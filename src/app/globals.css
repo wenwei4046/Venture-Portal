@@ -7159,3 +7159,57 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .page-search input:focus { border-color: #E99A53; }
 .page-search button { height: 34px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .page-search button:hover { background: rgb(247 247 245); }
+
+/* ─── Me (2026-10-17) ───
+   One's own attendance, leave, payslips, record and line — the Claude Design
+   handoff `design_handoff_staff_app` (Staff App v2), in the HR theme, on Me's
+   root (`[data-me]`, components/me). Its own colours, value for value: the
+   hub's tiles (Vivid, in order — Attendance, Leave, Payslip, Profile,
+   Hierarchy, Submit request, Documents, My team; Submit request's three
+   glyphs wear the first three), Correct a punch's quota card, the leave
+   cards (Ledger, one per tab), the hierarchy's level tones, the camera and
+   the letter page. */
+[data-me] {
+  --me-tile-1-bg: #FFE3CC; --me-tile-1: #E0661F;
+  --me-tile-2-bg: #DCE8FB; --me-tile-2: #2F64C8;
+  --me-tile-3-bg: #D9F2E2; --me-tile-3: #1F8A4C;
+  --me-tile-4-bg: #ECE2FA; --me-tile-4: #6B44C2;
+  --me-tile-5-bg: #FBDDDD; --me-tile-5: #C23B3B;
+  --me-tile-6-bg: #D5F1F0; --me-tile-6: #11807B;
+  --me-tile-7-bg: #FBEFC9; --me-tile-7: #A87A00;
+  --me-tile-8-bg: #E6E1F7; --me-tile-8: #4F46B5;
+  --me-quota-ink: #1E3F7A;
+  --me-quota-open: rgb(47 100 200 / .22);
+  --me-ledger-1: #6E4A3A;
+  --me-ledger-2: #2A221D;
+  --me-ledger-3: #A9491F;
+  --me-ledger-4: #6B7A50;
+  --me-ledger-5: #8C7B6E;
+  --me-ledger-6: #8E6A50;
+  --me-ledger-7: #ECE6DD;
+  --me-ledger-ink: #3F2B22;
+  --me-ledger-fill: #A9491F;
+  --me-tone-principal: #ECE7E2; --me-tone-principal-edge: #DCD3CB; --me-tone-principal-av: #5A4A40;
+  --me-tone-head: #F2E8E0; --me-tone-head-edge: #E3D3C6; --me-tone-head-av: #8C6A55;
+  --me-tone-upline: #FAEADF; --me-tone-upline-edge: #EED3C1; --me-tone-upline-av: #C8754A;
+  --me-tone-ink: #3F2B22;
+  --me-cam: #0E0C0B;
+  --me-cam-frame: #1E1A17;
+  --me-cam-ok: rgb(120 190 140);
+  --me-cam-warn: rgb(255 214 170);
+  --me-letter-ink: #1a1a1a;
+  --me-letter-sub: #666;
+  --me-slate: rgb(230 237 241);
+  --me-slate-deep: rgb(78 101 116);
+  --me-ease: cubic-bezier(.2, .8, .2, 1);
+}
+[data-me] .me-scroll { scrollbar-width: none; }
+[data-me] .me-scroll::-webkit-scrollbar { display: none; }
+[data-me] .me-tile { transition: border-color .2s var(--me-ease); }
+[data-me] .me-tile:hover { border-color: var(--ds-accent) !important; }
+[data-me] .me-hover:hover { background: var(--ds-surface-2) !important; }
+@keyframes meSheetIn { from { transform: translateY(105%); } to { transform: translateY(0); } }
+@keyframes meFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-me] *, [data-me] *::before, [data-me] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

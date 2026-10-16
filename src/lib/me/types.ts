@@ -69,8 +69,13 @@ export interface MeToday {
   now: string
   mode: ClockMode | null
   day: ScheduleDay | null
+  /** What the day is: a whole day HR set as a work day wins over the schedule's row. */
+  dayType: 'work' | 'off' | 'rest'
+  /** The holiday or whole day off it is, by name. */
+  holiday: string | null
   grace: number | null
   onLeave: string | null
+  onLeaveName: string | null
   punches: MeTodayPunch[]
   noticeRead: boolean
 }
@@ -85,7 +90,10 @@ export interface MeTeam {
   punches: AttMonth['punches']
   marks: AttMonth['marks']
   leave: AttMonth['leave']
-  waiting: AttRequest[]
+  /** What waits at their upline step; a correction says its place in its month's quota. */
+  waiting: Array<AttRequest & { nth: number | null }>
+  /** Each of them's overtime this month, asked or approved, in hours. */
+  otHours: Record<string, number>
   ledger: AttLedger
 }
 
@@ -96,6 +104,8 @@ export interface OrgPerson {
   name: string
   title: string | null
   rank: number | null
+  /** The title's level by name ("Head of Department"). */
+  level: string | null
   departmentId: string | null
   department: string | null
   reportsTo: string | null

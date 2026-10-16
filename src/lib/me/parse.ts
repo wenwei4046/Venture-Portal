@@ -99,8 +99,11 @@ export function meTodayOf(raw: unknown): MeToday | null {
     now: str(d.now),
     mode: (strOrNull(d.mode) as MeToday['mode']) ?? null,
     day: d.day ? (d.day as MeToday['day']) : null,
+    dayType: d.dayType === 'off' || d.dayType === 'rest' ? d.dayType : 'work',
+    holiday: strOrNull(d.holiday),
     grace: numOrNull(d.grace),
     onLeave: strOrNull(d.onLeave),
+    onLeaveName: strOrNull(d.onLeaveName),
     punches: arr(d.punches),
     noticeRead: d.noticeRead === true,
   }
@@ -115,7 +118,8 @@ export function meTeamOf(raw: unknown): MeTeam {
     punches: arr(d.punches),
     marks: arr(d.marks),
     leave: arr(d.leave),
-    waiting: requestsOf(d.waiting),
+    waiting: requestsOf(d.waiting).map((r, i) => ({ ...r, nth: numOrNull(arr<Record<string, unknown>>(d.waiting)[i]?.nth) })),
+    otHours: Object.fromEntries(Object.entries(obj(d.otHours)).map(([k, v]) => [k, num(v)])),
     ledger: ledgerOf(d.ledger),
   }
 }
@@ -132,6 +136,7 @@ export function meOrgOf(raw: unknown): MeOrg {
       name: str(p.name),
       title: strOrNull(p.title),
       rank: numOrNull(p.rank),
+      level: strOrNull(p.level),
       departmentId: strOrNull(p.departmentId),
       department: strOrNull(p.department),
       reportsTo: strOrNull(p.reportsTo),

@@ -606,7 +606,7 @@ BEGIN
         UNION SELECT s.id FROM public.hr_staff_costs s WHERE v_dept IS NOT NULL AND s.department_id = v_dept AND s.status = 'active'
       )
       SELECT jsonb_agg(jsonb_build_object(
-               'id', s.id, 'name', s.employee_name, 'title', coalesce(t.name, s.designation), 'rank', l.rank,
+               'id', s.id, 'name', s.employee_name, 'title', coalesce(t.name, s.designation), 'rank', l.rank, 'level', l.name,
                'departmentId', s.department_id, 'department', d.name, 'reportsTo', s.reports_to,
                'inLine', s.id IN (SELECT id FROM line), 'status', public.att_status_on(s.id, v_today),
                'phone', nullif(btrim(s.contact_number), ''))
