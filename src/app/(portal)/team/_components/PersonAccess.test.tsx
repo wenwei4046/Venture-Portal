@@ -29,6 +29,7 @@ const access = (overrides: Partial<Extract<PersonAccessData, { kind: 'template' 
   boxes: [],
   legacy: [],
   reach: null,
+  ownSensitive: [],
   functions: [fn('revenue_app', 'Revenue app', 'view create', 'own')],
   cellKeys: [
     K('revenue_app', 'view', 'member_portal'), K('revenue_app', 'view', 'member_insight'), K('revenue_app', 'view', 'member_memos'),
@@ -58,7 +59,7 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [{ tab: 'rev.quote', action: 'create', granted: false }] })
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [{ tab: 'rev.quote', action: 'create', granted: false }] })
     expect(onSaved).toHaveBeenCalled()
   })
 
@@ -77,7 +78,7 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
     expect(screen.queryByLabelText('changed for this person')).toBeNull()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [] })
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [] })
   })
 
   // Their title moved to another template since: the ✕ stored for Quote's Create would still close
@@ -88,7 +89,7 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Anthony’s own boxes were saved over another template.')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [{ tab: 'rev.quote', action: 'create', granted: false }] })
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [{ tab: 'rev.quote', action: 'create', granted: false }] })
   })
 
   it('a person with own cells and no boxes yet is drawn from their cells', () => {
@@ -128,7 +129,7 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     expect(screen.getAllByLabelText('changed for this person')).toHaveLength(4)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(mocks.setPersonTabs).toHaveBeenCalledWith({
-      userId: USER, templateId: 't',
+      userId: USER, templateId: 't', sensitive: [],
       boxes: ['rev.quote', 'rev.requests', 'rev.rooms', 'rev.track'].sort().map(tab => ({ tab, action: 'create', granted: false })),
     })
   })
@@ -179,7 +180,7 @@ describe('a person’s sub-departments on the Revenue tabs', () => {
     expect(box('Profile · My leads & appointments · IR')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getAllByLabelText('changed for this person')).toHaveLength(2)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [], reach: [{ area: 'crm', sub: IR, granted: true }] })
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], reach: [{ area: 'crm', sub: IR, granted: true }] })
   })
 
   it('Reset to title takes his own sub-departments away too', async () => {
@@ -188,11 +189,44 @@ describe('a person’s sub-departments on the Revenue tabs', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
     expect(box('CRM · Team · IR')).toHaveAttribute('aria-checked', 'false')
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [], reach: [] })
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], reach: [] })
   })
 
   it('is read-only without accounts.manage', () => {
     render(<PersonAccess access={kris()} canEdit={false} />)
     expect(box('CRM · Team · IR')).toBeDisabled()
+  })
+})
+
+// A person's own Salary / NRIC / Bank (2026-10-16 — the owner: "Edit Permission 的优先级是高于 Title 和 Template 的"):
+// three pills above the matrix, ticked where they see it, the red dot where it is theirs alone.
+describe('a person’s own sensitive fields', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.setPersonTabs.mockResolvedValue({ ok: true })
+  })
+
+  it('shows the template’s, and gives Salary to one person — saved with the boxes', async () => {
+    render(<PersonAccess access={access()} canEdit />)
+    expect(box('Sensitive fields · Salary amounts')).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(box('Sensitive fields · Salary amounts'))
+    expect(box('Sensitive fields · Salary amounts')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(1)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [{ field: 'salary', granted: true }], boxes: [] })
+  })
+
+  it('their own tick is drawn over the template’s, and Reset to title takes it away', async () => {
+    render(<PersonAccess access={access({ ownSensitive: [{ field: 'bank', granted: true }] })} canEdit />)
+    expect(box('Sensitive fields · Bank accounts')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
+    expect(box('Sensitive fields · Bank accounts')).toHaveAttribute('aria-checked', 'false')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [] })
+  })
+
+  it('is read-only without accounts.manage', () => {
+    render(<PersonAccess access={access()} canEdit={false} />)
+    expect(box('Sensitive fields · NRIC / IC')).toBeDisabled()
   })
 })

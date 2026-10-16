@@ -21,6 +21,8 @@ import {
   type TabView,
 } from '@/lib/permission-tabs'
 import { sameReachTicks, toggleReach, type ReachTick } from '@/lib/sub-department-reach'
+import { sameSensitiveTicks, sensitiveOf, toggleSensitive, type SensitiveTick } from '@/lib/person-sensitive'
+import { SENSITIVE_FIELDS } from '@/lib/permission-matrix'
 import type { PersonAccessData } from '../_lib/person-permissions'
 import PersonPermissions from './PersonPermissions'
 import TabMatrix from './TabMatrix'
@@ -96,16 +98,21 @@ function TemplateAccess({
   const [reachDraft, setReachDraft] = useState<ReachTick[] | null>(null)
   const savedReach = access.reach?.ticks ?? []
   const reachTicks = reachDraft ?? savedReach
+  // Their own Salary / NRIC / Bank over the template's (2026-10-16): what they see, and what a ticked tab opens.
+  const [sensDraft, setSensDraft] = useState<SensitiveTick[] | null>(null)
+  const sensTicks = sensDraft ?? access.ownSensitive
+  const sensitive = useMemo(() => sensitiveOf(access.template.sensitive, sensTicks), [access.template.sensitive, sensTicks])
   const [view, setView] = useState<TabView>(() => TAB_VIEWS.find(v => viewCount(v.id, saved).seen > 0)?.id ?? 'hr')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const changes = boxesOf(base, ticks).length + reachTicks.length
+  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length
   const reachDirty = reachDraft !== null && !sameReachTicks(reachDraft, savedReach)
-  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty
+  const sensDirty = sensDraft !== null && !sameSensitiveTicks(sensDraft, access.ownSensitive)
+  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty
   const who = personName?.trim() || 'this person'
-  // Their title's sensitive fields and kind decide what a ticked tab opens, as for the template.
-  const held = useMemo(() => heldTabs(ticks, access.template.sensitive, access.template.baseRole, access.cellKeys), [ticks, access])
+  // Their sensitive fields (the template's with their own over them) and the kind decide what a ticked tab opens.
+  const held = useMemo(() => heldTabs(ticks, sensitive, access.template.baseRole, access.cellKeys), [ticks, sensitive, access])
 
   function save(boxes: PersonBox[]) {
     if (pending) return
@@ -116,10 +123,12 @@ function TemplateAccess({
         templateId: access.template.id,
         boxes,
         ...(access.reach ? { reach: reachTicks } : {}),
+        sensitive: sensTicks,
       })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
       setReachDraft(null)
+      setSensDraft(null)
       onSaved?.()
       router.refresh()
     })
@@ -138,7 +147,7 @@ function TemplateAccess({
   const actions = canEdit ? (
     <span className={s.footActions}>
       {changes > 0 ? (
-        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]) }}>Reset to title</button>
+        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]) }}>Reset to title</button>
       ) : null}
       <button type="button" className={s.footSave} disabled={!dirty || pending} onClick={() => save(boxesOf(base, ticks))}>
         {pending ? 'Saving…' : 'Save'}
@@ -161,6 +170,23 @@ function TemplateAccess({
           {canEdit ? <button type="button" className={s.all} disabled={pending} onClick={clearLegacy}>Clear them</button> : null}
         </p>
       ) : null}
+      {/* Their own Salary / NRIC / Bank (2026-10-16): ticked where they see it, the red dot where it is theirs alone. */}
+      <div className={s.sensRow} role="group" aria-label="Sensitive fields">
+        <span className={s.sensHead}>Sensitive fields</span>
+        <span className={s.subs}>
+          {SENSITIVE_FIELDS.map(f => {
+            const on = sensitive.includes(f.key)
+            return (
+              <button key={f.key} type="button" role="checkbox" aria-checked={on} aria-label={`Sensitive fields · ${f.label}`} disabled={!canEdit}
+                className={`${s.sub} ${on ? s.subOn : ''}`} onClick={() => setSensDraft(toggleSensitive(access.template.sensitive, sensTicks, f.key))}>
+                <span className={s.subTick} aria-hidden>{on ? '✓' : ''}</span>
+                {f.label}
+                {sensTicks.some(t => t.field === f.key) ? <span className={s.dot} aria-label="changed for this person" /> : null}
+              </button>
+            )
+          })}
+        </span>
+      </div>
       <TabMatrix
         ticks={ticks}
         base={base}

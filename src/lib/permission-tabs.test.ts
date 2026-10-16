@@ -307,8 +307,9 @@ describe('Select all, the New template window and the boxes that open nothing ye
     // The ledgers want a treasury tab's View.
     expect(held(['fin.invoice.view'], [])).toEqual({ 'fin.invoice': 'Not open yet — it needs the View of a treasury tab too (Payments, Receipt, Fund IN …)' })
     expect(held(['fin.invoice.view', 'fin.payments.view'], [])).toEqual({})
-    // The Principal's own pages want a full-access template.
-    expect(held(['pri.settings.view'], [])).toEqual({ 'pri.settings': 'Does not open — only a full-access template opens it' })
+    // The Principal's own pages open for a tick, whatever the template's kind (2026-10-16, mig 20261016190000:
+    // no key waits for the kind — the owner: "Edit Permission 的优先级是高于 Title 和 Template 的").
+    expect(held(['pri.settings.view'], [])).toEqual({})
     expect(held(['pri.settings.view'], [], 'principal')).toEqual({})
     // A Revenue app account opens no portal page — said before the salary, which would not help.
     expect(held(['hr.payroll.view', 'rev.today.view'], [], 'revenue_member')).toEqual({ 'hr.payroll': 'Does not open — a Revenue app account opens only the Revenue app' })
