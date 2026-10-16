@@ -207,15 +207,15 @@ export function EditProfileDialog({
   )
 }
 
-const EMAIL_ACTIONS: RequestEmailActions = { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange }
-
 /**
  * Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their own
  * request; HR approves it on Attendance › Requests, which moves the sign-in too): the email they sign in with, their
  * latest request — waiting, with Withdraw; declined, with HR's words; done — and the new email.
  */
 export function RequestEmailDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const f = useRequestEmail(EMAIL_ACTIONS, open)
+  // The portal's own actions (the hook keeps the last ones handed in, so a new object each render reads once).
+  const actions: RequestEmailActions = { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange }
+  const f = useRequestEmail(actions, open)
   const W = EMAIL_WORDS
   const current = f.mine?.email ?? ''
   const st = f.state

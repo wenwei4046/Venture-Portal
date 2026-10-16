@@ -389,3 +389,45 @@ describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
     vi.restoreAllMocks()
   })
 })
+
+// Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their own
+// request, beside Change password; HR approves it): More offers it on Change password's terms.
+describe('the HR app’s Request to change email', () => {
+  const mine = { email: 'nurul@x.my', latest: null }
+  const requestEmail = {
+    load: vi.fn(async () => mine),
+    send: vi.fn(async (email: string) => ({ ok: true as const, mine: { email: 'nurul@x.my', latest: { id: 'r1', ref: 'PF-2610-007', status: 'pending' as const, to: email.trim().toLowerCase(), from: 'nurul@x.my', at: null, decidedAt: null, note: null } } })),
+    withdraw: vi.fn(async () => ({ ok: true as const, mine })),
+  }
+  function openMore(over: Partial<HrAppData>) {
+    render(<HrApp data={{ ...data, ...over }} actions={{ ...actions, changePassword: vi.fn(), requestEmail }} />)
+    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+  }
+
+  it('is in More for a personal login only, never while viewing as somebody', () => {
+    openMore({ personalLogin: true })
+    expect(screen.getByRole('button', { name: /Request to change email/ })).toBeInTheDocument()
+    cleanup()
+    openMore({})
+    expect(screen.queryByRole('button', { name: /Request to change email/ })).toBeNull()
+    cleanup()
+    openMore({ personalLogin: true, viewingAs: 'Nurul Huda' })
+    expect(screen.queryByRole('button', { name: /Request to change email/ })).toBeNull()
+  })
+
+  it('reads the email they sign in with, then sends the new one and shows it waiting for HR', async () => {
+    openMore({ personalLogin: true })
+    fireEvent.click(screen.getByRole('button', { name: /Request to change email/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Request to change email' })
+    await waitFor(() => expect(within(sheet).getByText('nurul@x.my')).toBeInTheDocument())
+    fireEvent.change(within(sheet).getByLabelText('New email'), { target: { value: 'nurul@x' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Send to HR' }))
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('Enter an email address like name@houzs.my.')
+    fireEvent.change(within(sheet).getByLabelText('New email'), { target: { value: 'Nurul.New@Mail.com' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Send to HR' }))
+    await waitFor(() => expect(within(sheet).getByText('Waiting for HR')).toBeInTheDocument())
+    expect(requestEmail.send).toHaveBeenCalledWith('Nurul.New@Mail.com')
+    expect(within(sheet).getByText('PF-2610-007')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Withdraw' })).toBeInTheDocument()
+  })
+})
