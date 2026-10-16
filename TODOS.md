@@ -24,6 +24,18 @@ pills (`.claude/rules/portal-wide/permissions.md` › SUB-DEPARTMENTS PER PERSON
 - **Others' lists in the CRM** (`crm_role_of`) still read the structure: an IR
   salesperson held back from IR is out of the CRM but still assignable.
 
+## Asked — the account's KIND (2026-10-16)
+
+A person's own ticks now win over the template, Salary / NRIC / Bank too, and
+no key waits for the kind (`.claude/rules/portal-wide/permissions.md` › A
+PERSON'S OWN EDITS WIN). Still the kind's (the template's `base_role`), and put
+to the owner: which app an account lands in (a Revenue app account opens only
+the Revenue app, whatever portal tab is ticked for it), approving one's own
+request, reopening a Total-Closed payroll month, View as a person refusing a
+Revenue app account. If they should follow ticks: a per-person kind, or a cell
+each (Approvals · self-approve, Payroll · reopen), and the landing app from the
+views ticked.
+
 ## Owed — Revenue Director (2026-09-11)
 
 - **The CEO above the directors.** The user: "Revenue Director 上面就是

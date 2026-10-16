@@ -1305,6 +1305,7 @@ The dense kit for lists of short strings, never money. It now serves the payroll
   - **Not open yet** (v3.53) says, under a ticked tab, why its page still won't open.
 - **The person window's matrix:** a red dot on a changed box. *Reset to title* and *Save* sit in the footer, and the foot reads *Unsaved changes to X* while there are edits. A reader gets no foot.
   - **Sub-departments** (v4.69): under a Revenue tab whose View is ticked — Comm Cal, Sales Groups, Rules, *Profile · My leads & appointments*, *CRM · Team* (the CRM's two are one setting) — a pill per sub-department: 11px, a 12px tick square inside, fully rounded; peach inside the accent edge where they reach it, white where not; the red dot where it was changed for them alone. Saved with the boxes; *Reset to title* clears them. The template matrix draws none.
+  - **Sensitive fields** (v4.71): above the matrix, *Sensitive fields* in 10.5px caps and three pills — Salary amounts, NRIC / IC, Bank accounts — drawn as the sub-department pills: ticked where they see it (the template's, their own over it), the red dot where it is theirs alone. The not-open notes read these fields, not the template's.
 
 ### Permission matrix (2026-10-08 — People Management › Permissions, the invite drawer, a person's card)
 
@@ -1599,6 +1600,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.71** · 2026-10-16 · A person's permission window: their own Salary amounts / NRIC / Bank accounts as three pills above the matrix, over the template's — the red dot where it is theirs alone → Permissions by view and tab
 - **v4.70** · 2026-10-16 · Request to change email: a login's email changes only by their own request — the Revenue app's Profile, the HR app's More and the Finance app's Profile, under Change password; their sign-in email, the latest request (waiting with Withdraw, declined with HR's words, approved) and the new one; HR approves it on Attendance › Requests, which moves the sign-in → Request to change email
 - **v4.69** · 2026-10-16 · A person's permission window: a pill per sub-department under the Revenue tabs (Comm Cal, Sales Groups, Rules, the CRM's two) — ticked where they reach it, the red dot where it is theirs alone → Permissions by view and tab
 - **v4.68** · 2026-10-16 · The CRM's Team Profile (the Control panel's) looks like the Revenue app's Profile too, as Mine's since v4.64: the glow behind a white card on a white page, a 56px avatar, Inter Tight on the avatar, the name and *Your workspace*, facts and rows at 650, *View as a team member* as the app's View as entry, rows ruled between in `--rv-rule`, the app's chevron and count → The Revenue app — the refresh
