@@ -272,7 +272,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [reqError, setReqError] = useState<string | null>(null);
   const [trackSeg, setTrackSeg] = useState<TrackSegment>("waiting");
   const [memoTab, setMemoTab] = useState<MemoTab>("all");
-  const [memoPick, setMemoPick] = useState<string | null>(null);
+  // A tapped memo's notice (`?memo=<id>`, below) picks it in the first drawing.
+  const [memoPick, setMemoPick] = useState<string | null>(() => new URLSearchParams(startSearch).get("memo"));
   const [memoBusy, setMemoBusy] = useState(false);
   const [memoError, setMemoError] = useState<string | null>(null);
   const [memoRead, setMemoRead] = useState<ReadonlySet<string>>(() => new Set());
@@ -889,18 +890,26 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       }
     });
   }, [source]);
-  // A tapped push about a memo opens it (`/member?memo=…`, lib/push/notices noticeUrl): its page, the memo, once.
+  // A tapped push about a memo opens it (`/member?page=account&view=memos&memo=…`, lib/push/notices noticeUrl): its page
+  // and the memo, from the app's first drawing (2026-10-17) — the page from the address (`readRoute`, which reads an older
+  // notice's bare `?memo=` as that page too), the memo as `memoPick`'s first value, shown once its list has it. Opened by an
+  // effect here, both waited for the app's first reads (4.8 s with one held, production). Here the address keeps the page
+  // and drops the memo — through the history's own state, so Next's router does not put back the address it last knew.
+  const memoFromAddress = useRef(memoPick);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    const id = q.get("memo");
-    if (!id) return;
+    if (!q.has("memo")) return;
     q.delete("memo");
-    window.history.replaceState(null, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
-    goScreen("account", { pf: "memos" });
-    if (memos.some(m => m.id === id)) openMemo(id);
-    // Only on opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!q.get("page")) { q.set("page", "account"); q.set("view", "memos"); }
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${q}`);
   }, []);
+  // …and it is read once it is on the screen: opening one is reading it, as a tap on the list does.
+  const memoOnScreen = memoPick && memos.some(m => m.id === memoPick) ? memoPick : null;
+  useEffect(() => {
+    if (!memoOnScreen || memoOnScreen !== memoFromAddress.current) return;
+    memoFromAddress.current = null;
+    openMemo(memoOnScreen);
+  }, [memoOnScreen, openMemo]);
   const ackMemo = useCallback(async () => {
     if (!memoPick || memoReadOnly) return;
     setMemoBusy(true); setMemoError(null);
@@ -1145,7 +1154,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen || pwOpen || emailOpen);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPickVM !== null || pfDateOpen || schemeOpen || pwOpen || emailOpen);
   // Change password: the login is a person's own (the layout hands the action only then), and it is their own Profile —
   // not a member viewed, not the demo.
   const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
@@ -1438,7 +1447,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
               <RoomViewSheet {...rooms.view} />
             </>
           )}
-          {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}
+          {route.pf === "memos" && <MemoSheet open={memoPickVM !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}
             onFile={memoPick && source.memoFile && !fxp ? mode => openMemoFile(memoPick, mode) : undefined} />}
           {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
           {!route.pf && ownPassword && <PasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} change={ownPassword} />}
