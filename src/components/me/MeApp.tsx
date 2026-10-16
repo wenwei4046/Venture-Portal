@@ -13,6 +13,7 @@ import { teamRows, waitItems, type WaitItem } from '@/lib/me/org'
 import { changedFields, formOf, pendingProfile, type ProfileForm } from '@/lib/me/profile'
 import { uploadOwn } from '@/lib/me/read'
 import { punchToast, todayCard } from '@/lib/me/today'
+import { officeToday } from '@/lib/office-time'
 import type { MePayslip, OrgPerson } from '@/lib/me/types'
 import { AttendanceScreen } from './AttendanceScreen'
 import { Camera, type Shot } from './Camera'
@@ -129,7 +130,7 @@ export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startPunch, data])
 
-  const card = todayCard(s.today, nowSec)
+  const card = todayCard(s.today, nowSec, officeToday())
   const person = data?.me ?? null
   const name = person?.name ?? s.record?.name ?? ''
   const reports = data?.reports ?? 0
@@ -162,7 +163,7 @@ export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source
     })
     if (!r.ok) { flash(r.reason); return false }
     setCam(null)
-    flash(punchToast(dir, nowSec, shot.place.short, s.today))
+    flash(punchToast(dir, nowSec, shot.place.short, s.today, officeToday()))
     refresh()
     return true
   }

@@ -757,3 +757,5 @@ GRANT EXECUTE ON FUNCTION public.att_my_org() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.my_record() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.my_payslips() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.att_punch_notice_ack() TO authenticated, service_role;
+
+NOTIFY pgrst, 'reload schema';

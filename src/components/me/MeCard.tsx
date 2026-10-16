@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ds/Button'
 import { hm } from '@/lib/me/format'
 import { todayCard } from '@/lib/me/today'
+import { officeToday } from '@/lib/office-time'
 import { NUM } from './kit'
 import { MeOverlay } from './MeOverlay'
 import { useClock, useMe } from './useMe'
@@ -19,7 +20,7 @@ export function MeCard({ backLabel = 'Profile' }: { backLabel?: string }) {
   const [open, setOpen] = useState(false)
   const [punch, setPunch] = useState<'in' | 'out' | null>(null)
   const nowSec = useClock(me.s.today?.now, me.s.todayAt)
-  const card = todayCard(me.s.today, nowSec)
+  const card = todayCard(me.s.today, nowSec, officeToday())
   if (!card) return null
   const enter = (p: 'in' | 'out' | null) => { setPunch(p); setOpen(true) }
   return (

@@ -8,7 +8,7 @@ import { deptTiers, lineTiers, teamRows, waitItems } from './org'
 import { openMonth, slipLines, slipNote, slipSub } from './pay'
 import { changedFields, formOf, pendingBanner } from './profile'
 import { correctionNth, deciders, goesTo, leaveRouteLine, meStatus, requestAmount, requestTitle, requestWhen, routeFor, trailOf } from './requests'
-import { metres, placeOf, punchToast, streetOf, todayCard, topLabel } from './today'
+import { earlyOutWarning, metres, placeOf, punchToast, streetOf, todayCard, topLabel } from './today'
 import { docRows } from './docs'
 import type { MeData, MeOrg, MePayslip, MeTeam, MeToday, OrgPerson } from './types'
 
@@ -77,7 +77,17 @@ describe('the Today card', () => {
     expect(todayCard(done, secOf('18:10'))).toMatchObject({ chip: 'Done', line: 'IN 08:57 · OUT 18:03', punch: null })
   })
   it('past midnight, before the cutover, the work day is still yesterday’s', () => {
-    expect(todayCard(today({ punches: [{ dir: 'in', time: '20:00', inside: true, source: 'app' }] }), secOf('01:30'))?.line).toBe('IN 20:00 · worked 5 h 30 m')
+    const late = today({ workDay: '2026-10-14', punches: [{ dir: 'in', time: '20:00', inside: true, source: 'app' }] })
+    expect(todayCard(late, secOf('01:30'))?.line).toBe('IN 20:00 · worked 5 h 30 m')
+    expect(todayCard(late, secOf('01:30'), '2026-10-15')?.line).toBe('IN 20:00 · worked 5 h 30 m')
+    // 00:30 on the 15th is 24:30 of the 14th: past its 18:00 end (no early out), long past its 09:00 start.
+    const atWork = today({ workDay: '2026-10-14', punches: [{ dir: 'in', time: '08:57', inside: true, source: 'app' }] })
+    expect(earlyOutWarning('out', secOf('00:30'), atWork, '2026-10-15')).toBeNull()
+    expect(earlyOutWarning('out', secOf('00:30'), atWork, '2026-10-14')).toBe('Before 18:00 — this records an early out.')
+    expect(punchToast('out', secOf('00:30'), 'HQ', atWork, '2026-10-15')).toBe('OUT 00:30 · HQ · on time')
+    expect(todayCard(today({ workDay: '2026-10-14' }), secOf('00:30'), '2026-10-15')).toMatchObject({ chip: 'Late', line: 'Not in · 930 min past 09:00' })
+    // After the cutover the work day is the calendar's: no shift.
+    expect(todayCard(today({ workDay: '2026-10-15' }), secOf('08:57'), '2026-10-15')).toMatchObject({ chip: 'Work day', line: 'Not in yet · starts 09:00' })
   })
   it('a day with nothing to punch says what it is', () => {
     expect(todayCard(today({ mode: null }), 0)).toMatchObject({ chip: 'Not clocking', punch: null })

@@ -18,9 +18,17 @@ export interface TodayCard {
   out: string | null
 }
 
+/**
+ * Past midnight, before the policy's cutover, the work day is still yesterday's: its clock runs on past 24:00
+ * (02:30 is 26:30 of the work day). `calendarDay` is the office's date now.
+ */
+export const workClock = (t: Pick<MeToday, 'workDay'> | null, nowSec: number, calendarDay?: string) =>
+  t && calendarDay && t.workDay && t.workDay < calendarDay ? nowSec + 86400 : nowSec
+
 /** The card at `nowSec` (seconds of the office's day, the server's clock). Null: no People record — no Me. */
-export function todayCard(t: MeToday | null, nowSec: number): TodayCard | null {
+export function todayCard(t: MeToday | null, clockSec: number, calendarDay?: string): TodayCard | null {
   if (!t || !t.me) return null
+  const nowSec = workClock(t, clockSec, calendarDay)
   const ins = t.punches.filter(p => p.dir === 'in')
   const outs = t.punches.filter(p => p.dir === 'out')
   const first = ins[0]?.time ?? null
@@ -128,18 +136,20 @@ export function placeOf(pos: Position, locations: readonly AttLocation[], assign
 }
 
 /** The toast a punch leaves: "IN 08:57 · HQ · on time", "IN 09:12 · HQ · late 12 min", "OUT 17:40 · HQ · early out". */
-export function punchToast(dir: 'in' | 'out', nowSec: number, place: string, t: MeToday | null): string {
+export function punchToast(dir: 'in' | 'out', clockSec: number, place: string, t: MeToday | null, calendarDay?: string): string {
+  const nowSec = workClock(t, clockSec, calendarDay)
   const work = t?.day?.type === 'work' && t.dayType === 'work' && !t.holiday
   const start = work ? t?.day?.start ?? null : null
   const end = work ? t?.day?.end ?? null : null
   let status = 'on time'
   if (dir === 'in' && start && nowSec - secOf(start) > (t?.grace ?? 5) * 60) status = `late ${Math.floor((nowSec - secOf(start)) / 60)} min`
   if (dir === 'out' && end && nowSec < secOf(end)) status = 'early out'
-  return `${dir.toUpperCase()} ${hm(nowSec)} · ${place} · ${status}`
+  return `${dir.toUpperCase()} ${hm(clockSec)} · ${place} · ${status}`
 }
 
 /** Clocking out before the schedule's end: the camera's warning line. */
-export function earlyOutWarning(dir: 'in' | 'out', nowSec: number, t: MeToday | null): string | null {
+export function earlyOutWarning(dir: 'in' | 'out', clockSec: number, t: MeToday | null, calendarDay?: string): string | null {
+  const nowSec = workClock(t, clockSec, calendarDay)
   const end = t?.day?.type === 'work' && t.dayType === 'work' && !t.holiday ? t.day.end ?? null : null
   return dir === 'out' && end && nowSec < secOf(end) ? `Before ${end} — this records an early out.` : null
 }

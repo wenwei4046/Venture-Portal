@@ -5,6 +5,7 @@ import { TextField } from '@/components/ds/Field'
 import { assignmentFor, policyOn } from '@/lib/attendance/engine'
 import { hms } from '@/lib/me/format'
 import { earlyOutWarning, placeOf, type Place, type Position } from '@/lib/me/today'
+import { officeToday } from '@/lib/office-time'
 import type { MeData, MeToday } from '@/lib/me/types'
 import { useEscape } from '@/components/hrv/overlay'
 
@@ -66,7 +67,7 @@ export function Camera({ dir, data, today, nowSec, phone, computer, onClose, onS
   const assignment = me ? assignmentFor(me, data.workDay, data.assignments) : null
   const policy = policyOn(data.workDay, data.policies)
   const place = placeOf(pos, data.locations, assignment, policy)
-  const warn = earlyOutWarning(dir, nowSec, today)
+  const warn = earlyOutWarning(dir, nowSec, today, officeToday())
   const needPhoto = !!policy?.photoRequired
   const wantsReason = place.needReason && !reason.trim()
   const off = saving || wantsReason || place.refused || (needPhoto && !camOk)

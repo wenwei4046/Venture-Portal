@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '@/components/hrv/overlay'
 import { topLabel, todayCard } from '@/lib/me/today'
+import { officeToday } from '@/lib/office-time'
 import { Avatar } from './kit'
 import { MeApp } from './MeApp'
 import { useClock, useMe } from './useMe'
@@ -20,7 +21,7 @@ export function MeDesktop({ hostLabel }: { hostLabel: string }) {
   const [shown, setShown] = useState(false)
   const [mounted, setMounted] = useState(false)
   const nowSec = useClock(me.s.today?.now, me.s.todayAt)
-  const card = todayCard(me.s.today, nowSec)
+  const card = todayCard(me.s.today, nowSec, officeToday())
   useEscape(open, () => setOpen(false))
   useEffect(() => {
     if (open) {
