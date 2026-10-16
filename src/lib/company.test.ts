@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { COMPANY_NAME, COMPANY_REG_NO } from './company'
+import { COMPANY_ADDRESS, COMPANY_NAME, COMPANY_REG_NO } from './company'
 
 // The company's full name is HOUZS Venture Holding Sdn Bhd (2026-10-16, the
 // user: "holding, without s is correct", then "改成 这个houzs venture holding
@@ -49,10 +49,17 @@ describe('the company’s name', () => {
   })
 
   // 2026-10-16 — the user: "202501008262 (1609676-A)"; the letterhead printed a made-up number before.
-  it('has its real registration number on the statement’s letterhead, and the placeholder is gone', () => {
+  it('has its real registration number and address on the statement’s letterhead, and the placeholders are gone', () => {
     expect(COMPANY_REG_NO).toBe('202501008262 (1609676-A)')
-    expect(readFileSync(resolve(ROOT, 'src/app/(paper)/statements/[id]/print/page.tsx'), 'utf8')).toContain('Registration No. {COMPANY_REG_NO}')
-    const placeholder = sources(resolve(ROOT, 'src')).filter(path => /202401000000|1234567-X/.test(readFileSync(path, 'utf8')))
+    // The user's address, in the letterhead's capitals, two lines.
+    expect(COMPANY_ADDRESS).toEqual([
+      'E-28-02 and E-28-03, E-28-03A, Menara Suezcap 2, KL Gateway',
+      'No. 2, Jalan Kerinchi, Gerbang Kerinchi Lestari, 59200 Kuala Lumpur, W.P. Kuala Lumpur',
+    ])
+    const letterhead = readFileSync(resolve(ROOT, 'src/app/(paper)/statements/[id]/print/page.tsx'), 'utf8')
+    expect(letterhead).toContain('Registration No. {COMPANY_REG_NO}')
+    expect(letterhead).toContain('COMPANY_ADDRESS.map(')
+    const placeholder = sources(resolve(ROOT, 'src')).filter(path => /202401000000|1234567-X|Menara HOUZS/.test(readFileSync(path, 'utf8')))
     expect(placeholder.map(where)).toEqual([])
   })
 

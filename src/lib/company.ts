@@ -17,3 +17,15 @@ export const COMPANY_NAME = 'HOUZS Venture Holding Sdn Bhd'
  * on the monthly statement's letterhead, which printed a placeholder until then.
  */
 export const COMPANY_REG_NO = '202501008262 (1609676-A)'
+
+/**
+ * Its address, as the letterhead prints it — two lines, the letterhead's
+ * capitals (2026-10-16, the user: "E-28-02 AND E-28-03,E-28-03A, MENARA
+ * SUEZCAP 2, KL GATEWAY, NO. 2, JALAN KERINCHI, GERBANG KERINCHI LESTARI,
+ * 59200 KUALA LUMPUR, W.P KUALA LUMPUR"); the statement printed a made-up one
+ * until then.
+ */
+export const COMPANY_ADDRESS: readonly string[] = [
+  'E-28-02 and E-28-03, E-28-03A, Menara Suezcap 2, KL Gateway',
+  'No. 2, Jalan Kerinchi, Gerbang Kerinchi Lestari, 59200 Kuala Lumpur, W.P. Kuala Lumpur',
+]
