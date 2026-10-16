@@ -100,6 +100,10 @@
 .app textarea[data-draft] { scrollbar-width: none; }
 /* A message bubble: an up / down drag scrolls the chat, a sideways one is ours: swipe right to reply (shared/msg-menu.tsx, 2026-10-14). */
 .app [data-msg] { touch-action: pan-y; }
+/* The composer stands on the chat's wall colour, a soft edge above it (the owner, 2026-10-16, a long orange bubble running
+   under the floating bar: "處理一下下方的部分"): a message scrolled under the bar is hidden by it, not seen through it, and
+   your orange bubble never meets the orange mic. The Attach card floats above the stack, outside this background. */
+.app [data-composer] { background: linear-gradient(rgba(239, 231, 222, 0), #EFE7DE 14px); }
 /* The message a reply quotes, inside your own orange bubble (2026-10-15): white on a lighter band, not rust on rust. */
 .app [data-mine] [style*="border-left"] { background: rgba(255, 255, 255, .18) !important; border-left-color: #fff !important; }
 .app [data-mine] [style*="border-left"] > * { color: #fff !important; }
