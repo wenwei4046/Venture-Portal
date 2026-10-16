@@ -31,8 +31,12 @@ vi.mock('@/app/(portal)/payments/actions', () => ({
 vi.mock('@/app/(portal)/payments/_components/CreatePaymentDialog', () => ({
   default: ({ open }: { open: boolean }) => (open ? <div data-testid="create-payment">Create payment sheet</div> : null),
 }))
-vi.mock('@/app/(portal)/receipts/_components/CreateReceiptDialog', () => ({ default: () => null }))
-vi.mock('@/app/(portal)/receipts/_components/LoanRepaymentDialog', () => ({ default: () => null }))
+vi.mock('@/app/(portal)/receipts/_components/CreateReceiptDialog', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div data-testid="create-receipt">Create receipt sheet</div> : null),
+}))
+vi.mock('@/app/(portal)/receipts/_components/LoanRepaymentDialog', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div data-testid="loan-repayment">Loan repayment received sheet</div> : null),
+}))
 vi.mock('@/app/(portal)/payments/_components/AmendDateButton', () => ({ default: () => null }))
 vi.mock('@/app/(portal)/payments/[id]/_components/ReassignGlAccountButton', () => ({ default: () => null }))
 vi.mock('@/app/(portal)/payments/[id]/_components/CopyAsDraft', () => ({ CopyVoucherDialog: () => null }))
@@ -306,5 +310,57 @@ describe('Daily › Payment on the phone', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Payment' }))
     expect(screen.getByTestId('create-payment')).toBeInTheDocument()
+  })
+})
+
+const RECEIVE: HubLedger = {
+  ...LEDGER,
+  receipts: true,
+  seesPayroll: false,
+  hero: { label: 'Total received · October 2026', amount: 52000 },
+  cards: [
+    { key: 'all', count: 1, other: 0, amount: 52000 },
+    { key: 'paid', count: 1, other: 0, amount: 52000 },
+    { key: 'voided', count: 0, other: 0, amount: 0 },
+  ],
+  rows: [row({ id: '0101', no: 'HV-OR-202610-0101', name: 'HOUZS Century', desc: 'Service fee Sep', amount: 52000 })],
+  batches: [],
+}
+
+const drawReceive = () =>
+  render(
+    <FinAppFrame platform="android" rows={['payments', 'receipts', 'invoices', 'billing']}>
+      <VoucherApp hub="receipts" search="" ledger={RECEIVE} record={null} refused={null} canCreate canExport prefix="HV-OR-202610" today="2026-10-16" />
+    </FinAppFrame>,
+  )
+
+describe('Daily › Receive on the phone', () => {
+  beforeEach(() => window.history.replaceState(null, '', '/fin-app/daily/receipts'))
+
+  it('the bar says Receipt and Repayment — one word each, as Payment’s (2026-10-16)', () => {
+    drawReceive()
+    expect(screen.getByRole('link', { name: 'Receive' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Receipt' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Repayment' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create receipt' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Loan repayment' })).toBeNull()
+  })
+
+  it('each opens the desktop’s own sheet — Create receipt, Loan repayment received', () => {
+    drawReceive()
+    fireEvent.click(screen.getByRole('button', { name: 'Receipt' }))
+    expect(screen.getByTestId('create-receipt')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Repayment' }))
+    expect(screen.getByTestId('loan-repayment')).toBeInTheDocument()
+    expect(screen.queryByTestId('create-receipt')).toBeNull()
+  })
+
+  it('All receipts carries Receipt in its bar', () => {
+    drawReceive()
+    fireEvent.click(screen.getByRole('button', { name: /^All receipts/ }))
+    expect(window.location.search).toBe('?f=all')
+    expect(screen.getByRole('heading', { name: 'All receipts' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Receipt' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Repayment' })).toBeNull()
   })
 })
