@@ -250,13 +250,14 @@ export function RequestEmailDialog({ open, onClose }: { open: boolean; onClose: 
           <Input id="fv-email-now" type="email" value={f.loading && !current ? '…' : current} readOnly disabled />
         </Field>
         {st ? (
-          <Hint>
+          <div className="flex flex-col items-start gap-1.5">
             <span className={`chip ${st.kind === 'waiting' ? 'alert' : st.kind === 'approved' ? 'ledger' : 'danger'}`}>
               {st.kind === 'waiting' ? W.waiting : st.kind === 'approved' ? W.approved : W.declined}
-            </span>{' '}
-            {st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}${st.kind === 'waiting' && st.ref ? ` · ${st.ref}` : ''}`}
-            {st.kind === 'declined' && st.note ? <> — “{st.note}”</> : null}
-          </Hint>
+            </span>
+            <span className="text-sm text-ink break-all">{st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}`}</span>
+            {st.kind === 'waiting' && st.ref ? <Hint>{st.ref}</Hint> : null}
+            {st.kind === 'declined' && st.note ? <Hint>“{st.note}”</Hint> : null}
+          </div>
         ) : null}
         {waiting ? null : (
           <Field label={W.next} htmlFor="fv-email-new">
