@@ -34,6 +34,8 @@ async function tap(el: Element | null) {
 }
 /** A page of the bottom bar, by its label. */
 const go = (label: string) => tap(screen.getAllByText(label, { exact: true }).find(e => e.closest("nav")) ?? null);
+/** Team's Insight, the page Team opens on, has the house alone (2026-10-16, the owner: the way back to the Revenue app there). */
+const onlyHouse = () => expect([!!swapToMine(), !!swapToTeam(), !!house(), !!bell()]).toEqual([false, false, true, false]);
 /** None of the three round buttons on the page. */
 const noButtons = () => expect([swapToMine(), swapToTeam(), house(), bell()]).toEqual([null, null, null, null]);
 
@@ -41,7 +43,7 @@ describe("the CRM's three round buttons, on the first page alone", () => {
   it("the Principal: Team's Inbox has them — two people, the house, the bell; a tap is Mine's Inbox, and back", async () => {
     await open("boss");
     expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
-    noButtons();
+    onlyHouse();
     await go("Inbox");
     const toMine = swapToMine()!;
     expect(iconOf(toMine)).toBe(TEAM_ICON);
@@ -63,7 +65,7 @@ describe("the CRM's three round buttons, on the first page alone", () => {
 
   it("Team's other pages have none of them, and no line under their title", async () => {
     await open("boss");
-    noButtons();
+    onlyHouse();
     await go("Inbox");
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     expect(screen.queryByText(/need attention/)).toBeNull();

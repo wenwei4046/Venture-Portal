@@ -55,6 +55,12 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </>)}
                 </span>
               </>)}
+              {!!(v.houseOv) && (<><span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", display: "grid", placeItems: "center", color: "#BD4A19", boxShadow: "0 2px 8px rgba(63,43,34,.06)", cursor: "pointer" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9">
+                  </path>
+                </svg>
+              </span></>)}
               <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.ov.meIni}</span>
             </div>
             <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "#806B60" }}>{v.ov.todayLabel} · {v.ov.meTitle} · {v.accessLbl}</span>
