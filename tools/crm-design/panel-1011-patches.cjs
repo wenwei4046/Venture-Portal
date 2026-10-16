@@ -140,7 +140,11 @@ module.exports = [
   // keeps the prototype's bell to it). Until then they were on Inbox, Assignment, Calendar and Profile's card too.
   // 2026-10-16 (the owner, circling Team | Mine and the house on Insight: "換到 Inbox 那頁"): the three moved to the Inbox's
   // title row, beside Contacts — where Mine keeps its own on its first page (vm/app.ts › bellIn).
-  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n', '</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  // 2026-10-16, later (the owner, circling the space left of the avatar on Team's Insight: "帮我把 inbox 标记处的小房子放到截图1
+  // 标记的地方"): the house is on Insight too — the page Team opens on — so the way back to the Revenue app is there at once.
+  ['<span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>',
+    '{!!(v.houseOv) && (<>' + switchBack("              ") + '</>)}\n              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>'],
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n','</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
   // …so Profile's card has no bell in its corner, and its name the whole row.
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
     '<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
