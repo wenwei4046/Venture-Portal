@@ -40,15 +40,16 @@ const onlyHouse = () => expect([!!swapToMine(), !!swapToTeam(), !!house(), !!bel
 const noButtons = () => expect([swapToMine(), swapToTeam(), house(), bell()]).toEqual([null, null, null, null]);
 
 describe("the CRM's three round buttons, on the first page alone", () => {
-  it("the Principal: Team's Inbox has them — two people, the house, the bell; a tap is Mine's Inbox, and back", async () => {
+  it("the Principal: Team's Inbox has two people, the bell, then Contacts — no house; a tap is Mine's Inbox, and back", async () => {
     await open("boss");
     expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
     onlyHouse();
     await go("Inbox");
     const toMine = swapToMine()!;
     expect(iconOf(toMine)).toBe(TEAM_ICON);
-    expect(house()!.previousElementSibling).toBe(toMine);
-    expect(bell()).not.toBeNull();
+    // 2026-10-16 (the owner: "人像，鈴鐺，contacts（小房子不需要）"): no house on Team's Inbox; the bell beside Team | Mine.
+    expect(house()).toBeNull();
+    expect(bell()!.previousElementSibling).toBe(toMine);
     // The old text segment is gone.
     expect(screen.queryByText("Mine", { exact: true })).toBeNull();
 
