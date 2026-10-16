@@ -21,9 +21,12 @@ import s from './fin-app.module.css'
 // Finance pages open this app, lib/one-app.ts): the views of the one app, as
 // the HR app's More has them — each opens where it lives.
 
-/** The views of the one app: the view, its name, where it opens, its icon. */
+/**
+ * The views of the one app: the view, its name, where it opens, its icon. The Principal's own view opens this
+ * app too since 2026-10-17 — with its Approvals tab.
+ */
 const VIEWS: ReadonlyArray<readonly [string, string, string, HrIconName]> = [
-  ['principal', 'Principal', 'The portal', 'home'],
+  ['principal', 'Principal', 'This app, with Approvals', 'home'],
   ['finance', 'Finance', 'This app', 'report'],
   ['hr', 'HR', 'The HR app', 'people'],
   ['revenue_member', 'Revenue team', 'The Revenue app', 'staff'],
@@ -44,6 +47,7 @@ export default function ProfileScreen({
   personal,
   admin,
   canSwitch = false,
+  view = 'finance',
 }: {
   name: string
   email: string
@@ -53,6 +57,8 @@ export default function ProfileScreen({
   admin: ProfileAdminRow[]
   /** The account may switch views (and is not viewing as a person). */
   canSwitch?: boolean
+  /** The view the app is open in: Finance's, or the Principal's own (2026-10-17). */
+  view?: 'finance' | 'principal'
 }) {
   const router = useRouter()
   const [win, setWin] = useState<'profile' | 'password' | 'email' | 'signout' | null>(null)
@@ -75,7 +81,9 @@ export default function ProfileScreen({
           </span>
           <span className={s.pText}>
             <span className={s.pName}>{name}</span>
-            <span className={s.pSub}>{email} · Finance view</span>
+            <span className={s.pSub}>
+              {email} · {view === 'principal' ? 'Principal view' : 'Finance view'}
+            </span>
           </span>
         </div>
 
@@ -157,10 +165,10 @@ export default function ProfileScreen({
               <span className={s.caps}>Switch view</span>
             </div>
             <div className={s.menu} aria-label="Switch view">
-              {VIEWS.map(([view, label, where, icon]) => {
-                const here = view === 'finance'
+              {VIEWS.map(([to, label, where, icon]) => {
+                const here = to === view
                 return (
-                  <button key={view} type="button" className={s.menuRow} disabled={here || switching} aria-current={here ? 'true' : undefined} onClick={() => switchTo(view)}>
+                  <button key={to} type="button" className={s.menuRow} disabled={here || switching} aria-current={here ? 'true' : undefined} onClick={() => switchTo(to)}>
                     <span className={`${s.menuIcon} ${s.walnut}`}>
                       <HrIcon name={icon} size={16} />
                     </span>
@@ -195,7 +203,7 @@ export default function ProfileScreen({
           <RequestEmailDialog open={win === 'email'} onClose={() => setWin(null)} />
         </>
       ) : null}
-      <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} />
+      <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} view={view === 'principal' ? 'the Principal view' : 'the Finance view'} />
     </>
   )
 }

@@ -15,16 +15,25 @@
 // to whoever holds it — first in Daily; Overdue, which the design lists under
 // Fund, stays gone (its page went the same day). Claims stood last in
 // Department until the user took it out (2026-10-15: "delete the claim tab") —
-// its page stays, the Principal's own sidebar still lists it.
+// its page stays.
+//
+// The Principal's own view wears this sidebar too (2026-10-17 — the user:
+// "take the same totally view with finance. no need show hr, cause can switch
+// view to hr"), with the few rows of its own the user placed (`principal`):
+// OPEX at Department's foot, and Access log and Settings in the account menu's
+// Admin. HR's pages are not here — HR's view is one switch away.
 
 import { opensPath } from '@/lib/page-tabs'
 import { statementDepts, statementPath } from '@/lib/dept-statements'
 import {
+  canAccessAuditLog,
   canAccessCategories,
   canAccessDeptPool,
   canAccessDeptReports,
   canAccessMeetingRooms,
+  canAccessOpex,
   canAccessReports,
+  canAccessSettings,
   canAccessTreasury,
   canAccessVenturePool,
   canApprove,
@@ -58,8 +67,14 @@ const link = (
   more: Partial<HrNavItem> = {},
 ): HrNavItem => ({ key, label, icon, href, visible, match, ...more })
 
+/** Whose sidebar it is: Finance's view, or the Principal's own view on a computer (its own rows added). */
+export interface FinNavOptions {
+  /** The Principal's own view (2026-10-17): OPEX at Department's foot; Access log and Settings in Admin. */
+  principal?: boolean
+}
+
 /** Finance's sections, with Dept Pool's departments from the registry (the five when none is handed in). */
-export function finNavSections(data: NavData): HrNavSection[] {
+export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSection[] {
   const depts = data.deptPoolDepts ?? statementDepts([])
   return [
     {
@@ -127,6 +142,8 @@ export function finNavSections(data: NavData): HrNavSection[] {
           ),
         ),
         link('venture-pool', 'Venture Pool', 'in', '/venture-pool', canAccessVenturePool),
+        // The Principal's own (2026-10-17, the user's pick): a department's payroll, any department.
+        ...(opts.principal ? [link('opex', 'OPEX', 'people', '/opex', canAccessOpex)] : []),
       ],
     },
   ]
@@ -148,8 +165,12 @@ export interface AccountMenuGroup {
   items: AccountMenuItem[]
 }
 
-/** The footer's menu (the design's D13): Account — a login of one's own only, as Change password —, then Admin. */
-export function finAccountMenu(): AccountMenuGroup[] {
+/**
+ * The footer's menu (the design's D13): Account — a login of one's own only, as Change password —, then Admin.
+ * The Principal's own view adds Access log and Settings to Admin (2026-10-17, the user's pick: "Audit Log ·
+ * Access log · Departments · Meeting Rooms · Settings") — Settings opens on Treasury, its strip reaching the rest.
+ */
+export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
   return [
     {
       title: 'Account',
@@ -162,9 +183,15 @@ export function finAccountMenu(): AccountMenuGroup[] {
       title: 'Admin',
       items: [
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', visible: canSeeAuditChanges },
+        ...(opts.principal
+          ? [{ key: 'access', label: 'Access log', icon: 'shield', href: '/audit-log/access', visible: canAccessAuditLog } satisfies AccountMenuItem]
+          : []),
         // Settings › Departments is Finance's (the Chart of Account's tab).
         { key: 'depts', label: 'Departments', icon: 'org', href: '/settings?tab=departments', permissionTabs: ['fin.chart_of_account'], visible: canAccessCategories },
         { key: 'rooms', label: 'Meeting Rooms', icon: 'room', href: '/admin/rooms', visible: canAccessMeetingRooms },
+        ...(opts.principal
+          ? [{ key: 'settings', label: 'Settings', icon: 'bank', href: '/settings', permissionTabs: ['pri.settings'], visible: canAccessSettings } satisfies AccountMenuItem]
+          : []),
       ],
     },
   ]
@@ -180,16 +207,22 @@ export function visibleAccountMenu(groups: AccountMenuGroup[], viewer: NavViewer
     .filter((g) => g.items.length > 0)
 }
 
-/** The page a menu row opens is the page being read (Departments on /settings?tab=departments). */
+/**
+ * The page a menu row opens is the page being read (Departments on /settings?tab=departments). The closest
+ * row wins: Access log on /audit-log/access, Departments over the Principal's Settings on its own tab.
+ */
 export function accountMenuActive(groups: AccountMenuGroup[], pathname: string, search?: URLSearchParams | null): string | null {
+  let best: { key: string; score: number } | null = null
   for (const g of groups) {
     for (const i of g.items) {
       if (!i.href) continue
       const [path, query] = i.href.split('?')
       if (!under(pathname, path)) continue
       const tab = query ? new URLSearchParams(query).get('tab') : null
-      if (tab === null || search?.get('tab') === tab) return i.key
+      if (tab !== null && search?.get('tab') !== tab) continue
+      const score = path.length * 2 + (tab === null ? 0 : 1)
+      if (!best || score > best.score) best = { key: i.key, score }
     }
   }
-  return null
+  return best?.key ?? null
 }

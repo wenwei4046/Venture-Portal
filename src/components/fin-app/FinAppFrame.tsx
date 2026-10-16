@@ -15,7 +15,8 @@ import s from './fin-app.module.css'
 
 // The Finance phone app's frame (2026-10-15, the Finance revamp v2's phone —
 // README §1, `Finance Mobile App.dc.html`): the screen the phone shows, the
-// five tabs at its foot, the toast. A screen says what stands over its foot
+// five tabs at its foot (six for the Principal's own view since 2026-10-17 —
+// Approvals after the Overview), the toast. A screen says what stands over its foot
 // (`useChrome`): the tab bar only on a tab's root, sliding away when a screen
 // is pushed over it (and on the Overview while reading down), the action bar
 // over the tab bar, the toast over both. Each tab remembers its last top tab.
@@ -30,6 +31,8 @@ interface FrameCtx {
   platform: FinPlatform
   /** The sidebar rows this reader sees (fin-nav.ts keys). */
   rows: ReadonlySet<string>
+  /** Whose app it is: Finance's view, or the Principal's own (2026-10-17) — a tab root's kicker says it. */
+  view: 'finance' | 'principal'
   setChrome: (c: Chrome) => void
 }
 
@@ -73,18 +76,34 @@ function lastHub(tab: 'daily' | 'fund' | 'report', open: HubKey[]): HubKey | nul
 
 const TABS: ReadonlyArray<{ key: AppTab; label: string; icon: HrIconName }> = [
   { key: 'home', label: 'Overview', icon: 'home' },
+  // The Principal's own view's (2026-10-17 — the user: "just add on then tab for approval tab").
+  { key: 'approvals', label: 'Approvals', icon: 'approve' },
   { key: 'daily', label: 'Daily', icon: 'calendar' },
   { key: 'fund', label: 'Fund', icon: 'payroll' },
   { key: 'report', label: 'Report', icon: 'report' },
   { key: 'profile', label: 'Profile', icon: 'staff' },
 ]
 
-/** A screen pushed over its tab — a list, a record (`?f=`, `?id=`), a page of its own — has no tab bar. */
+/** A screen pushed over its tab — a list, a record (`?f=`, `?id=`), a combined approval (`?g=`), a page of its own — has no tab bar. */
 export function isRootScreen(pathname: string, search: Pick<URLSearchParams, 'has'>): boolean {
-  return !pathname.startsWith('/fin-app/page/') && !search.has('f') && !search.has('id')
+  return !pathname.startsWith('/fin-app/page/') && !search.has('f') && !search.has('id') && !search.has('g')
 }
 
-export default function FinAppFrame({ platform, rows, children }: { platform: FinPlatform; rows: string[]; children: ReactNode }) {
+export default function FinAppFrame({
+  platform,
+  rows,
+  view = 'finance',
+  approvals = null,
+  children,
+}: {
+  platform: FinPlatform
+  rows: string[]
+  /** The Principal's own view opens this app too (2026-10-17). */
+  view?: 'finance' | 'principal'
+  /** The Principal's own view (2026-10-17): an Approvals tab, its badge what waits for their decision. */
+  approvals?: { waiting: number } | null
+  children: ReactNode
+}) {
   const pathname = usePathname() ?? '/fin-app'
   const search = useSearchParams()
   const router = useRouter()
@@ -94,7 +113,7 @@ export default function FinAppFrame({ platform, rows, children }: { platform: Fi
   const setChrome = useCallback((c: Chrome) => {
     setChromeState((prev) => (prev.root === c.root && prev.bar === c.bar && prev.bulk === c.bulk ? prev : c))
   }, [])
-  const ctx = useMemo(() => ({ platform, rows: rowSet, setChrome }), [platform, rowSet, setChrome])
+  const ctx = useMemo(() => ({ platform, rows: rowSet, view, setChrome }), [platform, rowSet, view, setChrome])
   const surface = useMemo(() => ({ platform }), [platform])
 
   // The browser's own Back (a phone's back gesture) is a pop, whichever screen hears it first.
@@ -114,6 +133,7 @@ export default function FinAppFrame({ platform, rows, children }: { platform: Fi
   const tabHref = (t: AppTab): string | null => {
     if (t === 'home') return '/fin-app'
     if (t === 'profile') return '/fin-app/profile'
+    if (t === 'approvals') return approvals ? '/fin-app/approvals' : null
     const open = hubsOf(t)
     if (open.length === 0) return null
     return HUB_HREF[open[0]]
@@ -186,6 +206,11 @@ export default function FinAppFrame({ platform, rows, children }: { platform: Fi
                 >
                   <span className={s.tabPill}>
                     <HrIcon name={t.icon} size={platform === 'ios' ? 22 : 19} />
+                    {t.key === 'approvals' && approvals && approvals.waiting > 0 ? (
+                      <span className={s.tabBadge} aria-label={`${approvals.waiting} waiting`}>
+                        {approvals.waiting > 99 ? '99+' : approvals.waiting}
+                      </span>
+                    ) : null}
                   </span>
                   <span className={s.tabLabel}>{t.label}</span>
                 </Link>

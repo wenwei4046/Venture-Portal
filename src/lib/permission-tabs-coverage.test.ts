@@ -83,6 +83,28 @@ describe('every tab of every view is in People › Permissions', () => {
     expect(bad).toEqual([])
   })
 
+  it('the Principal’s own rows on Finance’s sidebar (2026-10-17): each opens from a tab of the Principal view', () => {
+    const finance = new Set([
+      ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }).flatMap(section => section.items).map(i => i.key),
+      ...finAccountMenu().flatMap(group => group.items).map(i => i.key),
+    ])
+    const items = [
+      ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }, { principal: true }).flatMap(section => section.items),
+      ...finAccountMenu({ principal: true }).flatMap(group => group.items).filter(item => item.href !== undefined),
+    ].filter(item => !finance.has(item.key))
+    expect(items.map(i => i.key).sort()).toEqual(['access', 'opex', 'settings'])
+    const bad = items.flatMap(item => {
+      const href = item.href as string
+      const route = known(href)
+      if (route === 'open') return []
+      if (route === null) return [`${item.label} (${href}): no page in PAGE_TABS`]
+      const own = item.permissionTabs
+      const opens = own ? own.some(t => t.startsWith('pri.')) : TABS[route].some(t => t.startsWith('pri.'))
+      return opens ? [] : [`${item.label} (${href}): no Principal view tab opens it`]
+    })
+    expect(bad).toEqual([])
+  })
+
   it('the portal’s sidebar: every link lands on a page the registry knows', () => {
     const entries = buildNavEntries({
       revenueSubDepts: [{ slug: 'fair', name: 'Fair' }],

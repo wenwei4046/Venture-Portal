@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { officeTime, officeToday } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
-import { onFinanceView } from '@/lib/finance-view'
+import { isPrincipalView, onFinanceView } from '@/lib/finance-view'
 import { REVENUE_SUB_COOKIE } from '@/lib/hr-view'
 import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
@@ -14,6 +14,7 @@ import { listSubDepartments } from '../revenue/_lib/sub-departments'
 import FinanceOverview from './_components/FinanceOverview'
 import HrOverview from './_components/HrOverview'
 import { loadFinanceOverviewCounts } from './_lib/finance-overview'
+import { loadPrincipalOverview } from './_lib/principal-overview'
 import { loadHrOverview } from './_lib/hr-overview'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -168,11 +169,16 @@ export default async function DashboardPage() {
 
   // Finance's view opens on its own Overview (2026-10-14, the Finance revamp
   // v2 — D01): the greeting, what waits, the quick actions, the categories.
-  // The Principal's own view keeps the treasury dashboard below.
+  // The Principal's own view too since 2026-10-17 (the user: "the same totally
+  // view with finance"), with what waits for its decision and a row of the
+  // treasury's figures (`loadPrincipalOverview`); the treasury dashboard below
+  // is left to whoever reads the treasury off Finance's view.
   if (overview === 'treasury' && onFinanceView(user)) {
     const navData: NavData = { revenueSubDepts: [], ...(readsDeptStatements(user) ? { deptPoolDepts: statementDepts(primedRegistryRows()) } : {}) }
+    const principalRead = isPrincipalView(user) ? startRead(loadPrincipalOverview(supabase as unknown as SupabaseClient, user)) : null
     const counts = await loadFinanceOverviewCounts(supabase as unknown as SupabaseClient, user)
-    return <FinanceOverview user={user} navData={navData} counts={counts} />
+    const principal = principalRead ? await principalRead : null
+    return <FinanceOverview user={user} navData={navData} counts={counts} principal={principal} />
   }
   // HR's Overview (2026-10-14, the same handoff's H01): Finance's layout for HR's view.
   if (overview === 'hr') {

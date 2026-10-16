@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth'
+import { isPrincipalView } from '@/lib/finance-view'
 import { loadMyProfile } from '@/lib/account/actions'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { primedRegistryRows } from '@/lib/dept-registry'
@@ -34,7 +35,8 @@ export default async function FinAppProfile() {
 
   return (
     <ProfileScreen
-      name={profile?.name ?? user.name ?? 'Finance'}
+      view={isPrincipalView(user) ? 'principal' : 'finance'}
+      name={profile?.name ?? user.name ?? (isPrincipalView(user) ? 'Principal' : 'Finance')}
       email={profile?.email ?? user.email ?? ''}
       phone={profile?.phone ?? ''}
       personal={personal}

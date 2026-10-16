@@ -1,5 +1,5 @@
 import { isHrView } from '@/lib/hr-view'
-import { isFinanceShell } from '@/lib/finance-view'
+import { isFinanceShell, type ShellViewer } from '@/lib/finance-view'
 import { can, type PermissionHolder } from '@/lib/permissions'
 
 /**
@@ -13,8 +13,10 @@ import { can, type PermissionHolder } from '@/lib/permissions'
  * - Finance's view on a PHONE (2026-10-16): the Finance app (`/fin-app`) —
  *   every Finance page is an app screen, the user: "我不要再用那种 portal 的
  *   手机版了，把它全部转成 native app";
- * - everybody else: the portal. The Principal's phone face comes later, into
- *   this same app.
+ * - the Principal's own view on a PHONE (2026-10-17): the Finance app too, with
+ *   an Approvals tab of its own — the user: "the mobile use the same view with
+ *   finance app … just add on then tab for approval tab";
+ * - everybody else: the portal.
  * A view switcher moves the Principal between them all (setViewAs).
  */
 
@@ -40,10 +42,11 @@ export function opensHrAppOnPhone(user: (PermissionHolder & { role: string }) | 
 
 /**
  * Somebody the Finance app (`/fin-app`, 2026-10-15 — the Finance revamp v2's
- * phone) opens for: Finance's view — the finance kind, or the Principal's
- * Finance lens (`isFinanceShell`). Its screens each ask the page they stand
- * for, as the portal's would.
+ * phone) opens for: whoever wears Finance's shell — the finance kind, the
+ * Principal's Finance lens, and the Principal's own view (2026-10-17,
+ * `isFinanceShell`). Its screens each ask the page they stand for, as the
+ * portal's would.
  */
-export function opensFinApp(user: { role: string } | null | undefined): boolean {
-  return !!user && isFinanceShell(user.role)
+export function opensFinApp(user: ShellViewer): boolean {
+  return isFinanceShell(user)
 }

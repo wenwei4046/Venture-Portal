@@ -32,6 +32,10 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['revenue.view:own'], text: 'canAccessRevenue(user) — the sidebar’s Revenue sub-departments (listSubDepartments)' },
   'src/components/layout/BottomTabBar.tsx#BottomTabBar':
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
+  // 2026-10-17 — the Principal's own view opens the Finance app with an Approvals tab: its badge is read only
+  // where the tab is drawn — the sidebar's Approvals row, `canApprove` and its page's tabs.
+  'src/app/(fin-app)/fin-app/layout.tsx#FinAppLayout':
+    { wants: ['approvals.view', ...APPROVE], text: 'hasApprovalsTab(user) — canApprove, the Principal’s Approvals tab badge' },
   'src/app/(portal)/payments/voucher-doc/route.tsx#readSubmissions':
     { wants: ['treasury.view'], text: 'can(user, treasury) — the voucher print’s approval requests, the treasury’s read only' },
   'src/lib/attendance/payroll-write.ts#payrollMarksFor':
@@ -77,7 +81,12 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
   // (loadFinanceOverviewCounts): the vouchers only for the treasury, the invoices and
   // this month's allocations only for Billing (canAccessTreasury / canAccessBilling).
   'src/app/(fin-app)/fin-app/page.tsx#FinAppOverview': {
-    'treasury.view': ['payment_vouchers'],
+    // …and, for the Principal's own view with the treasury (2026-10-17, loadPrincipalOverview), what waits for
+    // its decision and the treasury dashboard's summary (dashboard_summary — the desktop Overview's own reads).
+    'treasury.view': [
+      'payment_vouchers', 'approval_requests', 'bank_accounts', 'base_rate_history', 'dept_pools', 'fund_source_repayments', 'fund_sources',
+      'invoice_payout_pool', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'repayments', 'venture_pool',
+    ],
     'billing.view': ['alloc_txns', 'invoices'],
   },
 }

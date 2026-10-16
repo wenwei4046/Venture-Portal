@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { canDo } from '@/lib/permission-actions'
 import { officeClock } from '@/lib/office-clock'
+import { officeTime } from '@/lib/office-time'
+import { formatMoney } from '@/lib/utils'
 import { firstName } from '@/lib/finance-view'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { finNavSections } from '@/components/layout/fin-nav'
@@ -8,6 +10,7 @@ import { visibleHrNav, type HrNavTone } from '@/components/layout/hr-nav'
 import type { NavData } from '@/components/layout/nav-config'
 import type { User } from '@/types'
 import { financeSummary, type FinanceOverviewCounts } from '../_lib/finance-overview'
+import type { PrincipalFigures, PrincipalOverview } from '../_lib/principal-overview'
 import s from './overview.module.css'
 
 // The Finance view's Overview (2026-10-14, the Finance revamp v2 — D01 of
@@ -15,9 +18,17 @@ import s from './overview.module.css'
 // Create invoice, one line of what waits, eight quick actions with their
 // counts, then one card per category — the sidebar's, in its order, each row a
 // page this viewer opens.
+//
+// The Principal's own view opens on it too (2026-10-17, `principal`): its line
+// leads with what waits for its decision, Approvals is its first quick action,
+// and a row of the treasury's figures stands under the line (the user kept
+// them: "留一排金额卡") — each card opening its page.
+
+type QuickBadge = 'payments' | 'invoices' | 'billing' | 'approvals'
+type Quick = { key: string; label: string; icon: HrIconName; tone: HrNavTone; badge?: QuickBadge }
 
 /** The eight quick actions, in the design's order: the page each opens (by its sidebar row), its tone and icon — the phone app's Overview too. */
-export const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone: HrNavTone; badge?: 'payments' | 'invoices' | 'billing' }> = [
+export const QUICK: ReadonlyArray<Quick> = [
   { key: 'payments', label: 'Payment', icon: 'out', tone: 'clay', badge: 'payments' },
   { key: 'receipts', label: 'Receive', icon: 'in', tone: 'clay' },
   { key: 'invoices', label: 'Invoice', icon: 'invoice', tone: 'clay', badge: 'invoices' },
@@ -28,17 +39,53 @@ export const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName
   { key: 'ledger', label: 'Ledger', icon: 'doc', tone: 'slate' },
 ]
 
-export default function FinanceOverview({ user, navData, counts }: { user: User; navData: NavData; counts: FinanceOverviewCounts }) {
+/** The Principal's own view's (2026-10-17): Approvals first — the tab the user opens most — its badge what waits for them. */
+export const PRINCIPAL_QUICK: ReadonlyArray<Quick> = [{ key: 'approvals', label: 'Approvals', icon: 'approve', tone: 'clay', badge: 'approvals' }, ...QUICK]
+
+/** The figures' cards: the sidebar row each opens, its tone (the row's category) and icon. */
+function figureCards(f: PrincipalFigures, month: string): Array<{ key: string; row: string; label: string; icon: HrIconName; tone: HrNavTone; value: number; sub: string }> {
+  const bare = (n: number) => formatMoney(n).replace(/^RM /, '')
+  return [
+    { key: 'venture', row: 'venture-pool', label: 'Venture Pool', icon: 'bank', tone: 'gold', value: f.venturePool, sub: 'Live ledger' },
+    { key: 'pool', row: 'dp', label: 'Pool', icon: 'org', tone: 'gold', value: f.pool, sub: 'Dept pools + Venture Pool' },
+    { key: 'lent', row: 'fund-out', label: 'Lent out', icon: 'out', tone: 'olive', value: f.lentOut, sub: 'Loans outstanding' },
+    {
+      key: 'interest',
+      row: 'pnl',
+      label: `Interest · ${month}`,
+      icon: 'percent',
+      tone: 'slate',
+      value: f.interest.net,
+      sub: `In ${bare(f.interest.income)} · Out ${bare(f.interest.expense)}`,
+    },
+  ]
+}
+
+export default function FinanceOverview({
+  user,
+  navData,
+  counts,
+  principal = null,
+}: {
+  user: User
+  navData: NavData
+  counts: FinanceOverviewCounts
+  /** The Principal's own view (2026-10-17): what waits for its decision and the treasury's figures. */
+  principal?: PrincipalOverview | null
+}) {
   const clock = officeClock()
-  const sections = visibleHrNav(finNavSections(navData), user).filter((sec) => sec.label !== null)
+  const sections = visibleHrNav(finNavSections(navData, { principal: !!principal }), user).filter((sec) => sec.label !== null)
   const hrefOf = new Map(sections.flatMap((sec) => sec.items.map((i) => [i.key, i.href] as const)))
-  const badgeOf = {
+  const badgeOf: Record<QuickBadge, number> = {
     payments: (counts.pending ?? 0) + (counts.draft ?? 0),
     invoices: counts.outstanding ?? 0,
     billing: counts.toBill ?? 0,
+    approvals: principal?.waiting ?? 0,
   }
-  const summary = financeSummary(counts)
-  const name = firstName(user.name, 'Finance')
+  const summary = financeSummary(counts, principal ? { waiting: principal.waiting } : {})
+  const name = firstName(user.name, principal ? 'Principal' : 'Finance')
+  const quick = (principal ? PRINCIPAL_QUICK : QUICK).filter((q) => hrefOf.has(q.key))
+  const figures = principal?.figures ? figureCards(principal.figures, officeTime().format('MMM')).filter((c) => hrefOf.has(c.row)) : []
 
   return (
     <div className={s.root}>
@@ -68,12 +115,31 @@ export default function FinanceOverview({ user, navData, counts }: { user: User;
 
       {summary ? <p className={s.summary}>{summary}</p> : null}
 
+      {figures.length > 0 ? (
+        <div className={s.figs} aria-label="Treasury today">
+          {figures.map((c) => (
+            <Link key={c.key} href={hrefOf.get(c.row) as string} className={`${s.fig} ${s[c.tone]}`}>
+              <span className={s.figTop}>
+                <span className={s.figLabel}>{c.label}</span>
+                <span className={s.figIcon} aria-hidden="true">
+                  <HrIcon name={c.icon} size={14} />
+                </span>
+              </span>
+              <span className={s.figValue} data-neg={c.value < 0 ? 'true' : undefined}>
+                {formatMoney(c.value)}
+              </span>
+              <span className={s.figSub}>{c.sub}</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
       <div className={s.label}>
         <span className={s.labelText}>Quick actions</span>
         <span className={s.labelRule} aria-hidden="true" />
       </div>
-      <div className={s.quick}>
-        {QUICK.filter((q) => hrefOf.has(q.key)).map((q) => {
+      <div className={s.quick} data-count={quick.length}>
+        {quick.map((q) => {
           const badge = q.badge ? badgeOf[q.badge] : 0
           return (
             <Link key={q.key} href={hrefOf.get(q.key) as string} className={`${s.tile} ${s[q.tone]}`}>

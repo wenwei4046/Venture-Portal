@@ -53,6 +53,10 @@ describe('the Finance app (2026-10-15, the Finance revamp v2’s phone)', () => 
     expect(opensFinApp({ role: 'finance' })).toBe(true)
     for (const role of ['principal', 'hr', 'staff', 'dept_manager', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
     expect(opensFinApp(null)).toBe(false)
+    // The Principal's own view (2026-10-17): "the mobile use the same view with finance app … just add on then
+    // tab for approval tab" — for an account that may switch views.
+    expect(opensFinApp({ role: 'principal', permissions: ['view_switch'] })).toBe(true)
+    expect(opensFinApp({ role: 'hr', permissions: ['view_switch'] })).toBe(false)
   })
 })
 

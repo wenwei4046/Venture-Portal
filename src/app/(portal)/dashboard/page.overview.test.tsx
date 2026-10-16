@@ -164,10 +164,48 @@ describe("Finance's Overview (D01)", () => {
     expect(screen.queryByRole('link', { name: 'Create invoice' })).toBeNull()
   })
 
-  it('keeps the Principal’s own view on the treasury dashboard', async () => {
+  // 2026-10-17 — the user: "take the same totally view with finance", then kept "一排金额卡" when told the treasury
+  // dashboard's figures would go.
+  it('opens the Principal’s own view on it: what waits for their decision, the treasury’s figures, Approvals first', async () => {
+    TABLES.approval_requests = [
+      { id: 'a1', group_id: null, request_type: 'payment_voucher', submitted_by: 'f', status: 'pending' },
+      // A payroll batch: two vouchers, one request.
+      { id: 'a2', group_id: 'g1', request_type: 'payment_voucher', submitted_by: 'f', status: 'pending' },
+      { id: 'a3', group_id: 'g1', request_type: 'payment_voucher', submitted_by: 'f', status: 'pending' },
+    ]
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'p', name: 'Principal', role: 'principal', permissions: [...FINANCE, 'approvals', 'view_switch', 'opex'] }))
+    const { container } = render(await drawn())
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Good afternoon, Principal.')
+    expect(screen.getByText('2 requests waiting for your approval · 2 invoices outstanding · 2 allocations to bill.')).toBeInTheDocument()
+    // The four figures, each opening its page (the treasury dashboard's own summary).
+    const figs = screen.getByLabelText('Treasury today')
+    const card = (label: string) => within(figs).getByText(label).closest('a') as HTMLElement
+    expect(card('Venture Pool')).toHaveAttribute('href', '/venture-pool')
+    expect(card('Pool')).toHaveAttribute('href', '/dept-pool')
+    expect(within(card('Pool')).getByText('RM 250,000.00')).toBeInTheDocument()
+    expect(card('Lent out')).toHaveAttribute('href', '/fund-out')
+    expect(card('Interest · Oct')).toHaveAttribute('href', '/reports/monthly-pnl')
+    // Approvals first, badged with what waits for them; then Finance's eight.
+    const tiles = [...container.querySelectorAll('[class*="tileLabel"]')].map((t) => t.textContent)
+    expect(tiles).toEqual(['Approvals', 'Payment', 'Receive', 'Invoice', 'Billing', 'Daily Bank', 'Fund IN', 'Fund OUT', 'Ledger'])
+    expect(tile('Approvals')).toHaveAttribute('href', '/approvals')
+    expect(within(tile('Approvals')).getByText('2')).toBeInTheDocument()
+    // OPEX at Department's foot (the Principal's own row).
+    expect(screen.getAllByRole('link').some((a) => a.getAttribute('href') === '/opex')).toBe(true)
+  })
+
+  it('keeps a Principal kind that may not switch views on the treasury dashboard', async () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'p', name: 'Principal', role: 'principal', permissions: ['treasury', 'approvals', 'override'] }))
     render(await drawn())
     expect(screen.queryByText(/^Good afternoon, Principal\.$/)).toBeNull()
+    expect(screen.queryByLabelText('Treasury today')).toBeNull()
+  })
+
+  it('draws no figures and leads with the vouchers on Finance’s own view', async () => {
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', name: 'Aina Rahman', role: 'finance', permissions: FINANCE }))
+    render(await drawn())
+    expect(screen.queryByLabelText('Treasury today')).toBeNull()
+    expect(screen.getByText(/^2 vouchers waiting for approval/)).toBeInTheDocument()
   })
 })
 
