@@ -186,6 +186,31 @@
   gap: 10px;
 }
 .signOut { margin-top: 22px; height: 48px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); color: var(--rv-sub); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
+/* Settings (2026-10-16 — the user: Privacy, Account and Sign out "combine to one, name (settings)"): one section, the
+   eye's outline buttons, Notifications first and Sign out last — a little apart, no rule between. */
+.settings { display: flex; flex-direction: column; gap: 16px; padding: 22px 0 0; }
+.settings .signOut { margin-top: 6px; }
+/* Notifications: the eye's outline button, its words to the left and the switch to the right. */
+.setRow {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font-size: calc(15px * var(--rv-type));
+  font-weight: 550;
+}
+/* Waiting on the phone's answer; a row that cannot be switched keeps its words readable. */
+.setRow[data-busy] { opacity: .6; }
+.setText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.setSub { font-size: calc(12.5px * var(--rv-type)); font-weight: 450; line-height: 1.35; color: var(--rv-sub); }
+.setSubBad { color: var(--rv-err); }
 
 /* ── a page inside Profile: ‹ back, an optional period chip, the title ── */
 .page { padding: 10px 20px 32px; display: flex; flex-direction: column; gap: 20px; }

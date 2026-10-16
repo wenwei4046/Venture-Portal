@@ -228,7 +228,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
   const closedRows = useMemo<WorkKey[]>(() => (["income", "honours", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
   // My income closed (the user, 2026-10-11: "go with your recommendations for hidden amount"): Today's income card
-  // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Privacy, can show it.
+  // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Settings, can show it.
   const incomeShut = !shows(closed, "income");
   const requestKinds = useMemo(() => (["claim", "replacement", "waiting"] as const).filter(kind => sends(closed, requestPageOf(kind))), [closed]);
   const quoteSends = sends(closed, "quote");
@@ -1315,7 +1315,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else {
       // My leads & appointments carries the chats' unread messages, the same live count as Today's chat button (the owner,
       // 2026-10-14: "有任何消息，幫我出現 notification 在 revenue apps 的 my leads & appointment 中").
-      page = <ProfileMain vm={docs.unseen || crmUnread ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(crm && crmUnread ? { crm: crmUnread > 99 ? "99+" : String(crmUnread) } : {}) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!principal && !data.demo} actions={{
+      page = <ProfileMain vm={docs.unseen || crmUnread ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(crm && crmUnread ? { crm: crmUnread > 99 ? "99+" : String(crmUnread) } : {}) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!data.demo && !viewed} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,

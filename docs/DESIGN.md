@@ -564,6 +564,7 @@ Desktop is the primary target, but the whole portal works on a phone. `md` (768p
 #### Navigation
 
 - **Below `md` the sidebar rail is not rendered.** Navigation is `BottomTabBar` — four destinations per role plus **更多**, which opens `MoreSheet` with the full nav grouped as the sidebar groups it.
+- **On a phone `MoreSheet` ends with *Phone notifications*** (v4.73), above *Sign out*: a 28×16 switch, `bg-ds-accent` when on; a state the switch cannot answer for is its chip — *Add to Home Screen* (an iPhone outside the Home Screen app), *Blocked* — and *Make them pop up* follows on an Android phone once on. The first open asks *Turn on notifications?* in the apps' window (`PushAsk`). Never while viewing as a person, never on a computer (`components/pwa/PortalPushRow.tsx`, `PortalPushAsk.tsx`).
 - **`components/layout/nav-config.ts` holds the tabs** (`TABS_BY_ROLE`) and `navEntries`, so the sidebar, the tab bar and the sheet cannot drift. The Approvals tab carries a pending-count badge.
 - **The bar is 54px plus `var(--safe-bottom)`.** The root layout sets `viewportFit: 'cover'`.
 
@@ -1600,6 +1601,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.73** · 2026-10-16 · The portal on a phone: *Phone notifications* above *Sign out* in More (a switch; *Add to Home Screen* / *Blocked* as chips; *Make them pop up* on Android) and the first open's *Turn on notifications?* — the Principal's own view had no way to turn them on, so an iPhone was never asked → Responsive › Navigation
 - **v4.72** · 2026-10-16 · Finance's phone app: Receive's bar follows Payment's — *Receipt* · *Repayment*, not *Create receipt* · *Loan repayment* (two words left *Loan repayment* 6px each side on a 384px phone); the sheets they open and the desktop's buttons unchanged → Finance's view — the phone app
 - **v4.71** · 2026-10-16 · A person's permission window: their own Salary amounts / NRIC / Bank accounts as three pills above the matrix, over the template's — the red dot where it is theirs alone → Permissions by view and tab
 - **v4.70** · 2026-10-16 · Request to change email: a login's email changes only by their own request — the Revenue app's Profile, the HR app's More and the Finance app's Profile, under Change password; their sign-in email, the latest request (waiting with Withdraw, declined with HR's words, approved) and the new one; HR approves it on Attendance › Requests, which moves the sign-in → Request to change email
