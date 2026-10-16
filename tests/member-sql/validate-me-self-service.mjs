@@ -269,6 +269,20 @@ check(JSON.stringify(rec).includes('5142'), false, 'the full account number neve
 await as(SHARED_USER, [])
 check((await q(`select public.my_record() r`))[0].r, null, 'nothing for a login no People record names')
 
+// ── 9. One's photo ──────────────────────────────────────────────────────────
+await as(ANN_USER, [])
+await refuses(`select public.my_photo_set($1)`, [`profile/${ANN_USER}/p.jpg`], /was not filed/, 'a photo that is not filed is refused')
+await q(`insert into storage.objects (bucket_id, name) values ('attendance', $1), ('attendance', $2)`, [`profile/${ANN_USER}/p.jpg`, `profile/${DAN_USER}/d.jpg`])
+await refuses(`select public.my_photo_set($1)`, [`profile/${DAN_USER}/d.jpg`], /was not filed/, 'never another’s folder')
+await refuses(`select public.my_photo_set($1)`, [`punch/${ANN_USER}/a.jpg`], /was not filed/, 'only the profile folder')
+await q(`select public.my_photo_set($1)`, [`profile/${ANN_USER}/p.jpg`])
+check((await q(`select public.my_record() r`))[0].r.photo, `profile/${ANN_USER}/p.jpg`, 'her record names her photo')
+check((await q(`select photo_path from public.hr_staff_costs where id = $1`, [S.dan]))[0].photo_path, null, 'nobody else’s changed')
+check((await q(`select pg_get_expr(polwithcheck, polrelid) c from pg_policy where polname = 'attendance_files_upload'`))[0].c.includes('profile'), true,
+  'the bucket takes the profile folder, still one’s own only')
+await as(SHARED_USER, [])
+await refuses(`select public.my_photo_set($1)`, [`profile/${SHARED_USER}/s.jpg`], /staff record/, 'a login no People record names has no photo to set')
+
 // ── 5. my_payslips: paid ones, one's own ────────────────────────────────────
 const lastMonth = (await q(`select (date_trunc('month', $1::date) - interval '1 month')::date::text m`, [today]))[0].m
 const [paidRow, draftRow, eveRow] = (await q(`insert into public.hr_monthly_payroll (staff_id, period_month, basic_salary, gross, net, epf_ee, status) values
@@ -286,7 +300,7 @@ check(slips.map(p => [p.month, p.status, Number(p.net), p.bank, p.accountLast4])
 check(slips[0].paidOn, (await q(`select ($1::date + interval '1 month - 1 day')::date::text d`, [lastMonth]))[0].d, 'paid on the voucher’s date')
 
 // ── Who may call them ───────────────────────────────────────────────────────
-for (const fn of ['public.att_me(date)', 'public.att_me_today()', 'public.att_my_team()', 'public.att_my_org()', 'public.my_record()', 'public.my_payslips()', 'public.att_punch_notice_ack()'])
+for (const fn of ['public.att_me(date)', 'public.att_me_today()', 'public.att_my_team()', 'public.att_my_org()', 'public.my_record()', 'public.my_payslips()', 'public.att_punch_notice_ack()', 'public.my_photo_set(text)'])
   check((await q(`select has_function_privilege('anon', $1::regprocedure, 'EXECUTE') a, has_function_privilege('authenticated', $1::regprocedure, 'EXECUTE') b`, [fn]))[0],
     { a: false, b: true }, `${fn}: a sign-in, never the anon key`)
 check((await q(`select has_function_privilege('authenticated', 'public.att_status_on(uuid, date)'::regprocedure, 'EXECUTE') b`))[0].b, false,

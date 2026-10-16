@@ -30,6 +30,8 @@
 --    by default): who for, the days, the role and how many (1–6); and one's own corrections stop at the policy's
 --    "Corrections per month" for that month (HR's on behalf still may). att_route_for: 'MP' defaults to upline → HR.
 --    Both are PRODUCTION's bodies (md5 below, read 2026-10-17) with those swaps only.
+-- 9. hr_staff_costs.photo_path + my_photo_set(path) — the avatar's camera badge: a photo filed in one's own folder of
+--    the `attendance` bucket (profile/<login>/…, the upload policy now takes that folder too), named on one's record.
 -- 8. att_status_on(staff, day) — the status word, as lib/attendance/engine.ts reckons a day (HR's mark wins, then
 --    approved leave, then the first valid IN against the schedule's start and the policy's grace; outside a fence or
 --    from a computer counts as flagged). Called only by the functions above.
@@ -603,7 +605,7 @@ BEGIN
              'department', d.name, 'hireDate', s.hire_date, 'upline', up.employee_name,
              'phone', s.contact_number, 'email', s.email, 'address', s.address,
              'ecName', s.emergency_contact_name, 'ecPhone', s.emergency_contact_phone, 'ecRel', s.emergency_contact_relationship,
-             'bank', s.bank_name,
+             'bank', s.bank_name, 'photo', s.photo_path,
              'accountLast4', nullif(right(regexp_replace(coalesce(s.bank_account_no, ''), '\D', '', 'g'), 4), ''),
              'nric', CASE WHEN length(regexp_replace(coalesce(s.nric, ''), '\D', '', 'g')) >= 5
                           THEN left(regexp_replace(s.nric, '\D', '', 'g'), 1) || '•••••-••-' || right(regexp_replace(s.nric, '\D', '', 'g'), 4) END)
@@ -667,6 +669,40 @@ BEGIN
 END
 $fn$;
 
+-- ── 9. One's photo (the avatar's camera badge — "Profile photo updated") ─────
+-- Filed in one's own folder of the private `attendance` bucket (profile/<login>/…), named on one's People record.
+-- Read back by its person (the bucket's own-folder read) and by Attendance · View.
+
+ALTER TABLE public.hr_staff_costs ADD COLUMN IF NOT EXISTS photo_path text;
+ALTER TABLE public.hr_staff_costs DROP CONSTRAINT IF EXISTS hr_staff_costs_photo_path_check;
+ALTER TABLE public.hr_staff_costs ADD CONSTRAINT hr_staff_costs_photo_path_check
+  CHECK (photo_path IS NULL OR (length(photo_path) <= 300 AND photo_path LIKE 'profile/%'));
+GRANT SELECT (photo_path) ON public.hr_staff_costs TO authenticated;
+
+DROP POLICY IF EXISTS attendance_files_upload ON storage.objects;
+CREATE POLICY attendance_files_upload ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'attendance'
+    AND (storage.foldername(name))[1] IN ('punch', 'request', 'profile')
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text);
+
+CREATE OR REPLACE FUNCTION public.my_photo_set(p_path text)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  v_me uuid := public.att_my_staff_id();
+BEGIN
+  IF v_me IS NULL THEN RAISE EXCEPTION 'A photo needs a staff record linked to this login.' USING ERRCODE = '42501'; END IF;
+  IF p_path IS NULL OR NOT starts_with(p_path, 'profile/' || auth.uid()::text || '/') OR strpos(p_path, '..') > 0
+     OR NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id = 'attendance' AND o.name = p_path) THEN
+    RAISE EXCEPTION 'The photo was not filed — choose it again.' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.hr_staff_costs SET photo_path = p_path WHERE id = v_me;
+  RETURN jsonb_build_object('path', p_path);
+END
+$fn$;
+
 -- ── Who may call them ───────────────────────────────────────────────────────
 
 REVOKE ALL ON FUNCTION public.att_status_on(uuid, date) FROM PUBLIC, anon, authenticated;
@@ -681,6 +717,8 @@ REVOKE ALL ON FUNCTION public.att_my_org() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.my_record() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.my_payslips() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.att_punch_notice_ack() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.my_photo_set(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.my_photo_set(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.att_me(date) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.att_my_team() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.att_my_org() TO authenticated, service_role;
