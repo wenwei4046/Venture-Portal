@@ -59,7 +59,8 @@ export function notifsVM(ctx: PanelCtx) {
   const isRead = (n: PanelNotif) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
   const unread = all.filter(n => !isRead(n));
   // Unread | Read (rev 1011, as RS rev 1010 §6): the kind chips filter inside the chosen tab and count only that tab.
-  const rt = ui.nfR === "read" ? "read" : "unread", inTab = (n: PanelNotif) => rt === "read" ? isRead(n) : !isRead(n);
+  // All · Unread · Read, on All (the owner, 2026-10-16: "Notification 要有一個 all，看過的要能看回去").
+  const rt = ui.nfR ?? "all", inTab = (n: PanelNotif) => rt === "all" || (rt === "read" ? isRead(n) : !isRead(n));
   const list = all.filter(n => inTab(n) && (!f || n.kind === f));
   const T = day0(now);
   const dayOf = (iso: string) => { const d = day0(new Date(iso)); return d === T ? "Today" : d === T - DAY ? "Yesterday" : gb(new Date(iso), { weekday: "short", day: "numeric", month: "short" }); };
@@ -89,11 +90,11 @@ export function notifsVM(ctx: PanelCtx) {
       return { label, dot: on ? "#fff" : dot, n: all.filter(n => inTab(n) && (!k || n.kind === k)).length, bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2", pick: () => patch({ nfF: k }) };
     }),
     nfGroups: groups, nfEmpty: !list.length,
-    nfEmptyText: rt === "unread" ? "You're all caught up." : "Nothing read yet.",
-    nfTabs: ([["unread", "Unread", unread.length], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
+    nfEmptyText: rt === "unread" ? "You're all caught up." : rt === "read" ? "Nothing read yet." : "No notifications yet.",
+    nfTabs: ([["all", "All", 0], ["unread", "Unread", unread.length], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
       label, n: n ? String(n) : "", pick: () => patch({ nfR: k }),
       bg: rt === k ? "#fff" : "transparent", fg: rt === k ? "#3F2B22" : "#806B60", w: rt === k ? 650 : 500, sh: rt === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
     // Mark all read on Unread only.
-    readAllShow: rt === "unread",
+    readAllShow: rt !== "read",
   };
 }

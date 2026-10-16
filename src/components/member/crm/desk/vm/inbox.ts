@@ -162,7 +162,8 @@ export function alertsVM(ctx: DeskCtx) {
   const all = panelNotifs(pc);
   const isRead = (n: PanelNotif) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
   const unread = all.filter(n => !isRead(n)), read = all.filter(isRead);
-  const tab = ctx.ui.alR === "read" ? "read" : "unread", list = (tab === "read" ? read : unread).slice(0, 60);
+  // All · Unread · Read, on All (the owner, 2026-10-16: "Notification 要有一個 all，看過的要能看回去").
+  const tab = ctx.ui.alR ?? "all", list = (tab === "read" ? read : tab === "unread" ? unread : all).slice(0, 60);
   const today = new Date(now).toDateString();
   const when = (iso: string) => { const d = new Date(iso), t = d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
     return d.toDateString() === today ? t : `${d.toLocaleDateString("en-MY", { day: "numeric", month: "short" })}, ${t}`; };
@@ -184,9 +185,9 @@ export function alertsVM(ctx: DeskCtx) {
   return {
     alerts: rows, alertsUnread: unread.length,
     alertsP: { rows, tab,
-      tabs: ([["unread", "Unread", unread.length], ["read", "Read", read.length]] as const).map(([k, label, nn]) => ({ label: nn ? `${label} ${nn}` : label, on: tab === k, pick: () => patch({ alR: k }) })),
+      tabs: ([["all", "All", all.length], ["unread", "Unread", unread.length], ["read", "Read", read.length]] as const).map(([k, label, nn]) => ({ label: nn ? `${label} ${nn}` : label, on: tab === k, pick: () => patch({ alR: k }) })),
       markAll: unread.length ? () => act.readNotifs(unread.map(n => n.key), true) : null,
-      empty: tab === "read" ? "Nothing read yet" : "No unread alerts · you're all caught up" },
+      empty: tab === "read" ? "Nothing read yet" : tab === "unread" ? "No unread alerts · you're all caught up" : "No alerts yet" },
   };
 }
 

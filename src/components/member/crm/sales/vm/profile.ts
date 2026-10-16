@@ -35,7 +35,8 @@ export function profileVM(ctx: SalesCtx) {
     openSummary(s);
   };
   const unread = notifs.filter(n => !isRead(n)).length, nTab = ui.nTab;
-  const vis = notifs.filter(n => (nTab === "unread") === !isRead(n));
+  // All · Unread · Read, on All (the owner, 2026-10-16: "Notification 要有一個 all，看過的要能看回去").
+  const vis = notifs.filter(n => nTab === "all" || (nTab === "unread") === !isRead(n));
   const team = viewingOther ? [] : downlineOf(owner.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(Boolean);
   const K = { share: ["#BD4A19", "#FFF0E4", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"], move: ["#2F6FB5", "#E4EDF8", "M5 12h14m-5-5 5 5-5 5"] } as const;
 
@@ -66,13 +67,13 @@ export function profileVM(ctx: SalesCtx) {
     teamOpen: ui.teamOpen, openTeam: () => patch({ teamOpen: true }), closeTeam: () => patch({ teamOpen: false }),
     teamList: team.map(p => ({ name: p.name, title: titleOf(p), ini: ini(p.name), go: () => { set(u => ({ ...u, teamOpen: false, chat: null, tab: "inbox", filter: null })); embedded?.onSwitch?.(p.id); } })),
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
-    openNotif: () => patch({ profSub: "notif", nTab: "unread" }),
-    nTabs: ([["unread", "Unread", unread], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
+    openNotif: () => patch({ profSub: "notif", nTab: "all" }),
+    nTabs: ([["all", "All", 0], ["unread", "Unread", unread], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
       label, n: n || 0, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "#3F2B22" : "#806B60", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
     // Mark all as read: every update, never an invitation still to answer.
-    canMarkAll: nTab === "unread" && notifs.some(n => !n.pending && !isRead(n)),
+    canMarkAll: nTab !== "read" && notifs.some(n => !n.pending && !isRead(n)),
     markAll: () => act.readNotifs(notifs.filter(n => !n.pending && !isRead(n)).map(n => n.id), true),
-    nEmpty: !vis.length, nEmptyText: nTab === "unread" ? "You're all caught up." : "Nothing read yet.",
+    nEmpty: !vis.length, nEmptyText: nTab === "unread" ? "You're all caught up." : nTab === "read" ? "Nothing read yet." : "No notifications yet.",
     openAuto: () => patch({ profSub: "auto" }), openQuick: () => patch({ profSub: "quick" }),
     // Pending invitations stay as cards; once answered they move into Updates.
     hasInv: vis.some(n => n.pending),
