@@ -348,6 +348,19 @@ export function portalHrefOf(r: AppRecordRef): string {
   return `${base}/${encodeURIComponent(r.id)}`
 }
 
+/**
+ * Where a request leads on the computer, each to a page of its own (2026-10-17 — the Approvals drawer's ⋯ and the
+ * request's full page): the voucher, what raised it, the loan, the fund source.
+ */
+export function recordLinks(r: Pick<ApprovalRecordModel, 'voucher' | 'loan' | 'open'>): Array<{ key: string; label: string; href: string }> {
+  return [
+    ...(r.voucher ? [{ key: 'voucher', label: 'Open the voucher', href: `/payments/${r.voucher.id}` }] : []),
+    ...(r.voucher?.upstream ? [{ key: 'upstream', label: `Open the ${r.voucher.upstream.label.toLowerCase()}`, href: r.voucher.upstream.portalHref }] : []),
+    ...(r.loan ? [{ key: 'loan', label: 'Open the loan', href: portalHrefOf(r.loan.open) }] : []),
+    ...(r.open ? [{ key: 'open', label: r.open.hub === 'fund-in' ? 'Open the fund source' : r.open.hub === 'fund-out' ? 'Open the loan' : 'Open the voucher', href: portalHrefOf(r.open) }] : []),
+  ]
+}
+
 /** A portal page's address, in the app where it has a screen. */
 export function inApp(href: string): string {
   const m = /^\/(fund-out|fund-in)\/([^/?#]+)$/.exec(href)
