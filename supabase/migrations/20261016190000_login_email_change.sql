@@ -8,7 +8,7 @@
 -- a" — HR, on Attendance › Requests, where a profile change is already decided (mig 20261015200000).
 --
 -- 1. att_profile_changes — an email asked for is kept in lower case, and for somebody with a login it may not be
---    another login's, nor nothing at all (a login needs one).
+--    another login's (a portal account's, or any sign-in the auth server holds), nor nothing at all (a login needs one).
 -- 2. att_profile_apply — HR's last approval of a login's email writes their login row (`users.email`) too, and only
 --    once the login itself already signs in with it: the portal moves the login first (the auth server, at the press
 --    of Approve — src/lib/attendance/actions.ts › decideRequest), then decides. An approval that came any other way
@@ -81,8 +81,9 @@ BEGIN
       IF (v_rec ->> 'user_id') IS NOT NULL AND v_to IS NULL THEN
         RAISE EXCEPTION 'Their login needs an email — name the new one.' USING ERRCODE = '22023';
       END IF;
-      IF (v_rec ->> 'user_id') IS NOT NULL AND EXISTS (
-           SELECT 1 FROM public.users u WHERE lower(u.email) = v_to AND u.id <> (v_rec ->> 'user_id')::uuid) THEN
+      IF (v_rec ->> 'user_id') IS NOT NULL AND (
+           EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = v_to AND u.id <> (v_rec ->> 'user_id')::uuid)
+           OR EXISTS (SELECT 1 FROM auth.users a WHERE lower(a.email) = v_to AND a.id <> (v_rec ->> 'user_id')::uuid)) THEN
         RAISE EXCEPTION 'That email already belongs to another login.' USING ERRCODE = '22023';
       END IF;
     END IF;

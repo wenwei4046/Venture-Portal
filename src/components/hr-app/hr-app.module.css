@@ -248,6 +248,12 @@
 .pwForm { display: flex; flex-direction: column; gap: 12px; }
 .pwForm .formBtn:disabled { opacity: .6; }
 .pwShow { display: flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 13px; color: rgb(90 78 68); }
+/* More › Request to change email (2026-10-16, not in the handoff): the email they sign in with, then their latest request. */
+.emailNow { font-size: 15px; font-weight: 600; color: rgb(43 31 23); overflow-wrap: anywhere; }
+.emailCard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid rgb(229 222 212); border-radius: 14px; background: rgb(255 255 255); }
+.emailCardHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.emailRef { font-size: 12.5px; color: rgb(108 104 98); }
+.emailText { font-size: 13.5px; line-height: 1.45; color: rgb(43 31 23); overflow-wrap: anywhere; }
 .formBtn { height: 48px; border-radius: 14px; border: 1px solid; display: grid; place-items: center; font-weight: 700; }
 .bookWhen { font-size: 13.5px; color: rgb(90 78 68); margin-top: -6px; }
 .bookFacts { display: flex; flex-direction: column; }

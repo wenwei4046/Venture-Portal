@@ -37,6 +37,11 @@ export interface ProfileMainActions {
    * login of their own, never a shared one, never while viewing a member, never on the preview's demo.
    */
   changePassword?: () => void;
+  /**
+   * Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their
+   * own request): beside Change password, on the same terms.
+   */
+  changeEmail?: () => void;
 }
 
 const NO_ROWS: readonly WorkKey[] = [];
@@ -153,12 +158,19 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
           </section>
         ) : null}
         {/* Not in the prototype (2026-10-12): the login's own password, drawn as Privacy's button. */}
-        {actions.changePassword ? (
+        {actions.changePassword || actions.changeEmail ? (
           <section className={s.privacy} aria-label="Account">
             <h2 className={s.h2}>Account</h2>
-            <button className={s.hideBtn} onClick={actions.changePassword}>
-              Change password<Svg d={ICON.lock} size={20} sw={1.7} />
-            </button>
+            {actions.changePassword ? (
+              <button className={s.hideBtn} onClick={actions.changePassword}>
+                Change password<Svg d={ICON.lock} size={20} sw={1.7} />
+              </button>
+            ) : null}
+            {actions.changeEmail ? (
+              <button className={s.hideBtn} onClick={actions.changeEmail}>
+                Request to change email<Svg d={ICON.mail} size={20} sw={1.7} />
+              </button>
+            ) : null}
           </section>
         ) : null}
         <button className={s.signOut} onClick={actions.signOut}>Sign out</button>

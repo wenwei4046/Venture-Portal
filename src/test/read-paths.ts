@@ -317,6 +317,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'my_login_is_personal',
   // Edit profile (mig 20261014210000): the caller's own name, email and phone; the change asks a personal login first.
   'my_profile', 'update_my_profile',
+  // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
+  // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
+  'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',

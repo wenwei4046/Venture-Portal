@@ -113,6 +113,8 @@ check(await mine(), null, 'nothing asked yet')
 await refuses(`select public.request_my_email_change('not an email')`, [], /email address like/, 'an email is an email')
 await refuses(`select public.request_my_email_change('')`, [], /needs an email/, 'a login keeps an email')
 await refuses(`select public.request_my_email_change('DAN@x.my')`, [], /another login/, 'never another login’s, whatever its case')
+await q(`insert into auth.users (id, email) values ($1, 'signed.up@x.my')`, [id(9)])
+await refuses(`select public.request_my_email_change('signed.up@x.my')`, [], /another login/, 'nor a sign-in the auth server holds with no portal account')
 await refuses(`select public.request_my_email_change('ann@x.my')`, [], /already says that/, 'the same email is no change')
 const asked = (await q(`select public.request_my_email_change(' Ann.New@Mail.COM ') r`))[0].r
 check(/^PF-\d{4}-\d{3}$/.test(asked.ref), true, 'filed as a profile change, its own reference')

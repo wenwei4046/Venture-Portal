@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { moveBackUnlessApproved, moveLoginForApproval } from '@/lib/account/login-email'
 import { registerOf } from './engine'
 import { pushSoon } from '@/lib/push/outbox'
 import { ATT_BUCKET, previewOf, type FileLink, type RemindOutcome } from './files'
@@ -117,10 +118,23 @@ export async function createRequestOnBehalf(r: NewRequest) {
   }, 'The request could not be sent.')
 }
 
-/** Decide the waiting step (HR's, or the upline's on their behalf). */
+/**
+ * Decide the waiting step (HR's, or the upline's on their behalf). HR's last approval of a login's email
+ * (2026-10-16, Request to change email) moves the login first — the database writes the record only once the login
+ * signs in with the new email — and moves it back when the decision did not go through (lib/account/login-email.ts).
+ */
 export async function decideRequest(id: string, approve: boolean, note: string) {
   await requireActionOn('/attendance/requests', 'attendance', 'approve')
-  return call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+  const decide = () => call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+  if (!approve) return decide()
+  const move = await moveLoginForApproval(id)
+  if (move.kind === 'refused') return { ok: false as const, reason: move.reason }
+  const res = await decide()
+  if (!res.ok && move.kind === 'moved') {
+    const stuck = await moveBackUnlessApproved(move)
+    if (stuck) return { ok: false as const, reason: `${res.reason} ${stuck}` }
+  }
+  return res
 }
 
 // ── Leave balances ──────────────────────────────────────────────────────────

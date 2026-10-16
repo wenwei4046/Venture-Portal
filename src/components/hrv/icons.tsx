@@ -129,6 +129,13 @@ const NAV = {
     </>
   ),
   phone: <path d="M5 4h3.2l1.6 4.2-2 1.4a11 11 0 0 0 6.6 6.6l1.4-2 4.2 1.6V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z" />,
+  // Request to change email (2026-10-16): an envelope, Lucide's mail at the set's stroke.
+  mail: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.5 7 8.5 6.5L20.5 7" />
+    </>
+  ),
   buoy: (
     <>
       <circle cx="12" cy="12" r="9" />

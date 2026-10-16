@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
-import { ChangePasswordDialog, EditProfileDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { ChangePasswordDialog, EditProfileDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
@@ -12,7 +13,8 @@ import s from './fin-app.module.css'
 
 // The Finance app's Profile (2026-10-15, the Finance revamp v2's phone — M17,
 // M18): who is signed in, I. Account — Edit profile and Change password, a
-// login of one's own only, each its window rising as a sheet — II. Admin —
+// login of one's own only, each its window rising as a sheet (and, 2026-10-16,
+// Request to change email beside them, HR approving it) — II. Admin —
 // Audit Log, Departments, Meeting Rooms, the desktop's account menu's rows —
 // and Sign out, asked first. The windows are the desktop's own (AccountMenu).
 // For an account that may switch views (2026-10-16 — on a phone the portal's
@@ -53,7 +55,7 @@ export default function ProfileScreen({
   canSwitch?: boolean
 }) {
   const router = useRouter()
-  const [win, setWin] = useState<'profile' | 'password' | 'signout' | null>(null)
+  const [win, setWin] = useState<'profile' | 'password' | 'email' | 'signout' | null>(null)
   const [switching, startSwitch] = useTransition()
   const switchTo = (view: string) => {
     const form = new FormData()
@@ -102,6 +104,18 @@ export default function ProfileScreen({
                 </span>
                 <span className={s.menuText}>
                   <span className={s.menuLabel}>Change password</span>
+                </span>
+                <span className={s.menuChev} aria-hidden="true">
+                  ›
+                </span>
+              </button>
+              <button type="button" className={s.menuRow} onClick={() => setWin('email')}>
+                <span className={`${s.menuIcon} ${s.walnut}`}>
+                  <HrIcon name="mail" size={16} />
+                </span>
+                <span className={s.menuText}>
+                  <span className={s.menuLabel}>{EMAIL_WORDS.title}</span>
+                  {email ? <span className={s.menuSub}>{email}</span> : null}
                 </span>
                 <span className={s.menuChev} aria-hidden="true">
                   ›
@@ -178,6 +192,7 @@ export default function ProfileScreen({
         <>
           <EditProfileDialog open={win === 'profile'} onClose={() => setWin(null)} user={{ name, email }} onSaved={() => router.refresh()} />
           <ChangePasswordDialog open={win === 'password'} onClose={() => setWin(null)} />
+          <RequestEmailDialog open={win === 'email'} onClose={() => setWin(null)} />
         </>
       ) : null}
       <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} />

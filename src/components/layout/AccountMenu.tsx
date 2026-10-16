@@ -4,8 +4,10 @@ import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { changeMyPassword, loadMyProfile, updateMyProfile } from '@/lib/account/actions'
+import { changeMyPassword, loadMyEmailChange, loadMyProfile, requestEmailChange, updateMyProfile, withdrawEmailChange } from '@/lib/account/actions'
 import { MIN_PASSWORD_LENGTH, passwordChangeProblem } from '@/lib/account/password'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
+import { useRequestEmail, type RequestEmailActions } from '@/components/account/use-request-email'
 import { profileProblem } from '@/lib/account/profile'
 import { HrIcon } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
@@ -200,6 +202,78 @@ export function EditProfileDialog({
           <Input id="fv-profile-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" maxLength={30} />
         </Field>
         {refusal ? <Hint danger>{refusal}</Hint> : null}
+      </DialogForm>
+    </FinDialog>
+  )
+}
+
+const EMAIL_ACTIONS: RequestEmailActions = { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange }
+
+/**
+ * Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their own
+ * request; HR approves it on Attendance › Requests, which moves the sign-in too): the email they sign in with, their
+ * latest request — waiting, with Withdraw; declined, with HR's words; done — and the new email.
+ */
+export function RequestEmailDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const f = useRequestEmail(EMAIL_ACTIONS, open)
+  const W = EMAIL_WORDS
+  const current = f.mine?.email ?? ''
+  const st = f.state
+  const waiting = st?.kind === 'waiting'
+  return (
+    <FinDialog open={open} onClose={onClose} title={W.title} sub="HR approves the new one" locked={f.busy}>
+      <DialogForm
+        onSubmit={waiting ? onClose : f.submit}
+        buttons={
+          waiting ? (
+            <>
+              <DialogButton onClick={f.withdraw} disabled={f.busy}>
+                {f.busy ? W.withdrawing : W.withdraw}
+              </DialogButton>
+              <DialogButton type="submit" kind="primary" off={f.busy}>
+                Done
+              </DialogButton>
+            </>
+          ) : (
+            <>
+              <DialogButton onClick={onClose} disabled={f.busy}>
+                Cancel
+              </DialogButton>
+              <DialogButton type="submit" kind="primary" off={!f.mine || f.busy}>
+                {f.busy ? W.sending : W.send}
+              </DialogButton>
+            </>
+          )
+        }
+      >
+        <Field label={W.current} htmlFor="fv-email-now">
+          <Input id="fv-email-now" type="email" value={f.loading && !current ? '…' : current} readOnly disabled />
+        </Field>
+        {st ? (
+          <Hint>
+            <span className={`chip ${st.kind === 'waiting' ? 'alert' : st.kind === 'approved' ? 'ledger' : 'danger'}`}>
+              {st.kind === 'waiting' ? W.waiting : st.kind === 'approved' ? W.approved : W.declined}
+            </span>{' '}
+            {st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}${st.kind === 'waiting' && st.ref ? ` · ${st.ref}` : ''}`}
+            {st.kind === 'declined' && st.note ? <> — “{st.note}”</> : null}
+          </Hint>
+        ) : null}
+        {waiting ? null : (
+          <Field label={W.next} htmlFor="fv-email-new">
+            <Input
+              id="fv-email-new"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={f.next}
+              onChange={(e) => f.setNext(e.target.value)}
+              disabled={!f.mine}
+            />
+          </Field>
+        )}
+        {f.error ? <Hint danger>{f.error}</Hint> : f.sent && waiting ? <Hint>{W.sent(current)}</Hint> : null}
       </DialogForm>
     </FinDialog>
   )

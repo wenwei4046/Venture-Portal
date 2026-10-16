@@ -1,0 +1,23 @@
+/* Profile › Request to change email (2026-10-16, not in the prototype): Change password's sheet (password.module.css)
+   with what is theirs above the form — the email they sign in with, and their latest request. Every size times
+   --rv-type. */
+.fact { display: flex; flex-direction: column; gap: 4px; }
+.factLabel { font-size: calc(12px * var(--rv-type)); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--rv-sub); }
+.factValue { font-size: calc(16px * var(--rv-type)); font-weight: 650; color: var(--rv-ink); overflow-wrap: anywhere; }
+.card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--rv-line); border-radius: 14px; background: var(--rv-white); }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.chip { flex: 0 0 auto; font-size: calc(11.5px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 4px 9px; white-space: nowrap; }
+.ref { font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
+.cardText { margin: 0; font-size: calc(14.5px * var(--rv-type)); line-height: 1.45; color: var(--rv-ink); overflow-wrap: anywhere; }
+.withdraw {
+  box-sizing: content-box;
+  height: 40px;
+  padding: 0;
+  border-radius: 20px;
+  border: 1px solid var(--rv-line);
+  background: transparent;
+  color: inherit;
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 650;
+}
+.withdraw:disabled { opacity: .55; cursor: default; }
