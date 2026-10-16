@@ -92,6 +92,8 @@ describe('a CRM notice on the phone', () => {
     }))
     // Nothing to draw with here: the app's tile stands in for the picture.
     expect(showNotification.mock.calls[0][1].icon).toBe('/icons/icon-192.png')
+    // The chat, whole, for an iPhone (iOS 18.4+) to open by itself (2026-10-17 — a tap there did not reach the chat).
+    expect(showNotification.mock.calls[0][1].navigate).toBe(`${ORIGIN}${LEAD.url}`)
     let work: Promise<unknown> = Promise.resolve()
     listeners.notificationclick({ notification: { close: vi.fn(), data: { url: LEAD.url } }, waitUntil: (p: Promise<unknown>) => { work = p } })
     await work

@@ -78,6 +78,18 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
 }
 
 /**
+ * What a tapped CRM notice asks the Revenue app to open (`noticeUrl` above): the chat (`chat=<id>`), or the CRM's
+ * notifications (`crm=notifs`). Read from the address the app STARTS on, in its first drawing (2026-10-17): a state set
+ * after it reached the CRM only once the app's first reads were all back.
+ */
+export function crmOpenTarget(search: string): { chat: string } | { notifs: true } | null {
+  const q = new URLSearchParams(search)
+  const chat = q.get('chat')
+  if (chat) return { chat }
+  return q.get('crm') === 'notifs' ? { notifs: true } : null
+}
+
+/**
  * The tag a notice shows under on the phone: a later one with the same tag takes its place. One customer's chat is one
  * tag (`crm:<contact>`), so their messages gather on one notice as a chat app's do; everything else is its own.
  */

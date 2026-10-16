@@ -92,10 +92,12 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     return () => { current = false; };
   }, [live, snapKey]);
   // Live: read once on opening, under the member's own session.
+  // `readFresh`: the network's answer has landed — the kept copy above may be older than a chat a tapped notice opens.
+  const readFresh = useRef(!live);
   useEffect(() => {
     if (!live) return;
     let current = true;
-    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) { setData(r.data); saveSnapshot(snapKey, r.data); } else setProblem(r.error); } });
+    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) { readFresh.current = true; setData(r.data); saveSnapshot(snapKey, r.data); } else setProblem(r.error); } });
     return () => { current = false; };
   }, [live, desk]);
   // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
@@ -115,6 +117,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
         // The desktop also reads every customer's journey (Chat progress, CRM Desktop rev 1).
         const r = await fetchCrmData({ journey: desk });
         if (!stopped && r.ok && started >= (refs.localAt ?? 0)) {
+          readFresh.current = true;
           const sig = JSON.stringify(r.data);
           if (sig === lastRead) return;
           lastRead = sig;
@@ -183,19 +186,25 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   }, [live, ui.chat, panelUi.lead, hodMode, viewing, teamAs]);
   // A tapped notice opens its place once the customers are read: one's own chat in Mine; a chat one may only watch
   // (CRM · View at All) on the Team side; an invitation, Mine's notifications.
+  // A chat the phone's kept copy does not have yet — a new lead's first message, a customer handed over since that
+  // copy (2026-10-17, the user: a tapped notice did not open the chat) — is looked for again in the network's answer.
   const opened = useRef(false);
   useEffect(() => {
     if (!data || !open || opened.current) return;
     const me = personOf(data.viewerId, data.people);
     if (!me) return;
-    opened.current = true;
     if ("notifs" in open) {
+      opened.current = true;
       setViewing(null); setTeamAs(null); setHodMode("crm");
       setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "profile", profSub: "notif", nTab: "unread" }));
       return;
     }
     const c = data.customers.find(x => x.id === open.chat);
-    if (!c) return;
+    if (!c) {
+      if (readFresh.current) opened.current = true;
+      return;
+    }
+    opened.current = true;
     if (c.assignedTo === me.id || data.shares.some(s => s.staffId === me.id && s.customerId === c.id)) {
       setViewing(null); setTeamAs(null); setHodMode("crm");
       setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "inbox", chat: c.id }));
