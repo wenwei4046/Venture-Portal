@@ -9,7 +9,7 @@ import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { Chip } from '@/components/finv/Hub'
 import { HrIcon } from '@/components/hrv/icons'
 import { poolLabel } from '@/lib/pools'
-import { plural, portalHrefOf, rm, type ApprovalMember, type ApprovalRecordModel } from '@/lib/fin-app/approval-model'
+import { plural, portalHrefOf, recordLinks, rm, type ApprovalMember, type ApprovalRecordModel } from '@/lib/fin-app/approval-model'
 import { getBatchVoucherDetails, type BatchVoucherRow } from '../actions'
 import { openApprovalRequest } from '../page-actions'
 import { getAttachmentSignedUrl } from '@/app/(portal)/payments/actions'
@@ -116,10 +116,7 @@ export function ApprovalDrawer({
         },
       })
       links = [
-        ...(r.voucher ? [{ key: 'voucher', label: 'Open the voucher', ...go(`/payments/${r.voucher.id}`) }] : []),
-        ...(r.voucher?.upstream ? [{ key: 'upstream', label: `Open the ${r.voucher.upstream.label.toLowerCase()}`, ...go(r.voucher.upstream.portalHref) }] : []),
-        ...(r.loan ? [{ key: 'loan', label: 'Open the loan', ...go(portalHrefOf(r.loan.open)) }] : []),
-        ...(r.open ? [{ key: 'open', label: r.open.hub === 'fund-in' ? 'Open the fund source' : r.open.hub === 'fund-out' ? 'Open the loan' : 'Open the voucher', ...go(portalHrefOf(r.open)) }] : []),
+        ...recordLinks(r).map((l) => ({ key: l.key, label: l.label, ...go(l.href) })),
         ...(r.groupId && onOpenGroup ? [{ key: 'group', label: 'Open the combined request', onClick: () => { setMenu(false); onOpenGroup(r.groupId as string) } }] : []),
       ]
       const decides = r.status === 'pending' && r.may && !r.groupId && live

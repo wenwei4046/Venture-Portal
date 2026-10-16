@@ -55,3 +55,10 @@
 
 /* The hub's total: the oldest wait as its chip, under the figure. */
 .heroChip { margin-top: 10px; }
+
+/* A request's full page (2026-10-17, D06's hand — components/finv/full.module.css): a link inside a card's line,
+   the decision's notes, and why the panel has no Approve (another's to decide). */
+.inline { color: var(--ds-ink); text-decoration: underline; text-decoration-color: var(--ds-accent); text-underline-offset: 3px; }
+.inline:hover { color: var(--ds-ink); text-decoration-color: currentColor; }
+.notes { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ds-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.panelNote { margin: 14px 0 0; font-size: 12.5px; line-height: 1.45; color: rgb(var(--fv-dark-note)); }
