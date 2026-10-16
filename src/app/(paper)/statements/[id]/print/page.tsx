@@ -10,7 +10,7 @@ import { HandoffSections, type PrintLine } from './PrintSections'
 import FinSwitch from '@/app/(portal)/statements/_components/FinSwitch'
 import { FinViewProvider } from '@/components/layout/fin-view'
 import { isFinanceView } from '@/lib/finance-view'
-import { COMPANY_NAME } from '@/lib/company'
+import { COMPANY_ADDRESS, COMPANY_NAME, COMPANY_REG_NO } from '@/lib/company'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -218,10 +218,12 @@ export default async function StatementPrintPage({ params }: Props) {
         {/* Letterhead */}
         <div className="header">
           <div className="company-name">{COMPANY_NAME}</div>
-          <div className="company-reg">Registration No. 202401000000 (1234567-X)</div>
-          <div className="company-reg">
-            Level 8, Menara HOUZS, Jalan Ampang, 50450 Kuala Lumpur
-          </div>
+          <div className="company-reg">Registration No. {COMPANY_REG_NO}</div>
+          {COMPANY_ADDRESS.map((line) => (
+            <div key={line} className="company-reg">
+              {line}
+            </div>
+          ))}
           <div className="doc-title">Monthly Consolidated Statement</div>
         </div>
 
