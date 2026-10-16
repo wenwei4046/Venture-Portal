@@ -11,7 +11,8 @@
 // through the Management API, and shows what would change first:
 //
 //   node scripts/push-auth-email.mjs                      what would change; nothing is sent
-//   node scripts/push-auth-email.mjs --apply              the invite's subject and template
+//   node scripts/push-auth-email.mjs --apply              the address the invite links to, its
+//                                                         subject and its template
 //   SMTP_PASS=… node scripts/push-auth-email.mjs --apply  …and the sender, HOUZS Venture
 //                                                         <hello@houzsventure.com>, through
 //                                                         Google Workspace's SMTP
@@ -27,6 +28,14 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PROJECT_REF = 'gixpptmfuryskbwkmiwz'
+
+/**
+ * The portal's address, which the invite's link and logo are written on (`{{ .SiteURL }}`):
+ * the company's own domain, where the installed app has lived since 2026-10-11 — not Vercel's
+ * venture-portal-chi.vercel.app (the user 2026-10-16, circling the link: "this if not
+ * mistaken, is preview link"). No trailing slash: the template writes `{{ .SiteURL }}/welcome`.
+ */
+export const SITE_URL = 'https://erp.houzsventure.com'
 
 /** Who the portal's email comes from: the company's own address, the one its documents print. */
 export const SENDER = { name: 'HOUZS Venture', email: 'hello@houzsventure.com' }
@@ -53,6 +62,7 @@ export function inviteTemplate() {
  */
 export function wanted({ smtpPass = '' } = {}) {
   const fields = {
+    site_url: SITE_URL,
     mailer_subjects_invite: INVITE.subject,
     mailer_templates_invite_content: inviteTemplate(),
   }

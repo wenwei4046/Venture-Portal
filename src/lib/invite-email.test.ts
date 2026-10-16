@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { COMPANY_NAME } from './company'
 import { welcomeLink } from './invite'
-import { EMAILS_PER_HOUR, INVITE, SENDER, wanted } from '../../scripts/push-auth-email.mjs'
+import { EMAILS_PER_HOUR, INVITE, SENDER, SITE_URL, wanted } from '../../scripts/push-auth-email.mjs'
 
 // The invite email (2026-10-16, the user: "在 email 那边收到它显示的是 148B，我要它显示是我们的
 // email。 and icon. email hello@houzsventure.com"). Supabase sends it; its body is
@@ -21,9 +21,16 @@ describe('the invite email', () => {
   it('opens our /welcome with the token hash, the address HR copies when Supabase does not email it', () => {
     const toWelcome = [...html.matchAll(/href="([^"]*)"/g)].map(m => m[1]).filter(href => href.includes('/welcome'))
     expect(toWelcome).toEqual([LINK, LINK])
-    expect(welcomeLink('venture-portal-chi.vercel.app', 'abc123')).toBe(
-      LINK.replace('{{ .SiteURL }}', 'https://venture-portal-chi.vercel.app').replace('{{ .TokenHash }}', 'abc123'),
+    expect(welcomeLink(new URL(SITE_URL).host, 'abc123')).toBe(
+      LINK.replace('{{ .SiteURL }}', SITE_URL).replace('{{ .TokenHash }}', 'abc123'),
     )
+  })
+
+  it('is written on the company’s own domain — not Vercel’s, which reads as a preview link', () => {
+    const site = new URL(SITE_URL)
+    expect(site.protocol).toBe('https:')
+    expect(site.origin).toBe(SITE_URL)
+    expect(site.hostname.endsWith('.houzsventure.com')).toBe(true)
   })
 
   it('never carries Supabase’s own link — opening it spends the token, as a mail scanner would', () => {
@@ -65,13 +72,14 @@ describe('what scripts/push-auth-email.mjs sends', () => {
     expect(local?.slice(1)).toEqual([INVITE.subject, INVITE.file])
   })
 
-  it('without the app password, the subject and the body only — never half an SMTP', () => {
-    expect(wanted()).toEqual({ mailer_subjects_invite: INVITE.subject, mailer_templates_invite_content: html })
+  it('without the app password, the address, the subject and the body only — never half an SMTP', () => {
+    expect(wanted()).toEqual({ site_url: SITE_URL, mailer_subjects_invite: INVITE.subject, mailer_templates_invite_content: html })
     expect(wanted({ smtpPass: '   ' })).toEqual(wanted())
   })
 
   it('with it, the sender whole: HOUZS Venture <hello@houzsventure.com> through Google Workspace', () => {
     expect(wanted({ smtpPass: 'abcd efgh ijkl mnop' })).toEqual({
+      site_url: SITE_URL,
       mailer_subjects_invite: INVITE.subject,
       mailer_templates_invite_content: html,
       smtp_host: 'smtp.gmail.com',
