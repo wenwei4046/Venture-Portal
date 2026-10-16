@@ -190,6 +190,15 @@ message): `approveRequestsBulk` says a closed month in `failed`;
 may decide, the database's refusal — and BatchDetailsModal shows the reason.
 The finance view's phone rules: `../finance/finance-view.md` › PART 5a.
 
+**THE QUEUE ON THE COMPUTER IS A HUB (2026-10-17, DESIGN.md v4.77; the whole of
+it: `../finance/finance-view.md` › APPROVALS IS FINANCE'S HUB).** The gates are
+the page's as before (`requirePage('/approvals')` + `requireApprovalQueue()`;
+every decision the same Server Actions). `undecidable` is now each hub row's
+`why` — no tick, said when pressed, no right-click *Tick to decide*; a refusal
+stays in the decision dialog (`_components/decisions.tsx`, the phone's too).
+PendingApprovals, RecentDecisions and BatchDetailsModal are gone; the decided
+are `readDecidedSince`'s 30 days.
+
 **THE DATABASE ASKS FOR THE ACTION TOO (2026-10-09, PR3a).** A table's row
 policies opened it to whoever held ANY key of its domain (`has_scope(ARRAY
 ['treasury'])`), and a View cell opens a key — so through the API a template

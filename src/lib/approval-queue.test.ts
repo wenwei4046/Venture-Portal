@@ -4,7 +4,6 @@ import {
   buildQueueRows,
   executiveSubmitterIds,
   queueSummary,
-  recentDecisionRows,
   requestTypeLabel,
   splitVoucherTitle,
   type ApprovalRequestRow,
@@ -224,21 +223,5 @@ describe('executiveSubmitterIds', () => {
   })
   it('names nobody when HR has no level called Executive', () => {
     expect(executiveSubmitterIds([{ user_id: 'ex', title_id: 'T-acc' }], titles, [{ id: 'L3', name: 'Junior', rank: 3 }]).size).toBe(0)
-  })
-})
-
-describe('recentDecisionRows', () => {
-  it('lists each decision with its number, text, type, outcome, who sent it and when it was decided', () => {
-    const rows = recentDecisionRows(
-      [
-        request({ id: 'r1', description: 'HV-PV-202610-0463: Payroll bank transfer — Sep 2026', amount: 105519.29, status: 'approved', approved_at: at(5, 14), created_at: at(5, 12) }),
-        request({ id: 'r2', description: 'HV-PV-202610-0448: Hostel & Accommodation', amount: 3450, status: 'rejected', approved_at: at(4, 9), submitted_by: 'ex' }),
-      ],
-      opts,
-    )
-    expect(rows).toEqual([
-      { id: 'r1', voucherNo: 'HV-PV-202610-0463', description: 'Payroll bank transfer — Sep 2026', typeLabel: 'Payment voucher', decision: 'approved', submitterName: 'Finance Manager', decidedAt: at(5, 14), amount: 105519.29, href: '/approvals/r1' },
-      { id: 'r2', voucherNo: 'HV-PV-202610-0448', description: 'Hostel & Accommodation', typeLabel: 'Payment voucher', decision: 'rejected', submitterName: 'ONG MEI SHUANG', decidedAt: at(4, 9), amount: 3450, href: '/approvals/r2' },
-    ])
   })
 })

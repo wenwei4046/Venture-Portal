@@ -1,38 +1,41 @@
-import dayjs from 'dayjs'
 import type { createClient } from '@/lib/supabase/server'
 import type { User } from '@/types'
 import { decision } from '@/lib/approval-domains'
 import { poolLabel } from '@/lib/pools'
 import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
 import { fetchAllRows } from '@/lib/paginate'
-import { buildQueueRows, executiveSubmitterIds, queueSummary, recentDecisionRows, type ApprovalRequestRow } from '@/lib/approval-queue'
-import type { PendingRow } from '../_components/PendingApprovals'
+import { buildQueueRows, executiveSubmitterIds, queueSummary, type ApprovalRequestRow, type QueueRow } from '@/lib/approval-queue'
+import type { AttachmentThumb } from '@/components/voucher/AttachmentThumbs'
 
 // The Principal's queue, read (2026-10-15 — moved out of `/approvals/page.tsx`
 // word for word, so the Finance phone app's Approvals reads the same): what
-// waits and the last ten decided, each at its LIVE amount (a voucher edited
-// after it was submitted), who is "the executive", each waiting voucher's pool,
-// category, payee, how it is paid and its files, the summary, which rows this
-// reader may decide (and why not the others), and the month's decisions.
+// waits, at its LIVE amount (a voucher edited after it was submitted), who is
+// "the executive", each waiting voucher's pool, category, payee, how it is paid
+// and its files, the summary, and which rows this reader may decide (and why
+// not the others). The decided are `readDecidedSince`'s (2026-10-17: the last
+// ten and the month's two counts went with the sheet's page — the hub and the
+// phone list the 30 days the Decided card counts).
+
+/** A waiting row with what its vouchers say: the pool(s), the category, who is paid, how, and the files. */
+export interface QueueItem extends QueueRow {
+  pool: string
+  category: string
+  payee: string
+  payBy: string
+  attachments: AttachmentThumb[]
+}
 
 type Client = Awaited<ReturnType<typeof createClient>>
 
 const uniq = (xs: string[]) => [...new Set(xs)]
 
 export async function readApprovalQueue(supabase: Client, user: User) {
-  const since = dayjs().subtract(30, 'day').toISOString()
-
-  const [{ data: pendingRows }, { data: recentRows }, { data: submitters }, { count: approved30 }, { count: rejected30 }] =
-    await Promise.all([
-      supabase.from('approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: true }),
-      supabase.from('approval_requests').select('*').neq('status', 'pending').order('approved_at', { ascending: false }).limit(10),
-      supabase.from('users').select('id, name'),
-      supabase.from('approval_requests').select('id', { count: 'exact', head: true }).eq('status', 'approved').gte('approved_at', since),
-      supabase.from('approval_requests').select('id', { count: 'exact', head: true }).eq('status', 'rejected').gte('approved_at', since),
-    ])
+  const [{ data: pendingRows }, { data: submitters }] = await Promise.all([
+    supabase.from('approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: true }),
+    supabase.from('users').select('id, name'),
+  ])
 
   const pending = (pendingRows ?? []) as ApprovalRequestRow[]
-  const recent = (recentRows ?? []) as ApprovalRequestRow[]
   const submitterMap = new Map((submitters ?? []).map((u) => [u.id, u.name as string]))
   const nameOf = (id: string) => submitterMap.get(id) ?? 'Unknown'
 
@@ -40,12 +43,11 @@ export async function readApprovalQueue(supabase: Client, user: User) {
   // refreshes, so an edited-after-submit voucher showed the OLD figure here
   // while the detail page (and the posting) used the new one. Read the amount
   // through to the target row instead — see lib/approval-amounts.ts.
-  const liveAmounts = await resolveLiveApprovalAmounts(supabase, [...pending, ...recent])
+  const liveAmounts = await resolveLiveApprovalAmounts(supabase, pending)
   const amountOf = (row: ApprovalRequestRow): number | null =>
     liveAmounts.has(row.id) ? liveAmounts.get(row.id)! : row.amount === null ? null : Number(row.amount)
 
   const rows = buildQueueRows(pending, { amountOf, nameOf })
-  const decisions = recentDecisionRows(recent, { amountOf, nameOf })
 
   // Two lookups that hang off the queue: which submitters are "the executive"
   // (their staff title's level, HR's own banding), and the pool / category
@@ -130,7 +132,7 @@ export async function readApprovalQueue(supabase: Client, user: User) {
       categoriesByVoucher.set(s.voucher_id, cats)
     }
   }
-  const queue: PendingRow[] = rows.map((r) => ({
+  const queue: QueueItem[] = rows.map((r) => ({
     ...r,
     pool: uniq(r.voucherIds.flatMap((id) => poolsByVoucher.get(id) ?? [])).join(' + '),
     category: uniq(r.voucherIds.flatMap((id) => categoriesByVoucher.get(id) ?? [])).join(' + '),
@@ -147,7 +149,7 @@ export async function readApprovalQueue(supabase: Client, user: User) {
     }),
   ) as Record<string, string>
 
-  return { queue, decisions, summary, undecidable, executives: [...executives], approved30: approved30 ?? 0, rejected30: rejected30 ?? 0 }
+  return { queue, summary, undecidable, executives: [...executives] }
 }
 
 /**
