@@ -50,6 +50,8 @@ export interface CrmCustomer {
   channel: CrmChannel;
   adId: string | null;
   ad: string;
+  /** What Meta sent as the ad's headline ("Chat with us"); `ad` is the ad's name where it has one (crm_ad_names). */
+  adHeadline?: string;
   /** Meta's link to the ad (its video or picture), when the customer came from one. */
   adUrl?: string | null;
   /** The ad's kind, "video" or "image", when Meta said (mig 20261015210000). */
@@ -216,6 +218,11 @@ export interface CrmData {
   /** Notifications read one by one (the Control panel). */
   notifRead: string[];
   adRules: CrmAdRule[];
+  /**
+   * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
+   * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
+   */
+  adNames?: Record<string, { name: string; source: "manual" | "meta" }>;
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
@@ -330,6 +337,7 @@ export interface CrmDataRows {
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
+  adNames?: { ad_source_id: string; name: string; source: string }[];
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
@@ -382,6 +390,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     adUrl: row.ad_source_url ?? null,
     adMedia: row.ad_media === "video" || row.ad_media === "image" ? row.ad_media : null,
     ad: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} · no ad`),
+    adHeadline: row.ad_headline?.trim() || "",
     status: row.status,
     ...(row.status === "lost" && reason ? { lost: { reason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),
     ...(row.previous_status ? { previous: row.previous_status } : {}),
@@ -427,6 +436,8 @@ export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAu
 }
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
+  const adNames: NonNullable<CrmData["adNames"]> = {};
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual" };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {
@@ -434,7 +445,13 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
-    customers: rows.contacts.map(c => customerFromRow(c, rows.messages)),
+    // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read
+    // a customer's `ad` (the owner, 2026-10-16: "顯示廣告的名稱，不然業務也看不懂"); Meta's headline stays in adHeadline.
+    customers: rows.contacts.map(c => {
+      const cu = customerFromRow(c, rows.messages), nm = c.ad_source_id ? adNames[c.ad_source_id]?.name : undefined;
+      return nm ? { ...cu, ad: nm } : cu;
+    }),
+    adNames,
     visits: rows.visits.map(visitFromRow),
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),

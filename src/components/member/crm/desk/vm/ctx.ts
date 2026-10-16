@@ -59,6 +59,8 @@ export interface DeskUi {
   awMenuOpen: boolean;
   ad: string | null;
   adMode: "evenly" | "team";
+  /** Ads to teams' editor: the ad's name while it is typed (null = as saved). */
+  adNameDraft?: string | null;
   tm: Record<string, "evenly" | "pct" | "max">;
   mv: Record<string, number>;
   split: Record<string, number> | null;

@@ -13,6 +13,8 @@ import type { Dispatch, SetStateAction } from "react";
 export interface PanelActions extends SalesActions {
   sendTo(customerId: string, staffId: string | null): Promise<boolean>;
   /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
+  /** Names an ad (crm_name_ad, CRM · Manage); an empty name takes the given name off. */
+  nameAd(ad: string, name: string): Promise<boolean>;
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
@@ -41,6 +43,17 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (!(await write("crm_send_to", { p_contact: customerId, p_staff: staffId }))) return false;
       const team = staffId ? teamOf(staffId, data().people)?.id ?? null : null;
       setData(d => ({ ...d, customers: d.customers.map(c => (c.id === customerId ? { ...c, assignedTo: staffId, teamId: team } : c)) }));
+      return true;
+    },
+    async nameAd(ad, name) {
+      const nm = name.trim();
+      if (!(await write("crm_name_ad", { p_ad: ad, p_name: nm }))) return false;
+      // The screen follows at once: the names, and every customer from that ad (their `ad`), back to Meta's headline when cleared.
+      setData(d => {
+        const names = { ...(d.adNames ?? {}) };
+        if (nm) names[ad] = { name: nm, source: "manual" }; else delete names[ad];
+        return { ...d, adNames: names, customers: d.customers.map(c => (c.adId === ad ? { ...c, ad: nm || c.adHeadline || `Ad ${ad}` } : c)) };
+      });
       return true;
     },
     async saveAdRule(ad, label, rule) {

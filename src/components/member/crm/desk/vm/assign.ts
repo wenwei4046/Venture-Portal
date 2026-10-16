@@ -142,9 +142,22 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const draftOk = mode === "evenly" || (Object.values(pctDefault).reduce((a2, n) => a2 + n, 0) === 100
     && TA.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0) === 100; if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
   const saveOne = async (id: string, label: string) => ctx.act.saveAdRule(id, label, ruleFromDraft());
+  // The ad's name, typed in the editor's title (crm_name_ad; the phone's ad editor does the same — panel/vm/assign.ts).
+  const savedName = ad ? data.adNames?.[ad.id]?.name ?? "" : "";
+  const headline = ad ? data.customers.find(c => c.adId === ad.id && c.adHeadline)?.adHeadline || `Ad ${ad.id}` : "";
+  const adNaming = {
+    canName: !!ad && !!data.can.manage, nameDraft: ui.adNameDraft ?? savedName, headline,
+    onName: (e: { target: { value: string } }) => patch({ adNameDraft: e.target.value }),
+    saveName: () => {
+      const d = ui.adNameDraft;
+      if (!ad || d == null || d.trim() === savedName) { patch({ adNameDraft: null }); return; }
+      void ctx.act.nameAd(ad.id, d).then(() => patch({ adNameDraft: null }));
+    },
+    nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
+  };
   const applyN = shownAds.length;
   const adEdit = {
-    adOpen, ad: { name: ad?.label ?? "", meta: ad ? `${ad.wa ? "WhatsApp" : "Messenger"} · ${ad.leads} leads` : "" },
+    adOpen, ad: { name: ad?.label ?? "", meta: ad ? `${ad.wa ? "WhatsApp" : "Messenger"} · ${ad.leads} leads` : "", ...adNaming },
     adModes: ([["evenly", "Evenly"], ["team", "By team"]] as const).map(([v, label]) => ({ label, on: v === mode, off: v !== mode, pick: () => patch({ adMode: v }) })),
     adByTeam: mode === "team", adEvenly: mode !== "team",
     adSplit: TA.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1)), pctStr: String(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1))),

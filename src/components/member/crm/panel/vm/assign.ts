@@ -120,7 +120,7 @@ export function assignVM(ctx: PanelCtx) {
     const r: CrmAdRule | undefined = ruleOf(id), cs = data.customers.filter(c => c.adId === id);
     const latest = [...cs].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     const even = Object.fromEntries(teams.map((t, k) => [t.id, Math.floor(100 / (teams.length || 1)) + (k < 100 % (teams.length || 1) ? 1 : 0)]));
-    return { id, label: r?.label || latest?.ad || id, page: latest?.channel === "messenger" ? "Messenger" : "WhatsApp", leads: cs.filter(c => inRange(c.createdAt, month)).length,
+    return { id, label: data.adNames?.[id]?.name || r?.label || latest?.ad || id, page: latest?.channel === "messenger" ? "Messenger" : "WhatsApp", leads: cs.filter(c => inRange(c.createdAt, month)).length,
       mode: r?.mode ?? "unset", split: r && Object.keys(r.split).length ? { ...r.split } : even, pm: r?.pm ?? "cnt", pp: { ...(r?.pp ?? {}) }, lockT: [], lockP: [] };
   };
   const ads = adIds.map(draftOf).sort((a, b) => b.leads - a.leads || a.label.localeCompare(b.label));
@@ -141,9 +141,23 @@ export function assignVM(ctx: PanelCtx) {
   }));
   const E = ui.adEd;
   const aeRow = E ? mkRow(teams, E, p => set(u => (u.adEd ? { ...u, adEd: { ...u.adEd, ...p } } : u))) : null;
+  // The ad's name, typed in the editor's title (the owner, 2026-10-16: the chat showed Meta's "Chat with us", not which ad):
+  // saved when it loses focus or on Enter (crm_name_ad); empty gives Meta's headline back. CRM · Manage only.
+  const headlineOf = (id: string) => data.customers.find(c => c.adId === id && c.adHeadline)?.adHeadline || `Ad ${id}`;
+  const savedName = (id: string) => data.adNames?.[id]?.name ?? "";
+  const naming = E ? {
+    canName: !!data.can.manage, nameDraft: ui.adNameDraft ?? savedName(E.id), headline: headlineOf(E.id),
+    onName: (e: { target: { value: string } }) => patch({ adNameDraft: e.target.value }),
+    saveName: () => {
+      const d = ui.adNameDraft;
+      if (d == null || d.trim() === savedName(E.id)) { patch({ adNameDraft: null }); return; }
+      void act.nameAd(E.id, d).then(ok => { patch({ adNameDraft: null }); if (ok) set(u => (u.adEd && u.adEd.id === E.id ? { ...u, adEd: { ...u.adEd, label: d.trim() || headlineOf(E.id) } } : u)); });
+    },
+    nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
+  } : { canName: false, nameDraft: "", headline: "", onName: () => {}, saveName: () => {}, nameKey: () => {} };
   const ae = aeRow && E
-    ? { ...aeRow, close: () => patch({ adEd: null }), saveBg: aeRow.ok ? "#2F6FB5" : "#C9D6E6", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
-    : { ...mkRow(teams, draftOf(""), () => {}), close: () => {}, saveBg: "#C9D6E6", save: undefined as (() => void) | undefined };
+    ? { ...aeRow, ...naming, close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "#2F6FB5" : "#C9D6E6", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
+    : { ...mkRow(teams, draftOf(""), () => {}), ...naming, close: () => {}, saveBg: "#C9D6E6", save: undefined as (() => void) | undefined };
 
   // Awaiting reply, on Assignment: counts per level, then every waiting customer.
   const by = waitingByLevel(ctx);
