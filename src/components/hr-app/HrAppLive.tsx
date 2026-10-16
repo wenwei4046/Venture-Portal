@@ -9,7 +9,7 @@ import {
 } from '@/lib/hr-app/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
 import { readNotices, removePushSubscription, reportPushTrouble, savePushSubscription } from '@/lib/push/actions'
-import { changeMyPassword } from '@/lib/account/actions'
+import { changeMyPassword, loadMyEmailChange, requestEmailChange, withdrawEmailChange } from '@/lib/account/actions'
 import { markMyMemo, openMemoFile } from '@/lib/memos/actions'
 import { openMyDoc } from '@/lib/documentation/my-docs-actions'
 import HrApp, { type HrAppActions } from './HrApp'
@@ -42,6 +42,8 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     bookCancel: hrAppCancelBooking,
     // The account's own, not a module's: the portal's one action, which asks for a personal login itself.
     changePassword: changeMyPassword,
+    // …and the email it signs in with, by request (2026-10-16): HR approves it.
+    requestEmail: { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange },
     // Their own memos (2026-10-12): the login's receipt, the same one the portal's bell and the Revenue app write.
     memoMark: markMyMemo,
     memoFile: openMemoFile,

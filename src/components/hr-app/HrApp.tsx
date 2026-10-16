@@ -12,7 +12,9 @@ import { pageKeyOf, usePageScroll } from './page-scroll'
 import { Select } from '@/components/hrv/select'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import { PASSWORD_CHANGED, useChangePassword, type ChangePassword } from '@/components/account/use-change-password'
+import { useRequestEmail, type RequestEmailActions } from '@/components/account/use-request-email'
 import { MIN_PASSWORD_LENGTH } from '@/lib/account/password'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
 import {
   CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, MEMO_TAG, ORANGE, SLATE,
   bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
@@ -58,6 +60,11 @@ export interface HrAppActions {
   /** This login's own password (2026-10-12): the current one, then the new one twice — a personal login only. */
   changePassword: ChangePassword
   /**
+   * Request to change email (2026-10-16): this login's own — the email it signs in with, changed when HR approves the
+   * request (lib/account/actions.ts). A personal login only, as Change password. Absent: the row is not drawn.
+   */
+  requestEmail?: RequestEmailActions
+  /**
    * Their own memo (2026-10-12): opened (`ack` false) or acknowledged — the LOGIN's receipt, so it is done in every
    * view (the portal's bell, the Revenue app) at once. The account's own, not a module's (lib/memos/actions.ts).
    */
@@ -94,6 +101,7 @@ type Sheet =
   | { k: 'booking'; id: string }
   | { k: 'approve'; id: string }
   | { k: 'password' }
+  | { k: 'email' }
 
 type Form = Record<string, string | string[] | number | undefined>
 
@@ -533,6 +541,19 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
                     </svg>
                   </span>
                   <span className={s.grow}><span className={s.moreTitle}>Change password</span><span className={s.moreSub}>The current one, then a new one twice</span></span>
+                  <Chevron />
+                </button>
+              ) : null}
+              {/* Not in the handoff (2026-10-16 — the user: their email is the one they sign in with, changed only by their
+                  own request, an option beside Change password): on Change password's terms; HR approves it. */}
+              {d.personalLogin && !d.viewingAs && actions.requestEmail ? (
+                <button type="button" className={s.moreRow} onClick={() => openSheet({ k: 'email' })}>
+                  <span className={s.moreIcon} style={{ background: 'rgb(238 235 231)', color: 'rgb(90 78 68)' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="m3.5 7 8.5 6.5L20.5 7" />
+                    </svg>
+                  </span>
+                  <span className={s.grow}><span className={s.moreTitle}>{EMAIL_WORDS.title}</span><span className={s.moreSub}>HR approves the new one</span></span>
                   <Chevron />
                 </button>
               ) : null}
@@ -1250,6 +1271,66 @@ function PasswordForm({ change, close, onBusy }: { change: ChangePassword; close
   )
 }
 
+/**
+ * More › Request to change email's sheet (2026-10-16): the email they sign in with, their latest request (waiting —
+ * with Withdraw —, declined with HR's words, or done), and the new email — the portal's own rules and actions
+ * (lib/account). While it is being sent the sheet stays.
+ */
+function EmailForm({ actions, close, onBusy }: { actions: RequestEmailActions; close: () => void; onBusy: (busy: boolean) => void }) {
+  const f = useRequestEmail(actions, true)
+  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
+  const W = EMAIL_WORDS
+  const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
+  const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
+  const current = f.mine?.email ?? ''
+  const st = f.state
+  const tone = st?.kind === 'waiting' ? CHIP.alert : st?.kind === 'approved' ? CHIP.ledger : CHIP.danger
+  return (
+    <div className={s.pwForm}>
+      <Field label={W.current} group>
+        <span className={s.emailNow}>{f.loading && !current ? '…' : current || '—'}</span>
+      </Field>
+      {f.sent && st?.kind === 'waiting' ? <p className={s.replNote} role="status">{W.sent(current)}</p> : null}
+      {st ? (
+        <div className={s.emailCard}>
+          <div className={s.emailCardHead}>
+            <span className={s.pageChip} style={{ background: tone[0], color: tone[1] }}>
+              {st.kind === 'waiting' ? W.waiting : st.kind === 'approved' ? W.approved : W.declined}
+            </span>
+            {st.kind === 'waiting' && st.ref ? <span className={s.emailRef}>{st.ref}</span> : null}
+          </div>
+          <span className={s.emailText}>{st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}`}</span>
+          {st.kind === 'declined' && st.note ? <span className={s.emailText}>“{st.note}”</span> : null}
+          {st.kind === 'waiting' ? (
+            <button type="button" className={s.formBtn} style={{ ...outline, height: 40 }} disabled={f.busy} onClick={f.withdraw}>{f.busy ? W.withdrawing : W.withdraw}</button>
+          ) : null}
+        </div>
+      ) : null}
+      {st?.kind === 'waiting' ? (
+        <>
+          {f.error ? <span className={s.formErr} role="alert">{f.error}</span> : null}
+          <div className={s.btnRow}>
+            <button type="button" className={s.formBtn} style={{ ...go, flex: 1 }} onClick={close} disabled={f.busy}>Done</button>
+          </div>
+        </>
+      ) : (
+        <form className={s.pwForm} noValidate onSubmit={e => { e.preventDefault(); f.submit() }}>
+          <Field label={W.next}>
+            <input className={s.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+              value={f.next} onChange={e => f.setNext(e.target.value)} disabled={!f.mine} />
+          </Field>
+          {f.error ? <span className={s.formErr} role="alert">{f.error}</span> : null}
+          <div className={s.btnRow}>
+            <button type="button" className={s.formBtn} style={{ ...outline, flex: 1 }} onClick={close} disabled={f.busy}>Cancel</button>
+            <button type="submit" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={f.busy || !f.mine}>{f.busy ? W.sending : W.send}</button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 function SheetView(p: {
   d: HrAppData
   sheet: Sheet
@@ -1328,6 +1409,12 @@ function SheetView(p: {
   if (sh.k === 'password') {
     title = 'Change password'
     body = <PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} />
+  }
+
+  // More › Request to change email (2026-10-16): its own state, so a sheet closed and opened reads afresh.
+  if (sh.k === 'email' && actions.requestEmail) {
+    title = EMAIL_WORDS.title
+    body = <EmailForm actions={actions.requestEmail} close={close} onBusy={setLocked} />
   }
 
   if (sh.k === 'ack' && hr) {

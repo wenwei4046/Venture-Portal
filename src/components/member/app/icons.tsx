@@ -55,6 +55,8 @@ export const ICON = {
   alert: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01",
   /* Profile › Change password (2026-10-12) — not in the prototype */
   lock: "M5 10.5h14v10H5zM8.5 10.5v-3a3.5 3.5 0 0 1 7 0v3M12 14.5v2",
+  /* Profile › Request to change email (2026-10-16) — not in the prototype */
+  mail: "M3 6h18v12H3zM3.5 6.5 12 13l8.5-6.5",
   /* the notification icons (`IC`) */
   nOk: "M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   nMemo: "M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4",

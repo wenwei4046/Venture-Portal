@@ -1447,6 +1447,14 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **Words, everywhere** — *Password changed. You stay signed in here; your other devices are signed out within an hour and need the new password.* Refusals: `lib/account/password.ts`.
 - **While sending** the button reads *Changing…* and the sheets wait for the answer. The portal's boxes carry **no `name`** — a submit before hydration would put the passwords in the address.
 
+### Request to change email (v4.70, 2026-10-16 — the Revenue app's Profile, the HR app's More, the Finance app's Profile)
+
+A login's email is the one they sign in with: it changes only by their own request, which HR approves on Attendance › Requests — approving it moves the sign-in too (the user 2026-10-16). On Change password's terms (a login a People record names, never while viewing as), right under it in each app. One set of actions (`lib/account/`) and one hook (`components/account/use-request-email`) under three surfaces.
+- **Revenue app** — Profile › Account, a second button under *Change password*: **Request to change email** with the envelope (`ICON.mail`); a sheet on Change password's. **HR app** — More, a row under *Change password* (*HR approves the new one*); a sheet. **Finance app** — Profile › I. Account, a row under *Change password* (kit icon `mail`, the email as its second line); the desktop's dialog (`RequestEmailDialog`, *HR approves the new one*), its request as the chip, the email and the reference each on a line of its own, *Withdraw* beside *Done*.
+- **The sheet** — **You sign in with** over their email; their latest request, if any, as a card: *Waiting for HR* (alert tone) with its reference, *New email · …* and **Withdraw**; *Declined* (danger) with HR's words in quotes; *Approved* (ledger) — *You sign in with … now.* (a decision shows for two weeks). Then, unless one waits, **New email** and **Send to HR** (*Sending…*); sent: *Sent to HR. Until they approve it, you sign in with ….*
+- **Words** — *Enter the new email.* · *Enter an email address like name@houzs.my.* · *That is already the email you sign in with.* (before anything is sent) · *That email already belongs to another login.* · *You already asked to change your email — HR has not decided yet.* (the database's) — `lib/account/email-change.ts`.
+- **HR's side** — the request is a profile change of one field (*Request to change email*, Email from → to) in Requests, as any other; Approve on HR's last step moves the login first, and refuses in words when it cannot (*That email already belongs to another login. Nothing was decided.*).
+
 ### Choosing a password from an invite link (v4.62, 2026-10-16 — `/welcome`)
 
 The sign-in page's screen (`MemberLoginScreen`'s `panel`), its right column swapped: **Set your password.** · *Choose a password to activate your account.* · **New password** · **Confirm password** — each the sign-in's box with the lock and its own eye — and **Activate account** (*Activating…*). A link missing its token reads **This link is not complete.** · *Open the link from your invitation again, or ask HR to send you a new one.* with no form.
@@ -1591,6 +1599,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.70** · 2026-10-16 · Request to change email: a login's email changes only by their own request — the Revenue app's Profile, the HR app's More and the Finance app's Profile, under Change password; their sign-in email, the latest request (waiting with Withdraw, declined with HR's words, approved) and the new one; HR approves it on Attendance › Requests, which moves the sign-in → Request to change email
 - **v4.69** · 2026-10-16 · A person's permission window: a pill per sub-department under the Revenue tabs (Comm Cal, Sales Groups, Rules, the CRM's two) — ticked where they reach it, the red dot where it is theirs alone → Permissions by view and tab
 - **v4.68** · 2026-10-16 · The CRM's Team Profile (the Control panel's) looks like the Revenue app's Profile too, as Mine's since v4.64: the glow behind a white card on a white page, a 56px avatar, Inter Tight on the avatar, the name and *Your workspace*, facts and rows at 650, *View as a team member* as the app's View as entry, rows ruled between in `--rv-rule`, the app's chevron and count → The Revenue app — the refresh
 - **v4.67** · 2026-10-16 · A person's full page goes on in the 360's wells: Promotion beside Employment, Permissions, Activity — each its title in spaced capitals beside its icon → People
