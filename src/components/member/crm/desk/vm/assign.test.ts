@@ -35,7 +35,8 @@ describe("opening an ad loads its saved split", () => {
     h.vm().openAdById("AD1");
     expect(h.ui().ad).toBe("AD1");
     const split = h.vm().adSplit.map(r => [r.name, r.pct]);
-    expect(split).toEqual([["Team A", 0], ["Team B", 0], ["Revenue Director", 100]]);
+    // The Revenue Director first, above the teams (the owner, 2026-10-16).
+    expect(split).toEqual([["Revenue Director", 100], ["Team A", 0], ["Team B", 0]]);
   });
   it("its card opens the same way", () => {
     const h = harness(directorAll);

@@ -24,7 +24,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const sheetOpen = ui.stage !== "menu";
   const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: t.people }));
   // An ad's split has one more row, the Revenue Director, its people the directors (the owner, 2026-10-16; mig 20261016010000).
-  const TA = [...T, ...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: ctx.directors }] : [])];
+  // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
+  const TA = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: ctx.directors }] : []), ...T];
 
   // ── Organic Leads and Awaiting reply: the rows, Send to / Assign, Remind (D1 / D4).
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).sort((a, b) => a.createdAt.localeCompare(b.createdAt));

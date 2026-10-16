@@ -108,7 +108,8 @@ export function assignVM(ctx: PanelCtx) {
   // An ad's split has one more row, the Revenue Director, its people the directors — as the desktop's (the owner, 2026-10-16:
   // "新增了 revenue director 也加入可以获得广告名单"; mig 20261016010000, crm_director_key() = DIRECTOR_SPLIT_KEY).
   const directors = data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name));
-  const adTeams: Team[] = [...teams, ...(directors.length ? [{ id: DIRECTOR_SPLIT_KEY, tl: directors[0], name: DIRECTOR_TEAM, who: directors.map(d => d.name).join(", "), c: DIRECTOR_C[0], tint: DIRECTOR_C[1], own: DIRECTOR_C[1], people: directors }] : [])];
+  // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
+  const adTeams: Team[] = [...(directors.length ? [{ id: DIRECTOR_SPLIT_KEY, tl: directors[0], name: DIRECTOR_TEAM, who: directors.map(d => d.name).join(", "), c: DIRECTOR_C[0], tint: DIRECTOR_C[1], own: DIRECTOR_C[1], people: directors }] : []), ...teams];
 
   // Organic Leads: no rule placed them, so somebody has to.
   // Organic Leads: no team and not held Over the limit (a held lead keeps its team).
