@@ -22,6 +22,8 @@ export interface BarButton {
   onClick?: () => void
   /** A page to go to instead. */
   href?: string
+  /** With `href`: in place of this entry (a view switched, not a step forward). */
+  replace?: boolean
   disabled?: boolean
   /** Drawn pale while what it needs is missing (it still says why when pressed). */
   off?: boolean
@@ -266,7 +268,7 @@ export default function AppScreen({
         <div className={s.bar}>
           {bar.map((b) =>
             b.href ? (
-              <Link key={b.key} href={b.href} className={s.barBtn} data-kind={b.kind && b.kind !== 'secondary' ? b.kind : undefined}>
+              <Link key={b.key} href={b.href} replace={b.replace} scroll={b.replace ? false : undefined} className={s.barBtn} data-kind={b.kind && b.kind !== 'secondary' ? b.kind : undefined}>
                 {b.label}
               </Link>
             ) : (

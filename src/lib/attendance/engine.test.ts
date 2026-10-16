@@ -23,7 +23,7 @@ const config = (over: Partial<AttConfig> = {}): AttConfig => ({
     { id: 'sl', code: 'SL', name: 'Sick leave', groups: [{ titles: ['all'], levels: ['all'], base: 14, steps: [] }], rules: '', route: 'hr_only', counts: 'working', accrues: false, unpaid: false, drawsFrom: null },
   ],
   otRates: [], routes: [],
-  policies: [{ id: 'p', from: '2026-01-01', fenceMode: 'flag', photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic', photoKeepDays: 90 }],
+  policies: [{ id: 'p', from: '2026-01-01', fenceMode: 'flag', photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic', photoKeepDays: 90, otWageCap: 4000 }],
   ...over,
 })
 const month = (over: Partial<AttMonth> = {}): AttMonth => ({ month: '2026-10-01', punches: [], marks: [], overrides: [], leave: [], decisions: [], close: null, ...over })

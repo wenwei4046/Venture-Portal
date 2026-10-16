@@ -16,7 +16,7 @@ import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, tickColor } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
@@ -84,9 +84,9 @@ export function leadVM(ctx: PanelCtx) {
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
       }), () => { patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
-      tickC: m.status === "read" ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B",
+      tickC: tickColor(m.status),
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
-      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FCD6B8" : "#fff", bd: mine ? "#FCD6B8" : "#fff", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "#3F2B22", timeC: mine ? MINE_TIME : "#806B60", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
       ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };

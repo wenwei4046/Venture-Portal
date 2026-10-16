@@ -19,6 +19,8 @@ import s from './fin-app.module.css'
 // export them (the first two stand in it, the rest and the Segment in its ⋯),
 // and whatever the page adds (`bar`).
 
+const OVERVIEW = { label: 'Overview', href: '/fin-app' }
+
 export type PageStep = { kind: 'hub' } | { kind: 'list'; card: string } | { kind: 'detail'; card: string; line: string }
 
 export default function PageApp({
@@ -27,6 +29,7 @@ export default function PageApp({
   search,
   files = [],
   bar: extraBar = [],
+  home = OVERVIEW,
   children,
 }: {
   place: PagePlace
@@ -36,6 +39,8 @@ export default function PageApp({
   files?: ReportFile[]
   /** The page's own steps beside its files (a page's create — drawn first). */
   bar?: BarButton[]
+  /** Where the page was opened from: the Overview's rows, or Profile's Admin (*‹ Profile*). */
+  home?: { label: string; href: string }
   /** Windows the page's own steps open. */
   children?: ReactNode
 }) {
@@ -73,7 +78,7 @@ export default function PageApp({
       return
     }
     setIntent('pop')
-    router.replace('/fin-app')
+    router.replace(home.href)
   }
   const go = (next: PageStep) => open(joinQuery(place.keep, stepQuery(next)))
   const backTo = () => back(joinQuery(place.keep, step.kind === 'detail' ? stepQuery({ kind: 'list', card: step.card }) : ''))
@@ -143,7 +148,7 @@ export default function PageApp({
   } else {
     const p = place.period
     screen = (
-      <AppScreen screenKey={place.href} head={{ kind: 'back', title: place.title, backLabel: 'Overview', onBack: leave }} bar={bar}>
+      <AppScreen screenKey={place.href} head={{ kind: 'back', title: place.title, backLabel: home.label, onBack: leave }} bar={bar}>
         <BankHero
           value={model.hero.value}
           label={`${model.hero.label}${ofSegment}`}

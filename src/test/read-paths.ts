@@ -87,7 +87,8 @@ export const DYNAMIC_TABLES: Readonly<Record<string, readonly string[]>> = {
   'src/lib/approval-amounts.ts#resolveLiveApprovalAmounts': ['payment_vouchers', 'fund_sources', 'loans'],
   'src/app/(member)/member/(app)/products/load.ts#count': ['erp_products', 'erp_product_models', 'erp_maintenance_options', 'erp_fabrics'],
   'src/app/(portal)/revenue/config-actions.ts#cloneSchemeChildren': ['comm_item_groups', 'comm_kpi_items', 'comm_cost_ratios', 'comm_kpi_thresholds', 'comm_open_bill_rules', 'comm_promotion_rules'],
-  'src/app/(portal)/payments/actions.ts#updatePaymentVoucher': ['payroll_voucher_lines', 'payroll_statutory_voucher_lines'],
+  // The work of updatePaymentVoucher and its in-words twin (2026-10-16).
+  'src/app/(portal)/payments/actions.ts#updatePaymentVoucherWork': ['payroll_voucher_lines', 'payroll_statutory_voucher_lines'],
   'src/lib/hierarchy-writes.ts#updateChecked': ['comm_hierarchy'],
 }
 
@@ -302,6 +303,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_save_setting', 'att_delete_setting', 'att_set_days', 'att_clear_days',
   'att_set_day_override', 'att_invalidate_punch', 'att_create_request', 'att_decide', 'att_ledger_add', 'att_decide_day', 'att_close_month',
   'att_reopen_month', 'att_register',
+  // …the user's answers (mig 20261015200000): a file named for its short link asks View, Remind all Edit.
+  'att_file', 'att_remind',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',

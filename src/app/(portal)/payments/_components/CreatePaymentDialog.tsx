@@ -67,12 +67,28 @@ interface Line {
 // The words are the kit's (components/finv/form-words), kept importable from here.
 export { neededSentence, poolName }
 
+/**
+ * What the voucher page fills in for a payment begun elsewhere (2026-10-16 —
+ * the Finance phone app's Invoice: a paid invoice's *Refund*, Billing's
+ * *Add non-billable expense*): its title, and who is paid, how much, for what.
+ * Every field stays the reader's to change.
+ */
+export interface PaymentPreset {
+  title?: string
+  payee?: string
+  companyId?: string | null
+  amount?: number
+  description?: string
+}
+
 export default function CreatePaymentDialog({
   open,
   onClose,
   prefix,
   today,
   initial = null,
+  preset = null,
+  onSaved,
 }: {
   open: boolean
   onClose: () => void
@@ -82,16 +98,20 @@ export default function CreatePaymentDialog({
   today: string
   /** The lists, when the page read them already (`/payments?new=1`). */
   initial?: CreatePaymentOptions | null
+  /** A payment begun elsewhere — what it starts from (each opening starts from it again). */
+  preset?: PaymentPreset | null
+  /** Saved: the voucher it made (the caller refreshes what it shows). */
+  onSaved?: (voucher: { id: string; voucherNo: string }) => void
 }) {
   const [opts, setOpts] = useState<CreatePaymentOptions | null>(initial)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [payee, setPayee] = useState('')
-  const [companyId, setCompanyId] = useState('')
+  const [payee, setPayee] = useState(preset?.payee ?? '')
+  const [companyId, setCompanyId] = useState(preset?.companyId ?? '')
   const [account, setAccount] = useState('')
   const [pool, setPool] = useState('venture_pool')
   const [bankId, setBankId] = useState(initial?.banks[0]?.id ?? '')
-  const [amount, setAmount] = useState('')
-  const [desc, setDesc] = useState('')
+  const [amount, setAmount] = useState(preset?.amount ? preset.amount.toFixed(2) : '')
+  const [desc, setDesc] = useState(preset?.description ?? '')
   const [date, setDate] = useState(today)
   // What the small buttons open.
   const [split, setSplit] = useState(false)
@@ -134,13 +154,13 @@ export default function CreatePaymentDialog({
   }, [open, opts])
 
   const reset = () => {
-    setPayee('')
-    setCompanyId('')
+    setPayee(preset?.payee ?? '')
+    setCompanyId(preset?.companyId ?? '')
     setAccount('')
     setPool('venture_pool')
     setBankId(opts?.banks[0]?.id ?? '')
-    setAmount('')
-    setDesc('')
+    setAmount(preset?.amount ? preset.amount.toFixed(2) : '')
+    setDesc(preset?.description ?? '')
     setDate(today)
     setSplit(false)
     setRepay(false)
@@ -341,6 +361,7 @@ export default function CreatePaymentDialog({
       onClose()
       reset()
       flash(res.note ?? (res.submitted ? `${res.voucherNo} submitted — waiting for Principal` : `${res.voucherNo} saved as draft`))
+      onSaved?.({ id: res.id, voucherNo: res.voucherNo })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The voucher could not be saved.')
     } finally {
@@ -367,7 +388,7 @@ export default function CreatePaymentDialog({
   })
 
   return (
-    <FinDialog open={open} onClose={close} title="Create payment" sub={`New payment voucher · ${prefix}`} locked={busy !== null} tall>
+    <FinDialog open={open} onClose={close} title={preset?.title ?? 'Create payment'} sub={`New payment voucher · ${prefix}`} locked={busy !== null} tall>
       <DialogForm
         buttons={
           <>

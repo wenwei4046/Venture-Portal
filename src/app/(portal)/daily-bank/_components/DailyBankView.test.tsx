@@ -50,7 +50,7 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('Daily Bank on the sheet', () => {
   it('heads with the day between its arrows, and the image, PNG and PDF', () => {
-    render(<DailyBankView data={data()} today="2026-10-09" />)
+    render(<DailyBankView data={data()} today="2026-10-09" canExport />)
     expect(document.querySelector('.page-eyebrow')).toHaveTextContent('TREASURY · DAILY BANK')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Daily Bank')
     expect(screen.getByText('Today · 9 Oct 2026')).toBeInTheDocument()
@@ -63,6 +63,12 @@ describe('Daily Bank on the sheet', () => {
     expect(screen.getByRole('button', { name: 'PNG' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Get image' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Today' })).toBeNull()
+  })
+
+  it('keeps the PDF to whoever may take it out (Treasury · Export, 2026-10-16) — the image stays', () => {
+    render(<DailyBankView data={data()} today="2026-10-09" />)
+    expect(screen.queryByRole('link', { name: 'PDF' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'PNG' })).toBeInTheDocument()
   })
 
   it('offers the way back to today from another day', () => {

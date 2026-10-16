@@ -14,6 +14,7 @@ import { fullDay, type FullStep } from '@/components/finv/FullParts'
 import { allTermsChanges, buildTermsSegments, currentSegment, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 import { addMonths } from '../../_lib/loan-hub'
+import type { AmendTerms } from '@/lib/fund-amend'
 
 // A loan's page, read (2026-10-15 — moved out of `/fund-out/[id]/page.tsx`
 // word for word, so the Finance phone app's record reads the same): the loan,
@@ -70,6 +71,8 @@ export interface LoanPageModel {
   audit: Array<{ at: string; who: string; what: string }>
   /** A cancellation filed and waiting for the Principal. */
   pendingCancel: { by: string; at: string } | null
+  /** Amend terms' starting values, as its edit page reads them — an active loan, Treasury · Approve. */
+  amend: AmendTerms | null
   can: {
     /** Treasury · Edit — the repayment settings (funding source, start, minimum pay). */
     edit: boolean
@@ -217,6 +220,18 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     trail,
     audit: changes,
     pendingCancel: pendingCancel ? { by: ((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance', at: stamp(pendingCancel.created_at) } : null,
+    amend:
+      isActive && canDo(user, 'treasury', 'approve')
+        ? {
+            ratePct: (Number(loan.effective_rate) * 100).toString(),
+            months: (loan.tenure_months ?? '').toString(),
+            start: (loan.disbursement_date as string | null) ?? '',
+            compound: (loan as { compound_interest?: boolean }).compound_interest === true,
+            text: (loan.repayment_terms as string | null) ?? '',
+            termsFrom: ((loan as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null,
+            nextMonth: officeTime().add(1, 'month').format('YYYY-MM'),
+          }
+        : null,
     // Each step asks for the action its Server Action asks (2026-10-08, PR2).
     can: {
       edit: canDo(user, 'treasury', 'edit'),

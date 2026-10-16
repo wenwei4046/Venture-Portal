@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { amendLoan, amendLoanFrom } from '../../actions'
+import { amendFormData, draftOfForm, type AmendTerms } from '@/lib/fund-amend'
 
 interface Props {
   loanId: string
@@ -43,13 +44,16 @@ export default function LoanAmendForm({
 
   const field =
     'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border'
+  // What the form opened with: only what is changed from it is sent (lib/fund-amend, 2026-10-16).
+  const was: AmendTerms = { ratePct, months: tenureMonths, start: disbursementDate, compound, text: repaymentTerms, termsFrom: termsFrom ?? null, nextMonth }
 
   return (
     <form
       action={(fd) =>
         startTransition(async () => {
           setError(null)
-          const r = fromMode ? await amendLoanFrom(fd) : await amendLoan(fd)
+          const sent = amendFormData('out', loanId, was, draftOfForm('out', fd, mode, was))
+          const r = fromMode ? await amendLoanFrom(sent) : await amendLoan(sent)
           if (r?.error) setError(r.error)
         })
       }

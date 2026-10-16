@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { ChangePasswordDialog, EditProfileDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { setViewAs } from '@/components/layout/view-as-actions'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
 import s from './fin-app.module.css'
@@ -14,6 +15,17 @@ import s from './fin-app.module.css'
 // login of one's own only, each its window rising as a sheet — II. Admin —
 // Audit Log, Departments, Meeting Rooms, the desktop's account menu's rows —
 // and Sign out, asked first. The windows are the desktop's own (AccountMenu).
+// For an account that may switch views (2026-10-16 — on a phone the portal's
+// Finance pages open this app, lib/one-app.ts): the views of the one app, as
+// the HR app's More has them — each opens where it lives.
+
+/** The views of the one app: the view, its name, where it opens, its icon. */
+const VIEWS: ReadonlyArray<readonly [string, string, string, HrIconName]> = [
+  ['principal', 'Principal', 'The portal', 'home'],
+  ['finance', 'Finance', 'This app', 'report'],
+  ['hr', 'HR', 'The HR app', 'people'],
+  ['revenue_member', 'Revenue team', 'The Revenue app', 'staff'],
+]
 
 export interface ProfileAdminRow {
   key: string
@@ -29,6 +41,7 @@ export default function ProfileScreen({
   phone,
   personal,
   admin,
+  canSwitch = false,
 }: {
   name: string
   email: string
@@ -36,9 +49,19 @@ export default function ProfileScreen({
   /** A login of the person's own: Edit profile and Change password are theirs. */
   personal: boolean
   admin: ProfileAdminRow[]
+  /** The account may switch views (and is not viewing as a person). */
+  canSwitch?: boolean
 }) {
   const router = useRouter()
   const [win, setWin] = useState<'profile' | 'password' | 'signout' | null>(null)
+  const [switching, startSwitch] = useTransition()
+  const switchTo = (view: string) => {
+    const form = new FormData()
+    form.set('role', view)
+    startSwitch(async () => {
+      await setViewAs(form)
+    })
+  }
   const initial = (name.trim()[0] ?? 'F').toUpperCase()
 
   return (
@@ -109,6 +132,36 @@ export default function ProfileScreen({
                   </span>
                 </Link>
               ))}
+            </div>
+          </>
+        ) : null}
+
+        {canSwitch ? (
+          <>
+            <div className={s.menuHead}>
+              <span className={s.roman}>{['I.', 'II.', 'III.'][(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
+              <span className={s.caps}>Switch view</span>
+            </div>
+            <div className={s.menu} aria-label="Switch view">
+              {VIEWS.map(([view, label, where, icon]) => {
+                const here = view === 'finance'
+                return (
+                  <button key={view} type="button" className={s.menuRow} disabled={here || switching} aria-current={here ? 'true' : undefined} onClick={() => switchTo(view)}>
+                    <span className={`${s.menuIcon} ${s.walnut}`}>
+                      <HrIcon name={icon} size={16} />
+                    </span>
+                    <span className={s.menuText}>
+                      <span className={s.menuLabel}>{label}</span>
+                      <span className={s.menuSub}>{here ? 'You are here' : where}</span>
+                    </span>
+                    {here ? null : (
+                      <span className={s.menuChev} aria-hidden="true">
+                        ›
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </>
         ) : null}

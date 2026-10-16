@@ -5,11 +5,12 @@ import { revalidatePath } from 'next/cache'
 import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
-import { DAY_END, DAY_START, SLOT, isDay, rangeFromRow, roomFromRow, type Room, type RoomsRange } from './model'
+import { DAY_END, DAY_START, SLOT, isDay, peopleFromRow, rangeFromRow, roomFromRow, type Room, type RoomsPeople, type RoomsRange } from './model'
 
 /**
  * Meeting rooms' writes (2026-10-11, mig 20261011090000) — Server Actions any
- * page may call: Admin › Meeting Rooms, the Guest Link page, the HR app. Each
+ * page may call: Admin › Meeting Rooms, the Guest Link page, the HR app, the
+ * Finance phone app's Meeting Rooms (the Revenue app's Book a room). Each
  * asks its gate here and its cell again in the database, which also decides
  * whose booking it is. A refusal answers `{ ok: false, reason }` in words
  * (production masks a thrown message).
@@ -46,6 +47,23 @@ export async function readRoomsDay(day: string): Promise<Done<{ range: RoomsRang
   return range ? { ok: true, range } : { ok: false, reason: 'The schedule could not be read. Please try again.' }
 }
 
+/**
+ * The seven days the Finance phone app's Meeting Rooms shows (2026-10-15 — the
+ * Revenue app's Book a room, read again after a booking or a cancel): the
+ * schedule from one day to another and who may be picked.
+ */
+export async function readRoomsWeek(from: string, to: string): Promise<Done<{ range: RoomsRange; people: RoomsPeople }>> {
+  await requirePermission('meeting_rooms', 'meeting_rooms_manage')
+  if (!isDay(from) || !isDay(to) || to < from) return { ok: false, reason: 'That is not a day.' }
+  const c = await client()
+  const [range, people] = await Promise.all([c.rpc('meeting_rooms_range', { p_from: from, p_to: to }), c.rpc('meeting_rooms_people')])
+  if (range.error) return { ok: false, reason: words(range.error, 'The schedule could not be read. Please try again.') }
+  if (people.error) return { ok: false, reason: words(people.error, 'The people list could not be read. Please try again.') }
+  const r = rangeFromRow(range.data)
+  const p = peopleFromRow(people.data)
+  return r && p ? { ok: true, range: r, people: p } : { ok: false, reason: 'The schedule could not be read. Please try again.' }
+}
+
 export interface BookInput {
   /** A booking to change; absent = a new one. */
   id?: string | null
@@ -57,6 +75,12 @@ export interface BookInput {
   department: string | null
   /** The person it is for; null = the account booking. */
   bookedBy: string | null
+  /**
+   * One of the Revenue Department's sub-departments ("Revenue · Fair") in place
+   * of a department — the Book a room form the Finance phone app shares with
+   * the Revenue app lists them first.
+   */
+  subDepartment?: string | null
   internal: string[]
   guests: Array<{ name: string; company: string }>
   pax: number
@@ -77,6 +101,7 @@ export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref
   }
   if (input.department != null && !isId(input.department)) return { ok: false, reason: 'Pick the department it is booked from.' }
   if (input.bookedBy != null && !isId(input.bookedBy)) return { ok: false, reason: 'Pick who the meeting is booked by.' }
+  if (input.subDepartment != null && !isId(input.subDepartment)) return { ok: false, reason: 'Pick the department it is booked from.' }
   const internal = (Array.isArray(input.internal) ? input.internal : []).filter(isId)
   const guests = (Array.isArray(input.guests) ? input.guests : [])
     .map(g => ({ name: String(g?.name ?? '').trim(), company: String(g?.company ?? '').trim() }))
@@ -88,13 +113,13 @@ export async function bookRoom(input: BookInput): Promise<Done<{ id: string; ref
     p_from: from,
     p_to: to,
     p_title: String(input.title ?? ''),
-    p_department: input.department,
+    p_department: input.subDepartment ? null : input.department,
     p_booked_by: input.bookedBy,
     p_internal: internal,
     p_guests: guests,
     p_pax: Math.max(0, Math.round(Number(input.pax) || 0)),
     p_source: source,
-    p_sub_department: null,
+    p_sub_department: input.subDepartment ?? null,
   })
   if (error) return { ok: false, reason: words(error, 'The room could not be booked. Please try again.') }
   freshen()

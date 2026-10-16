@@ -39,6 +39,8 @@ export default async function FinAppProfile() {
       phone={profile?.phone ?? ''}
       personal={personal}
       admin={admin.map((a) => ({ key: a.key, label: a.label, icon: a.icon, sub: sub[a.key] ?? '', href: appHref(a.key) }))}
+      // The views of the one app, for an account that may switch them (as the HR app's More) — never while viewing as a person.
+      canSwitch={!!user.canSwitchView && !user.viewingAs}
     />
   )
 }

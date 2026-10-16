@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { generatePvFromRequest } from '../actions'
-import { summariseRound, deptRemaining, type RoundLine } from '@/lib/payroll-funding'
+import { summariseRound, deptRemaining, poolLabel, type RoundLine } from '@/lib/payroll-funding'
 
 interface Bank {
   id: string
@@ -31,26 +31,6 @@ interface Props {
 
 function fmt(n: number): string {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function poolLabel(key: string, deptName?: string): string {
-  switch (key) {
-    case 'dept_pool_hr':
-      return 'HR Department Pool'
-    case 'dept_pool_finance':
-      return 'Finance Department Pool'
-    case 'dept_pool_director_office':
-      return 'Director Office Department Pool'
-    case 'dept_pool_marketing':
-      return 'Marketing Department Pool'
-    case 'dept_pool_director':
-      return 'Director Department Pool'
-    default:
-      // A department HR picked for HOUZS Venture's director share (IT, Revenue
-      // Department, Venture Office …) — named by the department the row reads.
-      if (!deptName) return key
-      return /department$/i.test(deptName) ? `${deptName} Pool` : `${deptName} Department Pool`
-  }
 }
 
 export default function GeneratePvForm({

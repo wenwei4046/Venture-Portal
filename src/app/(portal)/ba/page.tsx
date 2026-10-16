@@ -40,6 +40,8 @@ export default async function BaPage({
         // The register's arrangement as everyone's default — whoever records
         // financing, as on Fund IN / Fund OUT (2026-10-10, the handoff).
         canSetDefault={canDo(user, 'treasury', 'create')}
+        // Record financing for whoever may record it — its action asks Treasury · Create (2026-10-16).
+        canRecord={canDo(user, 'treasury', 'create')}
       />
     </div>
   )

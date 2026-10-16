@@ -19,6 +19,7 @@ export default async function ReceiptsHub({ params }: { params: LedgerParams }) 
       ledger={ledger}
       canCreate={canDo(user, 'treasury', 'create')}
       canSetDefault={user.role === 'finance' || user.role === 'principal'}
+      canExport={canDo(user, 'treasury', 'export')}
       prefix={`HV-OR-${officeMonth().replace('-', '')}`}
       today={officeToday()}
     />

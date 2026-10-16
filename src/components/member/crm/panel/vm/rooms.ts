@@ -33,6 +33,9 @@ export function roomsVM(ctx: PanelCtx) {
   // A showroom being added shows as one more row, in edit.
   const shown: (CrmRoom | null)[] = [...rooms, ...(ed && ed.id === null ? [null] : [])];
   const T = iso(now);
+  // One showroom at a time (the owner, 2026-10-16: "如果都在下面太長了"): the one being edited, else the one ‹ › reached.
+  const at = ed ? ed.i : Math.min(Math.max(0, ui.rmAt ?? 0), Math.max(0, shown.length - 1));
+  const step = (d: 1 | -1) => () => { if (!ed) set(u => ({ ...u, rmAt: Math.min(Math.max(0, at + d), shown.length - 1) })); };
 
   const rmList = shown.map((r, i) => {
     const editing = !!ed && ed.i === i, name = r?.name ?? "", addr = r?.address ?? "", slots = r?.slots ?? [], weekly = r?.weekly ?? [], blocks = r?.blocks ?? [], cap = r?.cap ?? 2;
@@ -131,8 +134,10 @@ export function roomsVM(ctx: PanelCtx) {
   const del = ui.rmDel != null ? shown[ui.rmDel] : undefined;
   return {
     rmOpen: ui.roomsOpen, stop, closeRooms: () => patch({ roomsOpen: false, rmEdit: null }),
-    rmAdd: () => patch({ rmEdit: draftOf(null, rooms.length) }),
-    rmList,
+    rmAdd: () => patch({ rmEdit: draftOf(null, rooms.length), rmAt: rooms.length }),
+    rmList: rmList.filter((_, i) => i === at),
+    rmPager: shown.length > 1, rmPos: `${at + 1} / ${shown.length}`, rmPrev: step(-1), rmNext: step(1),
+    rmPrevOp: !ed && at > 0 ? 1 : 0.3, rmNextOp: !ed && at < shown.length - 1 ? 1 : 0.3,
     tpOpen: !!tp, tpClose: () => patch({ rmTP: null }), tpStop: (e: SyntheticEvent) => e.stopPropagation(),
     tpH: tp ? Array.from({ length: 12 }, (_, k) => k + 1).map(v => opt(tp.h === v, () => setT({ h: v }), String(v))) : [],
     tpM: tp ? [0, 15, 30, 45].map(v => opt(tp.m === v, () => setT({ m: v }), String(v).padStart(2, "0"))) : [],

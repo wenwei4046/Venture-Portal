@@ -31,6 +31,7 @@ export default async function FinAppReceipts({ searchParams }: { searchParams: P
       record={read && read.ok ? { detail: read.detail, extras: read.extras, canCopy: read.canCopy } : null}
       refused={read && !read.ok ? REFUSED[read.reason] : null}
       canCreate={canDo(user, 'treasury', 'create')}
+      canExport={canDo(user, 'treasury', 'export')}
       prefix={`HV-OR-${officeMonth().replace('-', '')}`}
       today={officeToday()}
     />

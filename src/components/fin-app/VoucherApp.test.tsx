@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { HubLedger, HubRow } from '@/app/(portal)/payments/_lib/hub-ledger'
 import type { VoucherDetail } from '@/app/(portal)/payments/_lib/voucher-detail'
 
@@ -7,14 +7,15 @@ import type { VoucherDetail } from '@/app/(portal)/payments/_lib/voucher-detail'
 // stacked cards open a list, a row opens the voucher (the drawer's parts, read
 // by openVoucherPage), Back steps back; the windows are the desktop's.
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), openPage: vi.fn() }))
+const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), openPage: vi.fn(), openEdit: vi.fn(), update: vi.fn(), flash: vi.fn(), voidWords: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh, replace: mocks.replace }),
   usePathname: () => '/fin-app/daily/payments',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/components/layout/RouteFreshener', () => ({ default: () => null }))
-vi.mock('@/app/(portal)/payments/page-actions', () => ({ openVoucherPage: mocks.openPage }))
+vi.mock('@/app/(portal)/payments/page-actions', () => ({ openVoucherPage: mocks.openPage, openVoucherEdit: mocks.openEdit }))
+vi.mock('@/components/hrv/toast', async (orig) => ({ ...(await orig<object>()), flash: mocks.flash }))
 vi.mock('@/app/(portal)/payments/actions', () => ({
   approveVoucher: vi.fn(),
   getAttachmentSignedUrl: vi.fn(),
@@ -24,6 +25,8 @@ vi.mock('@/app/(portal)/payments/actions', () => ({
   uploadVoucherAttachment: vi.fn(),
   voidPaidReceipt: vi.fn(),
   voidVoucher: vi.fn(),
+  updatePaymentVoucherInWords: mocks.update,
+  voidVoucherStepInWords: mocks.voidWords,
 }))
 vi.mock('@/app/(portal)/payments/_components/CreatePaymentDialog', () => ({
   default: ({ open }: { open: boolean }) => (open ? <div data-testid="create-payment">Create payment sheet</div> : null),
@@ -132,7 +135,7 @@ const DETAIL: VoucherDetail = {
   reference: null,
 }
 
-const draw = (search = '') =>
+const draw = (search = '', canExport = true) =>
   render(
     <FinAppFrame platform="android" rows={['payments', 'receipts', 'invoices', 'billing']}>
       <VoucherApp
@@ -142,6 +145,7 @@ const draw = (search = '') =>
         record={null}
         refused={null}
         canCreate
+        canExport={canExport}
         create={{ prefix: 'HV-PV-202610', today: '2026-10-15', open: false, initial: null }}
         today="2026-10-15"
         dept={[]}
@@ -182,6 +186,63 @@ describe('Daily › Payment on the phone', () => {
     expect(screen.getByRole('button', { name: /Google Asia Pacific/ })).toBeInTheDocument()
   })
 
+  it('Edit opens the voucher’s form in a sheet and sends only what changed', async () => {
+    mocks.openEdit.mockResolvedValue({
+      ok: true,
+      data: {
+        statutoryDetailsLocked: false,
+        salaryDetailsLocked: false,
+        voucher: { id: '0001', voucher_no: 'HV-PV-202610-0001', voucher_type: 'expense', direction: 'debit', amount: 100, payee_name: 'Meta Platforms Ireland', payee_company_id: null, bank_account_id: 'bank', description: 'Ads Oct', notes: null, payment_method: 'bank_transfer', payment_date: '2026-10-05', target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null },
+        initialSources: [{ pool: 'venture_pool', amount: '100.00', account_code: '9010', override_account_type: '', override_gl_account_code: '', override_reason: '' }],
+        extraPools: [],
+        fundSourceAccount: null,
+        initialCreditAccountCode: null,
+        companies: [],
+        bankAccounts: [{ id: 'bank', bank_name: 'Hong Leong Bank', account_number: '123', current_balance: 5000 }],
+        glAccounts: [{ code: '9010', name: 'Advertising', type: 'expense', parent_code: null }],
+      },
+    })
+    mocks.update.mockResolvedValue({ ok: true })
+    window.history.replaceState(null, '', '/fin-app/daily/payments?f=all')
+    draw('f=all')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Meta Platforms Ireland/ }))
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(mocks.openEdit).toHaveBeenCalledWith('0001')
+    const sheet = await screen.findByRole('dialog', { name: /Edit HV-PV-202610-0001/ })
+    expect(await within(sheet).findByLabelText('Description')).toHaveValue('Ads Oct')
+    expect(within(sheet).getByLabelText('Line 1 account')).toHaveValue('9010')
+    fireEvent.change(within(sheet).getByLabelText('Description'), { target: { value: 'Ads Oct — Meta' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save changes' }))
+    })
+    const fd = mocks.update.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(fd.entries())).toEqual({ id: '0001', description: 'Ads Oct — Meta' })
+    expect(mocks.flash).toHaveBeenCalledWith('Voucher saved')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('Void is answered in words — the app stays on its screen (its action ends on the portal’s Payments)', async () => {
+    mocks.voidWords.mockResolvedValue({ ok: true })
+    window.history.replaceState(null, '', '/fin-app/daily/payments?f=all')
+    draw('f=all')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Meta Platforms Ireland/ }))
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Void voucher' }))
+    const ask = await screen.findByRole('dialog', { name: /Void HV-PV-202610-0001\?/ })
+    await act(async () => {
+      fireEvent.click(within(ask).getByRole('button', { name: 'Void voucher' }))
+    })
+    const [kind, fd] = mocks.voidWords.mock.calls[0] as [string, FormData]
+    expect(kind).toBe('void')
+    expect(fd.get('id')).toBe('0001')
+    expect(mocks.flash).toHaveBeenCalledWith('HV-PV-202610-0001 voided')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
   it('a row opens the voucher — its hero at once, then the drawer’s groups and steps', async () => {
     window.history.replaceState(null, '', '/fin-app/daily/payments?f=all')
     draw('f=all')
@@ -195,7 +256,9 @@ describe('Daily › Payment on the phone', () => {
     expect(screen.getByText('Deducted from')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/payments/voucher-doc?id=0001')
     // Pending, and this reader does not approve: Edit, Return to draft, the ⋯ (Copy, Void).
-    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/payments/0001/edit')
+    // Edit is the app's own sheet (part E4b), not the portal's /payments/0001/edit.
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Return to draft' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'More' }))
     const menu = await screen.findByRole('menu')
@@ -222,6 +285,18 @@ describe('Daily › Payment on the phone', () => {
     fireEvent.click(batch)
     expect(batch).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: /Marketing 2 vouchers 6,200\.00/ })).toBeDisabled()
+  })
+
+  it('the ⋯ keeps Export to whoever may export (Treasury · Export, 2026-10-16)', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('menuitem', { name: /^Export/ })).toBeInTheDocument()
+    cleanup()
+    resetNav()
+    draw('', false)
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('menuitem', { name: /^Claims/ })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^Export/ })).toBeNull()
   })
 
   it('Create payment opens the desktop’s own window', () => {

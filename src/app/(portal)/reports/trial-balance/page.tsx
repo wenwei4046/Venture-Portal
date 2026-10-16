@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
@@ -17,7 +18,7 @@ interface Props {
 
 export default async function TrialBalancePage({ searchParams }: Props) {
   await requirePage('/reports/trial-balance')
-  await requirePermission('reports')
+  const user = await requirePermission('reports')
   const supabase = await createClient()
 
   const { as_of: rawAsOf, show_zero: rawShowZero, segment: rawSegment } = await searchParams
@@ -53,14 +54,17 @@ export default async function TrialBalancePage({ searchParams }: Props) {
           </div>
           <h1 className="page-title">Trial Balance</h1>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <a href={`/reports/trial-balance/export?format=xlsx&${exportQs}`} className="btn-quiet-sheet">
-            Excel
-          </a>
-          <a href={`/reports/trial-balance/export?format=pdf&${exportQs}`} className="btn-quiet-sheet">
-            PDF
-          </a>
-        </div>
+        {/* The files only for whoever may take them out — the route asks Reports · Export (2026-10-16). */}
+        {canDo(user, 'reports', 'export') ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a href={`/reports/trial-balance/export?format=xlsx&${exportQs}`} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={`/reports/trial-balance/export?format=pdf&${exportQs}`} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <StatCards label="Trial balance">

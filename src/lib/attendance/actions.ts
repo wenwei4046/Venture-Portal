@@ -5,6 +5,8 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { registerOf } from './engine'
+import { pushSoon } from '@/lib/push/outbox'
+import { ATT_BUCKET, previewOf, type FileLink, type RemindOutcome } from './files'
 import { attendanceFacts, otHoursOf } from './payroll'
 import { sendToPayroll, type PayrollSend } from './payroll-write'
 import { loadBoard, loadMonth, loadRequests } from './server'
@@ -62,6 +64,34 @@ export async function setDayOverride(from: string, to: string, code: string | nu
 export async function invalidatePunch(id: string, reason: string) {
   await requireActionOn(['/attendance/records', '/attendance/today'], 'attendance', 'edit')
   return call('att_invalidate_punch', { p_id: id, p_reason: reason }, 'The punch could not be marked invalid.')
+}
+
+/**
+ * Today › Not in yet › Remind all (2026-10-15 — the user: "现在就做"): a notice to each of them who has a login,
+ * pushed to their phone once the answer has gone back (lib/push/outbox.ts); never a bell.
+ */
+export async function remindNotIn(staff: string[]) {
+  await requireActionOn('/attendance/today', 'attendance', 'edit')
+  const r = await call<RemindOutcome>('att_remind', { p_staff: staff }, 'The reminder could not be sent.')
+  if (r.ok && r.data.sent > 0) pushSoon()
+  return r
+}
+
+/**
+ * A request's attachment or a punch's photo, through a link that works for ten minutes — made at the press, never
+ * kept in a page (2026-10-15, the `attendance` bucket: "现在开好"). The bucket's own read policy asks again.
+ */
+export async function attendanceFileLink(kind: 'request' | 'punch', id: string, download = false): Promise<AttOutcome<FileLink>> {
+  await requireActionOn(['/attendance/requests', '/attendance/today', '/attendance/records'], 'attendance', 'view')
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.rpc('att_file', { p_kind: kind, p_id: id })
+  if (error) return { ok: false, reason: refusal(error, 'The file could not be found. Please try again.') }
+  const file = data as { path?: string | null; name?: string | null } | null
+  if (!file?.path) return { ok: false, reason: kind === 'punch' ? 'No photo with this punch.' : 'No file has been attached.' }
+  const name = file.name || 'file'
+  const { data: link, error: linkError } = await supabase.storage.from(ATT_BUCKET).createSignedUrl(file.path, 600, download ? { download: name } : undefined)
+  if (linkError || !link) return { ok: false, reason: 'The file could not be opened. Please try again.' }
+  return { ok: true, data: { url: link.signedUrl, name, preview: previewOf(name) } }
 }
 
 // ── Requests ────────────────────────────────────────────────────────────────

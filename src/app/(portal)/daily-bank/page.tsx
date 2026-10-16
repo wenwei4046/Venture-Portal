@@ -12,6 +12,7 @@
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { listsPayrollByPerson } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
@@ -38,5 +39,6 @@ export default async function DailyBankPage({
 
   const data = await fetchDailyBank(supabase, date, { seesPayroll: listsPayrollByPerson(user) })
 
-  return <DailyBankView data={data} today={today} />
+  // The PDF only for whoever may take it out — the route asks Treasury · Export (2026-10-16).
+  return <DailyBankView data={data} today={today} canExport={canDo(user, 'treasury', 'export')} />
 }

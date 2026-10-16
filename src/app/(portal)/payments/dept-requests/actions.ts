@@ -49,3 +49,37 @@ export async function cancelDeptRequest(formData: FormData) {
   revalidatePath('/approvals')
   revalidatePath('/dept-pool')
 }
+
+/**
+ * The two steps answered in words (2026-10-16, the Finance phone app's Dept
+ * Payment Requests): production hides a thrown message behind a digest, so
+ * each asks the same gate, calls the page's own action and says what it said.
+ */
+export type DeptRequestStepResult = { ok: true } | { ok: false; reason: string }
+const refusalOf = (e: unknown, fallback: string): DeptRequestStepResult => ({
+  ok: false,
+  reason: e instanceof Error && e.message ? e.message : fallback,
+})
+
+export async function generateDeptRequestPvInWords(args: { requestId: string; payFromAccountId: string; paymentMethod: string }): Promise<DeptRequestStepResult> {
+  await requireActionOn('/payments/dept-requests', 'treasury', 'create')
+  try {
+    await generateDeptRequestPv(args)
+    return { ok: true }
+  } catch (e) {
+    return refusalOf(e, 'The voucher could not be generated.')
+  }
+}
+
+export async function cancelDeptRequestInWords(requestId: string, reason: string | null): Promise<DeptRequestStepResult> {
+  await requireActionOn('/payments/dept-requests', 'treasury', 'void')
+  const fd = new FormData()
+  fd.set('request_id', requestId)
+  if (reason) fd.set('reason', reason)
+  try {
+    await cancelDeptRequest(fd)
+    return { ok: true }
+  } catch (e) {
+    return refusalOf(e, 'The request could not be cancelled.')
+  }
+}

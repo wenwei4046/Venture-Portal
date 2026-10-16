@@ -42,6 +42,14 @@ function bubble(b, side) {
     ["v.msgEnter", "m.enter"], ["v.msgLeave", "m.leave"], ["v.msgHover", "m.hover"], ["v.msgMenuToggle", "m.menuToggle"], ["v.msgMenuOpen", "m.menuOpen"],
     ["v.msgMenuClose", "m.menuClose"], ["v.reactBar", "m.reactBar"], ["v.msgActs", "m.acts"]]) b = must(b, a, z);
   if (side === "Out") {
+    // Your own bubble in the brand's orange with white words, as the phone's (the owner, 2026-10-16: "這個顏色不錯，電腦版的也換吧";
+    // shared/chat-media.ts › MINE_BG): bound to the VM, the design's peach kept where nothing binds it (the prototype harness,
+    // so its frames still compare).
+    b = must(b, `background: "#F9D5B8", color: "#3F2B22" }}>`, `background: m.outBg ?? "#F9D5B8", color: m.outFg ?? "#3F2B22" }}>`);
+    b = must(b, `fontSize: "11px", color: "#806B60" }}>{!!(m.starred)`, `fontSize: "11px", color: m.outTime ?? "#806B60" }}>{!!(m.starred)`);
+    b = must(b, `borderLeft: "3px solid #BD4A19", background: "rgba(63,43,34,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: "#BD4A19" }}>`,
+      `borderLeft: m.outBg ? "3px solid #fff" : "3px solid #BD4A19", background: m.outBg ? "rgba(255,255,255,.18)" : "rgba(63,43,34,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: m.outBg ? "#fff" : "#BD4A19" }}>`);
+    b = b.replace(/(\{m\.quote\.who\}<\/strong><span style=\{\{ fontSize: "13px", color: )"#806B60"/, `$1m.outBg ? "rgba(255,255,255,.9)" : "#806B60"`);
     // The tick: blue once read, grey before, none while sending or failed; a failed message says so.
     b = b.replace(/\{m\.time\}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B8FD9"([^>]*)>([\s\S]*?)<\/svg><\/span>/,
       (_x, rest, inner) => `{m.time}{!!(m.hasTick) && (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={m.tick}${rest}>${inner}</svg>)}{!!(m.failed) && (<span style={{ color: "#A3371A", fontWeight: "600" }}>Not sent</span>)}</span>`);

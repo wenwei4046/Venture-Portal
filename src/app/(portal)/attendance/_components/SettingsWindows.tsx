@@ -3,13 +3,14 @@
 import { useMemo, useState, useTransition, type CSSProperties } from 'react'
 import { Button } from '@/components/ds/Button'
 import { DsSelect, Field, TextField, Textarea } from '@/components/ds/Field'
-import { SegmentedControl } from '@/components/ds/Controls'
+import { SegmentedControl, Switch } from '@/components/ds/Controls'
 import { CenterWindow } from '@/components/ds/Overlay'
 import { deleteSetting, saveSetting, type SettingKind } from '@/lib/attendance/actions'
 import {
-  DAY_NAMES, HALF_HOURS, MONTHS, blankWeek, dmy, groupSummary, isWeekend, monthCells, multipliersFrom, nextFirsts, previewGroups, toggleAll, unitOf, weeklyHours,
+  DAY_NAMES, HALF_HOURS, MONTHS, blankWeek, derivedFlags, dmy, groupSummary, isWeekend, monthCells, multipliersFrom, nextFirsts, previewGroups, settledFlags,
+  toggleAll, unitOf, weeklyHours, type LeaveFlags,
 } from '@/lib/attendance/settings'
-import type { AttConfig, AttLeaveType, LeaveGroup, ScheduleDay } from '@/lib/attendance/types'
+import type { AttConfig, LeaveGroup, ScheduleDay } from '@/lib/attendance/types'
 import { Avatar, HoverButton } from './bits'
 import { FenceRing, OT_DAY } from './SettingsPanels'
 
@@ -62,12 +63,14 @@ function Shell({
   const { sm, close, flash, canEdit } = props
   const isNew = !sm.id
   const [busy, start] = useTransition()
-  const run = (fn: () => Promise<{ ok: boolean; reason?: string }>, done: string) =>
+  // A new item has no title yet: its toast names what was saved (att_save_setting answers its label).
+  const run = (fn: () => Promise<{ ok: boolean; reason?: string; data?: unknown }>, done: string | ((label: string) => string)) =>
     start(async () => {
       const r = await fn()
       if (r.ok) {
         close()
-        flash(done)
+        const saved = (r.data as { label?: unknown } | undefined)?.label
+        flash(typeof done === 'function' ? done(typeof saved === 'string' && saved ? saved : title) : done)
       } else flash(r.reason ?? 'Something went wrong.')
     })
   return (
@@ -90,7 +93,7 @@ function Shell({
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="secondary" size="sm" onClick={close}>Cancel</Button>
           {canEdit ? (
-            <Button size="sm" disabled={blocked || busy} onClick={() => run(save as () => Promise<{ ok: boolean; reason?: string }>, kind === 'ot' ? `${title} OT saved · from next close` : `${title} saved · ${isNew ? 'added' : 'updated'} · audited`)}>
+            <Button size="sm" disabled={blocked || busy} onClick={() => run(save as () => Promise<{ ok: boolean; reason?: string; data?: unknown }>, kind === 'ot' ? `${title} OT saved · from next close` : label => `${label} saved · ${isNew ? 'added' : 'updated'} · audited`)}>
               {isNew && kind !== 'ot' ? 'Add' : 'Save'}
             </Button>
           ) : null}
@@ -115,7 +118,8 @@ function AssignmentWindow(props: Props) {
     mode: cur?.mode ?? 'clock',
     scheduleId: cur?.scheduleId ?? config.schedules[0]?.id ?? '',
     where: cur ? (cur.anywhere ? 'anywhere' : cur.locationId ?? '') : config.locations[0]?.id ?? '',
-    ot: cur?.ot ?? 'statutory',
+    // A new assignment pays OT by wage (2026-10-15 — the user: "set default by wage"): RM 4,000's line is Policy's.
+    ot: cur?.ot ?? 'by_wage',
     from: cur?.from ?? froms[0],
   }))
   const set = (k: keyof typeof f, v: string) => setF(x => ({ ...x, [k]: v }))
@@ -320,10 +324,14 @@ function HolidayWindow(props: Props) {
 
 // ── Leave types ─────────────────────────────────────────────────────────────
 
-/** What a code implies: AL accrues monthly, UL has no balance, EL comes out of AL, maternity / paternity count calendar days. */
-export function derivedFlags(code: string, name: string, cur?: AttLeaveType) {
-  if (cur && cur.code === code) return { accrues: cur.accrues, unpaid: cur.unpaid, drawsFrom: cur.drawsFrom, counts: cur.counts }
-  return { accrues: code === 'AL', unpaid: code === 'UL', drawsFrom: code === 'EL' ? 'AL' : null, counts: /maternity|paternity/i.test(name) ? 'calendar' : 'working' }
+/** One flag of a leave type: its name, its switch. */
+function FlagRow({ label, first = false, children }: { label: string; first?: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 34, padding: '8px 0', borderTop: first ? 0 : '1px solid var(--ds-border)' }}>
+      <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
+      {children}
+    </div>
+  )
 }
 
 const chip = (on: boolean): CSSProperties => ({ whiteSpace: 'nowrap', padding: '4px 10px', borderRadius: 999, border: `1px solid ${on ? 'var(--hr-accent, rgb(233 154 83))' : 'var(--ds-border)'}`, background: on ? 'rgb(255 240 228)' : 'var(--ds-surface)', color: on ? 'rgb(var(--tone-clay-deep))' : 'var(--ds-ink-2)', fontFamily: 'inherit', fontSize: 12, fontWeight: on ? 600 : 400, cursor: 'pointer' })
@@ -346,7 +354,12 @@ function LeaveWindow(props: Props) {
   const unit = unitOf(f.name)
   const pv = useMemo(() => previewGroups(groups, config.people, config.today), [groups, config.people, config.today])
   const code = f.code.trim().toUpperCase()
-  const flags = derivedFlags(code, f.name, cur)
+  // The code suggests the flags until HR turns one (2026-10-15, "窗口加开关").
+  const [turned, setTurned] = useState<Partial<LeaveFlags>>({})
+  const flags = settledFlags({ ...derivedFlags(code, f.name, cur), ...turned })
+  const turn = <K extends keyof LeaveFlags>(k: K, v: LeaveFlags[K]) => setTurned(t => ({ ...t, [k]: v }))
+  const sources = [...new Set([...config.leaveTypes.filter(t => t.code !== code && !t.unpaid && !t.drawsFrom).map(t => t.code), ...(flags.drawsFrom ? [flags.drawsFrom] : [])])]
+  const typeName = (c: string) => config.leaveTypes.find(t => t.code === c)?.name
   const beside = (
     <>
       <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--ds-border)' }}>
@@ -482,6 +495,31 @@ function LeaveWindow(props: Props) {
           </div>
           <Field label="Rules"><Textarea value={f.rules} onChange={v => set('rules', v)} rows={2} placeholder="Notice, documents, carry-forward" /></Field>
           <Field label="Approval route"><DsSelect value={f.route} onChange={v => set('route', v)} options={[{ value: 'upline_only', label: 'Upline only' }, { value: 'hr_only', label: 'HR only' }, { value: 'upline_then_hr', label: 'Upline → HR' }]} ariaLabel="Approval route" /></Field>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={LBL}>Balance and pay</span>
+            <div style={{ border: '1px solid var(--ds-border)', borderRadius: 12, padding: '0 14px', background: 'var(--ds-surface)' }}>
+              <FlagRow first label="Earned month by month">
+                <Switch checked={flags.accrues} disabled={flags.unpaid || !!flags.drawsFrom} onChange={v => turn('accrues', v)} ariaLabel="Earned month by month" />
+              </FlagRow>
+              <FlagRow label="Unpaid">
+                <Switch checked={flags.unpaid} onChange={v => turn('unpaid', v)} ariaLabel="Unpaid" />
+              </FlagRow>
+              <FlagRow label="Comes out of">
+                <div style={{ width: 210 }}>
+                  <DsSelect
+                    value={flags.drawsFrom ?? ''}
+                    disabled={flags.unpaid}
+                    onChange={v => turn('drawsFrom', v || null)}
+                    options={[{ value: '', label: 'Its own days' }, ...sources.map(c => ({ value: c, label: typeName(c) ? `${c} · ${typeName(c)}` : c }))]}
+                    ariaLabel="Comes out of"
+                  />
+                </div>
+              </FlagRow>
+              <FlagRow label="Counts calendar days">
+                <Switch checked={flags.counts === 'calendar'} onChange={v => turn('counts', v ? 'calendar' : 'working')} ariaLabel="Counts calendar days" />
+              </FlagRow>
+            </div>
+          </div>
         </>
       }
     />

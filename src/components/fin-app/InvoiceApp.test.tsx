@@ -10,7 +10,19 @@ import type { InvoicePageData } from '@/app/(portal)/invoices/[id]/_lib/invoice-
 // non-billable lines, and an invoice: the drawer's parts and what the full page
 // adds (its trail, its audit log), with the drawer's own steps.
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), flash: vi.fn(), openPage: vi.fn(), approve: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
+  flash: vi.fn(),
+  openPage: vi.fn(),
+  approve: vi.fn(),
+  openSettle: vi.fn(),
+  openRefund: vi.fn(),
+  settle: vi.fn(),
+  createContract: vi.fn(),
+  updateContract: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh, replace: mocks.replace }),
   usePathname: () => '/fin-app/daily/invoices',
@@ -39,6 +51,18 @@ vi.mock('@/app/(portal)/statements/_components/SettleDialog', () => ({
 }))
 vi.mock('@/app/(portal)/statements/_components/GenerateDialogs', () => ({ MarketingDialog: () => null, PayrollInvoicesDialog: () => null, ReconcileDialog: () => null, OwnShareDialog: () => null }))
 vi.mock('@/components/department/DepartmentModeSwitch', () => ({ default: () => <div data-testid="mode-switch" /> }))
+// The voucher page's work, as the app's sheets (part E4b).
+vi.mock('@/app/(portal)/payments/create-actions', () => ({ openInvoiceSettle: mocks.openSettle, openInvoiceRefund: mocks.openRefund, openCreatePayment: vi.fn(() => new Promise(() => {})) }))
+vi.mock('@/app/(portal)/payments/actions', () => ({ settleInvoiceFromSheet: mocks.settle, createPaymentFromDialog: vi.fn() }))
+vi.mock('@/app/(portal)/billing/actions', () => ({ createContractInWords: mocks.createContract, updateContractInWords: mocks.updateContract }))
+vi.mock('@/app/(portal)/payments/_components/CreatePaymentDialog', () => ({
+  default: ({ open, preset }: { open: boolean; preset?: { title?: string; payee?: string; amount?: number; description?: string } | null }) =>
+    open ? (
+      <div data-testid="create-payment">
+        {[preset?.title, preset?.payee, preset?.amount, preset?.description].filter(Boolean).join(' | ')}
+      </div>
+    ) : null,
+}))
 
 import FinAppFrame from './FinAppFrame'
 import InvoiceApp from './InvoiceApp'
@@ -99,7 +123,7 @@ const HUB: InvoiceHubData = {
   ],
   otherOpen: [],
   creditNotes: [CN],
-  contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', invoice: null }],
+  contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', companyId: 'co-hc', invoice: null }],
   nonBillable: [{ id: 'vp1', at: '2026-10-06T02:00:00Z', type: 'expense_out', amount: 2899.75, description: 'AI tools Sep26 claim', source: 'Payment voucher', out: true }],
   banks: [{ id: 'b1', label: 'Hong Leong Bank — 123-456-7890' }],
   basis: { status: 'Pending', note: 'HR pending', summary: 'Nothing from payroll yet', lines: [], director: null, allocation: [] },
@@ -132,10 +156,10 @@ const PAGE: InvoicePageData = {
   extraModes: [],
 }
 
-const draw = (search = '') =>
+const draw = (search = '', hub: InvoiceHubData = HUB) =>
   render(
     <FinAppFrame platform="android" rows={['payments', 'receipts', 'invoices', 'billing']}>
-      <InvoiceApp hub={HUB} can={ALL} search={search} today="2026-10-15" thisMonth="2026-10" record={null} refused={null} />
+      <InvoiceApp hub={hub} can={ALL} search={search} today="2026-10-15" thisMonth="2026-10" record={null} refused={null} />
     </FinAppFrame>,
   )
 
@@ -235,6 +259,86 @@ describe('Daily › Invoice on the phone', () => {
     draw('f=mkt')
     fireEvent.click(screen.getByRole('button', { name: 'Invoice' }))
     expect(mocks.flash).toHaveBeenCalledWith('No invoice for this project in October 2026 yet — Create invoice ▾ › Generate Marketing invoices raises them.')
+  })
+
+  it('a project is edited in the app’s sheet, sending only what changed; + New contract opens it empty', async () => {
+    mocks.updateContract.mockResolvedValue({ ok: true })
+    window.history.replaceState(null, '', '/fin-app/daily/invoices?f=mkt')
+    draw('f=mkt')
+    fireEvent.click(screen.getByRole('button', { name: /Marketing retainer — Q4/ }))
+    const sheet = await screen.findByRole('dialog', { name: /Edit contract/ })
+    expect(within(sheet).getByLabelText('Contract amount RM')).toHaveValue('6000.00')
+    fireEvent.change(within(sheet).getByLabelText('Contract amount RM'), { target: { value: '6500' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+    })
+    const fd = mocks.updateContract.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(fd.entries())).toEqual({ id: 'ct1', amount: '6500' })
+    expect(mocks.flash).toHaveBeenCalledWith('Contract saved')
+    expect(mocks.push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '+ New contract' }))
+    const fresh = await screen.findByRole('dialog', { name: /New marketing contract/ })
+    expect(within(fresh).getByLabelText('Subsidiary')).toHaveValue('')
+  })
+
+  it('+ Add non-billable expense opens Create payment in the app, on the Venture Pool', () => {
+    window.history.replaceState(null, '', '/fin-app/daily/invoices?f=nonbill')
+    draw('f=nonbill')
+    fireEvent.click(screen.getByRole('button', { name: '+ Add non-billable expense' }))
+    expect(screen.getByTestId('create-payment')).toHaveTextContent('Non-billable expense')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('a paid invoice’s Refund opens Create payment filled from what was received', async () => {
+    mocks.openRefund.mockResolvedValue({ ok: true, preset: { invoice_no: 'HV-INV-202610-0003', company_name: 'HOUZS Century', company_id: 'co-hc', amount: 1250 } })
+    window.history.replaceState(null, '', '/fin-app/daily/invoices?id=pd1')
+    mocks.openPage.mockResolvedValue({ ok: true, page: { ...PAGE, invoice: HUB.invoices[3] } })
+    await act(async () => {
+      draw('id=pd1')
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refund' }))
+    })
+    expect(mocks.openRefund).toHaveBeenCalledWith('pd1')
+    expect(screen.getByTestId('create-payment')).toHaveTextContent('Refund payment | HOUZS Century | 1250 | Refund invoice HV-INV-202610-0003 — HOUZS Century')
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('a department pool’s invoice settles on its receipt in the app — netting, the page’s own fields', async () => {
+    const pool = toHubInvoice(row({ id: 'dp1', invoice_no: 'HV-INV-202610-0020', company_id: null, billable_to_type: 'dept_pool', billable_to_department_id: 'd-mkt', total_amount: 800 }), ctx)
+    const hub = { ...HUB, invoices: [...HUB.invoices, pool] }
+    mocks.openPage.mockResolvedValue({ ok: true, page: { ...PAGE, invoice: pool } })
+    mocks.openSettle.mockResolvedValue({
+      ok: true,
+      preset: { id: 'dp1', invoice_no: 'HV-INV-202610-0020', company_id: null, company_name: '—', total_amount: 800, period_month: '2026-10-01', billing_mode: 'hr_attribution', target_pool: 'dept_pool_hr', billable_to_type: 'dept_pool' },
+      poolLabel: 'HR Dept Pool',
+      banks: [{ id: 'b1', bank_name: 'Hong Leong Bank', account_number: '123', current_balance: 1000 }],
+    })
+    mocks.settle.mockResolvedValue({ ok: true, id: 'or-1', voucherNo: 'HV-OR-202610-0031', submitted: false })
+    window.history.replaceState(null, '', '/fin-app/daily/invoices?id=dp1')
+    await act(async () => {
+      draw('id=dp1', hub)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Settle' }))
+    const sheet = await screen.findByRole('dialog', { name: /Settle HV-INV-202610-0020/ })
+    expect(await within(sheet).findByText('HR Dept Pool')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Method')).toHaveValue('netting')
+    expect(within(sheet).getByLabelText('Description')).toHaveValue('Settle invoice HV-INV-202610-0020 — —')
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Settle & create receipt' }))
+    })
+    const fd = mocks.settle.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(fd.entries())).toMatchObject({
+      direction: 'credit',
+      voucher_type: 'billing_payment',
+      invoice_id: 'dp1',
+      payment_method: 'netting',
+      amount: '800.00',
+      target_pool: 'dept_pool_hr',
+      payment_date: '2026-10-15',
+    })
+    expect(mocks.flash).toHaveBeenCalledWith('Receipt HV-OR-202610-0031 written — the invoice is settled')
+    expect(mocks.push).not.toHaveBeenCalled()
   })
 
   it('Create invoice ▾ opens the desktop’s own window', async () => {

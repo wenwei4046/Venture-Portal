@@ -3,8 +3,9 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatIntlDate, formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import { claimReference, readClaimQueueRow, splitClaimQueue } from '@/lib/claim-requests'
+import { claimReference, splitClaimQueue } from '@/lib/claim-requests'
 import RaiseClaimVoucherForm from './_components/RaiseClaimVoucherForm'
+import { readClaimRequests } from './_lib/claim-read'
 
 const day = (iso: string | null) =>
   iso ? formatIntlDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kuala_Lumpur' }) : '—'
@@ -24,24 +25,10 @@ export default async function ClaimRequestsPage() {
   await requirePermission('treasury')
   const supabase = await createClient()
 
-  const [{ data: queue, error }, { data: banks }] = await Promise.all([
-    supabase.rpc('claim_payment_queue'),
-    supabase
-      .from('bank_accounts')
-      .select('id, bank_name, current_balance')
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false }),
-  ])
-  if (error) throw new Error(`Could not load the claim requests: ${error.message}`)
-
-  const rows = (queue ?? []).map(r => readClaimQueueRow(r as unknown as Record<string, unknown>))
+  // The queue and the banks, as the Finance phone app reads them (`_lib/claim-read`).
+  const { rows, banks: bankOptions } = await readClaimRequests(supabase)
   const { toRaise, withPrincipal } = splitClaimQueue(rows)
   const sum = (list: typeof rows) => list.reduce((total, r) => total + r.amount, 0)
-  const bankOptions = (banks ?? []).map(b => ({
-    id: b.id,
-    bank_name: b.bank_name,
-    current_balance: Number(b.current_balance ?? 0),
-  }))
   const countOf = (n: number) => `${n} ${n === 1 ? 'claim' : 'claims'}`
 
   return (

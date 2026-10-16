@@ -15,12 +15,15 @@ export default function ReceiptsHubClient({
   ledger,
   canCreate,
   canSetDefault,
+  canExport = false,
   prefix,
   today,
 }: {
   ledger: HubLedger
   canCreate: boolean
   canSetDefault: boolean
+  /** Treasury · Export: the head's Export ▾. */
+  canExport?: boolean
   /** "HV-OR-202610" — Create receipt's line under its title. */
   prefix: string
   /** The office's today. */
@@ -31,6 +34,7 @@ export default function ReceiptsHubClient({
     <VoucherHub
       ledger={ledger}
       canSetDefault={canSetDefault}
+      canExport={canExport}
       dept={[]}
       payroll={null}
       claims={[]}

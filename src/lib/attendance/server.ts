@@ -32,6 +32,7 @@ export async function loadConfig(): Promise<Read<AttConfig>> {
     data: {
       ...c,
       otRates: c.otRates.map(x => ({ ...x, multiplier: Number(x.multiplier), minimum: Number(x.minimum) })),
+      policies: c.policies.map(p => ({ ...p, otWageCap: Number(p.otWageCap) })),
       leaveTypes: c.leaveTypes.map(t => ({ ...t, groups: (t.groups ?? []).map(g => ({ ...g, base: Number(g.base), steps: (g.steps ?? []).map(s => ({ yrs: Number(s.yrs), days: Number(s.days) })) })) })),
     },
   }
