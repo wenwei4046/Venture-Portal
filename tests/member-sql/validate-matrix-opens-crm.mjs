@@ -71,7 +71,7 @@ for (const [t, name, role] of [['ceo', 'CHIEF EXECUTIVE OFFICER', 'boss'], ['dir
 }
 const staff = [
   ['boss', 'ceo', 'principal'], ['peter', 'dir', null], ['kris', 'dir', null], ['anthony', 'tl', null], ['rachael', 'rs', null],
-  ['cmk', 'director', 'principal'], ['kaiyee', 'ea', 'principal'], ['siti', 'fa', 'finance'],
+  ['cmk', 'director', 'principal'], ['kaiyee', 'ea', 'principal'], ['siti', 'fa', 'finance'], ['faironly', 'rs', null],
 ]
 for (const [who, t, kind] of staff) {
   await q(`insert into users values ($1, true, $2)`, [U(who), kind])
@@ -82,6 +82,7 @@ const member = (who, t, up) => q(`insert into comm_hierarchy (scheme_id, staff_i
   [id('sc', 'ir'), S(who), T(t), up ? S(up) : null])
 await member('anthony', 'tl', null)
 await member('rachael', 'rs', 'anthony')
+await q(`insert into comm_hierarchy (scheme_id, staff_id, title_id) values ($1, $2, $3)`, [id('sc', 'fair'), S('faironly'), T('rs')])  // Fair's only
 await q(`insert into comm_sub_department_directors values ($1, $2), ($3, $4)`, [IR, S('peter'), FAIR, S('kris')])
 
 // What each holds of the CRM row (template + their own cells), as production's would.
@@ -135,10 +136,15 @@ await cells('rachael', [['edit', 'own']])
 check(await myRole('rachael'), null, 'her own cells without View close the CRM to her')
 await q(`delete from test_crm_cells where uid = $1`, [U('rachael')])
 
-// 5. Fair's director: his template opens it too (the owner unticks his CRM cells to keep him out).
-check(await myRole('kris'), 'boss', 'KRIS (Fair\'s director, not IR\'s) holds every CRM cell → in, at the top')
-await cells('kris', [['export', 'all']])
-check(await myRole('kris'), null, 'with his CRM cells unticked for him alone, he is out')
+// 5. Somebody who handles another sub-department only is not in IR's CRM, whatever their cells (the owner:
+//    "只是 handle Fare 的话，那他其实就只能看到 Fare 那边罢了") — the company's level is, by its cells.
+check(await myRole('kris'), null, 'KRIS (Fair\'s director, not IR\'s) holds every CRM cell — and is not in IR\'s CRM')
+check((await people('kris')).people, [], 'he sees nobody')
+await cells('faironly', [['view', 'all'], ['edit', 'all']])
+check(await myRole('faironly'), null, 'a Fair-only salesperson is not in IR\'s CRM either')
+await q(`delete from comm_sub_department_directors where staff_id = $1`, [S('kris')])
+check(await myRole('kris'), 'boss', '(handling no sub-department, the same cells put him at the top)')
+await q(`insert into comm_sub_department_directors values ($1, $2)`, [FAIR, S('kris')])
 
 // 6. The structure still places everybody it knows; the Principal's login is still the CEO.
 check([await myRole('boss'), await myRole('peter'), await myRole('anthony'), await myRole('rachael')], ['boss', 'hod', 'tl', 'rs'], 'IR\'s and the CEO\'s roles are as before')

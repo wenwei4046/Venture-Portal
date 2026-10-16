@@ -16,10 +16,14 @@
 --   • crm_me() already answered only for somebody holding CRM · View (any
 --     reach, the template's cell or their own over it).
 --   • crm_my_role(): a person in the CRM's structure keeps their role (IR's
---     TL / STL / TA / RS, IR's director the HOD, a Boss title); anybody else
---     crm_me() answers for is at the top, 'boss' — what they see and do there
---     is still exactly their CRM cells (crm_can: View · All the Control panel,
---     Edit, Manage), as for the CEO.
+--     TL / STL / TA / RS, IR's director the HOD, a Boss title); somebody
+--     crm_me() answers for who handles NO sub-department (the company's
+--     level — the CEO, the directors, their office) is at the top, 'boss' —
+--     what they see and do there is still exactly their CRM cells (crm_can:
+--     View · All the Control panel, Edit, Manage), as for the CEO. Somebody
+--     who handles another sub-department only (Fair's director or people) is
+--     not in IR's CRM: the owner's default, "follow by the handled
+--     department" (per-person sub-department ticks come next).
 --   • crm_people(): the signed-in person is in their own list, with that
 --     role, even when no title places them (the screen draws the CRM only for
 --     somebody it finds there).
@@ -63,10 +67,21 @@ BEGIN
 END
 $fn$;
 
--- Who they are in the CRM: their place in it, else the top.
+-- Who they are in the CRM: their place in it — else, for somebody who handles no sub-department at all
+-- (the company's level: the CEO, the directors, their office), the top. Somebody who handles another
+-- sub-department only (Fair's director, Fair's people) is not in IR's CRM (the owner, 2026-10-16: "如果他
+-- 不是 handle IR，只是 handle Fare 的话，那他其实就只能看到 Fare 那边罢了").
 SELECT pg_temp.swap_once('public.crm_my_role()',
   $q$select crm_role_of(crm_me())$q$,
-  $q$select coalesce(crm_role_of(me.id), case when me.id is not null then 'boss' end) from (select crm_me() as id) me$q$);
+  $q$select coalesce(crm_role_of(me.id),
+    case when me.id is not null
+          and not exists (select 1 from comm_sub_department_directors d where d.staff_id = me.id)
+          and not exists (select 1 from comm_hierarchy h join comm_schemes c on c.id = h.scheme_id
+                           where h.staff_id = me.id and c.is_active
+                             and h.effective_from <= (now() at time zone 'Asia/Kuala_Lumpur')::date
+                             and (h.effective_to is null or h.effective_to >= (now() at time zone 'Asia/Kuala_Lumpur')::date))
+         then 'boss' end)
+  from (select crm_me() as id) me$q$);
 
 -- Their own list: the role above, and themselves in it.
 SELECT pg_temp.swap_once('public.crm_people()',
