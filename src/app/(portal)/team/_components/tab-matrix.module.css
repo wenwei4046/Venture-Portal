@@ -26,7 +26,8 @@
 .railCount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--hv-brown)); }
 .railCompact .railCount { font-size: 10.5px; }
 
-.table { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow: hidden; min-width: 0; }
+/* White of its own: on a person's page it stands in a grey well (2026-10-16). */
+.table { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow: hidden; min-width: 0; background: rgb(255 255 255); }
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(4, 76px) 60px;

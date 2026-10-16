@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import type { CardLadder } from '../card-actions'
 import Promotion from './Promotion'
 import Employment from './Employment'
+import w from '../../_components/person-well.module.css'
 
 /**
  * Promote and Deactivate / Reactivate on a person's full page (2026-10-10,
@@ -28,8 +29,9 @@ export default function PersonChanges({
 }) {
   const router = useRouter()
   const done = () => router.refresh()
+  // Two wells side by side where they fit (2026-10-16, the 360).
   return (
-    <div className="max-w-3xl mb-8">
+    <div className={w.pair}>
       {active ? (
         <Promotion personId={personId} personName={personName} title={title} department={department} ladder={ladder} onDone={done} />
       ) : null}

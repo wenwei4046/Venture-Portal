@@ -48,6 +48,7 @@ export default function PersonAccess({
   onSaved,
   personName,
   footSlot,
+  bare = false,
 }: {
   access: PersonAccessData
   canEdit: boolean
@@ -57,9 +58,11 @@ export default function PersonAccess({
   personName?: string
   /** The person window's footer, where Reset to title and Save stand (the handoff's). */
   footSlot?: HTMLElement | null
+  /** Inside a well that carries the title already (a person's page, 2026-10-16). */
+  bare?: boolean
 }) {
   if (access.kind === 'legacy') {
-    return <PersonPermissions userId={access.userId} rows={access.rows} source={access.source} canEdit={canEdit} />
+    return <PersonPermissions userId={access.userId} rows={access.rows} source={access.source} canEdit={canEdit} bare={bare} />
   }
   return <TemplateAccess access={access} canEdit={canEdit} onSaved={onSaved} personName={personName} footSlot={footSlot} />
 }
