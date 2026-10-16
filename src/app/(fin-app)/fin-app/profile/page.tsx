@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth'
+import { isPrincipalView } from '@/lib/finance-view'
 import { loadMyProfile } from '@/lib/account/actions'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { primedRegistryRows } from '@/lib/dept-registry'
@@ -34,13 +35,16 @@ export default async function FinAppProfile() {
 
   return (
     <ProfileScreen
-      name={profile?.name ?? user.name ?? 'Finance'}
+      view={isPrincipalView(user) ? 'principal' : 'finance'}
+      name={profile?.name ?? user.name ?? (isPrincipalView(user) ? 'Principal' : 'Finance')}
       email={profile?.email ?? user.email ?? ''}
       phone={profile?.phone ?? ''}
       personal={personal}
       admin={admin.map((a) => ({ key: a.key, label: a.label, icon: a.icon, sub: sub[a.key] ?? '', href: appHref(a.key) }))}
       // The views of the one app, for an account that may switch them (as the HR app's More) — never while viewing as a person.
       canSwitch={!!user.canSwitchView && !user.viewingAs}
+      // This phone's notifications (2026-10-17 — the Principal's own view lands here now, not on the portal's phone face).
+      push={!user.viewingAs}
     />
   )
 }

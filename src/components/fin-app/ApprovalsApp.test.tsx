@@ -145,6 +145,23 @@ afterEach(() => {
 })
 
 describe('Approvals on the phone', () => {
+  // 2026-10-17 — the Principal's own view: "just add on then tab for approval tab".
+  it('stands as the Principal’s own tab: the hub is its root, no way back, the tab bar under it', () => {
+    window.history.replaceState(null, '', '/fin-app/approvals')
+    render(
+      <FinAppFrame platform="android" rows={['approvals', 'payments']} view="principal" approvals={{ waiting: 3 }}>
+        <ApprovalsApp tab hub={HUB} search="" record={null} refused={null} />
+      </FinAppFrame>,
+    )
+    expect(screen.getByText('HOUZS Venture · Principal')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Back to/ })).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Finance' })).toHaveAttribute('data-hidden', 'false')
+    fireEvent.click(screen.getByRole('button', { name: /^Pending/ }))
+    expect(window.location.pathname + window.location.search).toBe('/fin-app/approvals?f=pending')
+    // A list is pushed over the tab: no bar under it.
+    expect(screen.getByRole('navigation', { name: 'Finance' })).toHaveAttribute('data-hidden', 'true')
+  })
+
   it('opens on the hub: what waits in total, the oldest wait, a card per list', () => {
     draw()
     // The total twice: the hero's and the Pending card's (the card's list is all of it).

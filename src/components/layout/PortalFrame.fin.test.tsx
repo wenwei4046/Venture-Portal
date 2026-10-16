@@ -22,7 +22,7 @@ vi.mock('./FinSwipeBack', () => ({ default: () => <span data-testid="swipe" /> }
 vi.mock('./FinScrollMemory', () => ({ default: () => <span data-testid="scroll-memory" /> }))
 vi.mock('./RouteFreshener', () => ({ default: () => null }))
 vi.mock('./HrSidebar', () => ({ default: () => <aside>hr sidebar</aside> }))
-vi.mock('./FinSidebar', () => ({ default: () => <aside>fin sidebar</aside> }))
+vi.mock('./FinSidebar', () => ({ default: (p: { principal?: boolean }) => <aside>{p.principal ? 'principal fin sidebar' : 'fin sidebar'}</aside> }))
 vi.mock('./HrTopBar', () => ({ default: (p: { viewLabel?: string }) => <div data-testid="hr-topbar">{p.viewLabel}</div> }))
 vi.mock('@/components/finv/Toast', () => ({ FinToastHost: () => <span data-testid="fin-toast" /> }))
 
@@ -64,11 +64,23 @@ describe('PortalFrame and the Finance view', () => {
     expect(screen.getByTestId('fin-toast')).toBeInTheDocument()
   })
 
-  it('keeps the Principal’s own view in its own shell — the new sidebar is Finance’s view only', () => {
+  // 2026-10-17 — the user: "revamp the principle desktop view, take the same totally view with finance. no need
+  // show hr, cause can switch view to hr".
+  it('draws the Principal’s own view in Finance’s shell, its own rows added, named Principal view', () => {
+    const principal = { ...user('principal'), permissions: ['treasury', 'approvals', 'view_switch'] } as unknown as User
+    render(<PortalFrame user={principal} navData={navData}><Probe /></PortalFrame>)
+    expect(document.querySelector('.hrv-shell')).toHaveClass('fin-shell')
+    expect(screen.getByText('principal fin sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('hr-topbar')).toHaveTextContent('Principal view')
+    expect(document.querySelector('.hrv-frame')).toHaveClass('fin-view')
+    expect(screen.getByTestId('probe')).toHaveTextContent('true')
+  })
+
+  it('keeps a Principal kind that may not switch views in the portal’s own shell — HR’s pages are listed there', () => {
     render(<PortalFrame user={user('principal')} navData={navData}><Probe /></PortalFrame>)
     expect(document.querySelector('.hrv-shell')).toBeNull()
     expect(document.querySelector('.sheet-frame')).toHaveClass('fin-view')
-    expect(screen.queryByText('fin sidebar')).toBeNull()
+    expect(screen.queryByText(/fin sidebar/)).toBeNull()
   })
 
   it('wears Finance’s shell off Finance’s pages too, without .fin-view (Meeting Rooms from the account menu)', () => {

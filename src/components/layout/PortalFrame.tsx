@@ -6,7 +6,7 @@ import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
-import { isFinanceDetailRoute, isFinanceShell, isFinanceView } from '@/lib/finance-view'
+import { isFinanceDetailRoute, isFinanceShell, isFinanceView, isPrincipalView } from '@/lib/finance-view'
 import { FinViewProvider } from './fin-view'
 import FinSwipeBack from './FinSwipeBack'
 import FinScrollMemory from './FinScrollMemory'
@@ -75,9 +75,11 @@ export default function PortalFrame({
   const fin = isFinanceView(pathname, user.role)
   // Finance's own shell (2026-10-14, the Finance revamp v2): HR's square
   // sidebar and greeting bar, drawn with Finance's categories — for the
-  // finance kind and the Principal's Finance lens, on a computer (a phone keeps
-  // the portal's phone shell until Finance's phone app takes it over).
-  const finShell = !hr && isFinanceShell(user.role) && !phone
+  // finance kind, the Principal's Finance lens and, since 2026-10-17, the
+  // Principal's own view (its few rows added), on a computer (a phone opens
+  // the Finance app — the layout sends it there).
+  const finShell = !hr && isFinanceShell(user) && !phone
+  const principalShell = finShell && isPrincipalView(user)
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   // This phone's notifications (2026-10-16 — the user's iPhone opened here and was never asked): the first open's
@@ -126,7 +128,7 @@ export default function PortalFrame({
         <div className={`hrv-shell${finShell ? ' fin-shell' : ''} flex h-screen overflow-hidden print:h-auto print:overflow-visible`}>
           <div className="print:hidden contents">
             {finShell ? (
-              <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} />
+              <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} principal={principalShell} />
             ) : (
               <HrSidebar user={navUser} revenueSub={revenueSubsOf(navData)} initialCollapsed={hrNavCollapsed} />
             )}
@@ -134,7 +136,7 @@ export default function PortalFrame({
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
               {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
-              <HrTopBar user={user} viewLabel={finShell ? 'Finance view' : 'HR view'} />
+              <HrTopBar user={user} viewLabel={principalShell ? 'Principal view' : finShell ? 'Finance view' : 'HR view'} />
               <div className="md:hidden">
                 <TopBar user={user} fin={finPage} />
               </div>

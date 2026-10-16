@@ -95,7 +95,7 @@ export function AccountMenu({
 }
 
 /** "Sign out?" — then this device only (2026-10-08: the shared accounts are switched on the office PC). */
-export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SignOutDialog({ open, onClose, view = 'the Finance view' }: { open: boolean; onClose: () => void; /** What signing in again opens: "the Finance view", "the Principal view". */ view?: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const signOut = async () => {
@@ -108,7 +108,7 @@ export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <FinDialog open={open} onClose={onClose} title="Sign out?" locked={busy}>
       <DialogConfirm
-        text="You will need to sign in again to open the Finance view."
+        text={`You will need to sign in again to open ${view}.`}
         confirmLabel="Sign out"
         danger
         busy={busy}

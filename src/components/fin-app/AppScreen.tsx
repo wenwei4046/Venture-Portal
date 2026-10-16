@@ -108,7 +108,7 @@ export default function AppScreen({
   onSwipe?: (way: 'next' | 'prev') => void
   children: ReactNode
 }) {
-  const { platform } = useFrame()
+  const { platform, view } = useFrame()
   useChrome({ root, bar: bar.length > 0 && !bulk, bulk: !!bulk })
 
   const scroller = useRef<HTMLDivElement>(null)
@@ -180,7 +180,7 @@ export default function AppScreen({
                 H
               </span>
               <span className={s.rootText}>
-                <span className={s.rootKicker}>HOUZS Venture · Finance</span>
+                <span className={s.rootKicker}>HOUZS Venture · {view === 'principal' ? 'Principal' : 'Finance'}</span>
                 <span className={s.rootName}>{head.title}</span>
               </span>
             </span>

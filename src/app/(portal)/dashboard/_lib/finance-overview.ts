@@ -85,10 +85,20 @@ export async function loadFinanceOverviewCounts(supabase: SupabaseClient, user: 
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-/** The Overview's line (D01): what waits, part by part, for the parts this viewer reads. */
-export function financeSummary(c: FinanceOverviewCounts): string {
+/**
+ * The Overview's line (D01): what waits, part by part, for the parts this viewer reads. The Principal's own
+ * view (2026-10-17) leads with what waits for ITS decision — the queue's items (`waiting`, a combined
+ * approval one) — in place of the vouchers waiting; `undefined` keeps Finance's line, null leaves the part out.
+ */
+export function financeSummary(c: FinanceOverviewCounts, opts: { waiting?: number | null } = {}): string {
   const parts = [
-    c.pending === null ? null : `${plural(c.pending, 'voucher', 'vouchers')} waiting for approval`,
+    opts.waiting !== undefined
+      ? opts.waiting === null
+        ? null
+        : `${plural(opts.waiting, 'request', 'requests')} waiting for your approval`
+      : c.pending === null
+        ? null
+        : `${plural(c.pending, 'voucher', 'vouchers')} waiting for approval`,
     c.outstanding === null ? null : `${plural(c.outstanding, 'invoice', 'invoices')} outstanding`,
     c.toBill === null ? null : `${plural(c.toBill, 'allocation', 'allocations')} to bill`,
   ].filter((p): p is string => p !== null)

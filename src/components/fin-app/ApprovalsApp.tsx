@@ -8,7 +8,7 @@ import { drawerStyles as d } from '@/components/finv/Drawer'
 import fm from '@/components/finv/form.module.css'
 import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/DrawerParts'
 import { HrIcon } from '@/components/hrv/icons'
-import { HUB_HREF } from '@/lib/fin-app/routes'
+import { APPROVALS_TAB_HREF, HUB_HREF } from '@/lib/fin-app/routes'
 import { plural, rm, type ApprovalCardKey, type ApprovalHubModel, type ApprovalMember, type ApprovalRecordModel, type ApprovalRow, type AppRecordRef } from '@/lib/fin-app/approval-model'
 import { approveRequestGroupPartial, approveRequestsBulk, rejectRequestsBulk } from '@/app/(portal)/approvals/actions'
 import { openApprovalRequest } from '@/app/(portal)/approvals/page-actions'
@@ -109,11 +109,14 @@ type Ask =
   | { kind: 'split'; row: ApprovalRow; approve: string[]; reject: string[] }
 
 export default function ApprovalsApp({
+  tab = false,
   hub,
   search,
   record: initialRecord,
   refused: initialRefused,
 }: {
+  /** The Principal's own Approvals tab (2026-10-17, `/fin-app/approvals`): the hub is the tab's root, the tab bar under it. */
+  tab?: boolean
   hub: ApprovalHubModel
   /** The address's query as the server read it (a refresh, a link). */
   search: string
@@ -524,7 +527,11 @@ export default function ApprovalsApp({
     )
   } else {
     screen = (
-      <AppScreen screenKey={HERE} head={{ kind: 'back', title: 'Approvals', backLabel: 'Overview', onBack: leave }}>
+      <AppScreen
+        screenKey={tab ? APPROVALS_TAB_HREF : HERE}
+        head={tab ? { kind: 'root', title: 'Approvals' } : { kind: 'back', title: 'Approvals', backLabel: 'Overview', onBack: leave }}
+        root={tab}
+      >
         <BankHero value={hub.hero.value} label={hub.hero.label} chip={hub.hero.chip} />
         <StackCards cards={hub.cards} onOpen={(k) => go({ kind: 'list', card: k as ApprovalCardKey })} />
       </AppScreen>

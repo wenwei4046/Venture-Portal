@@ -45,23 +45,38 @@ export function isFinanceView(pathname: string | null | undefined, role: UserRol
   return FINANCE_VIEW_PREFIXES.some((p) => under(pathname, p))
 }
 
+/** Who the shell is drawn for: the kind it is drawn as, and the account's keys. */
+export type ShellViewer = { role: UserRole | string; permissions?: readonly string[] } | null | undefined
+
+/**
+ * The Principal's own view (2026-10-17 — the user: "revamp the principle
+ * desktop view, take the same totally view with finance. no need show hr,
+ * cause can switch view to hr"): the Principal kind, in its own view, on an
+ * account that may switch views — HR's pages are one switch away. One that
+ * may not (the template *Full access · no view switching*) keeps the portal's
+ * own sidebar, which still lists them.
+ */
+export function isPrincipalView(viewer: ShellViewer): boolean {
+  return !!viewer && viewer.role === 'principal' && (viewer.permissions ?? []).includes('view_switch')
+}
+
 /**
  * Does the portal wear Finance's own shell (2026-10-14, the Finance revamp v2 —
  * `.design/fin-r2/handoff`): HR's square sidebar and greeting bar with
  * Finance's categories. The finance kind (finance@, a Finance template's
- * holder) and the Principal's Finance lens — the user: "只给 Finance view";
- * the Principal's own view keeps its sidebar, which holds far more.
+ * holder), the Principal's Finance lens — and since 2026-10-17 the
+ * Principal's own view (`isPrincipalView`), with its own few rows added.
  */
-export function isFinanceShell(role: UserRole | string | null | undefined): boolean {
-  return role === 'finance'
+export function isFinanceShell(viewer: ShellViewer): boolean {
+  return !!viewer && (viewer.role === 'finance' || isPrincipalView(viewer))
 }
 
 /**
  * The account as it is drawn: on Finance's view (its shell, its Overview) —
  * which view a page is drawn in, never what it may do (the cells decide that).
  */
-export function onFinanceView(viewer: { role: UserRole | string }): boolean {
-  return isFinanceShell(viewer.role)
+export function onFinanceView(viewer: ShellViewer): boolean {
+  return isFinanceShell(viewer)
 }
 
 /** The name the views greet with (the prototypes' `acct.first`): its first word. */
