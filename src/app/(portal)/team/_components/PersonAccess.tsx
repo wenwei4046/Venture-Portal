@@ -20,6 +20,7 @@ import {
   type PersonBox,
   type TabView,
 } from '@/lib/permission-tabs'
+import { sameReachTicks, toggleReach, type ReachTick } from '@/lib/sub-department-reach'
 import type { PersonAccessData } from '../_lib/person-permissions'
 import PersonPermissions from './PersonPermissions'
 import TabMatrix from './TabMatrix'
@@ -91,12 +92,17 @@ function TemplateAccess({
   )
   const [draft, setDraft] = useState<Set<string> | null>(null)
   const ticks = draft ?? saved
+  // Their sub-departments on the Revenue tabs (2026-10-16): their own ticks over what they handle.
+  const [reachDraft, setReachDraft] = useState<ReachTick[] | null>(null)
+  const savedReach = access.reach?.ticks ?? []
+  const reachTicks = reachDraft ?? savedReach
   const [view, setView] = useState<TabView>(() => TAB_VIEWS.find(v => viewCount(v.id, saved).seen > 0)?.id ?? 'hr')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const changes = boxesOf(base, ticks).length
-  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep
+  const changes = boxesOf(base, ticks).length + reachTicks.length
+  const reachDirty = reachDraft !== null && !sameReachTicks(reachDraft, savedReach)
+  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty
   const who = personName?.trim() || 'this person'
   // Their title's sensitive fields and kind decide what a ticked tab opens, as for the template.
   const held = useMemo(() => heldTabs(ticks, access.template.sensitive, access.template.baseRole, access.cellKeys), [ticks, access])
@@ -105,9 +111,15 @@ function TemplateAccess({
     if (pending) return
     setError(null)
     startTransition(async () => {
-      const result = await setPersonTabs({ userId: access.userId, templateId: access.template.id, boxes })
+      const result = await setPersonTabs({
+        userId: access.userId,
+        templateId: access.template.id,
+        boxes,
+        ...(access.reach ? { reach: reachTicks } : {}),
+      })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
+      setReachDraft(null)
       onSaved?.()
       router.refresh()
     })
@@ -126,7 +138,7 @@ function TemplateAccess({
   const actions = canEdit ? (
     <span className={s.footActions}>
       {changes > 0 ? (
-        <button type="button" className={s.footGhost} disabled={pending} onClick={() => setDraft(new Set(base))}>Reset to title</button>
+        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]) }}>Reset to title</button>
       ) : null}
       <button type="button" className={s.footSave} disabled={!dirty || pending} onClick={() => save(boxesOf(base, ticks))}>
         {pending ? 'Saving…' : 'Save'}
@@ -157,6 +169,7 @@ function TemplateAccess({
         canEdit={canEdit}
         compact
         held={held}
+        reach={access.reach ? { person: access.reach, ticks: reachTicks, onToggle: (area, sub) => setReachDraft(toggleReach(access.reach!, reachTicks, area, sub)) } : undefined}
         onToggle={(tabId, action) => setDraft(toggleBox(ticks, tabId, action))}
         onRow={tabId => setDraft(toggleRow(ticks, tabId))}
         onColumn={action => setDraft(toggleColumn(ticks, view, action))}

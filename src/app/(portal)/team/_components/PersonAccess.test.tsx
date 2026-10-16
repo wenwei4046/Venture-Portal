@@ -28,6 +28,7 @@ const access = (overrides: Partial<Extract<PersonAccessData, { kind: 'template' 
   cells: {},
   boxes: [],
   legacy: [],
+  reach: null,
   functions: [fn('revenue_app', 'Revenue app', 'view create', 'own')],
   cellKeys: [
     K('revenue_app', 'view', 'member_portal'), K('revenue_app', 'view', 'member_insight'), K('revenue_app', 'view', 'member_memos'),
@@ -139,5 +140,59 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
       { key: 'reports', label: 'Reports', section: 'Reports', inherited: true, override: false },
       { key: 'treasury', label: 'Treasury', section: 'Daily', inherited: true, override: null },
     ] })).toBe(1)
+  })
+})
+
+// Sub-departments per person (2026-10-16 — the owner: "在 CRM 权限那边，应该可以让我去打勾，它是按 sub-department
+// 去打勾的"): under a Revenue tab whose View is ticked, a pill per sub-department.
+describe('a person’s sub-departments on the Revenue tabs', () => {
+  const FAIR = '11111111-1111-4111-8111-111111111111'
+  const IR = '22222222-2222-4222-8222-222222222222'
+  // KRIS: Fair's director, the CRM's two tabs ticked on his template.
+  const kris = (ticks: Array<{ area: 'crm' | 'comm_cal' | 'sales_groups' | 'rules'; sub: string; granted: boolean }> = []) => access({
+    template: {
+      id: 't', name: 'Revenue Director', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own' } }, sensitive: [],
+      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit', 'rev.crm_team.view'],
+    },
+    reach: { subs: [{ id: FAIR, name: 'Fair' }, { id: IR, name: 'IR' }], handled: [FAIR], ticks },
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.setPersonTabs.mockResolvedValue({ ok: true })
+  })
+
+  it('ticks what he handles, on both CRM rows, and only where the row is viewed', () => {
+    render(<PersonAccess access={kris()} canEdit />)
+    expect(box('CRM · Team · Fair')).toHaveAttribute('aria-checked', 'true')
+    expect(box('CRM · Team · IR')).toHaveAttribute('aria-checked', 'false')
+    expect(box('Profile · My leads & appointments · IR')).toHaveAttribute('aria-checked', 'false')
+    // Quote is not a sub-department row; Comm Cal is, but its View is not ticked on this template.
+    expect(screen.queryByRole('checkbox', { name: 'Quote · Fair' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Today · sub-departments' })).toBeNull()
+  })
+
+  it('opens IR’s CRM for him alone — one area, both rows, a red dot — and saves it with the boxes', async () => {
+    render(<PersonAccess access={kris()} canEdit />)
+    fireEvent.click(box('CRM · Team · IR'))
+    expect(box('CRM · Team · IR')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Profile · My leads & appointments · IR')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(2)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [], reach: [{ area: 'crm', sub: IR, granted: true }] })
+  })
+
+  it('Reset to title takes his own sub-departments away too', async () => {
+    render(<PersonAccess access={kris([{ area: 'crm', sub: IR, granted: true }])} canEdit />)
+    expect(box('CRM · Team · IR')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
+    expect(box('CRM · Team · IR')).toHaveAttribute('aria-checked', 'false')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', boxes: [], reach: [] })
+  })
+
+  it('is read-only without accounts.manage', () => {
+    render(<PersonAccess access={kris()} canEdit={false} />)
+    expect(box('CRM · Team · IR')).toBeDisabled()
   })
 })

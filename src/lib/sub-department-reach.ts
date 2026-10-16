@@ -131,6 +131,22 @@ export function sameReachTicks(a: readonly ReachTick[], b: readonly ReachTick[])
   return x.length === y.length && x.every((t, i) => t.area === y[i].area && t.sub === y[i].sub && t.granted === y[i].granted)
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A person's ticks as their window sends them: an area, a sub-department id, on or off — each pair once, at most 200. */
+export function isReachTickList(ticks: unknown): ticks is ReachTick[] {
+  if (!Array.isArray(ticks) || ticks.length > 200) return false
+  const seen = new Set<string>()
+  return ticks.every(t => {
+    const r = t as Partial<ReachTick> | null
+    if (!r || !isReachArea(r.area) || typeof r.sub !== 'string' || !UUID.test(r.sub) || typeof r.granted !== 'boolean') return false
+    const key = `${r.area}:${r.sub}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 /** Is a sub-department changed for them alone in this area (the red dot)? */
 export function tickedFor(ticks: readonly ReachTick[], area: ReachArea, sub: string): boolean {
   return ticks.some(t => t.area === area && t.sub === sub)

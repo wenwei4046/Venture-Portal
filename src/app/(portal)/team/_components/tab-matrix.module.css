@@ -98,6 +98,41 @@
 /* A ticked tab whose page opens nothing yet: why, under its name. */
 .held { display: block; margin-top: 2px; font-size: 11px; line-height: 1.35; color: rgb(var(--hv-alert)); }
 
+/* One person's sub-departments under a Revenue tab (2026-10-16): a pill each, peach inside the
+   accent edge where they reach it; the red dot (.dot) where it was changed for them alone. */
+.subs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.sub {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 5px;
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 999px;
+  background: rgb(255 255 255);
+  color: rgb(var(--hv-ink));
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.sub:disabled { cursor: default; }
+.subOn { background: rgb(var(--hv-peach)); border-color: rgb(var(--hv-accent)); }
+.subTick {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgb(var(--hv-frame));
+  background: rgb(255 255 255);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  color: rgb(255 255 255);
+}
+.subOn .subTick { background: rgb(var(--hv-accent)); border-color: rgb(var(--hv-accent)); }
+
 /* The person window's tighter matrix (170px rail, 64px boxes). */
 .gridCompact { grid-template-columns: 170px minmax(0, 1fr); gap: 14px; }
 .gridCompact .row { grid-template-columns: minmax(0, 1fr) repeat(4, 64px) 44px; font-size: 12.5px; }
