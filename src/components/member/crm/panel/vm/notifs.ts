@@ -26,9 +26,17 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
   const { data, now, nameOf } = ctx, since = now.getTime() - 14 * DAY;
   const cust = (id: string) => data.customers.find(c => c.id === id)?.name ?? "A customer";
   const out: PanelNotif[] = [];
+  // Only what is about oneself, on the Team side too (the owner, 2026-10-16: "notification 只跳關於自己的 … principal
+  // assign 名單給 peter，peter 需要收到通知；但如果 principal 給 anthony assign 名單，peter 就不會收到，不單單只是 chat"):
+  // a customer handed to me or taken from me, an invitation to me, and my own customers' news — never another
+  // person's. The Team inbox still shows everybody's chats; this is what tells.
+  const me = ctx.me.id;
+  const ownerOf = (id: string) => data.customers.find(c => c.id === id)?.assignedTo ?? null;
   for (const e of data.events) {
     if (new Date(e.at).getTime() < since) continue;
     const to = String(e.data.to ?? e.owner ?? "");
+    const mine = to === me || String(e.data.from ?? "") === me || ownerOf(e.customerId) === me;
+    if (!mine) continue;
     const base = { key: `e${e.id}`, at: e.at, who: nameOf(e.actor), lead: cust(e.customerId), customerId: e.customerId };
     if (e.kind === "moved") out.push({ ...base, kind: "move", text: "moved", tail: ` to ${nameOf(to)}`, extra: e.data.by_manager ? "" : `Accepted by ${nameOf(to)}` });
     if (e.kind === "move_declined") out.push({ ...base, kind: "move", text: "asked to move", tail: ` to ${nameOf(to)}`, extra: `Declined by ${nameOf(to)}` });
@@ -43,7 +51,7 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
   // Overdue: the moment a customer's wait passed 9 h, until someone answers.
   for (const c of data.customers) {
     const u = urgencyOf(c, now);
-    if (u.level !== "overdue" || !c.lastCustomerAt) continue;
+    if (u.level !== "overdue" || !c.lastCustomerAt || c.assignedTo !== me) continue;
     const last = new Date(c.lastCustomerAt), at = new Date(last.getTime() + 9 * 3_600_000);
     out.push({ key: `o${c.id}@${c.lastCustomerAt}`, customerId: c.id, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
       extra: `Last message ${last.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}` });
