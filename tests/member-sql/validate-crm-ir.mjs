@@ -145,12 +145,13 @@ check((await people('faironly')).people, [], 'a Fair-only salesperson sees nobod
 // 5. Dealing: an ad set Evenly goes to IR's people only.
 await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even', 'even', '{}', 'cnt', '{}', '{}')`)
 const dealt = []
-for (let k = 0; k < 4; k++) {
+for (let k = 0; k < 5; k++) {
   const c = (await q(`insert into crm_contacts (channel, account_id, external_id, name, ad_source_id) values ('whatsapp', 'PN1', $1, $1, 'AD-E') returning id`, [`e${k}`]))[0].id
   await q(`select public.crm_assign_contact($1)`, [c])
   dealt.push((await q(`select assigned_to from crm_contacts where id = $1`, [c]))[0].assigned_to)
 }
-check(dealt.slice().sort(), ids('anthony', 'chea', 'rachael', 'zack'), 'four enquiries, one to each of ANTHONY\'s team')
+// The Revenue Director (PETER) is dealt among them since mig 20261016010000 (the owner, 2026-10-16).
+check(dealt.slice().sort(), ids('anthony', 'chea', 'peter', 'rachael', 'zack'), 'five enquiries, one to each of ANTHONY\'s team and the Revenue Director')
 
 // 6. Move goes to one's IR superior.
 const zacks = (await q(`select id from crm_contacts where assigned_to = $1`, [S('zack')]))[0].id
