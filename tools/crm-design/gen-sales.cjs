@@ -4,6 +4,7 @@ const fs = require("fs"), path = require("path");
 const { convert, hoverClasses } = require("./dc2jsx.cjs");
 const scaleType = require("./type-scale.cjs");
 const profileType = require("./profile-type.cjs");
+const profileLikeApp = require("./profile-like-app.cjs");
 const repo = path.resolve(__dirname, "../..");
 const src = fs.readFileSync(path.join(repo, "docs/design_handoff_crm_roles/CRM Revenue View.dc.html"), "utf8").split(/\r?\n/);
 const out = path.join(repo, "src/components/member/crm/sales");
@@ -240,10 +241,11 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
     if (n !== 1) throw new Error(`${name}: patch matched ${n} times: ${a}`);
     body = body.replace(a, b);
   }
-  // Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs), then the Revenue app's type scale
-  // on every size (type-scale.cjs) — both after the patches, which match the prototype's px.
+  // Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs) and its look (2026-10-16 —
+  // profile-like-app.cjs), then the Revenue app's type scale on every size (type-scale.cjs) — all after the patches, which
+  // match the prototype's px.
   body = require("./ad-link.cjs")(body);
-  if (name === "SalesProfile") body = profileType(body, "{!!(v.profMain) && (<>");
+  if (name === "SalesProfile") body = profileLikeApp(profileType(body, "{!!(v.profMain) && (<>"), "{!!(v.profMain) && (<>");
   body = scaleType(body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));

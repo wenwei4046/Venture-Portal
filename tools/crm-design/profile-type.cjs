@@ -27,3 +27,4 @@ module.exports = function profileType(body, marker) {
   return body.slice(0, a) + sized + body.slice(b);
 };
 module.exports.STEP = STEP;
+module.exports.region = region;

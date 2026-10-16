@@ -93,6 +93,9 @@
 .app [style*="overflow:auto"], .app [style*="overflow: auto"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
 .app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
+/* Mine's Profile wears the Revenue app Profile's glow (2026-10-16, tools/crm-design/profile-like-app.cjs): the status-bar
+   strip above it takes the glow's top colour, as the app's own Profile turns its strip peach (RevenueApp › --status-bg). */
+.app:not(.panel):has([data-prof-glow]) { background: linear-gradient(#F6B48A, #F6B48A) top / 100% var(--crm-top) no-repeat, #FFFFFF; }
 /* A layer positioned against .app spans its padding, so it keeps its own content clear of the insets
    with a transparent border its own background paints under (the design's padding is left exactly as is):
    a bottom sheet lifts above the home indicator; a full-screen page (slideIn) starts below the status bar. */
