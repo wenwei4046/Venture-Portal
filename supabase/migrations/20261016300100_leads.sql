@@ -142,13 +142,13 @@ ALTER TABLE public.lead_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.lead_brands, public.lead_sales, public.lead_contacts, public.lead_messages, public.lead_events
   FROM anon, authenticated;
 
-SELECT public.audit_register('lead_brands', 'Lead View brands', 'Lead View', '{leads}', 'all', p_labels => '{name}');
-SELECT public.audit_register('lead_sales', 'Lead View salespeople', 'Lead View', '{leads}', 'all', p_labels => '{name}');
-SELECT public.audit_register('lead_contacts', 'Lead View customers', 'Lead View', '{leads}', 'all', p_labels => '{name}',
+SELECT public.audit_register('lead_brands', 'Lead View brands', 'Member services', '{leads}', 'all', p_labels => '{name}');
+SELECT public.audit_register('lead_sales', 'Lead View salespeople', 'Member services', '{leads}', 'all', p_labels => '{name}');
+SELECT public.audit_register('lead_contacts', 'Lead View customers', 'Member services', '{leads}', 'all', p_labels => '{name}',
   p_omit => '{last_at,last_dir,last_text}');
-SELECT public.audit_register('lead_messages', 'Lead View messages', 'Lead View', '{}', 'none',
+SELECT public.audit_register('lead_messages', 'Lead View messages', 'Member services', '{}', 'none',
   p_reason => 'A conversation''s messages are its record already: each says who wrote it and when.');
-SELECT public.audit_register('lead_events', 'Lead View timeline', 'Lead View', '{}', 'none',
+SELECT public.audit_register('lead_events', 'Lead View timeline', 'Member services', '{}', 'none',
   p_reason => 'Each conversation''s own timeline, written by the lead functions beside the change (which is recorded).');
 
 -- ── The three brands the user named (2026-10-16); more are added on Settings ─

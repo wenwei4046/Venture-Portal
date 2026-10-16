@@ -18,20 +18,21 @@
 -- 2. One key, scope none (the module's tables are read and written only
 --    through its own functions, which ask has_any_action): leads.
 -- 3. Accounts with no template: the Principal.
--- 4. Templates: Ultimate and Full every new cell; a new template "Customer
---    Service" holds View · Create · Edit (the title of the same name points at
---    it once HR sets the title up — nobody holds it on the day).
+-- 4. Templates: Ultimate and Full every new cell. Customer Service's own
+--    template is made on People › Permissions (+ New template, Lead View's
+--    tabs) once HR sets up the title — nobody holds Lead View on the day but
+--    the full-access accounts.
 --
 -- Nobody loses anything; no page reads these cells until the pages land.
 
 INSERT INTO public.permission_functions (key, label, section, actions, scopes, description, sort_order) VALUES
-  ('leads', 'Lead View', 'Sales', ARRAY['view', 'create', 'edit', 'manage'], ARRAY['all'],
+  ('leads', 'Lead View', 'Daily', ARRAY['view', 'create', 'edit', 'manage'], ARRAY['all'],
    'Customer Service''s inbox for the brands'' Messenger and Instagram enquiries. Create = reply, send a test enquiry; Edit = the customer card, hand a lead to sales, its outcome; Manage = the brands and their salespeople.',
    135)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO public.permission_defs (key, label, section, scope, description, sort_order) VALUES
-  ('leads', 'Lead View', 'Sales', 'none',
+  ('leads', 'Lead View', 'Daily', 'none',
    'Lead View: Inbox, Leads, Insight and Settings. Opened by Lead View · View.', 135)
 ON CONFLICT (key) DO NOTHING;
 

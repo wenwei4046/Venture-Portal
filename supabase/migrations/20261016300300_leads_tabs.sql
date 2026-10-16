@@ -4,7 +4,7 @@
 --
 -- The registry changed, so the database's copy of it is seeded whole again (mig 20261011220000's
 -- rule — src/lib/tab-write-guards.test.ts holds both tables to the registry, row for row): every
--- row as mig 20261015030300 left it, plus the four pages and their boxes' cells. Nobody's
+-- row as mig 20261016140000 left it, plus the four pages and their boxes' cells. Nobody's
 -- access moves: no template ticks these boxes yet (the templates still stand on their cells).
 
 DELETE FROM public.permission_page_tabs;
@@ -47,7 +47,7 @@ INSERT INTO public.permission_page_tabs (page, tab_id) VALUES
   ('/billing/requests', 'fin.invoice'),
   ('/claims', 'dept.claims'),
   ('/claims', 'dept.my_claims'),
-  ('/claims', 'fin.claims'),
+  ('/claims', 'pri.claims'),
   ('/daily-bank', 'fin.daily_bank'),
   ('/dept-pool', 'dept.dept_pool'),
   ('/dept-pool', 'fin.dept_pool'),
@@ -117,7 +117,6 @@ INSERT INTO public.permission_page_tabs (page, tab_id) VALUES
   ('/payments/[id]', 'hr.payment'),
   ('/payments/[id]', 'hr.payroll'),
   ('/payments/[id]/edit', 'fin.payments'),
-  ('/payments/claim-requests', 'fin.claims'),
   ('/payments/claim-requests', 'fin.payments'),
   ('/payments/dept-requests', 'fin.payments'),
   ('/payments/new', 'fin.payments'),
@@ -148,8 +147,8 @@ INSERT INTO public.permission_page_tabs (page, tab_id) VALUES
   ('/reports/cash-flow/layout', 'fin.reports'),
   ('/reports/cash-flow/layout', 'pri.reports'),
   ('/reports/claims', 'dept.claims'),
-  ('/reports/claims', 'fin.claims'),
   ('/reports/claims', 'fin.reports'),
+  ('/reports/claims', 'pri.claims'),
   ('/reports/claims', 'pri.reports'),
   ('/reports/company-statement', 'fin.reports'),
   ('/reports/company-statement', 'pri.reports'),
@@ -254,11 +253,6 @@ INSERT INTO public.permission_tab_cells (tab_id, action, cell) VALUES
   ('fin.billing_allocator', 'view', 'billing.view'),
   ('fin.chart_of_account', 'edit', 'categories.manage'),
   ('fin.chart_of_account', 'view', 'categories.view'),
-  ('fin.claims', 'approve', 'claims.approve'),
-  ('fin.claims', 'approve', 'claims.void'),
-  ('fin.claims', 'create', 'claims.create'),
-  ('fin.claims', 'edit', 'claims.edit'),
-  ('fin.claims', 'view', 'claims.view'),
   ('fin.daily_bank', 'approve', 'treasury.approve'),
   ('fin.daily_bank', 'approve', 'treasury.void'),
   ('fin.daily_bank', 'create', 'treasury.create'),
@@ -425,6 +419,11 @@ INSERT INTO public.permission_tab_cells (tab_id, action, cell) VALUES
   ('pri.approvals', 'view', 'approvals.view'),
   ('pri.audit_log', 'view', 'audit_log.export'),
   ('pri.audit_log', 'view', 'audit_log.view'),
+  ('pri.claims', 'approve', 'claims.approve'),
+  ('pri.claims', 'approve', 'claims.void'),
+  ('pri.claims', 'create', 'claims.create'),
+  ('pri.claims', 'edit', 'claims.edit'),
+  ('pri.claims', 'view', 'claims.view'),
   ('pri.dept_pool', 'view', 'dept_pool.export'),
   ('pri.dept_pool', 'view', 'dept_pool.view'),
   ('pri.meeting_rooms', 'create', 'rooms.create'),

@@ -49,7 +49,7 @@ describe('Audit Log on the phone', () => {
     expect(m.chip).toBe('4029 changes · 7 people · 7 days')
     expect(m.cards.map((c) => [c.label, c.sub, c.value])).toEqual([
       ['Latest changes', '3 records', '2 saves'],
-      ['Areas you read', 'Payments · People · Catalogue', '3 of 13'],
+      ['Areas you read', 'Payments · People · Catalogue', '3 of 12'],
     ])
   })
 
