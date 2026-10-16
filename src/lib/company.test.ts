@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { COMPANY_NAME } from './company'
+import { COMPANY_NAME, COMPANY_REG_NO } from './company'
 
 // The company's full name is HOUZS Venture Holding Sdn Bhd (2026-10-16, the
 // user: "holding, without s is correct", then "改成 这个houzs venture holding
@@ -46,6 +46,14 @@ describe('the company’s name', () => {
   it('is printed from one place by every page and document that prints it', () => {
     const missing = PRINTS.filter(file => !readFileSync(resolve(ROOT, file), 'utf8').includes('COMPANY_NAME'))
     expect(missing).toEqual([])
+  })
+
+  // 2026-10-16 — the user: "202501008262 (1609676-A)"; the letterhead printed a made-up number before.
+  it('has its real registration number on the statement’s letterhead, and the placeholder is gone', () => {
+    expect(COMPANY_REG_NO).toBe('202501008262 (1609676-A)')
+    expect(readFileSync(resolve(ROOT, 'src/app/(paper)/statements/[id]/print/page.tsx'), 'utf8')).toContain('Registration No. {COMPANY_REG_NO}')
+    const placeholder = sources(resolve(ROOT, 'src')).filter(path => /202401000000|1234567-X/.test(readFileSync(path, 'utf8')))
+    expect(placeholder.map(where)).toEqual([])
   })
 
   it('is never written the old way in src/ (Venture Sdn Bhd, Holdings, Sdn. Bhd.)', () => {

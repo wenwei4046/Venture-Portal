@@ -10,3 +10,10 @@
  * *Holdings*) anywhere in `src/`.
  */
 export const COMPANY_NAME = 'HOUZS Venture Holding Sdn Bhd'
+
+/**
+ * Its SSM registration number, the new twelve digits and the old number in
+ * brackets (2026-10-16, the user: "202501008262 (1609676-A)") — under the name
+ * on the monthly statement's letterhead, which printed a placeholder until then.
+ */
+export const COMPANY_REG_NO = '202501008262 (1609676-A)'
