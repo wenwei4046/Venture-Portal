@@ -148,7 +148,8 @@ describe('Request to change email', () => {
     })
     expect(actions.requestEmailChange).toHaveBeenCalledWith('carrie.new@mail.com')
     expect(screen.getByText('Waiting for HR')).toBeInTheDocument()
-    expect(screen.getByText(/carrie\.new@mail\.com · PF-2610-009/)).toBeInTheDocument()
+    expect(screen.getByText('New email · carrie.new@mail.com')).toBeInTheDocument()
+    expect(screen.getByText('PF-2610-009')).toBeInTheDocument()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
     })

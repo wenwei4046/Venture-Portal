@@ -156,4 +156,4 @@ Read this before changing anything it covers, and again in every full scan of su
 
 **THE SIGN-IN FOOTER NAMES THE COMPANY IN FULL (2026-10-16 — the user: "改成 这个houzs venture holding sdn bhd"):** `MemberLoginScreen`'s footer prints `COMPANY_NAME` (`lib/company.ts`) — *HOUZS Venture Holding Sdn Bhd*, where the prototype wrote the name without *Holding*. The rest of the screen is the prototype's.
 
-**PROFILE › REQUEST TO CHANGE EMAIL (2026-10-16 — `../hr/people.md` › REQUEST TO CHANGE EMAIL; DESIGN.md v4.68):** Account's second button, under Change password and on its terms — the layout hands the actions (`requestEmail`) only to a login of their own, and the app draws it never on a member viewed, the demo or a fixture: `profile/EmailSheet`.
+**PROFILE › REQUEST TO CHANGE EMAIL (2026-10-16 — `../hr/people.md` › REQUEST TO CHANGE EMAIL; DESIGN.md v4.69):** Account's second button, under Change password and on its terms — the layout hands the actions (`requestEmail`) only to a login of their own, and the app draws it never on a member viewed, the demo or a fixture: `profile/EmailSheet`.
