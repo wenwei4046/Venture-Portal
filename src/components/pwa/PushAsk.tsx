@@ -22,12 +22,19 @@ const BODY: Readonly<Record<PushApp, string>> = {
  * notifications* in the app turns them on any time. Every open also signs up
  * again, without asking, a phone that already said yes (`healPush`).
  */
-export default function PushAsk({ app, save, trouble, onState }: {
+export default function PushAsk({ app, save, trouble, onState, body, reportOpen = true }: {
   app: PushApp
   save: (s: { endpoint: string; p256dh: string; auth: string; app: PushApp }) => Promise<Saved>
   trouble?: PushTrouble
   /** The state after the open's sign-up, and after an answer — for the app's own row. */
   onState?: (state: PushState) => void
+  /** The window's words where the app's own do not fit — the portal's (2026-10-16). */
+  body?: string
+  /**
+   * Whether the open's own sign-up tells the server what went wrong (`trouble`, a Server Action). Not in the portal,
+   * where nothing may fire one on its own (speed.md); a press still tells it.
+   */
+  reportOpen?: boolean
 }) {
   const [open, setOpen] = useState(false)
   // Turned on, on an Android phone: how to make them pop up comes next (2026-10-14).
@@ -40,7 +47,7 @@ export default function PushAsk({ app, save, trouble, onState }: {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const state = await healPush(app, save, trouble).catch(() => 'unsupported' as PushState)
+      const state = await healPush(app, save, reportOpen ? trouble : undefined).catch(() => 'unsupported' as PushState)
       if (!alive) return
       tell.current?.(state)
       if (state === 'off' && typeof Notification !== 'undefined' && Notification.permission === 'default' && !askedBefore()) setOpen(true)
@@ -81,7 +88,7 @@ export default function PushAsk({ app, save, trouble, onState }: {
           </svg>
         </span>
         <h2 id="push-ask-title" className={s.title}>Turn on notifications?</h2>
-        <p className={s.body}>{BODY[app]}</p>
+        <p className={s.body}>{body ?? BODY[app]}</p>
         {reason ? <p className={s.reason} role="alert">{reason}</p> : null}
         <button type="button" className={s.allow} onClick={allow} disabled={busy}>{busy ? 'Turning on…' : 'Allow notifications'}</button>
         <button type="button" className={s.later} onClick={later} disabled={busy}>Not now</button>

@@ -90,6 +90,43 @@ describe('turning them on', () => {
   })
 })
 
+// The user's iPhone (2026-10-16): Safari asks only within the tap's own moment — WebKit spends the tap's activation on
+// the question, and without one answers "denied" without asking. The app never reached Settings › Notifications.
+describe('an iPhone asks only within the tap', () => {
+  it('asks the phone before anything is awaited', async () => {
+    const { N } = phone()
+    const save = vi.fn(async () => ({ ok: true as const }))
+    const done = turnPushOn('hr', save)
+    // Nothing has been awaited yet: the question was asked inside the press itself.
+    expect(N.requestPermission).toHaveBeenCalledTimes(1)
+    expect(await done).toEqual({ state: 'on' })
+  })
+
+  it('a "denied" given without asking is not a no — it says so, tells the server, and may be tried again', async () => {
+    const { N, pushManager } = phone()
+    N.requestPermission.mockImplementation(async () => 'denied') // the phone's own setting stays unset
+    const trouble = vi.fn()
+    expect(await turnPushOn('hr', vi.fn(), trouble)).toEqual({ state: 'off', reason: 'This phone did not ask. Tap once more.' })
+    expect(trouble).toHaveBeenCalledWith({ app: 'hr', stage: 'permission', message: 'denied without asking' })
+    expect(pushManager.subscribe).not.toHaveBeenCalled()
+  })
+
+  it('a phone that allowed them already is not asked again — only signed up', async () => {
+    const { N, pushManager } = phone({ permission: 'granted' })
+    const save = vi.fn(async () => ({ ok: true as const }))
+    expect(await turnPushOn('hr', save)).toEqual({ state: 'on' })
+    expect(N.requestPermission).not.toHaveBeenCalled()
+    expect(pushManager.subscribe).toHaveBeenCalled()
+  })
+
+  it('an iPhone outside the Home Screen app is told to add it, and nothing is asked', async () => {
+    const ua = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1')
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { getRegistration: vi.fn(async () => null), ready: new Promise(() => {}) } })
+    expect(await turnPushOn('hr', vi.fn())).toEqual({ state: 'install' })
+    ua.mockRestore()
+  })
+})
+
 describe('opening the app', () => {
   it('signs up again a phone that already said yes — the server may never have heard of it', async () => {
     phone({ permission: 'granted', existing: true })

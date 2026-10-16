@@ -26,6 +26,7 @@ import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
 import { ToastHost } from '@/components/hrv/toast'
 import { FinToastHost } from '@/components/finv/Toast'
+import PortalPushAsk from '@/components/pwa/PortalPushAsk'
 
 // Portal shell.
 //
@@ -79,6 +80,9 @@ export default function PortalFrame({
   const finShell = !hr && isFinanceShell(user.role) && !phone
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
+  // This phone's notifications (2026-10-16 — the user's iPhone opened here and was never asked): the first open's
+  // question and More's switch, on a phone, never while viewing as a person (read-only).
+  const push = phone && !user.viewingAs
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -150,8 +154,9 @@ export default function PortalFrame({
             onMoreClick={() => setMoreOpen((o) => !o)}
             fin={finPage}
           />
-          <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} />
+          <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} push={push} />
           {finShell ? <FinToastHost /> : null}
+          {push ? <PortalPushAsk /> : null}
           <Suspense fallback={null}>
             <RouteFreshener />
           </Suspense>
@@ -203,7 +208,9 @@ export default function PortalFrame({
         navData={navData}
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
+        push={push}
       />
+      {push ? <PortalPushAsk /> : null}
 
       <BackToTop />
       {/* The revamped pages flash a line after a save wherever they are opened. */}

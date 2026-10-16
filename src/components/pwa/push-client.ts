@@ -26,6 +26,16 @@ const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.p
 const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 const errText = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e)).slice(0, 300)
 
+/**
+ * What may be asked right now, read without waiting on anything — so the phone's question can be the very first
+ * thing a tap does (`turnPushOn`).
+ */
+function askable(): PushState | 'ask' {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return 'unsupported'
+  if (!('PushManager' in window) || !('Notification' in window)) return isIos() && !standalone() ? 'install' : 'unsupported'
+  return Notification.permission === 'denied' ? 'denied' : 'ask'
+}
+
 async function registration(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null
   return (await navigator.serviceWorker.getRegistration('/')) ?? null
@@ -43,9 +53,8 @@ async function activeRegistration(waitMs = 8000): Promise<ServiceWorkerRegistrat
 }
 
 export async function pushState(): Promise<PushState> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return 'unsupported'
-  if (!('PushManager' in window) || !('Notification' in window)) return isIos() && !standalone() ? 'install' : 'unsupported'
-  if (Notification.permission === 'denied') return 'denied'
+  const now = askable()
+  if (now !== 'ask') return now
   const reg = await registration()
   if (!reg) return 'unsupported'
   return (await reg.pushManager.getSubscription()) ? 'on' : 'off'
@@ -82,18 +91,31 @@ async function signUp(app: PushApp, save: Save, trouble: PushTrouble | undefined
   return { state: 'on' }
 }
 
-/** Ask, subscribe, and tell the server — the state it ends in, or why not. */
+/**
+ * Ask, subscribe, and tell the server — the state it ends in, or why not.
+ *
+ * The phone's question comes FIRST, before anything is awaited (2026-10-16 — the user's iPhone never showed the app
+ * in Settings › Notifications): Safari asks only within the tap's own moment — WebKit spends the tap's activation on
+ * the question, and without one answers "denied" without asking anything. Subscribing after a yes needs no tap.
+ */
 export async function turnPushOn(app: PushApp, save: Save, trouble?: PushTrouble): Promise<Result> {
-  const before = await pushState().catch(() => 'unsupported' as PushState)
-  if (before === 'unsupported' || before === 'install' || before === 'denied') return { state: before }
+  const now = askable()
+  if (now !== 'ask') return { state: now }
   let answer: NotificationPermission
   try {
-    answer = await Notification.requestPermission()
+    answer = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
   } catch (e) {
     void trouble?.({ app, stage: 'permission', message: errText(e) })
     return { state: 'off', reason: `This phone did not ask for permission (${errText(e)}).` }
   }
-  if (answer !== 'granted') return { state: answer === 'denied' ? 'denied' : 'off' }
+  if (answer !== 'granted') {
+    // "Denied" while the phone's own setting is still unset: it would not ask (no tap to answer to) — not a no.
+    if (answer === 'denied' && Notification.permission === 'default') {
+      void trouble?.({ app, stage: 'permission', message: 'denied without asking' })
+      return { state: 'off', reason: 'This phone did not ask. Tap once more.' }
+    }
+    return { state: answer === 'denied' ? 'denied' : 'off' }
+  }
   return signUp(app, save, trouble, 'subscribe')
 }
 

@@ -124,7 +124,8 @@ export interface PushMessage {
   crm?: { ch: 'whatsapp' | 'messenger' | null; name: string; line: string; at: string }
 }
 
-export type SendOutcome = { ok: true } | { ok: false; gone: boolean; status: number }
+/** `reason`: the push service's own words for a refusal (Apple's `{"reason":"BadJwtToken"}`), cut short. */
+export type SendOutcome = { ok: true } | { ok: false; gone: boolean; status: number; reason?: string }
 
 /**
  * Send one message to one device. `gone` — the subscription is no more (404 / 410): forget it.
@@ -150,5 +151,6 @@ export async function sendPush(
     body: body as BodyInit,
   })
   if (res.ok) return { ok: true }
-  return { ok: false, gone: res.status === 404 || res.status === 410, status: res.status }
+  const reason = (await res.text().catch(() => '')).slice(0, 200)
+  return { ok: false, gone: res.status === 404 || res.status === 410, status: res.status, ...(reason ? { reason } : {}) }
 }

@@ -15,6 +15,7 @@ import {
   type NavEntry,
 } from './nav-config'
 import { useNavOwner } from './nav-owner'
+import PortalPushRow from '@/components/pwa/PortalPushRow'
 
 // The fifth tab. Everything the four promoted tabs don't cover — for a
 // Principal that is ~45 destinations — rendered as one scrolling sheet
@@ -30,11 +31,13 @@ interface Props {
   navData: NavData
   open: boolean
   onClose: () => void
+  /** This phone's notifications above Sign out (2026-10-16): on a phone, never while viewing as a person. */
+  push?: boolean
 }
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
 
-export default function MoreSheet({ user, navData, open, onClose }: Props) {
+export default function MoreSheet({ user, navData, open, onClose, push = false }: Props) {
   const pathname = usePathname() ?? ''
   // The list a page belongs to when its path says another (a receipt, 2026-10-10).
   const navPath = useNavOwner(pathname)?.href ?? pathname
@@ -206,6 +209,8 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
               </div>
             )
           })}
+
+          {push ? <PortalPushRow open={open} /> : null}
 
           <button
             type="button"
