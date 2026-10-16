@@ -120,7 +120,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   // In flight while the permission is checked; only awaited once it passes,
   // so a reader without it is redirected, never shown a 404.
-  const subDeptLookup = requireSubDepartment(sub)
+  const subDeptLookup = requireSubDepartment(sub, 'comm_cal')
   subDeptLookup.catch(() => {})
   await requirePermission('revenue')
   const subDept = await subDeptLookup
