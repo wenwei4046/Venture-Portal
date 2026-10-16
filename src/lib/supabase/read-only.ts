@@ -29,6 +29,8 @@ export const READ_ONLY_MESSAGE = 'Read-only while viewing as somebody — nothin
 /** Functions the portal calls that change nothing (STABLE, or read to write nothing). */
 export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   // STABLE in the database (2026-10-11):
+  // People's invite links not used yet (mig 20261016140000): STABLE, reading only.
+  'account_invite_states',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',
   'bridge_ref_flags', 'build_hr_cost_submission_payload', 'calculate_dept_np', 'claim_payment_queue', 'comm_home_sub_department',
   'comm_open_bill_on', 'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',

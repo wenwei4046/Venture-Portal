@@ -157,6 +157,20 @@ export function isTokenHash(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{16,200}$/.test(value)
 }
 
+/**
+ * The logins whose invite link is not used yet, from `account_invite_states()`
+ * — read defensively: no answer (a refusal, an old database) is nobody.
+ */
+export function pendingLogins(rows: unknown): Set<string> {
+  if (!Array.isArray(rows)) return new Set()
+  return new Set(
+    rows
+      .filter((r): r is { user_id: string; pending: boolean } => !!r && typeof (r as { user_id?: unknown }).user_id === 'string')
+      .filter(r => r.pending === true)
+      .map(r => r.user_id),
+  )
+}
+
 /** The first thing wrong with the two password fields on /welcome, or ''. */
 export function welcomeBlocker(password: string, confirm: string): string {
   if (password.length < MIN_PASSWORD_LENGTH) return `Your password needs at least ${MIN_PASSWORD_LENGTH} characters.`

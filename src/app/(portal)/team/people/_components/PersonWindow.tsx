@@ -75,11 +75,17 @@ export default function PersonWindow({
                 {person.active ? 'Active' : person.resignedOn ? `Resigned ${person.resignedOn}` : 'Inactive'}
               </Chip>
               <Chip
-                tone={person.account ? (person.account.isActive ? 'info' : 'danger') : 'plain'}
+                tone={person.account ? (person.account.invitePending ? 'alert' : person.account.isActive ? 'info' : 'danger') : 'plain'}
                 style={{ gap: 5, fontSize: 10.5 }}
                 title={person.account?.email}
               >
-                {person.account ? (person.account.isActive ? 'Has login' : 'Login disabled') : 'No login'}
+                {person.account
+                  ? person.account.invitePending
+                    ? 'Invited'
+                    : person.account.isActive
+                      ? 'Has login'
+                      : 'Login disabled'
+                  : 'No login'}
               </Chip>
               {person.missing.length > 0 ? (
                 <Chip tone="alert" style={{ gap: 5, fontSize: 10.5 }} title={`Missing ${person.missing.join(', ')} — blocks payroll or the InfoTech import`}>
@@ -166,6 +172,12 @@ export default function PersonWindow({
         <span className={s.pwHint}>Esc closes.</span>
         {/* Reset to title and Save, while Permissions is open (the handoff's footer). */}
         <span ref={setFootSlot} className={s.pwFootSlot} hidden={tab !== 'permissions'} />
+        {/* An invite link never used (2026-10-16): a new one, or a password now. */}
+        {person?.account?.invitePending && person.active && person.can.invite && onInvite ? (
+          <button type="button" className={`${btn('outline')} ${s.pwFull}`} onClick={() => onInvite(person.staff.id)}>
+            Invite again
+          </button>
+        ) : null}
         {person ? (
           <Link href={`/team/people/${person.staff.id}`} className={`${btn('outline')} ${s.pwFull}`}>
             Full page

@@ -1,7 +1,9 @@
 'use server'
 
 import dayjs from 'dayjs'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { pendingLogins } from '@/lib/invite'
 import { requirePermission } from '@/lib/auth'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
@@ -47,7 +49,8 @@ export interface PersonCardData {
   ladder: CardLadder
   /** The same three payroll-blocking gaps the roster row marks. */
   missing: string[]
-  account: { id: string; email: string; role: string; isActive: boolean; lastSeenAt: string | null } | null
+  /** `invitePending`: sent an invite link not used yet (2026-10-16) — known only to whoever may invite. */
+  account: { id: string; email: string; role: string; isActive: boolean; lastSeenAt: string | null; invitePending?: boolean } | null
   /** Their title's template with their own cells — or, with no template yet, the old per-key view. */
   access: PersonAccessData | null
   canManagePermissions: boolean
@@ -155,14 +158,26 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     }
   }
 
-  // What their login may do: beside the roster's own key only.
-  const access = acct && direct
-    ? await loadPersonAccess(
-        supabase,
-        { id: acct.id, role: acct.role },
-        { id: row.title_id ?? null, name: titleName, templateId: row.titles?.template_id ?? null },
-      )
-    : null
+  // What their login may do: beside the roster's own key only. And, for
+  // whoever may invite, whether it is an invite link not used yet (2026-10-16).
+  const mayInvite = direct && canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create')
+  const [access, invitePending] = await Promise.all([
+    acct && direct
+      ? loadPersonAccess(
+          supabase,
+          { id: acct.id, role: acct.role },
+          { id: row.title_id ?? null, name: titleName, templateId: row.titles?.template_id ?? null },
+        )
+      : Promise.resolve(null),
+    acct && mayInvite
+      ? (supabase as unknown as SupabaseClient)
+          .rpc('account_invite_states', { p_logins: [acct.id] })
+          .then(
+            r => pendingLogins(r.data).has(acct.id),
+            () => false,
+          )
+      : Promise.resolve(false),
+  ])
 
   const allTitles = titleRows ?? []
   const rungs: Rung[] = (levels ?? []).map(l => ({ id: l.id, rank: l.rank, name: l.name }))
@@ -282,6 +297,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
           role: acct.role,
           isActive: acct.is_active,
           lastSeenAt: acct.last_seen_at,
+          invitePending,
         }
       : null,
     access,
@@ -292,7 +308,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     can: {
       edit: direct && canDo(viewer, 'team', 'edit') && seesSalary,
       promote: direct && canDo(viewer, 'team', 'edit'),
-      invite: direct && canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create'),
+      invite: mayInvite,
     },
   }
 }
