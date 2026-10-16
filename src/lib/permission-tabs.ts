@@ -164,8 +164,8 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('fin', 'dept_reports', 'Department reports', ['dept_reports'], DEPT_REPORTS),
   tab('fin', 'reconciliation', 'Reconciliation', ['reconciliation'], RECONCILIATION),
   tab('fin', 'journal_entries', 'Journal Entries', ['reconciliation'], RECONCILIATION),
-  // Pages Finance opens today that the handoff's list left out.
-  tab('fin', 'claims', 'Claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'], approve: ['claims.approve', 'claims.void'] }),
+  // Pages Finance opens today that the handoff's list left out. (Claims went with its sidebar link —
+  // the user, 2026-10-16: "can delete"; its company-wide box is the Principal view's below.)
   shared('dept_pool', tab('fin', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL)),
   shared('venture_pool', tab('fin', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('fin', 'chart_of_account', 'Chart of Account', ['categories'], { view: ['categories.view'], edit: ['categories.manage'] }),
@@ -180,6 +180,11 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   shared('venture_pool', tab('pri', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('pri', 'opex', 'OPEX', ['opex'], OPEX),
   tab('pri', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
+  // Every department's claims (2026-10-16): Finance view › Claims was deleted (the user: "i will build
+  // another tab for it. so delete this version first"); the Principal's sidebar keeps Claims under
+  // Departments, so the company-wide box stands here until that tab is built — the full-access
+  // templates' claims cells keep a box, and no save narrows them to one department.
+  tab('pri', 'claims', 'Claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'], approve: ['claims.approve', 'claims.void'] }),
   shared('reports', tab('pri', 'reports', 'Reports', ['reports'], REPORTS)),
   shared('meeting_rooms', tab('pri', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   tab('pri', 'audit_log', 'Audit Log', ['audit_log'], { view: ['audit_log.view', 'audit_log.export'] }),
