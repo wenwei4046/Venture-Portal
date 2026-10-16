@@ -5,13 +5,11 @@
 // paid, the request's kind, who sent it and when, the pool, the category, how it is paid and its files — the old
 // queue table's columns. Pure.
 
-import { requestTypeLabel, type ApprovalRequestRow, type QueueRow, type QueueSummary } from '@/lib/approval-queue'
+import { requestTypeLabel, type ApprovalRequestRow, type QueueSummary } from '@/lib/approval-queue'
 import { approvalHubModel, decidedRows, type ApprovalHubModel, type ApprovalRow } from '@/lib/fin-app/approval-model'
+import type { QueueItem } from './queue-read'
 
 export type ApprovalHubCard = 'pending' | 'exec' | 'decided'
-
-/** A queue row as the desktop's queue reads it (`_lib/queue-read`): the row and its voucher's facts. */
-export type QueueItem = QueueRow & { pool: string; category: string; payee: string; payBy: string; attachments: Array<{ id: string }> }
 
 export interface HubRow extends ApprovalRow {
   /** Who is paid — "Landlord Sdn Bhd", "SIA JONAS + 11 more" — else the request's kind. */
@@ -64,7 +62,7 @@ export function approvalHub(args: {
     const type = q?.typeLabel ?? typeOf(r)
     return {
       ...r,
-      name: q?.payee || type,
+      name: q?.payee || (r.kind === 'group' ? r.title : type),
       type,
       at: q?.submittedAt ?? null,
       pool: q?.pool ?? '',
@@ -84,17 +82,10 @@ export function approvalHub(args: {
   const decided: HubRow[] = base.decided.map((r) => {
     const type = typeOf(r)
     const paid = r.members.filter((m) => m.isVoucher && m.open).map((m) => args.payees.get(m.open!.id))
-    return { ...r, name: payeesOf(paid) || type, type, at: decidedAt.get(r.key) ?? null, pool: '', category: '', payBy: '', files: 0 }
+    return { ...r, name: payeesOf(paid) || (r.kind === 'group' ? r.title : type), type, at: decidedAt.get(r.key) ?? null, pool: '', category: '', payBy: '', files: 0 }
   })
 
-  // The cards stand two to a row beside the table, so their names are short: the phone's full words are
-  // "Submitted by the executive" and "Decided · 30 days".
-  const approved = decided.reduce((n, r) => n + r.members.filter((m) => m.decision === 'approved').length, 0)
-  const cards = base.cards.map((c) =>
-    c.key === 'exec' ? { ...c, label: 'By executives' } : c.key === 'decided' ? { ...c, label: 'Decided', sub: `30 days · ${base.decidedCount - approved} rejected` } : c,
-  )
-
-  return { ...base, cards, pending, decided }
+  return { ...base, pending, decided }
 }
 
 /** The rows a card lists. */

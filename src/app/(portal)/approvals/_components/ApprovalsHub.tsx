@@ -20,8 +20,6 @@ import a from './approvals.module.css'
 // decided its own way). Every figure is the queue's (`_lib/hub-model` on the phone app's model), every decision the
 // queue's own Server Action (decisions.tsx). The card is the address's (?card=), for a refresh or a link.
 
-const LIST_TITLE: Record<ApprovalHubCard, string> = { pending: 'Pending', exec: 'By executives', decided: 'Decided' }
-
 const f2 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const when = (iso: string | null) => (iso ? officeTime(iso).format('DD MMM YYYY') : '—')
 
@@ -35,18 +33,18 @@ function stateOf(r: HubRow): { text: string; tone: ChipTone } {
 
 function columnsFor(card: ApprovalHubCard): FinColumn<HubRow>[] {
   return [
-    { key: 'name', label: 'Name', kind: 'name', fixed: true, width: 190, min: 120, value: (r) => r.name.toLowerCase(), text: (r) => r.name || '—' },
-    { key: 'desc', label: 'Request', kind: 'desc', fixed: true, width: 220, min: 140, value: (r) => r.title.toLowerCase(), text: (r) => (r.kind === 'group' ? `${r.title} · ${plural(r.members.length, 'request', 'requests')}` : r.title) },
-    { key: 'no', label: 'Ref #', kind: 'no', width: 160, value: (r) => r.no ?? '', text: (r) => r.no ?? '—' },
+    { key: 'name', label: 'Name', kind: 'name', fixed: true, width: 180, min: 120, value: (r) => r.name.toLowerCase(), text: (r) => r.name || '—' },
+    { key: 'desc', label: 'Request', kind: 'desc', fixed: true, width: 200, min: 120, value: (r) => (r.kind === 'group' ? r.type : r.title).toLowerCase(), text: (r) => (r.kind === 'group' ? r.type : r.title) },
+    { key: 'no', label: 'Ref #', kind: 'no', width: 170, value: (r) => r.no ?? '', text: (r) => r.no ?? '—' },
     { key: 'type', label: 'Type', kind: 'text', width: 150, value: (r) => r.type.toLowerCase(), text: (r) => r.type },
     { key: 'by', label: 'By', kind: 'text', width: 140, value: (r) => r.sentBy.toLowerCase(), text: (r) => r.sentBy },
-    { key: 'at', label: card === 'decided' ? 'Decided' : 'Submitted', kind: 'date', width: 120, value: (r) => r.at ?? '', text: (r) => when(r.at) },
+    { key: 'at', label: card === 'decided' ? 'Decided' : 'Submitted', kind: 'date', width: 126, value: (r) => r.at ?? '', text: (r) => when(r.at) },
     { key: 'pool', label: 'Pool', kind: 'text', width: 130, value: (r) => r.pool.toLowerCase(), text: (r) => r.pool || '—' },
     { key: 'cat', label: 'Category', kind: 'text', width: 140, value: (r) => r.category.toLowerCase(), text: (r) => r.category || '—' },
     { key: 'payBy', label: 'Pay by', kind: 'text', width: 150, value: (r) => r.payBy.toLowerCase(), text: (r) => r.payBy || '—' },
     { key: 'files', label: 'Files', kind: 'text', width: 90, value: (r) => r.files, text: (r) => (r.files > 0 ? plural(r.files, 'file', 'files') : '—') },
-    { key: 'state', label: 'Status', kind: 'chip', width: 150, value: (r) => stateOf(r).text, text: (r) => stateOf(r).text, chip: (r) => stateOf(r) },
-    { key: 'amount', label: 'Amount', kind: 'amount', fixed: true, width: 140, value: (r) => r.amount, text: (r) => (r.hasAmount ? rm(r.amount) : '—') },
+    { key: 'state', label: 'Status', kind: 'chip', width: 136, value: (r) => stateOf(r).text, text: (r) => stateOf(r).text, chip: (r) => stateOf(r) },
+    { key: 'amount', label: 'Amount', kind: 'amount', fixed: true, width: 130, value: (r) => r.amount, text: (r) => (r.hasAmount ? rm(r.amount) : '—') },
   ]
 }
 
@@ -55,21 +53,35 @@ const DEFAULT_SHOWN: Record<'waiting' | 'decided', readonly string[]> = {
   decided: ['state'],
 }
 
-export default function ApprovalsHub({ hub, initialCard, canSetDefault }: { hub: ApprovalHub; initialCard: ApprovalHubCard; canSetDefault: boolean }) {
-  const [card, setCard] = useState<ApprovalHubCard>(initialCard)
+export default function ApprovalsHub({
+  hub,
+  initialCard,
+  initialOpen = null,
+  canSetDefault,
+}: {
+  hub: ApprovalHub
+  initialCard: ApprovalHubCard
+  /** A row to open at once (`?group_id=` — Payroll's "Open Approvals →"), when it is on the lists. */
+  initialOpen?: string | null
+  canSetDefault: boolean
+}) {
+  const opening = initialOpen && [...hub.pending, ...hub.decided].some((r) => r.key === initialOpen) ? initialOpen : null
+  const [card, setCard] = useState<ApprovalHubCard>(opening && hub.decided.some((r) => r.key === opening) ? 'decided' : initialCard)
   const [query, setQuery] = useState('')
   // What was decided here waits for the server's next read before it leaves the cards; the lists drop it at once.
   const [gone, setGone] = useState<Set<string>>(new Set())
   useEffect(() => setGone(new Set()), [hub])
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [drawerKey, setDrawerKey] = useState<string | null>(null)
-  const [shownKey, setShownKey] = useState<string | null>(null)
+  const [drawerKey, setDrawerKey] = useState<string | null>(opening)
+  const [shownKey, setShownKey] = useState<string | null>(opening)
   const [rowMenu, setRowMenu] = useState<{ row: HubRow; anchor: RowMenuAnchor } | null>(null)
 
-  // The card in the address, so a refresh or a link lands on it (the list is here: no navigation).
+  // The card in the address, so a refresh or a link lands on it (the list is here: no navigation); a
+  // ?group_id= has done its work once its drawer opened.
   useEffect(() => {
     const url = new URL(window.location.href)
+    url.searchParams.delete('group_id')
     if (card === 'pending') url.searchParams.delete('card')
     else url.searchParams.set('card', card)
     if (url.toString() !== window.location.href) window.history.replaceState(window.history.state, '', url.toString())
@@ -172,11 +184,12 @@ export default function ApprovalsHub({ hub, initialCard, canSetDefault }: { hub:
           cards={hub.cards}
           active={card}
           onSelect={(k) => pickCard(k as ApprovalHubCard)}
+          wide
         />
         <FinTable
           key={card === 'decided' ? 'decided' : 'waiting'}
           layoutId={card === 'decided' ? 'fin.approvals.decided' : 'fin.approvals'}
-          title={LIST_TITLE[card]}
+          title="Approvals"
           rows={rows}
           rowKey={(r) => r.key}
           columns={columnsFor(card)}

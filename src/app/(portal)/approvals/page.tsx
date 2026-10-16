@@ -10,18 +10,19 @@ import type { ApprovalHubCard } from './_lib/hub-model'
 // (Pending, Submitted by the executive, Decided · 30 days), the table, Select and the dark bar, the drawer — with
 // every decision it had: one request, what is ticked, a combined approval whole or voucher by voucher, the notes,
 // the overdraw, the reason. The reads are the queue's (`_lib/hub-read`); the page draws nothing of its own.
+// `?card=` opens a list, `?group_id=` a combined approval's drawer (Payroll's "Open Approvals →").
 
 const CARDS: readonly ApprovalHubCard[] = ['pending', 'exec', 'decided']
 
-export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ card?: string }> }) {
+export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ card?: string; group_id?: string }> }) {
   await requirePage('/approvals')
   // The queue opens for whoever may see it or decide anything in it; what each
   // may decide is asked row by row (2026-10-09, approvals by domain).
   const user = await requireApprovalQueue()
   const supabase = await createClient()
-  const [{ card }, hub] = await Promise.all([searchParams, readApprovalHub(supabase, user)])
+  const [{ card, group_id: groupId }, hub] = await Promise.all([searchParams, readApprovalHub(supabase, user)])
   const initialCard = (CARDS as readonly string[]).includes(card ?? '') ? (card as ApprovalHubCard) : 'pending'
   // Whoever arranges the table for everybody (Finance, the Principal), as the old queue table's.
   const canSetDefault = user.role === 'finance' || user.role === 'principal'
-  return <ApprovalsHub hub={hub} initialCard={initialCard} canSetDefault={canSetDefault} />
+  return <ApprovalsHub hub={hub} initialCard={initialCard} initialOpen={groupId ? `g:${groupId}` : null} canSetDefault={canSetDefault} />
 }

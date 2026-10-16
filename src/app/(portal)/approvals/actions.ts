@@ -1136,10 +1136,10 @@ export async function approveRequestGroupPartial(args: {
   return { ok: true }
 }
 
-// ─── Batch voucher details for BatchDetailsModal (Principal) ─────────────────
-// Called when Principal opens a row tagged Combined in the approvals queue.
-// Batches the voucher + sources + attachments lookups so an N-voucher modal
-// opens in 3 round-trips, not 3N.
+// ─── Batch voucher details for a combined approval's drawer ─────────────────
+// Called when a combined row is opened in the Approvals hub (ApprovalDrawer —
+// it was the BatchDetailsModal until 2026-10-17). Batches the voucher + sources
+// + attachments lookups so an N-voucher drawer opens in 3 round-trips, not 3N.
 
 export interface BatchVoucherRow {
   approvalId: string

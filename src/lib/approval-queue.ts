@@ -69,18 +69,6 @@ export interface QueueRow {
   href: string | null
 }
 
-export interface DecisionRow {
-  id: string
-  voucherNo: string | null
-  description: string
-  typeLabel: string
-  decision: 'approved' | 'rejected'
-  submitterName: string
-  decidedAt: string | null
-  amount: number | null
-  href: string
-}
-
 interface Options {
   amountOf: (row: ApprovalRequestRow) => number | null
   nameOf: (userId: string) => string
@@ -306,21 +294,4 @@ export function executiveSubmitterIds(
     if (rank !== undefined && rank <= ceiling) ids.add(s.user_id)
   }
   return ids
-}
-
-export function recentDecisionRows(recent: ApprovalRequestRow[], opts: Options): DecisionRow[] {
-  return recent.map((r) => {
-    const { voucherNo, text } = splitVoucherTitle(r.description)
-    return {
-      id: r.id,
-      voucherNo,
-      description: text,
-      typeLabel: requestTypeLabel(r.request_type),
-      decision: r.status === 'approved' ? 'approved' : 'rejected',
-      submitterName: opts.nameOf(r.submitted_by),
-      decidedAt: r.approved_at,
-      amount: opts.amountOf(r),
-      href: `/approvals/${r.id}`,
-    }
-  })
 }
