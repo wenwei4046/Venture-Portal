@@ -41,6 +41,8 @@ export interface PersonRow {
   accountEmail: string | null
   accountActive: boolean | null
   lastSeenAt: string | null
+  /** Sent an invite link not used yet (2026-10-16) — read only for whoever may invite. */
+  invitePending?: boolean
   /** Fields whose absence breaks payroll or the import, computed server-side. */
   missing: string[]
 }
@@ -123,7 +125,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
   function inviteFrom(p: PersonRow) {
     setMenu(null)
     if (!p.active) return flash(`${p.name} is not active`)
-    if (p.accountEmail) return flash(`${p.name} already has a login`)
+    // An invite link never used is invited again (2026-10-16); any other login is theirs already.
+    if (p.accountEmail && !p.invitePending) return flash(`${p.name} already has a login`)
     if (!onInvite) return flash('Inviting needs Logins & invites · Create')
     onInvite(p.id)
   }
@@ -134,7 +137,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
         {[
           { label: 'Active staff', value: counts.active, note: `${counts.total} on the roster`, tone: 'primary' as const },
           { label: 'Departments', value: counts.departments, note: null },
-          { label: 'With a login', value: counts.withLogin, note: 'Can sign in to the portal' },
+          { label: 'With a login', value: counts.withLogin, note: counts.invited > 0 ? `${counts.invited} invited` : 'Can sign in to the portal' },
           {
             label: 'Missing details',
             value: counts.incomplete,
@@ -221,8 +224,14 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                         <span className={s.nameCell} data-faded={p.active ? undefined : 'true'}>
                           <span
                             className={s.tile}
-                            data-login={p.accountEmail ? 'true' : undefined}
-                            title={p.accountEmail ? `Can sign in — ${p.accountEmail}` : 'No login yet'}
+                            data-login={p.accountEmail && !p.invitePending ? 'true' : undefined}
+                            title={
+                              p.invitePending
+                                ? `Invited — ${p.accountEmail} has not chosen a password yet`
+                                : p.accountEmail
+                                  ? `Can sign in — ${p.accountEmail}`
+                                  : 'No login yet'
+                            }
                           >
                             {initialsOf(p.name)}
                           </span>
@@ -273,10 +282,10 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               type="button"
                               role="menuitem"
                               className={s.menuItem}
-                              data-quiet={!p.active || p.accountEmail || !onInvite ? 'true' : undefined}
+                              data-quiet={!p.active || (p.accountEmail && !p.invitePending) || !onInvite ? 'true' : undefined}
                               onClick={() => inviteFrom(p)}
                             >
-                              Invite user
+                              {p.invitePending ? 'Invite again' : 'Invite user'}
                             </button>
                             <button
                               type="button"
@@ -357,6 +366,13 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
 function LastSeen({ person }: { person: PersonRow }) {
   if (!person.accountEmail) return <span title="No login yet">—</span>
   if (person.accountActive === false) return <span className={s.seenWarn}>Disabled</span>
+  if (person.invitePending) {
+    return (
+      <span className={s.seenWarn} title={`Invited ${person.accountEmail} — no password chosen yet`}>
+        Invited
+      </span>
+    )
+  }
   if (!person.lastSeenAt) return <span>never</span>
   const at = dayjs(person.lastSeenAt)
   const seenAt = officeTime(person.lastSeenAt).format('D MMM YYYY, HH:mm')

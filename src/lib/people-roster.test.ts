@@ -17,7 +17,13 @@ const roster = [
 
 describe('the roster', () => {
   it('counts the five cards over everybody, whatever the filter shows', () => {
-    expect(rosterCounts(roster)).toEqual({ total: 5, active: 4, inactive: 1, withLogin: 1, incomplete: 2, departments: 3 })
+    expect(rosterCounts(roster)).toEqual({ total: 5, active: 4, inactive: 1, withLogin: 1, invited: 0, incomplete: 2, departments: 3 })
+  })
+
+  // 2026-10-16: an invite link not used yet is a login nobody can sign in with — counted apart.
+  it('does not count an invite link not used yet as a way in', () => {
+    const invited = [...roster, person({ name: 'KAI YEE', accountEmail: 'kaiyee@houzs.my', invitePending: true })]
+    expect(rosterCounts(invited)).toMatchObject({ withLogin: 1, invited: 1 })
   })
 
   it('searches name, code, title, department and email, inside the employment filter', () => {

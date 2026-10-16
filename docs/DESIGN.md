@@ -1267,7 +1267,10 @@ The dense kit for lists of short strings, never money. It now serves the payroll
 - **The head:** *Invite user · Import InfoTech · + Add person*, compact tabs, five cards, then search with counted pills.
 - **The grid** — a band per department ("· N incomplete" in amber), then rows of: tile (an orange rim when they can sign in), name, title + L-level, rank chip, code, status, Last seen. Right-click opens the row menu.
 - **The person window** (760px; 900 on a login's Permissions) — Details and History tabs, "missing" in amber, then *Esc closes.* · Full page.
-- **Invite user** (466px) — Email, Password with Regenerate, Role, then *Send invite*.
+- **Invite user** (466px; v4.62) — the kit's small tabs *Send invite link* | *Set password* (the link first), Email, and on *Set password* the password: dots until the eye inside its box is pressed, Regenerate beside it; then Role and *Send invite link* / *Create login*.
+  - **When Supabase does not email the link** the window stays: why, in the amber note, then *Invite link · {email}* in a read-only box with *Copy link* (*Copied*), and *Done*.
+  - **The notice after *Set password*** keeps the password as dots, with the eye and *Copy*.
+  - **A link never used** reads *Invited* in Last seen (amber, the tile without its rim) and in the person window's login chip; *With a login* notes "N invited". Right-click *Invite again*, or the window's foot: the same window over the login's own email (fixed), a new link or a password now (*Set password*).
 - **The full page is a 360** (v4.63, the user's option C; `PersonRecord`, `person-record.module.css`). Its head is a card, not a `.page-head`.
   - **The card** (left, 280–340px, white, framed, radius 12; sticky from 1200px while it reads): their tile (64px, an orange rim on peach while they can sign in), the eyebrow, the name (Newsreader 30), code · title, the window's chips (Active / Resigned / Inactive, Has login / Login disabled / No login), *Edit* and *Invite* full width, then Department · Reports to (a link to their page, their title under it) · Level · Employment Type · Hire Date (with how long, "9 months").
   - **The record** (right) in wells — panel grey, hairline, radius 12, two to a row where they fit, one to a row while editing: Identity · Contact · Emergency contact · Bank accounts · Salary · Statutory, each fact's label over its value, two to a row.
@@ -1306,7 +1309,7 @@ The matrix is **Permissions by view and tab** (Part III). Around it:
 - **The tab:** `?tab=permissions` (`&template=<id>`).
 - **The title tables** (`ledger-table tight`): Title · Department · People · Their own boxes · Template. The select moves the title at once.
 - ***Show history*:** When · Who · What changed.
-- **Invite user** (`InviteDialog`): email, password, and the title's template as the role — nothing to choose. A per-person cell is set later, in their window.
+- **Invite user** (`InviteDialog`): email, an invite link or a password (v4.62), and the title's template as the role — nothing to choose. A per-person cell is set later, in their window.
 - **Hierarchy › Roles** (`PeopleRoles`): a band per title, with its template link, over the people holding it.
 - **Masked fields** follow **A hidden value** (Part II).
 
@@ -1440,6 +1443,12 @@ Only for a login a People record names: the shared principal@, finance@, hr@ and
 - **HR app** — More › Change password, a sheet. **Revenue app** — Profile › Account, a sheet; never on a member viewed, and the sheet forgets what was typed once it closes.
 - **Words, everywhere** — *Password changed. You stay signed in here; your other devices are signed out within an hour and need the new password.* Refusals: `lib/account/password.ts`.
 - **While sending** the button reads *Changing…* and the sheets wait for the answer. The portal's boxes carry **no `name`** — a submit before hydration would put the passwords in the address.
+
+### Choosing a password from an invite link (v4.62, 2026-10-16 — `/welcome`)
+
+The sign-in page's screen (`MemberLoginScreen`'s `panel`), its right column swapped: **Set your password.** · *Choose a password to activate your account.* · **New password** · **Confirm password** — each the sign-in's box with the lock and its own eye — and **Activate account** (*Activating…*). A link missing its token reads **This link is not complete.** · *Open the link from your invitation again, or ask HR to send you a new one.* with no form.
+- **Words** — *Your password needs at least 6 characters.* · *The two passwords are not the same.* (both before anything is sent) · *This invite link has expired or was already used. Ask HR to send you a new one.* · *Your password was not saved. Try again.* · *Your account is not active. Please contact HR.*
+- Activated, they land where a sign-in lands (`/`, which sends each to their app).
 
 ### My documents (v4.5, 2026-10-14 — Admin › My documents, the HR app's More, the Revenue app's Profile › Documentation)
 
@@ -1579,6 +1588,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 ## Part IV — Version index
 
 - **v4.63** · 2026-10-16 · A person's full page is a 360 (option C): the card on the left (tile, name, chips, Edit, Department · Reports to · Level · Employment Type · Hire Date), the record in wells on the right in the reference's words (spaced capitals over plain values, a well's icon); no Account or Role; Reports to set here; a login's email locked → People
+- **v4.62** · 2026-10-16 · People › Invite user: *Send invite link* | *Set password* — the password hidden behind an eye, the link kept on screen to copy when Supabase does not email it, *Invited* and *Invite again* for a link never used; `/welcome`, where the link chooses the password → People; Choosing a password from an invite link
 - **v4.61** · 2026-10-16 · The company's full name is *HOUZS Venture Holding Sdn Bhd* wherever it is printed (the user: "改成 这个houzs venture holding sdn bhd") — the documents' issuer (no longer *Sdn. Bhd.*), the statement's letterhead, a schedule's print, the reports' PDF header, the staff and director payslips, Director Salary's and Director Pool's prints (in capitals), the Revenue app's sign-in footer, the site's description; one constant, `lib/company.ts`. The brand's short name, *HOUZS Venture*, is unchanged → Finance's view — the documents
 - **v4.60** · 2026-10-16 · The user's answers: the documents' issuer is *HOUZS Venture Holding Sdn. Bhd.* (no s) with *hello@houzsventure.com* under its lines; the desktop's one-way steps ask first, in the phone app's question — a statement's Issue / Mark as paid, Bill interest / Bill borrower, Mark executed (Department Pools, its submissions, HR Costing's Execute transfers), Dept Requests' Cancel request, Payroll Requests' Send back to HR → Finance's pages on the sheet · Finance's view — the documents
 - **v4.59** · 2026-10-16 · Finance's pages: a page's files only for whoever may take them out — the reports, the Ledger, Daily Bank, Statements, Payments' and Receipt's *Export ▾*, Company Statement's ticks, a department's statement, and the phone app's Statements and Payment; Invoice Financing's *Record financing* only for whoever may record it; the printed statement titled *Statement — {code} — {Month YYYY}* (Save as PDF's file name), its *Print / Save PDF* over the letterhead on a phone; a schedule's print on a phone scrolls its table inside the sheet → Finance's pages on the sheet

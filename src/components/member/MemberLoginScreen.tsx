@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import MemberLoginForm from "./MemberLoginForm";
 import { forgetReads } from "./app/read-memory";
 import { forgetMedia } from "./crm/shared/media-cache";
@@ -18,6 +18,11 @@ type LoginScreenProps = {
   initialError?: string;
   preview?: boolean;
   previewHref?: string;
+  /**
+   * Another job on the same page (2026-10-16 — /welcome, an invite link's
+   * password): its own heading, line and form in place of the sign-in's.
+   */
+  panel?: { title: string; intro: string; body: ReactNode };
 };
 
 /** Selected Warm Editorial design for member sign-in and sample previews. */
@@ -26,6 +31,7 @@ export default function MemberLoginScreen({
   initialError,
   preview = false,
   previewHref,
+  panel,
 }: LoginScreenProps) {
   // Every sign-out ends here: the Revenue app's figures kept on this phone go with the session (2026-10-08),
   // so a phone handed to somebody else shows nobody's.
@@ -91,19 +97,25 @@ export default function MemberLoginScreen({
                 <path d="m22 3 1 2m5 1-2 1" />
               </svg>
             </div>
-            <h1 id="member-login-heading">Welcome back.</h1>
-            <p className={s.intro}>Let’s make today a little more rewarding.</p>
-            <MemberLoginForm action={action} initialError={initialError} preview={preview} />
-            {previewHref && (
-              <a className={s.previewLink} href={previewHref}>
-                {preview ? "Preview workspace" : "Explore the demo"}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
-              </a>
+            <h1 id="member-login-heading">{panel ? panel.title : "Welcome back."}</h1>
+            <p className={s.intro}>{panel ? panel.intro : "Let’s make today a little more rewarding."}</p>
+            {panel ? (
+              panel.body
+            ) : (
+              <>
+                <MemberLoginForm action={action} initialError={initialError} preview={preview} />
+                {previewHref && (
+                  <a className={s.previewLink} href={previewHref}>
+                    {preview ? "Preview workspace" : "Explore the demo"}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12h14m-6-6 6 6-6 6" />
+                    </svg>
+                  </a>
+                )}
+                <LoginInstallCard />
+                <p className={s.invitation}><strong>New to the team?</strong> Your HR team will help you get started.</p>
+              </>
             )}
-            <LoginInstallCard />
-            <p className={s.invitation}><strong>New to the team?</strong> Your HR team will help you get started.</p>
           </div>
         </section>
       </main>
