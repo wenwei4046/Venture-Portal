@@ -85,8 +85,12 @@
 /* Smooth scrolling (the owner, 2026-10-14: "在 revenue app 很順滑，在 crm 就卡 … 我要整個畫面都順滑"): every list scrolls on
    its own and never hands a scroll on at its end (no chaining, no page bounce behind it). */
 .app { overscroll-behavior: none; }
-.app [style*="overflow-y:auto"], .app [style*="overflow:auto"], .app [style*="overflow-x:auto"],
-.app [style*="overflow-y: auto"], .app [style*="overflow: auto"], .app [style*="overflow-x: auto"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* …each in its OWN direction only (2026-10-16, the owner: "Android 的 Team inbox 是不能左右滑動"): a Team inbox column
+   scrolls up and down, and `contain` on both axes kept Android's Chrome from handing a sideways swipe begun on a column to
+   the board around it, which scrolls left and right. */
+.app [style*="overflow-y:auto"], .app [style*="overflow-y: auto"] { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+.app [style*="overflow-x:auto"], .app [style*="overflow-x: auto"] { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.app [style*="overflow:auto"], .app [style*="overflow: auto"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
 .app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
 /* A layer positioned against .app spans its padding, so it keeps its own content clear of the insets

@@ -14,6 +14,7 @@ import { infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
+import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, tickColor } from "../../shared/chat-media";
@@ -216,7 +217,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
     voiceStart, voiceStop: sendIt => void recStop(sendIt),
-    camera: () => document.getElementById("crm-panel-camera")?.click(),
+    camera: () => openCamera("crm-panel-camera", act.toast),
     tile,
     // One's recent emoji: CrmApp's list, shared with Mine's chat; kept on the server a moment later.
     recents: ctx.recents?.list ?? data.recentEmoji ?? [],

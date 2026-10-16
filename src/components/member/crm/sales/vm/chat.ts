@@ -17,6 +17,7 @@ import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTi
 import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
+import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor } from "../../shared/chat-media";
@@ -494,7 +495,7 @@ export function chatVM(ctx: SalesCtx) {
       return true;
     },
     voiceStop: send => void recStop(send),
-    camera: () => document.getElementById("crm-pick-camera")?.click(),
+    camera: () => openCamera("crm-pick-camera", act.toast),
     tile,
     // One's recent emoji: picked ones show at once (CrmApp's list, the Team side's chat shares it) and are kept on the
     // server a moment later.
