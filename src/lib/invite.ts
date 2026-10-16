@@ -16,6 +16,16 @@ import { isAction, isScope, type Action, type Scope } from '@/lib/permission-mat
 /** Supabase hard-floors this and answers a shorter one with a 422. */
 export const MIN_PASSWORD_LENGTH = 6
 
+/**
+ * How the login is handed over (2026-10-16, the user: "Invite 选项…两个选择：
+ * 1. Send Invite Link 2. 直接帮它 set password"). `link`: Supabase emails them a
+ * link, they choose their own password on /welcome and the login is theirs
+ * from then on. `password`: HR sets one now and passes it on, as before.
+ */
+export type InviteMode = 'link' | 'password'
+
+export const isInviteMode = (value: unknown): value is InviteMode => value === 'link' || value === 'password'
+
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** No 0/O, 1/l/I — a password read out over the phone. */
@@ -31,6 +41,8 @@ export interface InviteCell {
 export interface RawInvite {
   staffId?: string | null
   email?: string | null
+  /** `password` when absent — the window's only way until 2026-10-16. */
+  mode?: string | null
   password?: string | null
   cells?: unknown
 }
@@ -38,6 +50,8 @@ export interface RawInvite {
 export interface ValidInvite {
   staffId: string
   email: string
+  mode: InviteMode
+  /** '' for a link: they choose it themselves. */
   password: string
   cells: InviteCell[]
 }
@@ -74,10 +88,14 @@ export function validateInvite(raw: RawInvite): ValidInvite {
   const email = (raw.email ?? '').trim().toLowerCase()
   if (!email || !EMAIL.test(email)) throw new Error('Email is required')
 
+  const mode = raw.mode === undefined || raw.mode === null ? 'password' : raw.mode
+  if (!isInviteMode(mode)) throw new Error('Reload the page and try again.')
+
   // Not trimmed: a leading or trailing space is a legitimate character in a
   // password, and silently eating it would lock them out on their first try.
-  const password = raw.password ?? ''
-  if (password.length < MIN_PASSWORD_LENGTH) {
+  // A link carries none — whatever the form still held is dropped.
+  const password = mode === 'link' ? '' : (raw.password ?? '')
+  if (mode === 'password' && password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
   }
 
@@ -103,5 +121,45 @@ export function validateInvite(raw: RawInvite): ValidInvite {
   })
   if (cells.length > 200) throw new Error('Reload the page and try again.')
 
-  return { staffId, email, password, cells }
+  return { staffId, email, mode, password, cells }
+}
+
+/* ── The link (2026-10-16) ─────────────────────────────────────────────── */
+
+/**
+ * Where the link lands: our own page, the token's hash in its query. It never
+ * goes through Supabase's redirect (production's Site URL was still
+ * localhost:3000 with no Redirect URLs), and nothing is spent by opening it —
+ * the token is checked only when they press Activate, so a mail scanner that
+ * fetches every link cannot use it up. `host` is the request's own, as the ERP
+ * receiver's address is made (`receiverUrlFor`).
+ */
+export function welcomeLink(host: string | null | undefined, tokenHash: string): string {
+  const h = (host ?? '').trim() || 'localhost:3000'
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(h)
+  return `${local ? 'http' : 'https'}://${h}/welcome?token_hash=${encodeURIComponent(tokenHash)}&type=invite`
+}
+
+/**
+ * Why Supabase did not email it, said so HR knows what to do with the link
+ * instead. Its own sender (no SMTP of ours) writes only to members of the
+ * Supabase organisation, and two an hour.
+ */
+export function emailRefusal(code: string | null | undefined): string {
+  if (code === 'email_address_not_authorized') return 'Supabase can only email the team’s own addresses until an email service is connected.'
+  if (code === 'over_email_send_rate_limit') return 'Supabase has sent as many emails as it may this hour.'
+  if (code === 'email_address_invalid') return 'Supabase would not send to that address.'
+  return 'Supabase could not send the email.'
+}
+
+/** A token hash as Supabase makes it (hex today) — anything else is not worth a round trip. */
+export function isTokenHash(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{16,200}$/.test(value)
+}
+
+/** The first thing wrong with the two password fields on /welcome, or ''. */
+export function welcomeBlocker(password: string, confirm: string): string {
+  if (password.length < MIN_PASSWORD_LENGTH) return `Your password needs at least ${MIN_PASSWORD_LENGTH} characters.`
+  if (password !== confirm) return 'The two passwords are not the same.'
+  return ''
 }

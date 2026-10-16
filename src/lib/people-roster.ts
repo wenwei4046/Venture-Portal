@@ -14,6 +14,8 @@ export interface RosterPerson {
   title: string | null
   department: string | null
   accountEmail: string | null
+  /** Sent an invite link they have not used yet (2026-10-16): a login, but no password to sign in with. */
+  invitePending?: boolean
   active: boolean
   missing: string[]
 }
@@ -27,7 +29,9 @@ export function rosterCounts(people: readonly RosterPerson[]) {
     total: people.length,
     active,
     inactive: people.length - active,
-    withLogin: people.filter(p => p.accountEmail).length,
+    // Who can sign in: an invite not yet used is not a way in.
+    withLogin: people.filter(p => p.accountEmail && !p.invitePending).length,
+    invited: people.filter(p => p.accountEmail && p.invitePending).length,
     incomplete: people.filter(p => p.missing.length > 0).length,
     departments: new Set(people.map(p => p.department ?? NO_DEPT)).size,
   }
