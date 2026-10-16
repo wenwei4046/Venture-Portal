@@ -5,7 +5,7 @@ import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Button } from '@/components/ds/Button'
 import { DataTable, type Column } from '@/components/ds/Data'
 import { Toast, useFlash } from '@/components/ds/Overlay'
-import { TextField } from '@/components/ds/Field'
+import { DsSelect, TextField } from '@/components/ds/Field'
 import { balanceOf, serviceYears, type Balance, type LedgerRow } from '@/lib/attendance/engine'
 import type { AttConfig, AttLeaveType, AttLedger, AttPerson } from '@/lib/attendance/types'
 import { Avatar, HoverButton, Pill } from './bits'
@@ -35,6 +35,9 @@ export default function BalancesView({ config, ledger }: { config: AttConfig; le
   const today = config.today
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('All')
+  // One department at a time (2026-10-16, the user: "i need can be select by department, might be drop down") —
+  // Records' own dropdown; the pills count inside it.
+  const [dept, setDept] = useState('all')
   const [personId, setPersonId] = useState<string | null>(null)
   const [typeCode, setTypeCode] = useState<string | null>(null)
   const [pick, setPick] = useState<LedgerPick | null>(null)
@@ -51,10 +54,11 @@ export default function BalancesView({ config, ledger }: { config: AttConfig; le
       })),
     [config, ledger, today, alType],
   )
-  const low = all.filter(x => x.al?.left != null && x.al.left <= 2)
-  const miss = all.filter(x => !x.opening)
+  const inDept = all.filter(x => dept === 'all' || x.p.departmentId === dept)
+  const low = inDept.filter(x => x.al?.left != null && x.al.left <= 2)
+  const miss = inDept.filter(x => !x.opening)
   const ql = q.trim().toLowerCase()
-  const list = (filter === 'Low' ? low : filter === 'Missing' ? miss : all).filter(x => !ql || x.p.name.toLowerCase().includes(ql))
+  const list = (filter === 'Low' ? low : filter === 'Missing' ? miss : inDept).filter(x => !ql || x.p.name.toLowerCase().includes(ql))
 
   const bal = all.find(x => x.p.id === personId) ?? null
   const types = bal ? config.leaveTypes.map(t => ({ t, b: balanceOf(bal.p, t, config, ledger, today) })) : []
@@ -78,8 +82,14 @@ export default function BalancesView({ config, ledger }: { config: AttConfig; le
               <span style={{ fontSize: 12, color: 'var(--ds-ink-3)' }}>Annual leave left</span>
             </div>
             <TextField value={q} onChange={setQ} placeholder="Search name" />
+            <DsSelect
+              value={dept}
+              onChange={setDept}
+              ariaLabel="Department"
+              options={[{ value: 'all', label: 'All departments' }, ...config.departments.map(d => ({ value: d.id, label: d.name }))]}
+            />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <Pill label="All" n={all.length} on={filter === 'All'} onClick={() => setFilter('All')} />
+              <Pill label="All" n={inDept.length} on={filter === 'All'} onClick={() => setFilter('All')} />
               <Pill label="2 days or less" n={low.length} on={filter === 'Low'} onClick={() => setFilter('Low')} />
               <Pill label="No opening" n={miss.length} on={filter === 'Missing'} onClick={() => setFilter('Missing')} />
             </div>
