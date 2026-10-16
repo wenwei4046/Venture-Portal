@@ -7,6 +7,7 @@ import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { ChangePasswordDialog, EditProfileDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
+import { MeCard } from '@/components/me/MeCard'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
 import PushRow from './PushRow'
@@ -52,6 +53,7 @@ export default function ProfileScreen({
   canSwitch = false,
   view = 'finance',
   push = false,
+  me = false,
 }: {
   name: string
   email: string
@@ -65,6 +67,8 @@ export default function ProfileScreen({
   view?: 'finance' | 'principal'
   /** This phone's notifications (2026-10-17) — never while viewing as a person. */
   push?: boolean
+  /** Me's card on top (2026-10-17): a login of one's own, not while viewing as a person. */
+  me?: boolean
 }) {
   const router = useRouter()
   const [win, setWin] = useState<'profile' | 'password' | 'email' | 'signout' | null>(null)
@@ -92,6 +96,9 @@ export default function ProfileScreen({
             </span>
           </span>
         </div>
+
+        {/* Me (2026-10-17): today's punch, and the way into one's own attendance, leave, payslips and record. */}
+        {me ? <MeCard backLabel="Profile" /> : null}
 
         {personal ? (
           <>

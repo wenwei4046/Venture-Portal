@@ -17,6 +17,8 @@ vi.mock('@/components/layout/AccountMenu', () => ({
   RequestEmailDialog: () => null,
   SignOutDialog: (p: { view?: string }) => <div data-testid="sign-out">{p.view}</div>,
 }))
+// Me's card (2026-10-17) reads from the browser and writes through Server Actions: drawn here as its marker only.
+vi.mock('@/components/me/MeCard', () => ({ MeCard: () => <div data-testid="me-card" /> }))
 vi.mock('./PushRow', () => ({
   default: ({ roman }: { roman: string }) => (
     <>
@@ -53,6 +55,13 @@ describe('the Finance app’s Profile', () => {
     expect(screen.getByRole('button', { name: 'Phone notifications' })).toBeInTheDocument()
     const heads = [...document.querySelectorAll('[class*="menuHead"]')].map((h) => h.textContent)
     expect(heads).toEqual(['I.Admin', 'II.Switch view', 'III.This phone'])
+  })
+
+  it('opens on Me’s card for a login of one’s own (the page says so), and on nothing else for a shared one', () => {
+    draw({ personal: true, me: true })
+    expect(screen.getByTestId('me-card')).toBeInTheDocument()
+    draw({ personal: false, me: false })
+    expect(screen.getAllByTestId('me-card')).toHaveLength(1)
   })
 
   it('draws no switch while viewing as a person (push off), and keeps Finance’s words on Finance’s view', () => {

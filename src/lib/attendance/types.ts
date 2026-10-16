@@ -249,7 +249,8 @@ export interface AttRequest {
   ref: string
   staffId: string
   who: string
-  kind: 'leave' | 'ot' | 'correction' | 'profile'
+  /** `manpower` — Extra manpower for a fair (2026-10-17, Me › Submit request): detail { for, role, count }. */
+  kind: 'leave' | 'ot' | 'correction' | 'profile' | 'manpower'
   leaveCode: string | null
   from: string | null
   to: string | null

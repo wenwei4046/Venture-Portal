@@ -41,8 +41,19 @@ export function kindLabel(r: AttRequest, leaveTypes: readonly AttLeaveType[]): s
   if (r.kind === 'leave') return leaveTypes.find(t => t.code === r.leaveCode)?.name ?? `${r.leaveCode ?? ''} leave`.trim()
   if (r.kind === 'ot') return 'Overtime · asked first'
   if (r.kind === 'correction') return `Correction${str(r.detail.punch) ? ` · ${str(r.detail.punch).toUpperCase()}` : ''}`
+  if (r.kind === 'manpower') return manpowerTitle(r.detail)
   return 'Profile change'
 }
+
+/** "Extra manpower · 2 promoters" (Me › Submit request's own words). */
+export function manpowerTitle(detail: Record<string, unknown>): string {
+  const n = Number(detail.count) || 0
+  const role = str(detail.role).toLowerCase()
+  return role && n ? `Extra manpower · ${n} ${role}${n === 1 ? '' : 's'}` : 'Extra manpower'
+}
+
+/** Calendar days from a to b, inclusive (a fair's days). */
+const calendarDays = (from: string, to: string | null) => Math.max(1, Math.round((Date.parse(to ?? from) - Date.parse(from)) / 86400000) + 1)
 
 /** "Mon 12 Oct", "Thu 22 – Fri 23 Oct", "Fri 30 Oct – Mon 2 Nov". */
 export function rangeLabel(from: string, to: string | null): string {
@@ -63,6 +74,7 @@ export function whenLabel(r: AttRequest): string {
     return `${shortDay(r.from)} · ${from && to ? `${from}–${to}` : DAY_TYPE[dt] ?? 'overtime'}`
   }
   if (r.kind === 'correction') return `${shortDay(r.from)}${str(r.detail.at) ? ` · ${str(r.detail.at)}` : ''}`
+  if (r.kind === 'manpower') return `${str(r.detail.for) ? `${str(r.detail.for)} · ` : ''}${rangeLabel(r.from, r.to)}`
   return rangeLabel(r.from, r.to)
 }
 
@@ -86,6 +98,7 @@ export function amountLabel(r: AttRequest): string {
     const n = Array.isArray(r.detail.changes) ? r.detail.changes.length : 0
     return plural(n, 'field')
   }
+  if (r.kind === 'manpower' && r.from) return `${calendarDays(r.from, r.to) * (Number(r.detail.count) || 0)} person-days`
   return '—'
 }
 
