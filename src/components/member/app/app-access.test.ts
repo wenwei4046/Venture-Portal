@@ -19,6 +19,14 @@ describe("where the app may go once ticks close some of its pages (2026-10-11)",
     expect(pageOfRoute(readRoute("?page=account&view=crm"))).toBeNull();
   });
 
+  // A tapped memo's notice from before 2026-10-17 (`/member?memo=<id>`) named no page: its page is Profile › Memos.
+  it("reads a bare memo's address as Profile › Memos; a page the address names wins", () => {
+    expect(readRoute("?memo=m1")).toMatchObject({ screen: "account", pf: "memos" });
+    expect(readRoute("?page=account&view=memos&memo=m1")).toMatchObject({ screen: "account", pf: "memos" });
+    expect(readRoute("?page=insight&memo=m1")).toMatchObject({ screen: "insight", pf: null });
+    expect(readRoute("?memo=")).toMatchObject({ screen: "today", pf: null });
+  });
+
   it("a closed My honours or My brand weeks is not drawn: the app opens where it opens", () => {
     const honours = readRoute("?page=account&view=honours");
     expect(allowedRoute(honours, closing(["honours"])).screen).toBe("today");

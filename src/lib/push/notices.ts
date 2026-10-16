@@ -73,7 +73,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
     if (n.refKind === 'memo') return `/hr-app?open=memo:${id}`
     return `/hr-app?open=req:${id}`
   }
-  if (n.refKind === 'memo') return `/member?memo=${id}`
+  // The memo's page named too (2026-10-17): the app's first drawing is Profile › Memos, not Today.
+  if (n.refKind === 'memo') return `/member?page=account&view=memos&memo=${id}`
   return n.refKind === 'booking' ? '/member?page=account&view=rooms' : '/member?bell=1'
 }
 

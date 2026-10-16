@@ -95,6 +95,44 @@ describe("a tapped request notice", () => {
   });
 });
 
+// A tapped memo's notice opens `/member?page=account&view=memos&memo=<id>` (before 2026-10-17 `/member?memo=<id>`, which
+// named no page). Its page and the memo were opened by an effect and waited the same way — 4.8 s with one read held,
+// production — and the address then fell back to `/member` (Next's router put back the address it last knew).
+describe("a tapped memo's notice", () => {
+  const MEMO = { id: "m-1", title: "Fair dress code", body: "Please read.", sender: "People & Culture", publishedAt: "2026-10-14T02:00:00Z",
+    effectiveAt: "2026-10-14", version: 1, requiresAck: true, readAt: null, acknowledgedAt: null, departments: [] };
+  const withMemo = (): MemberData => ({ ...member(), memos: [MEMO] });
+  /** The app's first drawing: the page it stands on, and the memo sheet's state ("" when no memo sheet is drawn). */
+  const firstDrawing = (address: string) => {
+    window.history.replaceState({}, "", address);
+    const html = renderToString(<RevenueApp initialData={withMemo()} source={source()} today="2026-10-17" />);
+    const sheet = /<div[^>]*role="dialog"[^>]*aria-label="(Fair dress code|Memo)"[^>]*>/.exec(html);
+    return { memosPage: html.includes("Memos &amp; notifications"), sheet: sheet ? `${sheet[1]}${sheet[0].includes("inert") ? " (closed)" : ""}` : "" };
+  };
+
+  it("draws Profile › Memos with the memo open in the app's first drawing — the old address too", () => {
+    expect(firstDrawing("/member?page=account&view=memos&memo=m-1")).toEqual({ memosPage: true, sheet: "Fair dress code" });
+    expect(firstDrawing("/member?memo=m-1")).toEqual({ memosPage: true, sheet: "Fair dress code" });
+  });
+
+  it("a memo not in the list leaves its page open, and no empty sheet", () => {
+    expect(firstDrawing("/member?page=account&view=memos&memo=gone")).toEqual({ memosPage: true, sheet: "Memo (closed)" });
+  });
+
+  it("is read once on the screen, and the address keeps its page and drops the memo", async () => {
+    for (const address of ["/member?page=account&view=memos&memo=m-1", "/member?memo=m-1"]) {
+      const src = source();
+      const read = vi.fn(async () => ({ ok: true as const, data: { acknowledgedAt: null } }));
+      window.history.replaceState({}, "", address);
+      render(<RevenueApp initialData={withMemo()} source={{ ...src, memo: read }} today="2026-10-17" />);
+      await act(async () => {});
+      expect(read.mock.calls).toEqual([["m-1", false]]);
+      expect(window.location.search).toBe("?page=account&view=memos");
+      cleanup();
+    }
+  });
+});
+
 describe("crmOpenTarget", () => {
   it("reads the chat, else the notifications, else nothing", () => {
     expect(crmOpenTarget("?page=account&view=crm&chat=abc%201")).toEqual({ chat: "abc 1" });

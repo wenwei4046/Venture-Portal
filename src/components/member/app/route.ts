@@ -50,8 +50,10 @@ const LEGACY: Record<string, Partial<Route>> = {
 
 export function readRoute(search: string): Route {
   const q = new URLSearchParams(search);
-  const page = q.get("page") ?? "today";
-  const view = q.get("view") ?? "";
+  // A tapped memo's notice from before 2026-10-17 (`/member?memo=<id>`) names no page: its page is Profile › Memos.
+  const memoOnly = !q.get("page") && !!q.get("memo");
+  const page = memoOnly ? "account" : q.get("page") ?? "today";
+  const view = memoOnly ? "memos" : q.get("view") ?? "";
   const base: Route = { screen: "today", pf: null, ins: "main", arena: "hub", board: "sales", department: q.get("department") ?? "", staff: q.get("staff") ?? "" };
   if (LEGACY[page]) return { ...base, ...LEGACY[page] };
   const screen = (SCREENS as string[]).includes(page) ? (page as Screen) : "today";
