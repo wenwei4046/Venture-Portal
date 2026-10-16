@@ -162,6 +162,28 @@ const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(workD
 check([t.me, t.mode, t.day.day, t.punches.map(p => [p.dir, p.inside, p.source])], [true, 'clock', weekday, [['in', true, 'app']]],
   'att_me_today: who clocks, the schedule’s row for the work day, her punches today')
 check(t.noticeRead, false, 'and the notice unread')
+check([t.dayType, t.holiday, t.onLeave, t.onLeaveName], [['Sat', 'Sun'].includes(weekday) ? (weekday === 'Sat' ? 'off' : 'rest') : 'work', null, null, null],
+  'what the day is: the schedule’s row, no holiday, no leave')
+await as(HR_USER, ALL)
+await q(`insert into public.att_day_overrides (day, code, name, by_name) values ($1, 'CH', '', 'Siti')`, [workDay])
+await as(ANN_USER, [])
+check((await q(`select public.att_me_today() t`))[0].t.holiday, 'Company holiday', 'a whole day HR set is the day’s holiday, named by its kind when HR named none')
+await as(HR_USER, ALL)
+await q(`update public.att_day_overrides set code = 'WD', name = 'Fair weekend' where day = $1`, [workDay])
+await as(ANN_USER, [])
+check([(await q(`select public.att_me_today() t`))[0].t.dayType, (await q(`select public.att_me_today() t`))[0].t.holiday], ['work', null],
+  'a work day HR set makes any day a work day')
+await as(HR_USER, ALL)
+await q(`delete from public.att_day_overrides where day = $1`, [workDay])
+await q(`insert into public.att_holidays (day, name, kind, states) values ($1, 'Deepavali', 'compulsory', 'All except Sarawak')`, [workDay])
+await as(ANN_USER, [])
+check((await q(`select public.att_me_today() t`))[0].t.holiday, 'Deepavali', 'a holiday that covers her fence’s state')
+await as(HR_USER, ALL)
+await q(`update public.att_holidays set states = 'Sarawak' where day = $1`, [workDay])
+await as(ANN_USER, [])
+check((await q(`select public.att_me_today() t`))[0].t.holiday, null, 'and not one for another state')
+await as(HR_USER, ALL)
+await q(`delete from public.att_holidays where day = $1`, [workDay])
 await as(SHARED_USER, [])
 check((await q(`select public.att_me_today() t`))[0].t.me, false, 'a login no People record names: nothing to punch')
 await as(ANN_USER, [])
@@ -237,6 +259,9 @@ const atDaniel = (await q(`select r.ref from public.att_requests r join public.a
 check(atDaniel.includes(al.ref) && atDaniel.includes(mp.ref) && atDaniel.length === 4, true, 'the leave, the manpower and the two corrections wait on Daniel')
 check(team.waiting.map(r => r.ref).sort(), atDaniel, 'what waits at his step — all of it')
 check(team.ledger.leave.every(l => l.staffId === S.ann), true, 'the requesters’ leave, for the Balance')
+check(team.waiting.filter(r => r.kind === 'correction').map(r => r.nth), [1, 2], 'each correction’s place in her month’s quota')
+check(team.waiting.filter(r => r.kind !== 'correction').every(r => r.nth === null), true, 'and nothing else has one')
+check(team.otHours, {}, 'nobody asked for overtime this month')
 // He decides his own step; the leave is then approved (upline only), the manpower moves on to HR.
 await q(`select public.att_decide($1, true, '')`, [al.id])
 await q(`select public.att_decide($1, true, '')`, [mp.id])
@@ -244,6 +269,10 @@ check((await q(`select status from public.att_requests where id = $1`, [al.id]))
 check((await q(`select array_agg(state order by seq) s from public.att_request_steps where request_id = $1`, [mp.id]))[0].s, ['approved', 'waiting'],
   'and passes the manpower on to HR')
 check((await q(`select public.att_my_team() t`))[0].t.waiting.map(r => r.ref), atDaniel.filter(r => r.startsWith('CR-')), 'only the corrections wait on him now')
+await as(DAN_USER, [])
+await q(`select public.att_create_request($1, 'ot', null, $2::date, $2::date, null, 2.5, '{}'::jsonb, 'Fair booth', false)`, [S.dan, workDay])
+await as(UP_USER, [])
+check((await q(`select public.att_my_team() t`))[0].t.otHours, { [S.dan]: 2.5 }, 'a report’s overtime this month, for the decision sheet')
 
 // ── 3. att_my_org: words, not times ─────────────────────────────────────────
 await as(ANN_USER, [])
@@ -298,6 +327,13 @@ const slips = (await q(`select public.my_payslips() p`))[0].p
 check(slips.map(p => [p.month, p.status, Number(p.net), p.bank, p.accountLast4]), [[lastMonth, 'paid', 3813.53, 'Maybank', '3376']],
   'her paid month only — not this month’s draft, not Eve’s')
 check(slips[0].paidOn, (await q(`select ($1::date + interval '1 month - 1 day')::date::text d`, [lastMonth]))[0].d, 'paid on the voucher’s date')
+
+// Dan on sick leave today, booked by HR: his Today card names it.
+await as(HR_USER, ALL)
+await q(`select public.att_create_request($1, 'leave', 'SL', $2::date, $2::date, 1, null, '{}'::jsonb, 'Fever', true)`, [S.dan, workDay])
+await as(DAN_USER, [])
+check((({ onLeave, onLeaveName }) => [onLeave, onLeaveName])((await q(`select public.att_me_today() t`))[0].t), ['SL', 'Sick leave'],
+  'att_me_today: the leave today, by its code and its name')
 
 // ── Who may call them ───────────────────────────────────────────────────────
 for (const fn of ['public.att_me(date)', 'public.att_me_today()', 'public.att_my_team()', 'public.att_my_org()', 'public.my_record()', 'public.my_payslips()', 'public.att_punch_notice_ack()', 'public.my_photo_set(text)'])

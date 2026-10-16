@@ -409,17 +409,22 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public
 AS $fn$
 DECLARE
-  v_me    uuid := public.att_my_staff_id();
-  v_day   date := public.att_work_day();
-  v_title uuid;
-  v_mode  text;
-  v_sched uuid;
-  v_row   jsonb;
+  v_me     uuid := public.att_my_staff_id();
+  v_day    date := public.att_work_day();
+  v_title  uuid;
+  v_mode   text;
+  v_sched  uuid;
+  v_loc    uuid;
+  v_state  text;
+  v_row    jsonb;
+  v_ocode  text;
+  v_oname  text;
+  v_leave  text;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in first.' USING ERRCODE = '42501'; END IF;
   IF v_me IS NULL THEN RETURN jsonb_build_object('me', false, 'workDay', v_day); END IF;
   SELECT s.title_id INTO v_title FROM public.hr_staff_costs s WHERE s.id = v_me;
-  SELECT a.mode, a.schedule_id INTO v_mode, v_sched
+  SELECT a.mode, a.schedule_id, a.location_id INTO v_mode, v_sched, v_loc
     FROM public.att_assignments a
    WHERE a.deleted_at IS NULL AND a.effective_from <= v_day
      AND (a.level = 'company' OR (a.level = 'title' AND a.title_id = v_title) OR (a.level = 'person' AND a.staff_id = v_me))
@@ -428,15 +433,30 @@ BEGIN
   IF v_sched IS NOT NULL THEN
     SELECT x.days -> (extract(isodow FROM v_day)::integer - 1) INTO v_row FROM public.att_schedules x WHERE x.id = v_sched;
   END IF;
+  SELECT l.state INTO v_state FROM public.att_locations l WHERE l.id = v_loc;
+  SELECT o.code, o.name INTO v_ocode, v_oname FROM public.att_day_overrides o WHERE o.day = v_day;
+  SELECT r.leave_code INTO v_leave FROM public.att_requests r
+   WHERE r.staff_id = v_me AND r.kind = 'leave' AND r.status = 'approved' AND r.date_from <= v_day AND r.date_to >= v_day LIMIT 1;
   RETURN jsonb_build_object(
     'me', true,
     'workDay', v_day,
     'now', to_char(now() AT TIME ZONE 'Asia/Kuala_Lumpur', 'HH24:MI:SS'),
     'mode', v_mode,
     'day', v_row,
+    -- What the day is, as lib/attendance/engine.ts reads it: a whole day HR set (WD makes a rest day a work day),
+    -- else a holiday that covers the fence's state, else the schedule's row.
+    'dayType', CASE WHEN v_ocode = 'WD' THEN 'work' ELSE coalesce(v_row ->> 'type', 'work') END,
+    'holiday', CASE WHEN v_ocode IN ('H', 'CH', 'SO')
+                      THEN coalesce(nullif(btrim(v_oname), ''), CASE v_ocode WHEN 'H' THEN 'Public holiday' WHEN 'CH' THEN 'Company holiday' ELSE 'Special off' END)
+                    WHEN v_ocode IS NULL
+                      THEN (SELECT h.name FROM public.att_holidays h
+                             WHERE h.deleted_at IS NULL AND h.day = v_day
+                               AND (coalesce(h.states, '') IN ('', 'All') OR v_state IS NULL OR h.states = v_state
+                                    OR (h.states = 'All except Sarawak' AND v_state IS DISTINCT FROM 'Sarawak'))
+                             ORDER BY h.name LIMIT 1) END,
     'grace', (SELECT x.grace_min FROM public.att_policy x ORDER BY (x.effective_from <= v_day) DESC, x.effective_from DESC LIMIT 1),
-    'onLeave', (SELECT r.leave_code FROM public.att_requests r
-                 WHERE r.staff_id = v_me AND r.kind = 'leave' AND r.status = 'approved' AND r.date_from <= v_day AND r.date_to >= v_day LIMIT 1),
+    'onLeave', v_leave,
+    'onLeaveName', (SELECT t.name FROM public.att_leave_types t WHERE t.code = v_leave AND t.deleted_at IS NULL),
     'punches', coalesce((SELECT jsonb_agg(jsonb_build_object('dir', p.direction, 'time', to_char(p.at AT TIME ZONE 'Asia/Kuala_Lumpur', 'HH24:MI'),
                'inside', p.inside_fence, 'source', p.source) ORDER BY p.at)
         FROM public.att_punches p WHERE p.staff_id = v_me AND p.work_day = v_day AND p.invalid_at IS NULL), '[]'::jsonb),
@@ -455,6 +475,7 @@ DECLARE
   v_me    uuid := public.att_my_staff_id();
   v_today date := public.att_work_day();
   v_year  integer := extract(year FROM (now() AT TIME ZONE 'Asia/Kuala_Lumpur'))::integer;
+  v_month date := date_trunc('month', public.att_work_day())::date;
   v_who   uuid[];
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sign in first.' USING ERRCODE = '42501'; END IF;
@@ -519,12 +540,22 @@ BEGIN
                            'decidedBy', st.decided_by_name, 'onBehalf', st.on_behalf, 'note', st.note,
                            'arrivedAt', st.arrived_at, 'decidedAt', st.decided_at) ORDER BY st.seq)
                     FROM public.att_request_steps st WHERE st.request_id = r.id), '[]'::jsonb),
-               'events', '[]'::jsonb)
+               'events', '[]'::jsonb,
+               -- A correction's place in its month's quota ("2 of 3"): the ones that count, up to this one.
+               'nth', CASE WHEN r.kind = 'correction' THEN (SELECT count(*) FROM public.att_requests c
+                        WHERE c.staff_id = r.staff_id AND c.kind = 'correction' AND c.status IN ('pending', 'approved')
+                          AND date_trunc('month', c.date_from) = date_trunc('month', r.date_from) AND c.sent_at <= r.sent_at) END)
              ORDER BY r.sent_at)
         FROM public.att_requests r JOIN public.hr_staff_costs s ON s.id = r.staff_id
        WHERE r.status = 'pending'
          AND EXISTS (SELECT 1 FROM public.att_request_steps st
                       WHERE st.request_id = r.id AND st.state = 'waiting' AND st.role = 'upline' AND st.approver_staff_id = v_me)), '[]'::jsonb),
+    -- Each of them's overtime this month, asked or approved (the decision sheet's "9.5 h this month").
+    'otHours', coalesce((SELECT jsonb_object_agg(x.staff_id, x.h) FROM (
+        SELECT r.staff_id, sum(coalesce(r.hours, 0)) AS h FROM public.att_requests r
+         WHERE r.staff_id = ANY (coalesce(v_who, '{}'::uuid[])) AND r.kind = 'ot' AND r.status IN ('pending', 'approved')
+           AND r.date_from >= v_month AND r.date_from < (v_month + interval '1 month')
+         GROUP BY r.staff_id) x), '{}'::jsonb),
     'ledger', jsonb_build_object(
       'year', v_year,
       'entries', coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'ref', l.ref, 'staffId', l.staff_id, 'code', l.leave_code,
