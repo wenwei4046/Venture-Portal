@@ -128,8 +128,11 @@ cfClean
 cfDesk
 cfDevs
 cfDirty
+cfDragEnd
 cfFields
 cfOn
+cfPages
+cfPagesOn
 cfPhone
 cfPhoneH
 cfPhoneW

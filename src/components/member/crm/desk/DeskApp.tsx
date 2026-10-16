@@ -10,7 +10,7 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -544,14 +544,14 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   {!!(v.cfFields) && (<>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "flex-start" }}>
                       <div style={{ flex: "1 1 640px", display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" }}>
-                        {(v.cfSecs).map((sec, sec_i) => (<Fragment key={sec_i}>
-                          <section id={sec.anchor} style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "16px 20px 12px" }}>
+                        {!!(v.cfPagesOn) && (<DeskFormPages v={v.cfPages} />)}{(v.cfSecs).map((sec, sec_i) => (<Fragment key={sec_i}>
+                          <section id={sec.anchor} onDragOver={sec.dragOver} onDrop={sec.drop} style={{ display: "flex", flexDirection: "column", border: sec.bd ?? "1px solid #EBDDD2", borderRadius: "14px", background: "#fff", boxShadow: sec.ring, opacity: sec.op, transition: "box-shadow .15s, opacity .15s" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "16px 20px 12px" }}>{!!(v.cfPagesOn) && (<span draggable={true} onDragStart={sec.grip} onDragEnd={v.cfDragEnd} title="Drag to move this section — onto a page tab to move it to that page" className={DX.grip} style={{ flex: "none", width: "18px", height: "22px", marginLeft: "-8px", display: "grid", placeItems: "center", color: "#B5A398", cursor: "grab" }}><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.5"></circle><circle cx="9" cy="3" r="1.5"></circle><circle cx="3" cy="8" r="1.5"></circle><circle cx="9" cy="8" r="1.5"></circle><circle cx="3" cy="13" r="1.5"></circle><circle cx="9" cy="13" r="1.5"></circle></svg></span>)}
                               <span style={{ flex: "1", display: "flex", flexDirection: "column", gap: "3px" }}>
-                                <strong style={{ fontSize: "15px", fontWeight: "650" }}>{sec.title}</strong>
+                                {!!(sec.custom) && (<input type="text" value={sec.title} onChange={sec.setTitle} placeholder="Section name" style={{ height: "30px", boxSizing: "border-box", padding: "0 10px", margin: "-4px 0 0 -10px", border: "1px solid #EBDDD2", borderRadius: "8px", background: "#fff", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#3F2B22", outline: "none", maxWidth: "320px" }} />)}{!(sec.custom) && (<strong style={{ fontSize: "15px", fontWeight: "650" }}>{sec.title}</strong>)}
                                 <span style={{ fontSize: "12.5px", color: "#806B60" }}>{sec.desc}</span>
                               </span>
-                              <span style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap" }}>{sec.count} fields</span>
+                              <span style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap" }}>{sec.count} fields</span>{!!(sec.removable) && (<button type="button" onClick={sec.remove} title="Delete this section and its questions" className={DX.emo} style={{ flex: "none", width: "26px", height: "26px", margin: "-4px -6px 0 0", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "#A08E82", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>)}
                             </div>
                             {!!(sec.hasAuto) && (<>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "0 20px 12px", padding: "10px 12px", borderRadius: "10px", background: "#FBF6F2" }}>
@@ -566,7 +566,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                               </div>
                             </>)}
                             {!!(sec.hasEdit) && (<>
-                              <div style={{ display: "grid", gridTemplateColumns: "48px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", padding: "8px 20px", borderTop: "1px solid #F1E7DF", borderBottom: "1px solid #F1E7DF", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#A08E82" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "66px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", padding: "8px 20px", borderTop: "1px solid #F1E7DF", borderBottom: "1px solid #F1E7DF", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#A08E82" }}>
                                 <span>
                                 </span>
                                 <span>FIELD</span>
@@ -577,8 +577,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 </span>
                               </div>
                               {(sec.fields).map((f, f_i) => (<Fragment key={f_i}>
-                                <div style={{ display: "grid", gridTemplateColumns: "48px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", alignItems: "center", padding: "8px 20px", borderTop: f.bt }}>
-                                  <span style={{ display: "flex", gap: "2px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "66px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", alignItems: "center", padding: "8px 20px", borderTop: f.bt, opacity: f.op }} data-cf-row="" onDragOver={f.dragOver} onDrop={f.drop}>
+                                  <span style={{ display: "flex", alignItems: "center", gap: "2px" }}>{!!(v.cfPagesOn) && (<span draggable={true} onDragStart={f.grip} onDragEnd={v.cfDragEnd} title="Drag to move — onto another section or a page tab" className={DX.grip} style={{ flex: "none", width: "16px", height: "28px", display: "grid", placeItems: "center", color: "#B5A398", cursor: "grab" }}><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"></circle><circle cx="7.5" cy="3" r="1.4"></circle><circle cx="2.5" cy="8" r="1.4"></circle><circle cx="7.5" cy="8" r="1.4"></circle><circle cx="2.5" cy="13" r="1.4"></circle><circle cx="7.5" cy="13" r="1.4"></circle></svg></span>)}
                                     <button type="button" onClick={f.up} title="Move up" style={{ width: "24px", height: "28px", padding: "0", border: "0", background: "transparent", color: f.upFg, cursor: "pointer" }}>
                                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12 19V5M6 11l6-6 6 6">

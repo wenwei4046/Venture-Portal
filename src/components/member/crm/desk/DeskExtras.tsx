@@ -471,3 +471,39 @@ export function DeskFoldRail({ v }: { v: { title: string; open: () => void } }) 
     </aside>
   );
 }
+
+/**
+ * The Customer form's pages (the owner, 2026-10-16: "變成可以換 page，新增 page，並且每個都可以拖動" — vm/formpage.ts
+ * › cfPages): a tab a page — its number, name and how many questions — with + Add page after them; a section or a field
+ * dragged onto a tab moves there (the tab lights). Under them the open page's name to type, + Add section and Delete page
+ * (only a page of added sections; the four the CRM needs move first).
+ */
+export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpage").formPageVM>["cfPages"] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", borderBottom: "1px solid #EBDDD2", flexWrap: "wrap" }}>
+        {v.tabs.map(t => (
+          <button key={t.num} type="button" onClick={t.pick} onDragOver={t.over} onDrop={t.drop}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", marginBottom: "-1px", border: "0",
+              borderBottom: `2px solid ${t.on ? "#BD4A19" : "transparent"}`, borderRadius: "10px 10px 0 0", background: t.lit ? "#FFF0E4" : "transparent",
+              outline: t.lit ? "2px dashed #BD4A19" : "none", outlineOffset: "-4px", font: "inherit", fontSize: "14px", fontWeight: t.on ? "650" : "550",
+              color: t.on ? "#3F2B22" : "#806B60", cursor: "pointer", transition: "background .15s" }} className={t.on ? undefined : DX.emo}>
+            {t.label}
+            <span style={{ minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: t.on ? "#FFF0E4" : "#F5EEE8", color: t.on ? "#BD4A19" : "#806B60", fontSize: "11.5px", fontWeight: "700", display: "grid", placeItems: "center" }}>{t.count}</span>
+          </button>
+        ))}
+        <button type="button" onClick={v.addPage} className={DX.emo} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 12px", marginBottom: "2px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#BD4A19", cursor: "pointer" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add page</button>
+        {v.dragging && <span style={{ marginLeft: "auto", marginBottom: "10px", fontSize: "12px", color: "#806B60" }}>Drop on a tab to move it to that page</span>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "#806B60" }}>Page name</span>
+        <input type="text" value={v.title} onChange={v.setTitle} placeholder="Page name" style={{ height: "34px", width: "220px", boxSizing: "border-box", padding: "0 12px", border: "1px solid #EBDDD2", borderRadius: "10px", background: "#fff", font: "inherit", fontSize: "13.5px", color: "#3F2B22", outline: "none" }} />
+        <span style={{ flex: "1" }}></span>
+        <button type="button" onClick={v.addSection} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", borderRadius: "17px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "#3F2B22", cursor: "pointer" }} className={DX.emo}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add section</button>
+        {v.many && <button type="button" onClick={v.remove} disabled={!v.canDelete} title={v.deleteTip} style={{ height: "34px", padding: "0 14px", borderRadius: "17px", border: "1px solid #E2CFC1", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: v.canDelete ? "#A3371A" : "#C9B8AB", cursor: v.canDelete ? "pointer" : "not-allowed" }}>Delete page</button>}
+      </div>
+    </div>
+  );
+}
