@@ -89,7 +89,7 @@ import { foodOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
-import type { Notices } from "@/lib/push/notices";
+import { crmOpenTarget, type Notices } from "@/lib/push/notices";
 import { readNotices } from "@/lib/push/actions";
 
 export type Device = "live" | "ios" | "android" | "desktop";
@@ -215,7 +215,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // then is newer than what the app holds (the Quote's catalogue among it), so it is taken.
   useEffect(() => { setData(initialData); }, [initialData]);
   const searchNow = useSearchParams()?.toString() ?? "";
-  const [baseRoute, go] = useRoute(initialSearch ?? (searchNow ? `?${searchNow}` : ""));
+  const startSearch = initialSearch ?? (searchNow ? `?${searchNow}` : "");
+  const [baseRoute, go] = useRoute(startSearch);
   // The Product List is a page of its own (`/member/products`), drawn inside the app.
   const pathname = usePathname();
   const router = useRouter();
@@ -236,7 +237,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (!onProducts && route !== baseRoute) go({ screen: route.screen, pf: null, ins: "main", arena: "hub" }, true);
   }, [onProducts, route, baseRoute, go]);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [nfOpen, setNfOpen] = useState(false);
+  // Open from the first drawing when a tapped notice asked for it (`?bell=1`, below).
+  const [nfOpen, setNfOpen] = useState(() => new URLSearchParams(startSearch).get("bell") === "1");
   const [nfTab, setNfTab] = useState<NotifTab>("all");
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useStoredBool("member-hide-amounts", false);
@@ -602,26 +604,29 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [goScreen]);
   const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); seeNotices(); }, [seeNotices]);
   const toggleNotif = useCallback(() => { setSheet(null); setNfOpen(open => !open); seeNotices(); }, [seeNotices]);
-  // A tapped push about a manpower request opens the app at `?bell=1` (lib/push/notices noticeUrl): the bell, once.
+  // A tapped push about a manpower request opens the app at `?bell=1` (lib/push/notices noticeUrl): the bell, once —
+  // open from the first drawing (`nfOpen` above, 2026-10-17: opened here, it waited for the app's first reads, as the
+  // CRM's chat did below); here it is seen, and the address drops it.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (q.get("bell") !== "1") return;
     q.delete("bell");
     window.history.replaceState(null, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
-    openNotif();
+    seeNotices();
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // A tapped push about a CRM chat or invitation opens the CRM there (`/member?page=account&view=crm&chat=…` or
-  // `&crm=notifs`, lib/push/notices noticeUrl): the CRM opens that chat, or its notifications, once.
-  const [crmOpen, setCrmOpen] = useState<CrmOpen | null>(null);
+  // `&crm=notifs`, lib/push/notices noticeUrl): the CRM opens that chat, or its notifications, once. Read from the
+  // address the app starts on, in its first drawing (2026-10-17): set by an effect after it, the CRM was handed it only
+  // once the app's first reads had all come back — seconds on a phone, the chat seemingly never opening. The address
+  // then drops it, so a reload opens the CRM as it was.
+  const [crmOpen] = useState<CrmOpen | null>(() => crmOpenTarget(startSearch));
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    const chat = q.get("chat"), notifs = q.get("crm") === "notifs";
-    if (!chat && !notifs) return;
+    if (!q.has("chat") && !q.has("crm")) return;
     q.delete("chat"); q.delete("crm");
     window.history.replaceState(window.history.state, "", window.location.pathname + (q.toString() ? `?${q}` : ""));
-    setCrmOpen(chat ? { chat } : { notifs: true });
   }, []);
   const openSheet = useCallback((next: Sheet) => { setNfOpen(false); setSheet(next); }, []);
   // The CRM from Today's chat button (2026-10-14) opens as Profile › My leads & appointments does, and its way back
