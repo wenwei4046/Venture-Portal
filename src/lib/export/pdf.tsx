@@ -3,6 +3,7 @@ import {
   Document, Page, Text, View, StyleSheet, pdf,
 } from '@react-pdf/renderer'
 import { officeTime } from '@/lib/office-time'
+import { COMPANY_NAME } from '@/lib/company'
 
 export type PdfOrientation = 'portrait' | 'landscape'
 
@@ -114,7 +115,9 @@ export function PdfDocument({
     <Document>
       <Page size="A4" orientation={orientation} style={styles.page}>
         <Text style={styles.header}>
-          HOUZS Venture Sdn Bhd · {title} · {periodLabel}
+          {/* One run for the name and its dot, as the literal it replaced was (pdf.test's page frame counts runs). */}
+          {`${COMPANY_NAME} · `}
+          {title} · {periodLabel}
         </Text>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

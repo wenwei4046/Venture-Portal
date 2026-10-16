@@ -10,6 +10,7 @@
 
 import type { Metadata } from 'next'
 import PrintButton from './PrintButton'
+import { COMPANY_NAME } from '@/lib/company'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import { requirePermission } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
@@ -148,7 +149,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
       `}</style>
       <PrintButton />
         <div className="rpt-head">
-          <div className="co">HOUZS VENTURE SDN BHD</div>
+          <div className="co">{COMPANY_NAME.toUpperCase()}</div>
           <div className="sub">
             Director Pool — Flow Report · {m.name} {m.month.slice(0, 4)}
             {m.fullPayout && ' · 💯 Full Payout'}

@@ -190,7 +190,7 @@ describe('a receipt and a payment voucher, as the design draws them', () => {
     const content = words(sheets.Pages[0])
     for (const w of [
       'Receipt', 'Receipt number', 'HV-OR-202610-0020', 'Date paid', '7 October 2026', 'Payment method', 'Bank transfer · Alliance Bank 1200-4410-0091', 'Reference', 'IBG-HB-071026-88',
-      'HOUZS Venture Holding Sdn. Bhd.', 'Internal banking · Shared services', 'hello@houzsventure.com',
+      'HOUZS Venture Holding Sdn Bhd', 'Internal banking · Shared services', 'hello@houzsventure.com',
       'Received from', 'HOUZS Bedding (HB)', 'Group company', 'RM 150,000.00 paid on 7 October 2026',
       'Description', 'Credited to', 'Advance repayment', '1200 · Loans to Subsidiaries', 'Venture Pool', 'Total', 'Amount paid', 'RM 150,000.00',
       'Received by · Aina Rahman', 'Company stamp', 'HV-OR-202610-0020 · RM 150,000.00 paid on 7 October 2026', 'Page 1 of 1',
@@ -203,7 +203,7 @@ describe('a receipt and a payment voucher, as the design draws them', () => {
     const content = words(sheets.Pages[1])
     for (const w of [
       'Payment voucher', 'Voucher number', 'HV-PV-202610-0044', 'Payment date', '6 October 2026', 'Pay from', 'Hong Leong Bank · 5123-0098-77', 'Status', 'Approved',
-      'HOUZS Venture Holding Sdn. Bhd.', 'hello@houzsventure.com',
+      'HOUZS Venture Holding Sdn Bhd', 'hello@houzsventure.com',
       'Pay to', 'Meta Platforms Ireland', 'Bank transfer', 'RM 25,000.00 to pay on 6 October 2026', 'FB ads top-up',
       'Deducted from', 'Account', 'Marketing Pool', '6100 · Advertising', 'Total RM 25,000.00',
       'Approval', 'Created Aina · 6 Oct 2026, 09:12', 'Submitted Aina · 6 Oct 2026, 09:30', 'Approved Loo K.W. · 6 Oct 2026, 14:08', 'Paid Not yet',
