@@ -30,7 +30,9 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
   const router = useRouter()
   const [brand, setBrand] = useState('all')
   const [handed, setHanded] = useState<'all' | 'yes' | 'no'>('all')
-  const [tests, setTests] = useState(false)
+  // Only test conversations so far (before Meta is connected): show them, or the page is empty.
+  const onlyTests = contacts.length > 0 && contacts.every(c => c.isTest)
+  const [tests, setTests] = useState(onlyTests)
   const brands = new Map(config.brands.map(b => [b.id, b]))
   const real = contacts.filter(c => tests || !c.isTest)
   const t = leadInsight(contacts, config.brands, { withTests: tests }).total
@@ -51,6 +53,7 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
         <Card label="已到店 Came" value={String(t.came)} note="參考，不算客服 KPI" />
       </Cards>
 
+      {onlyTests ? <div className={s.note} style={{ margin: '18px 0 0' }}>目前只有測試資料（Meta 還沒串接），所以先顯示測試對話。真的客戶進來後，測試資料不會算進數字。</div> : null}
       <div className={s.toolbar} style={{ marginTop: 18 }}>
         <div className={s.tabs} role="group" aria-label="Brand">
           <button type="button" className={s.tab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}>全部</button>

@@ -11,7 +11,7 @@ import s from './lead.module.css'
  * 拿到電話號碼); handed, booked and came for reference — by brand, by ad, and by who handed the leads over.
  * Test conversations are left out. Reply times and the AI's share join with Meta and the AI agent.
  */
-export default function InsightView({ insight, period, months }: { insight: LeadInsight; period: LeadPeriod; months: LeadPeriod[] }) {
+export default function InsightView({ insight, onlyTests = false, period, months }: { insight: LeadInsight; onlyTests?: boolean; period: LeadPeriod; months: LeadPeriod[] }) {
   const router = useRouter()
   const t = insight.total
   return (
@@ -21,6 +21,7 @@ export default function InsightView({ insight, period, months }: { insight: Lead
           {months.map(m => <option key={m.month} value={m.month}>{m.label}</option>)}
         </select>
       } />
+      {onlyTests ? <div className={s.note} style={{ margin: '0 0 14px' }}>目前只有測試資料（Meta 還沒串接），以下數字是測試資料算出來的。</div> : null}
       <Cards count={4} label="This month">
         <Card label="拿電話率 Phone rate" value={rate(t.phones, t.conversations) == null ? '—' : `${rate(t.phones, t.conversations)}%`} note={`${t.phones} / ${t.conversations} 個對話`} tone="primary" />
         <Card label="已轉交 Handed" value={String(t.handed)} note={`${rate(t.handed, t.phones) ?? '—'}% of phones`} />

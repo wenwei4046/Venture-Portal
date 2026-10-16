@@ -21,5 +21,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
       </HvPage>
     )
   }
-  return <InsightView insight={leadInsight(list.data, config.data.brands)} period={period} months={recentMonths()} />
+  // Only test conversations so far (before Meta is connected): count them, and say so.
+  const onlyTests = list.data.length > 0 && list.data.every(c => c.isTest)
+  return <InsightView insight={leadInsight(list.data, config.data.brands, { withTests: onlyTests })} onlyTests={onlyTests} period={period} months={recentMonths()} />
 }
