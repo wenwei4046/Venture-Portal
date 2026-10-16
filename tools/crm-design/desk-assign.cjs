@@ -23,4 +23,7 @@ module.exports = [
   ['<aside style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "0" }}>',
     '<aside style={{ flex: "0 1 400px", position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "300px" }}>',
     "The preview's column, 300–400 px (the owner, 2026-10-16)."],
+  ['fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}>{r.v}</span>',
+    'fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>',
+    "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
 ];

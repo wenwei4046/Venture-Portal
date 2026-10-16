@@ -23,6 +23,7 @@ import { chatProgressVM } from "./chatprogress";
 import { chatVM } from "./chat";
 import { railVM } from "./rail";
 import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
+import { adHref } from "../../shared/AdLink";
 
 export function deskVM(ctx: DeskCtx) {
   const { ui, patch, data } = ctx;
@@ -80,7 +81,7 @@ export function deskVM(ctx: DeskCtx) {
     ibInfo: (() => { const c = cur; const secs = formV2(data);
       return { name: c?.name ?? "", ini: c ? initials(c.name) : "", groups: c ? secs.map(sec => ({ label: sec.label,
         rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = answerOf(data, c, fl, ctx.nameOf);
-          return { k: fl.label.replace(/ (RM)$/, ""), v: val, bt: i ? "1px solid #F1E7DF" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "#A08E82" : "#3F2B22" }; }) })) : [] }; })(),
+          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid #F1E7DF" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "#A08E82" : "#3F2B22" }; }) })) : [] }; })(),
     awInfo: () => { if (awC) patch({ awMenuOpen: false, tab: ui.tab, pane: "overlay", kind: "info", infoId: awC.id, visit: null }); },
     awBook: () => { if (awC) patch({ awMenuOpen: false, pane: "overlay", kind: "book", chat: awC.id, book: null }); },
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },

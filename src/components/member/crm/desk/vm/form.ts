@@ -17,6 +17,7 @@
 import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
 import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
 import { phoneLabel } from "../../sales/vm/customer";
+import { adKindLabel } from "../../shared/AdLink";
 
 /** v2's answer types, and how each is kept (crm_forms' field type). */
 export const ANSWER_TYPES = ["Short text", "Number", "Long text", "Choice", "Range (from–to)", "Date"] as const;
@@ -105,7 +106,7 @@ export function answerOf(data: CrmData, c: CrmCustomer, f: FormFieldV2, nameOf: 
     case "first": return dmy(new Date(c.createdAt));
     case "last": { const l = lastReal(c); return l ? dmy(new Date(l.at)) : "—"; }
     case "plat": return CHANNEL[c.channel].name;
-    case "ad": return c.ad || "—";
+    case "ad": return c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad || "—";
     case "sp": return c.assignedTo ? nameOf(c.assignedTo) : "—";
     case "visit": return visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))}` : "—";
     case "showroom": return visit ? data.rooms.find(r => r.id === visit.showroomId)?.name ?? "—" : "—";

@@ -4869,7 +4869,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       {(g.rows).map((r, r_i) => (<Fragment key={r_i}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "7px 0" }}>
                           <span style={{ fontSize: "12px", color: "#806B60" }}>{r.k}</span>
-                          <span style={{ fontSize: "13.5px", lineHeight: "1.35", fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}>{r.v}</span>
+                          <span style={{ fontSize: "13.5px", lineHeight: "1.35", fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>
                         </div>
                       </Fragment>))}
                     </div>
