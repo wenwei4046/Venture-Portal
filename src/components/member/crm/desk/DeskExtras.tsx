@@ -404,6 +404,8 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
             </span>)}
           </div>
         </div>}
+        {/* The customer first, the chart under it (the owner, 2026-10-16: "倒翻位子"). */}
+        {v.side && <DeskContactSide v={v.side} />}
         {c && <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "14px", border: "1px solid #EBDDD2", borderRadius: "14px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             <strong style={{ fontSize: "14px", fontWeight: "650" }}>{c.title}</strong>
@@ -429,7 +431,6 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
             </div>
           </>}
         </div>}
-        {v.side && <DeskContactSide v={v.side} />}
       </div>
     </aside>
   );
