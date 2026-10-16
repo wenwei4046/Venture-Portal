@@ -87,7 +87,7 @@ function ProtoFrame({ props }: { props: ProtoProps }) {
   const p = { ...P, ...c.renderVals() } as Record<string, unknown>;
   const v = { ...p, ...PROTO_FRAME, ...protoChats(p), alertsP: { tab: "unread", markAll: null, empty: "", tabs: [{ label: "Unread 4", on: true, pick: noop }, { label: "Read", on: false, pick: noop }],
     rows: ((p.alerts ?? []) as { kind: string; color: string; time: string; title: string; sub: string }[]).map((a, i) => ({ ...a, key: String(i), unread: false, bg: "#fff", dot: a.color, line: "", extra: "", quote: "", hasQuote: false, canOpen: false, open: noop, markRead: null })) },
-    railOn: false, calRail: false, perfShut: false, cfPagesOn: false, perfFold: noop, perfRail: { title: "", open: noop }, ppPagerOn: false, ppRail: false, cfRealOn: false, ppFoldable: false, ppChartOpen: true, ppPie: [], ppChev: "none", ppChartSum: "", ppChartToggle: noop,
+    railOn: false, calRail: false, perfShut: false, cfPagesOn: false, ibInfoShut: false, perfFold: noop, perfRail: { title: "", open: noop }, ppPagerOn: false, ppRail: false, cfRealOn: false, ppFoldable: false, ppChartOpen: true, ppPie: [], ppChev: "none", ppChartSum: "", ppChartToggle: noop,
     ppRows: ((p.ppRows ?? []) as Record<string, unknown>[]).map(r => ({ ...r, rowBg: "#fff" })),
     ppSide: { has: false, todo: [], todoTitle: "", hasTodo: false, ini: "", name: "", phone: "", ch: "", ad: "", adUrl: null, status: "", owner: "", visit: "", lastAt: "", groups: [], msgs: [], hasMsgs: false, openChat: noop, edit: noop, close: noop },
     chNote: p.chRo ? "Only Principal and Director can change these. You can look." : "" } as unknown as DeskVM;

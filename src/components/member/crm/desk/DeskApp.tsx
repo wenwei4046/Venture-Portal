@@ -4848,11 +4848,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
             </aside>
           </>)}{!!(v.railOn) && (<DeskRail v={v.rail} />)}
           {!!(v.ibCols) && (<>
-            <aside style={{ position: "relative", flex: `0 0 ${v.ibInfoW}px`, width: `${v.ibInfoW}px`, boxSizing: "border-box", minHeight: "0", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+            {!(v.ibInfoShut) && (<><aside style={{ position: "relative", flex: `0 0 ${v.ibInfoW}px`, width: `${v.ibInfoW}px`, boxSizing: "border-box", minHeight: "0", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
               <div onPointerDown={v.dragInfo} onDoubleClick={v.resetInfo} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", display: "flex", justifyContent: "center", touchAction: "none" }} className={DH.h23}>
               </div>
               <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", borderBottom: "1px solid #EBDDD2" }}>
-                <strong style={{ flex: "1", minWidth: "0", fontSize: "15px", fontWeight: "650" }}>Customer info</strong>
+                <button type="button" onClick={v.ibInfoFold} title="Fold Customer info" className={DX.emo} style={{ flex: "0 0 30px", width: "30px", height: "30px", margin: "0 0 0 -8px", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5"></path></svg></button><strong style={{ flex: "1", minWidth: "0", fontSize: "15px", fontWeight: "650" }}>Customer info</strong>
                 <button type="button" disabled={v.ibNone} style={{ display: "inline-flex", alignItems: "center", gap: "5px", height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid #EBDDD2", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#BD4A19", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z">
                     </path>
@@ -4876,7 +4876,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </Fragment>))}
                 </>)}
               </div>
-            </aside>
+            </aside></>)}{!!(v.ibInfoShut) && (<DeskFoldRail v={v.ibInfoRail} />)}
             {!!(v.ibCpClosed) && (<>
               <aside style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <button type="button" onClick={v.ibCpToggle} title="Open chat progress" style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid #EBDDD2", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h24}>
