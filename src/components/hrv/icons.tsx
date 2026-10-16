@@ -118,6 +118,37 @@ const NAV = {
       <path d="M12 14.5v2" />
     </>
   ),
+  // A person's page, its wells' heads (2026-10-16): Lucide's id-card, phone,
+  // life-buoy, landmark and shield-check, drawn at the set's stroke.
+  idCard: (
+    <>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6.2 15.5a3 3 0 0 1 5.6 0" />
+      <path d="M15 10h3.5M15 14h3.5" />
+    </>
+  ),
+  phone: <path d="M5 4h3.2l1.6 4.2-2 1.4a11 11 0 0 0 6.6 6.6l1.4-2 4.2 1.6V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z" />,
+  buoy: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3.6" />
+      <path d="m5.6 5.6 3.9 3.9M14.5 14.5l3.9 3.9M14.5 9.5l3.9-3.9M5.6 18.4l3.9-3.9" />
+    </>
+  ),
+  bank: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M6 18v-7M10 18v-7M14 18v-7M18 18v-7" />
+      <path d="M12 3 20 8H4z" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 21c-4.2-1.5-7.5-4.2-7.5-8.6V6.2L12 3.5l7.5 2.7v6.2c0 4.4-3.3 7.1-7.5 8.6z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 const CARD = {

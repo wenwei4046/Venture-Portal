@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payPatchForUpdate } from '@/lib/staff-form'
-import { asksPay, payModeOf } from '@/lib/person-record'
+import { LOGIN_EMAIL_LOCKED, asksPay, payModeOf } from '@/lib/person-record'
+import { moveReportingLine } from '@/lib/hierarchy-writes'
+import { saveRecordAndLine } from '@/lib/person-line-save'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 import { isMasked, sees } from '@/lib/sensitive'
@@ -148,12 +150,26 @@ export async function updateStaff(id: string, formData: FormData): Promise<Staff
     return { ok: false, reason: 'Editing a person needs Salary amounts ticked for your title — the form saves their pay.' }
   }
 
+  // Reports to (2026-10-16) is saved apart from the record, by the one writer
+  // both charts use — the order the two go in is lib/person-line-save.ts's.
+  let outcome: StaffSaveOutcome
   try {
-    await writeStaff(editor, id, formData)
+    const supabase = await createClient()
+    outcome = await saveRecordAndLine({
+      lineSent: formData.has('reports_to'),
+      titleSent: formData.has('title_id'),
+      moveLine: async () => {
+        const moved = await moveReportingLine(supabase, id, trimOrNull(formData.get('reports_to')))
+        return moved.ok ? { ok: true } : { ok: false, reason: moved.reason }
+      },
+      writeRecord: () => writeStaff(editor, id, formData),
+    })
   } catch (err) {
     return { ok: false, reason: err instanceof Error ? err.message : 'Could not save. Please try again.' }
   }
 
+  // Refused or not, part of it may have been written (a title before a line
+  // the database still refused): the pages read again either way.
   revalidatePath('/hr-costing')
   // The org chart draws the title, the ladder rung it stands on and the rank —
   // all three can change here, so the graph is stale until this runs. Its
@@ -161,7 +177,7 @@ export async function updateStaff(id: string, formData: FormData): Promise<Staff
   // the next hard reload. `/team` holds the person's own page too.
   revalidatePath('/team', 'layout')
   revalidatePath('/revenue', 'layout')
-  return { ok: true }
+  return outcome
 }
 
 /**
@@ -192,10 +208,13 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
 
   const { data: current } = await supabase
     .from('hr_staff_costs')
-    .select('department_id, title_id, employment_type, bank_name, departments(payroll_source)')
+    .select('department_id, title_id, employment_type, bank_name, user_id, departments(payroll_source)')
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
+  // Somebody who signs in signs in with this email: it is theirs to change,
+  // by a request from their app, never HR's here (2026-10-16).
+  if (sent('email') && current.user_id) throw new Error(LOGIN_EMAIL_LOCKED)
 
   const patch: TablesUpdate<'hr_staff_costs'> = {}
 

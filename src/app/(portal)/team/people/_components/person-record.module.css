@@ -1,23 +1,164 @@
-/* A person's full page, edited where it stands (2026-10-14). Each fact's row
-   holds its field in the value's place; one bar at the sheet's foot saves.
-   Colours are the kit's --hv-* (on .sheet-theme); the soft dropdown draws the
-   selects (radius 10, its chevron and ring), so the text fields match it. */
+/* A person's full page — a 360 since 2026-10-16 (the user's option C): who
+   they are and where they stand in a card on the left, the record in wells on
+   the right. The words follow the user's reference (2026-10-16, "i want the
+   wording be like this kind"): a well's title in small spaced capitals with
+   its icon, each label in small spaced capitals OVER its value, the value in
+   plain dark type. Edited where it stands (2026-10-14): each value turns into
+   its field in the same place, one bar at the sheet's foot saves. Colours are
+   the kit's --hv-* (on .sheet-theme); the soft dropdown draws the selects
+   (radius 10, its chevron and ring), so the text fields match it. */
 
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+  max-width: 1160px;
+  margin-bottom: 28px;
+  line-height: normal;
+}
+
+/* The card: on the left wherever the two fit side by side, on top below that. */
+.profile {
+  flex: 1 1 280px;
+  max-width: 340px;
+  box-sizing: border-box;
+  padding: 22px 22px 10px;
+  background: rgb(255 255 255);
+  border: 1px solid rgb(var(--hv-frame));
+  border-radius: 12px;
+}
+/* Read, it stays in view while the record scrolls beside it. */
+@media (min-width: 1200px) {
+  .layout:not([data-editing='true']) .profile { position: sticky; top: 12px; }
+}
+
+/* Their tile — the roster's, larger: an orange rim on peach while they can sign in. */
+.tile {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: rgb(var(--hv-panel));
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgb(var(--hv-ink));
+}
+.tile[data-login='true'] {
+  background: rgb(var(--hv-peach));
+  box-shadow: 0 0 0 2px rgb(var(--hv-accent));
+}
+
+.eyebrow { margin: 18px 0 6px; }
+.profile h1.name { margin: 0; font-size: 30px; line-height: 1.15; overflow-wrap: anywhere; }
+.line {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgb(var(--hv-ink));
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.actions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.action { width: 100%; box-sizing: border-box; font-size: 14px; padding: 9px 14px; }
+
+/* The card's facts: each label over its value, a hairline between. */
+.sideFacts { margin: 14px 0 0; }
+.sideFact {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 0;
+  border-top: 1px solid rgb(var(--hv-hairline));
+}
+
+/* A label and its value — the reference's: spaced capitals over plain type. */
+.label {
+  display: block;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+.value {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: rgb(var(--hv-ink));
+  overflow-wrap: anywhere;
+}
+.mono {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.multiline { white-space: pre-line; }
+.empty { color: rgb(var(--hv-faint)); }
+.field { margin: 0; min-width: 0; }
+/* Under a name: their title (the upline's), quieter. */
+.sub { display: block; margin-top: 3px; font-size: 13px; color: rgb(var(--hv-brown)); }
+.person {
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--hv-frame));
+  text-underline-offset: 3px;
+}
+.person:hover { text-decoration-color: rgb(var(--hv-ink)); }
+
+/* The record: wells two to a row where they fit — one to a row while
+   editing, so each field has its room. */
+.main { flex: 999 1 560px; min-width: 0; }
+.wells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 14px;
+}
+.layout[data-editing='true'] .wells { grid-template-columns: minmax(0, 1fr); }
+.well {
+  min-width: 0;
+  padding: 18px 20px 20px;
+  background: rgb(var(--hv-panel));
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 12px;
+}
+.wellTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-ink));
+}
+.wellIcon { display: inline-flex; flex: none; color: rgb(var(--hv-body-2)); }
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 22px;
+  margin: 0;
+}
+.fact { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.fact[data-wide='true'] { grid-column: 1 / -1; }
+
+/* Fields: white on the well, the soft dropdown's box. */
 .input,
 .select,
 .locked {
   box-sizing: border-box;
   width: 100%;
-  max-width: 340px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: normal;
   color: rgb(var(--hv-ink));
 }
 
 .input {
   display: block;
-  padding: 7px 10px;
+  padding: 8px 11px;
   border: 1px solid rgb(var(--hv-hairline));
   border-radius: 10px;
   background: rgb(255 255 255);
@@ -26,35 +167,46 @@
 }
 .input:hover { border-color: rgb(var(--hv-frame)); }
 .input::placeholder { color: rgb(var(--hv-brown) / 0.7); }
-.area { resize: vertical; min-height: 52px; }
-.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12.5px; }
+.area { resize: vertical; min-height: 56px; }
+.inputMono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; }
 
 /* A changed field turns peach — the Members grid's changed cell. */
 .input[data-dirty='true'],
 .select[data-dirty='true'],
-.name[data-dirty='true'] {
+.nameField[data-dirty='true'] {
   background-color: rgb(var(--hv-peach));
 }
 .input[data-dirty='true'],
 .select[data-dirty='true'] { border-color: rgb(var(--hv-accent)); }
 
 /* A value this editor may not change: the reader's own words (•••• when on
-   file) in a quiet box with no field behind it. */
+   file) in a quiet box with no field behind it; a login's email wears a
+   padlock and its word. */
 .locked {
-  display: block;
-  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
   border: 1px solid rgb(var(--hv-hairline));
   border-radius: 10px;
-  background: rgb(var(--hv-panel-2));
-  font-family: var(--font-mono), 'Chivo Mono', monospace;
-  font-size: 12.5px;
+  background: rgb(var(--hv-panel-3));
   cursor: default;
+}
+.lockedIcon { display: inline-flex; flex: none; color: rgb(var(--hv-brown)); }
+.lockedValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 13.5px;
 }
 
 /* EPF: the part and the Exempt tick on one line. */
-.pair { display: flex; align-items: center; gap: 12px; max-width: 340px; }
+.pair { display: flex; align-items: center; gap: 12px; }
 .pair .select { flex: 1 1 auto; min-width: 0; }
-.tick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.tick { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; cursor: pointer; }
 .check { width: 15px; height: 15px; margin: 0; accent-color: rgb(var(--hv-accent)); cursor: pointer; }
 /* The Basic from commission tick, changed: the peach of a changed field. */
 .tick[data-dirty='true'] { background: rgb(var(--hv-peach)); border-radius: 6px; box-shadow: 0 0 0 4px rgb(var(--hv-peach)); }
@@ -62,7 +214,7 @@
 /* The name in the title's place and face — the line under it says it edits,
    and runs as long as the name (a browser without field-sizing draws it at
    the input's own width). */
-.name {
+.nameField {
   box-sizing: border-box;
   display: block;
   field-sizing: content;
@@ -79,8 +231,8 @@
   color: inherit;
   outline: none;
 }
-.name:hover { border-bottom-color: rgb(var(--hv-brown)); }
-.name:focus { border-bottom: 1px solid rgb(var(--hv-accent)); }
+.nameField:hover { border-bottom-color: rgb(var(--hv-brown)); }
+.nameField:focus { border-bottom: 1px solid rgb(var(--hv-accent)); }
 
 /* The save bar: the kit's peach bar, at the foot of the sheet while the page
    scrolls under it. */
@@ -92,6 +244,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  max-width: 1160px;
+  box-sizing: border-box;
   margin-top: 4px;
   margin-bottom: 24px;
   padding: 10px 12px 10px 16px;
@@ -101,16 +255,12 @@
   border-radius: 10px;
   line-height: normal;
 }
-.barText { font-size: 12.5px; min-width: 0; }
+.barText { font-size: 13.5px; min-width: 0; }
 .barText b { font-weight: 500; }
 .barError { color: rgb(var(--hv-danger)); }
 .barActions { display: flex; gap: 8px; flex-shrink: 0; }
 
 @media (max-width: 767px) {
-  .input,
-  .select,
-  .locked,
-  .pair { max-width: none; }
   .bar { flex-wrap: wrap; }
   .barText { flex-basis: 100%; }
   .barActions { margin-left: auto; }
@@ -120,5 +270,9 @@
   /* The phone's field rule (globals.css) holds every field at 16px with
      !important — iOS's zoom floor. The name keeps the title's own size, which
      is above it; an id is what outweighs that rule. */
-  .name:global(#person-name) { font-size: inherit !important; }
+  .nameField:global(#person-name) { font-size: inherit !important; }
+}
+
+@media (max-width: 560px) {
+  .facts { grid-template-columns: minmax(0, 1fr); }
 }

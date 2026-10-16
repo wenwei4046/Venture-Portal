@@ -3,17 +3,19 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { formatMoney } from '@/lib/utils'
+import { formatDate, formatMoney } from '@/lib/utils'
+import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
-import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf } from '@/lib/person-record'
+import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
-import { readDirectory, readsStaffTable } from '@/lib/team-directory'
+import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import { loadPersonAccess } from '../../_lib/person-permissions'
+import { loadUplineChoices } from '../../_lib/upline-choices'
 import PersonChanges from '../_components/PersonChanges'
 import PersonRecord, { type PersonRecordView } from '../_components/PersonRecord'
 import { getPersonCard } from '../card-actions'
@@ -21,6 +23,25 @@ import { getPersonCard } from '../card-actions'
 interface PageProps {
   params: Promise<{ id: string }>
   searchParams: Promise<{ edit?: string }>
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>
+
+/**
+ * Who they report to, as this viewer may name them: the roster's own read —
+ * with a link to their page — or, for a directory reader, the org chart,
+ * which names everybody active (a Department head's line runs up out of
+ * their reach).
+ */
+async function uplineOf(supabase: Supabase, direct: boolean, managerId: string | null): Promise<PersonRecordView['reportsTo']> {
+  if (!managerId) return null
+  if (direct) {
+    const { data } = await supabase.from('hr_staff_costs').select('id, employee_name, status, titles(name)').eq('id', managerId).maybeSingle()
+    const m = data as { id: string; employee_name: string; status: string | null; titles: { name: string } | null } | null
+    return m ? { name: m.employee_name, title: m.titles?.name ?? null, href: `/team/people/${m.id}`, active: m.status === 'active' } : null
+  }
+  const m = (await readOrgChart(supabase)).people.find(p => p.id === managerId)
+  return m ? { name: m.employee_name, title: m.titles?.name ?? null, href: null, active: true } : null
 }
 
 export default async function StaffDetailPage({ params, searchParams }: PageProps) {
@@ -36,7 +57,16 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // the HR revamp's window only reads (2026-10-10) — read beside the page's own,
   // Team · Edit. The card says what the viewer may do and carries the record
   // the edit fields start from (2026-10-14: edited where it stands).
-  const changes = canDo(viewer, 'team', 'edit') ? getPersonCard(id).catch(() => null) : Promise.resolve(null)
+  const mayEdit = canDo(viewer, 'team', 'edit')
+  const changes = mayEdit ? getPersonCard(id).catch(() => null) : Promise.resolve(null)
+  // …and the uplines Reports to offers them (2026-10-16), on the roster's own read.
+  // A failed read leaves the row as it reads; the line is still set on Hierarchy.
+  const uplines = mayEdit && direct
+    ? loadUplineChoices(supabase, id).catch(err => {
+        console.error('[person page] uplines', err)
+        return null
+      })
+    : Promise.resolve(null)
 
   // The row without its NRIC and account numbers, which come through the
   // reader beside it — the table no longer hands them out (2026-10-09, PR4).
@@ -45,7 +75,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
         supabase
           .from('hr_staff_costs')
           .select(
-            `${STAFF_ROW_COLUMNS}, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)` as const,
+            `${STAFF_ROW_COLUMNS}, departments(name, payroll_source), titles(name, template_id, level_id), users!hr_staff_costs_user_id_fkey(id, role, email, is_active)` as const,
           )
           .eq('id', id)
           .maybeSingle(),
@@ -67,12 +97,21 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   const row = staff as any
   const deptName: string = row.departments?.name ?? '—'
   const titleName: string | null = row.titles?.name ?? row.designation ?? null
-  const account = row.users as
-    | { id: string; name: string; email: string; role: string; is_active: boolean }
-    | null
+  // Their login, if they have one: who its access log and permissions are
+  // for, and the email they sign in with — their Contact email, which follows it.
+  const account = row.users as { id: string; role: string; email: string; is_active: boolean } | null
   // access_log is Principal-or-self; a reader without the audit permission
   // would only ever see an empty panel, so it is not rendered for them at all.
   const canSeeActivity = canAccessAuditLog(viewer) && !!account
+
+  // Where their title stands on the ladder, and who they report to.
+  const levelId: string | null = row.titles?.level_id ?? null
+  const [level, upline] = await Promise.all([
+    levelId
+      ? supabase.from('title_levels').select('name').eq('id', levelId).maybeSingle().then(r => (r.data as { name: string } | null)?.name ?? null)
+      : Promise.resolve(null),
+    uplineOf(supabase, direct, row.reports_to ?? null),
+  ])
 
   // What this person's account actually resolves to. Shared with the floating
   // person card since 2026-09-01 — two copies of this would drift, and it is
@@ -87,7 +126,8 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
       )
     : null
 
-  const card = await changes
+  const [card, uplineChoices] = await Promise.all([changes, uplines])
+  const active = staff.status !== 'inactive'
 
   // Paid 100% on commission (no basic, no allowances, statutory at 0) or
   // variable pay (the Director department's month, keyed on payroll) — the
@@ -97,12 +137,16 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     department: deptName,
     code: staff.employee_code,
     title: titleName,
-    resignationDate: staff.resignation_date,
-    account: account ? { email: account.email, role: account.role } : null,
+    level,
+    active,
+    login: account ? (account.is_active ? 'active' : 'disabled') : null,
+    reportsTo: upline,
+    hireDate: staff.hire_date ? formatDate(staff.hire_date) : null,
+    tenure: tenureLabel(staff.hire_date, officeToday()),
+    resignationDate: staff.resignation_date ? formatDate(staff.resignation_date) : null,
     nric: priv.nric,
     infotechCode: staff.infotech_code,
-    hireDate: staff.hire_date,
-    contact: { phone: staff.contact_number, email: staff.email, address: staff.address },
+    contact: { phone: staff.contact_number, email: account?.email ?? staff.email, address: staff.address },
     emergency: {
       name: staff.emergency_contact_name,
       relationship: staff.emergency_contact_relationship,
@@ -133,12 +177,23 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
       <PersonRecord
         view={view}
         // Team · Edit with the Salary tick (the save writes pay), on the
-        // roster's own read — the card's own answer.
-        editor={card?.can.edit ? { staff: card.staff, titles: card.titles, canSee: { nric: card.canSee.nric, bank: card.canSee.bank } } : null}
+        // roster's own read — the card's own answer. Reports to is offered
+        // only on the active roster, which the line's writer asks.
+        editor={
+          card?.can.edit
+            ? {
+                staff: card.staff,
+                titles: card.titles,
+                canSee: { nric: card.canSee.nric, bank: card.canSee.bank },
+                reportsTo: row.reports_to ?? null,
+                uplines: active ? uplineChoices : null,
+              }
+            : null
+        }
         // One person, one login — so Invite is offered only while they have
         // none, and only to whoever may mint one.
         inviteHref={
-          canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create') && !account && staff.status !== 'inactive'
+          canInviteUsers(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'create') && !account && active
             ? `/team/people?invite=${staff.id}`
             : null
         }
