@@ -21,6 +21,8 @@ import RouteFreshener from './RouteFreshener'
 import HrSidebar from './HrSidebar'
 import HrTopBar from './HrTopBar'
 import FinSidebar from './FinSidebar'
+import LeadSidebar from './LeadSidebar'
+import { isLeadViewPath } from './lead-nav'
 import ViewingAsBanner from './ViewingAsBanner'
 import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
@@ -61,7 +63,9 @@ export default function PortalFrame({
   // switcher on its head picks it; the layout's cookie covers every other page).
   const navData = useMemo(() => withPathRevenueSub(layoutNav, pathname ?? ''), [layoutNav, pathname])
   // HR's view (2026-10-10, the HR revamp handoff): its own shell.
-  const hr = isHrView(user.role)
+  // Lead View (2026-10-16): its pages draw its own shell, whatever view the account is in.
+  const lead = isLeadViewPath(pathname)
+  const hr = isHrView(user.role) && !lead
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
   // The white sheet (DESIGN.md › "Sheet theme"): HR's pages sit on one rounded
   // panel in the Comm Cal month's tone, the shell around it unchanged. Drawn
@@ -76,7 +80,7 @@ export default function PortalFrame({
   // sidebar and greeting bar, drawn with Finance's categories — for the
   // finance kind and the Principal's Finance lens, on a computer (a phone keeps
   // the portal's phone shell until Finance's phone app takes it over).
-  const finShell = !hr && isFinanceShell(user.role) && !phone
+  const finShell = !hr && !lead && isFinanceShell(user.role) && !phone
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
 
@@ -109,7 +113,7 @@ export default function PortalFrame({
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
 
-  if (hr || finShell) {
+  if (hr || finShell || lead) {
     // HR's shell — and Finance's since 2026-10-14: the square sidebar, the
     // white greeting bar, and the sheet as the scroller inside a 10px frame —
     // the frame is where drawers, windows and HR's toast are drawn, so they
@@ -121,7 +125,9 @@ export default function PortalFrame({
       <FinViewProvider value={finPage}>
         <div className={`hrv-shell${finShell ? ' fin-shell' : ''} flex h-screen overflow-hidden print:h-auto print:overflow-visible`}>
           <div className="print:hidden contents">
-            {finShell ? (
+            {lead ? (
+              <LeadSidebar user={user} initialCollapsed={hrNavCollapsed} />
+            ) : finShell ? (
               <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} />
             ) : (
               <HrSidebar user={navUser} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
@@ -130,7 +136,7 @@ export default function PortalFrame({
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
               {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
-              <HrTopBar user={user} viewLabel={finShell ? 'Finance view' : 'HR view'} />
+              <HrTopBar user={user} viewLabel={lead ? 'Lead View' : finShell ? 'Finance view' : 'HR view'} viewValue={lead ? 'lead' : undefined} />
               <div className="md:hidden">
                 <TopBar user={user} fin={finPage} />
               </div>

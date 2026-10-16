@@ -27,6 +27,8 @@ export type FunctionKey =
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
   // HR › Attendance (mig 20261015030000).
   | 'attendance'
+  // Lead View (mig 20261016300000).
+  | 'leads'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -113,6 +115,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   guest_link: ['guest_link.view', 'guest_link.edit'],
   // HR › Attendance (20261015030000).
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
+  // Lead View (20261016300000).
+  leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
 }
 
 /**
@@ -180,6 +184,11 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.create': 'all',
   'hiring.edit': 'all',
   'hiring.view': 'all',
+  // Lead View (2026-10-16).
+  'leads.create': 'all',
+  'leads.edit': 'all',
+  'leads.manage': 'all',
+  'leads.view': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',
   'my_billing.create': 'dept',

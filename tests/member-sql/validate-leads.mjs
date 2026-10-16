@@ -49,6 +49,13 @@ await db.exec(`
 `)
 for (const file of ['20261016300100_leads.sql', '20261016300200_leads_functions.sql'])
   await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8'))
+// The writes ask their pages (mig 20261016300500): the guard goes in after lead_need, once. A stand-in guard lets all through.
+await db.exec(`create function public.tab_write_guard(p_pages text[], p_wants text[]) returns void language plpgsql as $g$ begin end $g$`)
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016300500_leads_writes_ask_their_pages.sql', import.meta.url), 'utf8'))
+for (const [fn, page] of [['lead_reply', '/leads'], ['lead_simulate', '/leads/settings']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['${page}'], ARRAY['leads.create']);`), true, `${fn} asks ${page}`)
+}
 // Applying twice changes nothing (the seed asks first).
 await db.exec(await readFile(new URL('../../supabase/migrations/20261016300100_leads.sql', import.meta.url), 'utf8'))
 

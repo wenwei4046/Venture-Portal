@@ -95,7 +95,8 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
   })
 
   it('puts each template in the views its pages are in — the company-wide ones out of the Department view', () => {
-    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'rev'])
+    // Full access holds Lead View whole (mig 20261016300000).
+    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'rev', 'lead'])
     expect(views(moved('fin_maker'))).toEqual(['fin', 'dept'])
     expect(views(moved('dept_head'))).toEqual(['dept'])
     expect(views(moved('staff'))).toEqual(['dept'])

@@ -6,7 +6,8 @@ import { officeTime, officeToday } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
 import { onFinanceView } from '@/lib/finance-view'
 import { REVENUE_SUB_COOKIE } from '@/lib/hr-view'
-import { canAccessRevenue } from '@/lib/roles'
+import { redirect } from 'next/navigation'
+import { canAccessLeads, canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
 import { readsDeptStatements, type NavData } from '@/components/layout/nav-config'
@@ -165,6 +166,8 @@ export default async function DashboardPage() {
   // HR's and Finance's views are lenses over the account's own power (2026-10-11):
   // the view picks the Overview, never the account's cells.
   const overview = lensOverview(user) ?? overviewFor(user)
+  // Customer Service (2026-10-16): a title that opens no Overview but Lead View lands on its Inbox.
+  if (overview === 'none' && canAccessLeads(user)) redirect('/leads')
 
   // Finance's view opens on its own Overview (2026-10-14, the Finance revamp
   // v2 — D01): the greeting, what waits, the quick actions, the categories.

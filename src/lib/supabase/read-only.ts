@@ -66,6 +66,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people',
   // HR › Attendance (mig 20261015030200; att_file, the file a short link is made for — mig 20261015200000):
   'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_register', 'att_file',
+  // Lead View (mig 20261016300200):
+  'lead_config', 'lead_inbox', 'lead_thread', 'lead_list',
   // Admin › Guest Link (mig 20261011091000):
   'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:

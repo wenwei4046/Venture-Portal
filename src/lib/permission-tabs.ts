@@ -35,7 +35,7 @@ import {
   type SensitiveField,
 } from '@/lib/permission-matrix'
 
-export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'rev'
+export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'rev' | 'lead'
 export type TabAction = 'view' | 'create' | 'edit' | 'approve'
 /** `fn.action` — a cell of the function matrix. */
 export type FnAction = `${FunctionKey}.${Action}`
@@ -49,6 +49,8 @@ export const TAB_VIEWS: ReadonlyArray<{ id: TabView; label: string; reach: Scope
   { id: 'pri', label: 'Principal view', reach: 'all' },
   { id: 'dept', label: 'Department view', reach: 'dept' },
   { id: 'rev', label: 'Revenue app', reach: 'own' },
+  // Lead View (2026-10-16): Customer Service's inbox — every brand's enquiries are the company's.
+  { id: 'lead', label: 'Lead View', reach: 'all' },
 ]
 
 export interface PermissionTab {
@@ -90,6 +92,7 @@ const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue
 const HIRING: Opens = { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'], approve: ['hiring.approve'] }
 const ROOMS: Opens = { view: ['rooms.view'], create: ['rooms.create'], edit: ['rooms.edit'] }
 const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
+const LEADS_KEYS = ['leads']
 
 // The Overview is the company's in every view (the dashboard has no narrower reach).
 const tab = (view: TabView, id: string, label: string, keys: readonly string[], opens: Opens, reach?: Scope): PermissionTab => ({
@@ -223,6 +226,13 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // The Director and the CEO run the CRM for the whole team (PR #253); its Control panel opens with CRM · View at All.
   { ...tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'), cellGated: true },
   tab('rev', 'product_list', 'Product List', ['product_list'], { view: ['product_list.view'], edit: ['product_list.edit'] }, 'all'),
+
+  // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
+  tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),
+  tab('lead', 'leads', 'Leads', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.edit'] }),
+  tab('lead', 'insight', 'Insight', LEADS_KEYS, { view: ['leads.view'] }),
+  // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
+  tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]
 
 export const TAB_BY_ID: ReadonlyMap<string, PermissionTab> = new Map(PERMISSION_TABS.map(t => [t.id, t]))

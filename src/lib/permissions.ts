@@ -62,6 +62,8 @@ export const PERMISSIONS = [
   'guest_link',
   // HR › Attendance (2026-10-15, mig 20261015030000): Attendance · View opens it.
   'attendance',
+  // Lead View (2026-10-16, mig 20261016300000): Lead View · View opens it.
+  'leads',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

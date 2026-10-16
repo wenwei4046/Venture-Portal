@@ -39,6 +39,8 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   guest_link: { actions: ['view', 'edit'], scopes: ['all'] },
   // HR › Attendance (mig 20261015030000).
   attendance: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
+  // Lead View (mig 20261016300000).
+  leads: { actions: ['view', 'create', 'edit', 'manage'], scopes: ['all'] },
 }
 
 // `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
@@ -60,6 +62,7 @@ export const CELL_KEYS: CellKey[] = [
   K('view_switch', 'view', 'view_switch', 'all', 'principal'),
   K('documentation', 'view', 'documentation', 'all'), K('hiring', 'view', 'hiring', 'all'), K('rooms', 'view', 'meeting_rooms', 'all'),
   K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'), K('attendance', 'view', 'attendance', 'all'),
+  K('leads', 'view', 'leads', 'all'),
 ]
 
 // The eleven templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
