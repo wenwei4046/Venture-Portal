@@ -184,7 +184,7 @@ function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: M
 }
 
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, products, modules, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
   /** Screens their ticks close: not listed (2026-10-11). */
   hidden?: readonly Screen[];
@@ -198,6 +198,8 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
   products?: { group: string; onOpen: () => void } | null;
   /** The module switcher — a Principal's, who can open the other modules. */
   modules?: { current: ModuleId; onPick: (id: ModuleId) => void } | null;
+  /** The CRM, a row under Arena with its unread messages — for an account the CRM is open to (the owner, 2026-10-16). */
+  crm?: { unread: number; onOpen: () => void } | null;
   onGo: (screen: Screen) => void;
   onQuote: () => void;
   onNotif: () => void;
@@ -211,13 +213,23 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
         <span className={s.asideWord}>HOUZS VENTURE</span>
         <span className={s.asideDept}>Revenue</span>
       </button>
-      {DESK_NAV.filter(n => !hidden.includes(n.id)).map(n => {
+      {DESK_NAV.filter(n => !hidden.includes(n.id)).map((n, i, shown) => {
         const on = tab === n.id;
-        return (
+        // The CRM sits right under Arena (the owner, 2026-10-16: "把 crm 的入口拉出來，加到 Revenue app, arena 的下面"),
+        // or before Profile when their ticks close Arena.
+        const crmHere = !!crm && (n.id === "arena" || (n.id === "account" && !shown.some(x => x.id === "arena")));
+        const crmRow = crmHere && crm ? (
+          <button key="crm" className={`${s.asideNav} ${s.asideNotif}`} onClick={crm.onOpen}>
+            <Svg d={ICON.chat} size={20} sw={1.8} /><span className={s.asideNotifLabel}>CRM</span>
+            {crm.unread > 0 && <span className={s.asideCount}>{crm.unread > 99 ? "99+" : crm.unread}</span>}
+          </button>
+        ) : null;
+        const row = (
           <button key={n.id} className={`${s.asideNav} ${on ? s.asideNavOn : ""}`} onClick={() => (n.id === "quote" ? onQuote() : onGo(n.id))} aria-current={on ? "page" : undefined}>
             <Svg d={n.d} size={20} sw={1.8} />{n.label}
           </button>
         );
+        return n.id === "arena" ? [row, crmRow] : [crmRow, row];
       })}
       <button className={`${s.asideNav} ${s.asideNotif} ${notifOpen ? s.asideNotifOn : ""}`} onClick={onNotif}>
         <Svg d={ICON.bell} size={20} sw={1.8} /><span className={s.asideNotifLabel}>Notifications</span>

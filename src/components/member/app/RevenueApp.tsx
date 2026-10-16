@@ -1327,7 +1327,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => openSheet("brand")}
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
-        modules={principal ? { current: "revenue", onPick: pickModule } : null} />
+        modules={principal ? { current: "revenue", onPick: pickModule } : null}
+        crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
