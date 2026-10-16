@@ -95,6 +95,7 @@ export function meTodayOf(raw: unknown): MeToday | null {
   if (typeof d.me !== 'boolean') return null
   return {
     me: d.me,
+    name: strOrNull(d.name),
     workDay: str(d.workDay),
     now: str(d.now),
     mode: (strOrNull(d.mode) as MeToday['mode']) ?? null,

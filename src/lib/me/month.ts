@@ -82,11 +82,16 @@ export interface MonthView {
 const isOt = (r: AttRequest, day: string) => r.kind === 'ot' && r.from === day && (r.status === 'pending' || r.status === 'approved')
 const isCorrection = (r: AttRequest, day: string) => r.kind === 'correction' && r.from === day && (r.status === 'pending' || r.status === 'approved')
 
-/** Minutes past the schedule's end on a worked day, unless an overtime request already names the day. */
+/**
+ * Minutes past the schedule's end on a worked day that could be claimed — 30 or more, the smallest claim — unless an
+ * overtime request already names the day. A few minutes past six is leaving, not overtime (the handoff counts only
+ * 13 Oct's 1 h 42 m, not 1 Oct's 18:03).
+ */
 function pastEnd(info: DayInfo, day: string, requests: readonly AttRequest[]): number {
   if (!info.out || !info.sday?.end || info.sday.type !== 'work') return 0
   if (requests.some(r => isOt(r, day))) return 0
-  return Math.max(0, toMin(info.out) - toMin(info.sday.end))
+  const past = toMin(info.out) - toMin(info.sday.end)
+  return past >= 30 ? past : 0
 }
 
 export function monthView(d: MeData): MonthView | null {

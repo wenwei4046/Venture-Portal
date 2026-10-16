@@ -439,6 +439,7 @@ BEGIN
    WHERE r.staff_id = v_me AND r.kind = 'leave' AND r.status = 'approved' AND r.date_from <= v_day AND r.date_to >= v_day LIMIT 1;
   RETURN jsonb_build_object(
     'me', true,
+    'name', (SELECT s.employee_name FROM public.hr_staff_costs s WHERE s.id = v_me),
     'workDay', v_day,
     'now', to_char(now() AT TIME ZONE 'Asia/Kuala_Lumpur', 'HH24:MI:SS'),
     'mode', v_mode,

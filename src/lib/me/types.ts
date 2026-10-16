@@ -65,6 +65,8 @@ export interface MeTodayPunch {
 /** `att_me_today()`: just today, for the button and the card that open Me. */
 export interface MeToday {
   me: boolean
+  /** Their name, for the button's avatar. */
+  name: string | null
   workDay: string
   now: string
   mode: ClockMode | null

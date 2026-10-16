@@ -78,9 +78,9 @@ export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source
   const photoInput = useRef<HTMLInputElement | null>(null)
   const nowSec = useClock(s.today?.now ?? data?.now, s.todayAt || Date.now())
 
-  // ── Loads ──
+  // ── Loads ── (each opening reads again; what was read last stays on screen meanwhile)
   useEffect(() => {
-    if (!s.data) void me.loadMe()
+    void me.loadMe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {

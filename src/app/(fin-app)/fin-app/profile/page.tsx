@@ -45,6 +45,8 @@ export default async function FinAppProfile() {
       canSwitch={!!user.canSwitchView && !user.viewingAs}
       // This phone's notifications (2026-10-17 — the Principal's own view lands here now, not on the portal's phone face).
       push={!user.viewingAs}
+      // Me (2026-10-17): one's own punch, leave and payslips — a login a People record can name, never while viewing as a person.
+      me={personal && !user.viewingAs}
     />
   )
 }

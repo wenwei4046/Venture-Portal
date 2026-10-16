@@ -11,6 +11,7 @@ import { Select } from '@/components/hrv/select'
 import { setViewAs } from './view-as-actions'
 import MemoBell from './MemoBell'
 import ViewAsPersonPicker from './ViewAsPersonPicker'
+import { MeDesktop } from '@/components/me/MeDesktop'
 
 /** The select's value while a person is viewed (2026-10-11). */
 const VIEWING = '__viewing'
@@ -44,6 +45,9 @@ export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; 
         <span className={s.name}>{displayName}</span>.
       </div>
       <div className={s.right}>
+        {/* Me (2026-10-17): today's punch and one's own attendance, leave and payslips, in a panel from the right — a
+            login a People record names, never while viewing as somebody. */}
+        {user.personalLogin === true && !user.viewingAs ? <MeDesktop hostLabel={viewLabel.replace(/ view$/, '')} /> : null}
         {/* One's own memos, as in every view (2026-10-12): a login a People record names, never while viewing as somebody. */}
         {user.personalLogin === true && !user.viewingAs ? <MemoBell /> : null}
         {user.canSwitchView ? (

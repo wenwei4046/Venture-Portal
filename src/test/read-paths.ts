@@ -316,6 +316,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'att_reopen_month', 'att_register',
   // …the user's answers (mig 20261015200000): a file named for its short link asks View, Remind all Edit.
   'att_file', 'att_remind',
+  // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,
+  // record and paid payslips — and writes only one's own (the punch notice read, one's photo); one's punch and an MC
+  // filed on one's own request ask their own staff record (mig 20261015200000).
+  'att_me', 'att_me_today', 'att_my_team', 'att_my_org', 'my_record', 'my_payslips', 'att_punch_notice_ack', 'my_photo_set',
+  'att_punch', 'att_request_attach',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',
