@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — a statement's page on the Finance view (the user's Claude
 // Design handoff): the company as the title with its status chip, three cards
 // (the net as the primary, the two subtotals), the invoice items and the
 // contra items as two tables, the net summary, and the one action its status
-// allows — Issue for a draft, Mark as paid once issued.
+// allows — Issue for a draft, Mark as paid once issued. Since 2026-10-16 each
+// asks first, as the phone app's does (neither is taken back).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(),
+  createClient: vi.fn(),
+  notFound: vi.fn(),
+  refresh: vi.fn(),
+  issue: vi.fn(),
+  paid: vi.fn(),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
-vi.mock('../actions', () => ({ issueStatement: vi.fn(), markStatementPaid: vi.fn() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ refresh: mocks.refresh }) }))
+vi.mock('../actions', () => ({ issueStatementInWords: mocks.issue, markStatementPaidInWords: mocks.paid }))
 vi.mock('@/components/layout/ReturnLink', () => ({
   default: (p: { href: string; alsoFrom?: string[]; children: React.ReactNode }) => (
     <a href={p.href} data-also-from={(p.alsoFrom ?? []).join(' ')}>
@@ -99,5 +107,44 @@ describe('a statement on the sheet', () => {
     expect(screen.queryByRole('button', { name: /Mark as paid|Issue/ })).toBeNull()
     expect(card('Net amount')).toHaveTextContent('HV owes Carres')
     expect(document.querySelector('.page-head .chip')).toHaveClass('ledger')
+  })
+})
+
+describe('a statement’s step asks first (2026-10-16)', () => {
+  const question = () => screen.getByRole('dialog')
+
+  it('Issue opens the question — the company, the month, the net — and only its answer issues', async () => {
+    database()
+    mocks.issue.mockResolvedValue({ ok: true })
+    render(await page())
+    fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+    expect(within(question()).getByText('Issue to Carres?')).toBeInTheDocument()
+    expect(within(question()).getByText('September 2026 · RM 21,907.90')).toBeInTheDocument()
+    expect(question()).toHaveTextContent('An issued statement is locked — Generate statements skips it. This cannot be undone.')
+    expect(mocks.issue).not.toHaveBeenCalled()
+    // Cancel leaves it as it is.
+    fireEvent.click(within(question()).getByRole('button', { name: 'Cancel' }))
+    expect(mocks.issue).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Issue to subsidiary' }))
+    await act(async () => {
+      fireEvent.click(within(question()).getByRole('button', { name: 'Issue statement' }))
+    })
+    expect(mocks.issue).toHaveBeenCalledWith('s1')
+    expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('Mark as paid asks too, and a refusal stays in the question, in words', async () => {
+    database({ ...STATEMENT, status: 'issued', issued_at: '2026-10-02T03:30:00Z' })
+    mocks.paid.mockResolvedValue({ ok: false, reason: 'September 2026 is closed.' })
+    render(await page())
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
+    expect(within(question()).getByText('Mark Carres paid?')).toBeInTheDocument()
+    expect(question()).toHaveTextContent('This cannot be undone.')
+    await act(async () => {
+      fireEvent.click(within(question()).getByRole('button', { name: 'Mark as paid' }))
+    })
+    expect(mocks.paid).toHaveBeenCalledWith('s1')
+    await waitFor(() => expect(within(question()).getByRole('alert')).toHaveTextContent('September 2026 is closed.'))
+    expect(mocks.refresh).not.toHaveBeenCalled()
   })
 })

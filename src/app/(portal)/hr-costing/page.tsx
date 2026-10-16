@@ -6,7 +6,7 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
-import { executeHrCosting } from './actions'
+import MarkExecutedButton from '../dept-pool/_components/MarkExecutedButton'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
@@ -264,16 +264,15 @@ export default async function HRCostingPage() {
                       <td className="num m-hide" data-label="Basic">{formatMoney(totalBasic)}</td>
                       <td className="num font-bold">{formatMoney(totalCtc)}</td>
                       <td className="right m-hide">
+                        {/* Asks first — nothing sets a submission back (2026-10-16). */}
                         {canExecute && state === 'approved_for_execution' ? (
-                          <form action={executeHrCosting}>
-                            <input type="hidden" name="id" value={s.id} />
-                            <button
-                              type="submit"
-                              className="bg-accent hover:bg-accent-hover text-xs font-medium px-3 py-1.5 rounded-control transition-colors"
-                            >
-                              Execute transfers
-                            </button>
-                          </form>
+                          <MarkExecutedButton
+                            id={s.id}
+                            month={dayjs(s.period_month).format('MMMM YYYY')}
+                            total={formatMoney(totalCtc)}
+                            label="Execute transfers"
+                            className="bg-accent hover:bg-accent-hover text-xs font-medium px-3 py-1.5 rounded-control transition-colors"
+                          />
                         ) : (
                           <span className="text-xs">—</span>
                         )}

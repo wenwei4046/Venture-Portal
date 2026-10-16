@@ -141,8 +141,13 @@ describe('the Financing register', () => {
     expect(pv).toHaveTextContent('Interest to HOUZS Century: RM 4,500.00')
     fireEvent.click(within(pv).getByRole('button', { name: 'Close' }))
     const bill = within(menuOf('BA-1')).getByRole('menuitem', { name: /Bill borrower/ })
+    fireEvent.click(bill)
+    // It makes the borrower's invoice, so it asks first (2026-10-16, as the phone's does).
+    const ask = screen.getByRole('dialog')
+    expect(ask).toHaveTextContent('Bill CAR?')
+    expect(actions.generateBaInvoice).not.toHaveBeenCalled()
     await act(async () => {
-      fireEvent.click(bill)
+      fireEvent.click(within(ask).getByRole('button', { name: 'Bill interest' }))
     })
     expect(actions.generateBaInvoice).toHaveBeenCalledWith('1')
     expect(await screen.findByText(/Invoice HV-INV-202610-0051 created as draft/)).toBeInTheDocument()

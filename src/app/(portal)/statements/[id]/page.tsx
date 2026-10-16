@@ -9,7 +9,7 @@ import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import DetailGroups from '@/components/sheet/DetailGroups'
 import ReturnLink from '@/components/layout/ReturnLink'
-import { issueStatement, markStatementPaid } from '../actions'
+import StatementSteps from './_components/StatementSteps'
 import { readStatement, statementCategory } from '../_lib/statement-read'
 
 // A statement's page on the Finance view (2026-10-09, the user's Claude Design
@@ -131,22 +131,8 @@ export default async function StatementDetailPage({ params }: Props) {
             <span className="count">FINANCE ONLY · ISSUED STATEMENTS LOCK</span>
           </div>
           <div className="fin-actions">
-            {isDraft ? (
-              <form action={issueStatement}>
-                <input type="hidden" name="id" value={statement.id} />
-                <button type="submit" className="btn-pri">
-                  Issue to subsidiary
-                </button>
-              </form>
-            ) : null}
-            {isIssued ? (
-              <form action={markStatementPaid}>
-                <input type="hidden" name="id" value={statement.id} />
-                <button type="submit" className="btn-pri">
-                  Mark as paid
-                </button>
-              </form>
-            ) : null}
+            {/* Each asks first — neither is taken back (2026-10-16). */}
+            <StatementSteps id={statement.id} company={companyName} period={period} net={formatMoney(net)} step={isDraft ? 'issue' : 'paid'} />
             {isIssued ? (
               <span className="note">
                 {statement.issued_at ? `Issued ${officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}` : 'Issued.'}

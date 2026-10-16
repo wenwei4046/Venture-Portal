@@ -5,12 +5,14 @@ import { executeHrCosting } from '../hr-costing/actions'
 
 /**
  * Mark executed from the Finance phone app's Dept Pool (2026-10-15, part E3):
- * the very `executeHrCosting` the desktop's HR Costing Submission cell and the
- * submissions page run — it moves no money — behind the same Treasury · Edit,
- * its refusal answered in words (production hides a thrown message).
+ * the very `executeHrCosting` — it moves no money — behind the same Treasury ·
+ * Edit, its refusal answered in words (production hides a thrown message).
+ * Since 2026-10-16 the desktop's steps ask first too and answer through it —
+ * Department Pools, its submissions page and HR Costing's *Execute transfers*
+ * (`_components/MarkExecutedButton`), so it names the pages executeHrCosting does.
  */
 export async function executeHrCostingInWords(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requireActionOn('/dept-pool', 'treasury', 'edit')
+  await requireActionOn(['/dept-pool', '/hr-costing'], 'treasury', 'edit')
   const fd = new FormData()
   fd.set('id', id)
   try {

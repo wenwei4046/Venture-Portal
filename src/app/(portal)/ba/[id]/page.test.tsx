@@ -109,7 +109,14 @@ describe('a financing’s own page', () => {
     expect(within(actions).getAllByRole('button').map((b) => b.textContent)).toEqual(['Generate PV', 'Bill interest', 'Mark settled'])
     expect(within(actions).getByRole('button', { name: 'Generate PV' })).toHaveClass('btn-pri')
     expect(within(actions).getByRole('button', { name: 'Bill interest' })).toHaveClass('btn-sec')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Bill interest' })) })
+    // Bill interest makes the borrower's invoice, so it asks first (2026-10-16, as the phone's does).
+    fireEvent.click(within(actions).getByRole('button', { name: 'Bill interest' }))
+    const ask = screen.getByRole('dialog')
+    expect(ask).toHaveTextContent('Bill Carres (CAR)?')
+    expect(ask).toHaveTextContent('BA-2610-02 · RM 3,750.00')
+    expect(ask).toHaveTextContent('The interest goes out as a draft invoice (5028) to review and issue in Invoices.')
+    expect(mocks.generateBaInvoice).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(within(ask).getByRole('button', { name: 'Bill interest' })) })
     expect(mocks.generateBaInvoice).toHaveBeenCalledWith(BA.id)
     expect(await screen.findByText(/HV-INV-202610-0050/)).toBeInTheDocument()
     expect(mocks.refresh).toHaveBeenCalled()
@@ -117,6 +124,16 @@ describe('a financing’s own page', () => {
     expect(screen.getByRole('dialog', { name: 'Generate PV — BA-2610-02' })).toHaveTextContent('Interest to HOUZS Century: RM 2,250.00')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Mark settled' })) })
     expect(mocks.setBaStatus).toHaveBeenCalledWith(BA.id, 'settled')
+  })
+
+  it('a refused bill stays in the question, in words', async () => {
+    mocks.generateBaInvoice.mockResolvedValue({ error: 'An invoice for this financing already exists' })
+    render(await page())
+    fireEvent.click(screen.getByRole('button', { name: 'Bill interest' }))
+    const ask = screen.getByRole('dialog')
+    await act(async () => { fireEvent.click(within(ask).getByRole('button', { name: 'Bill interest' })) })
+    expect(within(ask).getByRole('alert')).toHaveTextContent('An invoice for this financing already exists')
+    expect(mocks.refresh).not.toHaveBeenCalled()
   })
 
   // 2026-10-12 — the sentences beside the buttons are gone (the user: too

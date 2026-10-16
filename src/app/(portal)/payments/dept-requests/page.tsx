@@ -4,7 +4,7 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import GenerateDeptPvForm from './_components/GenerateDeptPvForm'
-import { cancelDeptRequest } from './actions'
+import CancelDeptRequestButton from './_components/CancelDeptRequestButton'
 import { deptRequestsRead } from './_lib/dept-read'
 
 export default async function DeptRequestsPage() {
@@ -84,16 +84,9 @@ export default async function DeptRequestsPage() {
                     </div>
                   </div>
                   <GenerateDeptPvForm requestId={r.id} banks={bankOptions} />
-                  <form action={cancelDeptRequest} className="mt-2 text-right">
-                    <input type="hidden" name="request_id" value={r.id} />
-                    <input type="hidden" name="reason" value="Cancelled by Finance from dept-requests page" />
-                    <button
-                      type="submit"
-                      className="text-xs text-danger hover:underline font-sans transition-colors"
-                    >
-                      Cancel request (refunds the reserved pool)
-                    </button>
-                  </form>
+                  {/* Asks first — it refunds the pool and voids a pending voucher (2026-10-16). */}
+                  <CancelDeptRequestButton requestId={r.id} label={`${dept} → ${r.payee_name}`} amount={formatMoney(Number(r.amount))} />
+
                 </div>
               )
             })}

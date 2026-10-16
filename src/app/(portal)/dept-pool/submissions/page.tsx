@@ -5,8 +5,8 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
-import { executeHrCosting } from '../../hr-costing/actions'
 import LedgerRow from '@/components/LedgerRow'
+import MarkExecutedButton from '../_components/MarkExecutedButton'
 
 interface DeptSummaryRow {
   department_id?: string
@@ -105,16 +105,14 @@ export default async function PastMonthSubmissionsPage() {
                     <span className="statement-amount compact text-num-ink">
                       {formatMoney(total)}
                     </span>
+                    {/* Asks first — nothing sets a submission back (2026-10-16). */}
                     {canDo(user, 'treasury', 'edit') && sub.execution_state === 'approved_for_execution' && (
-                      <form action={executeHrCosting}>
-                        <input type="hidden" name="id" value={sub.id} />
-                        <button
-                          type="submit"
-                          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors"
-                        >
-                          Mark executed
-                        </button>
-                      </form>
+                      <MarkExecutedButton
+                        id={sub.id}
+                        month={dayjs(sub.period_month).format('MMMM YYYY')}
+                        total={formatMoney(total)}
+                        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-xs px-3 py-1.5 rounded-md transition-colors"
+                      />
                     )}
                   </div>
                 </summary>

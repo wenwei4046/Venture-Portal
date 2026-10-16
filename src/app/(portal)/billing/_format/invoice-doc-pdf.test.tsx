@@ -61,7 +61,7 @@ describe('an invoice’s document', () => {
     const content = text(page)
     for (const w of [
       'Invoice', 'Invoice number', 'HV-INV-202610-0024', 'Date of issue', '12 October 2026', 'Date due', '15 October 2026', 'Period', 'October 2026',
-      'HOUZS Venture Holdings Sdn. Bhd.', 'Internal banking · Shared services', 'Director salary distribution',
+      'HOUZS Venture Holding Sdn. Bhd.', 'Internal banking · Shared services', 'Director salary distribution', 'hello@houzsventure.com',
       'Bill to', 'Hookka', 'Subsidiary · HK', 'Venture (HV) OPEX',
       'RM 63,440.00 due 15 October 2026', 'Director Remuneration & Operation Management Fees',
       'Description', 'Qty', 'Unit price', 'Amount', 'Director Remuneration', 'Oct 1 – Oct 31, 2026', 'RM 50,000.00', 'RM 13,440.00',
@@ -71,8 +71,14 @@ describe('an invoice’s document', () => {
     ]) {
       expect(content, w).toContain(w)
     }
-    // No email under the issuer until the user names it, no status on an issued one.
-    expect(content).not.toContain('@')
+    // The issuer is Holding, no s, its email (the user's, 2026-10-16) the last line under its
+    // lines of work, in its column; no status on an issued one.
+    expect(content).not.toContain('Holdings')
+    const issuer = at(page, 'HOUZS Venture Holding Sdn. Bhd.')
+    const mail = at(page, 'hello@houzsventure.com')
+    expect(mail.x).toBeCloseTo(issuer.x, 2)
+    expect(mail.y).toBeGreaterThan(at(page, 'Director salary distribution').y)
+    expect(content.match(/@/g)).toHaveLength(1)
     expect(content).not.toContain('Status')
   })
 

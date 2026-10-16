@@ -6,7 +6,7 @@ import type { DeptPoolAccrual } from '@/lib/dept-pool-accrual'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './RevealAmount'
-import { executeHrCosting } from '@/app/(portal)/hr-costing/actions'
+import MarkExecutedButton from './MarkExecutedButton'
 import dayjs from 'dayjs'
 
 // Department Pools on the sheet (2026-10-09, the user's Claude Design handoff
@@ -113,7 +113,8 @@ const hrLabel = (hr: CashDeptRow['hr']) => (hr ? HR_STATE[hr.state]?.label ?? hr
 
 /** The HR Costing Submission cell: the latest submission's state as a chip
  *  (its month and the approved total on hover), and Mark executed for a ready
- *  one — the same action as the submissions page; it moves no money. */
+ *  one — the same action as the submissions page; it moves no money, and asks
+ *  first (2026-10-16 — nothing sets it back). */
 function HrCell({ hr, costing, canExecute }: { hr: CashDeptRow['hr']; costing: number; canExecute: boolean }) {
   if (!hr) return <span className="text-graphite">—</span>
   const s = HR_STATE[hr.state] ?? { label: hr.state, tone: '' }
@@ -124,12 +125,7 @@ function HrCell({ hr, costing, canExecute }: { hr: CashDeptRow['hr']; costing: n
         {s.label}
       </span>
       {canExecute && hr.state === 'approved_for_execution' ? (
-        <form action={executeHrCosting}>
-          <input type="hidden" name="id" value={hr.id} />
-          <button type="submit" className="btn-quiet-sheet">
-            Mark executed
-          </button>
-        </form>
+        <MarkExecutedButton id={hr.id} month={dayjs(hr.period).format('MMMM YYYY')} className="btn-quiet-sheet" />
       ) : null}
     </span>
   )
