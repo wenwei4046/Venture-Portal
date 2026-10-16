@@ -65,12 +65,15 @@ export interface LeadContact {
   /** The button flow on this conversation (mig 20261016310000): running = waiting on the customer's answer. */
   flowState?: 'none' | 'running' | 'done' | 'stopped'
   flowName?: string | null
+  /** Promotions consent (mig 20261016340000): Meta's rule for a campaign past the 24-hour window. */
+  optIn?: 'none' | 'in' | 'out'
+  optInAt?: string | null
 }
 
 export interface LeadMessage {
   id: number
   direction: 'in' | 'out'
-  sender: 'customer' | 'cs' | 'ai' | 'flow'
+  sender: 'customer' | 'cs' | 'ai' | 'flow' | 'campaign'
   byName: string
   body: string
   phoneFound: string | null

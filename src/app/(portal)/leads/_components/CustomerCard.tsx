@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { btn } from '@/components/hrv/kit'
-import { saveLeadCard, setLeadOutcome } from '@/lib/leads/actions'
+import { saveLeadCard, setLeadOutcome, setOptIn } from '@/lib/leads/actions'
+import type { OptIn } from '@/lib/leads/campaign'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadEvent, Shown } from '@/lib/leads/types'
@@ -109,6 +110,8 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
         </button>
       ) : null}
 
+      <Promotions contact={contact} canEdit={canEdit} onSaved={onSaved} />
+
       <div className={s.timeline}>
         <span className={s.label}>Timeline</span>
         {events.length === 0 ? <span className={s.hint}>—</span> : events.map((e, i) => (
@@ -131,7 +134,42 @@ function pickCard(form: Required<LeadCardFields>, contact: LeadContact): Partial
   return { name: form.name || contact.name, interest: form.interest, budget: form.budget, showroom: form.showroom, preferredTime: form.preferredTime, note: form.note }
 }
 
-const APPT: Readonly<Record<Appt, string>> = { unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
+const OPT_IN: Readonly<Record<OptIn, { en: string; zh: string; tone: string }>> = {
+  none: { en: 'Not asked', zh: '未同意', tone: 'plum' },
+  in: { en: 'Agreed', zh: '已同意', tone: 'olive' },
+  out: { en: 'Unsubscribed', zh: '已退订', tone: 'clay' },
+}
+
+/**
+ * Promotions consent (Campaigns, mig 20261016340000): past 24 hours a campaign reaches only who agreed. A real
+ * customer agrees through Meta; a test conversation's is set here, to try Campaigns before Meta is connected.
+ */
+function Promotions({ contact, canEdit, onSaved }: { contact: LeadContact; canEdit: boolean; onSaved: () => void }) {
+  const [busy, start] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const state = contact.optIn ?? 'none'
+  const put = (next: OptIn) => start(async () => {
+    setError(null)
+    const r = await setOptIn(contact.id, next)
+    if (!r.ok) setError(r.reason)
+    else onSaved()
+  })
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className={s.label}><Bi en="Promotions" zh="推广消息" /></span>
+      <div className={s.inline} style={{ alignItems: 'center' }}>
+        <span className={s.brand} data-tone={OPT_IN[state].tone}>{OPT_IN[state].en} · {OPT_IN[state].zh}</span>
+        {canEdit && contact.isTest ? (Object.keys(OPT_IN) as OptIn[]).filter(k => k !== state).map(k => (
+          <button key={k} type="button" className={s.linkBtn} disabled={busy} onClick={() => put(k)}>Set {OPT_IN[k].en.toLowerCase()} (test)</button>
+        )) : null}
+      </div>
+      {!contact.isTest ? <span className={s.hint}><Bi en="Comes from Meta once connected." zh="串接 Meta 后由客户在 Meta 同意。" /></span> : null}
+      {error ? <div className={s.error} role="alert">{error}</div> : null}
+    </div>
+  )
+}
+
+const APPT: Readonly<Record<Appt, string>> ={ unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
 const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known · 未知', came: 'Came · 到了', no_show: 'No show · 没来' }
 
 function Outcome({ contact, onSaved }: { contact: LeadContact; onSaved: () => void }) {

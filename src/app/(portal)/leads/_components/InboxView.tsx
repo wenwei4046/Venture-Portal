@@ -269,7 +269,7 @@ function Chat({ contact, thread, brandName, today, canReply, aiOn, loading, onSe
               </span>
             ) : null}
             <span className={s.msgMeta}>
-              {m.sender === 'cs' ? `${m.byName} · CS` : m.sender === 'ai' ? 'AI Agent' : `Flow · ${m.byName}`} · {whenShort(m.at, today)}
+              {m.sender === 'cs' ? `${m.byName} · CS` : m.sender === 'ai' ? 'AI Agent' : m.sender === 'campaign' ? `Campaign · ${m.byName}` : `Flow · ${m.byName}`} · {whenShort(m.at, today)}
               {m.delivery === 'recorded' ? ' · recorded' : m.delivery === 'failed' ? ' · not sent' : ''}
             </span>
           </div>

@@ -236,6 +236,8 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),
   tab('lead', 'leads', 'Leads', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.edit'] }),
   tab('lead', 'insight', 'Insight', LEADS_KEYS, { view: ['leads.view'] }),
+  // Campaigns (mig 20261016340000): a brand's message to many customers — sent and scheduled with Manage, by its Edit.
+  tab('lead', 'campaigns', 'Campaigns', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // Flows (phase 2, mig 20261016310000): the button flows, set up as Settings is (Manage, with its Edit).
   tab('lead', 'flows', 'Flows', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // AI Agent and its Data Center (mig 20261016330000): the soul and the cards it may quote, set up as Settings is.

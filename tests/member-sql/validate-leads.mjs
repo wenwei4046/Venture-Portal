@@ -340,4 +340,76 @@ await q('select public.lead_remove_knowledge($1)', [kHours])
 check((await q('select public.lead_knowledge() k'))[0].k.length, 4, 'a card removed')
 await refuses('select public.lead_remove_knowledge($1)', [kHours], /gone/, 'removed once')
 
+// ── Campaigns (migs 20261016340000 / 340100) ────────────────────────────────
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016340000_lead_campaigns.sql', import.meta.url), 'utf8'))
+const campTabs = (await readFile(new URL('../../supabase/migrations/20261016340100_lead_campaigns_tabs.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(campTabs.slice(campTabs.indexOf('CREATE OR REPLACE FUNCTION pg_temp.guard_put')))
+for (const [fn, page, want] of [['lead_save_campaign', '/leads/campaigns', 'leads.manage'], ['lead_send_campaign', '/leads/campaigns', 'leads.manage'],
+  ['lead_remove_campaign', '/leads/campaigns', 'leads.manage'], ['lead_set_opt_in', '/leads', 'leads.edit']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['${page}'], ARRAY['${want}']);`), true, `${fn} asks ${page}`)
+}
+// Applying it again changes nothing (the card's two keys go in once).
+await db.exec(await readFile(new URL('../../supabase/migrations/20261016340000_lead_campaigns.sql', import.meta.url), 'utf8'))
+for (const t of ['lead_campaigns', 'lead_campaign_recipients'])
+  check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = $1 and grantee in ('anon','authenticated')`, [t]))[0].n, 0, `no grants on ${t}`)
+await db.exec('update public.lead_flows set active = false')
+const camp = (await q(`select public.lead_save_brand(null, '{"name":"Camp"}') i`))[0].i
+const who = {}
+for (const [name, ch] of [['Ann', 'messenger'], ['Bob', 'messenger'], ['Cat', 'messenger'], ['Dee', 'messenger'], ['Eve', 'instagram']])
+  who[name] = (await q(`select public.lead_simulate($1, $2, $3, '', 'hello') c`, [camp, ch, name]))[0].c
+// Bob, Cat and Dee wrote three days ago; Bob agreed to promotions, Dee unsubscribed.
+await db.exec(`update public.lead_messages set created_at = now() - interval '3 days' where contact_id in ('${who.Bob}', '${who.Cat}', '${who.Dee}')`)
+await db.exec(`update public.lead_contacts set last_at = now() - interval '3 days' where id in ('${who.Bob}', '${who.Cat}', '${who.Dee}')`)
+await q(`select public.lead_set_opt_in($1, 'in')`, [who.Bob])
+await q(`select public.lead_set_opt_in($1, 'out')`, [who.Dee])
+await refuses(`select public.lead_set_opt_in($1, 'maybe')`, [who.Bob], /Agreed, not asked/, 'three states')
+check((await q('select public.lead_thread($1) t', [who.Bob]))[0].t.contact.optIn, 'in', 'the card shows the consent')
+await db.exec(`update public.lead_contacts set is_test = false where id = '${who.Cat}'`)
+await refuses(`select public.lead_set_opt_in($1, 'in')`, [who.Cat], /through Meta/, 'a real customer’s consent is Meta’s')
+await db.exec(`update public.lead_contacts set is_test = true where id = '${who.Cat}'`)
+// The count before sending: Meta's rule.
+const aud = { days: 30, tests: true }
+let count = (await q(`select public.lead_campaign_audience($1, 'all', $2::jsonb) a`, [camp, JSON.stringify(aud)]))[0].a
+check([count.matched, count.window, count.optin, count.notOptedIn, count.unsubscribed], [5, 2, 1, 1, 1], 'within 24 hours, opted in, neither, unsubscribed')
+check(count.sample, ['Ann', 'Bob', 'Eve'], 'who will get it')
+count = (await q(`select public.lead_campaign_audience($1, 'messenger', $2::jsonb) a`, [camp, JSON.stringify(aud)]))[0].a
+check(count.matched, 4, 'one channel')
+check((await q(`select public.lead_campaign_audience($1, 'all', '{"days":30}') a`, [camp]))[0].a.matched, 0, 'test conversations only when asked for')
+check((await q(`select public.lead_campaign_audience($1, 'all', '{"days":1,"tests":true}') a`, [camp]))[0].a.matched, 2, 'contacted within the days')
+// Saving: checked; scheduled only in the future.
+const base = { brandId: camp, name: '11.11 preview', channel: 'all', audience: aud, body: 'Hi {name}! 11.11 starts next week.', buttons: ['Book a visit'] }
+await refuses(`select public.lead_save_campaign(null, $1::jsonb)`, [JSON.stringify({ ...base, buttons: ['a', 'b', 'c', 'd'] })], /Up to 3 buttons/, 'three buttons at most')
+await refuses(`select public.lead_save_campaign(null, $1::jsonb)`, [JSON.stringify({ ...base, scheduledAt: '2020-01-01T00:00:00Z' })], /still to come/, 'no schedule in the past')
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_save_campaign(null, $1::jsonb)`, [JSON.stringify(base)], /Lead View · Manage/, 'campaigns need Manage')
+await as(CS_USER, ALL)
+const later = (await q(`select public.lead_save_campaign(null, $1::jsonb) i`, [JSON.stringify({ ...base, name: 'Later', scheduledAt: new Date(Date.now() + 86400000).toISOString() })]))[0].i
+const k1 = (await q(`select public.lead_save_campaign(null, $1::jsonb) i`, [JSON.stringify(base)]))[0].i
+check((await q('select public.lead_send_campaign($1) n', [k1]))[0].n, 3, 'sent to the three who may get it')
+await refuses('select public.lead_send_campaign($1)', [k1], /already sent/, 'sent once')
+await refuses(`select public.lead_save_campaign($1, $2::jsonb)`, [k1, JSON.stringify(base)], /already sent/, 'a sent campaign is not changed')
+await refuses('select public.lead_remove_campaign($1)', [k1], /already sent/, 'a sent campaign stays')
+const annT = (await q('select public.lead_thread($1) t', [who.Ann]))[0].t
+check([annT.messages.at(-1).sender, annT.messages.at(-1).body, annT.messages.at(-1).buttons, annT.contact.lastDir],
+  ['campaign', 'Hi Ann! 11.11 starts next week.', ['Book a visit'], 'out'], 'the message on the conversation, with the name')
+check((await q('select public.lead_thread($1) t', [who.Cat]))[0].t.messages.at(-1).sender, 'customer', 'not to one outside 24 hours without consent')
+check((await q('select public.lead_thread($1) t', [who.Dee]))[0].t.messages.at(-1).sender, 'customer', 'never to one who unsubscribed')
+// What came of it: Ann answers with her phone.
+await q(`select public.lead_simulate($1, 'messenger', 'Ann', '', 'Book a visit 0123384721')`, [camp])
+let campList = (await q('select public.lead_campaigns() l'))[0].l
+let row = campList.find(k => k.id === k1)
+check([row.status, row.sent, row.paid, row.replied, row.phones], ['sent', 3, 1, 1, 1], 'delivered, paid, replied, phones')
+check(campList.find(k => k.id === later).status, 'scheduled', 'the scheduled one waits')
+// The clock's sweep sends only what is due.
+check((await q('select public.lead_campaign_send_due() n'))[0].n, 0, 'nothing due yet')
+await db.exec(`update public.lead_campaigns set scheduled_at = now() - interval '1 minute' where id = '${later}'`)
+check((await q('select public.lead_campaign_send_due() n'))[0].n, 1, 'the due one goes')
+check((await q('select status, sent_by_name from public.lead_campaigns where id = $1', [later]))[0], { status: 'sent', sent_by_name: 'Scheduled' }, 'sent by the schedule')
+const draft = (await q(`select public.lead_save_campaign(null, $1::jsonb) i`, [JSON.stringify({ ...base, name: 'Draft' })]))[0].i
+await q('select public.lead_remove_campaign($1)', [draft])
+check((await q('select public.lead_campaigns() l'))[0].l.some(k => k.id === draft), false, 'a draft removed')
+// The flow runner leaves a campaign message alone.
+check((await q('select flow_state from public.lead_contacts where id = $1', [who.Eve]))[0].flow_state, 'none', 'no flow started or stopped')
+
 console.log(`validate-leads: ${checks} checks passed`)

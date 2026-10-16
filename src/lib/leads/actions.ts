@@ -6,6 +6,7 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel } from './ai-model'
+import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
 
@@ -205,4 +206,43 @@ export async function tryAgent(brandId: string, fields: PersonaFields, turns: Tu
   if (!answer.ok) return answer
   const draft = readDraft(answer.text, knowledge)
   return draft ? { ok: true, data: draft } : { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
+}
+
+// ── Campaigns (mig 20261016340000) ──────────────────────────────────────────
+
+/** The editor's count before sending: who may get it, who is left out and why. */
+export async function countAudience(brandId: string, channel: CampaignChannel, audience: Audience) {
+  await requireActionOn('/leads/campaigns', 'leads', 'view')
+  return quiet<AudienceCount>('lead_campaign_audience', { p_brand: brandId, p_channel: channel, p_audience: audience }, 'The audience could not be counted.')
+}
+
+/** A draft (no time) or a scheduled campaign (a time to come). */
+export async function saveCampaign(campaignId: string | null, data: {
+  brandId: string
+  name: string
+  channel: CampaignChannel
+  audience: Audience
+  body: string
+  buttons: string[]
+  scheduledAt: string | null
+}) {
+  await requireActionOn('/leads/campaigns', 'leads', 'manage')
+  return call<string>('lead_save_campaign', { p_id: campaignId, p_data: data }, 'The campaign was not saved.')
+}
+
+/** Send now — recorded on each conversation until Meta is connected. Answers how many it reached. */
+export async function sendCampaign(campaignId: string) {
+  await requireActionOn('/leads/campaigns', 'leads', 'manage')
+  return call<number>('lead_send_campaign', { p_id: campaignId }, 'The campaign was not sent.')
+}
+
+export async function removeCampaign(campaignId: string) {
+  await requireActionOn('/leads/campaigns', 'leads', 'manage')
+  return call<null>('lead_remove_campaign', { p_id: campaignId }, 'The campaign was not removed.')
+}
+
+/** A test conversation's promotions consent (a real customer's comes from Meta). */
+export async function setOptIn(contactId: string, state: OptIn) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  return call<null>('lead_set_opt_in', { p_contact: contactId, p_state: state }, 'The consent was not saved.')
 }

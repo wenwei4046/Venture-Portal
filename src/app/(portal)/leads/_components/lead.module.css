@@ -162,7 +162,7 @@
   overflow-wrap: anywhere;
 }
 .bubbleOut[data-sender='ai'] { background: rgb(var(--hv-peach)); color: rgb(var(--hv-ink)); border: 1px solid rgb(var(--hv-accent)); }
-.bubbleOut[data-sender='flow'] { background: rgb(var(--hv-info-bg)); color: rgb(var(--hv-ink)); }
+.bubbleOut[data-sender='flow'], .bubbleOut[data-sender='campaign'] { background: rgb(var(--hv-info-bg)); color: rgb(var(--hv-ink)); }
 .msgMeta { font: 11px var(--font-mono), monospace; color: rgb(var(--hv-faint)); }
 .found {
   display: inline-flex;

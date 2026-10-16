@@ -1,10 +1,10 @@
 // Lead View's sidebar (2026-10-16, the user's design canvas "Lead View" — approved "1，2，3（中英）"): the view
 // sidebar HR's and Finance's views draw, with Lead View's own pages —
 //
-//   Inbox · Leads · Insight
+//   Inbox · Leads · Insight · Campaigns
 //   I. SET UP   Automations · AI Agent · Data Center · Settings
 //
-// The canvas's other board (Campaigns) is a later phase; its row joins here
+// Every board of the canvas has its page now; a new one joins here
 // with its page. Every row asks its page's tab, as every view sidebar does (visibleHrNav → opensPath).
 
 import { canAccessLeads } from '@/lib/roles'
@@ -27,6 +27,7 @@ export function leadNavSections(): HrNavSection[] {
         link('leads-inbox', 'Inbox', 'in', '/leads', (p) => p === '/leads'),
         link('leads-list', 'Leads', 'people', '/leads/list', (p) => under(p, '/leads/list')),
         link('leads-insight', 'Insight', 'report', '/leads/insight', (p) => under(p, '/leads/insight')),
+        link('leads-campaigns', 'Campaigns', 'out', '/leads/campaigns', (p) => under(p, '/leads/campaigns')),
       ],
     },
     {

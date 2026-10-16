@@ -107,6 +107,7 @@ export const PAGE_TABS = {
   '/leads': ['lead.inbox'],
   '/leads/list': ['lead.leads'],
   '/leads/insight': ['lead.insight'],
+  '/leads/campaigns': ['lead.campaigns'],
   '/leads/flows': ['lead.flows'],
   '/leads/ai': ['lead.ai'],
   '/leads/knowledge': ['lead.knowledge'],
