@@ -104,7 +104,7 @@ export interface SalesUi {
   insSheet: { cm: [number, number]; a: number | null; b: number | null; dragged?: boolean } | null;
   /** rev 1010 §5: Team | Me (Me on every open), the Leads / Appointments / Upcoming list (its measured height) and its Customer info. */
   /** Profile › Notifications: Unread (default) | Read (rev 1010 §6). */
-  nTab: "unread" | "read";
+  nTab: "all" | "unread" | "read";
   insList: { kind: "leads" | "appts" | "up"; h: string } | null;
   insInfo: string | null;
   // Profile
@@ -121,7 +121,7 @@ export const initialSalesUi = (): SalesUi => ({
   hover: null, menu: null, reply: null, draft: {}, qr: false, qrPage: null, qrNew: { s: "", m: "" }, qrEditIdx: null,
   hm: null, cform: null, book: null, cancelAsk: null, tpl: false, templates: null, sending: false, rec: null,
   calView: "month", calSel: null, calYM: null, outcomeAsk: null, celebrate: null, rebookFor: null,
-  insPeriod: "month", insRange: null, insSheet: null, insList: null, insInfo: null, nTab: "unread",
+  insPeriod: "month", insRange: null, insSheet: null, insList: null, insInfo: null, nTab: "all",
   profSub: null, teamOpen: false, swOpen: false, tp: null,
 });
 

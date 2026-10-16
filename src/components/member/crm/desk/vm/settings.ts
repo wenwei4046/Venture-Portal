@@ -158,7 +158,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const deleted = new Set(data.notifDeleted ?? []);
   const NL = list0.filter(n => !deleted.has(n.key) && !(ui.undo?.kind === "delete" && ui.undo.ids?.includes(n.key))).sort((a, b) => b.at.localeCompare(a.at));
   const isRead = (n: N) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
-  const tabK = ui.ntfTab, inTab = NL.filter(n => (tabK === "unread" ? !isRead(n) : isRead(n)));
+  // All · Unread · Read, on All (the owner, 2026-10-16: "Notification 要有一個 all，看過的要能看回去").
+  const tabK = ui.ntfTab ?? "all", inTab = NL.filter(n => tabK === "all" || (tabK === "unread" ? !isRead(n) : isRead(n)));
   const CAT: [string, string, string[] | null][] = [["all", "All", null], ["toassign", "To assign", ["To assign"]], ["overdue", "Overdue", ["Overdue"]], ["move", "Move", ["Move"]], ["assign", "Assign", ["Assign"]],
     ["share", "Share", ["Share"]], ["appts", "Appointments", ["Appointment"]], ["results", "Results", ["Won", "Lost"]], ["general", "General", ["General"]]];
   const inCat = (n: N, c: string) => { const x = CAT.find(q => q[0] === c); return !x?.[2] || x[2].includes(n.type); };
@@ -203,10 +204,10 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     ntfReadSel: () => { if (!nP) return; act.readNotifs(ids.filter(x => pickd[x])); patch({ ntfPick: {}, ntfSel: false }); },
     ntfDelSel: () => { if (!nP) return; const keys = ids.filter(x => pickd[x]);
       void ctx.deskAct.deleteNotifs(keys).then(okd => { if (okd) patch({ ntfPick: {}, ntfSel: false, toast: `Deleted ${keys.length} ${keys.length === 1 ? "notification" : "notifications"}`, undo: { kind: "delete", ids: keys, until: Date.now() + 30_000 } }); }); },
-    ntfGroups, ntfEmpty: !shown.length, ntfEmptyMsg: tabK === "unread" ? "No unread notifications" : "No read notifications",
+    ntfGroups, ntfEmpty: !shown.length, ntfEmptyMsg: tabK === "unread" ? "No unread notifications" : tabK === "read" ? "No read notifications" : "No notifications yet",
     ntfNoUnread: !unreadN, ntfMarkFg: unreadN ? "#BD4A19" : "#C9B6A8", ntfMarkCur: unreadN ? "pointer" : "default",
     ntfMarkAll: () => { const k = NL.filter(n => !isRead(n)).map(n => n.key); if (k.length) act.readNotifs(k, true); },
-    ntfTabs: ([["unread", "Unread", unreadN], ["read", "Read", 0]] as const).map(([k, label, n]) => { const o = tabK === k;
+    ntfTabs: ([["all", "All", 0], ["unread", "Unread", unreadN], ["read", "Read", 0]] as const).map(([k, label, n]) => { const o = tabK === k;
       return { label, n: String(n), hasN: n > 0, bg: o ? "#fff" : "transparent", sh: o ? "0 1px 3px rgba(63,43,34,.14)" : "none", fw: o ? 700 : 600, fg: o ? "#3F2B22" : "#806B60", pick: () => patch({ ntfTab: k }) }; }),
     urgency: (id: string) => { const c = data.customers.find(x => x.id === id); return c ? urgencyOf(c, ctx.now) : null; },
   };

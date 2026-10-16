@@ -20,7 +20,7 @@ export function titleBellVM(ctx: SalesCtx) {
   const { set, data } = ctx;
   const unread = unreadNotifs(salesNotifs(ctx), data);
   return {
-    open: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "unread", hist: [...u.hist, u.tab].slice(-20) })); },
+    open: () => { set(u => ({ ...u, tab: "profile", profSub: "notif", nTab: "all", hist: [...u.hist, u.tab].slice(-20) })); },
     has: unread > 0, n: unread ? String(unread) : "",
   };
 }
