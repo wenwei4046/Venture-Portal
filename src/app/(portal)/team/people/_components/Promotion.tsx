@@ -3,7 +3,10 @@
 import { useState, useTransition } from 'react'
 import { promoteStaff } from '../promote-actions'
 import type { CardLadder } from '../card-actions'
+import { btn } from '@/components/hrv/kit'
 import { Select } from '@/components/hrv/select'
+import PersonWell from '../../_components/PersonWell'
+import w from '../../_components/person-well.module.css'
 
 /**
  * The Promote control on a person's card.
@@ -55,33 +58,42 @@ export default function Promotion({
   }
 
 
+  // A well of the person's page since 2026-10-16 (the 360): the step's label
+  // in spaced capitals over the title it leads to, Promote at the end.
   return (
-    <div className="mt-6 pt-4 border-t border-hairline flex flex-wrap items-start gap-x-4 gap-y-2">
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold uppercase tracking-[0.1em]">Promotion</div>
-        <div className="text-sm mt-1.5">
+    <PersonWell title="Promotion" icon="out">
+      <div className={w.line}>
+        <div className={w.lineText}>
           {ladder.level === null ? (
-            <>{title} is not on the ladder yet — place it under Hierarchy → Levels first.</>
+            <>
+              <span className={w.label}>Ladder</span>
+              <span className={w.value}>{title} is not on the ladder yet — place it under Hierarchy → Levels first.</span>
+            </>
           ) : next === null ? (
             <>
-              Top of the {department ?? 'department'} ladder, as {title} ({ladder.level}).
+              <span className={w.label}>Ladder</span>
+              <span className={w.value}>
+                Top of the {department ?? 'department'} ladder, as {title} ({ladder.level}).
+              </span>
             </>
           ) : next.titles.length === 1 ? (
             <>
-              Next up: <span className="font-bold">{next.titles[0].name}</span>
-              <span className="font-mono text-[11px] ml-2">
-                {ladder.level} → {next.level}
+              <span className={w.label}>Next up</span>
+              <span className={w.value}>
+                {next.titles[0].name}
+                <span className={w.mono}>
+                  {ladder.level} → {next.level}
+                </span>
               </span>
             </>
           ) : (
-            <label className="flex flex-wrap items-center gap-2">
-              <span>Next up ({next.level}):</span>
-              <Select bare
+            <>
+              <span className={w.label}>Next up ({next.level})</span>
+              <Select
                 value={target?.id ?? ''}
                 onChange={e => setChoice(e.target.value)}
                 disabled={pending}
                 aria-label="Title to promote to"
-                className="px-2 py-1 bg-surface border border-hairline rounded-control text-sm text-ink"
               >
                 {next.titles.map(t => (
                   <option key={t.id} value={t.id}>
@@ -89,23 +101,23 @@ export default function Promotion({
                   </option>
                 ))}
               </Select>
-            </label>
+            </>
           )}
+          {/* Why the button is off, in the amber of something still to settle. */}
+          {ladder.blocker ? <div className="sheet-warning mt-1 mb-0">{ladder.blocker}</div> : null}
+          {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
         </div>
-        {/* Why the button is off, in the amber of something still to settle. */}
-        {ladder.blocker ? <div className="sheet-warning mt-2 mb-0">{ladder.blocker}</div> : null}
-        {error ? <div className="sheet-danger mt-2 mb-0">{error}</div> : null}
+        {next ? (
+          <button
+            type="button"
+            onClick={promote}
+            disabled={pending || !target || ladder.blocker !== null}
+            className={btn('primary')}
+          >
+            {pending ? 'Promoting…' : 'Promote'}
+          </button>
+        ) : null}
       </div>
-      {next ? (
-        <button
-          type="button"
-          onClick={promote}
-          disabled={pending || !target || ladder.blocker !== null}
-          className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {pending ? 'Promoting…' : 'Promote'}
-        </button>
-      ) : null}
-    </div>
+    </PersonWell>
   )
 }

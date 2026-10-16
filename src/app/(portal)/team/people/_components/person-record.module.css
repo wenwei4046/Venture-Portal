@@ -14,7 +14,7 @@
   align-items: flex-start;
   gap: 20px;
   max-width: 1160px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
   line-height: normal;
 }
 
@@ -116,25 +116,7 @@
   gap: 14px;
 }
 .layout[data-editing='true'] .wells { grid-template-columns: minmax(0, 1fr); }
-.well {
-  min-width: 0;
-  padding: 18px 20px 20px;
-  background: rgb(var(--hv-panel));
-  border: 1px solid rgb(var(--hv-hairline));
-  border-radius: 12px;
-}
-.wellTitle {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 0 16px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgb(var(--hv-ink));
-}
-.wellIcon { display: inline-flex; flex: none; color: rgb(var(--hv-body-2)); }
+/* A well itself is the page's shared one (team/_components/PersonWell). */
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

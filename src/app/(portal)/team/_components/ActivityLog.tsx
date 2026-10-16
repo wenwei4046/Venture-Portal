@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
+import PersonWell from './PersonWell'
+import w from './person-well.module.css'
 
 /**
  * What this account has been doing, newest first.
@@ -38,23 +40,11 @@ export default async function ActivityLog({
   })
   const rows = (data ?? []) as ActivityRow[]
 
+  // A well of the person's page since 2026-10-16 (the 360), the count at its title's end.
   return (
-    <section className="mt-10">
-      <div className="sect-head">
-        <h2>Activity</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">
-          {rows.length === limit ? `LAST ${limit}` : `${rows.length} ENTRIES`}
-        </span>
-      </div>
-
+    <PersonWell title="Activity" icon="calendar" count={rows.length === limit ? `LAST ${limit}` : `${rows.length} ENTRIES`}>
       {rows.length === 0 ? (
-        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
-          <p className="text-sm">
-            Nothing recorded yet. Page visits are logged from the moment they
-            next sign in.
-          </p>
-        </div>
+        <p className={w.note}>Nothing recorded yet. Page visits are logged from the moment they next sign in.</p>
       ) : (
         // One line per visit or read, newest first, in the sheet's table —
         // the same three columns as the person card's Activity tab.
@@ -98,6 +88,6 @@ export default async function ActivityLog({
           </table>
         </div>
       )}
-    </section>
+    </PersonWell>
   )
 }

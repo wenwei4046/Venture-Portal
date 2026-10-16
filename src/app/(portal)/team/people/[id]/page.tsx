@@ -14,6 +14,8 @@ import { MASKED, sees } from '@/lib/sensitive'
 import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
+import PersonWell from '../../_components/PersonWell'
+import w from '../../_components/person-well.module.css'
 import { loadPersonAccess } from '../../_lib/person-permissions'
 import { loadUplineChoices } from '../../_lib/upline-choices'
 import PersonChanges from '../_components/PersonChanges'
@@ -200,22 +202,33 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
         startEditing={edit === '1'}
       />
 
-      {card?.can.promote ? (
-        <PersonChanges
-          personId={card.staff.id}
-          personName={card.staff.employee_name}
-          title={card.title}
-          department={card.department}
-          ladder={card.ladder}
-          active={card.active}
-        />
-      ) : null}
+      {/* The page goes on in the same wells, full width (2026-10-16, the user:
+          "the promotion, permissions and activity go with new as well"). */}
+      <div className={w.lower}>
+        {card?.can.promote ? (
+          <PersonChanges
+            personId={card.staff.id}
+            personName={card.staff.employee_name}
+            title={card.title}
+            department={card.department}
+            ladder={card.ladder}
+            active={card.active}
+          />
+        ) : null}
 
-      {access ? (
-        <PersonAccess access={access} canEdit={canManagePermissions(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'edit')} personName={staff.employee_name} />
-      ) : null}
+        {access ? (
+          <PersonWell title="Permissions" icon="lock">
+            <PersonAccess
+              bare
+              access={access}
+              canEdit={canManagePermissions(viewer) && hasTab(viewer.tabs, 'hr.permissions', 'edit')}
+              personName={staff.employee_name}
+            />
+          </PersonWell>
+        ) : null}
 
-      {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
+        {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
+      </div>
     </div>
   )
 }
