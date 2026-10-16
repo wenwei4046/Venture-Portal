@@ -1,4 +1,5 @@
 import { requirePage, requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { officeToday } from '@/lib/office-time'
 import { loadPaymentsHub } from '@/app/(portal)/payments/_lib/payments-hub'
 import { openVoucherPage } from '@/app/(portal)/payments/page-actions'
@@ -29,6 +30,7 @@ export default async function FinAppPayments({ searchParams }: { searchParams: P
       record={read && read.ok ? { detail: read.detail, extras: read.extras, canCopy: read.canCopy } : null}
       refused={read && !read.ok ? REFUSED[read.reason] : null}
       canCreate={hub.canCreate}
+      canExport={canDo(user, 'treasury', 'export')}
       create={hub.create}
       today={officeToday()}
       dept={hub.dept}

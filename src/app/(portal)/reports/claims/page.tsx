@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { canDo } from '@/lib/permission-actions'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney } from '@/lib/utils'
@@ -6,7 +7,9 @@ import Link from 'next/link'
 
 export default async function ClaimsSummaryPage() {
   await requirePage('/reports/claims')
-  await requirePermission('reports', 'claims_approve')
+  const user = await requirePermission('reports', 'claims_approve')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   const claims = await fetchAllRows((lo, hi) => supabase.from('claims').select('claim_type, status, amount').order('id', { ascending: true }).range(lo, hi))
@@ -44,18 +47,22 @@ export default async function ClaimsSummaryPage() {
           <h1 className="page-title">Claims Summary</h1>
         </div>
         <div className="flex gap-2">
-          <Link
-            href="/reports/claims/export?format=xlsx"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export Excel
-          </Link>
-          <Link
-            href="/reports/claims/export?format=pdf"
-            className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-          >
-            Export PDF
-          </Link>
+          {canExport ? (
+            <Link
+              href="/reports/claims/export?format=xlsx"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              Export Excel
+            </Link>
+          ) : null}
+          {canExport ? (
+            <Link
+              href="/reports/claims/export?format=pdf"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
+            >
+              Export PDF
+            </Link>
+          ) : null}
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
+import { flash } from '@/components/hrv/toast'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { fd } from '@/components/finv/DrawerParts'
 import { HUB_HREF, HUB_TITLE } from '@/lib/fin-app/routes'
@@ -17,6 +18,7 @@ import { VoucherDetailBody, VoucherHero } from '@/app/(portal)/payments/_compone
 import { REFUSED } from '@/app/(portal)/payments/_lib/voucher-refusals'
 import { useVoucherSteps } from '@/app/(portal)/payments/_components/voucher-steps'
 import CreatePaymentDialog from '@/app/(portal)/payments/_components/CreatePaymentDialog'
+import VoucherEditSheet from './VoucherEditSheet'
 import AmendDateButton from '@/app/(portal)/payments/_components/AmendDateButton'
 import ReassignGlAccountButton from '@/app/(portal)/payments/[id]/_components/ReassignGlAccountButton'
 import { CopyVoucherDialog } from '@/app/(portal)/payments/[id]/_components/CopyAsDraft'
@@ -89,6 +91,7 @@ export default function VoucherApp({
   record: initialRecord,
   refused: initialRefused,
   canCreate,
+  canExport = false,
   create,
   prefix,
   today,
@@ -104,6 +107,8 @@ export default function VoucherApp({
   record: VoucherRecord | null
   refused: string | null
   canCreate: boolean
+  /** Treasury · Export: the vouchers' Excel and PDF, as the route asks (2026-10-16). */
+  canExport?: boolean
   /** Payments: Create payment's line, today and lists. */
   create?: { prefix: string; today: string; open: boolean; initial: CreatePaymentOptions | null } | null
   /** Receive: Create receipt's line. */
@@ -152,6 +157,8 @@ export default function VoucherApp({
   const [openBatches, setOpenBatches] = useState<Set<string>>(() => new Set(step.kind === 'batches' && step.batch ? [step.batch] : []))
   // The full page's own windows, opened from the record's ⋯ (a nonce re-opens one closed before).
   const [extra, setExtra] = useState<{ kind: 'copy' | 'date' | 'gl'; nonce: number } | null>(null)
+  // Edit is the app's sheet (part E4b), not the portal's /payments/[id]/edit.
+  const [editing, setEditing] = useState<string | null>(null)
 
   const go = (next: VoucherStep) => open(searchOfStep(next))
   const backTo = () => back(parentSearch(step))
@@ -186,7 +193,7 @@ export default function VoucherApp({
   const hubBar: BarButton[] = receipts
     ? [
         ...(createBtn ? [createBtn, { key: 'loan', label: 'Loan repayment', onClick: () => setMaking('loan') } as BarButton] : []),
-        { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') },
+        ...(canExport ? [{ key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') } as BarButton] : []),
       ]
     : [
         ...(createBtn ? [createBtn] : []),
@@ -194,10 +201,18 @@ export default function VoucherApp({
         ...(payroll ? [{ key: 'payroll', label: payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll', onClick: () => setMenu('payroll') } as BarButton] : []),
         { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('more') },
       ]
-  const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] =>
-    items.length > 0
-      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => { setMenu(null); router.push(page) } }))
-      : [{ key: 'open', label: openLabel, sub: 'Nothing waiting', onClick: () => { setMenu(null); router.push(page) } }]
+  // A queue opens on the request pressed (2026-10-16, part E4 — each queue is a page of the app now).
+  const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] => {
+    const inApp = page.startsWith('/fin-app/')
+    const goTo = (id?: string) => {
+      setMenu(null)
+      if (inApp) pushIntent()
+      router.push(inApp && id ? `${page}?f=waiting&id=${encodeURIComponent(id)}` : page)
+    }
+    return items.length > 0
+      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => goTo(it.key) }))
+      : [{ key: 'open', label: openLabel, sub: 'Nothing waiting', onClick: () => goTo() }]
+  }
 
   // ── A record's steps (the drawer's), with the full page's own in its ⋯ ──
   const v = step.kind === 'record' && record?.detail.id === step.id ? record.detail : null
@@ -220,13 +235,13 @@ export default function VoucherApp({
       router.refresh()
     },
     extraMore,
+    inWords: true,
   })
   const recordBar: BarButton[] = steps.map((st) => ({
     key: st.key,
     label: st.label,
     kind: st.kind,
-    href: st.href,
-    onClick: st.onClick,
+    ...(st.key === 'edit' && v ? { onClick: () => setEditing(v.id) } : { href: st.href, onClick: st.onClick }),
     disabled: busy && st.kind !== 'more',
   }))
 
@@ -362,21 +377,21 @@ export default function VoucherApp({
       {receipts ? null : (
         <>
           <FinDialog open={menu === 'dept'} onClose={() => setMenu(null)} title="Dept Requests" sub={dept.length > 0 ? `${dept.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(dept, '/payments/dept-requests', 'Open Dept Requests')} />
+            <DialogMenu items={requestItems(dept, '/fin-app/page/dept-requests', 'Open Dept Requests')} />
           </FinDialog>
           {payroll ? (
             <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="Payroll Requests" sub={payroll.length > 0 ? `${payroll.length} waiting` : undefined}>
-              <DialogMenu items={requestItems(payroll, '/payments/payroll-requests', 'Open Payroll Requests')} />
+              <DialogMenu items={requestItems(payroll, '/fin-app/page/payroll-requests', 'Open Payroll Requests')} />
             </FinDialog>
           ) : null}
           <FinDialog open={menu === 'claims'} onClose={() => setMenu(null)} title="Claim Requests" sub={claims.length > 0 ? `${claims.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(claims, '/payments/claim-requests', 'Open Claim Requests')} />
+            <DialogMenu items={requestItems(claims, '/fin-app/page/claim-requests', 'Open Claim Requests')} />
           </FinDialog>
           <FinDialog open={menu === 'more'} onClose={() => setMenu(null)} title="Payments">
             <DialogMenu
               items={[
                 { key: 'claims', label: claims.length > 0 ? `Claims · ${claims.length}` : 'Claims', sub: claims.length > 0 ? `${claims.length} waiting for a voucher` : 'Nothing waiting', onClick: () => setMenu('claims') },
-                { key: 'export', label: 'Export', sub: 'Excel or PDF of every voucher', onClick: () => setMenu('export') },
+                ...(canExport ? [{ key: 'export', label: 'Export', sub: 'Excel or PDF of every voucher', onClick: () => setMenu('export') }] : []),
               ]}
             />
           </FinDialog>
@@ -392,6 +407,17 @@ export default function VoucherApp({
       </FinDialog>
 
       {create ? <CreatePaymentDialog open={making === 'payment'} onClose={() => setMaking(null)} prefix={create.prefix} today={create.today} initial={create.initial} /> : null}
+      <VoucherEditSheet
+        voucherId={editing}
+        label={v?.no ?? 'draft'}
+        today={today}
+        onClose={() => setEditing(null)}
+        onDone={() => {
+          flash('Voucher saved')
+          router.refresh()
+          if (v) load(v.id)
+        }}
+      />
       {receipts && canCreate && prefix ? (
         <>
           <CreateReceiptDialog open={making === 'receipt'} onClose={() => setMaking(null)} prefix={prefix} today={today} />
@@ -400,7 +426,20 @@ export default function VoucherApp({
       ) : null}
 
       {v && extra?.kind === 'copy' ? (
-        <CopyVoucherDialog key={extra.nonce} open onClose={() => setExtra(null)} voucherId={v.id} voucherNo={v.no} />
+        <CopyVoucherDialog
+          key={extra.nonce}
+          open
+          onClose={() => setExtra(null)}
+          voucherId={v.id}
+          voucherNo={v.no}
+          // The copy opens here, its Edit sheet up — as the desktop opens it on its edit page.
+          onCopied={(copy) => {
+            flash(`${copy.voucherNo} — a new draft`)
+            router.refresh()
+            go({ kind: 'record', id: copy.id, from: step.kind === 'record' ? step.from : null })
+            setEditing(copy.id)
+          }}
+        />
       ) : null}
       {v && extra?.kind === 'date' && v.paymentDate ? (
         <AmendDateButton key={extra.nonce} autoOpen hideTrigger kind="voucher" id={v.id} currentDate={v.paymentDate} label={v.no ?? 'Draft'} />

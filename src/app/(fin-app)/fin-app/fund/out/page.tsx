@@ -47,6 +47,7 @@ export default async function FinAppFundOut({ searchParams }: { searchParams: Pr
       }}
       page={read && read.ok ? { side: 'out', loan: read.page } : null}
       refused={read && !read.ok ? read.reason : null}
+      printedBy={(user as { name?: string | null }).name ?? null}
     />
   )
 }

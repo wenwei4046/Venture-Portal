@@ -29,7 +29,7 @@ const asg = (over: Partial<AttAssignment>): AttAssignment => ({
   id: Math.random().toString(36), level: 'company', titleId: null, staffId: null, label: 'Co', mode: 'no_clock', scheduleId: 's1', locationId: null,
   anywhere: false, ot: 'by_wage', from: '2026-01-01', ...over,
 })
-const POLICY = { id: 'p', from: '2026-01-01', fenceMode: 'flag' as const, photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic' as const, photoKeepDays: 90 }
+const POLICY = { id: 'p', from: '2026-01-01', fenceMode: 'flag' as const, photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic' as const, photoKeepDays: 90, otWageCap: 4000 }
 const config = (over: Partial<AttConfig> = {}): AttConfig => ({
   today: '2026-11-02', now: '09:41', canCreate: true, canEdit: true, canApprove: true, me: 'HR',
   people: [person('ali', { name: 'Ali' })], titles: [], levels: [], departments: [],
@@ -146,8 +146,30 @@ describe('what a closed month sends to payroll', () => {
     const c = config({ assignments: [asg({ ot: 'none' })] })
     const [fact] = attendanceFacts(ctxOf(c, ALI_MONTH), ALI_OT)
     const pay = priceFact('2026-10-01', CLOSED_AT, fact, { basic: 2600, statutoryAllowance: 0 })
-    expect(pay.lines.map(l => [l.hours, l.paid, l.amount])).toEqual([[6, false, 0], [4, false, 0]])
+    expect(pay.lines.map(l => [l.hours, l.paid, l.unpaid, l.amount])).toEqual([[6, false, 'none', 0], [4, false, 'none', 0]])
     expect([pay.otHours, pay.otAmount]).toEqual([0, 0])
+  })
+
+  it('by wage: above the policy’s line the hours are recorded, not paid — Ben, the user’s example (2026-10-15)', () => {
+    const c = config({ people: [person('ben', { name: 'Ben' })] })
+    const bens = [ot('ben', '2026-10-05', 10, 'work')]
+    const [fact] = attendanceFacts(ctxOf(c, month()), bens)
+    expect([fact.ot[0].eligibility, fact.ot[0].wageCap]).toEqual(['by_wage', 4000])
+    // 4,500 ÷ 26 = 173.076923…; ÷ 8 = 21.6346; 10 h × 21.6346 × 1.5 = RM 324.52 — not paid: RM 4,500 is above RM 4,000.
+    const over = priceFact('2026-10-01', CLOSED_AT, fact, { basic: 4500, statutoryAllowance: 0 })
+    expect(over.lines.map(l => [l.hours, l.paid, l.unpaid, l.hrp, l.amount])).toEqual([[10, false, 'over_line', 21.6346, 0]])
+    expect([over.otHours, over.otAmount]).toEqual([0, 0])
+    // …and the register still counts his 10 hours.
+    expect(registerOf(ctxOf(c, month()), otHoursOf(ctxOf(c, month()), bens))[0].ot).toBe(10)
+    // Statutory pays whatever the wage.
+    const statutory = config({ people: [person('ben', { name: 'Ben' })], assignments: [asg({ ot: 'statutory' })] })
+    expect(priceFact('2026-10-01', CLOSED_AT, attendanceFacts(ctxOf(statutory, month()), bens)[0], { basic: 4500, statutoryAllowance: 0 }).otAmount).toBe(324.52)
+    // At the line it pays (4,000 ÷ 26 ÷ 8 = 19.2308; 10 h × 1.5 → RM 288.46); the fixed allowance counts towards it.
+    expect(priceFact('2026-10-01', CLOSED_AT, fact, { basic: 4000, statutoryAllowance: 0 }).otAmount).toBe(288.46)
+    expect(priceFact('2026-10-01', CLOSED_AT, fact, { basic: 3800, statutoryAllowance: 300 }).lines[0].unpaid).toBe('over_line')
+    // The line is the policy's: HR raises it to RM 5,000 and Ben is paid.
+    const higher = config({ people: [person('ben', { name: 'Ben' })], policies: [{ ...POLICY, otWageCap: 5000 }] })
+    expect(priceFact('2026-10-01', CLOSED_AT, attendanceFacts(ctxOf(higher, month()), bens)[0], { basic: 4500, statutoryAllowance: 0 }).otAmount).toBe(324.52)
   })
 
   it('a schedule with longer days lowers the hourly rate', () => {

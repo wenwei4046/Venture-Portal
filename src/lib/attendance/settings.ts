@@ -86,6 +86,33 @@ export function groupSummary(groups: readonly LeaveGroup[], short: boolean, titl
 /** The unit a leave type counts in ("days in a row" for maternity / paternity). */
 export const unitOf = (name: string) => (/maternity|paternity/i.test(name) ? 'days in a row' : 'days a year')
 
+// ── A leave type's flags ────────────────────────────────────────────────────
+
+export interface LeaveFlags {
+  accrues: boolean
+  unpaid: boolean
+  drawsFrom: string | null
+  counts: 'working' | 'calendar'
+}
+
+/**
+ * What a new type's code suggests — AL is earned month by month, UL is unpaid,
+ * EL comes out of AL, maternity / paternity count calendar days — and a saved
+ * type its own flags. Each is a switch in the window HR may turn (the user,
+ * 2026-10-15: "窗口加开关"): an unpaid type named NPL is unpaid too.
+ */
+export function derivedFlags(code: string, name: string, cur?: AttLeaveType): LeaveFlags {
+  if (cur && cur.code === code) return { accrues: cur.accrues, unpaid: cur.unpaid, drawsFrom: cur.drawsFrom, counts: cur.counts }
+  return { accrues: code === 'AL', unpaid: code === 'UL', drawsFrom: code === 'EL' ? 'AL' : null, counts: /maternity|paternity/i.test(name) ? 'calendar' : 'working' }
+}
+
+/** The flags as saved: an unpaid type keeps no balance and comes out of none; one that comes out of another earns nothing itself. */
+export function settledFlags(f: LeaveFlags): LeaveFlags {
+  if (f.unpaid) return { ...f, accrues: false, drawsFrom: null }
+  if (f.drawsFrom) return { ...f, accrues: false }
+  return f
+}
+
 /** The big line on a leave type's card. */
 export function entitlementLine(t: AttLeaveType, titleName: (id: string) => string): string {
   if (t.unpaid) return '—'

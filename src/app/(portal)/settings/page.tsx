@@ -15,6 +15,8 @@ import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
 import DepartmentsSection from './_components/DepartmentsSection'
 import { loadDepartmentModes } from '@/lib/department-mode-server'
+import { departmentRowsRead } from './_lib/departments-read'
+import { accountRowsRead } from './_lib/accounts-read'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
@@ -85,18 +87,10 @@ export default async function SettingsPage({ searchParams }: Props) {
     supabase.from('base_rate_history').select('weighted_cost, op_margin, base_rate').order('approved_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('bank_accounts').select('*').order('is_primary', { ascending: false }),
     supabase.from('period_locks').select('period_month, is_locked, closed_at, notes').order('period_month', { ascending: false }),
-    supabase
-      .from('chart_of_accounts')
-      .select('code, name, type, cash_flow_category, parent_code, is_active, sort_order')
-      .order('type')
-      .order('sort_order')
-      .order('code'),
-    // own_share_billback was read below but never selected (2026-09-29), so
-    // every Bill back box drew unticked whatever the registry held.
-    supabase
-      .from('departments')
-      .select('id, name, is_internal, created_at, segment_key, pool_gl_code, billing_mode_key, own_share_billback')
-      .order('created_at'),
+    // The chart, as the Finance phone app reads it (`_lib/accounts-read`).
+    accountRowsRead(supabase),
+    // The registry's rows, as the Finance phone app reads them (`_lib/departments-read`).
+    departmentRowsRead(supabase),
   ])
   // Cost center / centralized (2026-09-30). The rest of Settings must not fail
   // because of it, so a failed read leaves the Mode column blank.

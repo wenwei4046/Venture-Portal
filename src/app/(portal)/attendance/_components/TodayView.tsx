@@ -1,11 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Button } from '@/components/ds/Button'
 import { DsSelect, TextField } from '@/components/ds/Field'
 import { Toast, useFlash } from '@/components/ds/Overlay'
+import { remindNotIn } from '@/lib/attendance/actions'
 import { assignmentFor, dayInfo, fromMin, indexMonth, policyOn, scheduleDay, shortDay, toMin, type Ctx, type DayInfo } from '@/lib/attendance/engine'
+import { remindWords } from '@/lib/attendance/files'
 import type { AttConfig, AttLedger, AttMonth, AttPerson } from '@/lib/attendance/types'
 import { Avatar, HoverButton } from './bits'
 import { downloadCsv } from './codes'
@@ -26,11 +28,17 @@ export default function TodayView({ config, month, ledger }: { config: AttConfig
   const [toast, flash] = useFlash()
 
   const q = query.trim().toLowerCase()
-  const clocking = config.people.filter(p => assignmentFor(p, today, config.assignments)?.mode === 'clock')
-  const tp = clocking
-    .filter(p => (dept === 'all' || p.departmentId === dept) && (!q || `${p.name}${p.title ?? ''}`.toLowerCase().includes(q)))
-    .map(p => ({ p, d: dayInfo(p, today, ctx, idx) }))
+  const leaveCodes = useMemo(() => new Set(config.leaveTypes.map(t => t.code)), [config.leaveTypes])
+  // The people who clock today — and the fixed-hours people (No clock-in) on the day they are on leave
+  // (2026-10-15 — the user: "只在请假时显示").
+  const tp = config.people
+    .map(p => ({ p, mode: assignmentFor(p, today, config.assignments)?.mode }))
+    .filter(x => (x.mode === 'clock' || x.mode === 'no_clock') && (dept === 'all' || x.p.departmentId === dept)
+      && (!q || `${x.p.name}${x.p.title ?? ''}`.toLowerCase().includes(q)))
+    .map(x => ({ p: x.p, d: dayInfo(x.p, today, ctx, idx), fixed: x.mode === 'no_clock' }))
+    .filter(x => !x.fixed || leaveCodes.has(x.d.code))
   const total = tp.length
+  const [reminding, startRemind] = useTransition()
 
   // The company default's schedule names the day: "Office 9–6, 5 min grace".
   const company = config.assignments.filter(a => a.level === 'company' && a.from <= today).sort((a, b) => (a.from < b.from ? 1 : -1))[0]
@@ -75,9 +83,17 @@ export default function TodayView({ config, month, ledger }: { config: AttConfig
       label: 'On leave',
       bar: 'rgb(var(--tone-slate-deep))',
       note: 'Approved',
-      rows: tp.filter(x => config.leaveTypes.some(t => t.code === x.d.code)).map(x => ({ p: x.p, right: x.d.code, rightColor: 'var(--ds-ink-2)', sub: [leaveName(x.d.code), span(x.p)].filter(Boolean).join(' · ') })),
+      rows: tp.filter(x => leaveCodes.has(x.d.code)).map(x => ({ p: x.p, right: x.d.code, rightColor: 'var(--ds-ink-2)', sub: [leaveName(x.d.code), span(x.p)].filter(Boolean).join(' · ') })),
     },
   ]
+  const notIn = lanes[2].rows
+
+  // Not in yet › Remind all (the handoff's lane action; 2026-10-15, the user: "现在就做").
+  const remindAll = () =>
+    startRemind(async () => {
+      const r = await remindNotIn(notIn.map(x => x.p.id))
+      flash(r.ok ? remindWords(r.data) : r.reason)
+    })
 
   const exportCsv = () =>
     downloadCsv(`Attendance_${today}.csv`, [
@@ -125,6 +141,11 @@ export default function TodayView({ config, month, ledger }: { config: AttConfig
                 </HoverButton>
               ))}
               {l.rows.length === 0 ? <div style={{ padding: '12px 16px', borderTop: '1px solid var(--ds-border)', fontSize: 12.5, color: 'var(--ds-ink-3)' }}>Nobody</div> : null}
+              {l.rows === notIn && notIn.length > 0 && config.canEdit ? (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--ds-border)' }}>
+                  <Button variant="secondary" size="sm" block disabled={reminding} onClick={remindAll}>Remind all</Button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

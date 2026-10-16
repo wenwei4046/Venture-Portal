@@ -5,6 +5,7 @@
 // closing, reconciled against the banks' GL balances.
 
 import dayjs from 'dayjs'
+import { canDo } from '@/lib/permission-actions'
 import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -28,6 +29,8 @@ interface Props {
 export default async function CashFlowPage({ searchParams }: Props) {
   await requirePage('/reports/cash-flow')
   const user = await requirePermission('dept_reports')
+  // The files only for whoever may take them out — as the export route asks (2026-10-16).
+  const canExport = canDo(user, 'reports', 'export')
   const supabase = await createClient()
 
   const params = await searchParams
@@ -64,7 +67,9 @@ export default async function CashFlowPage({ searchParams }: Props) {
             <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
               Edit layout
             </Link>
-            <ExportLinks variant="sheet" basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+            {canExport ? (
+              <ExportLinks variant="sheet" basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+            ) : null}
           </div>
         </div>
 
@@ -123,7 +128,9 @@ export default async function CashFlowPage({ searchParams }: Props) {
               Edit layout
             </Link>
           )}
-          <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+          {canExport ? (
+            <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+          ) : null}
         </div>
       </div>
 

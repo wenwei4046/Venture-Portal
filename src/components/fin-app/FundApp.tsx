@@ -14,6 +14,8 @@ import { FundDetailBody, fundSteps, type FundCan } from '@/components/treasury/F
 import { segmentLine } from '@/components/treasury/TermsTimeline'
 import { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
 import { RevertTermsDialog } from '@/components/treasury/RevertTermsDialog'
+import PrintSchedule from '@/components/treasury/PrintSchedule'
+import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import { VoidRepaymentDialog } from '@/app/(portal)/fund-out/[id]/_components/VoidRepaymentDialog'
 import CreateFundOutDialog from '@/app/(portal)/fund-out/_components/CreateFundOutDialog'
 import RecordFundInDialog from '@/app/(portal)/fund-in/_components/RecordFundInDialog'
@@ -28,6 +30,7 @@ import { useHubTabs } from './hub-tabs'
 import { pushIntent, setIntent, useStep } from './nav'
 import { BankHero, ListBlock, RecordItems, Row, SearchRow, StackCards, type ItemLine } from './parts'
 import { DealCancelSheet, FundingSourceSheet, LoanRepaymentSheet, NotesSheet, RepaymentStartSheet, SourceRepaymentSheet } from './FundSheets'
+import { AmendTermsSheet, EditSourceSheet } from './FundTermsSheets'
 
 // Fund › Fund out and Fund › Fund in in the Finance phone app (2026-10-15, the
 // Finance revamp v2's phone — M13–M14): the hub (its top tabs, *Fund out ·
@@ -40,7 +43,9 @@ import { DealCancelSheet, FundingSourceSheet, LoanRepaymentSheet, NotesSheet, Re
 // terms over time and their revert, the repayment settings, a fund source's
 // notes, Record repayment, the steps, the audit log. Every figure is the
 // desktop hub's (`lib/fund-hub`) and the page's (`loadLoanPage`,
-// `loadSourcePage`); every write the page's own Server Action.
+// `loadSourcePage`); every write the page's own Server Action. Since part E4b
+// (2026-10-16) nothing opens the portal: Amend terms and a pending source's
+// Edit are sheets (FundTermsSheets), Print draws the schedule over the app.
 
 export type FundStep = { kind: 'hub' } | { kind: 'list'; card: FundCardKey } | { kind: 'record'; id: string; from: FundCardKey | null }
 
@@ -94,6 +99,9 @@ type Sheet =
   | { kind: 'notes' }
   | { kind: 'void'; id: string; label: string }
   | { kind: 'revert'; from: string }
+  | { kind: 'amend' }
+  | { kind: 'edit' }
+  | { kind: 'print' }
 
 export default function FundApp({
   side,
@@ -104,6 +112,7 @@ export default function FundApp({
   can,
   page: initialPage,
   refused: initialRefused,
+  printedBy,
 }: {
   side: FundSide
   records: FundRecord[]
@@ -117,11 +126,12 @@ export default function FundApp({
   /** The deal the address names, read with the page. */
   page: DealPage | null
   refused: string | null
+  /** Who prints a schedule — its corner says so. */
+  printedBy: string | null
 }) {
   const router = useRouter()
   const out = side === 'out'
   const hub = out ? 'fund-out' : 'fund-in'
-  const base = out ? '/fund-out' : '/fund-in'
   const read = useMemo(() => readFundStep(out ? OUT_CARDS : IN_CARDS), [out])
   const [step, open, back] = useStep(read, search)
   const { topTabs, swipe } = useHubTabs('fund', hub)
@@ -235,7 +245,8 @@ export default function FundApp({
     const status = dealOn?.status ?? r?.status ?? null
     const live = status === 'active' || status === 'matured'
     const recordable = loan ? loan.can.recordRepayment : !!source?.repay
-    const amendable = can.amend && status === 'active'
+    // Amend terms, as the edit page starts it — an active deal, Treasury · Approve.
+    const amendTerms = status === 'active' ? ((loan ?? source)?.amend ?? null) : null
     const mayEdit = loan ? loan.can.edit : !!source?.can.financeEdit
     const pendingCancel = dealOn?.pendingCancel ?? null
 
@@ -261,16 +272,18 @@ export default function FundApp({
     if (r && status === 'pending_approval') {
       for (const st of fundSteps(r, can)) {
         // Open in Approvals is the app's own request screen (part 5), not the portal's page.
-        const href = st.key === 'decide' && r.approval ? `/fin-app/page/approvals?id=${encodeURIComponent(r.approval.id)}` : st.href
-        bar.push(
-          href
-            ? { key: st.key, label: st.label, kind: st.kind === 'secondary' ? undefined : st.kind, href }
-            : { key: st.key, label: st.label, kind: 'danger', onClick: () => setCancelAsk('withdraw') },
-        )
+        if (st.key === 'decide' && r.approval) {
+          bar.push({ key: st.key, label: st.label, kind: 'primary', href: `/fin-app/page/approvals?id=${encodeURIComponent(r.approval.id)}` })
+        } else if (st.key === 'edit') {
+          // A pending fund source's Edit is a sheet (part E4b) — once its page is read.
+          if (source?.edit) bar.push({ key: st.key, label: st.label, onClick: () => setSheet({ kind: 'edit' }) })
+        } else if (st.key === 'withdraw') {
+          bar.push({ key: st.key, label: st.label, kind: 'danger', onClick: () => setCancelAsk('withdraw') })
+        }
       }
     } else if ((loan || source) && live) {
       if (recordable) bar.push({ key: 'repay', label: 'Record repayment', kind: 'primary', onClick: () => setSheet({ kind: 'repay' }) })
-      if (amendable) bar.push({ key: 'amend', label: 'Amend terms', href: `${base}/${step.id}/edit` })
+      if (amendTerms) bar.push({ key: 'amend', label: 'Amend terms', onClick: () => setSheet({ kind: 'amend' }) })
       if (recordMore.length > 0) bar.push({ key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('record') })
     }
 
@@ -333,7 +346,7 @@ export default function FundApp({
       <AppScreen
         screenKey={`${hub}?${searchOfStep(step)}`}
         head={{ kind: 'back', title: r?.party ?? loan?.companyName ?? source?.fromLabel ?? (out ? 'Loan' : 'Fund source'), backLabel: fromTitle, onBack: backTo }}
-        actions={status && status !== 'cancelled' ? [{ key: 'print', label: 'Print', href: `${base}/${step.id}?print=1` }] : []}
+        actions={status && status !== 'cancelled' && (loan || source) ? [{ key: 'print', label: 'Print', onClick: () => setSheet({ kind: 'print' }) }] : []}
         bar={bar}
       >
         {r ? (
@@ -457,6 +470,66 @@ export default function FundApp({
           />
           <NotesSheet key={`nt:${sourceOn.notes ?? ''}`} open={sheet?.kind === 'notes'} onClose={() => setSheet(null)} onDone={done} sourceId={sourceOn.id} current={sourceOn.notes} />
         </>
+      ) : null}
+      {loanOn?.amend ? (
+        <AmendTermsSheet
+          key={`am:${loanOn.id}:${loanOn.amend.ratePct}:${loanOn.amend.months}:${loanOn.amend.start}:${String(loanOn.amend.compound)}:${loanOn.amend.termsFrom ?? ''}`}
+          open={sheet?.kind === 'amend'}
+          onClose={() => setSheet(null)}
+          onDone={done}
+          side="out"
+          id={loanOn.id}
+          party={loanOn.companyName}
+          terms={loanOn.amend}
+          today={today}
+        />
+      ) : null}
+      {sourceOn?.amend ? (
+        <AmendTermsSheet
+          key={`am:${sourceOn.id}:${sourceOn.amend.ratePct}:${sourceOn.amend.months}:${sourceOn.amend.start}:${String(sourceOn.amend.compound)}:${sourceOn.amend.termsFrom ?? ''}`}
+          open={sheet?.kind === 'amend'}
+          onClose={() => setSheet(null)}
+          onDone={done}
+          side="in"
+          id={sourceOn.id}
+          party={sourceOn.fromLabel}
+          terms={sourceOn.amend}
+          today={today}
+        />
+      ) : null}
+      {sourceOn?.edit ? (
+        <EditSourceSheet
+          key={`ed:${sourceOn.id}:${Object.values(sourceOn.edit).join('|')}`}
+          open={sheet?.kind === 'edit'}
+          onClose={() => setSheet(null)}
+          onDone={done}
+          id={sourceOn.id}
+          party={sourceOn.fromLabel}
+          kind={sourceOn.typeLabel}
+          fields={sourceOn.edit}
+          today={today}
+        />
+      ) : null}
+      {loanOn ? (
+        <PrintSchedule
+          open={sheet?.kind === 'print'}
+          onClose={() => setSheet(null)}
+          kicker="FUND OUT · LOAN"
+          name={loanOn.companyName}
+          plan={loanOn.plan}
+          printed={printedLine(today, printedBy)}
+          meta={scheduleMeta({ label: 'Borrower', value: loanOn.borrower }, loanOn.principal, `${pct(loanOn.rate.effective)} /mo`, loanOn.plan)}
+        />
+      ) : sourceOn ? (
+        <PrintSchedule
+          open={sheet?.kind === 'print'}
+          onClose={() => setSheet(null)}
+          kicker={`FUND IN · ${sourceOn.typeLabel.toUpperCase()}`}
+          name={sourceOn.fromLabel}
+          plan={sourceOn.plan}
+          printed={printedLine(today, printedBy)}
+          meta={scheduleMeta({ label: 'Source', value: sourceOn.fromWithCode }, sourceOn.amount, sourceOn.rate, sourceOn.plan)}
+        />
       ) : null}
       {(loanOn || sourceOn) && sheet?.kind === 'revert' ? (
         <RevertTermsDialog

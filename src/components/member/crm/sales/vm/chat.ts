@@ -19,7 +19,7 @@ import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, INLINE_TIME, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
@@ -31,6 +31,7 @@ import { CHAT_WALL } from "../wall";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
 /** Own bubbles (rev 1010 §1.2; was #FFF0E4). */
+/** The desk menu's copy of a message stays the light peach it always was (it sits on the page, not in the chat). */
 const MINE = "#FCD6B8";
 const parts = (text: string) => String(text).split(/(\*[^*\n]+\*)/).filter(Boolean).map(t => (/^\*[^*]+\*$/.test(t) ? { t: t.slice(1, -1), w: 650 } : { t, w: "inherit" as const }));
 const plain = (text: string) => text.replace(/\*([^*\n]+)\*/g, "$1");
@@ -161,8 +162,8 @@ export function chatVM(ctx: SalesCtx) {
     return {
       // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
       sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
-      radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE : "#fff", borderStyle: "solid", border: mine ? MINE : "#fff",
-      textAlign: "left" as const, fg: INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
+      radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE_BG : "#fff", borderStyle: "solid", border: mine ? MINE_BG : "#fff",
+      textAlign: "left" as const, fg: mine ? "#fff" : INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
         kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
         time: timeLabel(cd), room: card.room, addr: card.addr,
@@ -174,15 +175,15 @@ export function chatVM(ctx: SalesCtx) {
       ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px", ...(md?.kind === "audio" ? { inPad: "0 2px" } : {}) } : {}), ...(!md && !card && m.text ? INLINE_TIME : {}),
       pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(14), textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
-      timeJustify: "flex-end", timeColor: mine ? "#806B60" : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
+      timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
-      tick: mine, tickColor: read ? "#2F8FD8" : m.status === "failed" ? "#A3371A" : "#A8968B", tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
+      tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks).
       tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.
-      press: { "data-msg": key, ...pressToOpen(() => {
+      press: { "data-msg": key, ...(mine ? { "data-mine": "1" } : {}), ...pressToOpen(() => {
         const pinnedNow = prefs?.pinnedMessageId === key;
         openMsgMenu({
           mine, preview: m.text ? plain(m.text) : m.media ? mediaWord(m) : "", reaction: m.myReaction ?? "", react: e => void act.react(key, e),

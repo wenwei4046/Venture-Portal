@@ -35,6 +35,7 @@ export default async function FinAppStatements({ searchParams }: { searchParams:
       hub={statementHubModel(statements, companies, month)}
       search={searchOf(sp)}
       canGenerate={canDo(user, 'treasury', 'create')}
+      canExport={canDo(user, 'treasury', 'export')}
       record={read && read.ok ? read.record : null}
       refused={read && !read.ok ? read.reason : null}
     />

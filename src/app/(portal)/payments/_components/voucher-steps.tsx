@@ -12,6 +12,7 @@ import {
   uploadVoucherAttachment,
   voidPaidReceipt,
   voidVoucher,
+  voidVoucherStepInWords,
 } from '../actions'
 import type { VoucherDetail } from '../_lib/voucher-detail'
 import d from '@/components/finv/drawer.module.css'
@@ -42,11 +43,17 @@ export function useVoucherSteps(
     onDone,
     onFilesChanged,
     extraMore = [],
+    inWords = false,
   }: {
     onDone: () => void
     onFilesChanged: () => void
     /** More rows for the ⋯ menu — the phone app's record screen carries the full page's Copy, Change date, Change GL account there. */
     extraMore?: DialogMenuItem[]
+    /**
+     * The Finance phone app (2026-10-16): Void, Void receipt and Reverse payment answered in words — their
+     * actions end on the portal's Payments, which the app does not open.
+     */
+    inWords?: boolean
   },
 ): {
   steps: VoucherStep[]
@@ -80,6 +87,23 @@ export function useVoucherSteps(
         setConfirm(null)
         setError(e instanceof Error ? e.message : 'That did not go through.')
       }
+    })
+  }
+
+  const runInWords = (kind: 'void' | 'void_receipt' | 'reverse', done: string) => {
+    if (!v) return
+    setError(null)
+    const form = new FormData()
+    form.set('id', v.id)
+    startBusy(async () => {
+      const res = await voidVoucherStepInWords(kind, form).catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : 'That did not go through.' }))
+      setConfirm(null)
+      if (!res.ok) {
+        setError(res.reason)
+        return
+      }
+      flash(done)
+      onDone()
     })
   }
 
@@ -156,7 +180,7 @@ export function useVoucherSteps(
           danger
           busy={busy}
           onCancel={() => setConfirm(null)}
-          onConfirm={() => run(voidVoucher, `${title} voided`)}
+          onConfirm={() => (inWords ? runInWords('void', `${title} voided`) : run(voidVoucher, `${title} voided`))}
         />
       </FinDialog>
       <FinDialog open={confirm === 'reverse'} onClose={() => setConfirm(null)} title={v.credit ? 'Void this receipt?' : 'Reverse this payment?'} locked={busy}>
@@ -170,7 +194,11 @@ export function useVoucherSteps(
           danger
           busy={busy}
           onCancel={() => setConfirm(null)}
-          onConfirm={() => run(v.credit ? voidPaidReceipt : reversePaidPayment, v.credit ? `${title} voided` : 'Payment reversed')}
+          onConfirm={() =>
+            inWords
+              ? runInWords(v.credit ? 'void_receipt' : 'reverse', v.credit ? `${title} voided` : 'Payment reversed')
+              : run(v.credit ? voidPaidReceipt : reversePaidPayment, v.credit ? `${title} voided` : 'Payment reversed')
+          }
         />
       </FinDialog>
       <FinDialog open={confirm === 'approve'} onClose={() => setConfirm(null)} title={`Approve ${title}?`} locked={busy}>

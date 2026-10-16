@@ -128,6 +128,8 @@ export interface HubContract {
   end: string | null
   /** "HOUZS Century (HC)". */
   company: string
+  /** The company it is with — its Edit starts from it. */
+  companyId: string
   /** Its invoice this month (the Generate Marketing invoices draft). */
   invoice: { id: string; no: string | null } | null
 }

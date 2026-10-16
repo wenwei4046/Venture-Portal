@@ -315,10 +315,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       // Team | Mine (rev 1010 §7.3): the Director to the Control panel.
       // Viewing somebody who leads: their Team, as they see it (user 2026-10-11).
-      // On Team's first page, Insight: the button is on Mine's first page alone and goes first page ⇄ first page (2026-10-14,
-      // the owner: the three round buttons only on the first page — it kept the page while it was on every page).
-      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi(initialPanelUi()); } : undefined)
-        : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: "overview", lead: null })); } : undefined,
+      // On Team's Inbox, where Team keeps its three round buttons since 2026-10-16 (the owner: "換到 Inbox 那頁") — Inbox ⇄
+      // Inbox; until then first page ⇄ first page, Team's Insight (2026-10-14).
+      toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi({ ...initialPanelUi(), tab: "inbox" }); } : undefined)
+        : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: "inbox", lead: null })); } : undefined,
       switchList,
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,

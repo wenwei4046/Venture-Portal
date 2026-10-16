@@ -274,6 +274,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
         start: c.start_date,
         end: c.end_date,
         company: co ? (co.code ? `${co.name} (${co.code})` : co.name) : '—',
+        companyId: c.company_id!,
         invoice: invoiceByContract.get(c.id) ?? null,
       }
     })

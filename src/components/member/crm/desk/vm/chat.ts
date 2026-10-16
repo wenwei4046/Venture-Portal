@@ -13,7 +13,7 @@ import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
 import type { DeskCtx } from "./ctx";
-import { albumsOf, galleryOf, mediaOf, mediaWord, NO_MEDIA } from "../../shared/chat-media";
+import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, tickColor } from "../../shared/chat-media";
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, autoChoices, DOC_ACCEPT } from "../../shared/attach-sheet";
@@ -35,6 +35,8 @@ export type Msg = typeof NO_MEDIA & {
   enter: () => void; leave: () => void; hover: boolean; menuToggle: (e?: Ev) => void; menuOpen: boolean; menuClose: () => void;
   reactBar: { e: string; bg: string; pick: () => void }[]; acts: { label: string; d: string; run: () => void; fg: string }[];
   tick: string; hasTick: boolean; failed: boolean; quote: { who: string; text: string } | null; quoteMargin: string; appt: ApptCard | null;
+  /** Your own bubble's colours — absent in the prototype harness, which keeps the design's peach. */
+  outBg?: string; outFg?: string; outTime?: string;
 };
 const NOOP = () => {};
 
@@ -100,7 +102,9 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       leave: () => { clearTimeout(hoverOut); hoverOut = setTimeout(() => set(u => (u.msgHov === m.id ? { ...u, msgHov: null } : u)), HOVER_GRACE_MS); },
       hover: ui.msgHov === m.id || ui.msgMenu === m.id, menuToggle: () => menu(ui.msgMenu !== m.id), menuOpen: ui.msgMenu === m.id, menuClose: () => menu(false),
       reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "#F5EBE3" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
-      acts, tick: m.status === "read" ? "#3B8FD9" : "#A8968B", hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed",
+      // Your own bubble: the brand's orange, white words, white time and ticks (the owner, 2026-10-16 — the phone's, chat-media.ts).
+      outBg: MINE_BG, outFg: "#fff", outTime: MINE_TIME,
+      acts, tick: tickColor(m.status), hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed",
       quote: q ? { who: q.from === "me" ? "You" : c.name, text: q.text || mediaWord(q) } : null, quoteMargin: media.pad === NO_MEDIA.pad ? "0 0 6px" : "0 0 4px", appt,
     };
   });

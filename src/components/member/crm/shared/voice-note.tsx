@@ -50,7 +50,8 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
     setAt(a.currentTime);
   };
   const done = dur ? at / dur : 0;
-  const ink = mine ? "#8A5A3C" : "#6B7B8C", dim = mine ? "rgba(138,90,60,.35)" : "rgba(107,123,140,.35)";
+  // On your own bubble — the brand's orange since 2026-10-15 (shared/chat-media.ts › MINE_BG) — the controls are white.
+  const ink = mine ? "#fff" : "#6B7B8C", dim = mine ? "rgba(255,255,255,.42)" : "rgba(107,123,140,.35)";
 
   return (
     // WhatsApp's layout (the owner, 2026-10-15, WhatsApp's voice bubble beside ours: "人 icon 至中（較大），語音 bar 也至中"):
@@ -77,11 +78,11 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
       </span>
       {started
         ? <button type="button" onClick={faster} aria-label={`Speed ${speedLabel(speed)}`} title="Playback speed"
-            style={{ flex: "none", width: "52px", height: "30px", borderRadius: "15px", border: 0, background: mine ? "#8A5A3C" : "#6B7B8C", color: "#fff", fontSize: typePx(12), fontWeight: 700, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
+            style={{ flex: "none", width: "52px", height: "30px", borderRadius: "15px", border: 0, background: mine ? "rgba(255,255,255,.24)" : "#6B7B8C", color: "#fff", fontSize: typePx(12), fontWeight: 700, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
         : <span style={{ position: "relative", flex: "none", width: "52px", height: "52px", borderRadius: "26px", background: mine ? "#F3B9A0" : "#D9E2EA", display: "grid", placeItems: "center", color: mine ? "#B2452A" : "#4E6478" }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0v1H5v-1Z" /></svg>
             <span style={{ position: "absolute", left: "-5px", bottom: "-1px", color: ink, display: "grid" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="#fff" strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke={mine ? "#BD4A19" : "#fff"} strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </span>
           </span>}
     </span>

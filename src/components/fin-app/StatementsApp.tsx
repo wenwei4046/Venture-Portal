@@ -42,6 +42,7 @@ export default function StatementsApp({
   hub,
   search,
   canGenerate,
+  canExport = false,
   record: initialRecord,
   refused: initialRefused,
 }: {
@@ -52,6 +53,8 @@ export default function StatementsApp({
   search: string
   /** Treasury's Create on the page's boxes: Generate statements. */
   canGenerate: boolean
+  /** Treasury · Export: the month's files (2026-10-16 — the route asks it). */
+  canExport?: boolean
   record: StatementRecordModel | null
   refused: string | null
 }) {
@@ -117,13 +120,15 @@ export default function StatementsApp({
     if (f.pdf) window.open(f.href, '_blank', 'noopener,noreferrer')
     else window.location.assign(f.href)
   }
+  const fileButtons: BarButton[] = [
+    { key: 'pdf', label: 'Export PDF', onClick: () => fetchFile(files[0]) },
+    { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu(true) },
+  ]
   const hubBar: BarButton[] = canGenerate
-    ? [
-        { key: 'generate', label: 'Generate statements', kind: 'primary', onClick: () => setGenerating(true) },
-        { key: 'pdf', label: 'Export PDF', onClick: () => fetchFile(files[0]) },
-        { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu(true) },
-      ]
-    : files.map((f, i) => ({ key: f.key, label: f.label, kind: i === 0 ? ('primary' as const) : undefined, onClick: () => fetchFile(f) }))
+    ? [{ key: 'generate', label: 'Generate statements', kind: 'primary', onClick: () => setGenerating(true) }, ...(canExport ? fileButtons : [])]
+    : canExport
+      ? files.map((f, i) => ({ key: f.key, label: f.label, kind: i === 0 ? ('primary' as const) : undefined, onClick: () => fetchFile(f) }))
+      : []
 
   const r = step.kind === 'record' && record?.id === step.id ? record : null
   // Issue and Mark as paid go one way — an issued statement locks (Generate statements skips it) and nothing

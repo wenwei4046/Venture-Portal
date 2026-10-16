@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { createContract, updateContract } from '../actions'
+import { contractEditForm, contractFieldsOf, type ContractFields } from '@/lib/contract-edit'
 
 interface Company {
   id: string
@@ -46,7 +47,15 @@ export default function ContractForm({ companies, contract, returnPath }: Props)
     startTransition(async () => {
       try {
         if (contract) {
-          await updateContract(formData)
+          // Only what is changed from what the form opened with is sent (lib/contract-edit, 2026-10-16).
+          const was: ContractFields = {
+            companyId: contract.company_id,
+            description: contract.description,
+            amount: contract.amount == null ? '' : String(contract.amount),
+            startDate: contract.start_date,
+            endDate: contract.end_date,
+          }
+          await updateContract(contractEditForm(contract.id, was, contractFieldsOf(formData)))
         } else {
           await createContract(formData)
         }

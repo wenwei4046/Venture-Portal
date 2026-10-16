@@ -20,6 +20,8 @@ export interface ReadyRow {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+/** "1 person who clocks has", "3 people who clock have". */
+const clockHave = (n: number) => (n === 1 ? 'clocks has' : 'clock have')
 /** "Hafiz Rahim · Jason Tan · Ahmad Faizal" — at most four names, then "+N". */
 const names = (people: readonly AttPerson[]) => {
   const shown = people.slice(0, 4).map(p => p.name).join(' · ')
@@ -39,7 +41,7 @@ export function readinessRows(config: AttConfig, ledger: AttLedger | null, today
   // 1. People who clock with no login of their own.
   const noLogin = clocking.filter(p => !p.hasLogin)
   if (noLogin.length) {
-    rows.push({ key: 'login', tone: 'danger', title: `${plural(noLogin.length, 'person', 'people')} who clock have no login`, sub: `${names(noLogin)} — invite them in People`, fix: { label: 'Invite', href: '/team/people' } })
+    rows.push({ key: 'login', tone: 'danger', title: `${plural(noLogin.length, 'person', 'people')} who ${clockHave(noLogin.length)} no login`, sub: `${names(noLogin)} — invite them in People`, fix: { label: 'Invite', href: '/team/people' } })
   }
 
   // 2. Uplines (of people who clock) with no personal login: their reports' requests fall back to HR.
@@ -62,6 +64,13 @@ export function readinessRows(config: AttConfig, ledger: AttLedger | null, today
   const noSchedule = clocking.filter(p => !assignmentFor(p, today, config.assignments)?.scheduleId)
   if (noSchedule.length) {
     rows.push({ key: 'schedule', tone: 'warning', title: `${plural(noSchedule.length, 'person', 'people')} with no schedule`, sub: names(noSchedule), fix: { label: 'Assign', href: '/attendance/settings' } })
+  }
+
+  // 3b. People who clock with no hire date: their years of service count as none, so service steps never reach them
+  // (2026-10-15 — the user, told the 36 without one are the Revenue team and the directors: "Readiness 提醒，到时再补").
+  const noHire = clocking.filter(p => !p.hireDate)
+  if (noHire.length) {
+    rows.push({ key: 'hire', tone: 'warning', title: `${plural(noHire.length, 'person', 'people')} who ${clockHave(noHire.length)} no hire date`, sub: `${names(noHire)} — add it in People`, fix: { label: 'Fix', href: '/team/people' } })
   }
 
   // 4. Opening balances missing (annual leave, this year) for people who clock.

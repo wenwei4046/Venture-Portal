@@ -124,6 +124,8 @@ export interface AttPolicy {
   otFlagH: number
   otBase: 'basic' | 'fixed'
   photoKeepDays: number
+  /** Who clocks › OT "by wage": monthly wages (basic + fixed allowance) above this are not paid overtime (2026-10-15). */
+  otWageCap: number
 }
 
 export interface AttRoute {

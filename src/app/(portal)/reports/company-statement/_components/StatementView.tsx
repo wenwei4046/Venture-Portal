@@ -238,9 +238,12 @@ function DetailTable({ items }: { items: PositionRow[] }) {
 export default function StatementView({
   rows,
   totals,
+  canExport = false,
 }: {
   rows: CounterpartyRow[]
   totals: StatementTotals
+  /** Reports · Export (2026-10-16): the ticks pick counterparties to export, so they are for whoever may. */
+  canExport?: boolean
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [q, setQ] = useState('')
@@ -316,7 +319,7 @@ export default function StatementView({
             {shown.length} / {rows.length} shown
           </span>
         ) : null}
-        {sel.size > 0 ? (
+        {canExport && sel.size > 0 ? (
           <span className="flex items-center gap-2 text-xs font-sans text-graphite border border-accent/40 bg-surface rounded-md px-3 py-1.5">
             {sel.size} selected · Export:
             <a
@@ -397,22 +400,24 @@ export default function StatementView({
                   className="border-b border-hairline cursor-pointer hover:bg-surface-2/40 transition-colors"
                 >
                   <td className="py-2 px-3">
-                    <span className="mr-2" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={sel.has(g.counterparty)}
-                        onChange={() =>
-                          setSel(prev => {
-                            const next = new Set(prev)
-                            if (next.has(g.counterparty)) next.delete(g.counterparty)
-                            else next.add(g.counterparty)
-                            return next
-                          })
-                        }
-                        title="Tick to export only selected counterparties"
-                        className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
-                      />
-                    </span>
+                    {canExport ? (
+                      <span className="mr-2" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={sel.has(g.counterparty)}
+                          onChange={() =>
+                            setSel(prev => {
+                              const next = new Set(prev)
+                              if (next.has(g.counterparty)) next.delete(g.counterparty)
+                              else next.add(g.counterparty)
+                              return next
+                            })
+                          }
+                          title="Tick to export only selected counterparties"
+                          className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
+                        />
+                      </span>
+                    ) : null}
                     <span className="font-mono text-[10px] text-muted mr-2">
                       {isOpen ? '▾' : '▸'}
                     </span>

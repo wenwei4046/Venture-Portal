@@ -31,6 +31,7 @@ import {
   type BilledRow,
 } from '@/lib/payroll-billing-delta'
 import { canDo } from '@/lib/permission-actions'
+import type { User } from '@/types'
 
 // Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
 // dept's expense JE debits what the charge actually was — rent share → 9094,
@@ -642,6 +643,11 @@ export async function generateMonthlyInvoices(
 
 export async function createContract(formData: FormData) {
   const user = await requireAnyActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], ['billing', 'create'], ['my_billing', 'create', 'dept'])
+  await createContractWork(user, formData)
+  redirect((formData.get('return_path') as string) || '/billing')
+}
+
+async function createContractWork(user: User, formData: FormData) {
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -649,7 +655,6 @@ export async function createContract(formData: FormData) {
   const amount = parseFloat((formData.get('amount') as string) ?? '0')
   const startDate = (formData.get('start_date') as string) || null
   const endDate = (formData.get('end_date') as string) || null
-  const returnPath = (formData.get('return_path') as string) || '/billing'
 
   if (!companyId) throw new Error('Company is required')
   if (!description.trim()) throw new Error('Description is required')
@@ -712,36 +717,47 @@ export async function createContract(formData: FormData) {
   revalidatePath('/billing')
   revalidatePath('/dept-pool')
   revalidatePath('/approvals')
-  redirect(returnPath)
 }
 
 // ─── Update marketing project contract (Finance) ────────────────────────────
 
 export async function updateContract(formData: FormData) {
   await requireActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], 'billing', 'edit')
+  await updateContractWork(formData)
+  redirect('/billing')
+}
+
+// Only the fields sent are written (lib/contract-edit — the forms send what was
+// edited, 2026-10-16: the shared logins open one contract on two screens).
+async function updateContractWork(formData: FormData) {
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
-  const companyId = (formData.get('company_id') as string) ?? ''
-  const description = (formData.get('description') as string) ?? ''
-  const amount = parseFloat((formData.get('amount') as string) ?? '0')
-  const startDate = (formData.get('start_date') as string) || null
-  const endDate = (formData.get('end_date') as string) || null
-
   if (!id) throw new Error('Contract id is required')
-  if (!companyId) throw new Error('Company is required')
-  if (!description.trim()) throw new Error('Description is required')
-  if (isNaN(amount) || amount <= 0) throw new Error('Amount must be > 0')
+
+  const patch: { company_id?: string; description?: string; amount?: number; start_date?: string | null; end_date?: string | null } = {}
+  if (formData.has('company_id')) {
+    const companyId = (formData.get('company_id') as string) ?? ''
+    if (!companyId) throw new Error('Company is required')
+    patch.company_id = companyId
+  }
+  if (formData.has('description')) {
+    const description = (formData.get('description') as string) ?? ''
+    if (!description.trim()) throw new Error('Description is required')
+    patch.description = description
+  }
+  if (formData.has('amount')) {
+    const amount = parseFloat((formData.get('amount') as string) ?? '0')
+    if (isNaN(amount) || amount <= 0) throw new Error('Amount must be > 0')
+    patch.amount = amount
+  }
+  if (formData.has('start_date')) patch.start_date = (formData.get('start_date') as string) || null
+  if (formData.has('end_date')) patch.end_date = (formData.get('end_date') as string) || null
+  if (Object.keys(patch).length === 0) return
 
   const { error } = await supabase
     .from('service_contracts')
-    .update({
-      company_id: companyId,
-      description,
-      amount,
-      start_date: startDate,
-      end_date: endDate,
-    })
+    .update(patch)
     .eq('id', id)
     .eq('billing_mode', 'marketing_project')
 
@@ -750,7 +766,31 @@ export async function updateContract(formData: FormData) {
   }
 
   revalidatePath('/billing')
-  redirect('/billing')
+}
+
+/**
+ * A marketing contract's New and Edit answered in words (2026-10-16, the
+ * Finance phone app's sheet): the same gates and work as `createContract` /
+ * `updateContract`, without the redirect to the portal's Billing.
+ */
+export async function createContractInWords(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const user = await requireAnyActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], ['billing', 'create'], ['my_billing', 'create', 'dept'])
+  try {
+    await createContractWork(user, formData)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The contract could not be saved.' }
+  }
+}
+
+export async function updateContractInWords(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], 'billing', 'edit')
+  try {
+    await updateContractWork(formData)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The contract could not be saved.' }
+  }
 }
 
 // ─── Credit Notes (Finance creates, Principal approves) ─────────────────────

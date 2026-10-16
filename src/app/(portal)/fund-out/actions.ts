@@ -17,6 +17,7 @@ import {
 } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
+import { compoundSent } from '@/lib/fund-amend'
 import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -684,18 +685,26 @@ export async function amendRepaymentDate(
 // the approval queue are a separate follow-up.
 export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-out', 'treasury', 'approve')
+  const refused = await amendLoanWork(formData)
+  if (refused) return refused
+  redirect(`/fund-out/${formData.get('loan_id') as string}`)
+}
+
+async function amendLoanWork(formData: FormData): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
   if (!loanId) return { error: 'Loan id is required' }
 
+  // Only what the form sends is changed (lib/fund-amend — the forms send what was edited, 2026-10-16).
   const ratePctRaw = (formData.get('effective_rate_percent') as string) ?? ''
   const tenureRaw = (formData.get('tenure_months') as string) ?? ''
   const disbursementDate = (formData.get('disbursement_date') as string) || null
   const repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
-  const compound = formData.get('compound_interest') === 'on'
+  const compound = compoundSent(formData)
 
-  const payload: Record<string, Json> = { compound_interest: compound }
+  const payload: Record<string, Json> = {}
+  if (compound !== null) payload.compound_interest = compound
 
   if (ratePctRaw.trim() !== '') {
     const ratePct = parseFloat(ratePctRaw)
@@ -717,7 +726,7 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
   revalidatePath('/fund-out')
   revalidatePath('/repayment-schedule')
   revalidatePath('/dashboard')
-  redirect(`/fund-out/${loanId}`)
+  return undefined
 }
 
 // ─── 「从某月起生效」 (user 2026-09-21) ────────────────────────────────────────
@@ -725,6 +734,12 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
 // their old terms (treasury_terms_history + lib/treasury-terms).
 export async function amendLoanFrom(formData: FormData): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-out', 'treasury', 'approve')
+  const refused = await amendLoanFromWork(formData)
+  if (refused) return refused
+  redirect(`/fund-out/${formData.get('loan_id') as string}`)
+}
+
+async function amendLoanFromWork(formData: FormData): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -746,7 +761,6 @@ export async function amendLoanFrom(formData: FormData): Promise<{ error: string
     if (isNaN(n) || n < 1 || n > 120) return { error: '剩余期数必须在 1–120,或留空保持原到期月' }
     remaining = n
   }
-  const compound = formData.get('compound_interest') === 'on'
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
 
@@ -755,7 +769,8 @@ export async function amendLoanFrom(formData: FormData): Promise<{ error: string
     p_effective_from: `${fromYM}-01`,
     p_effective_rate: rate,
     p_remaining_months: noFixedTerm ? null : remaining,
-    p_compound_interest: compound,
+    // Not sent = as it is (the RPC keeps a null).
+    p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
   })
@@ -767,7 +782,22 @@ export async function amendLoanFrom(formData: FormData): Promise<{ error: string
   revalidatePath('/reports/company-statement')
   revalidatePath('/reports/loan-aging')
   revalidatePath('/dashboard')
-  redirect(`/fund-out/${loanId}`)
+  return undefined
+}
+
+/**
+ * Amend terms answered in words (2026-10-16, the Finance phone app's deal):
+ * the same gate and work as `amendLoan` / `amendLoanFrom`, without the
+ * redirect to the portal's page — the app stays on its own screen.
+ */
+export async function amendLoanInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await requireActionOn('/fund-out', 'treasury', 'approve')
+  try {
+    const refused = mode === 'from' ? await amendLoanFromWork(formData) : await amendLoanWork(formData)
+    return refused ? { ok: false, reason: refused.error } : { ok: true }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The terms could not be changed.' }
+  }
 }
 
 // ─── 资金来源 (Finance self-service, mig 20260722000000) ─────────────────────

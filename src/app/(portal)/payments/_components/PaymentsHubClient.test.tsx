@@ -105,6 +105,7 @@ const draw = (over: Partial<Parameters<typeof PaymentsHubClient>[0]> = {}) =>
       ledger={LEDGER}
       canCreate
       canSetDefault={false}
+      canExport
       dept={[{ key: 'd1', label: 'Marketing · FB ads top-up', sub: 'RM 25,000.00 · requested 05 Oct' }]}
       payroll={[]}
       claims={[]}
@@ -129,13 +130,15 @@ describe('the head', () => {
     expect(screen.getByRole('button', { name: 'Dept · 1' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Payroll' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Claims' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export ▾' })).toBeInTheDocument()
   })
 
-  it('has no Payroll menu without Payroll payouts, no Create payment without Create', async () => {
-    draw({ payroll: null, canCreate: false })
+  it('has no Payroll menu without Payroll payouts, no Create payment without Create, no Export without Export', async () => {
+    draw({ payroll: null, canCreate: false, canExport: false })
     await act(async () => undefined)
     expect(screen.queryByRole('button', { name: /^Payroll( · \d+)?$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Create payment' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Export ▾' })).toBeNull()
   })
 
   it('Create payment opens the dialog at once, on the page', async () => {

@@ -27,6 +27,8 @@ export default function PrintSchedule({
   autoOpen = false,
   triggerClassName = 'btn-quiet-sheet',
   triggerLabel = 'Print schedule',
+  open: shown,
+  onClose,
 }: {
   /** e.g. FUND IN · SUBSIDIARY */
   kicker: string
@@ -40,8 +42,14 @@ export default function PrintSchedule({
   /** The button that opens it — a full page's head draws its own (2026-10-15, D06: *Print* in Newsreader italic). */
   triggerClassName?: string
   triggerLabel?: string
+  /** Opened from outside — the Finance phone app's *Print* (2026-10-16): no button of its own. */
+  open?: boolean
+  onClose?: () => void
 }) {
-  const [open, setOpen] = useState(autoOpen)
+  const [own, setOwn] = useState(autoOpen)
+  const controlled = shown !== undefined
+  const open = controlled ? shown : own
+  const close = () => (controlled ? onClose?.() : setOwn(false))
 
   // While it is open the page prints the sheet alone.
   useEffect(() => {
@@ -55,9 +63,11 @@ export default function PrintSchedule({
 
   return (
     <>
-      <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
-        {triggerLabel}
-      </button>
+      {controlled ? null : (
+        <button type="button" className={triggerClassName} onClick={() => setOwn(true)}>
+          {triggerLabel}
+        </button>
+      )}
       {open && typeof document !== 'undefined'
         ? createPortal(
             <div className="sched-print" role="dialog" aria-modal="true" aria-label={title}>
@@ -65,7 +75,7 @@ export default function PrintSchedule({
                 <button type="button" className="btn-pri-sheet" onClick={() => window.print()}>
                   Print
                 </button>
-                <button type="button" className="btn-quiet-sheet" onClick={() => setOpen(false)}>
+                <button type="button" className="btn-quiet-sheet" onClick={close}>
                   Close
                 </button>
               </div>
@@ -87,6 +97,7 @@ export default function PrintSchedule({
                     </div>
                   ))}
                 </dl>
+                <div className="sched-print-scroll">
                 <table className="sched-print-table">
                   <thead>
                     <tr>
@@ -127,6 +138,7 @@ export default function PrintSchedule({
                     </tr>
                   </tfoot>
                 </table>
+                </div>
                 <div className="fund-print-sign">
                   <div>Prepared by · Finance</div>
                   <div>Approved by · Principal</div>
