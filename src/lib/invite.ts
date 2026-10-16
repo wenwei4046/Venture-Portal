@@ -142,8 +142,9 @@ export function welcomeLink(host: string | null | undefined, tokenHash: string):
 
 /**
  * Why Supabase did not email it, said so HR knows what to do with the link
- * instead. Its own sender (no SMTP of ours) writes only to members of the
- * Supabase organisation, and two an hour.
+ * instead. Its own sender writes only to members of the Supabase organisation,
+ * and two an hour; once our SMTP is set (`scripts/push-auth-email.mjs`) it
+ * sends from hello@houzsventure.com, which can still be over its hour, or fail.
  */
 export function emailRefusal(code: string | null | undefined): string {
   if (code === 'email_address_not_authorized') return 'Supabase can only email the team’s own addresses until an email service is connected.'

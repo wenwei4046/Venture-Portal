@@ -1463,6 +1463,12 @@ The sign-in page's screen (`MemberLoginScreen`'s `panel`), its right column swap
 - **Words** — *Your password needs at least 6 characters.* · *The two passwords are not the same.* (both before anything is sent) · *This invite link has expired or was already used. Ask HR to send you a new one.* · *Your password was not saved. Try again.* · *Your account is not active. Please contact HR.*
 - Activated, they land where a sign-in lands (`/`, which sends each to their app).
 
+### The invite email (v4.75, 2026-10-16 — `supabase/templates/invite.html`)
+
+What the link arrives in, from **HOUZS Venture <hello@houzsventure.com>** with the subject *Your HOUZS Venture account* (`scripts/push-auth-email.mjs` puts all three into Supabase). It wears the sign-in page's look, in inline styles and hex — a mail app reads no stylesheet and no `var()`, so the values are the tokens' own (paper `#F2EFEA`, surface `#FCFAF7`, hairline `#D3CBC0`, ink `#2B1F17`, graphite `#5A4E44`, the walnut button `#5A3E2B` under `#FCFAF7`).
+- **Top to bottom** — on paper: the H icon (40px, `public/icons/icon-192.png`; a PNG, since mail apps show no SVG) beside **HOUZS VENTURE** (bold, spaced capitals). On a white card (radius 16, hairline): **Welcome to HOUZS Venture.** (Newsreader, falling back to Georgia as the sign-in's title does) · *Hi {name},* (*Hello,* without one) · *You have been invited to the HOUZS Venture portal. Choose your password to activate your account.* · **Set your password** (walnut, radius 12) · *The link works once and expires in 24 hours. If it has expired, ask HR to send you a new one.* · over a rule, *If the button does not open, copy this link into your browser:* and the link. Under the card: *HOUZS Venture Holding Sdn Bhd · hello@houzsventure.com*. The inbox's preview line: *Choose your password to activate your HOUZS Venture account.*
+- **The round icon beside the sender in Gmail is not the email's** — it is hello@houzsventure.com's own Google profile photo (`public/icons/maskable-512.png`: full-bleed, so the circle keeps the H).
+
 ### My documents (v4.5, 2026-10-14 — Admin › My documents, the HR app's More, the Revenue app's Profile › Documentation)
 
 One's own documents — **Company** (what HR shares with their department) and **Personal** (what HR shares with them of their own Data center folder, and their letters) — for a login of one's own only, never while viewing as (as Change password).
@@ -1602,6 +1608,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.75** · 2026-10-16 · The invite email: from HOUZS Venture <hello@houzsventure.com>, the H icon and *HOUZS VENTURE* over a white card — *Welcome to HOUZS Venture.*, *Hi {name},*, the walnut *Set your password*, the link written out — the company at the foot → The invite email
 - **v4.74** · 2026-10-16 · The Revenue app's Profile: Privacy, Account and Sign out are one section, *Settings* — *Notifications* first (a switch that asks the phone when turned on; the Principal's own app too), then *Hide income amounts*, *Change password*, *Request to change email*, *Sign out* → The Revenue app — built to the prototype › Profile's Settings
 - **v4.73** · 2026-10-16 · The portal on a phone: *Phone notifications* above *Sign out* in More (a switch; *Add to Home Screen* / *Blocked* as chips; *Make them pop up* on Android) and the first open's *Turn on notifications?* — the Principal's own view had no way to turn them on, so an iPhone was never asked → Responsive › Navigation
 - **v4.72** · 2026-10-16 · Finance's phone app: Receive's bar follows Payment's — *Receipt* · *Repayment*, not *Create receipt* · *Loan repayment* (two words left *Loan repayment* 6px each side on a 384px phone); the sheets they open and the desktop's buttons unchanged → Finance's view — the phone app

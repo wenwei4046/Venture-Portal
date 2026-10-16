@@ -57,12 +57,13 @@ interface Invitee {
  *
  * The credential comes one of two ways (2026-10-16, the user's two choices):
  * a password HR sets (`createUser`, confirmed at once), or an invite link —
- * Supabase emails it (`inviteUserByEmail`) and they choose their password on
- * /welcome. Supabase's own sender writes only to the Supabase organisation's
- * members, two an hour, so when it refuses, the same login is made with
- * `generateLink` instead, which sends nothing, and HR is handed the link to
- * pass on (WhatsApp). Either way the person is attached now and can sign in
- * once they have chosen a password.
+ * Supabase emails it (`inviteUserByEmail`; its sender, subject and body are
+ * `scripts/push-auth-email.mjs`'s) and they choose their password on /welcome.
+ * When Supabase does not send it — its own sender writes only to the Supabase
+ * organisation's members, two an hour, and ours can be over its hour or fail —
+ * the same login is made with `generateLink` instead, which sends nothing, and
+ * HR is handed the link to pass on (WhatsApp). Either way the person is
+ * attached now and can sign in once they have chosen a password.
  *
  * If a later step fails the auth user is deleted again rather than left
  * orphaned: that takes the portal user with it (cascade) and unlinks the
