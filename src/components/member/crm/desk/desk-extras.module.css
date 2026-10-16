@@ -10,3 +10,10 @@
 @container (min-width: 1500px) { .ppSide { display: block !important; } }
 /* The chart card open: the pie beside the rows. */
 .ppChartBody { display: flex !important; align-items: center !important; gap: 28px !important; }
+/* A right-hand panel slides in from its edge as it opens (the owner, 2026-10-15 — desk-motion.cjs). */
+@keyframes dxSlideIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.slideIn { animation: dxSlideIn .24s cubic-bezier(.2, .8, .2, 1) both !important; }
+@media (prefers-reduced-motion: reduce) { .slideIn { animation: none !important; } }
+/* The Customer form's drag grips (2026-10-16): darker under the pointer, grabbing while held. */
+.grip:hover { color: #806B60 !important; background: #F5EEE8 !important; border-radius: 6px !important; }
+.grip:active { cursor: grabbing !important; }

@@ -52,6 +52,8 @@ export interface CrmCustomer {
   ad: string;
   /** Meta's link to the ad (its video or picture), when the customer came from one. */
   adUrl?: string | null;
+  /** The ad's kind, "video" or "image", when Meta said (mig 20261015210000). */
+  adMedia?: "video" | "image" | null;
   status: CrmStatus;
   lost?: { reason: CrmLostReason; note?: string };
   previous?: "won" | "lost";
@@ -228,8 +230,16 @@ export interface CrmData {
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
-export interface CrmFormField { id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date" | "Range"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1 }
-export interface CrmForm { id: string; name: string; sections: { id: string; title: string; fields: CrmFormField[] }[]; base?: boolean }
+export interface CrmFormField {
+  id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date" | "Range"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1;
+  /** Kept only for its place (2026-10-16): filled by the CRM (First contact, Platform …) or the chat's own (Status) — never asked. */
+  sys?: 1;
+}
+export interface CrmForm {
+  id: string; name: string; base?: boolean;
+  /** `page` / `pageTitle`: the page a section is on (0 = the first) since the paged form (2026-10-16); none — one page. */
+  sections: { id: string; title: string; fields: CrmFormField[]; page?: number; pageTitle?: string }[];
+}
 export interface CrmNote { id: string; customerId: string; by: string | null; text: string; at: string }
 
 /** A cold lead template. `body` writes the customer's first name as {name}; `metaName` is what Meta keeps it by. */
@@ -262,6 +272,7 @@ export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
 
 export interface CrmContactRowX extends CrmContactRow {
   ad_source_url?: string | null;
+  ad_media?: string | null;
   property_type?: string | null;
   unit_size?: string | null;
   unit_location?: string | null;
@@ -369,6 +380,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     channel: row.channel,
     adId: row.ad_source_id,
     adUrl: row.ad_source_url ?? null,
+    adMedia: row.ad_media === "video" || row.ad_media === "image" ? row.ad_media : null,
     ad: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} · no ad`),
     status: row.status,
     ...(row.status === "lost" && reason ? { lost: { reason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),

@@ -128,8 +128,11 @@ cfClean
 cfDesk
 cfDevs
 cfDirty
+cfDragEnd
 cfFields
 cfOn
+cfPages
+cfPagesOn
 cfPhone
 cfPhoneH
 cfPhoneW
@@ -464,6 +467,9 @@ paneFull
 paneShown
 paneStyle
 people
+perfFold
+perfRail
+perfShut
 perfW
 periodNow
 periodOpts

@@ -15,7 +15,7 @@ import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/commo
 import { mediaWord } from "../../shared/chat-media";
 import { answerOf } from "./form";
 import { phoneLabel } from "../../sales/vm/customer";
-import { adHref } from "../../shared/AdLink";
+import { adHref, adKindLabel } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
 const BUDGET: [string, number, number][] = [["Under RM 5k", 0, 5000], ["RM 5k – 10k", 5000, 10000], ["RM 10k – 20k", 10000, 20000], ["RM 20k +", 20000, 1e12]];
@@ -179,7 +179,7 @@ function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
     at: timeLabel(new Date(m.at)), mine: m.from === "me" }));
   const last = lastReal(c);
   return { ...empty, has: true,
-    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.ad || "No ad", adUrl: adHref(c.adUrl),
+    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad || "No ad", adUrl: adHref(c.adUrl),
     status: STATUS_LABEL[c.status], owner: c.assignedTo ? nameOf(c.assignedTo) : "No one yet",
     visit: visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
     lastAt: last ? new Date(last.at).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—",

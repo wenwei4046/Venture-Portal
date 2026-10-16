@@ -10,7 +10,7 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -542,16 +542,16 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <button type="button" onClick={v.cfSave} disabled={v.cfClean} style={{ height: "36px", padding: "0 20px", borderRadius: "18px", border: "0", background: v.cfSaveBg, font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>Save form</button>
                   </div>
                   {!!(v.cfFields) && (<>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 400px", gap: "20px", alignItems: "start" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" }}>
-                        {(v.cfSecs).map((sec, sec_i) => (<Fragment key={sec_i}>
-                          <section id={sec.anchor} style={{ display: "flex", flexDirection: "column", border: "1px solid #EBDDD2", borderRadius: "14px", background: "#fff" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "16px 20px 12px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "flex-start" }}>
+                      <div style={{ flex: "1 1 640px", display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" }}>
+                        {!!(v.cfPagesOn) && (<DeskFormPages v={v.cfPages} />)}{(v.cfSecs).map((sec, sec_i) => (<Fragment key={sec_i}>
+                          <section id={sec.anchor} onDragOver={sec.dragOver} onDrop={sec.drop} style={{ display: "flex", flexDirection: "column", border: sec.bd ?? "1px solid #EBDDD2", borderRadius: "14px", background: "#fff", boxShadow: sec.ring, opacity: sec.op, transition: "box-shadow .15s, opacity .15s" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "16px 20px 12px" }}>{!!(v.cfPagesOn) && (<span draggable={true} onDragStart={sec.grip} onDragEnd={v.cfDragEnd} title="Drag to move this section — onto a page tab to move it to that page" className={DX.grip} style={{ flex: "none", width: "18px", height: "22px", marginLeft: "-8px", display: "grid", placeItems: "center", color: "#B5A398", cursor: "grab" }}><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.5"></circle><circle cx="9" cy="3" r="1.5"></circle><circle cx="3" cy="8" r="1.5"></circle><circle cx="9" cy="8" r="1.5"></circle><circle cx="3" cy="13" r="1.5"></circle><circle cx="9" cy="13" r="1.5"></circle></svg></span>)}
                               <span style={{ flex: "1", display: "flex", flexDirection: "column", gap: "3px" }}>
-                                <strong style={{ fontSize: "15px", fontWeight: "650" }}>{sec.title}</strong>
+                                {!!(sec.custom) && (<input type="text" value={sec.title} onChange={sec.setTitle} placeholder="Section name" style={{ height: "30px", boxSizing: "border-box", padding: "0 10px", margin: "-4px 0 0 -10px", border: "1px solid #EBDDD2", borderRadius: "8px", background: "#fff", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#3F2B22", outline: "none", maxWidth: "320px" }} />)}{!(sec.custom) && (<strong style={{ fontSize: "15px", fontWeight: "650" }}>{sec.title}</strong>)}
                                 <span style={{ fontSize: "12.5px", color: "#806B60" }}>{sec.desc}</span>
                               </span>
-                              <span style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap" }}>{sec.count} fields</span>
+                              <span style={{ fontSize: "12px", color: "#806B60", whiteSpace: "nowrap" }}>{sec.count} fields</span>{!!(sec.removable) && (<button type="button" onClick={sec.remove} title="Delete this section and its questions" className={DX.emo} style={{ flex: "none", width: "26px", height: "26px", margin: "-4px -6px 0 0", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "#A08E82", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>)}
                             </div>
                             {!!(sec.hasAuto) && (<>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "0 20px 12px", padding: "10px 12px", borderRadius: "10px", background: "#FBF6F2" }}>
@@ -566,7 +566,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                               </div>
                             </>)}
                             {!!(sec.hasEdit) && (<>
-                              <div style={{ display: "grid", gridTemplateColumns: "48px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", padding: "8px 20px", borderTop: "1px solid #F1E7DF", borderBottom: "1px solid #F1E7DF", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#A08E82" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "66px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", padding: "8px 20px", borderTop: "1px solid #F1E7DF", borderBottom: "1px solid #F1E7DF", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "#A08E82" }}>
                                 <span>
                                 </span>
                                 <span>FIELD</span>
@@ -577,8 +577,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 </span>
                               </div>
                               {(sec.fields).map((f, f_i) => (<Fragment key={f_i}>
-                                <div style={{ display: "grid", gridTemplateColumns: "48px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", alignItems: "center", padding: "8px 20px", borderTop: f.bt }}>
-                                  <span style={{ display: "flex", gap: "2px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "66px minmax(120px, 1fr) 140px minmax(120px, 1.3fr) 108px 28px", gap: "12px", alignItems: "center", padding: "8px 20px", borderTop: f.bt, opacity: f.op }} data-cf-row="" onDragOver={f.dragOver} onDrop={f.drop}>
+                                  <span style={{ display: "flex", alignItems: "center", gap: "2px" }}>{!!(v.cfPagesOn) && (<span draggable={true} onDragStart={f.grip} onDragEnd={v.cfDragEnd} title="Drag to move — onto another section or a page tab" className={DX.grip} style={{ flex: "none", width: "16px", height: "28px", display: "grid", placeItems: "center", color: "#B5A398", cursor: "grab" }}><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"></circle><circle cx="7.5" cy="3" r="1.4"></circle><circle cx="2.5" cy="8" r="1.4"></circle><circle cx="7.5" cy="8" r="1.4"></circle><circle cx="2.5" cy="13" r="1.4"></circle><circle cx="7.5" cy="13" r="1.4"></circle></svg></span>)}
                                     <button type="button" onClick={f.up} title="Move up" style={{ width: "24px", height: "28px", padding: "0", border: "0", background: "transparent", color: f.upFg, cursor: "pointer" }}>
                                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12 19V5M6 11l6-6 6 6">
@@ -659,7 +659,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           </section>
                         </Fragment>))}
                       </div>
-                      <aside style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "0" }}>
+                      <aside style={{ flex: "0 1 400px", position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "12px", minWidth: "300px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                           <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>Preview</strong>
                           <div style={{ display: "flex", background: "#F5EEE8", borderRadius: "10px", padding: "3px", gap: "2px" }}>
@@ -1242,7 +1242,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </>)}
             </div>
             {!!(v.sheetOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.menuW}px`, width: `${v.menuW}px`, boxSizing: "border-box", position: "relative", overflow: "auto", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.menuW}px`, width: `${v.menuW}px`, boxSizing: "border-box", position: "relative", overflow: "auto", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragMenu} onDoubleClick={v.resetMenu} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-start", gap: "12px", padding: "18px 12px 16px 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -1355,7 +1355,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              <aside style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -1502,11 +1502,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              <aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              {!(v.perfShut) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragPerf} onDoubleClick={v.resetPerf} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid #EBDDD2" }}>
-                  <strong style={{ flex: "1", fontSize: "15px", fontWeight: "650" }}>Ad performance</strong>
+                  <button type="button" onClick={v.perfFold} title="Fold Ad performance" className={DX.emo} style={{ flex: "0 0 30px", width: "30px", height: "30px", margin: "0 6px 0 -8px", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5"></path></svg></button><strong style={{ flex: "1", fontSize: "15px", fontWeight: "650" }}>Ad performance</strong>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.adPerToggle} style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "30px", padding: "0 8px 0 12px", borderRadius: "15px", border: "1px solid #EBDDD2", background: v.adPerBg, font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#3F2B22", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#806B60" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
@@ -1608,7 +1608,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </path>
                     </svg></button>
                 </div>
-              </aside>
+              </aside></>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}
               {!!(v.adLogClosed) && (<>
                 <aside style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <button type="button" onClick={v.adLogToggle} title="Open audit log" style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid #EBDDD2", background: "transparent", color: "#806B60", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h24}>
@@ -1628,7 +1628,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </aside>
               </>)}
               {!!(v.adLogOpen) && (<>
-                <aside style={v.adLogStyle}>
+                <aside className={DX.slideIn} style={v.adLogStyle}>
                   <div onPointerDown={v.dragAudit} onDoubleClick={v.resetAudit} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                   </div>
                   <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 0 16px", borderBottom: "1px solid #EBDDD2" }}>
@@ -1671,7 +1671,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </>)}
             </>)}
             {!!(v.cpOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -1748,7 +1748,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.frmOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -1919,7 +1919,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.cltOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -2006,7 +2006,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.srOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -2334,7 +2334,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.ftNone) && (<>
-              <aside style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", textAlign: "center", padding: "24px" }}>
+              <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#FBF6F2", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", textAlign: "center", padding: "24px" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <strong style={{ fontSize: "15px", fontWeight: "650" }}>Pick a team</strong>
@@ -2342,7 +2342,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.ftOpen) && (<>
-              <aside style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -2429,7 +2429,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.sendOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid #EBDDD2" }}>
@@ -2463,7 +2463,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.awOpen) && (<>
-              <aside style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
+              <aside className={DX.slideIn} style={{ flex: `0 0 ${v.sheetW}px`, width: `${v.sheetW}px`, position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", borderBottom: "1px solid #EBDDD2" }}>
@@ -4869,7 +4869,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       {(g.rows).map((r, r_i) => (<Fragment key={r_i}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "7px 0" }}>
                           <span style={{ fontSize: "12px", color: "#806B60" }}>{r.k}</span>
-                          <span style={{ fontSize: "13.5px", lineHeight: "1.35", fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}>{r.v}</span>
+                          <span style={{ fontSize: "13.5px", lineHeight: "1.35", fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>
                         </div>
                       </Fragment>))}
                     </div>

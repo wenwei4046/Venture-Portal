@@ -25,7 +25,8 @@ export interface MsgInbound {
   /** A photo, video, voice message or file: Meta's address for it (its own CDN, https only), shown through our route. */
   mediaUrl?: string | null;
   sentAt: string;        // ISO
-  ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null } | null;
+  /** media: "video" or "image" from the ad's context; sourceUrl: its post on Facebook (2026-10-15). */
+  ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null; media: string | null } | null;
 }
 
 /** Meta's own file hosts only (the ingest asks the same). */
@@ -41,7 +42,7 @@ export interface MsgDelivery {
   ignored: number;
 }
 
-interface Referral { source?: string; type?: string; ref?: string; ad_id?: string; ads_context_data?: { ad_title?: string; post_id?: string } }
+interface Referral { source?: string; type?: string; ref?: string; ad_id?: string; ads_context_data?: { ad_title?: string; post_id?: string; photo_url?: string; video_url?: string } }
 interface Attachment { type?: string; title?: string; payload?: { url?: string; sticker_id?: number; coordinates?: { lat?: number; long?: number } } }
 interface Event {
   sender?: { id?: string };
@@ -58,7 +59,10 @@ const iso = (ms: number | undefined) => (Number.isFinite(ms) && ms! > 0 ? new Da
 
 function adOf(r: Referral | undefined): MsgInbound["ad"] {
   if (!r || (!r.ad_id && r.source !== "ADS")) return null;
-  return { sourceId: r.ad_id ?? null, headline: r.ads_context_data?.ad_title ?? null, sourceUrl: null };
+  const x = r.ads_context_data;
+  return { sourceId: r.ad_id ?? null, headline: x?.ad_title ?? null,
+    sourceUrl: x?.post_id && /^\d+_\d+$/.test(x.post_id) ? `https://www.facebook.com/${x.post_id}` : null,
+    media: x?.video_url ? "video" : x?.photo_url ? "image" : null };
 }
 
 function kindOf(a: Attachment | undefined): MsgKind {

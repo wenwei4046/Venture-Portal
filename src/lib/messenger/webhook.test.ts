@@ -13,8 +13,17 @@ describe("Messenger deliveries", () => {
     }]));
     expect(d.messages).toEqual([{
       externalId: "m_1", pageId: "PAGE1", psid: "PSID1", name: null, kind: "text", body: "Is the sofa still on sale?",
-      sentAt: new Date(T).toISOString(), ad: { sourceId: "AD123", headline: "Sofa Clearance", sourceUrl: null },
+      sentAt: new Date(T).toISOString(), ad: { sourceId: "AD123", headline: "Sofa Clearance", sourceUrl: null, media: null },
     }]);
+  });
+
+  it("names the ad's kind and links its post (2026-10-15)", () => {
+    const ad = (x: Record<string, string>) => parseMessengerDelivery(page([{ sender: { id: "P" }, recipient: { id: "PAGE1" }, timestamp: T, message: { mid: "v", text: "hi" },
+      referral: { source: "ADS", type: "OPEN_THREAD", ad_id: "AD1", ads_context_data: { ad_title: "Sofa", ...x } } }])).messages[0].ad;
+    expect(ad({ video_url: "https://v", post_id: "102351059576534_88" })).toEqual({ sourceId: "AD1", headline: "Sofa", sourceUrl: "https://www.facebook.com/102351059576534_88", media: "video" });
+    expect(ad({ photo_url: "https://p" })).toMatchObject({ media: "image", sourceUrl: null });
+    // A post id that is not one is never made a link.
+    expect(ad({ post_id: "evil.com/x" })).toMatchObject({ sourceUrl: null, media: null });
   });
 
   it("names a photo, a sticker, a file and a button tap", () => {

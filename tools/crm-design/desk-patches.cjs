@@ -50,6 +50,7 @@ module.exports = [
   // Channels: its sample facts as the real ones; what Meta keeps to itself opens Meta (desk-channels.cjs).
   ...require("./desk-channels.cjs"),
   ...require("./desk-contacts.cjs"),
+  ...require("./desk-assign.cjs"),
   // Meta is not connected yet (PROPOSALS.md C, waiting for the owner): the line says so instead of the sample's
   // "Synced from Meta Ads · 9:00 am". The compact page's first, then the full page's (the only one left).
   [/(>Ads Performance<\/strong>\s*<span [^>]*><span style=\{\{ width: "7px", height: "7px", borderRadius: "50%", background: )"#3FA06B"( \}\}>\s*<\/span>)Synced from Meta Ads · 9:00 am/,

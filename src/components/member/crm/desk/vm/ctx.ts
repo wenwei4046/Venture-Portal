@@ -110,6 +110,8 @@ export interface DeskUi {
   paneW: number | null; sheetW: number | null; menuW: number | null; perfW: number | null; mwtLogW: number | null; auditW: number | null;
   /** The audit logs' rails (closed by default, closed again on another ad or page). */
   adLog: boolean; mwtLog: boolean;
+  /** Assignment's Ad performance folded to its strip (the owner, 2026-10-15). */
+  adPerfShut: boolean;
   meMenu: boolean;
   // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
   attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
@@ -138,6 +140,8 @@ export interface DeskUi {
   auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null;
   // Customer form (the page): its draft, the preview's device
   cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
+  /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
+  cfPage: number; cfDrag: { k: "f" | "s"; si: number; fi?: number } | null; cfOver: string | null;
   // Channels
   chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
   chDlg: { kind: string; id: string } | null; chNewOpen: boolean; chNew: { name: string; cat: string; lang: string; body: string } | null; chWaNum: string | null;
@@ -176,12 +180,12 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "unread", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
+  adLog: false, adPerfShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "unread", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "team",
   ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null,
-  cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null,
+  cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 

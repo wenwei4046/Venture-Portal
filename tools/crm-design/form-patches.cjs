@@ -25,6 +25,9 @@ const extras = P =>
   `{!!(fq.isChoice) && (<div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>{(fq.chips).map((fc, fc_i) => (<Fragment key={fc_i}><span onClick={fc.pick} style={${PILL}}>{fc.label}</span></Fragment>))}</div>)}` +
   `</div></Fragment>))}</Fragment>))}`;
 
+// Back to the page before, on a paged form (2026-10-16 — the owner chose page by page: Back / Next, Save on the last).
+const back = P => `{!!(${P}cfBack) && (<span onClick={${P}cfBack} style={{ flex: "none", alignSelf: "center", padding: "6px 18px", fontSize: "15px", fontWeight: "650", color: "#806B60", cursor: "pointer" }}>‹ Back</span>)}`;
+
 const chips = (caps, k) => new RegExp(`(<div style=\\{\\{ display: "flex", flexDirection: "column", gap: "6px" \\}\\}>\\s*<span style=\\{\\{[^}]*\\}\\}>${caps}</span>[\\s\\S]*?\\{\\((v\\.(?:cf\\.)?)${k}\\)\\.map[\\s\\S]*?</Fragment>\\)\\)\\}\\s*</div>\\s*</div>)`);
 const field = (caps, k) => new RegExp(`(<label style=\\{\\{ display: "flex", flexDirection: "column", gap: "6px" \\}\\}>\\s*<span style=\\{\\{[^}]*\\}\\}>${caps}</span>[\\s\\S]*?value=\\{(v\\.(?:cf\\.)?)${k}\\}[\\s\\S]*?</label>)`);
 const shown = key => (_m, block, P) => `{!!(${P}cfHas.${key}) && (<>${block}</>)}`;
@@ -35,5 +38,7 @@ module.exports = () => [
   [field("UNIT LOCATION", "cfLoc"), shown("loc")],
   [field("REQUIREMENT", "cfReq"), shown("req")],
   [field("BUDGET", "cfBudget"), shown("budget")],
-  [/(<span onClick=\{(v\.(?:cf\.)?)cfSave\})/, (_m, save, P) => `${extras(P)}\n${save}`],
+  [/(<span onClick=\{(v\.(?:cf\.)?)cfSave\})/, (_m, save, P) => `${extras(P)}\n${back(P)}${save}`],
+  // A paged form (2026-10-16) asks every question through cfExtra, in its saved order: the designed body stands aside.
+  [/(\{(v\.(?:cf\.)?)cfStep\}<\/span>\s*<\/div>)([\s\S]*?)(\{\(\2cfExtra\)\.map)/, (_m, head, P, body, tail) => `${head}{!(${P}cfPaged) && (<>${body}</>)}${tail}`],
 ];
