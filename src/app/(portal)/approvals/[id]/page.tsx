@@ -25,5 +25,13 @@ export default async function ApprovalDetailPage({ params }: Props) {
   if (!read.found) notFound()
 
   const back = canSeeApprovals(user) ? { href: '/approvals', label: 'Approvals' } : { href: '/dashboard', label: 'Overview' }
-  return <ApprovalFullPage r={approvalRecordModel(read)} back={back} />
+  const attachments = (read.voucherContext?.attachments ?? []).map((a) => ({
+    id: a.id,
+    file_name: a.file_name,
+    file_type: a.file_type,
+    file_size: a.file_size,
+    description: a.description,
+    uploaded_at: a.uploaded_at,
+  }))
+  return <ApprovalFullPage r={approvalRecordModel(read)} attachments={attachments} back={back} />
 }

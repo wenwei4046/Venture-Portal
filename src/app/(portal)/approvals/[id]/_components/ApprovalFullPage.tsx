@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { DialogMenu, FinDialog } from '@/components/finv/Dialog'
 import { FullCard as Card, FullFact as Fact, FullPanelRow as PanelRow, FullRow as Row, FullTrail, fullStyles as s, type FullStep } from '@/components/finv/FullParts'
 import { plural, recordLinks, rm, type ApprovalRecordModel } from '@/lib/fin-app/approval-model'
-import FullPageFiles from '@/app/(portal)/payments/[id]/_components/FullPageFiles'
+import AttachmentList, { type AttachmentListItem } from '@/components/voucher/AttachmentList'
 import { useApprovalDecisions } from '../../_components/decisions'
 import { heroStatus } from '../../_components/RequestParts'
 import a from '../../_components/approvals.module.css'
@@ -22,7 +22,16 @@ import a from '../../_components/approvals.module.css'
 /** The status's chip tone on the page (the pill), from the hero's light. */
 const PILL: Record<string, string> = { wait: 'wait', alert: 'alert', ledger: 'ledger', danger: 'danger', accent: 'accent' }
 
-export default function ApprovalFullPage({ r, back }: { r: ApprovalRecordModel; back: { href: string; label: string } }) {
+export default function ApprovalFullPage({
+  r,
+  attachments,
+  back,
+}: {
+  r: ApprovalRecordModel
+  /** The voucher's files as the request page always listed them (type, size, when) — for their previews. */
+  attachments: AttachmentListItem[]
+  back: { href: string; label: string }
+}) {
   const v = r.voucher
   const status = heroStatus(r.status, r.may)
   const amount = r.amount === null ? '—' : `${v?.credit ? '+' : ''}${rm(r.amount)}`
@@ -109,7 +118,9 @@ export default function ApprovalFullPage({ r, back }: { r: ApprovalRecordModel; 
               ) : null}
 
               <Card n={++n} title="Attachments" aside={plural(v.files.length, 'FILE', 'FILES')}>
-                <FullPageFiles voucherId={v.id} files={v.files.map((f) => ({ id: f.id, name: f.name, type: '', size: f.size, uploadedAt: '' }))} open={false} takes={false} canEdit={false} />
+                {/* The request page's own list, as before: each file to open, a picture or a PDF shown in place —
+                    the bill read without leaving the page. Reading only; Remove is the voucher's page's. */}
+                <AttachmentList attachments={attachments} emptyMessage="No attachments uploaded yet. Ask Finance to attach supporting docs before approving." />
               </Card>
             </>
           ) : null}

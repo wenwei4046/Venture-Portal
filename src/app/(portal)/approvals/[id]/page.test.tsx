@@ -22,7 +22,16 @@ vi.mock('@/lib/voucher-detail', async (original) => ({
 }))
 vi.mock('@/components/hrv/toast', async (orig) => ({ ...(await orig<object>()), flash: mocks.flash }))
 vi.mock('../actions', () => ({ approveRequestsBulk: mocks.approve, rejectRequestsBulk: mocks.reject, approveRequestGroupPartial: vi.fn() }))
-vi.mock('@/app/(portal)/payments/actions', () => ({ getAttachmentSignedUrl: vi.fn(), uploadVoucherAttachment: vi.fn(), deleteVoucherAttachment: vi.fn() }))
+// The list's own behaviour (previews, Download) is AttachmentList.test.tsx's; here, what the page hands it.
+vi.mock('@/components/voucher/AttachmentList', () => ({
+  default: ({ attachments, canDelete }: { attachments: Array<{ id: string; file_name: string }>; canDelete?: boolean }) => (
+    <ul data-testid="attachments" data-can-delete={String(!!canDelete)}>
+      {attachments.map((a) => (
+        <li key={a.id}>{a.file_name}</li>
+      ))}
+    </ul>
+  ),
+}))
 
 import ApprovalDetailPage from './page'
 
@@ -127,7 +136,10 @@ describe('the page, drawn as Finance’s records are', () => {
     const pools = screen.getByRole('region', { name: 'Deducted from' })
     expect(within(pools).getByText('Salaries')).toBeInTheDocument()
     expect(within(pools).getByText('RM 3,200.50')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Attachments' })).getByRole('button', { name: /payslip\.pdf/ })).toBeInTheDocument()
+    // The files as the request page always listed them — to read, never to remove.
+    const files = within(screen.getByRole('region', { name: 'Attachments' })).getByTestId('attachments')
+    expect(files).toHaveTextContent('payslip.pdf')
+    expect(files).toHaveAttribute('data-can-delete', 'false')
     expect(within(screen.getByRole('region', { name: 'Trail' })).getByText('Waiting for your decision')).toBeInTheDocument()
     // The panel: the bank and the pool named once.
     expect(screen.getByText('123-456-7890 · Balance RM 90,000.00')).toBeInTheDocument()
