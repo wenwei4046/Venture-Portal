@@ -10,6 +10,9 @@ const actions = vi.hoisted(() => ({
   loadMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
   changeMyPassword: vi.fn(),
+  loadMyEmailChange: vi.fn(),
+  requestEmailChange: vi.fn(),
+  withdrawEmailChange: vi.fn(),
 }))
 vi.mock('@/lib/account/actions', () => actions)
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ auth: { signOut: vi.fn(async () => ({})) } }) }))
@@ -18,7 +21,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }))
 const toast = vi.hoisted(() => ({ flash: vi.fn() }))
 vi.mock('@/components/hrv/toast', () => toast)
 
-import { AccountMenu, ChangePasswordDialog, EditProfileDialog, SignOutDialog } from './AccountMenu'
+import { AccountMenu, ChangePasswordDialog, EditProfileDialog, RequestEmailDialog, SignOutDialog } from './AccountMenu'
 import { finAccountMenu, visibleAccountMenu } from './fin-nav'
 import type { NavViewer } from './nav-config'
 
@@ -125,5 +128,45 @@ describe('Sign out', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     })
     expect(router.push).toHaveBeenCalledWith('/login')
+  })
+})
+
+// Request to change email (2026-10-16): the Finance app's Profile opens it — the email they sign in with, their latest
+// request, the new one; HR approves it.
+describe('Request to change email', () => {
+  const waiting = { id: 'r1', ref: 'PF-2610-009', status: 'pending', to: 'carrie.new@mail.com', from: 'carrie@x.my', at: null, decidedAt: null, note: null }
+
+  it('reads the sign-in email, sends the new one, and shows it waiting — with Withdraw', async () => {
+    actions.loadMyEmailChange.mockResolvedValue({ email: 'carrie@x.my', latest: null })
+    actions.requestEmailChange.mockResolvedValue({ ok: true, mine: { email: 'carrie@x.my', latest: waiting } })
+    actions.withdrawEmailChange.mockResolvedValue({ ok: true, mine: { email: 'carrie@x.my', latest: { ...waiting, status: 'cancelled' } } })
+    render(<RequestEmailDialog open onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByLabelText('You sign in with')).toHaveValue('carrie@x.my'))
+    fireEvent.change(screen.getByLabelText('New email'), { target: { value: 'carrie.new@mail.com' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send to HR' }))
+    })
+    expect(actions.requestEmailChange).toHaveBeenCalledWith('carrie.new@mail.com')
+    expect(screen.getByText('Waiting for HR')).toBeInTheDocument()
+    expect(screen.getByText('New email · carrie.new@mail.com')).toBeInTheDocument()
+    expect(screen.getByText('PF-2610-009')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+    })
+    expect(actions.withdrawEmailChange).toHaveBeenCalledWith('r1')
+    expect(screen.getByLabelText('New email')).toBeInTheDocument()
+  })
+
+  it('says the refusal, and keeps the form', async () => {
+    actions.loadMyEmailChange.mockResolvedValue({ email: 'carrie@x.my', latest: null })
+    actions.requestEmailChange.mockResolvedValue({ ok: false, reason: 'That email already belongs to another login.' })
+    render(<RequestEmailDialog open onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByLabelText('You sign in with')).toHaveValue('carrie@x.my'))
+    fireEvent.change(screen.getByLabelText('New email'), { target: { value: 'hr@venture.my' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send to HR' }))
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('That email already belongs to another login.')
+    expect(screen.getByLabelText('New email')).toHaveValue('hr@venture.my')
   })
 })

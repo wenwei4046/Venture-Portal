@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { requireAuth } from '@/lib/auth'
 import PortalFrame from '@/components/layout/PortalFrame'
-import { emptyNavData, readsDeptStatements, type NavData } from '@/components/layout/nav-config'
+import { emptyNavData, readsDeptStatements, revenueNavData, type NavData } from '@/components/layout/nav-config'
 import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
@@ -38,11 +38,9 @@ export default async function PortalLayout({
   if (canAccessRevenue(user)) {
     const subs = await listSubDepartments()
     // Comm Cal / Sales Groups / Rules open the sub-department last picked on a
-    // Revenue page's switcher (2026-10-10) — else the home one, the oldest.
-    const picked = jar.get(REVENUE_SUB_COOKIE)?.value
-    const home = subs.find(s => s.isHome) ?? subs[0]
-    const revenueSub = subs.find(s => s.slug === picked)?.slug ?? home?.slug ?? null
-    navData = { ...navData, revenueSubDepts: subs, revenueSub }
+    // Revenue page's switcher (2026-10-10) — else the home one, the oldest —
+    // of those the viewer reaches on that page (2026-10-16).
+    navData = { ...navData, ...revenueNavData(subs, user.reach, jar.get(REVENUE_SUB_COOKIE)?.value) }
   }
   // Dept Pool lists each department for whoever reads them all (2026-10-09);
   // the ones added since — IT, Revenue Department — come from the registry

@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { btn } from '@/components/hrv/kit'
 import { deactivateStaff, reactivateStaff } from '../actions'
+import PersonWell from '../../_components/PersonWell'
+import w from '../../_components/person-well.module.css'
 
 /**
  * The Deactivate / Reactivate control on a person's card.
@@ -44,66 +47,51 @@ export default function Employment({
     })
   }
 
+  // A well of the person's page since 2026-10-16 (the 360): their status in
+  // the reference's words, the one step at the end.
   return (
-    <div className="mt-6 pt-4 border-t border-hairline flex flex-wrap items-start gap-x-4 gap-y-2">
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold uppercase tracking-[0.1em]">Employment</div>
-        <div className="text-sm mt-1.5">
-          {active ? (
-            confirming ? (
-              <>
-                Deactivate <span className="font-bold">{personName}</span>? They leave the org
-                charts and every active list. Nothing is deleted.
-              </>
+    <PersonWell title="Employment" icon="staff">
+      <div className={w.line}>
+        <div className={w.lineText}>
+          <span className={w.label}>Status</span>
+          <span className={w.value}>
+            {active ? (
+              confirming ? (
+                <>
+                  Deactivate <b className="font-semibold">{personName}</b>? They leave the org charts and every active
+                  list. Nothing is deleted.
+                </>
+              ) : (
+                'Active'
+              )
             ) : (
-              'Active.'
-            )
-          ) : (
-            'Inactive.'
-          )}
+              'Inactive'
+            )}
+          </span>
+          {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
         </div>
-        {error ? <div className="sheet-danger mt-2 mb-0">{error}</div> : null}
-      </div>
 
-      {!active ? (
-        <button
-          type="button"
-          onClick={() => run(reactivateStaff)}
-          disabled={pending}
-          className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {pending ? 'Reactivating…' : 'Reactivate'}
-        </button>
-      ) : confirming ? (
-        <div className="flex items-center gap-3">
-          {/* Red, not orange: this is the one destructive step, and red on
-              white carries white lettering at a readable contrast. */}
-          <button
-            type="button"
-            onClick={() => run(deactivateStaff)}
-            disabled={pending}
-            className="bg-danger hover:bg-danger/90 text-white text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {pending ? 'Deactivating…' : 'Confirm'}
+        {!active ? (
+          <button type="button" onClick={() => run(reactivateStaff)} disabled={pending} className={btn('primary')}>
+            {pending ? 'Reactivating…' : 'Reactivate'}
           </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            disabled={pending}
-            className="text-sm hover:underline underline-offset-[3px]"
-          >
-            Cancel
+        ) : confirming ? (
+          <span className={w.actions}>
+            {/* Red, not orange: this is the one destructive step, and red
+                carries white lettering at a readable contrast. */}
+            <button type="button" onClick={() => run(deactivateStaff)} disabled={pending} className={btn('dangerSolid')}>
+              {pending ? 'Deactivating…' : 'Confirm'}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={btn('outline')}>
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setConfirming(true)} className={btn('danger')}>
+            Deactivate
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="border border-hairline bg-surface hover:border-danger hover:bg-danger-bg hover:text-danger text-sm px-4 py-2 rounded-control transition-colors"
-        >
-          Deactivate
-        </button>
-      )}
-    </div>
+        )}
+      </div>
+    </PersonWell>
   )
 }

@@ -6,6 +6,26 @@ history (`git log -p -- TODOS.md`).
 
 ---
 
+## Owed — sub-departments per person (2026-10-16)
+
+The owner: permission ticked "按 sub-department" on the CRM and the Revenue
+team's tabs; default = what a person handles. Shipped: the reach, the CRM (in
+the database), the Revenue pages and sidebars (in the app), the person window's
+pills (`.claude/rules/portal-wide/permissions.md` › SUB-DEPARTMENTS PER PERSON).
+The owner, asked about the first two below: "4 先不做" (2026-10-16) — not now.
+Build the data's before anybody is narrowed on a Revenue page.
+- **The Revenue pages' data in the database.** `comm_*` / `sales_*` rows are
+  still opened by the Revenue cells alone: somebody narrowed to Fair is kept
+  off IR's pages but could read IR's rows through the API. Needs a RESTRICTIVE
+  policy per table keyed by its sub-department (scheme → sub, batch → sub,
+  order → batch, run → sub) asking the `comm_cal` / `sales_groups` / `rules`
+  reach, without slowing the month's runs. Nobody is narrowed today.
+- **The Revenue app's director scope** (`member_director_scheme` and the
+  `member_*` readers that call it) follows `comm_sub_department_directors`, not
+  the ticks: ticking IR for KRIS opens IR's CRM, not IR's team in his app.
+- **Others' lists in the CRM** (`crm_role_of`) still read the structure: an IR
+  salesperson held back from IR is out of the CRM but still assignable.
+
 ## Owed — Revenue Director (2026-09-11)
 
 - **The CEO above the directors.** The user: "Revenue Director 上面就是

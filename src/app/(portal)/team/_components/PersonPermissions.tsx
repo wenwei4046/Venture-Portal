@@ -27,12 +27,15 @@ export default function PersonPermissions({
   rows,
   source,
   canEdit,
+  bare = false,
 }: {
   userId: string
   rows: PersonPermissionRow[]
   /** Where the inherited column comes from — a title, or the account's role. */
   source: string
   canEdit: boolean
+  /** Inside a well that carries the title already (a person's page, 2026-10-16). */
+  bare?: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -59,14 +62,16 @@ export default function PersonPermissions({
   }
 
   return (
-    <section className="mt-10">
-      <div className="sect-head">
-        <h2>Permissions</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">
-          {exceptions === 0 ? 'NO EXCEPTIONS' : `${exceptions} EXCEPTION${exceptions === 1 ? '' : 'S'}`}
-        </span>
-      </div>
+    <section className={bare ? undefined : 'mt-10'}>
+      {bare ? null : (
+        <div className="sect-head">
+          <h2>Permissions</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {exceptions === 0 ? 'NO EXCEPTIONS' : `${exceptions} EXCEPTION${exceptions === 1 ? '' : 'S'}`}
+          </span>
+        </div>
+      )}
 
       <p className="text-sm mb-4 max-w-2xl">
         Inherited from {source}. An exception applies to this person alone and

@@ -156,7 +156,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const { sub, period, orderId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   // Where the reader came from (2026-09-27): a bill opened on ANTHONY's ledger
   // goes back to ANTHONY's ledger, on the table it was opened from. Only a
   // month page of this sub-department is honoured (lib/commission/workbench-nav.ts).

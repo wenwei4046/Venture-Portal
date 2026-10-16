@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from 'react'
 import { btn, Chip } from '@/components/hrv/kit'
-import { NavIcon, type NavIconName } from '@/components/hrv/icons'
+import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { initialsOf } from '@/lib/people-roster'
@@ -41,6 +41,7 @@ import {
   type PayMode,
 } from '@/lib/person-record'
 import { updateStaff } from '../actions'
+import PersonWell from '../../_components/PersonWell'
 import s from './person-record.module.css'
 
 /**
@@ -737,17 +738,11 @@ export default function PersonRecord({
 }
 
 /** A well of the record: its icon and title in caps over its facts, two to a row. */
-function Well({ title, icon, children }: { title: string; icon: NavIconName; children: ReactNode }) {
+function Well({ title, icon, children }: { title: string; icon: HrIconName; children: ReactNode }) {
   return (
-    <section className={s.well}>
-      <h2 className={s.wellTitle}>
-        <span className={s.wellIcon} aria-hidden>
-          <NavIcon name={icon} size={15} stroke={1.6} />
-        </span>
-        {title}
-      </h2>
+    <PersonWell title={title} icon={icon}>
       <dl className={s.facts}>{children}</dl>
-    </section>
+    </PersonWell>
   )
 }
 

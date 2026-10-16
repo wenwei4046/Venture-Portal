@@ -76,7 +76,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const exhibitionFilter = { fair: fairFilter, brand: brandFilter }
   const exhibition = fairFilter !== undefined || brandFilter !== undefined
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const [all, uncosted] = await Promise.all([
     loadMonthOrders(supabase, subDept.id, period),

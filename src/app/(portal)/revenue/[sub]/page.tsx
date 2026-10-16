@@ -63,7 +63,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
   await requirePage('/revenue/[sub]')
   const user = await requirePermission('revenue')
   const { sub } = await params
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const thisPeriod = getPeriodMonth()
@@ -80,7 +80,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
       .select('period_month, status, total_commission, staff_count')
       .eq('sub_department_id', subDept.id),
     loadErpSyncPanelData(supabase, subDept.id),
-    loadSwitcherData(user, subDept),
+    loadSwitcherData(user, subDept, 'comm_cal'),
   ])
   // The link belongs to the programme the ERP feed belongs to (Fair), which is
   // what a non-null sync panel says. The receiver address the ERP must send to

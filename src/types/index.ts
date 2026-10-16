@@ -1,3 +1,5 @@
+import type { Reach } from '@/lib/sub-department-reach'
+
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 // `staff` (2026-10-08): an account whose access is wholly its title's
@@ -51,6 +53,12 @@ export interface User {
   // `closedBoxes`): a page's writes follow its own tabs' boxes (`actionsOnPage`)
   // and the Revenue app hides the pages they close. Empty or absent: nothing.
   closed?: string[]
+  // The Revenue Department's sub-departments they reach, area by area — the
+  // CRM, Comm Cal, Sales Groups, Rules (2026-10-16, lib/sub-department-reach.ts):
+  // what they handle, every one when they handle none, their own ticks over it.
+  // Every sign-in carries it (NO_REACH when it could not be read); absent only
+  // on a value built without it, which narrows nothing.
+  reach?: Reach
   // Set while an account that may switch views sees the portal AS this person
   // (2026-10-11): everything above is theirs, `actualRole` the viewer's kind,
   // and the session reads only (lib/supabase/read-only.ts).

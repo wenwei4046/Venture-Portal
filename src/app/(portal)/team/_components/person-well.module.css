@@ -1,0 +1,54 @@
+/* A well of a person's page (2026-10-16, the 360): panel grey on the white
+   sheet, a hairline, radius 12; its title in spaced capitals beside its icon
+   (the user's reference — "i want the wording be like this kind"). Shared by
+   the record's wells, Promotion · Employment, Permissions and Activity. */
+
+.well {
+  min-width: 0;
+  padding: 18px 20px 20px;
+  background: rgb(var(--hv-panel));
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 12px;
+  line-height: normal;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-ink));
+}
+.icon { display: inline-flex; flex: none; color: rgb(var(--hv-body-2)); }
+/* A count at the title's end ("LAST 40"), quiet. */
+.count {
+  margin-left: auto;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: rgb(var(--hv-brown));
+}
+
+/* Below the card and the record: the wells the page goes on with, full width. */
+.lower { display: flex; flex-direction: column; gap: 14px; max-width: 1160px; margin-bottom: 28px; }
+/* Promotion beside Employment where they fit. */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 14px; }
+
+/* A well's line of words and its one action, the action at the end. */
+.line { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 16px; }
+.lineText { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+.value { font-size: 14.5px; color: rgb(var(--hv-ink)); overflow-wrap: anywhere; }
+.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13px; margin-left: 8px; color: rgb(var(--hv-body-2)); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.note { margin: 0; font-size: 13.5px; color: rgb(var(--hv-body-2)); }

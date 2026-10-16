@@ -91,7 +91,10 @@ export default async function AccountDetailPage({ params }: PageProps) {
         </dl>
       </div>
 
-      <ActivityLog userId={account.id} />
+      {/* A person's page's well since 2026-10-16 — the room above is its own. */}
+      <div className="mt-10">
+        <ActivityLog userId={account.id} />
+      </div>
     </div>
   )
 }

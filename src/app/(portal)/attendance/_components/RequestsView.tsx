@@ -11,7 +11,7 @@ import { Toast, useFlash } from '@/components/ds/Overlay'
 import { attendanceFileLink, decideRequest, saveRoute } from '@/lib/attendance/actions'
 import { balanceOf } from '@/lib/attendance/engine'
 import type { FileLink } from '@/lib/attendance/files'
-import { ROUTE_WORDS, amountLabel, bucketOf, flowNodes, kindLabel, sinceLabel, statusOf, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
+import { ROUTE_WORDS, amountLabel, bucketOf, decidedToast, flowNodes, kindLabel, sinceLabel, statusOf, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
 import type { AttConfig, AttLedger, AttRequest, AttRoute, Route } from '@/lib/attendance/types'
 import { Avatar, HoverButton, NodeTrack, Pill } from './bits'
 import { downloadCsv } from './BalanceCsv'
@@ -80,12 +80,9 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
     start(async () => {
       const res = await decideRequest(req.id, approve, note)
       if (!res.ok) return flash(res.reason)
-      const fields = Array.isArray(req.detail.changes) ? req.detail.changes.length : 0
       setNote('')
       setReqId(null)
-      flash(req.kind === 'profile'
-        ? approve ? `Approved · ${req.who}'s record updated · ${fields} fields` : `Rejected · record unchanged · ${req.who} told`
-        : `${approve ? 'Approved' : 'Rejected'} · ${req.who} told`)
+      flash(decidedToast(req, approve))
     })
   }
 

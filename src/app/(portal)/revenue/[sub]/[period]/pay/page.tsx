@@ -41,7 +41,7 @@ export default async function MonthPayPage({ params }: PageProps) {
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const board = await loadPayBoard(supabase, subDept.id, period)
 

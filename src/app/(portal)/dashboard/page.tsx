@@ -9,7 +9,7 @@ import { REVENUE_SUB_COOKIE } from '@/lib/hr-view'
 import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
-import { readsDeptStatements, type NavData } from '@/components/layout/nav-config'
+import { readsDeptStatements, revenueNavData, revenueSubsOf, type NavData } from '@/components/layout/nav-config'
 import { listSubDepartments } from '../revenue/_lib/sub-departments'
 import FinanceOverview from './_components/FinanceOverview'
 import HrOverview from './_components/HrOverview'
@@ -181,8 +181,8 @@ export default async function DashboardPage() {
       (async () => {
         if (!canAccessRevenue(user)) return null
         const [subs, jar] = await Promise.all([listSubDepartments(), cookies()])
-        const picked = jar.get(REVENUE_SUB_COOKIE)?.value
-        return subs.find((x) => x.slug === picked)?.slug ?? (subs.find((x) => x.isHome) ?? subs[0])?.slug ?? null
+        // Each Revenue page's own, of those the viewer reaches there (2026-10-16).
+        return revenueSubsOf(revenueNavData(subs, user.reach, jar.get(REVENUE_SUB_COOKIE)?.value))
       })(),
     ])
     return <HrOverview user={user} data={data} revenueSub={revenueSub} />

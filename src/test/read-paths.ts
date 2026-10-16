@@ -317,9 +317,17 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'my_login_is_personal',
   // Edit profile (mig 20261014210000): the caller's own name, email and phone; the change asks a personal login first.
   'my_profile', 'update_my_profile',
+  // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
+  // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
+  'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
+  // Sub-departments per person (mig 20261016180000): the caller's own reach; a person's, to whoever reads their
+  // boxes; their ticks, by whoever manages permissions.
+  'my_sub_department_reach', 'person_sub_department_reach', 'permission_user_reach_set',
+  // A person's own Salary / NRIC / Bank (mig 20261016210000): by whoever manages permissions.
+  'permission_user_sensitive_set',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',

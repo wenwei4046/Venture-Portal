@@ -44,20 +44,20 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
 // `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
 const K = (functionKey: string, action: Action, legacyKey: string, minScope: Scope, gate: CellKey['gate'] = null): CellKey => ({ functionKey, action, legacyKey, minScope, gate })
 export const CELL_KEYS: CellKey[] = [
-  K('dashboard', 'view', 'dashboard', 'own'), K('approvals', 'view', 'approvals', 'all', 'principal'), K('approvals', 'view', 'approvals_queue', 'all'),
-  K('treasury', 'view', 'treasury', 'all', 'treasury'), K('treasury', 'approve', 'override', 'all', 'principal'), K('billing', 'view', 'billing', 'all', 'treasury'),
+  K('dashboard', 'view', 'dashboard', 'own'), K('approvals', 'view', 'approvals', 'all'), K('approvals', 'view', 'approvals_queue', 'all'),
+  K('treasury', 'view', 'treasury', 'all', 'treasury'), K('treasury', 'approve', 'override', 'all'), K('billing', 'view', 'billing', 'all', 'treasury'),
   K('categories', 'view', 'categories', 'all', 'treasury'), K('hr_costing', 'view', 'hr_costing', 'all', 'salary'), K('revenue', 'view', 'revenue', 'all', 'salary'),
   K('product_list', 'view', 'product_list', 'all'), K('director_salary', 'view', 'director_salary', 'all', 'salary'),
   K('director_pool', 'view', 'director_pool', 'all', 'salary'), K('team', 'view', 'team', 'all', 'salary'), K('team', 'view', 'team_directory', 'own'),
-  K('accounts', 'create', 'team_invite', 'all', 'principal'), K('accounts', 'manage', 'permissions_manage', 'all', 'principal'),
+  K('accounts', 'create', 'team_invite', 'all'), K('accounts', 'manage', 'permissions_manage', 'all'),
   K('member', 'manage', 'member_requests_manage', 'all'), K('member', 'manage', 'member_memos_manage', 'all'), K('dept_pool', 'view', 'dept_pool', 'own'),
   K('venture_pool', 'view', 'venture_pool', 'all', 'treasury'), K('opex', 'view', 'opex', 'own'), K('my_billing', 'view', 'my_billing', 'own'),
   K('claims', 'view', 'claims', 'own'), K('claims', 'approve', 'claims_approve', 'all'), K('reports', 'view', 'reports', 'all', 'treasury'),
-  K('dept_reports', 'view', 'dept_reports', 'own'), K('reconciliation', 'view', 'reconciliation', 'all', 'treasury'), K('audit_log', 'view', 'audit_log', 'all', 'principal'),
-  K('settings', 'view', 'settings', 'all', 'principal'), K('settings', 'manage', 'department_mode', 'all', 'principal'), K('revenue_app', 'view', 'member_portal', 'own'),
+  K('dept_reports', 'view', 'dept_reports', 'own'), K('reconciliation', 'view', 'reconciliation', 'all', 'treasury'), K('audit_log', 'view', 'audit_log', 'all'),
+  K('settings', 'view', 'settings', 'all'), K('settings', 'manage', 'department_mode', 'all'), K('revenue_app', 'view', 'member_portal', 'own'),
   K('revenue_app', 'view', 'member_memos', 'own'), K('revenue_app', 'view', 'member_insight', 'own'), K('revenue_app', 'create', 'member_quote', 'own'),
   K('revenue_app', 'create', 'member_requests', 'own'), K('crm', 'view', 'member_crm', 'own'), K('crm', 'manage', 'crm_manage', 'all'),
-  K('view_switch', 'view', 'view_switch', 'all', 'principal'),
+  K('view_switch', 'view', 'view_switch', 'all'),
   K('documentation', 'view', 'documentation', 'all'), K('hiring', 'view', 'hiring', 'all'), K('rooms', 'view', 'meeting_rooms', 'all'),
   K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'), K('attendance', 'view', 'attendance', 'all'),
 ]

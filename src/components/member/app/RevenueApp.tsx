@@ -68,6 +68,8 @@ import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
 import BrandWeeksPage from "./profile/BrandWeeksPage";
 import SchemeSheet from "./profile/SchemeSheet";
 import PasswordSheet from "./profile/PasswordSheet";
+import EmailSheet from "./profile/EmailSheet";
+import type { RequestEmailActions } from "@/components/account/use-request-email";
 import type { ChangePassword } from "@/components/account/use-change-password";
 import { schemeVM } from "./profile/scheme-model";
 import { brandWeeksVM } from "./profile/brand-weeks-model";
@@ -118,6 +120,11 @@ export interface RevenueAppProps {
    * previews.
    */
   changePassword?: ChangePassword;
+  /**
+   * Profile › Request to change email (2026-10-16): the portal's own actions (lib/account/actions.ts), handed in by the
+   * layout on Change password's terms — a login of their own only. Absent on the previews.
+   */
+  requestEmail?: RequestEmailActions;
   /**
    * The Principal's own memos (2026-10-12 — the user: a memo reaches its person in every view and is acknowledged
    * once): their People record's, handed in by the layout for a Principal whose login a record names. While they view
@@ -188,7 +195,7 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
 
 const NO_NOTICES: Notices = { unread: 0, items: [] };
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, own, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -253,6 +260,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [schemeOpen, setSchemeOpen] = useState(false);
   // Profile › Change password's sheet (2026-10-12).
   const [pwOpen, setPwOpen] = useState(false);
+  // …and Request to change email's (2026-10-16).
+  const [emailOpen, setEmailOpen] = useState(false);
   const [reqFilter, setReqFilter] = useState<RequestFilter>("all");
   const [reqPick, setReqPick] = useState<string | null>(null);
   const [reqForm, setReqForm] = useState<RequestKindVM | null>(null);
@@ -1131,10 +1140,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen || pwOpen);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen || pwOpen || emailOpen);
   // Change password: the login is a person's own (the layout hands the action only then), and it is their own Profile —
   // not a member viewed, not the demo.
   const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
+  const ownEmail = requestEmail && !viewed && !data.demo && !fixture ? requestEmail : null;
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
@@ -1313,6 +1323,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         signOut,
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
         changePassword: ownPassword ? () => setPwOpen(true) : undefined,
+        changeEmail: ownEmail ? () => setEmailOpen(true) : undefined,
       }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
     }
   } else {
@@ -1426,6 +1437,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             onFile={memoPick && source.memoFile && !fxp ? mode => openMemoFile(memoPick, mode) : undefined} />}
           {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
           {!route.pf && ownPassword && <PasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} change={ownPassword} />}
+          {!route.pf && ownEmail && <EmailSheet open={emailOpen} onClose={() => setEmailOpen(false)} actions={ownEmail} />}
         </>
       )}
       {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}

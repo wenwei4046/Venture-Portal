@@ -18,6 +18,7 @@ import type { OrgDirector } from './_components/org-chart-types'
 import { loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
+import { subsInReach } from '@/lib/sub-department-reach'
 import { loadMembershipDestinations } from '../../_lib/membership-destinations'
 import { loadEmployeeDepartmentDestinations } from '../../_lib/employee-destinations'
 
@@ -56,14 +57,16 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   const employmentToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const { sub } = await params
   // The same authenticated/RLS-filtered list used by the sidebar. Only
-  // siblings of this route belong on its overview, not another department.
-  const subDepartments = await listSubDepartments()
+  // siblings of this route belong on its overview, not another department —
+  // and only those the viewer reaches in Sales Groups (2026-10-16: what they
+  // handle, every one when they handle none, their own ticks over it).
+  const subDepartments = subsInReach(await listSubDepartments(), user.reach, 'sales_groups')
   const subDept = subDepartments.find(department => department.slug === sub)
   if (!subDept) notFound()
 
   // Nothing can be charted against a sub-department with no scheme: a rank is
   // a scheme's row, and a position points at one.
-  const switcher = await loadSwitcherData(user, subDept)
+  const switcher = await loadSwitcherData(user, subDept, 'sales_groups')
   const head = <SalesGroupsHead name={subDept.name} switcher={switcher} />
   if (!subDept.schemeId) return <NoScheme subDept={subDept} head={head} />
 
