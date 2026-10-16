@@ -7,7 +7,8 @@ import { AT } from "./shell/ViewSwitchCurtain";
 // The switch to the CRM on a phone (2026-10-17 — the user: "when revenue app, press switch to crm, i want is have a
 // motion"; the handoff "Revenue → CRM switch view motion", design 2c "Peach · Context"): Today's chat button and Profile's
 // My leads & appointments alike put a curtain up, the CRM goes in under it at 950ms, and it lifts only once the CRM has
-// drawn. The CRM's way out still leads to where it was opened.
+// drawn. The way out goes behind the mirror curtain (the user: "也做一个反方向的幕布") and still leads to where the CRM
+// was opened.
 vi.mock("next/navigation", () => ({
   usePathname: () => "/member/preview",
   useSearchParams: () => new URLSearchParams(window.location.search),
@@ -18,18 +19,20 @@ vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
-// The CRM draws when the test says so: "CRM drawn" stands for its kept copy or its first read landing.
+// The CRM draws when the test says so: "CRM drawn" stands for its kept copy or its first read landing. Its house is the
+// CRM's own button (as SalesInbox draws it); "Leave the CRM" stands for any other way out (a header's back).
 vi.mock("../crm/CrmApp", () => ({
   default: ({ onExit, onReady }: { onExit: () => void; onReady?: () => void }) => (
     <>
       <button onClick={() => onReady?.()}>CRM drawn</button>
+      <span onClick={onExit} title="Back to Revenue app" aria-label="Back to Revenue app">⌂</span>
       <button onClick={onExit}>Leave the CRM</button>
     </>
   ),
 }));
 
-type Lift = { el: Element; frames: Keyframe[]; finish: () => void };
-let anims: Lift[] = [];
+type Anim = { el: Element; frames: Keyframe[]; finish: () => void };
+let anims: Anim[] = [];
 
 class NoResize { observe() {} unobserve() {} disconnect() {} }
 beforeEach(() => {
@@ -57,14 +60,25 @@ afterEach(() => {
 
 const view = () => new URLSearchParams(window.location.search).get("view");
 const page = () => new URLSearchParams(window.location.search).get("page");
-const curtain = () => screen.queryByRole("status", { name: "Opening CRM" });
-const lifting = () => anims.find(a => a.el === curtain() && JSON.stringify(a.frames).includes("-100%"));
+const curtain = (to = "CRM") => screen.queryByRole("status", { name: `Opening ${to}` });
+const leaving = (to = "CRM") => anims.find(a => a.el === curtain(to) && a.frames.length === 2 && (a.frames[0] as { transform?: string }).transform === "translateY(0)");
 async function open(search: string) {
   window.history.replaceState({}, "", `/member/preview${search}`);
   render(<RevenueApp initialData={protoData()} initialSearch={search} today="2026-10-03" fixture={protoFixture()} crm />);
   await act(async () => {});
 }
 const wait = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
+/** Into the CRM, drawn, the curtain gone. */
+async function inCrm(search = "") {
+  await open(search);
+  fireEvent.click(search ? screen.getByRole("button", { name: /My leads & appointments/ }) : screen.getByRole("button", { name: "Open CRM" }));
+  await wait(AT.swap);
+  fireEvent.click(screen.getByRole("button", { name: "CRM drawn" }));
+  await wait(AT.uncover - AT.swap);
+  await act(async () => { leaving()!.finish(); });
+  expect(curtain()).not.toBeInTheDocument();
+  anims = [];
+}
 
 describe("the switch to the CRM on a phone", () => {
   it("from Today's chat button: the button squeezes and ripples, the curtain rises, the CRM goes in under it at 950ms", async () => {
@@ -85,36 +99,56 @@ describe("the switch to the CRM on a phone", () => {
     expect(curtain()).toBeInTheDocument();
   });
 
-  it("holds over a CRM still drawing and lifts once it has drawn — then the CRM's way out leads back to Today", async () => {
+  it("holds over a CRM still drawing and lifts once it has drawn", async () => {
     await open("");
     fireEvent.click(screen.getByRole("button", { name: "Open CRM" }));
     await wait(AT.uncover + 1000);
-    expect(lifting()).toBeUndefined();
+    expect(leaving()).toBeUndefined();
     fireEvent.click(screen.getByRole("button", { name: "CRM drawn" }));
     await wait(AT.uncover - AT.textOut);
-    const lift = lifting();
+    const lift = leaving();
     expect(lift).toBeDefined();
     await act(async () => { lift!.finish(); });
     expect(curtain()).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Leave the CRM" }));
-    await act(async () => {});
-    expect([page(), view()]).toEqual([null, null]);
   });
 
-  it("from Profile's My leads & appointments too — and its way out leads back to Profile", async () => {
-    await open("?page=account");
-    fireEvent.click(screen.getByRole("button", { name: /My leads & appointments/ }));
+  it("the house: its squeeze and a ripple laid over it, the mirror curtain, Today in under it at 950ms, gone at once", async () => {
+    await inCrm();
+    const house = screen.getByLabelText("Back to Revenue app");
+    fireEvent.pointerDown(house);
+    fireEvent.click(house);
     await act(async () => {});
-    expect(curtain()).toBeInTheDocument();
-    expect(view()).toBeNull();
-    await wait(AT.swap);
+    expect(anims.some(a => a.el === house && JSON.stringify(a.frames).includes("scale(.96)"))).toBe(true);
+    const ripple = anims.find(a => JSON.stringify(a.frames).includes("scale(1.6)"));
+    expect(ripple?.el.parentElement?.className).toMatch(/press/);
+    // Down from the top: the mirror of the way in.
+    expect(curtain("Revenue")).toHaveTextContent("Now opening");
+    expect(anims.find(a => a.el === curtain("Revenue"))?.frames[0]).toEqual({ transform: "translateY(-100%)", borderRadius: "0 0 40px 40px" });
     expect(view()).toBe("crm");
-    fireEvent.click(screen.getByRole("button", { name: "CRM drawn" }));
-    await wait(AT.uncover);
-    await act(async () => { lifting()!.finish(); });
-    expect(curtain()).not.toBeInTheDocument();
+    fireEvent.click(house);
+    expect(screen.getAllByRole("status", { name: "Opening Revenue" })).toHaveLength(1);
+    await wait(AT.swap);
+    expect([page(), view()]).toEqual([null, null]);
+    // The app is drawn already: no hold — it leaves through the bottom at 1850ms.
+    await wait(AT.uncover - AT.swap);
+    const out = leaving("Revenue");
+    expect(out?.frames[1]).toEqual({ transform: "translateY(100%)", borderRadius: "40px 40px 0 0" });
+    await act(async () => { out!.finish(); });
+    expect(curtain("Revenue")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open CRM" })).toBeInTheDocument();
+  });
+
+  it("from Profile's My leads & appointments too — any way out goes behind the curtain, back to Profile", async () => {
+    await inCrm("?page=account");
     fireEvent.click(screen.getByRole("button", { name: "Leave the CRM" }));
     await act(async () => {});
+    // No house pressed: no ripple, the curtain alike.
+    expect(anims.some(a => JSON.stringify(a.frames).includes("scale(1.6)"))).toBe(false);
+    expect(curtain("Revenue")).toBeInTheDocument();
+    await wait(AT.swap);
     expect([page(), view()]).toEqual(["account", null]);
+    await wait(AT.uncover - AT.swap);
+    await act(async () => { leaving("Revenue")!.finish(); });
+    expect(curtain("Revenue")).not.toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import tuck from "@/components/pwa/tuck.module.css";
 import { ICON, Svg } from "../icons";
 import type { Screen } from "../route";
 import s from "../shell.module.css";
+import { pressFeedback } from "./ViewSwitchCurtain";
 
 export interface Me {
   name: string;
@@ -17,17 +18,6 @@ export interface Me {
 
 /** A badge's figure: the count, `99+` above 99. */
 export const badgeCount = (n: number) => (n > 99 ? "99+" : String(n));
-
-/**
- * The CRM chat button's tap (2026-10-17, the switch handoff's chip press): a small squeeze, 1 → .96 → 1 in 250ms, and a
- * ripple from the icon's middle, .2 → 1.6 while it fades from .3, in 450ms — while the curtain gets ready to rise.
- */
-export function pressFeedback(button: HTMLElement, ripple: HTMLElement | null) {
-  if (typeof button.animate !== "function") return;
-  if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  button.animate([{ transform: "scale(1)" }, { transform: "scale(.96)" }, { transform: "scale(1)" }], { duration: 250, easing: "linear" });
-  ripple?.animate([{ transform: "scale(.2)", opacity: .3 }, { transform: "scale(1.6)", opacity: 0 }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)" });
-}
 
 /**
  * The phone header (`header-style="d"`): wordmark, then Fair ▾ · bell · avatar in one capsule — and, on Today for an

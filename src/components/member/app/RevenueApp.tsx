@@ -196,6 +196,9 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
 
 const NO_NOTICES: Notices = { unread: 0, items: [] };
 
+/** The CRM's way back to the app — its house, a button the CRM draws itself (crm/sales/SalesInbox, crm/panel). */
+const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue app"]';
+
 export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
@@ -638,10 +641,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [crmFrom, setCrmFrom] = useState<Screen | null>(null);
   // On a phone the CRM comes in behind a curtain (2026-10-17 — the user: "when revenue app, press switch to crm, i want
   // is have a motion"; the handoff "Peach · Context", shell/ViewSwitchCurtain): from Today's chat button and from
-  // Profile's row alike. `switching` holds where its way back leads (null: Profile's own back) until the curtain has
-  // lifted — a tap meanwhile changes nothing. The curtain lifts once the CRM has drawn (`crmReady`, CrmApp's onReady).
+  // Profile's row alike. Going in, `switching` holds where its way back leads (null: Profile's own back) until the
+  // curtain has lifted — a tap meanwhile changes nothing. The curtain lifts once the CRM has drawn (`crmReady`, CrmApp's
+  // onReady). Every way out of the CRM goes behind the mirror curtain (the user: "也做一个反方向的幕布"), the house's
+  // press with it (`press`).
   const curtained = live && !desk;
-  const [switching, setSwitching] = useState<{ from: Screen | null } | null>(null);
+  const [switching, setSwitching] = useState<{ to: "crm"; from: Screen | null } | { to: "revenue"; press: HTMLElement | null } | null>(null);
   const [crmReady, setCrmReady] = useState(false);
   useEffect(() => {
     if (!onCrm && crmReady) setCrmReady(false);
@@ -649,7 +654,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const openCrm = useCallback(() => {
     const from = route.screen;
     if (curtained) {
-      setSwitching(prev => prev ?? { from });
+      setSwitching(prev => prev ?? { to: "crm", from });
       return;
     }
     goScreen("account", { pf: "crm" });
@@ -658,6 +663,27 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   useEffect(() => {
     if (!onCrm && crmFrom) setCrmFrom(null);
   }, [onCrm, crmFrom]);
+  // The CRM's way out: back where Today's chat button opened it, else to Profile, whose row did.
+  const leaveCrm = () => {
+    if (crmFrom) {
+      setCrmFrom(null);
+      goScreen(crmFrom);
+    } else goScreen("account");
+  };
+  // What the finger last pressed in the CRM on a phone: its house is the CRM's own button, so the way back's press is
+  // found here (a capture listener — nothing in the CRM can stop it).
+  const pressed = useRef<Element | null>(null);
+  useEffect(() => {
+    if (!curtained || !onCrm) return;
+    const note = (e: PointerEvent) => { pressed.current = e.target instanceof Element ? e.target : null; };
+    document.addEventListener("pointerdown", note, true);
+    return () => document.removeEventListener("pointerdown", note, true);
+  }, [curtained, onCrm]);
+  const exitCrm = () => {
+    if (!curtained) return leaveCrm();
+    const press = pressed.current?.closest<HTMLElement>(CRM_HOUSE) ?? null;
+    setSwitching(prev => prev ?? { to: "revenue", press });
+  };
 
   const todo = (t: TodayTodo) => {
     if (t.target === "memos") goScreen("account", { pf: "memos" });
@@ -1334,7 +1360,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        onExit={crmFrom ? () => { const to = crmFrom; setCrmFrom(null); goScreen(to); } : back} deskApp={desk ? {
+        onExit={exitCrm} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
@@ -1347,7 +1373,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // My leads & appointments carries the chats' unread messages, the same live count as Today's chat button (the owner,
       // 2026-10-14: "有任何消息，幫我出現 notification 在 revenue apps 的 my leads & appointment 中").
       page = <ProfileMain vm={docs.unseen || crmUnread ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(crm && crmUnread ? { crm: crmUnread > 99 ? "99+" : String(crmUnread) } : {}) } } : profileVM} hidden={hidden} crm={crm} closedRows={closedRows} push={!data.demo && !viewed} actions={{
-        open: (key: WorkKey) => (key === "crm" && curtained ? setSwitching(prev => prev ?? { from: null }) : goScreen("account", { pf: key })),
+        open: (key: WorkKey) => (key === "crm" && curtained ? setSwitching(prev => prev ?? { to: "crm", from: null }) : goScreen("account", { pf: key })),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,
         toggleHide: incomeShut ? undefined : () => setHidden(!hidden),
@@ -1479,13 +1505,17 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   return (
     <div ref={appRef} className={`${base.root} ${s.app}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
       {live ? screen : <div className={`${s.frame} ${frame}`}>{screen}</div>}
-      {switching && (
+      {switching?.to === "crm" && (
         <ViewSwitchCurtain from="Revenue" to="CRM" ready={crmReady} screen={screenRef}
           onSwap={() => {
             goScreen("account", { pf: "crm" });
             if (switching.from) setCrmFrom(switching.from);
           }}
           onDone={() => setSwitching(null)} />
+      )}
+      {switching?.to === "revenue" && (
+        <ViewSwitchCurtain back from="CRM" to="Revenue" ready screen={screenRef} press={switching.press}
+          onSwap={leaveCrm} onDone={() => setSwitching(null)} />
       )}
     </div>
   );
