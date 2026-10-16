@@ -75,6 +75,13 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const adSt = ui.adSt;
   const shownAds = ads.filter(a => adSt === "all" || statusOf(a.id) === adSt);
   const ruleOf = (id: string): CrmAdRule | undefined => data.adRules.find(r => r.adId === id);
+  // Opening an ad — from its card, from "needs attention", or the first one when Ads to teams opens — always loads its saved
+  // split into the editor (the owner, 2026-10-16: Revenue Director set to 100% came back as 25% each — the automatic
+  // first-ad open set only `ad`, so the editor drew the default split).
+  const openAdById = (id: string) => { const rule = ruleOf(id);
+    set(u => ({ ...u, ad: id, stage: "op", adLog: false, adMode: rule?.mode === "even" ? "evenly" : "team",
+      tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},
+      split: rule && rule.mode !== "even" ? { ...rule.split } : null })); };
   const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
     const m = fromDb(r.tm?.[t.id]), mem = t.people, val = (pid: string) => r.pp[pid] ?? 0;
     const detail = m === "pct" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}%`).join(" · ") : m === "max" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}`).join(" · ") : "";
@@ -95,10 +102,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
       splitNote: r ? (r.mode === "even" ? "Evenly · each team an equal share" : "Custom split") : "Evenly by default", noteC: "#806B60",
       metricV: String(a.leads), metricL: "leads",
       flag: noAppt(a) ? "No appointments" : null as string | null, hasFlag: noAppt(a),
-      open: () => { const rule = ruleOf(a.id);
-        set(u => ({ ...u, ad: a.id, stage: "op", adMode: rule?.mode === "even" ? "evenly" : "team",
-          tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},
-          split: rule && rule.mode !== "even" ? { ...rule.split } : null })); } }; });
+      open: () => openAdById(a.id) }; });
   const stN = (k: string) => (k === "all" ? ads.length : ads.filter(a => statusOf(a.id) === k).length);
   const stCur = { label: ST_META[adSt][0], color: ST_META[adSt][1], tint: ST_META[adSt][3], ink: ST_META[adSt][4], n: stN(adSt) };
   const stOpts = (["Running", "Paused", "Pending", "all"] as const).map(k => ({ label: ST_META[k][0], color: ST_META[k][1], hint: ST_META[k][2], n: stN(k), tint: ST_META[k][3], ink: ST_META[k][4],
@@ -218,7 +222,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     sendGroups, closeSend: () => patch({ sendFor: null }),
     awOpen, aw, awAssign: () => patch({ sendFor: ui.awChat, awMenuOpen: false }), awMenu: ui.awMenuOpen, awMenuToggle: () => set(u => ({ ...u, awMenuOpen: !u.awMenuOpen })),
     awRemind: () => { if (awC) { patch({ awMenuOpen: false }); void remind(ctx, awC.id); } }, closeAw: () => patch({ awChat: null }),
-    adCards, stOpen: ui.stOpen, toggleSt: () => set(u => ({ ...u, stOpen: !u.stOpen })), stCur, stOpts,
+    adCards, openAdById, stOpen: ui.stOpen, toggleSt: () => set(u => ({ ...u, stOpen: !u.stOpen })), stCur, stOpts,
     ...adEdit, ...ftEdit,
     teamOf: (id: string | null) => teamNameOf(ctx, id),
   };

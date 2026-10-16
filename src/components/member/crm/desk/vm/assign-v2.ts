@@ -60,7 +60,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   // Needs attention: an ad whose leads wait because a By max team is full (the live rule — an ad with no split is dealt evenly, so nothing else waits).
   const attn = ads.filter(a => a.cs.some(c => c.held && !c.assignedTo)).map((a, i) => { const n = a.cs.filter(c => c.held && !c.assignedTo).length;
     return { title: a.label, sub: `${n} ${n === 1 ? "lead waits" : "leads wait"} · a team is at its max`, btn: "Set up", bt: i ? "1px solid #F3DCC4" : "0",
-      go: () => patch({ ad: a.id, stage: "op", adLog: false }) }; });
+      go: () => as.openAdById(a.id) }; });
 
   // ── Ad performance (the open ad): Today · This week · This month · Custom (its calendar: pick the start, then the end).
   const ad = ui.ad ? ads.find(a => a.id === ui.ad) : undefined;

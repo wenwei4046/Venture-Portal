@@ -233,9 +233,9 @@ export default function DeskScreens(p: DeskScreensProps) {
   const seedKey = `${ui.tab}:${ui.pick}:${ui.stage}`;
   useEffect(() => {
     if (seeded.current === seedKey) return;
-    if (v.adSeed) { seeded.current = seedKey; patch({ ad: v.adSeed }); }
+    if (v.adSeed) { seeded.current = seedKey; v.openAdById(v.adSeed); }
     else if (v.ftSeed) { seeded.current = seedKey; v.ftSeed(); }
-  }, [seedKey, v.adSeed, v.ftSeed, patch]);
+  }, [seedKey, v.adSeed, v.ftSeed, v.openAdById, patch]);
 
   // The prototype's keyboard: ↑ ↓ walk the number fields of the open editor; Esc closes the menu, then the pane.
   const closeRef = useRef(v.closePane);
