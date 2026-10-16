@@ -144,7 +144,10 @@ module.exports = [
   // 标记的地方"): the house is on Insight too — the page Team opens on — so the way back to the Revenue app is there at once.
   ['<span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>',
     '{!!(v.houseOv) && (<>' + switchBack("              ") + '</>)}\n              <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "13px", fontWeight: "650" }}>{v.ov.meIni}</span>'],
-  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n','</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + switchBack("              ") + "\n"],
+  // 2026-10-16, later (the owner, crossing out the house on Team's Inbox: "在 inbox, 右上角的功能是 人像，鈴鐺，contacts（小房子
+  // 不需要）"): the Inbox's title row reads Team | Mine, the bell, then Contacts — the house only on Insight (houseOv).
+  ['</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n','</svg>Contacts</span>\n            {!!(v.bellIn) && (<>\n              ' + SWAP("              ") + "\n"],
+  ['<span onClick={v.ib.openPc} style={{ flex: "none",', '<span onClick={v.ib.openPc} style={{ order: "1", flex: "none",'],
   // …so Profile's card has no bell in its corner, and its name the whole row.
   ['<div style={{ display: "flex", alignItems: "center", gap: "14px", paddingRight: "48px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>',
     '<div style={{ display: "flex", alignItems: "center", gap: "14px" }}>\n              <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", background: "#4E2F20", color: "#fff", display: "grid", placeItems: "center", fontSize: "20px", fontWeight: "650" }}>{v.pf.meIni}</span>'],
