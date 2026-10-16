@@ -182,7 +182,7 @@ function StepCard({ step, index, steps, canManage, onChange, onRemove, onMove }:
   const others = steps.filter(x => x.id !== step.id)
   const label = (id: string) => {
     const at = steps.findIndex(x => x.id === id)
-    return at < 0 ? id : `第 ${at + 1} 步：${(steps[at].text || '').slice(0, 16) || STEP_KIND_LABEL[steps[at].kind]}`
+    return at < 0 ? id : `第 ${at + 1} 步：${Array.from(steps[at].text || '').slice(0, 14).join('') || STEP_KIND_LABEL[steps[at].kind]}`
   }
   const setKind = (kind: FlowStepKind) =>
     onChange(kind === 'question'
@@ -215,11 +215,11 @@ function StepCard({ step, index, steps, canManage, onChange, onRemove, onMove }:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className={s.hint}>按鈕 Buttons（最多 13 個，每個 20 字內）</span>
           {(step.buttons ?? []).map((b, bi) => (
-            <div key={bi} className={s.inline} style={{ alignItems: 'center' }}>
-              <input className={s.search} style={{ flex: '1 1 120px' }} value={b.label} maxLength={20} disabled={!canManage} aria-label="Button"
+            <div key={bi} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 1fr) auto minmax(140px, 1.6fr) auto', gap: 6, alignItems: 'center' }}>
+              <input className={s.search} style={{ minWidth: 0 }} value={b.label} maxLength={20} disabled={!canManage} aria-label="Button"
                 onChange={e => onChange({ buttons: (step.buttons ?? []).map((x, j) => (j === bi ? { ...x, label: e.target.value } : x)) })} />
               <span className={s.hint}>→</span>
-              <select className={s.select} style={{ flex: '1 1 160px' }} value={b.next} disabled={!canManage} aria-label="Leads to"
+              <select className={s.select} style={{ minWidth: 0, width: '100%' }} value={b.next} disabled={!canManage} aria-label="Leads to"
                 onChange={e => onChange({ buttons: (step.buttons ?? []).map((x, j) => (j === bi ? { ...x, next: e.target.value } : x)) })}>
                 {steps.map(x => <option key={x.id} value={x.id}>{label(x.id)}</option>)}
               </select>
