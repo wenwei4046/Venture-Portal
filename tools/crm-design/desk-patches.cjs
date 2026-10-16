@@ -64,5 +64,11 @@ module.exports = [
   ...require("./resize-patches.cjs"),
   // Insight › Ads Performance's table sorts and sizes as Ads Performance's (the owner, 2026-10-13) — insight-table-patches.cjs.
   ...require("./insight-table-patches.cjs"),
+  // Ads to teams' editor names its ad (the owner, 2026-10-16: the chat showed Meta's headline "Chat with us" — "顯示廣告的
+  // 名稱"): the title is typed in place for CRM · Manage (vm/assign.ts › ad.canName; crm_name_ad), Meta's headline as the
+  // hint. The prototype harness binds no canName, so its frames keep the design's title.
+  ['<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>',
+    '{v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ width: "100%", boxSizing: "border-box", margin: "0", padding: "1px 0 3px", border: "0", borderBottom: "1px dashed #D9C7BA", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#3F2B22", outline: "none" }} />) : (<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>)}',
+    "Ads to teams' editor: the ad's name typed in place (CRM · Manage), saved on blur / Enter through crm_name_ad; the harness keeps the title."],
 ];
 

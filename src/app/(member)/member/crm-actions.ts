@@ -35,6 +35,8 @@ const CRM_WRITES = [
   "crm_star_message",
   // The chat composer's Recents (mig 20261014251500): one's own recent emoji.
   "crm_save_recent_emoji",
+  // An ad's name (mig 20261016120000), CRM · Manage.
+  "crm_name_ad",
   // CRM Desktop v2 · Channels: link / unlink a Page or number, its default (mig 20261015100000).
   "crm_set_channel",
 ] as const;
@@ -109,7 +111,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad",
   "crm_set_channel",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
@@ -178,7 +180,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars,
+      forms: more.forms, notes: more.notes, stars: more.stars, adNames: more.adNames,
     }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
@@ -196,7 +198,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -207,8 +209,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ message_id: string }[]>(db.from("crm_message_stars").select("message_id")),
     // One's own recent emoji, the chat composer's Recents (mig 20261014251500).
     soft<{ recent_emoji: string[] | null }[]>(db.from("crm_staff_prefs").select("recent_emoji")),
+    // Ads' names (mig 20261016120000).
+    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source")),
   ]);
-  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [] };
+  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

@@ -1185,7 +1185,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </svg>Assignment</span>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <h2 style={{ margin: "0", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.as.ae.name}</h2>
+                    {v.as.ae.canName ? (<input aria-label="Ad name" value={v.as.ae.nameDraft} onChange={v.as.ae.onName} onBlur={v.as.ae.saveName} onKeyDown={v.as.ae.nameKey} placeholder={v.as.ae.headline} maxLength={120} style={{ width: "100%", boxSizing: "border-box", margin: "0", padding: "2px 0 4px", border: "0", borderBottom: "1px dashed #D9C7BA", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "#3F2B22", outline: "none" }} />) : (<h2 style={{ margin: "0", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.as.ae.name}</h2>)}
                     <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "#806B60" }}>{v.as.ae.page} · Total leads {v.as.ae.leads}</small>
                   </span>
                 </div>
