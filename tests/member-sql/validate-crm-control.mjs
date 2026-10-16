@@ -79,6 +79,9 @@ const name = staff => ({ [S('ann')]: 'ann', [S('amir')]: 'amir', [S('ben')]: 'be
   check([name(a.team_id), name(b.team_id)].sort(), ['tla', 'tlb'], 'an ad nobody set: one enquiry to each team')
   check(!!a.assigned_to && !!b.assigned_to, true, '…each given to somebody in it')
   check(await arrive(null), { assigned_to: S('hod'), team_id: null }, 'an enquiry from no ad goes to the Revenue Director')
+  // The Revenue Director is one more "team" of the default even split (mig 20261016010000; the owner, 2026-10-16), last on a tie.
+  check(await arrive('AD-NONE'), { assigned_to: S('hod'), team_id: null }, 'an ad nobody set: the third enquiry to the Revenue Director, no team')
+  check(name((await arrive('AD-NONE')).team_id) !== null, true, '…and the fourth back to a team')
 }
 
 // 2. Evenly: everyone in the teams in turn.
@@ -86,8 +89,8 @@ await refused('ann', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even'
 await refused('boss', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}')`, [], /permission denied/, 'the old six-argument writer is nobody’s')
 await as('boss', `select public.crm_save_ad_assign('AD-E', 'Even ad', 'even', '{}', 'cnt', '{}', '{}')`)
 const even = []
-for (let i = 0; i < 5; i++) even.push(name((await arrive('AD-E')).assigned_to))
-check([...even].sort(), ['amir', 'ann', 'ben', 'tla', 'tlb'], 'Evenly: five leads, one each to the five people in the teams')
+for (let i = 0; i < 6; i++) even.push(name((await arrive('AD-E')).assigned_to))
+check([...even].sort(), ['amir', 'ann', 'ben', 'hod', 'tla', 'tlb'], 'Evenly: six leads, one each to the five people in the teams and the Revenue Director')
 await refused('boss', `select public.crm_save_ad_assign('AD-X', 'People', 'people', '{}', 'cnt', '{}', '{}')`, [], /Unknown assignment/, 'By people is merged into By team')
 
 // 3. By team %: 50 / 50; inside each, Evenly.
@@ -98,6 +101,16 @@ await as('boss', `select public.crm_save_ad_assign('AD-S', 'Split', 'split', $1,
 const split = []
 for (let i = 0; i < 4; i++) split.push(name((await arrive('AD-S')).team_id))
 check(split.sort(), ['tla', 'tla', 'tlb', 'tlb'], 'By team 50/50: two leads each')
+// The Revenue Director's row in a split (mig 20261016010000): its key, inside it Evenly; a By max past its limit deals evenly (no row to wait in).
+{
+  const dk = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+  await as('boss', `select public.crm_save_ad_assign('AD-D', 'Director', 'split', $1, 'cnt', '{}', $2)`, [JSON.stringify({ [S('tla')]: 50, [dk]: 50 }), JSON.stringify({ [S('tla')]: 'even', [dk]: 'even' })])
+  const got = []
+  for (let i = 0; i < 4; i++) { const r = await arrive('AD-D'); got.push(r.team_id === null ? name(r.assigned_to) : name(r.team_id)) }
+  check(got.sort(), ['hod', 'hod', 'tla', 'tla'], 'By team 50 / Revenue Director 50: two leads each, the director’s with no team')
+  await as('boss', `select public.crm_save_ad_assign('AD-DM', 'Director max', 'split', $1, 'cnt', $2, $3)`, [JSON.stringify({ [dk]: 100 }), JSON.stringify({ [S('hod')]: 1 }), JSON.stringify({ [dk]: 'cnt' })])
+  check([name((await arrive('AD-DM')).assigned_to), name((await arrive('AD-DM')).assigned_to)], ['hod', 'hod'], 'the Revenue Director past their maximum: dealt evenly, never left waiting')
+}
 
 // 4. By max inside each team: Ann 1 in Team A, Ben 1 in Team B. A full team HOLDS the lead (Over the limit) — never another team.
 const maxIn = JSON.stringify({ [S('tla')]: 'cnt', [S('tlb')]: 'cnt' })

@@ -10,7 +10,7 @@ import { urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
 import { first, initials, shortName, teamNameOf } from "./data";
 import { sendTo } from "./inbox";
-import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_TEAM, ST_META, teamColours } from "./tokens";
+import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META, teamColours } from "./tokens";
 
 const ago = (iso: string, now: Date) => { const m = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
   return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
@@ -23,6 +23,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const { ui, set, patch, data, now, teams } = ctx;
   const sheetOpen = ui.stage !== "menu";
   const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: t.people }));
+  // An ad's split has one more row, the Revenue Director, its people the directors (the owner, 2026-10-16; mig 20261016010000).
+  const TA = [...T, ...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: ctx.directors }] : [])];
 
   // ── Organic Leads and Awaiting reply: the rows, Send to / Assign, Remind (D1 / D4).
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -73,7 +75,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const adSt = ui.adSt;
   const shownAds = ads.filter(a => adSt === "all" || statusOf(a.id) === adSt);
   const ruleOf = (id: string): CrmAdRule | undefined => data.adRules.find(r => r.adId === id);
-  const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? T.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
+  const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
     const m = fromDb(r.tm?.[t.id]), mem = t.people, val = (pid: string) => r.pp[pid] ?? 0;
     const detail = m === "pct" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}%`).join(" · ") : m === "max" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}`).join(" · ") : "";
     return { color: t.color, pct: r.split[t.id], label: `${t.name.replace(/^Team /, "")} ${r.split[t.id]}%${m === "max" ? ` · max ${mem.reduce((s, p) => s + val(p.id), 0)}` : m === "pct" ? " · by %" : " · evenly"}`, detail: detail || null };
@@ -84,18 +86,18 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     return { name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? "#E8F3ED" : "#E4EDF8", chFg: a.wa ? "#387557" : "#2F6FB5",
       segs, set: !!r && r.mode !== null, unset: !r, status: st ?? "—", stColor: st ? ST_META[st][1] : "#C9B8AC", stTint: st ? ST_META[st][3] : "#F5EBE3",
       tag: null as string | null, noTag: true, tagBg: "#F5EBE3", tagFg: "#6B574C",
-      mode: r ? (r.mode === "even" ? "Evenly · each team 1/3" : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
+      mode: r ? (r.mode === "even" ? `Evenly · each team 1/${TA.length || 1}` : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
       bd: sel ? "#BD4A19" : "#EBDDD2", ring: sel ? "0 0 0 3px #FFF0E4" : "none",
       // v2's list row: the split as a bar (faint while on the default), its note, the leads, a flag when something is off.
       rowBg: sel ? "#FFF5EC" : "#fff",
-      segs2: (r && r.mode === "split" ? T.filter(t => (r.split[t.id] ?? 0) > 0).map(t => ({ color: t.color, pct: r.split[t.id], op: 1, label: t.name.replace(/^Team /, ""), pctS: `${r.split[t.id]}%` }))
-        : T.map(t => ({ color: t.color, pct: Math.round(100 / (T.length || 1)), op: r ? 1 : 0.4, label: t.name.replace(/^Team /, ""), pctS: `${Math.round(100 / (T.length || 1))}%` }))),
+      segs2: (r && r.mode === "split" ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => ({ color: t.color, pct: r.split[t.id], op: 1, label: t.name.replace(/^Team /, ""), pctS: `${r.split[t.id]}%` }))
+        : TA.map(t => ({ color: t.color, pct: Math.round(100 / (TA.length || 1)), op: r ? 1 : 0.4, label: t.name.replace(/^Team /, ""), pctS: `${Math.round(100 / (TA.length || 1))}%` }))),
       splitNote: r ? (r.mode === "even" ? "Evenly · each team an equal share" : "Custom split") : "Evenly by default", noteC: "#806B60",
       metricV: String(a.leads), metricL: "leads",
       flag: noAppt(a) ? "No appointments" : null as string | null, hasFlag: noAppt(a),
       open: () => { const rule = ruleOf(a.id);
         set(u => ({ ...u, ad: a.id, stage: "op", adMode: rule?.mode === "even" ? "evenly" : "team",
-          tm: Object.fromEntries(T.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},
+          tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},
           split: rule && rule.mode !== "even" ? { ...rule.split } : null })); } }; });
   const stN = (k: string) => (k === "all" ? ads.length : ads.filter(a => statusOf(a.id) === k).length);
   const stCur = { label: ST_META[adSt][0], color: ST_META[adSt][1], tint: ST_META[adSt][3], ink: ST_META[adSt][4], n: stN(adSt) };
@@ -106,11 +108,11 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const ad = ui.ad ? ads.find(a => a.id === ui.ad) : undefined;
   const adOpen = sheetOpen && opItem === "Ads to teams" && !!ad;
   const mode = ui.adMode, tm = ui.tm, mv = ui.mv;
-  const evenSplit = () => { const n = T.length || 1, base = Math.floor(100 / n); return Object.fromEntries(T.map((t, i) => [t.id, base + (i < 100 - base * n ? 1 : 0)])); };
-  const pctDefault = ui.split ?? (T.length === 3 ? Object.fromEntries(T.map((t, i) => [t.id, [50, 30, 20][i]])) : evenSplit());
+  const evenSplit = () => { const n = TA.length || 1, base = Math.floor(100 / n); return Object.fromEntries(TA.map((t, i) => [t.id, base + (i < 100 - base * n ? 1 : 0)])); };
+  const pctDefault = ui.split ?? (TA.length === 3 ? Object.fromEntries(TA.map((t, i) => [t.id, [50, 30, 20][i]])) : evenSplit());
   const setSplit = (id: string, raw: string) => {
     const v = Math.max(0, Math.min(100, (parseInt(String(raw).replace(/\D/g, ""), 10) || 0)));
-    const others = T.map(x => x.id).filter(n => n !== id), rest = others.reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
+    const others = TA.map(x => x.id).filter(n => n !== id), rest = others.reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
     const out: Record<string, number> = { [id]: v }; let left = 100 - v;
     others.forEach((n, i) => { const share = i === others.length - 1 ? left : rest ? Math.round(((100 - v) * (pctDefault[n] ?? 0)) / rest) : Math.round((100 - v) / others.length); out[n] = share; left -= share; });
     patch({ split: out });
@@ -120,7 +122,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const valOf = (t: (typeof T)[number], m: InMode, pid: string, k: number) => { const key = `${t.id}|${m}|${pid}`;
     if (mv[key] != null) return mv[key]; if (mv[pid] != null && m === inModeOf(t.id)) return mv[pid];
     return m === "pct" ? Math.round(100 / (t.people.length || 1)) + (k < 100 - Math.round(100 / (t.people.length || 1)) * t.people.length ? 0 : 0) : 0; };
-  const adTeams = T.map(t => { const m = inModeOf(t.id), mem = t.people;
+  const adTeams = TA.map(t => { const m = inModeOf(t.id), mem = t.people;
     const totalMax = mem.reduce((a2, p, k) => a2 + valOf(t, "max", p.id, k), 0), totalPct = mem.reduce((a2, p, k) => a2 + valOf(t, "pct", p.id, k), 0);
     return { name: t.name, color: t.color, share: `${pctDefault[t.id] ?? 0}%`, field: m !== "evenly", unit: m === "pct" ? "%" : "max",
       note: m === "max" ? `Up to ${totalMax} leads in this team` : m === "pct" ? (totalPct === 100 ? "Adds up to 100%" : `Adds up to ${totalPct}% · needs 100%`) : `Shared evenly among ${mem.length} people`,
@@ -134,22 +136,22 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const ruleFromDraft = () => {
     if (mode === "evenly") return { mode: "even" as const, split: {}, pm: "pct" as const, pp: {}, tm: undefined };
     const pp: Record<string, number> = {}, tmo: Record<string, "even" | "pct" | "cnt"> = {};
-    T.forEach(t => { const m = inModeOf(t.id); tmo[t.id] = toDb(m); t.people.forEach((p, k) => { pp[p.id] = valOf(t, m, p.id, k); }); });
+    TA.forEach(t => { const m = inModeOf(t.id); tmo[t.id] = toDb(m); t.people.forEach((p, k) => { pp[p.id] = valOf(t, m, p.id, k); }); });
     return { mode: "split" as const, split: { ...pctDefault }, pm: "pct" as const, pp, tm: tmo };
   };
   const draftOk = mode === "evenly" || (Object.values(pctDefault).reduce((a2, n) => a2 + n, 0) === 100
-    && T.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0) === 100; if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
+    && TA.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0) === 100; if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
   const saveOne = async (id: string, label: string) => ctx.act.saveAdRule(id, label, ruleFromDraft());
   const applyN = shownAds.length;
   const adEdit = {
     adOpen, ad: { name: ad?.label ?? "", meta: ad ? `${ad.wa ? "WhatsApp" : "Messenger"} · ${ad.leads} leads` : "" },
     adModes: ([["evenly", "Evenly"], ["team", "By team"]] as const).map(([v, label]) => ({ label, on: v === mode, off: v !== mode, pick: () => patch({ adMode: v }) })),
     adByTeam: mode === "team", adEvenly: mode !== "team",
-    adSplit: T.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (T.length || 1)), pctStr: String(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (T.length || 1))),
+    adSplit: TA.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1)), pctStr: String(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1))),
       onRange: (e: { target: { value: string } }) => setSplit(t.id, e.target.value) })),
     resetSplit: () => patch({ split: null, mv: {} }),
-    evenTotal: T.reduce((a2, t) => a2 + t.people.length, 0),
-    evenTeams: T.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
+    evenTotal: TA.reduce((a2, t) => a2 + t.people.length, 0),
+    evenTeams: TA.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
     adTeams, closeAd: () => patch({ ad: null }),
     applyLabel: `Save and apply to all ${applyN}${adSt === "all" ? "" : ` ${adSt.toLowerCase()}`} ads`,
     applyAll: () => { if (!ad || !draftOk) return; const list = shownAds.some(a => a.id === ad.id) ? shownAds : [...shownAds, ad];
