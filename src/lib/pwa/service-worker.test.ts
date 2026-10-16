@@ -92,6 +92,32 @@ describe('a push on the phone', () => {
     }
   })
 
+  // The review of #520 (2026-10-17): the place is read before the notice is shown, and `new URL('//', origin)` throws —
+  // a push that shows nothing is one an iPhone may take the app's notifications away for. An address no URL can be made
+  // of is the app's start; the notice, a CRM chat's too, is shown all the same, and a tap on it opens the start.
+  it('an address no URL can be made of still shows the notice, opening the app’s start', async () => {
+    const back = String.fromCharCode(92)
+    for (const url of ['//', '///', `/${back}`]) {
+      const { listeners, showNotification, clients } = worker()
+      let work: Promise<unknown> = Promise.resolve()
+      listeners.push({ data: { json: () => ({ title: 'x', url }) }, waitUntil: (p: Promise<unknown>) => { work = p } })
+      await work
+      expect(showNotification).toHaveBeenCalledTimes(1)
+      expect(showNotification.mock.calls[0][1]).toMatchObject({ navigate: `${ORIGIN}/` })
+
+      listeners.push({
+        data: { json: () => ({ title: 'Lww', body: 'Hi', url, tag: 'crm:c1', id: 'n1', crm: { ch: 'whatsapp', name: 'Lww', line: 'Hi', at: '2026-10-17T00:24:00Z' } }) },
+        waitUntil: (p: Promise<unknown>) => { work = p },
+      })
+      await work
+      expect(showNotification).toHaveBeenCalledTimes(2)
+      expect(showNotification.mock.calls[1][1]).toMatchObject({ navigate: `${ORIGIN}/` })
+
+      await tap(listeners, url)
+      expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}/`)
+    }
+  })
+
   // Android keeps only a badge's alpha and paints it white: a bare H looked plain to the user (2026-10-11), so the
   // badge is the mark's tile, white, with the H cut out — a tile, the one shape that place can show.
   it('the badge is a white tile with the H cut out, 96px, on transparent', async () => {

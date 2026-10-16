@@ -55,10 +55,19 @@ self.addEventListener('activate', (event) => {
  * which is what goes wrong on an iPhone: a tap reaches a worker only while the
  * app's page is alive, and `openWindow` then brought the app forward where it
  * was. Chrome reads no `navigate` and keeps `notificationclick` below.
+ *
+ * `placeOf` never throws (2026-10-17 review of #520): it runs before the
+ * notice is shown, and `new URL('//', origin)` throws — a push that shows
+ * nothing is one an iPhone may take the app's notifications away for.
  */
 function placeOf(url) {
-  const place = new URL(typeof url === 'string' && url.startsWith('/') ? url : '/', self.location.origin)
-  return place.origin === self.location.origin ? place.href : new URL('/', self.location.origin).href
+  const start = new URL('/', self.location.origin).href
+  try {
+    const place = new URL(typeof url === 'string' && url.startsWith('/') ? url : '/', self.location.origin)
+    return place.origin === self.location.origin ? place.href : start
+  } catch {
+    return start
+  }
 }
 
 self.addEventListener('push', (event) => {
