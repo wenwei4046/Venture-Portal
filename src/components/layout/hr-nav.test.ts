@@ -45,6 +45,22 @@ describe("HR's sidebar", () => {
     expect(sections.find(s => s.label === 'Admin')?.roman).toBe('III.')
   })
 
+  // Sub-departments per person (2026-10-16): each Revenue page opens one the viewer reaches there; none, no rows.
+  it('opens each Revenue page on its own sub-department, and leaves out a page with none', () => {
+    const rev = visibleHrNav(hrNavSections({ cc: 'fair', sg: 'ir', rules: null }), hr).find(s => s.label === 'Revenue')!
+    expect(rev.items.map(i => [i.label, i.href])).toEqual([
+      ['Comm Cal', '/revenue/fair'],
+      ['Sales chart', '/revenue/ir/hierarchy'],
+      ['Members', '/revenue/ir/hierarchy?tab=members'],
+      ['Waiting list', '/revenue/ir/hierarchy?tab=waiting'],
+      ['Replacement list', '/revenue/ir/hierarchy?tab=replacement'],
+      ['Requests', '/member-admin'],
+      ['Brand weeks', '/member-admin?tab=weeks'],
+      ['Claim rates', '/member-admin?tab=claims'],
+      ['Food claim', '/member-admin?tab=food'],
+    ])
+  })
+
   it('has no Revenue rows while there is no sub-department, but Member Services’ rows stay', () => {
     const rev = visibleHrNav(hrNavSections(null), hr).find(s => s.label === 'Revenue')!
     expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Claim rates', 'Food claim'])

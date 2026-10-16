@@ -4,7 +4,7 @@ import { canDo } from '@/lib/permission-actions'
 import { canAccessAttendance, canAccessDocumentation, canAccessHRCosting, canAccessHiring, canOpenPeople } from '@/lib/roles'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { Button } from '@/components/ds/Button'
-import { hrNavSections, visibleHrNav, type HrNavTone } from '@/components/layout/hr-nav'
+import { hrNavSections, visibleHrNav, type HrNavTone, type HrRevenueSubs } from '@/components/layout/hr-nav'
 import type { HrIconName } from '@/components/hrv/icons'
 import type { User } from '@/types'
 import type { HrOverviewData } from '../_lib/hr-overview'
@@ -26,7 +26,7 @@ const QUICK: ReadonlyArray<{ key: string; label: string; icon: HrIconName; tone:
   { key: 'docDocs', label: 'Documents', icon: 'doc', tone: 'olive', visible: canAccessDocumentation },
 ]
 
-export default function HrOverview({ user, data, revenueSub }: { user: User; data: HrOverviewData; revenueSub: string | null }) {
+export default function HrOverview({ user, data, revenueSub }: { user: User; data: HrOverviewData; revenueSub: string | null | HrRevenueSubs }) {
   const clock = officeClock()
   const { summary, badges } = data
   const sections = visibleHrNav(hrNavSections(revenueSub), user).filter(sec => sec.label !== null)

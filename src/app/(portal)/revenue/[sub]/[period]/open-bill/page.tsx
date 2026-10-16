@@ -37,7 +37,7 @@ export default async function OpenBillPage({ params }: PageProps) {
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
   // This month's Open Bill: its own setting, else Rules (2026-09-26).
   if (!subDept.schemeId || !(await openBillOnFor(supabase, subDept.id, period))) notFound()

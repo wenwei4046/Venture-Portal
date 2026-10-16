@@ -14,7 +14,15 @@ import {
   type TabView,
   type Tally,
 } from '@/lib/permission-tabs'
+import { AREA_OF_TAB, reachOf, tickedFor, type PersonReach, type ReachArea, type ReachTick } from '@/lib/sub-department-reach'
 import s from './tab-matrix.module.css'
+
+/** One person's sub-departments on the rows that carry them (2026-10-16): their reach, their own ticks, a click. */
+export interface MatrixReach {
+  person: PersonReach
+  ticks: readonly ReachTick[]
+  onToggle: (area: ReachArea, sub: string) => void
+}
 
 /**
  * The handoff's permission matrix (2026-10-11, People › Permissions and the
@@ -28,6 +36,12 @@ import s from './tab-matrix.module.css'
  * one box per column ticks it on every tab of the view, the last one every box
  * of the view; "–" while only some are. A tab whose View is ticked but whose
  * page would still not open says why under its name (`held`).
+ *
+ * One person's window (`reach`, 2026-10-16 — the owner: "在 CRM 权限那边，应该
+ * 可以让我去打勾，它是按 sub-department 去打勾的"): under a Revenue tab whose View
+ * is ticked — Comm Cal, Sales Groups, Rules, the CRM's two — a pill per
+ * sub-department, ticked where they reach it (what they handle, every one when
+ * they handle none), with the red dot where it was changed for them alone.
  */
 export default function TabMatrix({
   ticks,
@@ -39,6 +53,7 @@ export default function TabMatrix({
   onColumn,
   onAll,
   held,
+  reach,
   canEdit,
   compact = false,
 }: {
@@ -55,6 +70,8 @@ export default function TabMatrix({
   onAll: () => void
   /** Tab id → why its ticked View opens nothing yet. */
   held?: ReadonlyMap<string, string>
+  /** One person's sub-departments, on the Revenue rows that carry them. */
+  reach?: MatrixReach
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
@@ -103,11 +120,14 @@ export default function TabMatrix({
           const boxes = TAB_ACTIONS.filter(a => hasBox(t, a))
           const allOn = boxes.every(a => ticks.has(grantOf(t.id, a)))
           const why = held?.get(t.id)
+          const area = AREA_OF_TAB[t.id]
+          const subs = reach && area && ticks.has(grantOf(t.id, 'view')) && reach.person.subs.length > 0 ? area : null
           return (
             <div key={t.id} className={s.row} role="row">
               <span className={s.tabCell} role="rowheader">
                 {t.label}
                 {why ? <span className={s.held}>{why}</span> : null}
+                {subs ? <SubDepartmentPills reach={reach!} area={subs} tab={t.label} canEdit={canEdit} /> : null}
               </span>
               {TAB_ACTIONS.map(a => {
                 const g = grantOf(t.id, a)
@@ -141,6 +161,34 @@ export default function TabMatrix({
         })}
       </div>
     </div>
+  )
+}
+
+/** The sub-departments under one Revenue tab: ticked where they reach it, the red dot where it is theirs alone. */
+function SubDepartmentPills({ reach, area, tab, canEdit }: { reach: MatrixReach; area: ReachArea; tab: string; canEdit: boolean }) {
+  const on = reachOf(reach.person, reach.ticks, area)
+  return (
+    <span className={s.subs} role="group" aria-label={`${tab} · sub-departments`}>
+      {reach.person.subs.map(sub => {
+        const checked = on.has(sub.id)
+        return (
+          <button
+            key={sub.id}
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={`${tab} · ${sub.name}`}
+            disabled={!canEdit}
+            className={`${s.sub} ${checked ? s.subOn : ''}`}
+            onClick={() => reach.onToggle(area, sub.id)}
+          >
+            <span className={s.subTick} aria-hidden>{checked ? '✓' : ''}</span>
+            {sub.name}
+            {tickedFor(reach.ticks, area, sub.id) ? <span className={s.dot} aria-label="changed for this person" /> : null}
+          </button>
+        )
+      })}
+    </span>
   )
 }
 

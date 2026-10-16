@@ -30,13 +30,13 @@ export default async function RevenueRulesPage({ params }: PageProps) {
   await requirePage('/revenue/[sub]/rules')
   const user = await requirePermission('revenue')
   const { sub } = await params
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'rules')
   // Capacity is the member back office's to read: only for whoever manages
   // member requests, and then with the page, never after it.
   const [data, holders, switcher, capacity] = await Promise.all([
     loadCommissionSettings(subDept.schemeId),
     loadRankHolders(subDept.schemeId),
-    loadSwitcherData(user, subDept),
+    loadSwitcherData(user, subDept, 'rules'),
     can(user, 'member_requests_manage') ? loadSubDepartmentCapacity(subDept.id) : Promise.resolve(null),
   ])
 

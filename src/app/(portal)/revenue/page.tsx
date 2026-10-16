@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
-import { listSubDepartments } from './_lib/sub-departments'
+import { listReachedSubDepartments, listSubDepartments } from './_lib/sub-departments'
 import { loadCommissionSettings } from './_components/config/load'
 import FirstSubDepartment from './_components/FirstSubDepartment'
 
@@ -17,7 +17,11 @@ export default async function RevenueIndexPage() {
   await requirePermission('revenue')
 
   const subs = await listSubDepartments()
-  if (subs.length > 0) redirect(revenuePath(subs[0].slug))
+  if (subs.length > 0) {
+    // The first one the viewer reaches in Comm Cal (2026-10-16); none at all → their Overview.
+    const reached = await listReachedSubDepartments('comm_cal')
+    redirect(reached.length > 0 ? revenuePath(reached[0].slug) : '/dashboard')
+  }
 
   // Nothing to redirect to. The department cannot compute anything until it
   // has a sub-department carrying a scheme, so offer to make the first one.

@@ -11,7 +11,7 @@ import { FinViewProvider } from './fin-view'
 import FinSwipeBack from './FinSwipeBack'
 import FinScrollMemory from './FinScrollMemory'
 import { useViewAsSync } from './useViewAsSync'
-import { navRootPaths, withPathRevenueSub, type NavData } from './nav-config'
+import { navRootPaths, revenueSubsOf, withPathRevenueSub, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
@@ -124,7 +124,7 @@ export default function PortalFrame({
             {finShell ? (
               <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} />
             ) : (
-              <HrSidebar user={navUser} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
+              <HrSidebar user={navUser} revenueSub={revenueSubsOf(navData)} initialCollapsed={hrNavCollapsed} />
             )}
           </div>
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">

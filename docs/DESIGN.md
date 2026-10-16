@@ -1304,6 +1304,7 @@ The dense kit for lists of short strings, never money. It now serves the payroll
   - **Select all** (v3.53) shows ✓ when every box is ticked and "–" when only some are.
   - **Not open yet** (v3.53) says, under a ticked tab, why its page still won't open.
 - **The person window's matrix:** a red dot on a changed box. *Reset to title* and *Save* sit in the footer, and the foot reads *Unsaved changes to X* while there are edits. A reader gets no foot.
+  - **Sub-departments** (v4.69): under a Revenue tab whose View is ticked — Comm Cal, Sales Groups, Rules, *Profile · My leads & appointments*, *CRM · Team* (the CRM's two are one setting) — a pill per sub-department: 11px, a 12px tick square inside, fully rounded; peach inside the accent edge where they reach it, white where not; the red dot where it was changed for them alone. Saved with the boxes; *Reset to title* clears them. The template matrix draws none.
 
 ### Permission matrix (2026-10-08 — People Management › Permissions, the invite drawer, a person's card)
 
@@ -1590,6 +1591,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.69** · 2026-10-16 · A person's permission window: a pill per sub-department under the Revenue tabs (Comm Cal, Sales Groups, Rules, the CRM's two) — ticked where they reach it, the red dot where it is theirs alone → Permissions by view and tab
 - **v4.68** · 2026-10-16 · The CRM's Team Profile (the Control panel's) looks like the Revenue app's Profile too, as Mine's since v4.64: the glow behind a white card on a white page, a 56px avatar, Inter Tight on the avatar, the name and *Your workspace*, facts and rows at 650, *View as a team member* as the app's View as entry, rows ruled between in `--rv-rule`, the app's chevron and count → The Revenue app — the refresh
 - **v4.67** · 2026-10-16 · A person's full page goes on in the 360's wells: Promotion beside Employment, Permissions, Activity — each its title in spaced capitals beside its icon → People
 - **v4.66** · 2026-10-16 · Finance's phone app: the first button of Payment's bar says *Payment*, not *Create payment* — two words filled the 1.5-wide button edge to edge on the user's phone and did not sit centred; the sheet it opens is still *Create payment*, the desktop's buttons unchanged → Finance's view — the phone app
