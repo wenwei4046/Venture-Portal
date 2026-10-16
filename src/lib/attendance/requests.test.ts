@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountLabel, atLabel, bucketOf, flowNodes, kindLabel, rangeLabel, shownChanges, sinceLabel, statusOf, whenLabel } from './requests'
+import { amountLabel, atLabel, bucketOf, decidedToast, flowNodes, kindLabel, rangeLabel, shownChanges, sinceLabel, statusOf, whenLabel } from './requests'
 import type { AttLeaveType, AttRequest, AttStep } from './types'
 
 const step = (s: Partial<AttStep>): AttStep => ({
@@ -43,6 +43,15 @@ describe('Attendance › Requests words', () => {
     expect(sinceLabel(r, new Date('2026-10-14T20:10:00Z'))).toBe('20 h')
     expect(sinceLabel(r, new Date('2026-10-16T01:00:00Z'))).toBe('2 d')
     expect(sinceLabel(req({ status: 'approved', steps: [step({ state: 'approved' })] }), new Date())).toBe('')
+  })
+
+  it('says what was decided, counting a profile change’s fields in good English', () => {
+    const one = req({ kind: 'profile', who: 'LOO WEN WEI', detail: { changes: [{ key: 'email', field: 'Email' }] } })
+    expect(decidedToast(one, true)).toBe("Approved · LOO WEN WEI's record updated · 1 field")
+    expect(decidedToast(req({ kind: 'profile', detail: { changes: [{ field: 'Phone' }, { field: 'Bank' }] } }), true))
+      .toBe("Approved · Rajesh Kumar's record updated · 2 fields")
+    expect(decidedToast(one, false)).toBe('Rejected · record unchanged · LOO WEN WEI told')
+    expect(decidedToast(req({}), true)).toBe('Approved · Rajesh Kumar told')
   })
 
   it('writes the office clock', () => {
