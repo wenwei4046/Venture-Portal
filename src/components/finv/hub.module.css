@@ -80,6 +80,9 @@
   gap: 10px;
   align-content: start;
 }
+/* Approvals' cards keep the phone's words ("Submitted by the executive", "96 approved · 3 rejected"): one to a
+   row beside the table, three across when they wrap above it. */
+.cards[data-wide='true'] { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .hero {
   grid-column: 1 / -1;
   padding: 16px 16px 14px;

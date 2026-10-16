@@ -1,0 +1,57 @@
+/* The Approvals hub's drawer on the computer (2026-10-17): a combined approval's vouchers, each with its own
+   Approve / Reject (the old batch window's), its payee, number, pools and files — in the drawer's hand
+   (finv/drawer.module.css). Tokens only. */
+
+.members { margin: 0 16px; background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 12px; overflow: hidden; }
+.member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border-top: 1px solid var(--ds-border);
+}
+.member:first-child { border-top: 0; }
+.member[data-plain='true'] { grid-template-columns: minmax(0, 1fr) auto; }
+.toggle {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.toggle:disabled { cursor: default; }
+.toggle:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; border-radius: 99px; }
+.text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.name { font-size: 13.5px; color: var(--ds-ink); overflow-wrap: anywhere; }
+.sub { font-size: 11.5px; color: rgb(var(--hvs-muted)); overflow-wrap: anywhere; }
+.amount { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13.5px; color: var(--ds-ink); white-space: nowrap; }
+.member[data-off='true'] .name,
+.member[data-off='true'] .amount { color: rgb(var(--hvs-muted)); text-decoration: line-through; }
+.extras { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.member[data-plain='true'] .extras { grid-column: 1 / -1; }
+.fileChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ds-border);
+  border-radius: 7px;
+  background: var(--ds-surface);
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ds-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fileChip:hover { background: rgb(var(--hvs-nav-hover)); color: var(--ds-ink); text-decoration: none; }
+.loading { padding: 14px; font-size: 13px; color: rgb(var(--hvs-graphite)); }
+
+/* The hub's total: the oldest wait as its chip, under the figure. */
+.heroChip { margin-top: 10px; }

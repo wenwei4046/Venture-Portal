@@ -1,20 +1,16 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { DialogConfirm, DialogMenu, FinDialog, TextArea, type DialogMenuItem } from '@/components/finv/Dialog'
+import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import { drawerStyles as d } from '@/components/finv/Drawer'
-import fm from '@/components/finv/form.module.css'
-import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/DrawerParts'
-import { HrIcon } from '@/components/hrv/icons'
 import { APPROVALS_TAB_HREF, HUB_HREF } from '@/lib/fin-app/routes'
 import { plural, rm, type ApprovalCardKey, type ApprovalHubModel, type ApprovalMember, type ApprovalRecordModel, type ApprovalRow, type AppRecordRef } from '@/lib/fin-app/approval-model'
-import { approveRequestGroupPartial, approveRequestsBulk, rejectRequestsBulk } from '@/app/(portal)/approvals/actions'
 import { openApprovalRequest } from '@/app/(portal)/approvals/page-actions'
-import { approveLead, rejectLead } from '@/app/(portal)/approvals/_lib/decision-copy'
+import { useApprovalDecisions, type DecisionAsk } from '@/app/(portal)/approvals/_components/decisions'
+import { ApprovalHero, RequestBody, heroStatus } from '@/app/(portal)/approvals/_components/RequestParts'
 import { getAttachmentSignedUrl } from '@/app/(portal)/payments/actions'
-import { sizeOf } from '@/app/(portal)/payments/_components/VoucherDetailBody'
 import AppScreen, { PageHead, type BarButton, type BulkBar } from './AppScreen'
 import { canStepBack, pushIntent, setIntent, useStep } from './nav'
 import { BankHero, ListBlock, RecordItems, Row, SearchRow, StackCards, type ItemLine } from './parts'
@@ -66,47 +62,9 @@ export function parentSearch(step: ApprovalStep): string {
 const LIST_TITLE: Record<ApprovalCardKey, string> = { pending: 'Pending', exec: 'Submitted by the executive', decided: 'Decided · 30 days' }
 const BACK_LABEL: Record<ApprovalCardKey, string> = { pending: 'Pending', exec: 'Executive', decided: 'Decided' }
 const HERE = '/fin-app/page/approvals'
-const OVERDRAW = '允许部门池透支 · Allow dept-pool overdraw'
 
 /** A record of its own in the app. */
 const hrefOf = (r: AppRecordRef) => `${HUB_HREF[r.hub]}?id=${encodeURIComponent(r.id)}`
-
-/** The hero's status: its word and its light. */
-function heroStatus(status: string, may: boolean): { text: string; light: string } {
-  if (status === 'approved') return { text: 'Approved', light: 'ledger' }
-  if (status === 'rejected') return { text: 'Rejected', light: 'danger' }
-  if (status === 'partly') return { text: 'Partly approved', light: 'accent' }
-  return may ? { text: 'Pending', light: 'wait' } : { text: 'Awaiting sign-off', light: 'alert' }
-}
-
-/** The drawer's dark hero, for a request or a combined one. */
-function ApprovalHero({ kicker, status, no, amount, to, note }: { kicker: string; status: { text: string; light: string }; no: string | null; amount: string; to: string; note: string }) {
-  return (
-    <div className={d.hero} data-light={status.light}>
-      <div className={d.heroTop}>
-        <span className={d.kicker}>{kicker}</span>
-        <span className={d.heroChip}>
-          <span className={d.heroDot} />
-          {status.text}
-        </span>
-      </div>
-      {no ? <div className={d.heroNo}>{no}</div> : null}
-      <div className={d.heroAmount}>{amount}</div>
-      <div className={d.heroTo}>{to}</div>
-      <div className={d.heroNote}>
-        <span className={d.heroNoteDot} />
-        <span>{note}</span>
-      </div>
-    </div>
-  )
-}
-
-/** What a decision sheet is about: one request, what is ticked, or a combined one. */
-type Ask =
-  | { kind: 'approve' | 'reject'; scope: 'one'; record: ApprovalRecordModel }
-  | { kind: 'approve' | 'reject'; scope: 'bulk'; rows: ApprovalRow[] }
-  | { kind: 'approve' | 'reject'; scope: 'group'; row: ApprovalRow }
-  | { kind: 'split'; row: ApprovalRow; approve: string[]; reject: string[] }
 
 export default function ApprovalsApp({
   tab = false,
@@ -187,22 +145,25 @@ export default function ApprovalsApp({
 
   // ── Windows ──
   const [menu, setMenu] = useState<'bulk' | 'record' | 'group' | null>(null)
-  const [ask, setAsk] = useState<Ask | null>(null)
-  const [notes, setNotes] = useState('')
-  const [reason, setReason] = useState('')
-  const [overdraw, setOverdraw] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, startBusy] = useTransition()
-  const openAsk = (a: Ask) => {
+  // The decisions themselves are the queue's own (approvals/_components/decisions.tsx — the computer's hub decides the same way).
+  const decisions = useApprovalDecisions({
+    onDecided: ({ ask, keys }) => {
+      setGone((prev) => new Set([...prev, ...keys]))
+      if (ask.kind === 'split') {
+        if (step.kind === 'group') backTo()
+      } else if (ask.scope === 'bulk') {
+        setSelected(new Set())
+        setSelecting(false)
+      } else backTo()
+    },
+    onPartly: (keys) => {
+      setGone((prev) => new Set([...prev, ...keys]))
+      setSelected((prev) => new Set([...prev].filter((k) => !keys.includes(k))))
+    },
+  })
+  const openAsk = (a: DecisionAsk) => {
     setMenu(null)
-    setNotes('')
-    setReason('')
-    setOverdraw(false)
-    setError(null)
-    setAsk(a)
-  }
-  const closeAsk = () => {
-    if (!busy) setAsk(null)
+    decisions.ask(a)
   }
 
   const openRecord = (ref: AppRecordRef) => {
@@ -220,88 +181,6 @@ export default function ApprovalsApp({
       ({ url }) => window.open(url, '_blank', 'noopener,noreferrer'),
       () => flash('That file could not be opened just now.'),
     )
-  }
-
-  // ── Deciding ──
-  const decided = (keys: string[], said: string) => {
-    setGone((prev) => {
-      const next = new Set(prev)
-      for (const k of keys) next.add(k)
-      return next
-    })
-    setAsk(null)
-    flash(said)
-    router.refresh()
-  }
-  const failedText = (failed: Array<{ description: string; error: string }>, done: number, verb: string) =>
-    [done > 0 ? `${verb} ${done}.` : null, ...failed.map((f) => `${f.description === '—' ? 'A request' : f.description} — ${f.error}`)].filter(Boolean).join('\n')
-
-  const confirmAsk = () => {
-    if (!ask || busy) return
-    const text = reason.trim()
-    if ((ask.kind === 'reject' || (ask.kind === 'split' && ask.reject.length > 0)) && !text) {
-      setError('Please give a reason — it goes on the audit trail.')
-      return
-    }
-    setError(null)
-    startBusy(async () => {
-      try {
-        if (ask.kind === 'split') {
-          const res = await approveRequestGroupPartial({
-            groupId: ask.row.groupId as string,
-            approveApprovalIds: ask.approve,
-            rejectApprovalIds: ask.reject,
-            approveNotes: notes.trim(),
-            rejectReason: text,
-          })
-          if (!res.ok) return setError(res.reason)
-          decided(
-            [ask.row.key],
-            ask.reject.length === 0 ? `Approved ${plural(ask.approve.length, 'voucher', 'vouchers')}` : ask.approve.length === 0 ? `Rejected ${plural(ask.reject.length, 'voucher', 'vouchers')}` : `Approved ${ask.approve.length} · rejected ${ask.reject.length}`,
-          )
-          if (step.kind === 'group') backTo()
-          return
-        }
-        const rows: ApprovalRow[] = ask.scope === 'bulk' ? ask.rows : ask.scope === 'group' ? [ask.row] : []
-        const ids = ask.scope === 'one' ? [ask.record.id] : rows.filter((r) => r.kind === 'single' && r.id).map((r) => r.id as string)
-        const groupIds = rows.filter((r) => r.kind === 'group' && r.groupId).map((r) => r.groupId as string)
-        const keys = ask.scope === 'one' ? [ask.record.id] : rows.map((r) => r.key)
-        const name = ask.scope === 'one' ? (ask.record.no ?? ask.record.title) : ask.scope === 'group' ? ask.row.title : plural(rows.length, 'request', 'requests')
-        if (ask.kind === 'approve') {
-          const res = await approveRequestsBulk({ ids, groupIds, notes: notes.trim() || undefined, allowOverdraw: overdraw })
-          if (res.failed.length > 0) {
-            const failedKeys = new Set(res.failed.map((f) => (groupIds.includes(f.id) ? `g:${f.id}` : f.id)))
-            const done = keys.filter((k) => !failedKeys.has(k))
-            if (done.length > 0) {
-              setGone((prev) => new Set([...prev, ...done]))
-              setSelected((prev) => new Set([...prev].filter((k) => !done.includes(k))))
-              router.refresh()
-            }
-            return setError(failedText(res.failed, res.approved, 'Approved'))
-          }
-          decided(keys, `Approved · ${name}`)
-        } else {
-          const res = await rejectRequestsBulk({ ids, groupIds, notes: text })
-          if (res.failed.length > 0) {
-            const failedKeys = new Set(res.failed.map((f) => (groupIds.includes(f.id) ? `g:${f.id}` : f.id)))
-            const done = keys.filter((k) => !failedKeys.has(k))
-            if (done.length > 0) {
-              setGone((prev) => new Set([...prev, ...done]))
-              setSelected((prev) => new Set([...prev].filter((k) => !done.includes(k))))
-              router.refresh()
-            }
-            return setError(failedText(res.failed, res.rejected, 'Rejected'))
-          }
-          decided(keys, `Rejected · ${name}`)
-        }
-        if (ask.scope === 'bulk') {
-          setSelected(new Set())
-          setSelecting(false)
-        } else backTo()
-      } catch {
-        setError('That did not go through. Try again.')
-      }
-    })
   }
 
   // ── The screens ──
@@ -538,187 +417,10 @@ export default function ApprovalsApp({
     )
   }
 
-  // ── The decision sheets: the desktop's words, its notes, its overdraw, its reason ──
-  let sheet: ReactNode = null
-  if (ask) {
-    const rows = ask.kind === 'split' ? [ask.row] : ask.scope === 'bulk' ? ask.rows : ask.scope === 'group' ? [ask.row] : []
-    const n = rows.length
-    const sum = ask.kind !== 'split' && ask.scope === 'one' ? (ask.record.amount ?? 0) : rows.reduce((t, r) => t + r.amount, 0)
-    const hasVoucher = ask.kind !== 'split' && (ask.scope === 'one' ? !!ask.record.voucher : rows.some((r) => r.hasVoucher))
-    let title: string
-    let text: ReactNode
-    let confirmLabel: string
-    if (ask.kind === 'split') {
-      const a = ask.approve.length
-      const j = ask.reject.length
-      title = j === 0 ? `Approve all ${a}?` : a === 0 ? `Reject all ${j}?` : `Approve ${a}, reject ${j}?`
-      text =
-        j === 0 ? (
-          <>Every voucher in this request is approved and your decision recorded in the audit trail. <em>This cannot be undone.</em></>
-        ) : a === 0 ? (
-          <>Every voucher in this request is rejected with your reason.</>
-        ) : (
-          <>The ticked vouchers are approved and the rest rejected with your reason, in one go. <em>This cannot be undone.</em></>
-        )
-      confirmLabel = j === 0 ? `Yes, approve ${a}` : a === 0 ? `Yes, reject ${j}` : 'Yes, decide'
-    } else if (ask.kind === 'approve') {
-      title = ask.scope === 'bulk' ? `Approve ${plural(n, 'request', 'requests')}?` : 'Approve this request?'
-      text =
-        ask.scope === 'one' ? (
-          <>{approveLead(ask.record.type)} and records your decision in the audit trail. <em>This cannot be undone.</em></>
-        ) : (
-          <>This authorises {ask.scope === 'bulk' ? 'every selected request' : 'every part of this combined request'} for execution and records your decision in the audit trail. <em>This cannot be undone.</em></>
-        )
-      confirmLabel = ask.scope === 'bulk' ? `Yes, approve ${n}` : 'Yes, approve'
-    } else {
-      title = ask.scope === 'bulk' ? `Reject ${plural(n, 'request', 'requests')}?` : 'Reject this request?'
-      text =
-        ask.scope === 'one' ? (
-          <>{rejectLead(ask.record.type)}. A written reason is <em>required</em>.</>
-        ) : (
-          <>Every selected request is turned down with this reason: a voucher is voided, a loan or fund source cancelled. A combined approval is rejected whole.</>
-        )
-      confirmLabel = ask.scope === 'bulk' ? `Yes, reject ${n}` : 'Yes, reject'
-    }
-    const needsReason = ask.kind === 'reject' || (ask.kind === 'split' && ask.reject.length > 0)
-    const takesNotes = ask.kind === 'approve' || (ask.kind === 'split' && ask.approve.length > 0)
-    sheet = (
-      <FinDialog open onClose={closeAsk} title={title} sub={rm(sum)} locked={busy}>
-        <DialogConfirm
-          text={text}
-          confirmLabel={busy ? 'Saving…' : confirmLabel}
-          danger={ask.kind === 'reject' || (ask.kind === 'split' && ask.approve.length === 0)}
-          busy={busy}
-          off={needsReason && !reason.trim()}
-          error={error}
-          onCancel={closeAsk}
-          onConfirm={confirmAsk}
-        >
-          {needsReason ? (
-            <TextArea
-              rows={3}
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value)
-                if (e.target.value.trim()) setError(null)
-              }}
-              placeholder={ask.kind === 'split' ? 'Why are these rejected? (shown to whoever sent them)' : 'Rejection reason (required)'}
-              aria-label="Rejection reason"
-            />
-          ) : null}
-          {takesNotes ? (
-            <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for the audit trail (optional)" aria-label="Notes" />
-          ) : null}
-          {ask.kind === 'approve' && hasVoucher ? (
-            <div className={fm.checks}>
-              <label className={fm.check}>
-                <input type="checkbox" checked={overdraw} onChange={(e) => setOverdraw(e.target.checked)} />
-                <span className={fm.checkName}>{OVERDRAW}</span>
-              </label>
-            </div>
-          ) : null}
-        </DialogConfirm>
-      </FinDialog>
-    )
-  }
-
   return (
     <>
       {screen}
-      {sheet}
-    </>
-  )
-}
-
-/** A request as the desktop's request page lays it out, in the drawer's hand. */
-function RequestBody({ r, openFile }: { r: ApprovalRecordModel; openFile: (id: string) => void }) {
-  const v = r.voucher
-  const status = heroStatus(r.status, r.may)
-  const note =
-    r.status === 'pending'
-      ? r.may
-        ? r.groupId
-          ? 'Decided with its combined request.'
-          : 'Waiting for your decision.'
-        : (r.why ?? 'Waiting for sign-off.')
-      : `${r.status === 'approved' ? 'Approved' : 'Rejected'}${r.decidedAt ? ` · ${r.decidedAt}` : ''}`
-  let n = 0
-  const roman = () => `${['I', 'II', 'III', 'IV', 'V', 'VI'][n++]}.`
-  return (
-    <>
-      <ApprovalHero
-        kicker={r.typeLabel}
-        status={status}
-        no={r.no ?? (v ? 'Draft' : null)}
-        amount={r.amount === null ? '—' : `${v?.credit ? '+' : ''}${rm(r.amount)}`}
-        to={v ? `${v.credit ? 'Received from' : 'Pay to'} ${v.payee}` : r.loan ? `Loan to ${r.loan.borrower}` : r.title}
-        note={note}
-      />
-      {v?.short && v.bank ? (
-        <div className={d.error} role="alert">
-          Insufficient bank balance — this voucher needs {rm(v.amount)} but {v.bank.name} holds only {rm(v.bank.balance)}. Top up or void this voucher before approving.
-        </div>
-      ) : null}
-
-      {v ? (
-        <>
-          <Group n={roman()} title={v.credit ? 'Received from' : 'Pay to'}>
-            <Line label={v.credit ? 'Payer' : 'Payee'} value={v.payee} sub={v.payeeCompany ?? undefined} />
-            <Line label="Description" value={v.description || '—'} />
-          </Group>
-          <Group n={roman()} title="When & where">
-            {v.bank ? <Line label={v.credit ? 'Into bank' : 'From bank'} value={v.bank.name} sub={`Acct ${v.bank.number} · Balance ${rm(v.bank.balance)}`} /> : null}
-            <Line label={v.credit ? 'Credit to pool' : 'Deduct from pool'} value={v.pool ?? '—'} />
-          </Group>
-          {v.sources.length > 0 ? (
-            <Group n={roman()} title={v.credit ? 'Credited to' : 'Deducted from'} foot={{ l: 'Total', v: rm(v.sources.reduce((t, x) => t + x.amount, 0)) }}>
-              {v.sources.map((x, i) => (
-                <Line key={i} label={x.pool} value={rm(x.amount)} sub={x.account ?? undefined} mono />
-              ))}
-            </Group>
-          ) : null}
-          <div className={d.label}>
-            Attachments · {plural(v.files.length, 'file', 'files')}
-          </div>
-          {v.files.length > 0 ? (
-            <div className={d.files}>
-              {v.files.map((f) => (
-                <button key={f.id} type="button" className={d.file} onClick={() => openFile(f.id)}>
-                  <span className={d.fileIcon}>
-                    <HrIcon name="doc" size={16} />
-                  </span>
-                  <span className={d.fileText}>
-                    <span className={d.fileName}>{f.name}</span>
-                    <span className={d.fileMeta}>{sizeOf(f.size)}</span>
-                  </span>
-                  <span className={d.fileChev} aria-hidden="true">
-                    ›
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className={s.empty}>No files attached.</div>
-          )}
-        </>
-      ) : null}
-
-      {r.loan ? (
-        <Group n={roman()} title="Loan">
-          <Line label="Borrower" value={r.loan.borrower} />
-          <Line label="Principal" value={rm(r.loan.principal)} mono />
-          <Line label="Effective rate" value={r.loan.rate} sub={r.loan.rateSub} mono />
-          <Line label="Monthly interest" value={rm(r.loan.monthlyInterest)} sub="At full principal" mono />
-        </Group>
-      ) : null}
-
-      <Group n={roman()} title="Request">
-        {!v && !r.loan ? <Line label="Description" value={r.title} /> : null}
-        <Line label="Type" value={r.typeLabel} />
-        <Line label="Sent by" value={r.submittedBy} sub={r.submittedAt} />
-        {r.decidedAt ? <Line label={r.status === 'approved' ? 'Approved' : 'Rejected'} value={r.decidedAt} mono /> : null}
-        {r.notes && r.status !== 'pending' ? <Line label="Decision notes" value={r.notes} /> : null}
-      </Group>
+      {decisions.dialog}
     </>
   )
 }

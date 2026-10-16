@@ -94,6 +94,7 @@ export function HubCards({
   cards,
   active,
   onSelect,
+  wide = false,
 }: {
   heroLabel: string
   heroValue: string
@@ -102,9 +103,11 @@ export function HubCards({
   cards: HubCardItem[]
   active: string
   onSelect: (key: string) => void
+  /** Wider cards — one to a row beside the table — for a hub whose cards say more than a word (Approvals). */
+  wide?: boolean
 }) {
   return (
-    <div className={s.cards}>
+    <div className={s.cards} data-wide={wide ? 'true' : undefined}>
       <div className={s.hero}>
         <div className={s.heroBar} aria-hidden="true" />
         <div className={s.heroLabel}>{heroLabel}</div>
