@@ -74,8 +74,10 @@ export default function InviteDialog({
   onClose: () => void
   onCreated: (notice: InviteNotice) => void
 }) {
-  const again = initialStaffId !== null ? (pending.find(p => p.staffId === initialStaffId) ?? null) : null
-  const fixed = again !== null || (initialStaffId !== null && candidates.some(c => c.staffId === initialStaffId))
+  // Settled when the window opens: a login made here moves the person from candidates to pending as the page
+  // refreshes behind it, and the window must not start calling its first invite "again" (seen on the E2E).
+  const [again] = useState(() => (initialStaffId !== null ? (pending.find(p => p.staffId === initialStaffId) ?? null) : null))
+  const [fixed] = useState(() => again !== null || (initialStaffId !== null && candidates.some(c => c.staffId === initialStaffId)))
   const [staffId, setStaffId] = useState<string>(fixed ? initialStaffId! : '')
   const [mode, setMode] = useState<InviteMode>('link')
   const [email, setEmail] = useState('')
@@ -133,7 +135,8 @@ export default function InviteDialog({
     })
   }
 
-  const title = person ? `Invite ${person.name}${again ? ' again' : ''}` : 'Invite user'
+  const who = handed?.name ?? person?.name
+  const title = who ? `Invite ${who}${again ? ' again' : ''}` : 'Invite user'
 
   return (
     <Window

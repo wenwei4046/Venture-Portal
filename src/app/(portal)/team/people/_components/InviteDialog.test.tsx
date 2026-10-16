@@ -117,6 +117,27 @@ describe('Invite user', () => {
     expect(onCreated).toHaveBeenCalledWith({ text: 'Invite link made for ONG SIEW LAN (siew@houzs.com)' })
   })
 
+  // Seen on the production E2E (2026-10-16): the page refreshes behind the window as the login is made, the
+  // person moves from candidates to pending — and the link's window read "Invite … again" for a first invite.
+  it('keeps calling a first invite a first invite while the page refreshes behind it', async () => {
+    mocks.inviteUser.mockResolvedValue({ ok: true, mode: 'link', name: 'ONG SIEW LAN', email: 'siew@houzs.com', emailed: false, link: LINK, why: 'x' })
+    const handlers = { onClose: vi.fn(), onCreated: vi.fn() }
+    const { rerender } = render(<InviteDialog candidates={candidates} pending={pending} templates={templates} initialStaffId={ONG} {...handlers} />)
+    typeEmail('siew@houzs.com')
+    await press('Send invite link')
+    rerender(
+      <InviteDialog
+        candidates={candidates.filter(c => c.staffId !== ONG)}
+        pending={[...pending, { staffId: ONG, name: 'ONG SIEW LAN', email: 'siew@houzs.com', templateId: 'maker' }]}
+        templates={templates}
+        initialStaffId={ONG}
+        {...handlers}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: 'Invite ONG SIEW LAN' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue(LINK)).toBeInTheDocument()
+  })
+
   it('shows the server’s refusal and stays open', async () => {
     mocks.inviteUser.mockResolvedValue({ ok: false, reason: 'That email already has an account.' })
     const { onCreated } = open(ONG)
