@@ -43,6 +43,8 @@ export default async function FinAppProfile() {
       admin={admin.map((a) => ({ key: a.key, label: a.label, icon: a.icon, sub: sub[a.key] ?? '', href: appHref(a.key) }))}
       // The views of the one app, for an account that may switch them (as the HR app's More) — never while viewing as a person.
       canSwitch={!!user.canSwitchView && !user.viewingAs}
+      // This phone's notifications (2026-10-17 — the Principal's own view lands here now, not on the portal's phone face).
+      push={!user.viewingAs}
     />
   )
 }

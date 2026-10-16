@@ -39,6 +39,7 @@ export default async function FinAppLayout({ children }: { children: ReactNode }
       rows={finAppRows(user)}
       view={isPrincipalView(user) ? 'principal' : 'finance'}
       approvals={hasApprovalsTab(user) ? { waiting: waiting ?? 0 } : null}
+      push={!user.viewingAs}
     >
       {children}
     </FinAppFrame>

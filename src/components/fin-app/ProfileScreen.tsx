@@ -9,7 +9,10 @@ import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
+import PushRow from './PushRow'
 import s from './fin-app.module.css'
+
+const ROMAN = ['I.', 'II.', 'III.', 'IV.']
 
 // The Finance app's Profile (2026-10-15, the Finance revamp v2's phone — M17,
 // M18): who is signed in, I. Account — Edit profile and Change password, a
@@ -48,6 +51,7 @@ export default function ProfileScreen({
   admin,
   canSwitch = false,
   view = 'finance',
+  push = false,
 }: {
   name: string
   email: string
@@ -59,6 +63,8 @@ export default function ProfileScreen({
   canSwitch?: boolean
   /** The view the app is open in: Finance's, or the Principal's own (2026-10-17). */
   view?: 'finance' | 'principal'
+  /** This phone's notifications (2026-10-17) — never while viewing as a person. */
+  push?: boolean
 }) {
   const router = useRouter()
   const [win, setWin] = useState<'profile' | 'password' | 'email' | 'signout' | null>(null)
@@ -136,7 +142,7 @@ export default function ProfileScreen({
         {admin.length > 0 ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{personal ? 'II.' : 'I.'}</span>
+              <span className={s.roman}>{ROMAN[personal ? 1 : 0]}</span>
               <span className={s.caps}>Admin</span>
             </div>
             <div className={s.menu}>
@@ -161,7 +167,7 @@ export default function ProfileScreen({
         {canSwitch ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{['I.', 'II.', 'III.'][(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
+              <span className={s.roman}>{ROMAN[(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
               <span className={s.caps}>Switch view</span>
             </div>
             <div className={s.menu} aria-label="Switch view">
@@ -187,6 +193,9 @@ export default function ProfileScreen({
             </div>
           </>
         ) : null}
+
+        {/* This phone's notifications (2026-10-17): the last section, drawn only where the phone can show them. */}
+        {push ? <PushRow roman={ROMAN[(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0) + (canSwitch ? 1 : 0)]} /> : null}
 
         <div className={s.signOutWrap}>
           <button type="button" className={s.signOut} onClick={() => setWin('signout')}>

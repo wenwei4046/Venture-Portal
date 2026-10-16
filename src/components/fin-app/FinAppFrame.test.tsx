@@ -12,6 +12,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(nav.search),
 }))
 vi.mock('@/components/layout/RouteFreshener', () => ({ default: () => null }))
+vi.mock('@/components/pwa/PortalPushAsk', () => ({ default: () => <div data-testid="push-ask" /> }))
 
 import FinAppFrame, { isRootScreen } from './FinAppFrame'
 import AppScreen from './AppScreen'
@@ -66,6 +67,23 @@ describe('the Finance app’s tab bar', () => {
     const tab = within(screen.getByRole('navigation', { name: 'Finance' })).getAllByRole('link')[1]
     expect(tab).toHaveTextContent(/^Approvals$/)
     expect(tab).toHaveAttribute('aria-current', 'page')
+  })
+
+  // #514 (2026-10-16) asked the Principal's iPhone on the portal's phone face; that face is no longer where it lands.
+  it('asks this phone about notifications on the first open, as the portal’s phone face did — only when told to', () => {
+    const { unmount } = render(
+      <FinAppFrame platform="ios" rows={ROWS} view="principal" approvals={{ waiting: 0 }} push>
+        <p>Home</p>
+      </FinAppFrame>,
+    )
+    expect(screen.getByTestId('push-ask')).toBeInTheDocument()
+    unmount()
+    render(
+      <FinAppFrame platform="ios" rows={ROWS}>
+        <p>Home</p>
+      </FinAppFrame>,
+    )
+    expect(screen.queryByTestId('push-ask')).toBeNull()
   })
 
   it('hides the bar over a combined approval as over a list or a record', () => {

@@ -8,6 +8,7 @@ import { useCurrentToast } from '@/components/hrv/toast'
 import { FinSurface, type FinPlatform } from '@/components/finv/surface'
 import { useTuckOnScroll } from '@/components/pwa/tuck'
 import RouteFreshener from '@/components/layout/RouteFreshener'
+import PortalPushAsk from '@/components/pwa/PortalPushAsk'
 import { FinViewProvider } from '@/components/layout/fin-view'
 import { HUB_HREF, tabHubs, tabOf, type AppTab, type HubKey } from '@/lib/fin-app/routes'
 import { notePop, setIntent } from './nav'
@@ -94,12 +95,18 @@ export default function FinAppFrame({
   rows,
   view = 'finance',
   approvals = null,
+  push = false,
   children,
 }: {
   platform: FinPlatform
   rows: string[]
   /** The Principal's own view opens this app too (2026-10-17). */
   view?: 'finance' | 'principal'
+  /**
+   * This phone's notifications (2026-10-17): the first open's question, as the portal's phone face asked it (#514) —
+   * the Principal's own view lands here now. Never while viewing as a person.
+   */
+  push?: boolean
   /** The Principal's own view (2026-10-17): an Approvals tab, its badge what waits for their decision. */
   approvals?: { waiting: number } | null
   children: ReactNode
@@ -171,6 +178,7 @@ export default function FinAppFrame({
           {/* A screen shown from the router's memory is read again behind itself, as the portal's (speed.md). */}
           <RouteFreshener />
           {children}
+          {push ? <PortalPushAsk /> : null}
           {toastShown ? (
             <div role="status" aria-live="polite" className={s.toast} data-shown={toastIn ? 'true' : 'false'} key={toastShown.id}>
               <span className={s.toastDot} aria-hidden="true">●</span>
