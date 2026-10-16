@@ -69,6 +69,15 @@ export function whenLabel(r: AttRequest): string {
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 const num = (n: number) => String(Math.round(n * 100) / 100)
 
+/**
+ * What the page says once a request is decided: a profile change counts its fields as the record does — "1 field",
+ * "3 fields" (it said "1 fields", found 2026-10-16 approving a Request to change email).
+ */
+export function decidedToast(r: AttRequest, approve: boolean): string {
+  if (r.kind === 'profile') return approve ? `Approved · ${r.who}'s record updated · ${amountLabel(r)}` : `Rejected · record unchanged · ${r.who} told`
+  return `${approve ? 'Approved' : 'Rejected'} · ${r.who} told`
+}
+
 /** "1 day", "6 h", "3 fields". */
 export function amountLabel(r: AttRequest): string {
   if (r.kind === 'leave') return r.days != null ? `${num(r.days)} day${Number(r.days) === 1 ? '' : 's'}` : '—'
