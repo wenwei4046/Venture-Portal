@@ -13,9 +13,9 @@ type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
  * what they hid — added up by the database under the member's own session (`crm_my_unread`, mig 20261014120000). The
  * CRM is the signed-in ACCOUNT's own whatever view the portal was left in, so the cell is the account's, as
  * crm-actions.ts asks it; the database gives nobody without CRM · View a chat of their own anyway.
- * Whoever sees everybody's CRM (CRM · View at All — the Principal, the Revenue Director, who open on the Team side) gets
- * the Team inbox's figure instead (the owner, 2026-10-15: "在 revenue app 上方的 crm 接入口，有 notification 要顯示在這裡"):
- * the unread of every chat their session may read — crm_contacts' own row policy decides which; only the rows with any.
+ * Everybody's figure is their OWN chats', whoever sees everybody's CRM included (the owner, 2026-10-16: "notification 只跳
+ * 關於自己的 … 名單是在 peter 那邊，客戶回復 peter，作為 principal 賬號不需要收到通知，只有 peter 本人需要收到"); from
+ * 2026-10-15 a CRM · View at All account counted every chat's unread, so the Principal's sidebar showed PETER's customer.
  */
 export async function fetchMemberCrmUnread(): Promise<Outcome<number>> {
   try {
@@ -24,11 +24,6 @@ export async function fetchMemberCrmUnread(): Promise<Outcome<number>> {
     const account = await getAccountUser();
     if (!account?.is_active || !canDo(account, "crm", "view", "own")) throw new Error("The CRM is not part of your title's permissions.");
     const db = (await createClient()) as unknown as SupabaseClient;
-    if (canDo(account, "crm", "view", "all")) {
-      const { data, error } = await db.from("crm_contacts").select("unread").gt("unread", 0).limit(1000);
-      if (error) throw new Error(error.message);
-      return { ok: true, data: (data ?? []).reduce((n, r) => n + Math.max(0, Math.trunc(Number((r as { unread: number }).unread) || 0)), 0) };
-    }
     const { data, error } = await db.rpc("crm_my_unread");
     if (error) throw new Error(error.message);
     return { ok: true, data: Math.max(0, Math.trunc(Number(data) || 0)) };
