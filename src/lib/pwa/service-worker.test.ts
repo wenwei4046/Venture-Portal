@@ -16,15 +16,22 @@ const ORIGIN = 'https://erp.houzsventure.com'
 type Listener = (event: unknown) => void
 type Win = { url: string; focus: () => Promise<Win>; navigate: (url: string) => Promise<Win> }
 
-function worker(open: Win[] = []) {
+const ANDROID = 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36'
+// The user's iPhone, as it signed up for notifications (2026-10-17).
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7.5 Mobile/15E148 Safari/604.1'
+const IPAD = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Safari/605.1.15'
+const CHROME_ON_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.0.0 Mobile/15E148 Safari/604.1'
+
+function worker(open: Win[] = [], userAgent = ANDROID) {
   const listeners: Record<string, Listener> = {}
   const showNotification = vi.fn(async (_title: string, _options: unknown) => undefined)
-  const clients = { matchAll: vi.fn(async () => open), openWindow: vi.fn(async (_url: string) => null), claim: vi.fn() }
+  const clients = { matchAll: vi.fn(async (_opts?: unknown) => open), openWindow: vi.fn(async (_url: string) => null), claim: vi.fn() }
   const self = {
     addEventListener: (type: string, fn: Listener) => { listeners[type] = fn },
     registration: { showNotification },
     clients,
     location: { origin: ORIGIN },
+    navigator: { userAgent },
     skipWaiting: vi.fn(),
   }
   new Function('self', 'caches', SW)(self, {})
@@ -65,6 +72,24 @@ describe('a push on the phone', () => {
     expect(showNotification).toHaveBeenCalledWith('Booked for you', expect.objectContaining({
       body: 'Meeting Room 1 · 10:00', tag: 'n1', icon: '/icons/icon-192.png', badge: '/icons/badge-tile-96.png', data: { url: NOTICE },
     }))
+  })
+
+  // 2026-10-17 (the user: "when i press the pop up notification, it wont jump direct to the chat screen" — an iPhone on
+  // iOS 18.7): iOS 18.4+ opens a notice's `navigate` itself, where a tap reaches the worker only while the app's page
+  // is alive. Whole, on this site; a notice with no place of its own, the app's start.
+  it('carries its place whole as `navigate`, for an iPhone to open by itself', async () => {
+    const { listeners, showNotification } = worker()
+    let work: Promise<unknown> = Promise.resolve()
+    listeners.push({ data: { json: () => ({ title: 'Booked for you', url: NOTICE, tag: 'n1' }) }, waitUntil: (p: Promise<unknown>) => { work = p } })
+    await work
+    expect(showNotification.mock.calls[0][1]).toMatchObject({ navigate: `${ORIGIN}${NOTICE}` })
+
+    for (const url of [undefined, 'https://evil.example/x', '//evil.example/x']) {
+      showNotification.mockClear()
+      listeners.push({ data: { json: () => ({ title: 'x', url }) }, waitUntil: (p: Promise<unknown>) => { work = p } })
+      await work
+      expect(showNotification.mock.calls[0][1]).toMatchObject({ navigate: `${ORIGIN}/` })
+    }
   })
 
   // Android keeps only a badge's alpha and paints it white: a bare H looked plain to the user (2026-10-11), so the
@@ -108,5 +133,61 @@ describe('a tap on it opens the notice in the installed app', () => {
     listeners.notificationclick({ notification: { close: vi.fn(), data: {} }, waitUntil: (p: Promise<unknown>) => { work = p } })
     await work
     expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}/`)
+  })
+})
+
+// An iPhone before iOS 18.4 reads no `navigate` and still taps through here (WebKit bug 263687): `openWindow` brings the
+// open Home Screen app forward where it was, while the app's own window goes where it is sent.
+describe('an iPhone’s tap sends the open app’s window to the notice', () => {
+  it('focuses the window, then sends it — no second window', async () => {
+    const app = win(`${ORIGIN}/dashboard`)
+    const { listeners, clients } = worker([app], IPHONE)
+    const close = await tap(listeners, NOTICE)
+    expect(close).toHaveBeenCalled()
+    expect(app.focus).toHaveBeenCalled()
+    expect(app.navigate).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+    expect(app.url).toBe(`${ORIGIN}${NOTICE}`)
+    expect(clients.openWindow).not.toHaveBeenCalled()
+    // Only the windows this worker runs: those are the ones it may send.
+    expect(clients.matchAll).toHaveBeenCalledWith({ type: 'window' })
+  })
+
+  it('an iPad, which calls itself a Mac, the same', async () => {
+    const app = win(`${ORIGIN}/hr-app`)
+    const { listeners, clients } = worker([app], IPAD)
+    await tap(listeners, NOTICE)
+    expect(app.navigate).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+    expect(clients.openWindow).not.toHaveBeenCalled()
+  })
+
+  it('with no window open, openWindow', async () => {
+    const { listeners, clients } = worker([], IPHONE)
+    await tap(listeners, NOTICE)
+    expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+  })
+
+  it('a window that cannot be sent, or cannot be focused, is passed over', async () => {
+    const stuck = win(`${ORIGIN}/dashboard`)
+    stuck.navigate = vi.fn(async () => { throw new TypeError('navigate failed') })
+    const unfocused = win(`${ORIGIN}/member`)
+    unfocused.focus = vi.fn(async () => { throw new Error('InvalidAccessError') })
+    const { listeners, clients } = worker([stuck, unfocused], IPHONE)
+    await tap(listeners, NOTICE)
+    expect(unfocused.navigate).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+    expect(clients.openWindow).not.toHaveBeenCalled()
+
+    const alone = win(`${ORIGIN}/dashboard`)
+    alone.navigate = vi.fn(async () => { throw new TypeError('navigate failed') })
+    const second = worker([alone], IPHONE)
+    await tap(second.listeners, NOTICE)
+    expect(second.clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+  })
+
+  it('Chrome on an iPhone is no Home Screen app: openWindow, as on Android', async () => {
+    const tab = win(`${ORIGIN}/dashboard`)
+    const { listeners, clients } = worker([tab], CHROME_ON_IPHONE)
+    await tap(listeners, NOTICE)
+    expect(clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}${NOTICE}`)
+    expect(tab.navigate).not.toHaveBeenCalled()
   })
 })

@@ -56,7 +56,10 @@ self.addEventListener('activate', (event) => {
  * app's page is alive, and `openWindow` then brought the app forward where it
  * was. Chrome reads no `navigate` and keeps `notificationclick` below.
  */
-const placeOf = (url) => new URL(typeof url === 'string' && url.startsWith('/') ? url : '/', self.location.origin).href
+function placeOf(url) {
+  const place = new URL(typeof url === 'string' && url.startsWith('/') ? url : '/', self.location.origin)
+  return place.origin === self.location.origin ? place.href : new URL('/', self.location.origin).href
+}
 
 self.addEventListener('push', (event) => {
   let msg = {}
@@ -259,11 +262,11 @@ self.addEventListener('message', (event) => {
 })
 
 /*
- * A tap opens the notice's place in the installed app (2026-10-11), always
- * through openWindow: Chrome on Android hands a url inside an installed app's
+ * A tap opens the notice's place in the installed app (2026-10-11), on Android
+ * always through openWindow: Chrome hands a url inside an installed app's
  * scope to that app and makes it go there even when it is already open
- * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true); an
- * iPhone opens it in the Home Screen app, the only place its pushes arrive.
+ * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true). An
+ * iPhone on iOS 18.4+ never comes here — it opens `navigate` itself (above).
  *
  * Twice the same day a tap went wrong by reusing an open window instead:
  * loading the page before focusing it let the moment a tap allows for focusing
