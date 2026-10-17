@@ -6,7 +6,7 @@ import { finAccountMenu, finNavSections, visibleAccountMenu } from './fin-nav'
 import { visibleHrNav } from './hr-nav'
 import type { NavData } from './nav-config'
 import ViewSidebar from './ViewSidebar'
-import { AccountMenu, ChangePasswordDialog, EditProfileDialog, SignOutDialog, type AccountWindow } from './AccountMenu'
+import { AccountMenu, ChangePasswordDialog, SignOutDialog, type AccountWindow } from './AccountMenu'
 
 // The Finance view's sidebar (2026-10-14, the Finance revamp v2 — the design's
 // D01 / D13): the view sidebar with Finance's four categories (fin-nav.ts),
@@ -40,7 +40,6 @@ export default function FinSidebar({
         footerSub={principal ? 'Principal · settings & admin' : 'Finance · settings & admin'}
         footerMenu={(menu) => <AccountMenu {...menu} groups={groups} onWindow={setWin} />}
       />
-      <EditProfileDialog open={win === 'profile'} onClose={close} user={user} />
       <ChangePasswordDialog open={win === 'password'} onClose={close} />
       <SignOutDialog open={win === 'signout'} onClose={close} view={principal ? 'the Principal view' : 'the Finance view'} />
     </>
