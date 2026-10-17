@@ -149,13 +149,13 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
   ]
 }
 
-/** A row of the footer's account menu: a page to open, or one of the two windows. */
+/** A row of the footer's account menu: a page to open, or its window (Change password). */
 export interface AccountMenuItem {
   key: string
   label: string
   icon: HrIconName
   href?: string
-  window?: 'profile' | 'password'
+  window?: 'password'
   permissionTabs?: readonly string[]
   visible: (viewer: NavViewer) => boolean
 }
@@ -169,13 +169,13 @@ export interface AccountMenuGroup {
  * The footer's menu (the design's D13): Account — a login of one's own only, as Change password —, then Admin.
  * The Principal's own view adds Access log and Settings to Admin (2026-10-17, the user's pick: "Audit Log ·
  * Access log · Departments · Meeting Rooms · Settings") — Settings opens on Treasury, its strip reaching the rest.
+ * No Edit profile (2026-10-17 — the user: one's record is changed through Me › Profile, which HR approves).
  */
 export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
   return [
     {
       title: 'Account',
       items: [
-        { key: 'profile', label: 'Edit profile', icon: 'staff', window: 'profile', visible: canChangePassword },
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
       ],
     },

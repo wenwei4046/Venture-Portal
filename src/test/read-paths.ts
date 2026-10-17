@@ -333,8 +333,6 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
   'my_login_is_personal',
-  // Edit profile (mig 20261014210000): the caller's own name, email and phone; the change asks a personal login first.
-  'my_profile', 'update_my_profile',
   // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
   // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
   'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',

@@ -113,7 +113,8 @@ describe("Finance's account menu", () => {
   it('opens Account (a login of one’s own) and Admin for Carrie', () => {
     const groups = visibleAccountMenu(finAccountMenu(), carrie)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
-      ['Account', ['Edit profile', 'Change password']],
+      // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves.
+      ['Account', ['Change password']],
       ['Admin', ['Audit Log', 'Meeting Rooms']],
     ])
   })

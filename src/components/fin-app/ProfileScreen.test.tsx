@@ -13,7 +13,6 @@ vi.mock('@/components/layout/RouteFreshener', () => ({ default: () => null }))
 vi.mock('@/components/layout/view-as-actions', () => ({ setViewAs: vi.fn() }))
 vi.mock('@/components/layout/AccountMenu', () => ({
   ChangePasswordDialog: () => null,
-  EditProfileDialog: () => null,
   RequestEmailDialog: () => null,
   SignOutDialog: (p: { view?: string }) => <div data-testid="sign-out">{p.view}</div>,
 }))
@@ -36,7 +35,7 @@ import ProfileScreen from './ProfileScreen'
 const draw = (props: Partial<Parameters<typeof ProfileScreen>[0]> = {}) =>
   render(
     <FinAppFrame platform="android" rows={['payments']} view={props.view ?? 'finance'}>
-      <ProfileScreen name="Principal" email="principal@venture.my" phone="" personal={false} admin={[{ key: 'audit', label: 'Audit Log', icon: 'report', sub: '', href: '/fin-app/page/audit' }]} {...props} />
+      <ProfileScreen name="Principal" email="principal@venture.my" personal={false} admin={[{ key: 'audit', label: 'Audit Log', icon: 'report', sub: '', href: '/fin-app/page/audit' }]} {...props} />
     </FinAppFrame>,
   )
 
@@ -55,6 +54,13 @@ describe('the Finance app’s Profile', () => {
     expect(screen.getByRole('button', { name: 'Phone notifications' })).toBeInTheDocument()
     const heads = [...document.querySelectorAll('[class*="menuHead"]')].map((h) => h.textContent)
     expect(heads).toEqual(['I.Admin', 'II.Switch view', 'III.This phone'])
+  })
+
+  it('Account: Change password and Request to change email — no Edit profile, Me › Profile’s is the one (2026-10-17)', () => {
+    draw({ personal: true, me: true })
+    expect(screen.getByText('Change password')).toBeInTheDocument()
+    expect(screen.getByText('Request to change email')).toBeInTheDocument()
+    expect(screen.queryByText('Edit profile')).toBeNull()
   })
 
   it('opens on Me’s card for a login of one’s own (the page says so), and on nothing else for a shared one', () => {

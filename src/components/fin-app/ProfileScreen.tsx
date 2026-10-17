@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
-import { ChangePasswordDialog, EditProfileDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
 import { MeCard } from '@/components/me/MeCard'
@@ -16,9 +15,10 @@ import s from './fin-app.module.css'
 const ROMAN = ['I.', 'II.', 'III.', 'IV.']
 
 // The Finance app's Profile (2026-10-15, the Finance revamp v2's phone — M17,
-// M18): who is signed in, I. Account — Edit profile and Change password, a
-// login of one's own only, each its window rising as a sheet (and, 2026-10-16,
-// Request to change email beside them, HR approving it) — II. Admin —
+// M18): who is signed in, I. Account — Change password, a login of one's own
+// only, its window rising as a sheet (and, 2026-10-16, Request to change email
+// beside it, HR approving it; Edit profile gone 2026-10-17 — the user: one's
+// record changes through Me › Profile, which HR approves) — II. Admin —
 // Audit Log, Departments, Meeting Rooms, the desktop's account menu's rows —
 // and Sign out, asked first. The windows are the desktop's own (AccountMenu).
 // For an account that may switch views (2026-10-16 — on a phone the portal's
@@ -47,7 +47,6 @@ export interface ProfileAdminRow {
 export default function ProfileScreen({
   name,
   email,
-  phone,
   personal,
   admin,
   canSwitch = false,
@@ -57,8 +56,7 @@ export default function ProfileScreen({
 }: {
   name: string
   email: string
-  phone: string
-  /** A login of the person's own: Edit profile and Change password are theirs. */
+  /** A login of the person's own: Change password and Request to change email are theirs. */
   personal: boolean
   admin: ProfileAdminRow[]
   /** The account may switch views (and is not viewing as a person). */
@@ -70,8 +68,7 @@ export default function ProfileScreen({
   /** Me's card on top (2026-10-17): a login of one's own, not while viewing as a person. */
   me?: boolean
 }) {
-  const router = useRouter()
-  const [win, setWin] = useState<'profile' | 'password' | 'email' | 'signout' | null>(null)
+  const [win, setWin] = useState<'password' | 'email' | 'signout' | null>(null)
   const [switching, startSwitch] = useTransition()
   const switchTo = (view: string) => {
     const form = new FormData()
@@ -107,18 +104,6 @@ export default function ProfileScreen({
               <span className={s.caps}>Account</span>
             </div>
             <div className={s.menu}>
-              <button type="button" className={s.menuRow} onClick={() => setWin('profile')}>
-                <span className={`${s.menuIcon} ${s.walnut}`}>
-                  <HrIcon name="staff" size={16} />
-                </span>
-                <span className={s.menuText}>
-                  <span className={s.menuLabel}>Edit profile</span>
-                  {phone ? <span className={s.menuSub}>{phone}</span> : null}
-                </span>
-                <span className={s.menuChev} aria-hidden="true">
-                  ›
-                </span>
-              </button>
               <button type="button" className={s.menuRow} onClick={() => setWin('password')}>
                 <span className={`${s.menuIcon} ${s.walnut}`}>
                   <HrIcon name="lock" size={16} />
@@ -214,7 +199,6 @@ export default function ProfileScreen({
 
       {personal ? (
         <>
-          <EditProfileDialog open={win === 'profile'} onClose={() => setWin(null)} user={{ name, email }} onSaved={() => router.refresh()} />
           <ChangePasswordDialog open={win === 'password'} onClose={() => setWin(null)} />
           <RequestEmailDialog open={win === 'email'} onClose={() => setWin(null)} />
         </>
