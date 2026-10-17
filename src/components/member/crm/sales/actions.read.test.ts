@@ -12,7 +12,7 @@ import { makeSalesActions } from "./actions";
 
 function setup() {
   const base = crmDemoData("You");
-  const me = base.viewerId;
+  const me = base.viewerId ?? "a1";
   let data: CrmData = {
     ...base,
     customers: base.customers.map((c, i) => (i === 0 ? { ...c, assignedTo: me, unread: 3 } : i === 1 ? { ...c, assignedTo: "someone-else", unread: 2 } : i === 2 ? { ...c, assignedTo: me, unread: 0 } : c)),

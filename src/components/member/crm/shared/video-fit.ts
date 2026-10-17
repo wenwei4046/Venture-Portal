@@ -65,6 +65,10 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const start = cut ? Math.max(0, Math.min(cut.start, full)) : 0, end = cut ? Math.max(start + 0.2, Math.min(cut.end, full)) : full;
     const seconds = end - start;
     const trim = cut ? { trim: { start, end } } : {}, audio = cut?.mute ? { audio: { discard: true as const } } : {};
+    // The sound as every MP4 player takes it — AAC: the app's own camera records Opus where the phone makes WebM
+    // (2026-10-17, shared/in-app-camera.tsx), and WhatsApp plays AAC alone. Made AAC on the way where this phone can.
+    const sound = cut?.mute ? null : await input.getPrimaryAudioTrack();
+    const aac = sound && sound.codec !== "aac" && (await mb.canEncodeAudio("aac")) ? { audio: { codec: "aac" as const, bitrate: AUDIO_BPS } } : {};
     const estimate = full > 0 ? (file.size * seconds) / full : file.size;
     // H.264 that fits: as it is when it is already a plain MP4, else copied into one (trimmed / muted on the way).
     // An iPhone video keeps its picture sideways and a "turn 90°" flag; WhatsApp on a computer ignores the flag and
@@ -73,8 +77,8 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const turned = (track.rotation ?? 0) !== 0;
     let copyFile: File | null = null;
     if (!look && track.codec === "avc" && estimate <= maxBytes * 0.97) {
-      if (!cut && isMp4 && !turned) return { ok: true, file };
-      const copy = await convert(mb, input, file, { ...trim, ...audio }, onProgress);
+      if (!cut && isMp4 && !turned && !("audio" in aac)) return { ok: true, file };
+      const copy = await convert(mb, input, file, { ...trim, ...audio, ...aac }, onProgress);
       if (copy.file && copy.file.size <= maxBytes) {
         if (!turned) return { ok: true, file: copy.file };
         copyFile = copy.file;
@@ -98,7 +102,7 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     for (const side of [plan.side, 960, 640, 480].filter((s, i, a) => s <= plan.side && a.indexOf(s) === i)) {
       const kk = Math.min(1, side / Math.max(w, h, 1)), W = even(w * kk), Hh = even(h * kk);
       out = await convert(mb, input, file, {
-        ...trim, ...audio,
+        ...trim, ...audio, ...aac,
         video: { width: W, height: Hh, fit: "contain", codec: "avc", quality: new mb.Quality({ bitrate: plan.bps }), forceTranscode: true, allowTransformationMetadata: false, ...(look ? drawn(look, crop!, W, Hh) : {}) },
       }, onProgress);
       if (out.file) break;
