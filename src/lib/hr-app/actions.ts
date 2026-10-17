@@ -6,10 +6,11 @@ import { ACCEPT_NOTE } from '@/lib/member/member-services'
 import { openDocumentationFile } from '@/lib/documentation/actions'
 import {
   acknowledgeHiringRequest, cancelHiringRequest, declineHiringRequest, fillHiringRequest, removeHiringTalent, requestHiringInfo,
-  saveHiringCandidate, saveTalentNotes, setCandidateStage,
+  saveHiringCandidate, saveTalentNotes, setCandidateStage, submitHiringRequest,
 } from '@/lib/hiring/actions'
 import type { CandidateStage } from '@/lib/hiring/types'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
+import { decideRequest } from '@/lib/attendance/actions'
 import { appAccess } from './server'
 import type { HrAppData } from './model'
 
@@ -71,6 +72,13 @@ export async function hrAppAddCandidate(request: string, c: { name: string; phon
   return done(await saveHiringCandidate(form))
 }
 
+/** HR Mobile's "+ New hiring request" (2026-10-17): the desktop drawer's own Submit to HR, with Form settings' answers. */
+export async function hrAppNewHire(requestedBy: string, answers: Record<string, string>): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  if (!(await may('hireCreate'))) return { ok: false, reason: SHUT }
+  const res = await submitHiringRequest({ requestedBy, answers })
+  return res.ok ? { ok: true, id: res.id } : { ok: false, reason: res.reason }
+}
+
 // ── Hiring › Talent Bank (Edit) ──
 
 export async function hrAppTalentNotes(talent: string, notes: string): Promise<Act> {
@@ -97,6 +105,15 @@ export async function hrAppDecide(id: string, decision: 'accept' | 'approve' | '
   return res.ok ? { ok: true } : { ok: false, reason: res.error || 'The request could not be decided. Please try again.' }
 }
 
+// ── HR › Attendance › Requests (HR Mobile, 2026-10-17): decide the waiting step — HR's, or the upline's on their behalf ──
+
+export async function hrAppAttDecide(id: string, approve: boolean, note: string): Promise<Act> {
+  if (!(await may('attDecide'))) return { ok: false, reason: SHUT }
+  if (!approve && !note.trim()) return { ok: false, reason: 'Add a note to reject' }
+  const res = await decideRequest(id, approve, note)
+  return res.ok ? { ok: true } : { ok: false, reason: res.reason }
+}
+
 // ── Admin › Meeting Rooms: book from the HR app; cancel what is theirs to cancel ──
 
 export async function hrAppBook(b: { title: string; dept: string; roomId: string; date: string; from: number; to: number; attendees: string[]; pax: number }): Promise<Act> {
@@ -116,9 +133,10 @@ export async function hrAppCancelBooking(id: string): Promise<Act> {
 
 // ── People › Documentation: a letter's short link, made at the press (never kept) ──
 
-export async function hrAppLetterLink(id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+export async function hrAppLetterLink(id: string, kind: 'letter' | 'document' = 'letter'): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
   const user = await getUser()
   if (!user || !appAccess(user).parts.docs) return { ok: false, reason: SHUT }
-  const res = await openDocumentationFile('letter', id, 'view')
+  if (kind !== 'letter' && kind !== 'document') return { ok: false, reason: SHUT }
+  const res = await openDocumentationFile(kind, id, 'view')
   return res.ok ? { ok: true, url: res.url } : { ok: false, reason: res.reason }
 }

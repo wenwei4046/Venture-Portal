@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useTransition } from 'react'
 import { setViewAs } from '@/components/layout/view-as-actions'
 import {
-  hrAppAcknowledge, hrAppAddCandidate, hrAppBook, hrAppCancelBooking, hrAppCancelHire, hrAppCandidateStage, hrAppDecide, hrAppDecline,
-  hrAppFill, hrAppLetterLink, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
+  hrAppAcknowledge, hrAppAddCandidate, hrAppAttDecide, hrAppBook, hrAppCancelBooking, hrAppCancelHire, hrAppCandidateStage, hrAppDecide, hrAppDecline,
+  hrAppFill, hrAppLetterLink, hrAppNewHire, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
 } from '@/lib/hr-app/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
 import { readNotices, removePushSubscription, reportPushTrouble, savePushSubscription } from '@/lib/push/actions'
@@ -28,6 +28,7 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     hireDecline: hrAppDecline,
     hireCancel: hrAppCancelHire,
     hireFill: hrAppFill,
+    hireNew: hrAppNewHire,
     candStage: (_hire, candidate, stage) => hrAppCandidateStage(candidate, stage),
     candAdd: hrAppAddCandidate,
     talentNotes: hrAppTalentNotes,
@@ -38,6 +39,7 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     pushRemove: removePushSubscription,
     pushTrouble: reportPushTrouble,
     requestDecide: hrAppDecide,
+    attDecide: hrAppAttDecide,
     book: hrAppBook,
     bookCancel: hrAppCancelBooking,
     // The account's own, not a module's: the portal's one action, which asks for a personal login itself.

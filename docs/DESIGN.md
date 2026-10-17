@@ -1493,7 +1493,7 @@ One's own documents — **Company** (what HR shares with their department) and *
 - **Portal** — `/admin/documents`, the kit: compact tabs *Company* · *Personal* (counts of new), then the Data center's own cards: files as file cards (*Added 14 Oct*, *New* in the alert tone; a letter *To acknowledge* once read), folders as folder cards (*2 files · 1 new*; a press goes in, the path back up). A press views (a link made at the press, a tab readied in the click); ⋮ View · Download. Beside Change password in Admin / Reports & Admin.
 - **HR app** — More › *My documents* (above). **Revenue app** — Profile › Documentation's *Personal* (above).
 
-### Me — one's own attendance, leave, payslips, record and line (v4.79, 2026-10-17 — the Finance app's Profile, the desktop's top bar; the HR app's avatar next)
+### Me — one's own attendance, leave, payslips, record and line (v4.79, 2026-10-17 — the Finance app's Profile, the desktop's top bar; the HR app's avatar, v4.82)
 
 The Claude Design handoff `design_handoff_staff_app` (*Staff App v2*, `.design/hr-mobile2/`), built word for word in the HR theme (`components/me`, `lib/me`; its own colours as `--me-*` on `[data-me]`). For a login of one's own, never while viewing as somebody. **The prototype is the truth for layout, wording, motion and buttons; every figure is the reader's own** (mig `20261017100000`; `.claude/rules/hr/attendance.md` › ME).
 
@@ -1513,17 +1513,19 @@ The Claude Design handoff `design_handoff_staff_app` (*Staff App v2*, `.design/h
 
 **The phone apps**
 
-### The HR phone app (v3.38, 2026-10-11)
+### The HR phone app (v3.38, 2026-10-11 — HR Mobile since v4.82, 2026-10-17)
 
-`/hr-app` — HR's view of the one app on a phone (HR's portal pages are for the computer). `components/hr-app/hr-app.module.css` keeps the handoff's values and the browser's defaults (line-height normal, content-box), at most 560px wide.
+`/hr-app` — HR's view of the one app on a phone (HR's portal pages are for the computer). Since v4.82 it is the Claude Design handoff `design_handoff_hr_mobile` (HR Mobile), value for value: `components/hr-app/` (`HrApp.tsx`, `screens.tsx`, `kit.tsx`; `hr-app.module.css` — content-box and line-height normal as the prototype runs, buttons and selects border-box as the browser's own sheet draws them), its view model `lib/hr-app/hr-view.ts` and `gen-pages.ts`, its colours on `[data-hr-app]` in `globals.css` (the section tones and `--hr2-*`) and the motions *hrFade* (a tab), *hrIn* (a sub screen), *hrUp* / *hrDim* (a sheet), *hrToast* (2.4s). A column at most 430px wide on a white page. The old five tabs (Home · Review · Hiring · Rooms · More) are gone; every function they had is kept in the new look.
 
-- **Home** — the walnut hero (*To review* · *Open roles* · *Letters missing*), *Waiting for you* (HIRE / WAIT / REPL / CLAIM / MEMO), *Today's meetings*.
-- **Review** — All · Hiring · Member services; a claim's **Approve** asks *Request payment* or *Add to payroll* (v3.45).
-- **Hiring** — requests by status; a request's page ends on a bar pinned above the tabs (Decline / Request more info / Acknowledge, then Cancel / Mark filled).
-- **Rooms** — as the Revenue app's.
-- **More** — Insights, Talent Bank, Data center (a red `!` while a compulsory letter is missing), *Memos*, *My documents* (v4.3 — Company · Personal chips, then rows: a letter row with **View**, a folder as a More row), *Change password*, *Phone notifications*, *Make them pop up* (v3.86, `components/pwa/PopUpGuide.tsx`); last, for an account that may switch views, the view switch (*You are here* on the current one).
-- **Notifications (v3.47, v3.52)** — a bell; its page lists what was new when it opened, then the rest. First open asks *Turn on notifications?* once (`components/pwa/PushAsk.tsx`).
-- **Tab bar** — Home · Review · Hiring · Rooms · More, on `--safe-bottom` (Part II › The phone's own navigation bar); sheets rise over a walnut scrim; every select is the soft dropdown.
+- **Head** — Home: the walnut-deep *H* tile, *HOUZS HR*, who and their title, the date in mono; the other tabs their title (Newsreader 28). Not in the handoff (the user, 2026-10-17): the bell on Home's head, and on every tab the avatar that opens **Me** over the app (a personal login; a shared one gets an *Account* sheet — this phone's notifications, the view switch).
+- **Home** — *Good morning, Grace.*, the accent rule, the live line (*4 requests waiting for HR · 2 not in yet · 3 late · October closes 3 Nov.*), Quick actions (badges: Approve, Leave at 2 days or less, Hiring's pending requests) and the six sections I.–VI.; a page their tabs close is not drawn. Memos still to acknowledge head it as *Waiting for you*, only while there are some.
+- **Today** — four count tiles (In · Late · Not in · Leave, their top 3px in the state's colour; a tap filters, again clears), the list Not in → Late → Leave → In; a row opens the person.
+- **Approve** — pills Pending (HR's step) · At upline · Decided, and **Members** (Member services' requests). A request's page: the facts (a correction's *1 of 3*), a profile change's changes, the approval flow's nodes, the note, the decision bar (*Reject* — its words turn red once a note is typed, *Add a note to reject* without one — and *Approve*, or *Approve on behalf* while it waits at the upline); the toast *{who} · {kind} approved*. A claim's Approve asks *Request payment* or *Add to payroll* (v3.45).
+- **People** — the search, people by department; a person: the chip *Today · In 08:44*, Call · Message · Records, Service · Upline · Today · OT, the AL / SL / HL / RL cards HR keeps.
+- **Sub screens** — Leave balances (All · 2 days or less), Month close (the four steps, the last *Register + payroll*; deciding and closing on the desktop), and the generic page — Hiring › Requests (+ New hiring request with Form settings' own fields; a request's page with Acknowledge / More info · Decline, then Cancel / Mark filled, candidates' stages, + Add a candidate), Insights, Talent Bank (notes, Remove), Records, Org chart, Levels, Documents (Company · Personal · Missing), Letters, Room schedule (the week as pills, Book a room, a meeting's sheet and Cancel meeting). HR Costing, Payroll, Payment and the Audit Log open the handoff's *This page works best on a bigger screen.*
+- **Me › Profile** carries the old More's rows (v4.82): Memos, My documents, Phone notifications (+ *Make them pop up*), Change password, Request to change email, Switch view.
+- **Notifications (v3.47, v3.52)** — the bell; its page lists what was new when it opened, then the rest; a notice opens its place. First open asks *Turn on notifications?* once (`components/pwa/PushAsk.tsx`).
+- **Bottom bar** — Home · Today · Approve (its badge: what waits for HR) · People, on `--safe-bottom` (Part II › The phone's own navigation bar), tucking away while reading on (.32s); sheets rise over the scrim (radius 20, the grab handle, the round ×, the actions in equal columns).
 
 ### The Revenue app — built to the prototype (2026-10-05)
 
@@ -1654,6 +1656,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.82** · 2026-10-17 · The HR app is HR Mobile (the handoff, value for value): Home · Today · Approve · People, the sub screens and the generic pages, the bottom sheet and the toast; the avatar opens Me, whose Profile carries the old More's rows; Member services' requests on Approve's *Members*; HR Costing, Payroll, Payment and the Audit Log on the desktop → The HR phone app
 - **v4.81** · 2026-10-17 · The way back from the CRM on a phone is the mirror curtain (the user: "也做一个反方向的幕布"): the house squeezes and ripples, the curtain comes down from the top, *CRM* rolls down into *Revenue*, and it leaves through the bottom onto the app settling into place → The Revenue app — the switch to the CRM
 - **v4.80** · 2026-10-17 · The switch to the CRM on a phone is a curtain (the user's handoff *Revenue → CRM switch view motion*, 2c *Peach · Context*): the chat button squeezes and ripples, a peach curtain rises, *Revenue* rolls into *CRM* over three pulsing dots, the CRM goes in under it and the curtain lifts off the top once it has drawn → The Revenue app — the switch to the CRM
 - **v4.79** · 2026-10-17 · Me — one's own attendance, leave, payslips, record and line (the Staff App handoff, word for word): the Finance app's Profile opens on its Today card, the desktop's greeting bar has its button and a 430px panel; the selfie punch with the server's time and the fence, leave and its balances, payslips with a PDF, Edit profile to HR, the hierarchy, documents, OT · punch corrections · extra manpower, an upline's team and decisions → Me — one's own attendance, leave, payslips, record and line

@@ -28,8 +28,8 @@ const hrUser = (over: Partial<User>): User =>
 describe('the app follows the account’s tabs, page by page (the review’s M2)', () => {
   it('with nothing unticked, every part and every write their cells hold', () => {
     expect(appAccess(hrUser({}))).toEqual({
-      parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true },
-      may: { decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+      parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false },
+      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
     })
   })
 
@@ -38,8 +38,8 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
       'hr.member_services.view', 'hr.member_services.edit', 'hr.meeting_rooms.view', 'hr.meeting_rooms.create']
     const closed = ['hr.hiring_requests.view', 'hr.hiring_requests.create', 'hr.hiring_requests.edit', 'hr.hiring_requests.approve', 'hr.talent_bank.edit']
     const access = appAccess(hrUser({ tabs, closed }))
-    expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true })
-    expect(access.may).toEqual({ decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true })
+    expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
+    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true })
   })
 
   it('Member services’ Edit unticked: its requests still show, nothing is decided from the app', () => {
@@ -47,9 +47,20 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     expect(appAccess(hrUser({ tabs, closed: ['hr.member_services.edit'] })).may.decide).toBe(false)
   })
 
+  it('HR Mobile (2026-10-17): Attendance · View opens Today, Approve, the balances, the close and Records; Approve decides', () => {
+    const user = hrUser({ actions: { ...HR_ACTIONS, 'attendance.view': 'all', 'attendance.approve': 'all' }, permissions: [...HR_KEYS, 'attendance', 'team'] })
+    const access = appAccess(user)
+    expect(access.parts).toMatchObject({ today: true, approve: true, balances: true, close: true, records: true, people: true })
+    expect(access.may.attDecide).toBe(true)
+    // Requests' Approve unticked: its list still shows, nothing is decided from the app.
+    const tabs = ['hr.att_today.view', 'hr.att_requests.view', 'hr.att_balances.view', 'hr.att_close.view', 'hr.att_records.view']
+    expect(appAccess({ ...user, tabs, closed: ['hr.att_requests.approve'] }).may.attDecide).toBe(false)
+    expect(appAccess(hrUser({})).may.attDecide).toBe(false)
+  })
+
   it('without the cell, the tab opens nothing', () => {
     const access = appAccess(hrUser({ actions: { 'rooms.view': 'all' }, permissions: ['meeting_rooms'] }))
-    expect(access.parts).toEqual({ requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true })
+    expect(access.parts).toEqual({ requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
     expect(access.may.book).toBe(false)
   })
 })
@@ -108,9 +119,25 @@ describe('the Data center', () => {
     expect(center.staff).toEqual([{ id: 'kj', name: 'Kar Jun', title: 'Team Assistant', dept: 'Revenue' }, { id: 'x', name: 'Nobody', title: '', dept: '' }])
     expect(center.docTypes).toEqual([{ id: 'offer', name: 'Offer letter', compulsory: true }])
     expect(center.letters).toEqual([
-      { id: 'L1', staffId: 'kj', typeId: 'offer', typeName: 'Offer letter', file: 'Offer_kj.pdf' },
-      { id: 'L2', staffId: 'kj', typeId: '', typeName: 'Memo', file: 'Rules.pdf' },
+      { id: 'L1', staffId: 'kj', typeId: 'offer', typeName: 'Offer letter', file: 'Offer_kj.pdf', staffName: 'Kar Jun', filedAt: '', readAt: null, ackAt: null },
+      { id: 'L2', staffId: 'kj', typeId: '', typeName: 'Memo', file: 'Rules.pdf', staffName: 'Kar Jun', filedAt: '', readAt: null, ackAt: null },
     ])
+    // No company documents asked for: none.
+    expect(center.documents).toEqual([])
+  })
+
+  it('lists the company’s documents still on file for HR Mobile’s Documents › Company (2026-10-17)', () => {
+    const center = dataCenterOf({
+      departments: [{ id: 'rev', name: 'Revenue Department', people: 1 }],
+      people: [],
+      letterTypes: [],
+      letters: [],
+      documents: [
+        { id: 'D1', ref: 'DOC-1', name: 'Employee Handbook', fileName: 'Handbook.pdf', contentType: 'application/pdf', size: 2048, departmentIds: ['rev'], departments: ['Revenue Department'], uploadedAt: '2026-10-01T02:00:00Z', uploadedBy: 'HR', deletedAt: null, events: [] },
+        { id: 'D2', ref: 'DOC-2', name: 'Old', fileName: 'Old.pdf', contentType: null, size: null, departmentIds: [], departments: [], uploadedAt: '2026-09-01T02:00:00Z', uploadedBy: 'HR', deletedAt: '2026-09-02T02:00:00Z', events: [] },
+      ],
+    })
+    expect(center.documents).toEqual([{ id: 'D1', name: 'Employee Handbook', file: 'Handbook.pdf', size: 2048, depts: ['Revenue'], at: '2026-10-01T02:00:00Z' }])
   })
 })
 

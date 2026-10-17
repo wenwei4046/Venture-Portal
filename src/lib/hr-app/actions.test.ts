@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   bookRoom: vi.fn(),
   decide: vi.fn(),
   letter: vi.fn(),
+  attDecide: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ getUser: mocks.user }))
 vi.mock('./server', () => ({ appAccess: mocks.access }))
@@ -17,15 +18,16 @@ vi.mock('@/lib/member/member-services', () => ({ ACCEPT_NOTE: 'Accepted onto the
 vi.mock('@/lib/documentation/actions', () => ({ openDocumentationFile: mocks.letter }))
 vi.mock('@/lib/hiring/actions', () => ({
   acknowledgeHiringRequest: mocks.acknowledge, cancelHiringRequest: vi.fn(), declineHiringRequest: vi.fn(), fillHiringRequest: vi.fn(),
-  removeHiringTalent: vi.fn(), requestHiringInfo: vi.fn(), saveHiringCandidate: vi.fn(), saveTalentNotes: mocks.saveTalentNotes, setCandidateStage: vi.fn(),
+  removeHiringTalent: vi.fn(), requestHiringInfo: vi.fn(), saveHiringCandidate: vi.fn(), saveTalentNotes: mocks.saveTalentNotes, setCandidateStage: vi.fn(), submitHiringRequest: vi.fn(),
 }))
 vi.mock('@/lib/rooms/actions', () => ({ bookRoom: mocks.bookRoom, cancelBooking: vi.fn() }))
+vi.mock('@/lib/attendance/actions', () => ({ decideRequest: mocks.attDecide }))
 
-import { hrAppAcknowledge, hrAppBook, hrAppDecide, hrAppLetterLink, hrAppTalentNotes } from './actions'
+import { hrAppAcknowledge, hrAppAttDecide, hrAppBook, hrAppDecide, hrAppLetterLink, hrAppTalentNotes } from './actions'
 
 const OPEN = {
   parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true },
-  may: { decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
 }
 const SHUT = { ok: false, reason: 'This is not open to your account.' }
 
@@ -72,5 +74,19 @@ describe('a write from the HR app', () => {
     await expect(hrAppLetterLink('L1')).resolves.toEqual({ ok: true, url: 'https://files.example/l.pdf' })
     mocks.access.mockReturnValue({ ...OPEN, parts: { ...OPEN.parts, docs: false } })
     await expect(hrAppLetterLink('L1')).resolves.toEqual(SHUT)
+  })
+})
+
+describe('HR Mobile’s decision on an attendance request (2026-10-17)', () => {
+  it('goes to HR › Attendance’s own decideRequest while Requests’ Approve is open to them', async () => {
+    mocks.attDecide.mockResolvedValue({ ok: true, data: { id: 'r1', ref: 'LV-2610-009', status: 'approved' } })
+    await expect(hrAppAttDecide('r1', true, '')).resolves.toEqual({ ok: true })
+    expect(mocks.attDecide).toHaveBeenCalledWith('r1', true, '')
+  })
+  it('asks for a note before a rejection, and is refused once the box is unticked', async () => {
+    await expect(hrAppAttDecide('r1', false, '  ')).resolves.toEqual({ ok: false, reason: 'Add a note to reject' })
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, attDecide: false } })
+    await expect(hrAppAttDecide('r1', true, '')).resolves.toEqual(SHUT)
+    expect(mocks.attDecide).not.toHaveBeenCalled()
   })
 })

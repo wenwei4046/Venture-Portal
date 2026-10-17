@@ -7162,6 +7162,43 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .page-search button { height: 34px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .page-search button:hover { background: rgb(247 247 245); }
 
+/* ─── The HR app, HR Mobile (2026-10-17) ───
+   The Claude Design handoff `design_handoff_hr_mobile`: the HR theme's own
+   section tones (as the shell's, `.hrv-shell` above) and the handoff's few
+   colours of its own — the app's ground, the accent that marks, a picked
+   pill and tile, the In / Late chips, the waiting node's halo, the scrim,
+   the sheet's, toast's and frame's shadows, and the one curve. */
+[data-hr-app] {
+  --tone-walnut: 239 228 217;
+  --tone-walnut-deep: 75 48 36;
+  --tone-clay: 249 231 216;
+  --tone-clay-deep: 163 78 37;
+  --tone-gold: 246 237 213;
+  --tone-gold-deep: 125 91 32;
+  --tone-slate: 230 237 241;
+  --tone-slate-deep: 78 101 116;
+  --tone-olive: 238 240 226;
+  --tone-olive-deep: 88 98 68;
+  --hr2-ground: rgb(247 244 240);
+  --hr2-accent: rgb(233 154 83);
+  --hr2-on-accent: rgb(255 255 255);
+  --hr2-pill-on: rgb(255 240 228);
+  --hr2-tile-on: rgb(255 248 240);
+  --hr2-in-bg: rgb(225 240 230);
+  --hr2-late-bg: rgb(255 236 220);
+  --hr2-halo: 0 0 0 4px rgb(232 150 80 / .18), inset 0 0 0 5px var(--ds-surface), inset 0 0 0 13px var(--hr2-accent);
+  --hr2-scrim: rgb(43 31 23 / .35);
+  --hr2-sheet-shadow: 0 -10px 40px rgb(43 31 23 / .2);
+  --hr2-toast-shadow: 0 10px 30px rgb(0 0 0 / .2);
+  --hr2-frame-shadow: 0 0 0 1px var(--ds-border), 0 20px 50px rgb(63 43 34 / .12);
+  --hr2-ease: cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes hrIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hrFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes hrUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes hrDim { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hrToast { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
 /* ─── Me (2026-10-17) ───
    One's own attendance, leave, payslips, record and line — the Claude Design
    handoff `design_handoff_staff_app` (Staff App v2), in the HR theme, on Me's

@@ -136,7 +136,8 @@ export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source
   const reports = data?.reports ?? 0
   const upline = reports > 0 || (s.team?.waiting.length ?? 0) > 0
   const title = person?.title ?? s.record?.title ?? ''
-  const hubLine = [upline && reports ? `${title} · ${reports} report${reports === 1 ? '' : 's'}` : title, person?.code].filter(Boolean).join(' · ')
+  // "Marketing Manager · 3 reports · HV-0042" — no title, no stray "· " in front of the rest.
+  const hubLine = [title, upline && reports ? `${reports} report${reports === 1 ? '' : 's'}` : '', person?.code].filter(Boolean).join(' · ')
   const profileLine = [title, person?.department].filter(Boolean).join(' · ')
   const waiting = data && s.team ? waitItems(data, s.team) : []
 
