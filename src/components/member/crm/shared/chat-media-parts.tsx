@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cachedFacts, pdfFacts, sizeLabel, type PdfFacts } from "./pdf";
 import { keepImage, keepPoster, useKeptSrc } from "./media-cache";
+import { firstFrameSrc } from "./chat-media";
 import { typePx } from "./type";
 export { VoiceNote } from "./voice-note";
 
@@ -50,7 +51,7 @@ export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }
       {items.map((t, i) => (
         <span key={t.src} onClick={t.view} style={{ position: "relative", display: "block", aspectRatio: items.length === 3 && i === 0 ? "2 / 1" : "1", gridColumn: items.length === 3 && i === 0 ? "1 / span 2" : undefined, overflow: "hidden", borderRadius: "3px", background: "#000", cursor: "pointer" }}>
           {t.video
-            ? <ChatVideo src={t.src.startsWith("blob:") ? t.src : `${t.src}#t=0.1`} base={t.src} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+            ? <ChatVideo src={firstFrameSrc(t.src)} base={t.src} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
             : <ChatImg src={t.src} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
           {t.video && !(more && i === items.length - 1) && (
             <span style={{ position: "absolute", left: "50%", top: "50%", width: "36px", height: "36px", margin: "-18px 0 0 -18px", borderRadius: "18px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}>
@@ -78,7 +79,12 @@ export function MediaAlbum({ items, more }: { items: AlbumTile[]; more: number }
  */
 export const RETRY_MS = [800, 1500, 3000, 5000, 8000, 12000];
 /** The address to ask on the n-th try: our own route gets a fresh query so the browser asks again; a local copy never. */
-export const retrySrc = (src: string, n: number) => (!n || !src.startsWith("/") ? src : `${src}${src.includes("?") ? "&" : "?"}r=${n}`);
+// The try's number goes before a `#t=` (a video's first picture) — after it, it was part of the fragment and not asked.
+export const retrySrc = (src: string, n: number) => {
+  if (!n || !src.startsWith("/")) return src;
+  const [path, frag] = src.split("#", 2);
+  return `${path}${path.includes("?") ? "&" : "?"}r=${n}${frag !== undefined ? `#${frag}` : ""}`;
+};
 function useRetry(src: string) {
   const [n, setN] = useState(0), t = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => { setN(0); return () => clearTimeout(t.current); }, [src]);
@@ -101,6 +107,12 @@ export function ChatVideo({ src, base, onLoadedMetadata, style }: { src: string;
   const poster = useKeptSrc(base, true), r = useRetry(src);
   return (
     <video key={r.n} src={retrySrc(src, r.n)} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style} onError={r.failed}
-      onLoadedMetadata={onLoadedMetadata} onLoadedData={e => { if (!poster.kept) keepPoster(base, e.currentTarget); }} />
+      onLoadedMetadata={e => {
+        onLoadedMetadata?.(e);
+        // No picture kept and still at its start (a browser that took no `#t=`): asked for a moment in, an iPhone draws it.
+        const v = e.currentTarget;
+        if (!poster.src && v.currentTime < 0.05 && v.duration > 0.2) v.currentTime = 0.1;
+      }}
+      onLoadedData={e => { if (!poster.kept) keepPoster(base, e.currentTarget); }} />
   );
 }

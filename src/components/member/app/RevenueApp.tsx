@@ -8,6 +8,7 @@ import { NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-
 import { allowedRoute, landing, requestPage, sends, shows } from "./app-access";
 import { setViewAs } from "@/components/layout/view-as-actions";
 import PushAsk from "@/components/pwa/PushAsk";
+import { useStatusBar } from "@/components/pwa/status-bar";
 import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
@@ -1227,6 +1228,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const showHeader = route.screen === "today" || route.screen === "calc" || (home !== "today" && atHome);
   // Profile's glow runs up into the status bar until the page scrolls (or View as covers it, or the header sits above it).
   const statusBg = route.screen === "account" && !route.pf && !compact && !vaOpen && !showHeader ? "var(--rv-peach)" : "var(--rv-white)";
+  // …and the phone's own status bar with it (components/pwa/status-bar.ts, 2026-10-17); the CRM paints its own while open.
+  useStatusBar(statusBg, live && !desk && !onCrm);
   const screenVars = {
     "--status-bg": statusBg,
     "--status-h": live ? "env(safe-area-inset-top, 0px)" : android ? "38px" : "54px",

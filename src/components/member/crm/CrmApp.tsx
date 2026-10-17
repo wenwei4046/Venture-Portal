@@ -8,7 +8,7 @@
  * screens' markup is generated from the design (sales/Sales*.tsx); their
  * behaviour is sales/vm/*.ts; every change is saved first (sales/actions.ts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { fetchCrmData } from "@/app/(member)/member/crm-actions";
 import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
@@ -40,6 +40,7 @@ import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
 import { NotifSummaryHost } from "./shared/notif-summary";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
+import { paintStatusBar, topColorOf } from "@/components/pwa/status-bar";
 import { crmChatTag } from "@/lib/push/notices";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
@@ -88,6 +89,16 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   useEffect(() => {
     if (data || problem) readyCall.current?.();
   }, [data, problem]);
+
+  // The phone's status bar in this page's own top colour (2026-10-17, the owner: "for the top bar, should be same colour
+  // with the apps. with all tab as well"): the colour crm.module.css draws at .app's top for the page on screen — white
+  // (Mine, a chat), cream (the Team side), the glow's peach (either Profile) — written after every drawing.
+  const appRef = useRef<HTMLDivElement>(null);
+  const paintsBar = live && !desk;
+  useLayoutEffect(() => {
+    if (paintsBar && appRef.current) paintStatusBar(topColorOf(appRef.current));
+  });
+  useEffect(() => () => paintStatusBar(null), []);
 
   // The last answer is kept on the phone (2026-10-14, the owner: "當我進入時，我看到的還是上次的畫面，那你的後台系統可以再
   // 計算"): the CRM opens on it at once and the read below replaces it when it lands — the Revenue app's own store
@@ -225,7 +236,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
 
   const shell = (body: React.ReactNode, extra = "") => (
     // data-revenue-app: the portal's display serif stays off the CRM's headings (globals.css).
-    <div className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
+    <div ref={appRef} className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
       <style>{KEYFRAMES}</style>
       {body}
       <MediaViewer />
