@@ -40,6 +40,10 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['treasury.view'], text: 'can(user, treasury) — the voucher print’s approval requests, the treasury’s read only' },
   'src/lib/attendance/payroll-write.ts#payrollMarksFor':
     { wants: ['hr_costing.view:own'], text: 'can(user, hr_costing) with the Payroll tab open — Month close shows where each person’s payroll stands to a payroll reader only' },
+  // 2026-10-17 — HR Mobile: a person's Call and Message dial People's own mobile column, read only while People is
+  // open to them (appAccess(user).parts.people: can(team) || can(team_directory), with People's tab).
+  'src/lib/hr-app/server.ts#mobiles':
+    { wants: ['team.view:own'], text: 'appAccess(user).parts.people — People (team / team_directory) with its tab open' },
 }
 
 /**

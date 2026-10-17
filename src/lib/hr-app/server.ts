@@ -21,6 +21,7 @@ import { loginIsPersonal } from '@/lib/account/personal-login'
 import { loadMyMemos } from '@/lib/memos/server'
 import { NO_MEMOS } from '@/lib/memos/model'
 import { loadMyDocuments } from '@/lib/documentation/my-docs'
+import { loadBoard, loadLedger, loadRequests } from '@/lib/attendance/server'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -134,12 +135,19 @@ export function talentOf(t: HiringTalent): HrTalent {
 }
 
 /** People › Documentation's Data center as the app draws it: everybody, the letter types, the letters on file (a withdrawn one is not). */
-export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' | 'letterTypes' | 'letters'>): Pick<HrAppData, 'staff' | 'docTypes' | 'letters'> {
+export function dataCenterOf(doc: Pick<Documentation, 'people' | 'departments' | 'letterTypes' | 'letters'> & Partial<Pick<Documentation, 'documents'>>): Pick<HrAppData, 'staff' | 'docTypes' | 'letters' | 'documents'> {
   const dept = new Map(doc.departments.map(d => [d.id, deptLabel(d.name)]))
   return {
     staff: doc.people.map(p => ({ id: p.id, name: p.name, title: p.title ?? '', dept: (p.departmentId && dept.get(p.departmentId)) || '' })),
     docTypes: doc.letterTypes.map(t => ({ id: t.id, name: t.name, compulsory: t.compulsory })),
-    letters: liveLetters(doc.letters).map(l => ({ id: l.id, staffId: l.staffId, typeId: l.typeId ?? '', typeName: l.typeName, file: l.fileName })),
+    letters: liveLetters(doc.letters).map(l => ({
+      id: l.id, staffId: l.staffId, typeId: l.typeId ?? '', typeName: l.typeName, file: l.fileName,
+      staffName: l.staffName, filedAt: l.filedAt, readAt: l.readAt, ackAt: l.acknowledgedAt,
+    })),
+    // HR Mobile's Documents › Company (2026-10-17): the company's documents still on file.
+    documents: (doc.documents ?? []).filter(x => !x.deletedAt).map(x => ({
+      id: x.id, name: x.name, file: x.fileName, size: x.size, depts: x.departments.map(deptLabel), at: x.uploadedAt,
+    })),
   }
 }
 
@@ -156,6 +164,14 @@ export const PART_PAGE = {
   talent: '/hiring/talent',
   docs: '/team/documentation',
   rooms: '/admin/rooms',
+  // HR Mobile (2026-10-17): Today, Approve, Leave balances, Month close and Records are HR › Attendance's pages;
+  // People is People Management's.
+  today: '/attendance/today',
+  approve: '/attendance/requests',
+  balances: '/attendance/balances',
+  close: '/attendance/close',
+  records: '/attendance/records',
+  people: '/team/people',
 } as const satisfies Record<keyof HrAppData['parts'], PageRoute>
 
 /** The account as one page of the portal sees it: its writes narrowed to that page's open boxes. */
@@ -173,12 +189,19 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
     talent: canDo(user, 'hiring', 'view') && open(PART_PAGE.talent),
     docs: canDo(user, 'documentation', 'view') && open(PART_PAGE.docs),
     rooms: canDo(user, 'rooms', 'view') && open(PART_PAGE.rooms),
+    today: canDo(user, 'attendance', 'view') && open(PART_PAGE.today),
+    approve: canDo(user, 'attendance', 'view') && open(PART_PAGE.approve),
+    balances: canDo(user, 'attendance', 'view') && open(PART_PAGE.balances),
+    close: canDo(user, 'attendance', 'view') && open(PART_PAGE.close),
+    records: canDo(user, 'attendance', 'view') && open(PART_PAGE.records),
+    people: (can(user, 'team') || can(user, 'team_directory')) && open(PART_PAGE.people),
   }
   // Member services decides by its key (member_is_manager); a box unticked on its page still closes it.
   const decide = parts.requests && (!user.closed?.length || canDo(onPage(user, PART_PAGE.requests), 'member', 'manage'))
   return {
     parts,
     may: {
+      attDecide: parts.approve && canDo(onPage(user, PART_PAGE.approve), 'attendance', 'approve'),
       decide,
       hireApprove: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'approve'),
       hireEdit: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'edit'),
@@ -202,10 +225,32 @@ export function hrTopics(user: User): string[] {
   ]
 }
 
+/**
+ * Everybody's mobile, for a person's Call and Message (2026-10-17, HR Mobile): People's own column, read under the
+ * viewer's session — only while People is open to them, and only the people their reach shows.
+ */
+async function mobiles(): Promise<Record<string, string>> {
+  const { data, error } = await (await client()).from('hr_staff_costs').select('id, contact_number').eq('status', 'active')
+  if (error || !data) return {}
+  return Object.fromEntries((data as Array<{ id: string; contact_number: string | null }>).filter(r => r.contact_number).map(r => [r.id, String(r.contact_number)]))
+}
+
+/** HR › Attendance as the app reads it: settings and people, this month, the requests, this year's ledger. */
+async function attendanceOf(parts: HrAppData['parts'], today: string): Promise<{ att: HrAppData['att']; attError: string | null }> {
+  if (!(parts.today || parts.approve || parts.balances || parts.close || parts.records)) return { att: null, attError: null }
+  const [board, requests, ledger] = await Promise.all([loadBoard(today), parts.approve || parts.close ? loadRequests() : Promise.resolve(null), loadLedger(Number(today.slice(0, 4)))])
+  if (!board.ok) return { att: null, attError: board.reason }
+  return {
+    att: { config: board.data.config, month: board.data.month, requests: requests?.ok ? requests.data : [], ledger: ledger.ok ? ledger.data : null },
+    attError: requests && !requests.ok ? requests.reason : null,
+  }
+}
+
 export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
+  const [attRead, phones] = await Promise.all([attendanceOf(parts, today), parts.people ? mobiles() : Promise.resolve({})])
   const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
@@ -264,6 +309,10 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     talents: board && parts.talent ? board.talents.map(talentOf) : [],
     docTypes: center?.docTypes ?? [],
     letters: center?.letters ?? [],
+    documents: center?.documents ?? [],
+    hireFields: board && parts.hiring ? board.fields : [],
+    hirePeople: board && parts.hiring ? board.people.map(p => ({ id: p.id, name: p.name, dept: p.department ?? '' })) : [],
+    hireMe: board?.me.staffId ?? null,
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
     parts,
     may,
@@ -272,5 +321,10 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     personalLogin: personal,
     memos: mine.memos,
     myDocs: myDocs?.ok ? myDocs.data : null,
+    att: attRead.att,
+    attError: attRead.attError,
+    phones,
+    // The greeting's second line: "Siti Nurhaliza · HR Manager".
+    meLine: [user.viewingAs?.name ?? who?.me?.name ?? user.name ?? '', attRead.att?.config.people.find(p => p.id === who?.me?.staffId)?.title ?? null].filter(Boolean).join(' · '),
   }
 }

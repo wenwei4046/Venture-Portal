@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = { title: 'HR · HOUZS Venture' }
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#f6f2ec' }
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#f7f4f0' }
 
 /**
  * The HR phone app (2026-10-11, HR revamp round 2 — README §17): its own
@@ -17,5 +17,6 @@ export const viewport: Viewport = { width: 'device-width', initialScale: 1, view
  * phone's own buttons (hr-app.module.css › `.app`).
  */
 export default function HrAppLayout({ children }: { children: ReactNode }) {
-  return <div style={{ position: 'fixed', inset: 0, background: 'rgb(246 242 236)' }}>{children}</div>
+  // HR Mobile (2026-10-17): the app's column (430px at most, components/hr-app) on a white page, as the handoff draws it.
+  return <div style={{ position: 'fixed', inset: 0, background: 'rgb(255 255 255)' }}>{children}</div>
 }
