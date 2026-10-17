@@ -8273,29 +8273,8 @@ export type Database = {
         Args: { p_payment_date: string; p_voucher_id: string }
         Returns: undefined
       }
-      submit_dept_payment_request: {
-        Args: {
-          p_amount: number
-          p_category_code?: string
-          p_description: string
-          p_payee_company_id: string
-          p_payee_name: string
-        }
-        Returns: string
-      }
       submit_director_salary_to_finance: {
         Args: { p_period: string; p_user_id: string }
-        Returns: string
-      }
-      submit_invoice_request: {
-        Args: {
-          p_description: string
-          p_due_date: string
-          p_invoice_date: string
-          p_line_items: Json
-          p_period_month: string
-          p_reference_no: string
-        }
         Returns: string
       }
       director_payroll_complete: {

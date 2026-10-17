@@ -73,7 +73,7 @@ describe('the start (`/`)', () => {
 describe('the Finance app (2026-10-15, the Finance revamp v2’s phone)', () => {
   it('opens for Finance’s view — the finance kind, or the Principal’s Finance lens — and nobody else', () => {
     expect(opensFinApp({ role: 'finance' })).toBe(true)
-    for (const role of ['principal', 'hr', 'staff', 'dept_manager', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
+    for (const role of ['principal', 'hr', 'staff', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
     expect(opensFinApp(null)).toBe(false)
     // The Principal's own view (2026-10-17): "the mobile use the same view with finance app … just add on then
     // tab for approval tab" — for an account that may switch views.

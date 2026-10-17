@@ -5,7 +5,7 @@ import { APPROVAL_DOMAIN, approvableTypes, canDecide, canSeeApprovals, decision,
 import { actionsFromKeys } from './permission-actions'
 
 const PRINCIPAL_KEYS = ['approvals', 'treasury', 'override', 'billing', 'hr_costing', 'director_salary', 'claims', 'dashboard']
-const account = (id: string, role: string, keys: string[]): Approver => ({ id, role, permissions: keys, actions: actionsFromKeys(keys, role) })
+const account = (id: string, role: string, keys: string[]): Approver => ({ id, role, permissions: keys, actions: actionsFromKeys(keys) })
 
 const principal = account('p', 'principal', PRINCIPAL_KEYS)
 const finance = account('f', 'finance', ['treasury', 'billing', 'claims', 'claims_approve', 'dashboard'])

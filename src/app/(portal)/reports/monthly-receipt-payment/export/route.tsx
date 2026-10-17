@@ -23,8 +23,10 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
-  // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requireActionOn('/reports/monthly-receipt-payment', 'dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/monthly-receipt-payment', 'dept_reports', 'export')
+  // As the page: for whoever reads the reports company-wide (the Dept Manager's
+  // own-segment export went with the kind, 2026-10-17).
+  if (!reportsCompanyWide(user)) return Response.json({ error: 'Not found' }, { status: 404 })
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
@@ -36,8 +38,7 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const consolidated = reportsCompanyWide(user) && !segment
+  const consolidated = !segment
   // As on the page (2026-10-08): the bridge starts beside the journal read
   // with the bank codes still pending, and is not read where its lines are
   // dropped.
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
       // Every event, paged past PostgREST's cap — the page's own reader.
-      fetchRnpInvoiceEvents(supabase, isDeptMgr || !segment ? {} : { p_segment: segment }),
+      fetchRnpInvoiceEvents(supabase, segment ? { p_segment: segment } : {}),
       supabase.from('companies').select('id, name, short_code'),
     ])
   const ibLines = ib ? ib.lines : []

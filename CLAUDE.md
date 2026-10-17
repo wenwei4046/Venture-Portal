@@ -76,12 +76,11 @@ Every gate reads a PERMISSION, never a role (2026-09-01). A title points at a TE
 - Every table has its line in `audit_tables`; the history is read through `audit_changes()`, which shows a reader only what their own permissions open.
 - CRM: who is in it comes from titles and IR's memberships, what they may do from the matrix's CRM row. A CRM write that changes assignment or settings asks `crm_manages()`; one that works a customer asks `crm_can_reply()` / `crm_can('edit', …)` — never `crm_sees_all()`, which is reading. Rewrite a CRM function from PRODUCTION's body: the event trigger `crm_keeps_its_permission_checks` refuses one that drops its check.
 - View as: the Principal's `vp-view-as` cookie is shared by every tab; *Revenue View* is honoured by the member app only; `getAccountUser()` reads the account with no mask. HR's / Finance's view is a LENS (2026-10-11): that view's shell, sidebar and Overview over the account's own power — it edits (`lib/view-as.ts` `lensNav`, `lensOverview`). *View as a person* (cookie `vp-view-as-person`) draws the portal as one account and is READ-ONLY: while it is set the server client reads tables, calls only `READS_WHILE_VIEWING_AS` functions and reads storage (`lib/supabase/read-only.ts` — a new reader the portal calls goes on that list); a service-role write asks `refuseWhileViewingAs()`.
-4 Roles (now: the fallback each account is created with)
+3 Roles (now: the fallback each account is created with; the Dept Manager went 2026-10-17 — `permissions.md`)
 Role	DB Value	Access
 Principal	`principal`	Everything + Approve + Settings
 Finance	`finance`	Treasury + Billing + Reports — no individual salary, no Director Salary module, no Director Pool (v2 2026-07-21: calculator is Principal + HR only)
 HR	`hr`	Staff costs + Director Salary + Claims + Director Pool (v2 calculator, granted 2026-07-21) + Revenue Department (commission rules, hierarchy, runs — but NOT the Product List, a tick of its own: the Principal's templates and, since 2026-10-14, the Revenue Director's)
-Dept Manager	`dept_manager`	Own department only
 Key Business Rules
 Treasury
 Subsidiaries deposit savings in HV at negotiated rates (per-deal, not fixed)

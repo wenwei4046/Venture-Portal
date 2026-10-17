@@ -20,7 +20,7 @@ import MonthlyCashFlowBody from '../../../reports/_components/MonthlyCashFlowBod
 // switch between the two keeps the period.
 //
 // For whoever reads the reports company-wide AND every department's pool
-// (Finance, the Principal); a department manager keeps their own pages.
+// (Finance, the Principal).
 
 export const dynamic = 'force-dynamic'
 
@@ -88,7 +88,7 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
           ))}
         </div>
         {/* The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16). */}
-        {canDo(user, 'dept_reports', 'export', 'dept') ? (
+        {canDo(user, 'dept_reports', 'export') ? (
           <>
             <a href={exportHref('xlsx')} className="btn-quiet-sheet">
               Excel

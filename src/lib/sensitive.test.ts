@@ -45,7 +45,7 @@ describe('sensitiveFromKeys — current_sensitive_fields() for an account with n
     expect(sensitiveFromKeys(['salary_individual', 'team'], 'principal')).toEqual(['bank', 'nric', 'salary'])
     expect(sensitiveFromKeys(['salary_individual', 'team'], 'hr')).toEqual(['bank', 'nric', 'salary'])
     expect(sensitiveFromKeys(['treasury', 'payroll_payouts'], 'finance')).toEqual(['bank'])
-    expect(sensitiveFromKeys(['dept_pool'], 'dept_manager')).toEqual([])
+    expect(sensitiveFromKeys(['dept_pool'], 'staff')).toEqual([])
     expect(sensitiveFromKeys(['member_portal'], 'revenue_member')).toEqual([])
   })
 })

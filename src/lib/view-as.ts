@@ -23,8 +23,8 @@ export function viewAsPersonId(value: string | null | undefined): string | null 
   return value && UUID.test(value) ? value : null
 }
 
-// dept_manager is excluded: their pages key off user.department_id, which a
-// Principal account doesn't have.
+// The views a Principal can wear over the account (the Dept Manager's never was
+// one, and the kind went on 2026-10-17).
 export const VIEW_AS_ROLES = ['hr', 'finance', 'revenue_member'] as const
 export type ViewAsRole = (typeof VIEW_AS_ROLES)[number]
 

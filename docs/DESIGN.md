@@ -610,7 +610,7 @@ Four kinds of table keep every column instead:
    - A `<form>` inside a single cell is fine, and so is a controlled input read from React state.
 2. **A table that already expands on tap:** the GL statements (`GlReportView`), the Chart-of-Accounts tree, the company statement.
 3. **The reconciliation matching panes**, where a tap selects a row for pairing.
-4. **`MonthlyMatrix`** — it pins the account column and scrolls inside `.table-scroll`.
+4. **`SheetReport`** (`.sheet-rpt`, the reports' sheet) — it pins the account column and scrolls inside its own frame.
 
 `.table-scroll` is the escape hatch for any table that cannot fold.
 

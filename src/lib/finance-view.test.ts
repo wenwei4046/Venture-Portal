@@ -3,9 +3,9 @@ import { financePageTitle, isFinanceDetailRoute, isFinanceShell, isFinanceView, 
 
 // 2026-10-09 — the Finance revamp (the user's Claude Design handoff,
 // `.design/finance-revamp`) applies to Finance's pages only (user: 只套 Finance
-// 的页面): what Finance and the Principal see on those routes. HR's and a
-// department manager's pages keep the sheet as it was, and a shared route
-// (the Overview, Dept Pool, Reports, Settings) only counts for those two roles.
+// 的页面): what Finance and the Principal see on those routes. HR's pages keep
+// the sheet as it was, and a shared route (the Overview, Dept Pool, Reports,
+// Settings) only counts for those two roles.
 
 describe('isFinanceView', () => {
   it('is Finance’s pages, for Finance and the Principal', () => {
@@ -18,13 +18,13 @@ describe('isFinanceView', () => {
   it('counts a shared route only for those two roles', () => {
     expect(isFinanceView('/dashboard', 'finance')).toBe(true)
     expect(isFinanceView('/dashboard', 'hr')).toBe(false)
-    expect(isFinanceView('/dept-pool/marketing', 'dept_manager')).toBe(false)
-    expect(isFinanceView('/reports/monthly-pnl', 'dept_manager')).toBe(false)
+    expect(isFinanceView('/dept-pool/marketing', 'staff')).toBe(false)
+    expect(isFinanceView('/reports/monthly-pnl', 'staff')).toBe(false)
     expect(isFinanceView('/settings', 'principal')).toBe(true)
   })
 
   it('leaves HR’s pages alone, whoever opens them', () => {
-    for (const path of ['/hr-costing', '/director-salary', '/director-pool', '/revenue/fair', '/claims', '/team', '/opex', '/my-billing', '/audit-log']) {
+    for (const path of ['/hr-costing', '/director-salary', '/director-pool', '/revenue/fair', '/claims', '/team', '/opex', '/audit-log']) {
       expect(isFinanceView(path, 'principal'), path).toBe(false)
       expect(isFinanceView(path, 'finance'), path).toBe(false)
     }
@@ -87,8 +87,8 @@ describe('who wears Finance’s shell', () => {
     expect(isFinanceShell({ role: 'principal' })).toBe(false)
   })
 
-  it('is never HR’s view, a department’s, the Revenue team’s — or nobody', () => {
-    for (const role of ['hr', 'dept_manager', 'staff', 'revenue_member']) {
+  it('is never HR’s view, a templated account’s, the Revenue team’s — or nobody', () => {
+    for (const role of ['hr', 'staff', 'revenue_member']) {
       expect(isFinanceShell({ role, permissions: ['view_switch'] })).toBe(false)
       expect(isPrincipalView({ role, permissions: ['view_switch'] })).toBe(false)
     }

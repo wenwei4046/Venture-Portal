@@ -52,8 +52,8 @@ describe('isSheetRoute', () => {
   })
 
   // 2026-10-07 (user: "finance 的整体 background 可以换成和 principal 和 hr 一样"
-  // → "做 A 先"): Finance's pages — and the department manager's My Billing
-  // and OPEX — sit on the sheet as well, the pages themselves unchanged for now.
+  // → "做 A 先"): Finance's pages — and OPEX — sit on the sheet as well, the
+  // pages themselves unchanged for now.
   it('puts Finance’s pages on the sheet too, detail routes included', () => {
     for (const path of [
       '/approvals', '/approvals/abc', '/approvals/payroll-run/abc',
@@ -61,7 +61,7 @@ describe('isSheetRoute', () => {
       '/receipts', '/statements', '/statements/monthly', '/statements/abc',
       '/billing', '/billing/contracts/new', '/billing-allocator', '/invoice-pool',
       '/daily-bank', '/fund-in', '/fund-in/abc', '/fund-out', '/fund-out/abc', '/ba', '/repayment-schedule',
-      '/dept-pool', '/dept-pool/marketing', '/venture-pool', '/opex', '/my-billing',
+      '/dept-pool', '/dept-pool/marketing', '/venture-pool', '/opex',
       '/reports/ledger', '/reports/monthly-pnl', '/reports/company-statement',
       '/reconciliation', '/reconciliation/journal-entries', '/audit-log', '/settings',
     ]) {

@@ -25,8 +25,10 @@ users (
     id              uuid PK DEFAULT gen_random_uuid()
     email           text UNIQUE NOT NULL
     name            text NOT NULL
-    role            enum ('principal','finance','hr','dept_manager') NOT NULL
-    department_id   uuid FK → departments          -- dept_manager 才填
+    role            enum ('principal','finance','hr','dept_manager','revenue_member','staff') NOT NULL
+                    -- CHECK role <> 'dept_manager' since 2026-10-17 (users_no_dept_manager): the kind is gone,
+                    -- the label stays in the enum for access_log's history
+    department_id   uuid FK → departments          -- the person's department (any kind)
     is_active       boolean DEFAULT true
     created_at      timestamptz DEFAULT now()
     updated_at      timestamptz DEFAULT now()
@@ -476,7 +478,8 @@ collapsed to — admin = {principal}, treasury = {principal, finance},
 hr = {principal, hr}, treasury+hr = {principal, finance, hr}. 252 policies were
 rewritten onto them; the 16 that mention `dept_manager` still read
 `current_user_role()`, because no scope admits dept_manager (its every grant is
-row-scoped to its own department). That is why `users.role` remains.
+row-scoped to its own department). That is why `users.role` remains. (Those
+policies went with the kind on 2026-10-17, mig `20261017160000`.)
 
 5.1a titles  (Team module, 2026-09-01)
 ```sql
@@ -892,7 +895,7 @@ directors ←─── director_payouts (monthly payout)
 directors ←─── invoice_payout_pool (25% accumulate/release)
 directors ←─── fund_sources (director loans)
 
-departments ←── users (dept_manager)
+departments ←── users (their department)
 departments ←── dept_pools (pool per dept)
 departments ←── service_contracts (service from)
 departments ←── hr_staff_costs (employee belongs to)

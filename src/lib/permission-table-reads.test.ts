@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { KEY_ACTIONS } from './permission-actions'
 import { READS_WITHOUT_ACTION, TABLE_READS, tableReadRows } from './permission-table-reads'
 import { TABLE_WRITES } from './permission-table-writes'
-import { DEFINER_RPCS, INVOKER_READS, INVOKER_VIEWS, policyNeeds, readNeeds, type Need } from '@/test/read-paths'
+import { DEFINER_RPCS, INVOKER_READS, INVOKER_VIEWS, functionScopes, policyNeeds, readNeeds, type Need } from '@/test/read-paths'
 
 // PR3d (2026-10-09): every table a domain policy opens asks may_read(table)
 // in a restrictive policy — the caller must hold one of TABLE_READS[table].
@@ -58,10 +58,7 @@ describe('TABLE_READS', () => {
   })
 
   it('asks for a reach only where the function has it', () => {
-    const scopes = new Map<string, string[]>()
-    for (const m of sqlOf('20261008120000_permission_templates.sql').matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
-      scopes.set(m[1], [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1]))
-    }
+    const scopes = new Map(Object.entries(functionScopes()))
     expect(scopes.size).toBeGreaterThan(20)
     const reaches = tableReadRows().flatMap(r => r.actions.filter(a => a.includes(':')))
     expect(reaches.filter(a => {

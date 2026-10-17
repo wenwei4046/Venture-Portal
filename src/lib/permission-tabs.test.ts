@@ -81,7 +81,7 @@ describe('the tab catalog (HR revamp 8)', () => {
   })
 })
 
-describe('moving the eleven templates onto tabs loses nothing', () => {
+describe('moving the templates onto tabs loses nothing', () => {
   it.each(Object.keys(PROD))('%s keeps every cell it held', key => {
     expect(lossesOf(held(key), moved(key))).toEqual([])
   })
@@ -91,7 +91,6 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
   it('gains only the merges the user chose', () => {
     const gains = Object.fromEntries(Object.keys(PROD).map(k => [k, gainsOf(cellsOf(PROD[k].cells), moved(k))]))
     expect(gains).toEqual({
-      dept_head: ['claims.void:dept', 'opex.export:dept'],
       director: ['dept_reports.export:all', 'treasury.void:all', 'venture_pool.export:all'],
       fin_checker: ['dept_pool.export:all', 'treasury.void:all'],
       fin_maker: ['billing.export:all', 'treasury.export:all', 'venture_pool.export:all'],
@@ -114,7 +113,6 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
   it('puts each template in the views its pages are in — the company-wide ones out of the Department view', () => {
     expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'rev'])
     expect(views(moved('fin_maker'))).toEqual(['fin', 'dept'])
-    expect(views(moved('dept_head'))).toEqual(['dept'])
     expect(views(moved('staff'))).toEqual(['dept'])
     expect(views(moved('hr'))).toEqual(['hr', 'dept'])
     expect(views(moved('revenue_team'))).toEqual(['rev'])
@@ -279,11 +277,11 @@ describe('Select all, the New template window and the boxes that open nothing ye
     const other = new Set(['hr.payroll.view'])
     const every = toggleView(other, 'dept')
     expect(viewTally(every, 'dept')).toBe('all')
-    expect(viewCount('dept', every)).toEqual({ seen: 9, of: 9 })
+    expect(viewCount('dept', every)).toEqual({ seen: 3, of: 3 })
     expect(every.has('dept.my_claims.edit')).toBe(true)
     expect(every.has('hr.payroll.view')).toBe(true)
     expect([...toggleView(every, 'dept')]).toEqual(['hr.payroll.view'])
-    expect(viewTally(new Set(['dept.opex.view']), 'dept')).toBe('some')
+    expect(viewTally(new Set(['dept.overview.view']), 'dept')).toBe('some')
   })
 
   it('a new template’s ticks: View on every tab of the views picked, nothing else', () => {

@@ -49,7 +49,7 @@ describe('canonical sign-in routing', () => {
     expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_COOKIE)
   })
 
-  it.each(['principal', 'finance', 'hr', 'dept_manager'])('keeps an active %s account in the existing portal', async role => {
+  it.each(['principal', 'finance', 'hr'])('keeps an active %s account in the existing portal', async role => {
     mocks.profile.mockResolvedValue({ data: { is_active: true, role } })
     await expect(submit()).rejects.toThrow('REDIRECT:/dashboard')
     expect(mocks.clearView).toHaveBeenCalledWith(VIEW_AS_COOKIE)

@@ -6,10 +6,18 @@ import { withActions } from '@/test/with-actions'
 // user's Claude Design handoff (Phase 4 of the Finance revamp), for whoever
 // reads the reports company-wide: the two views in the head, the cards, one
 // control row, the matrix cut to From (an opening reads on its first month,
-// a closing or a balance on its last). A department manager keeps the old
-// page.
+// a closing or a balance on its last).
+// 2026-10-17 — nobody else: a reader short of Reports · View at All is
+// refused (the Dept Manager's own-segment page went with the kind).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), sides: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(),
+  createClient: vi.fn(),
+  sides: vi.fn(),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
@@ -31,7 +39,7 @@ vi.mock('@/lib/monthly-rnp', () => ({
   buildRnpMatrixRows: () => [{ key: 'AR_OUTSTANDING', label: 'Outstanding', depth: 0, kind: 'subtotal', values: [900, 900, 700, 500] }],
 }))
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeMonth: () => '2026-10' }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports/monthly-cash-flow', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports/monthly-cash-flow', useSearchParams: () => new URLSearchParams() }))
 
 import MonthlyCashFlowPage from './page'
 import MonthlyReceiptPaymentPage from '../monthly-receipt-payment/page'
@@ -95,12 +103,6 @@ describe('the month-by-month Cash Flow, company-wide', () => {
     expect(card('Money in')).toHaveTextContent('RM 50,000.00')
     expect(card('Closing cash')).toHaveTextContent('RM 115,000.00')
   })
-
-  it('keeps the old page for a department manager', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports'] }))
-    render(await MonthlyCashFlowPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · MONTHLY CASH FLOW · FY 2026')
-  })
 })
 
 describe('the month-by-month Receipt & Payment, company-wide', () => {
@@ -115,5 +117,17 @@ describe('the month-by-month Receipt & Payment, company-wide', () => {
     expect(card('Outstanding at month end')).toHaveTextContent('RM 900.00')
     // Each line as a % of the month's receipts (2026-10-10, the handoff).
     expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent).slice(0, 2)).toEqual(['RM', '%'])
+  })
+})
+
+describe('the month-by-month Cash Flow and Receipt & Payment, a reader short of Reports · View at All', () => {
+  it.each([
+    ['Cash Flow', MonthlyCashFlowPage],
+    ['Receipt & Payment', MonthlyReceiptPaymentPage],
+  ])('finds no %s page, and reads nothing', async (_name, Page) => {
+    mocks.requirePermission.mockResolvedValue(withActions({ id: 's', role: 'staff', permissions: ['dept_reports'] }))
+    await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(mocks.createClient).not.toHaveBeenCalled()
+    expect(mocks.sides).not.toHaveBeenCalled()
   })
 })

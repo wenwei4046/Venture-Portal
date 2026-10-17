@@ -155,6 +155,9 @@ const isHR = (v: NavViewer) => v.role === 'hr'
  *  (2026-10-09, user: 我要把每个 department 的 cash flow, P&L 放过来). */
 export const readsDeptStatements = (v: NavViewer) => canDo(v, 'dept_pool', 'view') && reportsCompanyWide(v)
 const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
+/** Cash Flow, Receipt & Payment and Debtor Aging: their own key (Department reports) and the reports company-wide
+ *  — the Dept Manager's own-department reading went with the kind (2026-10-17). */
+const readsDeptReports = (v: NavViewer) => canAccessDeptReports(v) && canAccessReports(v)
 
 /**
  * The parts of the nav that cannot be written down ahead of time.
@@ -324,15 +327,16 @@ function navEntries(data: NavData): NavEntry[] {
       section: 'Departments',
       visible: canAccessDeptPool,
       children: [
-        // Whoever reads them all (2026-10-09): the overview — Cash | Accrual
-        // P&L switched in its head — then each department's own P&L and Cash
-        // Flow. A department still lights on the pool page it already had.
+        // The overview — Cash | Accrual P&L switched in its head — for whoever
+        // reaches the pool; then, for whoever also reads the reports
+        // (2026-10-09), each department's own P&L and Cash Flow. A department
+        // still lights on the pool page it already had.
         {
           href: '/dept-pool',
           label: 'Overview',
           exact: true,
           alsoPaths: ['/dept-pool/submissions', '/dept-pool/contracts'],
-          visible: readsDeptStatements,
+          visible: canAccessDeptPool,
         },
         ...(data.deptPoolDepts ?? statementDepts([])).map((d) => ({
           href: statementPath(d.slug),
@@ -451,21 +455,21 @@ function navEntries(data: NavData): NavEntry[] {
     {
       label: 'Reports',
       section: 'Reports & Admin',
-      visible: canAccessDeptReports,
+      visible: canAccessReports,
       children: [
-        // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
-        // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
+        // Each statement page carries a Single month ｜ Month by month switch
+        // in its head (ReportModeSwitch, 2026-10-09), so the Monthly * entries
         // no longer need their own sidebar rows.
         // P&L opens month by month (2026-10-09, the Finance revamp handoff:
         // "P&L defaults to Monthly P&L").
         { href: '/reports/monthly-pnl', label: 'P&L', alsoPaths: ['/reports/income-statement'], visible: canAccessReports },
-        { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
-        { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
+        { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: readsDeptReports },
+        { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: readsDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
         { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
         // Fund Summary + Claims Report dropped from the menu (user 2026-09-15
         // "remove 掉"); routes still exist for direct links.
-        { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
+        { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: readsDeptReports },
         { href: '/reports/loan-aging', label: 'Loan Aging', visible: canAccessReports },
         { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
       ],
@@ -646,7 +650,7 @@ export function tabsForRole(role: UserRole): TabDef[] {
 }
 
 /** The fifth tab's label. Finance's and the Principal's bar reads in English
- *  (2026-10-07, user: "下面还是华语字体"); HR's and a department manager's as it was. */
+ *  (2026-10-07, user: "下面还是华语字体"); HR's as it was. */
 export function moreTabLabel(role: UserRole): string {
   return role === 'finance' || role === 'principal' || role === 'staff' ? 'More' : '更多'
 }

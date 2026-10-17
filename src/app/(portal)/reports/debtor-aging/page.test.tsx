@@ -5,15 +5,27 @@ import { withActions } from '@/test/with-actions'
 // 2026-10-09 — Debtor Aging, Loan Aging and the Company Statement per the
 // user's Claude Design handoff (Phase 4 of the Finance revamp): the date in
 // the eyebrow, Excel / PDF in the head, cards, and the aging tables closing
-// on a navy "All" row. A department manager's Debtor Aging stays as it was.
+// on a navy "All" row.
 // 2026-10-10 — the rest of the handoff: the section "Debtor aging · AS AT …",
 // Find company on a control row ("· highlights only"), bare figures on white
 // rows, the cards' notes (Follow up, the oldest company); Loan Aging's four
 // cards and its days-late wording; the Company Statement's counterparties
 // under their own head, no tiles repeating the cards, a navy-tinted total.
+// 2026-10-17 — Debtor Aging is a company-wide reader's alone: one short of
+// Reports · View at All is refused (the Dept Manager's own-segment page went
+// with the kind).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), fetchLoanMonitorData: vi.fn(), fetchCounterpartyStatement: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(),
+  fetchLoanMonitorData: vi.fn(),
+  fetchCounterpartyStatement: vi.fn(),
+  fetchPaidByInvoice: vi.fn(async () => new Map()),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
+vi.mock('next/navigation', async (orig) => ({ ...(await orig<object>()), notFound: mocks.notFound }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     from: (table: string) => {
@@ -33,7 +45,7 @@ vi.mock('@/lib/supabase/server', () => ({
     },
   }),
 }))
-vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: async () => new Map() }))
+vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: mocks.fetchPaidByInvoice }))
 vi.mock('@/lib/loan-monitor', () => ({ fetchLoanMonitorData: mocks.fetchLoanMonitorData }))
 vi.mock('@/lib/counterparty-statement-data', () => ({ fetchCounterpartyStatement: mocks.fetchCounterpartyStatement }))
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeToday: () => '2026-10-09', officeMonth: () => '2026-10' }))
@@ -134,11 +146,10 @@ describe('Debtor Aging on the sheet', () => {
     expect(within(table).getByText('HOUZS Century').closest('tr')).not.toHaveClass('search-row-hit')
   })
 
-  it('stays as it was for a department manager', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports'] }))
-    render(await DebtorAgingPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · DEBTOR AGING')
-    expect(document.querySelector('tr.rpt-all')).toBeNull()
+  it('is not found for a reader short of Reports · View at All, and reads nothing', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ id: 's', role: 'staff', permissions: ['dept_reports'] }))
+    await expect(DebtorAgingPage({ searchParams: Promise.resolve({}) })).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(mocks.fetchPaidByInvoice).not.toHaveBeenCalled()
   })
 })
 

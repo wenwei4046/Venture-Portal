@@ -5,7 +5,7 @@ import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
+import { requireActionOn, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeTime, officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
@@ -30,7 +30,6 @@ import {
   type ShouldBillRow,
   type BilledRow,
 } from '@/lib/payroll-billing-delta'
-import { canDo } from '@/lib/permission-actions'
 import type { User } from '@/types'
 
 // Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
@@ -642,7 +641,7 @@ export async function generateMonthlyInvoices(
 // ─── Create marketing project contract (Finance) ────────────────────────────
 
 export async function createContract(formData: FormData) {
-  const user = await requireAnyActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], ['billing', 'create'], ['my_billing', 'create', 'dept'])
+  const user = await requireActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], 'billing', 'create')
   await createContractWork(user, formData)
   redirect((formData.get('return_path') as string) || '/billing')
 }
@@ -668,12 +667,6 @@ async function createContractWork(user: User, formData: FormData) {
     .single()
 
   if (!mktDept) throw new Error('Marketing department not found')
-
-  // Dept Manager: must be Marketing's manager. Mig 207 RLS also enforces this,
-  // but fail fast here with a clean error instead of a generic RLS failure.
-  if (!canDo(user, 'billing', 'create') && user.department_id !== mktDept.id) {
-    throw new Error('Only Marketing department manager can create Marketing contracts')
-  }
 
   // Insert contract (active but not yet approved)
   const { data: contract, error } = await supabase
@@ -774,7 +767,7 @@ async function updateContractWork(formData: FormData) {
  * `updateContract`, without the redirect to the portal's Billing.
  */
 export async function createContractInWords(formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const user = await requireAnyActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], ['billing', 'create'], ['my_billing', 'create', 'dept'])
+  const user = await requireActionOn(['/billing/contracts/new', '/dept-pool/contracts/new'], 'billing', 'create')
   try {
     await createContractWork(user, formData)
     return { ok: true }

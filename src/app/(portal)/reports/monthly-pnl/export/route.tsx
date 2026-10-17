@@ -15,8 +15,10 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
-  // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requireActionOn('/reports/monthly-pnl', 'dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/monthly-pnl', 'dept_reports', 'export')
+  // As the page: for whoever reads the reports company-wide (the Dept Manager's
+  // own-segment export went with the kind, 2026-10-17).
+  if (!reportsCompanyWide(user)) return Response.json({ error: 'Not found' }, { status: 404 })
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
@@ -28,8 +30,8 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  // Mirror the page: consolidated only for finance/principal with no segment.
-  const consolidated = reportsCompanyWide(user) && !segment
+  // Mirror the page: consolidated when no segment is picked.
+  const consolidated = !segment
   const [rawLines, accounts, savedRaw, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),

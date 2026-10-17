@@ -7,10 +7,19 @@ import { withActions } from '@/test/with-actions'
 // period in the eyebrow, Single month · P&L / Monthly P&L in the head with
 // Edit layout, Excel and PDF; four cards; Period From – To, Find account,
 // Segment and Detail level on one row; the consolidated note; the matrix cut
-// to From with its months separated. A department manager keeps the page as
-// it was.
+// to From with its months separated.
+// 2026-10-17 — nobody else: a reader short of Reports · View at All is
+// refused (the Dept Manager's own-segment page went with the kind).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), buildPnlAccounts: vi.fn(), buildCustomPnlRows: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(),
+  createClient: vi.fn(),
+  buildPnlAccounts: vi.fn(),
+  buildCustomPnlRows: vi.fn(),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
@@ -22,7 +31,7 @@ vi.mock('@/lib/pnl-custom', () => ({
   defaultPnlLayout: () => ({ categories: [] }),
 }))
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeMonth: () => '2026-10' }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports/monthly-pnl', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports/monthly-pnl', useSearchParams: () => new URLSearchParams() }))
 
 import MonthlyPnlPage from './page'
 
@@ -125,11 +134,11 @@ describe('the Monthly P&L, company-wide', () => {
   })
 })
 
-describe('the Monthly P&L, a department manager', () => {
-  it('keeps the page as it was', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports'] }))
-    render(await page())
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · MONTHLY P&L · FY 2026')
-    expect(screen.queryByRole('group', { name: 'Report controls' })).toBeNull()
+describe('the Monthly P&L, a reader short of Reports · View at All', () => {
+  it('is not found, and nothing is read', async () => {
+    mocks.requirePermission.mockResolvedValue(withActions({ id: 's', role: 'staff', permissions: ['dept_reports'] }))
+    await expect(page()).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(mocks.createClient).not.toHaveBeenCalled()
+    expect(mocks.buildPnlAccounts).not.toHaveBeenCalled()
   })
 })

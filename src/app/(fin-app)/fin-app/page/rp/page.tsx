@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation'
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
@@ -14,26 +15,29 @@ export const dynamic = 'force-dynamic'
 
 /**
  * `/fin-app/page/rp` — Report › Receipt & Payment in the Finance phone app
- * (2026-10-15, part 5b): the page's own gates (its tabs, Department reports),
- * the month's receipts and payments as the desktop page builds them — the Cash
- * Flow statement's own (`readCashFlowStatement`, the same builder, the same
- * bridge and layouts) — and, for one segment (or a department's own reader),
- * every issued invoice of it still owed (`fetchDeptOutstanding`, as the page's
- * *To collect*). The files for whoever may export them.
+ * (2026-10-15, part 5b): the page's own gates (its tabs, Department reports,
+ * and — as the desktop page — Reports · View at All), the month's receipts and
+ * payments as the desktop page builds them — the Cash Flow statement's own
+ * (`readCashFlowStatement`, the same builder, the same bridge and layouts) —
+ * and, for one segment, every issued invoice of it still owed
+ * (`fetchDeptOutstanding`, as the page's *To collect*). The files for whoever
+ * may export them.
  */
 export default async function FinAppReceiptPayment({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requirePage('/reports/receipt-payment')
   const user = await requirePermission('dept_reports')
+  // For whoever reads the reports company-wide (Reports · View at All); the
+  // Dept Manager's own-segment screen went with the kind (2026-10-17).
+  if (!reportsCompanyWide(user)) notFound()
   const sp = await searchParams
   const thisMonth = officeMonth()
   const ym = askedMonth(sp, thisMonth)
   const supabase = await createClient()
-  // *To collect* — the desktop page's: a department's own reader keys off their segment, anybody else needs one
-  // picked. Its reads start beside the statement's (speed.md).
-  const companyWide = reportsCompanyWide(user)
-  const arSegment = companyWide ? askedSegment(sp) || null : null
-  const owedRead = !companyWide || arSegment ? Promise.all([fetchDeptOutstanding(supabase as never, { segment: arSegment }), supabase.from('companies').select('id, name')]) : null
-  const [{ cf, inflow, outflow, segment, isDeptMgr }, owedRows] = await Promise.all([
+  // *To collect* — the desktop page's: it needs a segment picked. Its reads
+  // start beside the statement's (speed.md).
+  const arSegment = askedSegment(sp) || null
+  const owedRead = arSegment ? Promise.all([fetchDeptOutstanding(supabase as never, { segment: arSegment }), supabase.from('companies').select('id, name')]) : null
+  const [{ cf, inflow, outflow, segment }, owedRows] = await Promise.all([
     readCashFlowStatement(supabase, user, { period: ym, compare: '', segment: askedSegment(sp) }),
     owedRead,
   ])
@@ -56,10 +60,10 @@ export default async function FinAppReceiptPayment({ searchParams }: { searchPar
   return (
     <PageApp
       key={`${ym}:${segment}`}
-      place={monthPlace({ href: '/fin-app/page/rp', title: 'Receipt & Payment', roman: 'III.', ym, thisMonth, label: monthWords(ym), segment, segments: isDeptMgr ? null : segmentOptions() })}
+      place={monthPlace({ href: '/fin-app/page/rp', title: 'Receipt & Payment', roman: 'III.', ym, thisMonth, label: monthWords(ym), segment, segments: segmentOptions() })}
       model={receiptPaymentModel(cf, { inflow, outflow }, ym, ym === thisMonth, owed)}
       search={searchOf(sp)}
-      files={canDo(user, 'dept_reports', 'export', 'dept') ? reportFiles('/reports/receipt-payment/export', { period: ym, segment }) : []}
+      files={canDo(user, 'dept_reports', 'export') ? reportFiles('/reports/receipt-payment/export', { period: ym, segment }) : []}
     />
   )
 }

@@ -185,8 +185,8 @@ describe('who and what the page is for', () => {
     expect(mocks.buildPnlAccounts).not.toHaveBeenCalled()
   })
 
-  it('is no page for somebody who reads only their own department’s pool', async () => {
-    mocks.requireActionOn.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports', 'dept_pool'] }))
+  it('is no page for somebody who reads the reports but not the pools', async () => {
+    mocks.requireActionOn.mockResolvedValue(withActions({ id: 'r', role: 'staff', permissions: ['reports', 'dept_reports'] }))
     await expect(page('marketing')).rejects.toThrow('NEXT_NOT_FOUND')
     expect(mocks.buildPnlAccounts).not.toHaveBeenCalled()
   })

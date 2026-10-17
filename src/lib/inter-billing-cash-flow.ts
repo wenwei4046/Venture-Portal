@@ -209,8 +209,8 @@ interface PoolRow {
  * Fetch reallocation settles and return synthetic cash-flow lines + the pseudo
  * account. Payer = every `inter_billing_out`; receiver = the `np_in` carrying the
  * same `HV-OR-…` PV ref (which excludes ordinary external receipts). Resilient:
- * on any read error (e.g. a dept_manager RLS-blocked from dept_pools) it returns
- * no lines, so the Cash Flow still renders (just un-adjusted, as before).
+ * on any read error it returns no lines, so the Cash Flow still renders (just
+ * un-adjusted, as before).
  *
  * `bankCodes` may be the page's own pending read (2026-10-08): none of the
  * reads below needs it — only the synthetic lines' bank leg does — so they all
@@ -278,17 +278,16 @@ export async function fetchInterBillingCashFlow(
       fetchAllRows((from, to) =>
         supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided').order('id').range(from, to),
       ),
-      // Pairing refs via SECURITY DEFINER (mig 20260820020000): a dept_manager's
-      // RLS hides the HR-pool custody rows and all payment_vouchers, which
-      // emptied custodyRefs + voided and silently killed their payroll bridge.
-      // Ref strings only — unioned with the direct reads below.
+      // Pairing refs via SECURITY DEFINER (mig 20260820020000), so the payroll
+      // bridge pairs whatever the reader's RLS hides of the HR-pool custody
+      // rows and the payment_vouchers. Ref strings only — unioned with the
+      // direct reads below.
       supabase.rpc('bridge_ref_flags' as never),
       // Mirror rows carry the PAYING side's real expense account per nature
       // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
-      // Via bridge_mirror_slices RPC (mig 20260820030000): the direct
-      // payment_voucher_sources read is RLS-blocked for dept_manager, which
-      // lumped their inter-billing line; the RPC serves finance/principal all
-      // slices and a dept_manager only their own department's vouchers.
+      // Via bridge_mirror_slices RPC (mig 20260820030000), which serves
+      // finance/principal every slice (the Dept Manager's own-department slices
+      // went with the kind, 2026-10-17).
       // (In this batch since 2026-10-08 — it needs nothing from the reads
       // above; awaited after them it was one more round trip in a row.)
       supabase.rpc('bridge_mirror_slices' as never),

@@ -73,8 +73,8 @@ describe('the sidebar’s data', () => {
     expect(data.deptPoolDepts).toHaveLength(7)
   })
 
-  it('hands a department manager none', async () => {
-    mocks.requireAuth.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_pool', 'dept_reports'] }))
+  it('hands whoever does not read the reports none', async () => {
+    mocks.requireAuth.mockResolvedValue(withActions({ id: 's', role: 'staff', permissions: ['dept_pool', 'dept_reports'] }))
     const data = await navDataFor()
     expect(data.deptPoolDepts).toBeUndefined()
   })

@@ -63,10 +63,10 @@ const SETTINGS = ['settings.manage'] as const satisfies readonly Want[]
 export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   // ── Treasury ────────────────────────────────────────────────────────────
   approval_requests: {
-    INSERT: ['billing.create', 'my_billing.create:dept', 'claims.approve', 'treasury.create', 'treasury.void', 'hr_costing.create'],
+    INSERT: ['billing.create', 'claims.approve', 'treasury.create', 'treasury.void', 'hr_costing.create'],
     // The decision (any domain's Approve), and a submitter's own pending request.
     UPDATE: [...ALL_APPROVE, 'treasury.create', 'treasury.edit', 'treasury.void', 'billing.create', 'billing.edit',
-      'my_billing.create:dept', 'hr_costing.create', 'hr_costing.edit'],
+      'hr_costing.create', 'hr_costing.edit'],
   },
   ba_attachments: each(TREASURY_WORK),
   ba_facilities: {
@@ -78,12 +78,12 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   bank_accounts: { INSERT: SETTINGS, UPDATE: [...APPROVE_TREASURY, ...SETTINGS] },
   base_rate_history: each([...SETTINGS, ...APPROVE_TREASURY], ['INSERT', 'UPDATE']),
   dept_payment_requests: {
-    INSERT: ['my_billing.create:dept', 'treasury.create'],
-    UPDATE: ['treasury.create', 'treasury.edit', 'treasury.void', ...APPROVE_TREASURY, 'my_billing.create:dept'],
-    DELETE: ['treasury.edit', 'treasury.void', 'my_billing.create:dept'],
+    INSERT: ['treasury.create'],
+    UPDATE: ['treasury.create', 'treasury.edit', 'treasury.void', ...APPROVE_TREASURY],
+    DELETE: ['treasury.edit', 'treasury.void'],
   },
   dept_pools: {
-    INSERT: ['treasury.create', 'treasury.edit', 'treasury.void', ...APPROVE_TREASURY, 'billing.create', 'my_billing.create:dept'],
+    INSERT: ['treasury.create', 'treasury.edit', 'treasury.void', ...APPROVE_TREASURY, 'billing.create'],
   },
   fund_source_repayments: { INSERT: ['treasury.create', 'treasury.edit', 'treasury.void'] },
   fund_sources: {
@@ -138,17 +138,17 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
       'director_salary.approve', 'director_salary.edit'],
   },
   invoice_submission_requests: {
-    INSERT: ['my_billing.create:dept', 'billing.create'],
-    UPDATE: [...BILLING_WORK, 'billing.void', 'my_billing.create:dept'],
-    DELETE: ['billing.edit', 'billing.void', 'my_billing.create:dept'],
+    INSERT: ['billing.create'],
+    UPDATE: [...BILLING_WORK, 'billing.void'],
+    DELETE: ['billing.edit', 'billing.void'],
   },
   invoices: {
-    INSERT: ['billing.create', 'my_billing.create:dept'],
-    UPDATE: [...BILLING_WORK, 'billing.void', 'my_billing.create:dept', ...VOUCHER_WRITERS],
-    DELETE: [...BILLING_WORK, 'my_billing.create:dept'],
+    INSERT: ['billing.create'],
+    UPDATE: [...BILLING_WORK, 'billing.void', ...VOUCHER_WRITERS],
+    DELETE: [...BILLING_WORK],
   },
   service_contracts: {
-    INSERT: ['billing.create', 'my_billing.create:dept'],
+    INSERT: ['billing.create'],
     UPDATE: BILLING_WORK,
   },
 

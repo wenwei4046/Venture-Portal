@@ -121,7 +121,7 @@ type DeptPoolBreakdownItem = {
 }
 
 type DashboardSummary = {
-  role: 'principal' | 'finance' | 'hr' | 'dept_manager'
+  role: 'principal' | 'finance' | 'hr'
   total_pool: number
   fund_sources_total: number
   loans_outstanding: number

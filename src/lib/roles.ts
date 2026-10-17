@@ -85,9 +85,9 @@ export function canAccessReports(u: PermissionHolder): boolean {
 }
 
 export function canAccessDeptReports(u: PermissionHolder): boolean {
-  // Segment-scoped reports (P&L, Cash Flow, Debtor Aging) somebody may see for
-  // THEIR OWN department. RLS restricts every row to their segment, so even a
-  // hand-typed ?segment= returns empty.
+  // The statements a segment filters (P&L, Cash Flow, Receipt & Payment,
+  // Debtor Aging) — read company-wide, with Reports (reportsCompanyWide). The
+  // Dept Manager's own-segment reading went with the kind (2026-10-17).
   return can(u, 'dept_reports')
 }
 
