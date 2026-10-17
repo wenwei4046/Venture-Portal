@@ -18,23 +18,27 @@ const money = (n: number) => rm(n)
 const minus = (n: number) => `− ${rm(n)}`
 
 /** The OT lines a close wrote on the row (`attendance_figures.lines`), as the slip names them. */
-function otLines(p: MePayslip): Array<{ ref: string; hours: number; multiplier: number; amount: number; paid: boolean }> {
+function otLines(p: MePayslip): Array<{ ref: string; hours: number; approved: number; multiplier: number; amount: number; paid: boolean; restDay: boolean }> {
   const lines = Array.isArray(p.attendance?.lines) ? (p.attendance.lines as Array<Record<string, unknown>>) : []
   return lines.map(l => ({
     ref: typeof l.ref === 'string' ? l.ref : '',
+    // The hours paid — since 2026-10-17 the smaller of approved and punched — and the hours approved (a line closed
+    // before then paid what was approved).
     hours: Number(l.hours) || 0,
+    approved: l.approved == null ? Number(l.hours) || 0 : Number(l.approved) || 0,
     multiplier: Number(l.multiplier) || 0,
     amount: Number(l.amount) || 0,
     paid: l.paid !== false,
+    restDay: l.dayType === 'rest',
   }))
 }
 
-/** "Overtime · 2 h × 1.5" — one rate; several rates, the hours alone. */
+/** "Overtime · 2 h × 1.5" — every hour at one rate; several rates, or a rest day's half / whole day, the hours alone. */
 function otLabel(p: MePayslip): string {
   const paid = otLines(p).filter(l => l.paid)
   const rates = [...new Set(paid.map(l => l.multiplier))]
   const hours = paid.reduce((a, l) => a + l.hours, 0) || p.otHours
-  if (rates.length === 1 && hours) return `Overtime · ${fmtN(hours)} h × ${fmtN(rates[0])}`
+  if (rates.length === 1 && hours && !paid.some(l => l.restDay)) return `Overtime · ${fmtN(hours)} h × ${fmtN(rates[0])}`
   return hours ? `Overtime · ${fmtN(hours)} h` : 'Overtime'
 }
 
@@ -77,13 +81,15 @@ export function slipLines(p: MePayslip): SlipLine[] {
 
 /** The note under the table: where the OT and unpaid days came from, and when attendance closed. */
 export function slipNote(p: MePayslip): string {
-  const paid = otLines(p).filter(l => l.paid && l.hours > 0)
+  const paid = otLines(p).filter(l => l.paid && l.approved > 0)
   const refs = [...new Set(paid.map(l => l.ref).filter(Boolean))]
   const hours = paid.reduce((a, l) => a + l.hours, 0)
+  const approved = paid.reduce((a, l) => a + l.approved, 0)
   const unpaid = Number(p.unpaidLeaveDays) || 0
   const closedAt = typeof p.attendance?.closedAt === 'string' ? p.attendance.closedAt.slice(0, 10) : null
   const parts: string[] = []
-  if (refs.length) parts.push(`OT from ${refs.join(', ')} · ${fmtN(hours)} h approved`)
+  // The punches held it lower: the hours paid, of those approved.
+  if (refs.length) parts.push(`OT from ${refs.join(', ')} · ${hours === approved ? `${fmtN(hours)} h approved` : `${fmtN(hours)} h paid of ${fmtN(approved)} h approved`}`)
   if (unpaid) parts.push(`${fmtN(unpaid)} unpaid day${unpaid === 1 ? '' : 's'}`)
   if (!parts.length) return 'No OT or unpaid leave this month.'
   return `${parts.join(' · ')}.${closedAt ? ` Attendance closed ${dayMon(closedAt)}.` : ''}`

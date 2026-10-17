@@ -220,6 +220,19 @@ describe('Me › Attendance', () => {
     expect(claimed.needs.some(n => n.key === 'ot:2026-10-13')).toBe(false)
     expect(monthView(data({ month: { ...m, close: { status: 'closed', closedAt: '2026-11-03T02:00:00Z', closedBy: 'HR', people: 1, reopenedAt: null } } }))!.needs).toEqual([])
   })
+  it('OT paid is what payroll pays: approved, held to the punches (2026-10-17)', () => {
+    const ot = (from: string, hours: number, status: AttRequest['status'] = 'approved') =>
+      req({ id: `ot-${from}`, kind: 'ot', ref: `OT-${from}`, leaveCode: null, from, to: from, days: null, hours, status })
+    // 3 h approved on the 13th, out at 19:42: 1.5 h paid. The 20th has not come: approved, not paid yet.
+    const w = monthView(data({ month: m, requests: [ot('2026-10-13', 3), ot('2026-10-20', 2), ot('2026-10-01', 2, 'pending')] }))!
+    expect(w.totals[3]).toEqual({ label: 'OT paid', value: '1.5 h', note: 'none unclaimed' })
+    expect(['2026-10-13', '2026-10-20', '2026-10-01'].map(day => w.card(day).facts[2].value)).toEqual(['OT 1.5 of 3 h paid', 'OT 2 h approved', 'OT 2 h waiting'])
+    expect(monthView(data({ month: m, requests: [ot('2026-10-13', 1.5)] }))!.card('2026-10-13').facts[2].value).toBe('OT 1.5 h paid')
+  })
+  it('a Saturday’s punches show on its card — its overtime is paid from them', () => {
+    const sat = monthView(data({ month: { ...m, punches: [...m.punches, punch('2026-10-10', 'in', '10:00'), punch('2026-10-10', 'out', '14:00')] } }))!
+    expect(sat.card('2026-10-10')).toMatchObject({ status: 'Off day', facts: [{ label: 'IN', value: '10:00' }, { label: 'OUT', value: '14:00' }, { label: 'Note', value: '—' }] })
+  })
 })
 
 describe('Me › Leave', () => {
@@ -267,6 +280,22 @@ describe('Submit request’s forms', () => {
     expect(checkOt(d, { date: '2026-10-18', hours: 2, reason: 'x', after: false }).rate).toBe("Rest day · up to 4 h: ½ day's pay · up to 8 h: 1 day · beyond: 2 × hourly")
     expect(otDetail(d, { date: '2026-10-15', hours: 3, reason: 'x', after: false })).toEqual({ after: false, from: '18:00', to: '21:00' })
   })
+  it('overtime: the sheet says how payroll pays it, for every kind of day (2026-10-17)', () => {
+    const sheet = (dd: MeData, date: string) => { const c = checkOt(dd, { date, hours: 2, reason: 'x', after: false }); return [c.rate, c.steps, c.paid] }
+    expect(sheet(d, '2026-10-14')).toEqual(['Work day · 1.5 × your hourly rate', 'After 18:00 · in 30-minute steps',
+      'Paid = the smaller of approved and punched past 18:00, rounded down to 30 min.'])
+    // Off, rest and holiday: every hour from IN to OUT, never "after 18:00".
+    const inOut = 'Paid = the smaller of approved and punched from IN to OUT, rounded down to 30 min.'
+    expect(sheet(d, '2026-10-17')).toEqual(['Off day · every hour at 1.5 × your hourly rate', 'Every hour counts · in 30-minute steps', inOut])
+    expect(sheet(d, '2026-10-18').slice(1)).toEqual(['Every hour counts · in 30-minute steps', inOut])
+    const hol = data({ holidays: [{ id: 'h', day: '2026-10-20', name: 'Deepavali', kind: 'compulsory', states: 'All' }] })
+    expect(sheet(hol, '2026-10-20')).toEqual(['Public holiday · 3 × your hourly rate', 'Every hour counts · in 30-minute steps', inOut])
+    // A company holiday HR set is an off day, as payroll prices it.
+    const ch = data({ month: { ...d.month, overrides: [{ day: '2026-10-15', code: 'CH', name: 'Company trip' }] } })
+    expect(sheet(ch, '2026-10-15')[0]).toBe('Off day · every hour at 1.5 × your hourly rate')
+    // Fixed hours punch nothing: the approved hours are paid.
+    expect(sheet(data({ assignments: [{ ...ASG, mode: 'no_clock' }] }), '2026-10-14')[2]).toBe('Paid = the hours approved.')
+  })
   it('manpower: the fairs coming, their days from today, person-days', () => {
     const opts = fairOptions([{ key: 'e1', name: 'Mid Valley Home Fair', from: '2026-10-10', to: '2026-10-18' }, { key: 'e2', name: 'Mid Valley Home Fair', from: '2026-11-20', to: '2026-11-22' }])
     expect(opts.map(o => o.label)).toEqual(['Mid Valley Home Fair · 10 Oct', 'Mid Valley Home Fair · 20 Nov', 'HQ showroom'])
@@ -289,6 +318,12 @@ describe('Me › Payslip', () => {
     expect(slipNote(slip)).toBe('OT from OT-2609-006 · 2 h approved. Attendance closed 3 Oct.')
     expect(slipNote({ ...slip, attendance: null })).toBe('No OT or unpaid leave this month.')
     expect(slipSub(slip)).toBe('Paid 30 Sep · Maybank ···3376')
+  })
+  it('the punches held it lower: the hours paid of those approved; a rest day’s half day is no rate × hours', () => {
+    const held = { ...slip, attendance: { closedAt: '2026-10-03T02:00:00Z', lines: [{ ref: 'OT-2609-006', hours: 1.5, approved: 3, punchedMin: 102, multiplier: 1.5, amount: 30.29, paid: true, dayType: 'work' }] } }
+    expect(slipNote(held)).toBe('OT from OT-2609-006 · 1.5 h paid of 3 h approved. Attendance closed 3 Oct.')
+    const rest = { ...slip, otHours: 4, attendance: { closedAt: '2026-10-03T02:00:00Z', lines: [{ ref: 'OT-2609-007', hours: 4, approved: 4, punchedMin: 240, multiplier: 2, amount: 80.77, paid: true, dayType: 'rest' }] } }
+    expect(slipLines(rest).find(l => l.label.startsWith('Overtime'))?.label).toBe('Overtime · 4 h')
   })
   it('the month still open', () => {
     expect(openMonth([slip], '2026-10-14')).toEqual({ name: 'October', line: 'Open · made after 3 Nov' })

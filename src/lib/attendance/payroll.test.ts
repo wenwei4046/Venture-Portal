@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { registerOf, type Ctx } from './engine'
+import { indexMonth, registerOf, type Ctx } from './engine'
 import {
   attendanceFacts,
+  clockOf,
   hoursADay,
   otDayType,
   otHoursOf,
@@ -9,11 +10,13 @@ import {
   payrollMarks,
   planPayroll,
   priceFact,
+  punchedOtMin,
+  restDayPay,
   type AttendancePay,
   type PayrollRowLite,
   type StaffLite,
 } from './payroll'
-import type { AttAssignment, AttConfig, AttMonth, AttPerson, AttRequest, AttSchedule } from './types'
+import type { AttAssignment, AttConfig, AttMonth, AttPerson, AttPunch, AttRequest, AttSchedule } from './types'
 
 const person = (id: string, over: Partial<AttPerson> = {}): AttPerson => ({
   id, name: id, code: null, titleId: 't-exec', title: 'Executive', level: 3, levelName: null, departmentId: 'd1', department: 'Marketing',
@@ -51,8 +54,9 @@ const ot = (staffId: string, day: string, hours: number, dayType?: string, over:
   sentAt: `${day}T10:00:00+08:00`, decidedAt: null, steps: [], events: [], ...over,
 })
 
-// Ali, the example the user agreed to (2026-10-15): basic RM 2,600, 8-hour days, October 2026 (31 days).
-// OT: 6 h on a work day × 1.5 and 4 h on a rest day × 2. Unpaid: 1 day of UL and 1 absent day decided Unpaid.
+// Ali, the example the user agreed to (2026-10-15): basic RM 2,600, 8-hour days, October 2026 (31 days), on fixed
+// hours (the company's No clock-in), so the approved hours stand. OT: 6 h on a work day × 1.5 and 4 h on a rest day —
+// since 2026-10-17 half a day, as Me's sheet says. Unpaid: 1 day of UL and 1 absent day decided Unpaid.
 const ALI_MONTH = month({
   leave: [{ id: 'l1', ref: 'AT-UL', staffId: 'ali', code: 'UL', from: '2026-10-07', to: '2026-10-07', status: 'approved' }],
   marks: [{ staffId: 'ali', day: '2026-10-06', code: 'A', in: null, out: null, note: 'no show', by: 'HR', at: '' }],
@@ -86,21 +90,29 @@ describe('the rate an OT line is paid at', () => {
     expect(otDayType(r(), { code: 'W', sday: { day: 'Sat', type: 'off' } })).toBe('off')
     expect(otDayType(r(), { code: '', sday: null })).toBe('work')
   })
+  it('with no schedule, Sunday is a rest day and Saturday an off day — as Me’s sheet says', () => {
+    const r = { detail: {} }
+    expect([otDayType(r, { code: 'P', sday: null }, '2026-10-18'), otDayType(r, { code: 'P', sday: null }, '2026-10-17'), otDayType(r, { code: 'P', sday: null }, '2026-10-14')])
+      .toEqual(['rest', 'off', 'work'])
+  })
 })
 
 describe('what a closed month sends to payroll', () => {
   const ctx = ctxOf(config(), ALI_MONTH)
 
-  it('Ali: OT 10 h · RM 212.50, 2 unpaid days — the example the user agreed to', () => {
+  it('Ali: OT 10 h · RM 162.50, 2 unpaid days — the example the user agreed to, its rest day as Me’s sheet pays it', () => {
     const [fact] = attendanceFacts(ctx, ALI_OT)
     expect(fact.unpaidDates).toEqual(['2026-10-06', '2026-10-07'])
     const pay = priceFact('2026-10-01', CLOSED_AT, fact, { basic: 2600, statutoryAllowance: 0 })
+    // 6 h × 12.50 × 1.5 = 112.50; 4 h on a rest day is half a full day (8 h): half of 100 = 50 (it was 4 × 12.50 × 2 = 100).
     expect(pay.lines.map(l => [l.day, l.dayType, l.hours, l.multiplier, l.orp, l.hrp, l.amount])).toEqual([
       ['2026-10-05', 'work', 6, 1.5, 100, 12.5, 112.5],
-      ['2026-10-11', 'rest', 4, 2, 100, 12.5, 100],
+      ['2026-10-11', 'rest', 4, 2, 100, 12.5, 50],
     ])
-    expect([pay.otHours, pay.otAmount, pay.unpaidDays, pay.closedAt]).toEqual([10, 212.5, 2, CLOSED_AT])
-    expect(payrollFields(pay)).toEqual({ ot_hours: 10, ot_amount: 212.5, unpaid_leave_days: 2, attendance_figures: pay })
+    expect([pay.otHours, pay.otAmount, pay.unpaidDays, pay.closedAt]).toEqual([10, 162.5, 2, CLOSED_AT])
+    expect(payrollFields(pay)).toEqual({ ot_hours: 10, ot_amount: 162.5, unpaid_leave_days: 2, attendance_figures: pay })
+    // Fixed hours: no punches to hold the hours to — the approved hours stand, and the line says so.
+    expect(pay.lines.map(l => [l.approved, l.punchedMin])).toEqual([[6, null], [4, null]])
   })
 
   it('takes only approved overtime of the month, at the rate of its day when the request names none', () => {
@@ -189,6 +201,76 @@ describe('what a closed month sends to payroll', () => {
     const [row] = registerOf(ctx, otHoursOf(ctx, [...ALI_OT, ot('ali', '2026-10-17', 3), ot('ali', '2026-10-20', 1, 'ph')]))
     expect([row.unpaid, row.ot, row.otRest, row.otPh]).toEqual([2, 9, 4, 1])
     expect(registerOf(ctx)[0]).toMatchObject({ unpaid: 2, ot: 0, otRest: 0, otPh: 0 })
+  })
+})
+
+// ── Paid as Me's sheet says (2026-10-17 — the user: "我要跟着表格的pay") ──────
+
+describe('the hours a line pays: the smaller of approved and punched, rounded down to 30 minutes', () => {
+  // Ali clocks now (Office 9–6, Sat off, Sun rest): RM 2,600 → ORP 100, HRP 12.50.
+  const clocking = config({ assignments: [asg({ mode: 'clock' })] })
+  let n = 0
+  const p = (day: string, dir: 'in' | 'out', time: string, over: Partial<AttPunch> = {}): AttPunch => ({
+    id: `p${++n}`, staffId: 'ali', day, dir, time, source: 'app', locationId: null, distance: null, inside: null, accuracy: null, device: '', photo: false,
+    reason: '', invalid: false, invalidReason: '', ...over,
+  })
+  const paidOn = (punches: AttPunch[], rs: AttRequest[], m: Partial<AttMonth> = {}) =>
+    priceFact('2026-10-01', CLOSED_AT, attendanceFacts(ctxOf(clocking, month({ punches, ...m })), rs)[0], { basic: 2600, statutoryAllowance: 0 })
+
+  it('a work day counts from the schedule’s end: 3 h approved, out at 19:42 → 1 h 42 m → 1.5 h — the example shown to the user', () => {
+    const pay = paidOn([p('2026-10-13', 'in', '08:51'), p('2026-10-13', 'out', '19:42')], [ot('ali', '2026-10-13', 3)])
+    expect(pay.lines.map(l => [l.approved, l.punchedMin, l.hours, l.amount])).toEqual([[3, 102, 1.5, 28.13]])
+    expect([pay.otHours, pay.otAmount]).toEqual([1.5, 28.13])
+    // Before: 3 h × 12.50 × 1.5 = RM 56.25, whatever the punches said.
+  })
+
+  it('approved less than punched pays the approved; gone by 18:05, or no OUT at all, pays nothing', () => {
+    expect(paidOn([p('2026-10-13', 'in', '08:51'), p('2026-10-13', 'out', '20:00')], [ot('ali', '2026-10-13', 1)]).lines[0].hours).toBe(1)
+    expect(paidOn([p('2026-10-13', 'in', '08:51'), p('2026-10-13', 'out', '18:05')], [ot('ali', '2026-10-13', 3)]).otAmount).toBe(0)
+    expect(paidOn([p('2026-10-13', 'in', '08:51')], [ot('ali', '2026-10-13', 3)]).lines[0]).toMatchObject({ punchedMin: 0, hours: 0, amount: 0 })
+  })
+
+  it('past midnight is still the day’s; HR’s correction wins; an invalid punch does not count', () => {
+    expect(paidOn([p('2026-10-13', 'in', '09:00'), p('2026-10-13', 'out', '00:30')], [ot('ali', '2026-10-13', 6)]).lines[0]).toMatchObject({ punchedMin: 390, hours: 6 })
+    const marks = [{ staffId: 'ali', day: '2026-10-13', code: 'P', in: '09:00', out: '21:00', note: 'forgot OUT', by: 'HR', at: '' }]
+    expect(paidOn([p('2026-10-13', 'in', '09:00')], [ot('ali', '2026-10-13', 4)], { marks }).lines[0]).toMatchObject({ punchedMin: 180, hours: 3 })
+    const invalid = [p('2026-10-13', 'in', '09:00'), p('2026-10-13', 'out', '19:00'), p('2026-10-13', 'out', '22:00', { invalid: true, invalidReason: 'from home' })]
+    expect(paidOn(invalid, [ot('ali', '2026-10-13', 4)]).lines[0]).toMatchObject({ punchedMin: 60, hours: 1 })
+  })
+
+  it('any other day counts IN to OUT: Saturday 10:00–14:00 is 4 h at 1.5 — RM 75', () => {
+    const pay = paidOn([p('2026-10-17', 'in', '10:00'), p('2026-10-17', 'out', '14:00')], [ot('ali', '2026-10-17', 5)])
+    expect(pay.lines.map(l => [l.dayType, l.punchedMin, l.hours, l.amount])).toEqual([['off', 240, 4, 75]])
+  })
+
+  it('a rest day: half a day up to 4 h, a whole day up to 8 h, then 2 × hourly — the table shown to the user', () => {
+    const sunday = (from: string, to: string, hours: number) => paidOn([p('2026-10-18', 'in', from), p('2026-10-18', 'out', to)], [ot('ali', '2026-10-18', hours)]).otAmount
+    expect([sunday('10:00', '14:00', 4), sunday('10:00', '16:00', 6), sunday('08:00', '18:00', 10)]).toEqual([50, 100, 150])
+    expect([restDayPay(0, 8, 100, 12.5, 2), restDayPay(0.5, 8, 100, 12.5, 2), restDayPay(8, 8, 100, 12.5, 2), restDayPay(8.5, 8, 100, 12.5, 2)]).toEqual([0, 50, 100, 112.5])
+  })
+
+  it('two requests on one day share its punches, oldest first; a rest day’s second line pays what it adds', () => {
+    const work = paidOn([p('2026-10-13', 'in', '09:00'), p('2026-10-13', 'out', '21:00')], [ot('ali', '2026-10-13', 2), ot('ali', '2026-10-13', 2)])
+    expect(work.lines.map(l => [l.approved, l.hours, l.amount])).toEqual([[2, 2, 37.5], [2, 1, 18.75]])
+    const rest = paidOn([p('2026-10-18', 'in', '09:00'), p('2026-10-18', 'out', '15:00')], [ot('ali', '2026-10-18', 3), ot('ali', '2026-10-18', 3)])
+    // 3 h is half a day (50); 6 h is a whole day (100) — the second line adds 50.
+    expect(rest.lines.map(l => [l.hours, l.earlier, l.amount])).toEqual([[3, 0, 50], [3, 3, 50]])
+    expect(rest.otAmount).toBe(100)
+  })
+
+  it('the register’s overtime columns are the hours paid', () => {
+    const c = ctxOf(clocking, month({ punches: [p('2026-10-13', 'in', '08:51'), p('2026-10-13', 'out', '19:42'), p('2026-10-18', 'in', '10:00'), p('2026-10-18', 'out', '13:10')] }))
+    const [row] = registerOf(c, otHoursOf(c, [ot('ali', '2026-10-13', 3), ot('ali', '2026-10-18', 4)]))
+    expect([row.ot, row.otRest]).toEqual([1.5, 3])
+  })
+
+  it('the punches it reads: first IN, last OUT, on any day', () => {
+    const idx = indexMonth(month({ punches: [p('2026-10-18', 'in', '10:00'), p('2026-10-18', 'in', '10:05'), p('2026-10-18', 'out', '12:00'), p('2026-10-18', 'out', '15:30')] }))
+    expect(clockOf('ali', '2026-10-18', idx)).toEqual({ in: '10:00', out: '15:30' })
+    expect(clockOf('ali', '2026-10-19', idx)).toEqual({ in: null, out: null })
+    expect(punchedOtMin('work', { in: '09:00', out: '19:00' }, { day: 'Mon', type: 'work', start: '09:00', end: '17:30' })).toBe(90)
+    expect(punchedOtMin('work', { in: '09:00', out: '19:00' }, null)).toBe(60)
+    expect(punchedOtMin('rest', { in: null, out: '19:00' }, null)).toBe(0)
   })
 })
 
