@@ -29,6 +29,7 @@ import { useCloseOnOutside } from "./outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 import { typePx } from "../shared/type";
 import { useBackCloses } from "../shared/back";
+import { InAppCamera } from "../shared/in-app-camera";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
@@ -60,6 +61,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
       <input id="crm-pick-photo" type="file" accept="image/*,video/*" multiple onChange={chat.pickVisual} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />
       <input id="crm-pick-camera" type="file" accept="image/*,video/*" capture="environment" onChange={chat.pickVisual} style={{ display: "none" }} />
       <input id="crm-pick-file" type="file" accept={DOC_ACCEPT} multiple onChange={chat.pickMedia} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />
+      {/* The camera inside the app, as WhatsApp's (2026-10-17): what it takes goes into the camera input above. */}
+      <InAppCamera inputId="crm-pick-camera" galleryId="crm-pick-photo" warn={ctx.act.toast} />
     </>)}
     {!chat && <SalesNav v={navVM(ctx)} />}
     {/* What happened, wherever the person is (the Inbox and a chat show it in their own place). */}
