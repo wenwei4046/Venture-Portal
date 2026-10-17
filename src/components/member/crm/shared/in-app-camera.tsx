@@ -22,8 +22,12 @@ import {
  * One per chat screen, beside the hidden camera input it hands to (sales/SalesScreens, panel/PanelScreens).
  */
 export function InAppCamera({ inputId, galleryId, warn }: { inputId: string; galleryId: string; warn: (text: string) => void }) {
-  const openId = useSyncExternalStore(subscribeCamera, cameraOpenFor, () => null);
-  if (openId !== inputId || typeof document === "undefined") return null;
+  const open = useSyncExternalStore(subscribeCamera, cameraOpenFor, () => null) === inputId;
+  // The phone's Back closes the camera, back to the chat. Held here, where the chat's screen keeps it, not in the camera
+  // screen: one that mounts afresh at each opening would take its history step back at once wherever React mounts a
+  // screen twice to check it (development), and the camera closed as it opened.
+  useBackCloses(open, closeInAppCamera, "crmCamera");
+  if (!open || typeof document === "undefined") return null;
   return createPortal(<CameraScreen inputId={inputId} galleryId={galleryId} warn={warn} />, document.body);
 }
 
@@ -56,7 +60,6 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
   const canRecord = typeof MediaRecorder !== "undefined";
 
   const close = useCallback(() => closeInAppCamera(), []);
-  useBackCloses(true, close, "crmCamera");
 
   const release = useCallback(() => {
     gen.current++;
@@ -205,7 +208,7 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
   const recording = since !== null;
   return (
     <div role="dialog" aria-modal="true" aria-label="Camera" data-in-app-camera=""
-      style={{ position: "fixed", inset: 0, zIndex: 2147482000, background: "rgb(0 0 0)", color: WHITE, fontFamily: FONT, overflow: "hidden", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      style={{ position: "fixed", inset: 0, zIndex: 2147482100, background: "rgb(0 0 0)", color: WHITE, fontFamily: FONT, overflow: "hidden", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <video ref={video} autoPlay playsInline muted aria-hidden="true"
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transform: facing === "user" ? "scaleX(-1)" : "none", opacity: status === "live" ? 1 : 0, transition: "opacity 120ms" }} />
       <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: WHITE, opacity: flash ? 0.85 : 0, transition: flash ? "none" : "opacity 160ms ease-out", pointerEvents: "none" }} />
@@ -251,8 +254,9 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 15a8 8 0 0 1-14 3l-2-2" /><path d="M20 4v4h-4M4 20v-4h4" /></svg>
           </button>
         </div>
-        {canRecord && !recording && (
-          <div role="radiogroup" aria-label="Camera mode" style={{ display: "flex", gap: "6px", padding: "4px", borderRadius: "18px", background: "rgba(0,0,0,.38)" }}>
+        {/* Hidden, not taken away, while recording: the shutter stays under the finger that holds it. */}
+        {canRecord && (
+          <div role="radiogroup" aria-label="Camera mode" aria-hidden={recording} style={{ display: "flex", gap: "6px", padding: "4px", borderRadius: "18px", background: "rgba(0,0,0,.38)", visibility: recording ? "hidden" : "visible" }}>
             {(["video", "photo"] as const).map(m => (
               <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
                 style={{ height: "28px", padding: "0 14px", borderRadius: "14px", border: 0, background: mode === m ? "rgba(255,255,255,.24)" : "transparent", color: WHITE, opacity: mode === m ? 1 : 0.75, fontSize: typePx(14), fontWeight: mode === m ? 600 : 500, fontFamily: FONT, cursor: "pointer" }}>
