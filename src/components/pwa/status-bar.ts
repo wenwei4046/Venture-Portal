@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 
 /**
  * The phone's status bar in the colour of the page under it (2026-10-17 — the owner, circling the strip above the CRM's
@@ -13,10 +13,18 @@ import { useEffect } from 'react'
  * page's background rather than the meta). Android follows at once. An iPhone was seen keeping the colour of the page
  * the app was opened on (the Finance app's #f8f5f0 all through the CRM, 2026-10-17, though the page's meta said #ffffff)
  * — what each screen asks is written all the same.
+ *
+ * A screen opened OVER another — a photo, a video, the camera, the editor, all black to the edges — holds the bar in its
+ * own colour until it closes (2026-10-18 — the owner, a photo opened on an iPhone under a white bar, WhatsApp's black one
+ * beside it: "when open pic and video, top bar didnt same colour or full screen"); whatever the screen under it paints
+ * meanwhile is kept for when it lets go.
  */
 type Mark = { was: string; now: string }
 const ours = new WeakMap<HTMLMetaElement, Mark>()
 let painted = false
+/** What the screen asked last (`null`: the page's own), and the colours held over it, the newest on top. */
+let screen: string | null = null
+const holds: { color: string }[] = []
 
 /** A `var(--name)` read off the Revenue app's root, where its colours are defined; any other colour as it is. */
 export function resolveColor(color: string): string {
@@ -32,11 +40,34 @@ export function topColorOf(el: Element): string {
   return /rgba?\([^)]*\)|#[0-9a-f]{3,8}\b/i.exec(cs.backgroundImage || '')?.[0] ?? cs.backgroundColor ?? ''
 }
 
-/** Paints the status bar `color`; `null` gives back what the page had (a meta someone changed since is left as it is). */
+/**
+ * The screen's own colour for the status bar; `null` gives back what the page had (a meta someone changed since is left
+ * as it is). Under a held colour it waits for the hold to go.
+ */
 export function paintStatusBar(color: string | null) {
-  if (typeof document === 'undefined') return
+  screen = color
+  if (!holds.length) write(color)
+}
+
+/** Holds the status bar at `color` over whatever the screen paints, until the function handed back lets go. */
+export function holdStatusBar(color: string): () => void {
+  const hold = { color }
+  holds.push(hold)
+  write(color)
+  return () => {
+    const i = holds.indexOf(hold)
+    if (i < 0) return
+    holds.splice(i, 1)
+    // A colour that no longer reads (its page gone) gives the page's own back rather than leaving the hold's.
+    if (!write(holds.length ? holds[holds.length - 1].color : screen)) write(null)
+  }
+}
+
+/** Writes the bar's colour (`null`: the page's own back); false when there was nothing to write it with. */
+function write(color: string | null): boolean {
+  if (typeof document === 'undefined') return false
   const c = color === null ? null : resolveColor(color)
-  if (c === '') return
+  if (c === '') return false
   const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
   for (const m of metas) {
     const mark = ours.get(m)
@@ -60,11 +91,12 @@ export function paintStatusBar(color: string | null) {
   if (c === null) {
     if (painted) { html.removeProperty('background-color'); body?.removeProperty('background-color') }
     painted = false
-    return
+    return true
   }
   html.setProperty('background-color', c)
   body?.setProperty('background-color', c)
   painted = true
+  return true
 }
 
 /** While `on`, the status bar is `color`; off or gone, the page's own again. */
@@ -73,4 +105,9 @@ export function useStatusBar(color: string | null, on: boolean) {
     if (on && color) paintStatusBar(color)
   }, [color, on])
   useEffect(() => () => paintStatusBar(null), [])
+}
+
+/** While `color` is set, the status bar holds it (a screen over the page, as it shows); `null` lets go. */
+export function useStatusBarHold(color: string | null) {
+  useLayoutEffect(() => (color ? holdStatusBar(color) : undefined), [color])
 }

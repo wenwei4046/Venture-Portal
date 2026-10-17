@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { paintStatusBar, resolveColor, topColorOf, useStatusBar } from './status-bar'
+import { holdStatusBar, paintStatusBar, resolveColor, topColorOf, useStatusBar, useStatusBarHold } from './status-bar'
 
 // The phone's status bar in the colour of the page under it (2026-10-17 — the owner, the strip above the CRM's Profile on
 // an iPhone: "for the top bar, should be same colour with the apps. with all tab as well").
@@ -75,5 +75,70 @@ describe('the status bar', () => {
     expect(metas()).toEqual(['#FFFFFF'])
     unmount()
     expect(metas()).toEqual(['#ffffff'])
+  })
+})
+
+// A photo, a video, the camera or the editor opened over a chat holds the bar black until it closes (2026-10-18 — the
+// owner, an iPhone's white bar over the black viewer: "when open pic and video, top bar didnt same colour or full screen").
+describe('a screen held over the page', () => {
+  it('turns the bar its colour, and gives the screen under it back when it goes', () => {
+    paintStatusBar('rgb(255, 255, 255)')
+    const letGo = holdStatusBar('#000000')
+    expect(metas()).toEqual(['#000000'])
+    expect(document.body.style.backgroundColor).toBe(document.documentElement.style.backgroundColor)
+    expect(document.documentElement.style.backgroundColor).toMatch(/^(#000000|rgb\(0, 0, 0\))$/)
+    letGo()
+    expect(metas()).toEqual(['rgb(255, 255, 255)'])
+  })
+
+  it('stays on top while the screen under it paints again, which shows once it goes', () => {
+    paintStatusBar('rgb(255, 255, 255)')
+    const letGo = holdStatusBar('#000000')
+    paintStatusBar('rgb(251, 247, 243)')
+    expect(metas()).toEqual(['#000000'])
+    letGo()
+    expect(metas()).toEqual(['rgb(251, 247, 243)'])
+  })
+
+  it('one over another (the camera, then its editor): the newest shows, each goes in any order', () => {
+    paintStatusBar('rgb(255, 255, 255)')
+    const camera = holdStatusBar('#000000')
+    const doc = holdStatusBar('#201814')
+    expect(metas()).toEqual(['#201814'])
+    camera()
+    expect(metas()).toEqual(['#201814'])
+    doc()
+    doc()
+    expect(metas()).toEqual(['rgb(255, 255, 255)'])
+  })
+
+  it('over a page no screen painted, its going gives the page its own back', () => {
+    const letGo = holdStatusBar('#000000')
+    letGo()
+    expect(metas()).toEqual(['#ffffff'])
+    expect(document.documentElement.style.backgroundColor).toBe('')
+    expect(document.body.style.backgroundColor).toBe('')
+  })
+
+  it('a screen colour that no longer reads (its page gone) leaves the page its own, not the black', () => {
+    document.body.innerHTML = '<div data-revenue-app style="--status-bg: #F6B48A"></div>'
+    paintStatusBar('var(--status-bg)')
+    const letGo = holdStatusBar('#000000')
+    document.body.innerHTML = ''
+    letGo()
+    expect(metas()).toEqual(['#ffffff'])
+  })
+
+  it('held while its colour is set, let go when it is null or gone', () => {
+    paintStatusBar('rgb(255, 255, 255)')
+    const { rerender, unmount } = renderHook(({ c }: { c: string | null }) => useStatusBarHold(c), { initialProps: { c: null as string | null } })
+    expect(metas()).toEqual(['rgb(255, 255, 255)'])
+    rerender({ c: '#000000' })
+    expect(metas()).toEqual(['#000000'])
+    rerender({ c: null })
+    expect(metas()).toEqual(['rgb(255, 255, 255)'])
+    rerender({ c: '#000000' })
+    unmount()
+    expect(metas()).toEqual(['rgb(255, 255, 255)'])
   })
 })

@@ -17,6 +17,7 @@ vi.mock("./camera", async importOriginal => {
 
 import { InAppCamera } from "./in-app-camera";
 import { cameraOpenFor, closeInAppCamera, HOLD_MS, MIN_RECORD_MS, openInAppCamera } from "./camera";
+import { paintStatusBar } from "@/components/pwa/status-bar";
 
 type Track = { kind: string; stop: ReturnType<typeof vi.fn>; getCapabilities: () => Record<string, unknown>; getSettings: () => Record<string, unknown>; applyConstraints: ReturnType<typeof vi.fn> };
 const tracks: Track[] = [];
@@ -76,6 +77,17 @@ describe("the camera inside the app", () => {
     await openIt();
     expect(screen.getByRole("dialog", { name: "Camera" })).toBeInTheDocument();
     expect(gum).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: { ideal: "environment" } }), audio: expect.anything() }));
+  });
+
+  it("holds the phone's status bar black while open, the chat's colour again once closed (2026-10-18)", async () => {
+    document.head.innerHTML = '<meta name="theme-color" content="#ffffff">';
+    paintStatusBar("rgb(255, 255, 255)");
+    const bar = () => document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content;
+    await openIt();
+    expect(bar()).toBe("#000000");
+    act(() => closeInAppCamera());
+    expect(bar()).toBe("rgb(255, 255, 255)");
+    paintStatusBar(null);
   });
 
   it("a tap of the shutter is a photo, straight to the chat's preview — no Use photo step", async () => {
