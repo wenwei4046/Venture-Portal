@@ -223,6 +223,10 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
     if (!name) throw new Error('A name is required')
     patch.employee_name = name
   }
+  // First and last name (2026-10-17): what the apps call them; blank leaves the full name's parts to answer.
+  // A full name changed alone carries them along in the database while they were its parts (hr_staff_costs_split_name).
+  if (sent('first_name')) patch.first_name = trimOrNull(formData.get('first_name'))
+  if (sent('last_name')) patch.last_name = trimOrNull(formData.get('last_name'))
 
   // The title dropdown. Department is fixed here, so the row says which
   // department a title has to fit. An unchanged title is left alone: a title

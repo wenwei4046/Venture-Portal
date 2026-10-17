@@ -226,6 +226,8 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     staff: {
       id: row.id,
       employee_name: row.employee_name,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
       designation: row.designation ?? null,
       department_id: row.department_id,
       department_name: deptName ?? '—',

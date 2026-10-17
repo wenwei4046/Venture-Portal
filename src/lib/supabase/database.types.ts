@@ -4419,9 +4419,11 @@ export type Database = {
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
           epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
+          first_name: string | null
           hire_date: string | null
           id: string
           is_epf_exempt: boolean
+          last_name: string | null
           non_statutory_allowance: number
           nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
@@ -4463,9 +4465,11 @@ export type Database = {
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          first_name?: string | null
           hire_date?: string | null
           id?: string
           is_epf_exempt?: boolean
+          last_name?: string | null
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
@@ -4507,9 +4511,11 @@ export type Database = {
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          first_name?: string | null
           hire_date?: string | null
           id?: string
           is_epf_exempt?: boolean
+          last_name?: string | null
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]

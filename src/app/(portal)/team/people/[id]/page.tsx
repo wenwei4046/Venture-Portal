@@ -7,6 +7,7 @@ import { formatDate, formatMoney } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
+import { keptParts } from '@/lib/person-name'
 import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -134,8 +135,11 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // Paid 100% on commission (no basic, no allowances, statutory at 0) or
   // variable pay (the Director department's month, keyed on payroll) — the
   // record words its salary and statutory by how they are paid.
+  const parts = keptParts(row)
   const view: PersonRecordView = {
     name: staff.employee_name,
+    firstName: parts.first,
+    lastName: parts.last,
     department: deptName,
     code: staff.employee_code,
     title: titleName,

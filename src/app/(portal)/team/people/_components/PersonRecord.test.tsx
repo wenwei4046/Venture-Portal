@@ -16,6 +16,8 @@ import type { UplineGroup } from '@/lib/upline-choices'
 
 const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   name: 'TEST STAFF',
+  firstName: 'TEST',
+  lastName: 'STAFF',
   department: 'Marketing',
   code: 'HV042',
   title: 'Executive',
@@ -39,7 +41,7 @@ const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
 })
 
 const staff = (over: Partial<StaffRow> = {}): StaffRow => ({
-  id: 'staff-1', employee_name: 'TEST STAFF', designation: 'Executive', department_id: 'd-marketing',
+  id: 'staff-1', employee_name: 'TEST STAFF', first_name: 'TEST', last_name: 'STAFF', designation: 'Executive', department_id: 'd-marketing',
   department_name: 'Marketing', commission_dept: false, director_dept: false, title_id: 't-exec',
   basic_salary: 2500, allowances: 0, non_statutory_allowance: 0, employee_code: 'HV042', infotech_code: null,
   hire_date: '2026-01-05', resignation_date: null, epf_category: 'A', socso_category: 'first',
@@ -204,6 +206,31 @@ describe('Reports to', () => {
 
 // 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change email"
 // — somebody who signs in signs in with their Contact email.
+// The user, 2026-10-17: "大家的名字需要拆分为 first name 和 last name" — the Revenue app greets by the first.
+describe('First Name and Last Name', () => {
+  it('read in Identity — the full name stays the page’s title', () => {
+    render(<PersonRecord view={view({ name: 'LOO WEN WEI', firstName: 'LOO', lastName: 'WEN WEI' })} editor={null} inviteHref={null} />)
+    const identity = screen.getByRole('heading', { level: 2, name: 'Identity' }).closest('section') ?? document.body
+    expect(within(identity as HTMLElement).getByText('LOO')).toBeInTheDocument()
+    expect(within(identity as HTMLElement).getByText('WEN WEI')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'LOO WEN WEI' })).toBeInTheDocument()
+  })
+  it('edited, each is a field holding what the record keeps, and only a changed one is sent', async () => {
+    openEditor(view({ name: 'WONG JOEY', firstName: 'WONG', lastName: 'JOEY' }), editor({ employee_name: 'WONG JOEY', first_name: 'WONG', last_name: 'JOEY' }))
+    expect(screen.getByLabelText('First Name')).toHaveValue('WONG')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('JOEY')
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'JOEY' } })
+    expect(screen.getByLabelText('First Name')).toHaveAttribute('data-dirty', 'true')
+    expect(await save()).toEqual({ first_name: 'JOEY' })
+  })
+  it('a record read before they were filled starts from the full name’s parts', () => {
+    openEditor(view({ name: 'LOO WEN WEI' }), editor({ employee_name: 'LOO WEN WEI', first_name: null, last_name: null }))
+    expect(screen.getByLabelText('First Name')).toHaveValue('LOO')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('WEN WEI')
+    expect(within(bar()).getByText(/No changes/)).toBeInTheDocument()
+  })
+})
+
 describe('Email follows the login', () => {
   const withLogin = view({ login: 'active', contact: { phone: '012-345 6789', email: 'staff@login.example', address: null } })
 
