@@ -3,8 +3,8 @@
 import { highlight } from '@/lib/report-search'
 
 // Renders `text` with every occurrence of `query` wrapped in <mark>.
-// Shared by the GL statements and the month matrices so a hit looks identical
-// on all four reports.
+// The reports' sheet (SheetReport) draws every statement's hits with it, so a
+// hit looks the same on every report.
 export default function Highlight({ text, query }: { text: string; query: string }) {
   const parts = highlight(text, query)
   if (parts.length === 1 && !parts[0].hit) return <>{text}</>

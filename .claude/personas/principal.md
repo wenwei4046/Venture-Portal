@@ -10,7 +10,7 @@ role: principal
 
 ## What you want
 - **Net cash position at a glance** (dashboard hero) — if Venture Pool + Dept Pools < buffer, pay attention
-- **Pending approvals clearing fast** — slow queue blocks Finance, HR, Dept Managers
+- **Pending approvals clearing fast** — slow queue blocks Finance and HR
 - **Risk visibility** — overdue loans, pending escalations, free-cash trend
 - **Rule control** — base rate quarterly, per-loan custom premium (the tier system was removed in mig 63), statutory tables
 

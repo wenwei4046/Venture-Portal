@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   // consolidated exports drop them (this route is principal/finance only, so
   // no-segment == consolidated) — and there the bridge is not read at all.
   const bankCodesRead = Promise.resolve(
-    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+    supabase.rpc('bank_gl_codes' as never), // codes only, no balances
   ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))
   const [lines, accounts, bankCodes, ib, inLayoutRaw, outLayoutRaw] = await Promise.all([
     fetchAllJournalLines(supabase),

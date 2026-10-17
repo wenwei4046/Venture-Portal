@@ -52,4 +52,14 @@ describe('the Monthly P&L export', () => {
     expect(matrix.columns).toHaveLength(4)
     expect(mocks.exportXlsxResponse.mock.calls[0][0].filename).toBe('monthly-pnl-2026-10')
   })
+
+  // 2026-10-17 — as the page: a company-wide reader's alone (the Dept
+  // Manager's own-segment export went with the kind).
+  it('answers 404 to a reader short of Reports · View at All, and builds nothing', async () => {
+    mocks.requireActionOn.mockResolvedValue({ role: 'staff', permissions: ['dept_reports'], actions: { 'dept_reports.export': 'all' } })
+    const res = await GET(new Request('http://localhost/reports/monthly-pnl/export?format=xlsx&period=2026-10'))
+    expect(res.status).toBe(404)
+    expect(mocks.buildMatrixXlsx).not.toHaveBeenCalled()
+    expect(mocks.exportXlsxResponse).not.toHaveBeenCalled()
+  })
 })

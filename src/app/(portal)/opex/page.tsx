@@ -29,23 +29,19 @@ export default async function OpexPage({ searchParams }: Props) {
   const user = await requirePermission('opex')
   const supabase = await createClient()
 
-  // Dept Manager is pinned to their own department; Principal picks any
-  // department via ?dept= (unified portal 2026-07-16). Venture Office is the
+  // Whoever reads OPEX company-wide picks the department via ?dept= (unified
+  // portal 2026-07-16); the Dept Manager's pin to their own went with the kind
+  // (2026-10-17), so a reader short of All sees none. Venture Office is the
   // internal pool dept — no payroll, excluded like the dashboard does.
-  let deptId = user.department_id
-  let allDepts: { id: string; name: string }[] = []
-  if (canDo(user, 'opex', 'view')) {
-    const { data: deptRows } = await supabase
-      .from('departments')
-      .select('id, name')
-      .neq('name', 'Venture Office')
-      .order('name')
-    allDepts = (deptRows ?? []) as { id: string; name: string }[]
-    const { dept: deptParam } = await searchParams
-    deptId = allDepts.some((d) => d.id === deptParam)
-      ? (deptParam as string)
-      : allDepts[0]?.id ?? null
-  }
+  if (!canDo(user, 'opex', 'view')) notFound()
+  const { data: deptRows } = await supabase
+    .from('departments')
+    .select('id, name')
+    .neq('name', 'Venture Office')
+    .order('name')
+  const allDepts = (deptRows ?? []) as { id: string; name: string }[]
+  const { dept: deptParam } = await searchParams
+  const deptId = allDepts.some((d) => d.id === deptParam) ? (deptParam as string) : allDepts[0]?.id ?? null
   if (!deptId) notFound()
 
   const { data: dept } = await supabase
@@ -58,7 +54,7 @@ export default async function OpexPage({ searchParams }: Props) {
   const period = getPeriodMonth()
   const trendStart = dayjs(period).subtract(11, 'month').startOf('month').format('YYYY-MM-DD')
 
-  // RPC bypasses RLS with internal role check (own-dept for dept_manager).
+  // RPC bypasses RLS with its own check (Opex · View).
   // See migration 20260101000172_get_dept_opex_rows.sql.
   const { data: rowsRaw } = await supabase.rpc('get_dept_opex_rows', {
     p_dept_id: deptId,

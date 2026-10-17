@@ -33,7 +33,6 @@ export const PERMISSIONS = [
   'dept_pool',
   'venture_pool',
   'opex',
-  'my_billing',
   'claims',
   'claims_approve',
   'reports',

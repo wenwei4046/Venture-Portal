@@ -12,7 +12,7 @@ export function withActions<T extends { permissions?: readonly string[]; role?: 
 ): T & { actions: Record<string, 'own' | 'dept' | 'all'>; sensitive: Array<'salary' | 'nric' | 'bank'> } {
   return {
     ...user,
-    actions: actionsFromKeys(user.permissions ?? [], user.role ?? 'staff'),
+    actions: actionsFromKeys(user.permissions ?? []),
     sensitive: sensitiveFromKeys(user.permissions ?? [], user.role ?? 'staff'),
   }
 }

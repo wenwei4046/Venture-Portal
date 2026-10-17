@@ -1,9 +1,9 @@
 import Link from 'next/link'
 
 // Single month ｜ month by month, in the report's head (2026-10-09, the
-// user's Claude Design handoff — it was the 单月 ｜ 逐月 strip under the head,
-// ReportViewToggle, which a department manager's view keeps). The view on
-// show is the primary button; switching keeps the month and the segment.
+// user's Claude Design handoff — it was the 单月 ｜ 逐月 strip under the
+// head). The view on show is the primary button; switching keeps the month
+// and the segment.
 
 export type ReportModePair = 'pnl' | 'cash-flow' | 'receipt-payment'
 

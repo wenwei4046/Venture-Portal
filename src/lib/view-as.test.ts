@@ -88,7 +88,7 @@ describe('isViewAsRole', () => {
     expect(isViewAsRole('principal')).toBe(false)
   })
 
-  it('rejects dept_manager (no department on the Principal account) and junk', () => {
+  it('rejects a kind that is gone (dept_manager, 2026-10-17) and junk', () => {
     expect(isViewAsRole('dept_manager')).toBe(false)
     expect(isViewAsRole('')).toBe(false)
     expect(isViewAsRole('admin')).toBe(false)

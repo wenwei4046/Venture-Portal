@@ -10,7 +10,7 @@ import { storedFeedSecret } from '@/lib/erp-sync/feed-secret'
  * POST /api/erp/v1/sales-orders — the ERP live feed's receiver.
  *
  * THE ONE POST ROUTE HANDLER, and why it is allowed. The portal's rule is that
- * writes go through Server Actions behind requireRole. The caller here is the
+ * writes go through Server Actions behind their gates. The caller here is the
  * ERP's DATABASE (pg_net, driven by pg_cron), which cannot call a Server Action
  * and has no session; a machine-to-machine ingest is the case the rule was not
  * written for. The exception is narrow on purpose:

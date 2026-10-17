@@ -4,9 +4,9 @@
 // rows, range filters, the phone's cream top bar and peach tab pill, an edge
 // swipe back — apply to Finance's pages only (user: 只套 Finance 的页面).
 // "Finance's pages" are the routes below as Finance or the Principal sees
-// them; HR's and a department manager's pages keep the sheet as it was, and a
-// route several roles share (the Overview, Dept Pool, Reports, Settings) only
-// counts for those two roles.
+// them; HR's pages keep the sheet as it was, and a route several roles share
+// (the Overview, Dept Pool, Reports, Settings) only counts for those two
+// roles.
 
 import type { UserRole } from '@/types'
 

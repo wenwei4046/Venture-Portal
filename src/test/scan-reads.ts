@@ -104,7 +104,7 @@ export const APPROVE: readonly Want[] = ['treasury.approve', 'approvals.approve'
 /**
  * minReach: each function's least reach (permission_functions.scopes) — a page
  * key is held with its function's View at SOME reach, so the key's gate is
- * read as that View at the least one (`claims.view:own`, `dept_pool.view:dept`).
+ * read as that View at the least one (`claims.view:own`, `revenue.view:own`).
  */
 export function scanReads(
   root: string = process.cwd(),

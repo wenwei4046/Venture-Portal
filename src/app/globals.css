@@ -1387,61 +1387,28 @@ table.ledger-table tbody tr:last-child { border-bottom: 0; }
 table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
 table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
 
-/* GL statements (P&L / BS / CF): role-based row colouring replaces zebra
-   striping — section title / group / leaf / transaction detail / summary each
-   get their own band so the hierarchy reads at a glance (user 2026-06-11). */
-table.ledger-table.gl-report tbody tr:nth-child(even) { background: transparent; }
-table.ledger-table.gl-report tbody tr.row-sect { background: rgb(var(--surface-2) / 0.7); }
-table.ledger-table.gl-report tbody tr.row-cat { background: rgb(var(--surface-2) / 0.7); } /* headed layout section — its own totals */
-table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)); }
-table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
-table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
-table.ledger-table.gl-report tbody tr.row-summary { background: rgb(var(--surface)); }
-/* Headline totals (流入/流出合计, net change, closing cash) must out-shout the
-   section-title band above them — user 2026-07-30: the totals were quieter than
-   the group headers. Full accent wash + accent rules + a size bump. */
-table.ledger-table.gl-report tbody tr.row-summary-strong {
-  background: rgb(var(--accent-bg));
-  border-top: 2px solid rgb(var(--accent-border));
-  border-bottom: 2px solid rgb(var(--accent-border));
-}
-table.ledger-table.gl-report tbody tr.row-summary-strong td {
-  padding-top: 18px;
-  padding-bottom: 18px;
-  font-size: 1.0625rem;
-  letter-spacing: 0.01em;
-}
-/* Keep the wash on hover instead of swapping to the (identical) hover tint. */
-table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
-table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb(var(--accent-bg)); }
-
 /* ── Cash Flow skin (user 2026-09-18: "以蓝色为主的不错" — navy structure, gold
    accents, flat detail rows) ──────────────────────────────────────────────
-   Scoped to `.cf-report`, which the Cash Flow statement (GlReportView) and the
-   Monthly Cash Flow matrix (MonthlyMatrix) opt into; every other report keeps
-   Walnut / Harbour. Three bands, each with one job, on flat white:
-     navy      header row + headline totals (流入/流出合计, net change, closing)
-     pale navy a layout category's own row, with a gold rule on its left edge
-     pale gold the "this month" column (matrix only)
-   Detail rows have NO zebra — "一行一个 colour 看了会 misleading" — and zero
-   renders as a dash so the few real figures stand out. */
-.cf-report, .cf-scope {
+   The tokens live on `.cf-scope` — the wrapper every page under /reports sits
+   in (reports/layout.tsx), and the navy side panels of the deal forms and a
+   payment; every other page keeps Walnut / Harbour. On a report: the navy
+   header band with a gold rule under it, flat white rows with NO zebra —
+   "一行一个 colour 看了会 misleading". */
+.cf-scope {
   --cf-navy: 27 42 68;        /* #1B2A44 */
-  --cf-navy-2: 42 59 92;      /* #2A3B5C — "now" cell on a navy band */
+  --cf-navy-2: 42 59 92;      /* #2A3B5C — a second navy, inside a navy panel */
   --cf-navy-ink: 246 241 228; /* cream text on navy */
   --cf-gold: 201 162 75;      /* #C9A24B */
   --cf-gold-deep: 158 126 51; /* #9E7E33 — rules */
   --cf-gold-ink: 227 195 106; /* #E3C36A — gold figures on navy */
-  --cf-band: 231 236 244;     /* #E7ECF4 — category row */
-  --cf-band-now: 217 225 238; /* #D9E1EE */
-  --cf-now: 251 243 221;      /* #FBF3DD — this-month column */
+  --cf-band: 231 236 244;     /* #E7ECF4 — a row's hover band */
   --cf-surface: 255 255 255;
   --cf-hairline: 221 225 233; /* #DDE1E9 */
   --cf-ink: 27 42 68;
   --cf-graphite: 75 86 112;
   --cf-muted: 139 147 166;
 }
-[data-theme="dark"] .cf-report, [data-theme="dark"] .cf-scope {
+[data-theme="dark"] .cf-scope {
   --cf-navy: 38 54 90;
   --cf-navy-2: 47 66 112;
   --cf-navy-ink: 243 238 224;
@@ -1449,8 +1416,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-gold-deep: 227 195 106;
   --cf-gold-ink: 227 195 106;
   --cf-band: 31 42 64;
-  --cf-band-now: 38 51 77;
-  --cf-now: 42 39 22;
   --cf-surface: 26 30 39;
   --cf-hairline: 50 58 75;
   --cf-ink: 237 231 216;
@@ -1458,7 +1423,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-muted: 114 122 141;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .cf-report, :root:not([data-theme="light"]) .cf-scope {
+  :root:not([data-theme="light"]) .cf-scope {
     --cf-navy: 38 54 90;
     --cf-navy-2: 47 66 112;
     --cf-navy-ink: 243 238 224;
@@ -1466,8 +1431,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
     --cf-gold-deep: 227 195 106;
     --cf-gold-ink: 227 195 106;
     --cf-band: 31 42 64;
-    --cf-band-now: 38 51 77;
-    --cf-now: 42 39 22;
     --cf-surface: 26 30 39;
     --cf-hairline: 50 58 75;
     --cf-ink: 237 231 216;
@@ -1477,8 +1440,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
 }
 
 /* Every ledger table under /reports (the `.cf-scope` wrapper in
-   reports/layout.tsx): navy header, flat white rows, no zebra. The GL
-   statements and month matrices add their own row bands below. */
+   reports/layout.tsx): navy header, flat white rows, no zebra. */
 .cf-scope table.ledger-table {
   background: rgb(var(--cf-surface));
   border-color: rgb(var(--cf-hairline));
@@ -1508,120 +1470,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   border-bottom: 2px solid rgb(var(--cf-gold-deep));
 }
 .cf-scope table.cf-plain tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
-
-/* Statement (GlReportView) */
-table.ledger-table.cf-report {
-  background: rgb(var(--cf-surface));
-  border-color: rgb(var(--cf-hairline));
-}
-/* Unheaded section eyebrows (P&L / Balance Sheet / R&P) sit on the pale band
-   with the gold rule, same as a headed category row. */
-table.ledger-table.cf-report tbody tr.row-sect { background: rgb(var(--cf-band)); }
-table.ledger-table.cf-report tbody tr.row-sect > td { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-table.ledger-table.cf-report tbody tr.row-sect .text-accent { color: rgb(var(--cf-gold-deep)); }
-table.ledger-table.cf-report thead th {
-  background: rgb(var(--cf-navy));
-  color: rgb(var(--cf-navy-ink));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 10.5px;
-}
-table.ledger-table.cf-report tbody tr { border-bottom: 1px solid rgb(var(--cf-hairline)); }
-table.ledger-table.cf-report tbody tr.row-group,
-table.ledger-table.cf-report tbody tr.row-leaf,
-table.ledger-table.cf-report tbody tr.row-summary { background: rgb(var(--cf-surface)); }
-table.ledger-table.cf-report td { color: rgb(var(--cf-ink)); }
-table.ledger-table.cf-report tbody tr.row-cat { background: rgb(var(--cf-band)); }
-table.ledger-table.cf-report tbody tr.row-cat > td:first-child { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong {
-  background: rgb(var(--cf-navy));
-  border-top: 2px solid rgb(var(--cf-gold-deep));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-}
-table.ledger-table.cf-report tbody tr.row-summary-strong td,
-table.ledger-table.cf-report tbody tr.row-summary-strong td.num,
-table.ledger-table.cf-report tbody tr.row-summary-strong .text-ledger,
-table.ledger-table.cf-report tbody tr.row-summary-strong .text-danger { color: rgb(var(--cf-gold-ink)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong .neg { color: rgb(var(--cf-navy-ink)); }
-table.ledger-table.cf-report tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
-table.ledger-table.cf-report tbody tr.row-cat:hover { background: rgb(var(--cf-band-now)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong:hover { background: rgb(var(--cf-navy-2)); }
-table.ledger-table.cf-report tbody tr.search-row-hit,
-table.ledger-table.cf-report tbody tr.search-row-active,
-table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(var(--cf-now)); }
-
-/* Month matrix (MonthlyMatrix) — utility-style classes the component switches in. */
-.cf-matrix { border-color: rgb(var(--cf-hairline)); background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-th {
-  background: rgb(var(--cf-navy));
-  color: rgb(var(--cf-navy-ink));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-}
-.cf-matrix .cf-th-now { background: rgb(var(--cf-navy-2)); }
-/* Two-row header (P&L: RM / %): the gold rule sits under the LAST row only. */
-.cf-matrix thead tr:not(:last-child) th.cf-th { border-bottom: 0; }
-.cf-matrix .cf-th-sub { color: rgb(var(--cf-navy-ink) / 0.75); font-weight: 400; }
-.cf-matrix .cf-hairline-row { border-color: rgb(var(--cf-hairline)); }
-.cf-matrix .cf-row { background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-sub { background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-cat { background: rgb(var(--cf-band)); }
-.cf-matrix .cf-cat-label { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-.cf-matrix .cf-cat.cf-now { background: rgb(var(--cf-band-now)); }
-.cf-matrix .cf-row.cf-now, .cf-matrix .cf-sub.cf-now { background: rgb(var(--cf-now)); }
-.cf-matrix .cf-strong { background: rgb(var(--cf-navy)); color: rgb(var(--cf-gold-ink)) !important; }
-.cf-matrix .cf-strong.cf-now { background: rgb(var(--cf-navy-2)); }
-.cf-matrix .cf-strong .neg { color: rgb(var(--cf-navy-ink)); }
-.cf-matrix .cf-strong-row { border-top: 2px solid rgb(var(--cf-gold-deep)); border-bottom: 2px solid rgb(var(--cf-gold-deep)); }
-.cf-matrix .cf-arrow { color: rgb(var(--cf-gold-deep)); }
-.cf-matrix .cf-dash { color: rgb(var(--cf-muted)); }
-.cf-matrix .cf-strong .cf-dash { color: rgb(var(--cf-gold-ink)); opacity: 0.55; }
-.cf-matrix td.text-ink, .cf-matrix td .text-ink { color: rgb(var(--cf-ink)); }
-.cf-matrix td.text-graphite { color: rgb(var(--cf-graphite)); }
-.cf-matrix tr.search-row-hit > td, .cf-matrix tr.search-row-active > td { background: rgb(var(--cf-now)); }
-.cf-pill-on { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-color: rgb(var(--cf-navy)); }
-
-/* ── The rules under the label column (2026-09-29, user: "这个线条不见了") ──
-   The first column is `position: sticky`, which makes it a positioned element
-   painted ABOVE the table's collapsed borders — so every row rule and the
-   column's own right edge disappeared under it while showing fine across the
-   figures. Redraw both on the cell itself, where the sticky paint can't cover
-   them. The cf skin keeps its gold category edge by stacking the shadows. */
-.mx-matrix tbody tr > td:first-child,
-.mx-matrix thead th:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--hairline));
-}
-.mx-matrix tbody tr:not(:last-child) > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--hairline)), inset 0 -1px 0 rgb(var(--hairline));
-}
-.cf-matrix tbody tr > td:first-child,
-.cf-matrix thead th:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr:not(:last-child) > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 -1px 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr > td.cf-cat-label {
-  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr:not(:last-child) > td.cf-cat-label {
-  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline)),
-    inset 0 -1px 0 rgb(var(--cf-hairline));
-}
-/* Headline rows (流入合计 / net change) carry a 2px gold rule top and bottom. */
-.cf-matrix tbody tr.cf-strong-row > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 2px 0 rgb(var(--cf-gold-deep)),
-    inset 0 -2px 0 rgb(var(--cf-gold-deep));
-}
-
-/* Row labels stay on one line — wrapped names made the reports hard to scan
-   (user 2026-09-29: "可以不要给他 wrap text 吗？其他的 report 也是一样"). The
-   column grows to the longest label and the figures scroll beside it. */
-.gl-report td:first-child,
-.gl-report th:first-child {
-  white-space: nowrap;
-}
 
 /* ── Deal form preview (2026-09-22, New loan / New fund source): the right-hand
    panel borrows the Cash Flow navy + gold so the live figures read as "the
@@ -1929,11 +1777,10 @@ h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title
 .chip.danger { background: rgb(var(--danger-bg)); color: rgb(var(--danger)); border-color: rgb(var(--danger) / 0.4); }
 .chip.info   { background: rgb(var(--info-bg));   color: rgb(var(--info));   border-color: rgb(var(--info) / 0.4); }
 
-/* ── Account search on the reports (P&L / Cash Flow + their monthly matrices).
-   Highlight only — a search never hides a row, so a subtotal is never read as
-   if it covered just what's on screen (user 2026-07-31). Three cues, weakest
-   to strongest: the matched substring, the matching row, the row you're
-   currently jumped to. */
+/* ── Account search on the reports: highlight only — a search never hides a
+   row, so a subtotal is never read as if it covered just what's on screen
+   (user 2026-07-31). Two cues: the matched substring and the matching row;
+   the reports' sheet (.sheet-rpt) marks its own rows. */
 .search-hit {
   background: rgb(var(--accent) / 0.28);
   color: inherit;
@@ -1942,16 +1789,6 @@ h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title
 }
 tr.search-row-hit > td,
 tr.search-row-hit > th { background: rgb(var(--accent-bg)); }
-tr.search-row-active > td,
-tr.search-row-active > th {
-  background: rgb(var(--accent-bg));
-  box-shadow: inset 0 1px 0 rgb(var(--accent)), inset 0 -1px 0 rgb(var(--accent));
-}
-/* The matrix pins its first column; keep the cue visible there too. */
-tr.search-row-hit > td.sticky,
-tr.search-row-active > td.sticky { background: rgb(var(--accent-bg)); }
-/* gl-report sets a blanket hover wash — don't let it erase the active cue. */
-table.ledger-table.gl-report tbody tr.search-row-active:hover { background: rgb(var(--accent-bg)); }
 
 /* These search boxes ship their own × button, so suppress the browser's native
    one — Chrome was rendering two clear icons side by side (user 2026-07-31).
@@ -5333,7 +5170,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
    (.design/finance-revamp, README "Global rules"). Finance's pages as
    Finance or the Principal sees them (lib/finance-view.ts); PortalFrame sets
    `.fin-view` on the sheet frame and everything below hangs off it, so HR's
-   and a department manager's pages keep the sheet exactly as it was.
+   pages keep the sheet exactly as it was.
    ═══════════════════════════════════════════════════════════════════════ */
 .fin-view { font-variant-numeric: tabular-nums lining-nums; }
 .fin-view .sheet-theme { --accent-hover: 201 116 31; }
@@ -5950,8 +5787,6 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .rpt-levels button { min-width: 34px; height: 32px; padding: 0 8px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; font-weight: 500; letter-spacing: normal; text-transform: none; }
 .rpt-levels button[aria-pressed='true'] { background: #E99A53; border-color: #E99A53; }
 .rpt-modes { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-/* Month columns separated: a rule before each column’s figures. */
-.mx-sep .mx-col-start { border-left: 1px solid rgb(207 197 183); }
 /* The aging reports’ closing row: the handoff’s navy "All". */
 .ledger-table tr.rpt-all > td { background: rgb(221 229 240); color: rgb(29 43 74); font-weight: 700; box-shadow: inset 0 2px 0 rgb(29 43 74); }
 @media (max-width: 767px) {

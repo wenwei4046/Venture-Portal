@@ -161,7 +161,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
         'fetchGlRefs vouchers',
       ),
       // CN JEs (reference_type='credit_note') resolve their party through the
-      // parent invoice's bill-to. Errors tolerated (dept_manager RLS blocks
+      // parent invoice's bill-to. Errors tolerated (a reader whose RLS blocks
       // credit_notes) — those lines just keep a null party.
       fetchAllRows((from, to) =>
         supabase.from('credit_notes').select('id, invoice_id').order('id', { ascending: true }).range(from, to),

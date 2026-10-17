@@ -139,7 +139,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
 
   if (canSwitchView && viewAs && masked) {
     const maskedKeys = (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key)
-    const maskedActions = actionsFromKeys(maskedKeys, viewAs)
+    const maskedActions = actionsFromKeys(maskedKeys)
     return {
       ...user,
       role: viewAs,
@@ -335,19 +335,6 @@ export async function requirePayrollPayoutsActionOn(
 ): Promise<User> {
   const user = await requireAnyActionOn(page, ...wants)
   if (!canSeePayrollPayouts(user)) {
-    redirect('/dashboard')
-  }
-  return user
-}
-
-/**
- * The old role gate. Still here for the dept_manager row policies no scope can
- * express — see the policies_on_permissions migration. Everything else moved
- * to requirePermission.
- */
-export async function requireRole(roles: UserRole[]): Promise<User> {
-  const user = await requireAuth()
-  if (!roles.includes(user.role)) {
     redirect('/dashboard')
   }
   return user

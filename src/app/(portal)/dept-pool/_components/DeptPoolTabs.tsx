@@ -3,25 +3,19 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-type Tab = 'overview' | 'history' | 'pnl' | 'request-payment' | 'request-credit'
+type Tab = 'overview' | 'history' | 'pnl'
 
 interface Props {
   basePath: string
-  /** Raises their own department's requests (My Billing · Create at Dept —
-   *  lib/surfaces.ts; it was the dept_manager kind until 2026-10-09). */
-  raisesRequests: boolean
-  isOwnDept: boolean
-  // Extra tabs inserted between History and the Request tabs. Used by Marketing
-  // for the P&L view; other dept pools don't pass this.
+  // Extra tabs after History. Used for the P&L view. (The department's own Request Payment / Request Credit tabs —
+  // the Dept Manager's — went with the kind, 2026-10-17.)
   extraTabs?: { key: Tab; label: string }[]
 }
 
-export default function DeptPoolTabs({ basePath, raisesRequests, isOwnDept, extraTabs }: Props) {
+export default function DeptPoolTabs({ basePath, extraTabs }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeTab = (searchParams.get('tab') as Tab | null) ?? 'overview'
-
-  const showRequestTabs = raisesRequests && isOwnDept
 
   const tabs: { key: Tab; label: string; href: string }[] = [
     { key: 'overview', label: 'Overview', href: basePath },
@@ -29,12 +23,6 @@ export default function DeptPoolTabs({ basePath, raisesRequests, isOwnDept, extr
   ]
   for (const t of extraTabs ?? []) {
     tabs.push({ key: t.key, label: t.label, href: `${basePath}?tab=${t.key}` })
-  }
-  if (showRequestTabs) {
-    tabs.push(
-      { key: 'request-payment', label: 'Request Payment', href: `${basePath}?tab=request-payment` },
-      { key: 'request-credit', label: 'Request Credit', href: `${basePath}?tab=request-credit` },
-    )
   }
 
   return (

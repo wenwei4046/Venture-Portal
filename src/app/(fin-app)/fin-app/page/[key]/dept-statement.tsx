@@ -51,7 +51,7 @@ export default async function DeptStatementScreen({ slug, sp }: { slug: string; 
   // The desktop page's files: the month-by-month statement of this segment, the year through this month.
   const base = view === 'pnl' ? '/reports/monthly-pnl/export' : '/reports/monthly-cash-flow/export'
   const file = (format: 'pdf' | 'xlsx') => `${base}?${new URLSearchParams({ format, period: ym, segment: dept.segment }).toString()}`
-  const files = canDo(user, 'dept_reports', 'export', 'dept')
+  const files = canDo(user, 'dept_reports', 'export')
     ? [
         { key: 'pdf', label: 'Export PDF', href: file('pdf'), format: 'pdf' as const },
         { key: 'xlsx', label: 'Export Excel', href: file('xlsx'), format: 'xlsx' as const },

@@ -1,12 +1,9 @@
-// Dept-scoped Receipt & Payment data (2026-08-20, marketing user features).
-// 实收/花出去 both come from the GL: a department's cash movements are the
-// bank-account lines inside its segment-tagged JEs (settle receipts post
-// Dr Bank / Cr 3030 per segment; payments post Cr Bank per paying segment).
-// dept_manager reads these through RLS (own segment only); finance/principal
-// pass an explicit segment. Bank accounts are recognised by COA name
-// ('Cash & Bank%') because bank_accounts itself is not dept_manager-readable.
+// Dept-scoped Receipt & Payment data (2026-08-20, marketing user features):
+// the 未收 To collect — every issued invoice of the segment the reader picks,
+// net of its receipts and approved credit notes. The reader reads the reports
+// company-wide (the Dept Manager's own-segment mode went with the kind,
+// 2026-10-17, and with it the department's own cash-line read).
 
-import dayjs from 'dayjs'
 import { fetchAllRows } from '@/lib/paginate'
 
 // Matches the supabase server/client shape loosely — same trick the other
@@ -14,16 +11,6 @@ import { fetchAllRows } from '@/lib/paginate'
 type Db = {
   from: (table: string) => any // eslint-disable-line @typescript-eslint/no-explicit-any
   rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
-}
-
-export interface DeptCashLine {
-  date: string
-  entryNo: string | null
-  description: string
-  /** Positive = money into the dept's bank side; from the bank line's Dr. */
-  inAmount: number
-  /** Positive = money out; from the bank line's Cr. */
-  outAmount: number
 }
 
 export interface DeptOutstandingInvoice {
@@ -40,62 +27,6 @@ export interface DeptOutstandingInvoice {
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
-
-/** COA codes whose name marks them as bank/cash accounts. */
-export async function fetchBankGlCodes(supabase: Db): Promise<string[]> {
-  const { data } = await supabase
-    .from('chart_of_accounts')
-    .select('code, name')
-    .ilike('name', 'Cash & Bank%')
-  return ((data ?? []) as Array<{ code: string }>).map((c) => c.code)
-}
-
-/** Bank-account GL lines inside segment JEs between from/to (inclusive).
- *  Pass segment for finance/principal; dept_manager may pass their own (RLS
- *  would blank any other) or null to rely on RLS alone. */
-export async function fetchDeptCashLines(
-  supabase: Db,
-  opts: { from: string; to: string; segment?: string | null },
-): Promise<DeptCashLine[]> {
-  const bankCodes = await fetchBankGlCodes(supabase)
-  if (bankCodes.length === 0) return []
-
-  const rows = (await fetchAllRows((lo, hi) => {
-    let q = supabase
-      .from('journal_lines')
-      .select(
-        'account_code, debit, credit, journal_entries!inner(entry_no, transaction_date, segment, is_reversed, description)',
-      )
-      .in('account_code', bankCodes)
-      .gte('journal_entries.transaction_date', opts.from)
-      .lte('journal_entries.transaction_date', opts.to)
-      .eq('journal_entries.is_reversed', false)
-    if (opts.segment) q = q.eq('journal_entries.segment', opts.segment)
-    return q.order('id').range(lo, hi)
-  })) as Array<{
-    account_code: string
-    debit: number | null
-    credit: number | null
-    journal_entries: {
-      entry_no: string | null
-      transaction_date: string
-      segment: string | null
-      is_reversed: boolean
-      description: string | null
-    } | null
-  }>
-
-  return rows
-    .map((l) => ({
-      date: l.journal_entries?.transaction_date ?? '',
-      entryNo: l.journal_entries?.entry_no ?? null,
-      description: l.journal_entries?.description ?? '',
-      inAmount: r2(Number(l.debit ?? 0)),
-      outAmount: r2(Number(l.credit ?? 0)),
-    }))
-    .filter((l) => l.inAmount > 0 || l.outAmount > 0)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.entryNo ?? '').localeCompare(b.entryNo ?? ''))
-}
 
 /** One row of dept_invoice_settlements: an issued invoice of the caller's
  *  segment with Σ receipts and Σ approved credit notes. */
@@ -161,9 +92,8 @@ export async function fetchDeptOutstanding(
   for (const s of ((sums ?? []) as Array<{ invoice_id: string; receipts: number; credits: number }>)) {
     sumById.set(s.invoice_id, { receipts: Number(s.receipts), credits: Number(s.credits) })
   }
-  // Finance/principal view: their invoice SELECT sees every segment, so keep
-  // only ids the (segment-scoped) RPC returned. dept_manager RLS already
-  // matches the RPC's scope.
+  // The invoice SELECT sees every segment, so keep only ids the
+  // (segment-scoped) RPC returned.
   return ((invRows ?? []) as Array<{
     id: string
     invoice_no: string | null
@@ -190,9 +120,4 @@ export async function fetchDeptOutstanding(
       }
     })
     .filter((i) => i.outstanding > 0.005)
-}
-
-export function monthRange(period: string): { from: string; to: string } {
-  const start = dayjs(`${period}-01`)
-  return { from: start.format('YYYY-MM-DD'), to: start.endOf('month').format('YYYY-MM-DD') }
 }

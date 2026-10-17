@@ -14,7 +14,7 @@ import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 // Always generate fresh from live invoice data; never statically cache.
 export const dynamic = 'force-dynamic'
 
-async function loadAging(scheme: 'months' | 'days', asAtMonth: string | null) {
+async function loadAging(asAtMonth: string | null) {
   const supabase = await createClient()
   const [invoices, companies, departments] = await Promise.all([
     fetchAllRows((lo, hi) =>
@@ -53,21 +53,19 @@ async function loadAging(scheme: 'months' | 'days', asAtMonth: string | null) {
       }
     })
     .filter((i) => i.amount > 0.005)
-  // Finance's view ages by days since the invoice (2026-10-09); a department
-  // manager's by months, as before. Finance's As at a month (2026-10-10), as
-  // the page reads it: the invoices dated by then, aged to that day.
-  if (scheme === 'days') {
-    const asAt = resolveAgingAsAt(asAtMonth, officeToday())
-    return debtorAgingView(invoicesAsAt(raw, asAt), asAt, scheme)
-  }
-  return debtorAgingView(raw, officeToday(), scheme)
+  // Aged by days since the invoice (2026-10-09); As at a month (2026-10-10),
+  // as the page reads it: the invoices dated by then, aged to that day.
+  const asAt = resolveAgingAsAt(asAtMonth, officeToday())
+  return debtorAgingView(invoicesAsAt(raw, asAt), asAt)
 }
 
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')
 
 export async function GET(req: Request) {
-  // dept_manager may export their own segment's aging (RLS scopes invoices).
-  const user = await requireActionOn('/reports/debtor-aging', 'dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/debtor-aging', 'dept_reports', 'export')
+  // As the page: for whoever reads the reports company-wide (the Dept Manager's
+  // own-segment export went with the kind, 2026-10-17).
+  if (!reportsCompanyWide(user)) return Response.json({ error: 'Not found' }, { status: 404 })
   const params = new URL(req.url).searchParams
   const format = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   // view: 'detail' (one row per invoice) or 'summary' (aging matrix by customer).
@@ -75,7 +73,7 @@ export async function GET(req: Request) {
   const viewParam = params.get('view')
   const view = viewParam === 'summary' ? 'summary' : viewParam === 'detail' ? 'detail' : format === 'pdf' ? 'summary' : 'detail'
 
-  const aging = await loadAging(reportsCompanyWide(user) ? 'days' : 'months', params.get('as_at'))
+  const aging = await loadAging(params.get('as_at'))
   const AGING_BUCKETS = aging.columns
   const asOf = dayjs(aging.asOf).format('D MMM YYYY')
   const filename = `debtor-aging-${view}-${dayjs(aging.asOf).format('YYYYMMDD')}`

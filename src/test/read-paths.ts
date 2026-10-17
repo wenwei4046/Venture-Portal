@@ -62,8 +62,6 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
       'invoice_payout_pool', 'invoices', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'payment_vouchers',
       'repayments', 'treasury_terms_history', 'venture_pool',
     ],
-    // overviewFor → 'department': its pool, its requests, its invoices.
-    'dept_pool.view:dept': ['approval_requests', 'dept_pools', 'invoices'],
     // Finance's view (2026-10-14, the Finance revamp v2's Overview): this month's allocations not yet
     // billed — read only with the billing key, as the Invoice and allocator pages (canAccessBilling,
     // dashboard/_lib/finance-overview.ts).
@@ -73,13 +71,12 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
   },
   'src/app/(portal)/approvals/[id]/page.tsx#ApprovalDetailPage': {
     // The request is read first, and the page stops (notFound) unless a row
-    // policy shows it: the queue, an approver of its kind, the treasury, or
-    // the department that raised its own expense.
+    // policy shows it: the queue, an approver of its kind, or the treasury.
+    // (The department that raised its own expense went with the Dept
+    // Manager, 2026-10-17.)
     'treasury.view': ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts'],
     'approvals.view': ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts'],
     ...Object.fromEntries(APPROVE.map(a => [a, ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts']])),
-    // A department sees only its own dept_expense requests: no loan, no voucher.
-    'dept_pool.view:dept': ['approval_requests'],
   },
   // The Finance phone app's Overview (2026-10-15, M01) — the desktop Overview's counts
   // (loadFinanceOverviewCounts): the vouchers only for the treasury, the invoices and
@@ -354,8 +351,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'return_voucher_to_draft', 'revenue_pay_preview', 'revenue_payroll_adjustments', 'revenue_save_pay_lines',
   'reverse_voucher_pool_rows', 'revert_terms_change', 'rnp_invoice_events', 'save_revenue_payroll_row',
   'set_fund_source_min_pay_interest', 'set_fund_source_notes', 'set_fund_source_repayment_start', 'set_loan_funding_source',
-  'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields', 'submit_dept_payment_request',
-  'submit_invoice_request', 'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
+  'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields',
+  'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
 ])
 
@@ -477,16 +474,35 @@ export const INVOKER_VIEWS: Readonly<Record<string, readonly string[]>> = {
 
 // ── Putting it together ──────────────────────────────────────────────────────
 
-/** Each function's least reach (permission_functions.scopes, from the migration that seeds it). */
-export function leastReach(): Record<string, string> {
+/**
+ * Each function's reaches (permission_functions.scopes): as the migration that
+ * seeds them wrote them, then as a later one narrowed them (`UPDATE
+ * public.permission_functions SET scopes = ARRAY[…] WHERE key IN (…);` — Dept
+ * Pool, OPEX and Department reports to All when the Dept Manager went,
+ * 20261017160000).
+ */
+export function functionScopes(): Record<string, string[]> {
   const dir = resolve(process.cwd(), 'supabase/migrations')
-  const sql = readFileSync(join(dir, readdirSync(dir).find(f => f.startsWith('20261008120000'))!), 'utf8').replace(/\r\n/g, '\n')
-  const out: Record<string, string> = {}
-  for (const m of sql.matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
-    const scopes = [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1])
-    out[m[1]] = ['own', 'dept', 'all'].find(s => scopes.includes(s)) ?? 'all'
+  const files = readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
+  const sqlOf = (f: string) => readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n')
+  const seed = files.find(f => f.startsWith('20261008120000'))!
+  const out: Record<string, string[]> = {}
+  for (const m of sqlOf(seed).matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
+    out[m[1]] = [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1])
+  }
+  for (const f of files.filter(f => f > seed)) {
+    for (const m of sqlOf(f).matchAll(/UPDATE public\.permission_functions SET scopes = ARRAY\[([^\]]*)\] WHERE key IN \(([^)]*)\);/g)) {
+      const scopes = [...m[1].matchAll(/'([a-z]+)'/g)].map(s => s[1])
+      for (const k of m[2].matchAll(/'([a-z_]+)'/g)) out[k[1]] = scopes
+    }
   }
   return out
+}
+
+/** Each function's least reach (functionScopes). */
+export function leastReach(): Record<string, string> {
+  return Object.fromEntries(Object.entries(functionScopes()).map(([fn, scopes]) =>
+    [fn, ['own', 'dept', 'all'].find(s => scopes.includes(s)) ?? 'all']))
 }
 
 /** One way to a table read: the gates of one path (somebody who reads holds one action of one of them). */

@@ -19,8 +19,10 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
-  // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requireActionOn('/reports/monthly-cash-flow', 'dept_reports', 'export', 'dept')
+  const user = await requireActionOn('/reports/monthly-cash-flow', 'dept_reports', 'export')
+  // As the page: for whoever reads the reports company-wide (the Dept Manager's
+  // own-segment export went with the kind, 2026-10-17).
+  if (!reportsCompanyWide(user)) return Response.json({ error: 'Not found' }, { status: 404 })
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
@@ -32,13 +34,12 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  // Per-segment only — cancels across segments, so drop it when consolidated
-  // (dept managers have no segment param but ARE one segment via RLS); there
-  // the bridge is not read at all, and elsewhere it starts beside the journal
-  // read with the bank codes still pending (2026-10-08).
-  const consolidated = reportsCompanyWide(user) && !segment
+  // Per-segment only — cancels across segments, so drop it when consolidated;
+  // there the bridge is not read at all, and elsewhere it starts beside the
+  // journal read with the bank codes still pending (2026-10-08).
+  const consolidated = !segment
   const bankCodesRead = Promise.resolve(
-    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+    supabase.rpc('bank_gl_codes' as never), // codes only, no balances
   ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))
   const [lines, accounts, bankCodes, ib, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),

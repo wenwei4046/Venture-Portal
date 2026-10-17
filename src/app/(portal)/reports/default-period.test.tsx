@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   buildPnlAccounts: vi.fn(),
   fetchLedger: vi.fn(),
   fetchTrialBalance: vi.fn(),
-  matrixNowKey: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
@@ -42,15 +41,11 @@ vi.mock('./ledger/export/_format/xlsx', () => ({ buildLedgerXlsx: () => Buffer.f
 vi.mock('./trial-balance/export/_format/xlsx', () => ({ buildTrialBalanceXlsx: () => Buffer.from('') }))
 vi.mock('@/lib/paginate', () => ({ fetchAllRows: async () => [] }))
 vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: async () => new Map() }))
-vi.mock('./_components/MonthlyMatrix', () => ({
-  default: (p: { nowKey: string }) => {
-    mocks.matrixNowKey(p.nowKey)
-    return <p data-testid="matrix">{p.nowKey}</p>
-  },
+// The month-by-month body, by the months it was handed.
+vi.mock('./_components/MonthlyPnlBody', () => ({
+  default: (p: { nowYM: string; range: { to: string } }) => <p data-testid="months">{`${p.range.to} · now ${p.nowYM}`}</p>,
 }))
-vi.mock('./_components/MonthlyReportControls', () => ({ default: () => null }))
 vi.mock('./_components/ReportSearchProvider', () => ({ ReportSearchProvider: (p: { children: React.ReactNode }) => <>{p.children}</> }))
-vi.mock('./_components/ReportViewToggle', () => ({ default: () => null }))
 vi.mock('./debtor-aging/_components/AgingByCustomer', () => ({ default: () => null }))
 
 import MonthlyPnlPage from './monthly-pnl/page'
@@ -60,9 +55,13 @@ import DebtorAgingPage from './debtor-aging/page'
 import TrialBalancePage from './trial-balance/page'
 import { GET as exportTrialBalance } from './trial-balance/export/route'
 
+// Whoever reads the reports company-wide (Reports · View at All) — the reports
+// are theirs alone since the Dept Manager's own-segment mode went (2026-10-17).
+const READER = { id: 'f', role: 'finance', permissions: ['reports', 'dept_reports'], actions: { 'reports.view': 'all' } }
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'f', role: 'finance', permissions: ['reports', 'dept_reports'] })
+  mocks.requirePermission.mockResolvedValue(READER)
   mocks.buildPnlAccounts.mockReturnValue({ accounts: [], columns: [], salesByColumn: {} })
   mocks.fetchLedger.mockResolvedValue({ code: '3000', from: '', to: '', lines: [] })
   mocks.fetchTrialBalance.mockImplementation(async (_db: unknown, args: { asOf: string; showZeroBalance: boolean }) => ({
@@ -81,10 +80,11 @@ const asTheServer = <T,>(fn: () => Promise<T>) => inTimeZoneAsync('UTC', fn)
 describe("reports open on the office's month", () => {
   it('Monthly P&L: November, not October, at half past midnight on the 1st', async () => {
     // Its Excel shows to whoever may take it out (2026-10-16): this reader may.
-    mocks.requirePermission.mockResolvedValue({ id: 'f', role: 'finance', permissions: ['reports', 'dept_reports'], actions: { 'dept_reports.export': 'all' } })
+    mocks.requirePermission.mockResolvedValue({ ...READER, actions: { ...READER.actions, 'dept_reports.export': 'all' } })
     render(await asTheServer(() => MonthlyPnlPage({ searchParams: Promise.resolve({}) })))
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ year: 2026, throughMonth: 11 }))
-    expect(screen.getByTestId('matrix')).toHaveTextContent('2026-11')
+    expect(screen.getByTestId('months')).toHaveTextContent('2026-11 · now 2026-11')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('JAN – NOV 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', expect.stringContaining('period=2026-11'))
   })
 
@@ -109,8 +109,9 @@ describe("reports open on the office's month", () => {
 
   it("Debtor Aging: as of the office's today", async () => {
     render(await asTheServer(() => DebtorAgingPage({ searchParams: Promise.resolve({}) })))
-    // The subtitle is the date alone since 2026-10-12 ("As of …").
-    expect(screen.getByText(/As of 1 Nov 2026/)).toBeInTheDocument()
+    // As at the day, in the eyebrow and over the table (2026-10-09, the handoff).
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('AS AT 1 NOV 2026')
+    expect(document.querySelector('.sect-head .count')).toHaveTextContent('AS AT 1 NOV 2026')
   })
 
   it("the CFO reports' month helpers, given no date, bound the office's month", async () => {

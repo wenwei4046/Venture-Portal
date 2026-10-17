@@ -101,9 +101,10 @@ export function buildDebtorAging(raw: RawInvoice[], asOfISO: string): DebtorAgin
 }
 
 // ─── By days (2026-10-09, the Finance revamp handoff) ───────────────────────
-// Finance's view ages in days, still from the INVOICE date (the July rule):
-// 0–30, 31–60, 61–90 and 90+ days since the invoice. A department manager's
-// view keeps the months above.
+// The aging reports age in days, still from the INVOICE date (the July rule):
+// 0–30, 31–60, 61–90 and 90+ days since the invoice. (The month buckets above
+// still give the page its totals; the month columns went with the Dept
+// Manager's view, 2026-10-17.)
 
 export type DayBucket = 'd0_30' | 'd31_60' | 'd61_90' | 'd90_plus'
 
@@ -126,21 +127,17 @@ export interface AgingColumn {
   label: string
 }
 
-/** An aging in either scheme, its columns named — what the page and the exports draw. */
+/** An aging by days, its columns named — what the page and the exports draw. */
 export interface AgingView {
   asOf: string
   columns: readonly AgingColumn[]
-  /** Oldest first; the age in months or days by the scheme. */
+  /** Oldest first; the age in days. */
   invoices: Array<RawInvoice & { age: number; bucket: string }>
   byPayer: Array<{ payer: string; buckets: Record<string, number>; total: number; count: number }>
   totals: { buckets: Record<string, number>; total: number; count: number }
 }
 
-export function debtorAgingView(raw: RawInvoice[], asOfISO: string, scheme: 'months' | 'days'): AgingView {
-  if (scheme === 'months') {
-    const a = buildDebtorAging(raw, asOfISO)
-    return { asOf: a.asOf, columns: AGING_BUCKETS, invoices: a.invoices.map((i) => ({ ...i, age: i.monthsOld })), byPayer: a.byPayer, totals: a.totals }
-  }
+export function debtorAgingView(raw: RawInvoice[], asOfISO: string): AgingView {
   const asOf = dayjs(asOfISO).startOf('day')
   const empty = (): Record<string, number> => Object.fromEntries(DAY_BUCKETS.map((b) => [b.key, 0]))
   const invoices = raw.map((r) => {

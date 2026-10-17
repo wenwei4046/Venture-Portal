@@ -10,8 +10,7 @@
 
 ## 2. dept_pool_balances.balance (per dept)
 - Principal: `/dept-pool`, `/dashboard`
-- Finance: `/dept-pool`
-- Dept Manager: `/dept-pool/{slug}`, own `/dashboard`
+- Finance: `/dept-pool`, `/dept-pool/{slug}`
 - Source: `dept_pool_balances` view (`SUM(np_in) - SUM(expense_out)` per dept)
 - **GL counterpart (post mig 198/200/202)**: `trial_balance` for 3030/3040/3050/3070/3080
 

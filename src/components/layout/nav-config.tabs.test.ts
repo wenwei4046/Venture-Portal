@@ -3,7 +3,7 @@ import { moreTabLabel, tabsForRole } from './nav-config'
 
 // 2026-10-07 (user, on the phone: "下面还是华语字体"): Finance's and the
 // Principal's phone tab bar reads in English, like the pages it opens. HR's
-// and a department manager's bar is as it was.
+// bar is as it was.
 describe('the phone tab bar', () => {
   it('reads in English for Finance and the Principal', () => {
     expect(tabsForRole('finance').map((t) => t.label)).toEqual(['Overview', 'Payments', 'Receipts', 'Invoices'])
@@ -11,9 +11,9 @@ describe('the phone tab bar', () => {
     expect(moreTabLabel('finance')).toBe('More')
     expect(moreTabLabel('principal')).toBe('More')
   })
-  it('is untouched for a department manager', () => {
-    expect(tabsForRole('dept_manager')[0].label).toBe('总览')
-    expect(moreTabLabel('dept_manager')).toBe('更多')
+  it('promises a templated account only its Overview', () => {
+    expect(tabsForRole('staff').map((t) => t.label)).toEqual(['Overview'])
+    expect(moreTabLabel('staff')).toBe('More')
   })
   // 2026-10-11 (one app, lib/one-app.ts): HR's view on a phone is the HR app; Payroll, People and Director
   // Salary are the computer's. The bar keeps only its Overview, for an HR account the HR app has nothing for.

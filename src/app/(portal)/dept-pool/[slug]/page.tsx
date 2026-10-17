@@ -9,7 +9,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import DeptPnlView from '../_components/DeptPnlView'
-import { ownDepartmentOnly, raisesDepartmentRequests } from '@/lib/surfaces'
+import { readsEveryPool } from '@/lib/surfaces'
 
 // Slug → dept name. Director (the special director payout pool) is intentionally
 // excluded — it has its own /director-pool view and is not a regular dept pool.
@@ -44,13 +44,10 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
     .single()
   if (!dept) notFound()
 
-  // Dept Manager restriction: must be their own dept
-  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id !== dept.id) {
-    notFound()
-  }
+  // Whoever reads every department's pool (the own-department reader went with the Dept Manager, 2026-10-17).
+  if (!readsEveryPool(user)) notFound()
 
   const period = getPeriodMonth()
-  const isOwnDept = user.department_id === dept.id
 
   // Balance from the view
   const { data: balanceRow } = await supabase
@@ -101,12 +98,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
         </div>
       </div>
 
-      <DeptPoolTabs
-        basePath={`/dept-pool/${slug}`}
-        raisesRequests={raisesDepartmentRequests(user)}
-        isOwnDept={isOwnDept}
-        extraTabs={[{ key: 'pnl', label: 'P&L' }]}
-      />
+      <DeptPoolTabs basePath={`/dept-pool/${slug}`} extraTabs={[{ key: 'pnl', label: 'P&L' }]} />
 
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">

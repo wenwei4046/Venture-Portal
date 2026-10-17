@@ -6,13 +6,21 @@ import { withActions } from '@/test/with-actions'
 // handoff (Phase 4 of the Finance revamp), for whoever reads the reports
 // company-wide: the month in the eyebrow, Single month / Monthly in the head
 // with Excel and PDF, the cards, and the statement's controls — period,
-// compare, find, segment, detail level — on one row over it. A department
-// manager keeps the page as it was (the rail).
+// compare, find, segment, detail level — on one row over it.
 // 2026-10-10 — the handoff's table: the month (peach) over its RM and %, the
 // month "vs" a month to compare, opened at L3; Cash Flow opens at L3 too, and
 // Receipt & Payment reads each line as a % of the receipts.
+// 2026-10-17 — nobody else: a reader short of Reports · View at All is
+// refused (the Dept Manager's own-segment page went with the kind).
 
-const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), buildPnl: vi.fn(), buildCashFlow: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  requirePermission: vi.fn(),
+  buildPnl: vi.fn(),
+  buildCashFlow: vi.fn(),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
+}))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
@@ -41,7 +49,7 @@ vi.mock('@/lib/report-layouts', () => ({ readReportLayout: async () => null }))
 vi.mock('@/lib/inter-billing-cash-flow', () => ({ fetchInterBillingCashFlow: async () => null, interBillTransferAccount: {}, payrollCustodyAccount: {} }))
 vi.mock('@/lib/dept-receipt-payment', () => ({ fetchDeptOutstanding: async () => [] }))
 vi.mock('@/lib/office-time', async (orig) => ({ ...(await orig<object>()), officeMonth: () => '2026-10' }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, useRouter: () => ({ push: vi.fn() }), usePathname: () => '/reports', useSearchParams: () => new URLSearchParams() }))
 
 import IncomeStatementPage from './page'
 import CashFlowPage from '../cash-flow/page'
@@ -102,13 +110,6 @@ describe('the single-month P&L, company-wide', () => {
     expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:first-child th')).slice(1).map((th) => th.textContent)).toEqual(['Oct 2026', 'Sep 2026 · compare'])
     expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', '%', 'RM', '%'])
   })
-
-  it('keeps the rail for a department manager', async () => {
-    mocks.requirePermission.mockResolvedValue(withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_reports'] }))
-    render(await IncomeStatementPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · P&L STATEMENT · OCTOBER 2026')
-    expect(screen.queryByRole('group', { name: 'Report controls' })).toBeNull()
-  })
 })
 
 describe('the single-month Cash Flow and Receipt & Payment, company-wide', () => {
@@ -135,4 +136,24 @@ describe('the single-month Cash Flow and Receipt & Payment, company-wide', () =>
     expect(screen.getByRole('group', { name: 'Report controls' })).toBeInTheDocument()
     expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent)).toEqual(['RM', '%'])
   })
+})
+
+describe('the single-month statements, a reader short of Reports · View at All', () => {
+  // Department reports alone, or Reports at Dept only.
+  const SHORT = {
+    'Department reports alone': withActions({ id: 's', role: 'staff', permissions: ['dept_reports'] }),
+    'Reports at Dept': { id: 's', role: 'staff', permissions: ['reports', 'dept_reports'], actions: { 'reports.view': 'dept', 'dept_reports.view': 'all' } },
+  }
+  const PAGES = { 'P&L': IncomeStatementPage, 'Cash Flow': CashFlowPage, 'Receipt & Payment': ReceiptPaymentPage }
+
+  for (const [who, reader] of Object.entries(SHORT)) {
+    for (const [name, Page] of Object.entries(PAGES)) {
+      it(`finds no ${name} page for ${who}`, async () => {
+        mocks.requirePermission.mockResolvedValue(reader)
+        await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow('NEXT_NOT_FOUND')
+        expect(mocks.buildPnl).not.toHaveBeenCalled()
+        expect(mocks.buildCashFlow).not.toHaveBeenCalled()
+      })
+    }
+  }
 })

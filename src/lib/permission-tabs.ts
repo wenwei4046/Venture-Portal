@@ -83,7 +83,6 @@ const VENTURE_POOL: Opens = { view: ['venture_pool.view', 'venture_pool.export']
 const REPORTS: Opens = { view: ['reports.view', 'reports.export'] }
 const DEPT_REPORTS: Opens = { view: ['dept_reports.view', 'dept_reports.export'] }
 const OPEX: Opens = { view: ['opex.view', 'opex.export'] }
-const MY_BILLING: Opens = { view: ['my_billing.view'], create: ['my_billing.create'] }
 const REVENUE_APP: Opens = { view: ['revenue_app.view'] }
 const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue_app.create'] }
 // HR revamp round 2 (mig 20261011060000).
@@ -179,7 +178,6 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   shared('dept_pool', tab('pri', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL)),
   shared('venture_pool', tab('pri', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('pri', 'opex', 'OPEX', ['opex'], OPEX),
-  tab('pri', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
   // Every department's claims (2026-10-16): Finance view › Claims was deleted (the user: "i will build
   // another tab for it. so delete this version first"); the Principal's sidebar keeps Claims under
   // Departments, so the company-wide box stands here until that tab is built — the full-access
@@ -191,16 +189,12 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('pri', 'settings', 'Settings', ['settings'], { view: ['settings.view'], edit: ['settings.manage'] }),
   tab('pri', 'switch_views', 'Switch views', ['view_switch'], { view: ['view_switch.view'] }),
 
-  // ── Department view (the holder's own department) ──
+  // ── Department view ── Staff · Basic's: the Overview, one's own claims, the rooms. The Dept Manager's
+  // own-department boxes (Dept Pool, OPEX, My Billing, Claims, Reports, People at Dept) went with the kind
+  // (2026-10-17 — the user: "全删"; each department gets a view of its own later).
   tab('dept', 'overview', 'Overview', [], OVERVIEW),
-  tab('dept', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL),
-  tab('dept', 'opex', 'OPEX', ['opex'], OPEX),
-  tab('dept', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
-  tab('dept', 'claims', 'Claims', ['claims'], { view: ['claims.view'], approve: ['claims.approve', 'claims.void'] }),
   // Raising one's own claims — every member of staff's (Staff · Basic).
   tab('dept', 'my_claims', 'My claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }, 'own'),
-  tab('dept', 'reports', 'Reports', ['dept_reports'], DEPT_REPORTS),
-  tab('dept', 'people', 'People', ['team', 'team_directory'], { view: ['team.view'] }),
   // The rooms are the company's: booked at the company's reach from the Department view too.
   shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 

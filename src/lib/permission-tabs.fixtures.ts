@@ -1,6 +1,8 @@
 // Production as it stood on 2026-10-11: the function catalog, what each cell
-// opens, and the eleven templates exactly as permission_template_grants holds
-// them — shared by permission-tabs.test.ts and page-tabs.test.ts.
+// opens, and the templates exactly as permission_template_grants holds them —
+// shared by permission-tabs.test.ts and page-tabs.test.ts. Less what went with
+// the Dept Manager (20261017140000 / 20261017160000): the Department head
+// template, My Billing, and Dept at Dept Pool, OPEX and Department reports.
 
 import { openedKeys, type Action, type CellKey, type Grants, type Scope, type SensitiveField } from './permission-matrix'
 
@@ -21,13 +23,12 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   member: { actions: ['view', 'manage'], scopes: ['all'] },
   revenue_app: { actions: ['view', 'create'], scopes: ['own'] },
   crm: { actions: ['view', 'edit', 'manage'], scopes: ['own', 'all'] },
-  dept_pool: { actions: ['view', 'export'], scopes: ['dept', 'all'] },
+  dept_pool: { actions: ['view', 'export'], scopes: ['all'] },
   venture_pool: { actions: ['view', 'create', 'edit', 'export'], scopes: ['all'] },
-  opex: { actions: ['view', 'export'], scopes: ['dept', 'all'] },
-  my_billing: { actions: ['view', 'create'], scopes: ['dept', 'all'] },
+  opex: { actions: ['view', 'export'], scopes: ['all'] },
   claims: { actions: ['view', 'create', 'edit', 'approve', 'void'], scopes: ['own', 'dept', 'all'] },
   reports: { actions: ['view', 'export'], scopes: ['all'] },
-  dept_reports: { actions: ['view', 'export'], scopes: ['dept', 'all'] },
+  dept_reports: { actions: ['view', 'export'], scopes: ['all'] },
   reconciliation: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
   audit_log: { actions: ['view', 'export'], scopes: ['all'] },
   settings: { actions: ['view', 'manage'], scopes: ['all'] },
@@ -51,7 +52,7 @@ export const CELL_KEYS: CellKey[] = [
   K('director_pool', 'view', 'director_pool', 'all', 'salary'), K('team', 'view', 'team', 'all', 'salary'), K('team', 'view', 'team_directory', 'own'),
   K('accounts', 'create', 'team_invite', 'all'), K('accounts', 'manage', 'permissions_manage', 'all'),
   K('member', 'manage', 'member_requests_manage', 'all'), K('member', 'manage', 'member_memos_manage', 'all'), K('dept_pool', 'view', 'dept_pool', 'own'),
-  K('venture_pool', 'view', 'venture_pool', 'all', 'treasury'), K('opex', 'view', 'opex', 'own'), K('my_billing', 'view', 'my_billing', 'own'),
+  K('venture_pool', 'view', 'venture_pool', 'all', 'treasury'), K('opex', 'view', 'opex', 'own'),
   K('claims', 'view', 'claims', 'own'), K('claims', 'approve', 'claims_approve', 'all'), K('reports', 'view', 'reports', 'all', 'treasury'),
   K('dept_reports', 'view', 'dept_reports', 'own'), K('reconciliation', 'view', 'reconciliation', 'all', 'treasury'), K('audit_log', 'view', 'audit_log', 'all'),
   K('settings', 'view', 'settings', 'all'), K('settings', 'manage', 'department_mode', 'all'), K('revenue_app', 'view', 'member_portal', 'own'),
@@ -62,7 +63,7 @@ export const CELL_KEYS: CellKey[] = [
   K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'), K('attendance', 'view', 'attendance', 'all'),
 ]
 
-// The eleven templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
+// The templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
 // with round 2's cells (20261011060000): every portal template books a room; Ultimate, Full and HR
 // hold Documentation, Hiring, Meeting rooms and the Guest link whole.
 const ROOMS = ' rooms.create:all rooms.view:all'
@@ -73,7 +74,6 @@ const everything = (withSwitch: boolean) => Object.entries(FUNCTIONS)
   .filter(([key]) => key !== 'revenue_app' && (withSwitch || key !== 'view_switch'))
   .flatMap(([key, f]) => f.actions.map(a => `${key}.${a}:${f.scopes[f.scopes.length - 1]}`)).join(' ')
 export const PROD: Record<string, { cells: string; sensitive: SensitiveField[]; baseRole: string }> = {
-  dept_head: { baseRole: 'dept_manager', sensitive: [], cells: 'claims.approve:dept claims.create:own claims.view:dept dashboard.view:all dept_pool.export:dept dept_pool.view:dept dept_reports.export:dept dept_reports.view:dept my_billing.create:dept my_billing.view:dept opex.view:dept team.view:dept' + ROOMS },
   director: { baseRole: 'staff', sensitive: ['salary'], cells: 'approvals.approve:all approvals.view:all claims.create:own claims.view:own dashboard.view:all dept_reports.view:all director_pool.view:all director_salary.approve:all director_salary.view:all reports.export:all reports.view:all team.view:all treasury.approve:all treasury.create:all treasury.export:all treasury.view:all venture_pool.view:all' + ROOMS },
   office: { baseRole: 'staff', sensitive: [], cells: 'approvals.view:all claims.create:own claims.view:own dashboard.view:all reports.view:all team.view:all' + ROOMS },
   // Its claims.approve:all and claims.view:all went with Finance view › Claims (mig 20261016140000; nobody wears it).
