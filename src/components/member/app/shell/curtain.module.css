@@ -1,8 +1,9 @@
 /*
  * The switch to the CRM (2026-10-17 — the Claude Design handoff "Revenue → CRM switch view motion", design 2c "Peach ·
  * Context", `.design/revenue-app/design_handoff_revenue_crm_switch`): a peach curtain over the whole phone, "Now
- * opening", the word rolling from Revenue to CRM, three dots. Its motion is ViewSwitchCurtain's (Web Animations); here
- * is how it looks, value for value — on a phone, so the type takes the phone's .92 as the rest of the app does.
+ * opening", the word rolling from Revenue to CRM (and back, mirrored), three dots. Its motion is ViewSwitchCurtain's (Web
+ * Animations); here is how it looks, value for value — on a phone, so the type takes the phone's .92 as the rest of the
+ * app does.
  */
 
 .curtain {
@@ -22,6 +23,29 @@
   /* Below the screen until its motion starts. */
   transform: translateY(100%);
   will-change: transform;
+}
+/* The way back (2026-10-17) is the mirror image: above the screen until it starts, the new word waiting above the box. */
+.back { transform: translateY(-100%); }
+.back .wordNext { transform: translateY(-100%); }
+
+/* The way back's press: the ripple laid over the button the CRM draws (its house), clipped to it, under the curtain. */
+.press {
+  position: fixed;
+  z-index: 89;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pressRipple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  background: var(--rv-accent);
+  opacity: 0;
 }
 
 .caption {

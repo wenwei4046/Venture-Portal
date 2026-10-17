@@ -5,7 +5,8 @@ import { AT, EASE, HOLD_MAX, ViewSwitchCurtain } from "./ViewSwitchCurtain";
 
 // The switch to the CRM (2026-10-17 — the handoff "Revenue → CRM switch view motion", design 2c "Peach · Context"): the
 // curtain's sequence from the tap — the CRM put in under it at 950ms, the lift held until the CRM has drawn, never
-// onto an empty screen — and at once with reduced motion or where the browser cannot animate.
+// onto an empty screen — and at once with reduced motion or where the browser cannot animate. The way back (the user:
+// "也做一个反方向的幕布") is its mirror image, with the press of the CRM's own house laid over it.
 
 type Call = { el: Element; frames: Keyframe[]; opts: KeyframeAnimationOptions; cancel: ReturnType<typeof vi.fn>; finish: () => void };
 
@@ -25,18 +26,20 @@ function fakeAnimate() {
 const reduced = (on: boolean) =>
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: on && q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {} }));
 
-function draw(ready = false) {
+function draw(ready = false, { back = false, press = null }: { back?: boolean; press?: HTMLElement | null } = {}) {
   const screenEl = document.createElement("div");
   document.body.appendChild(screenEl);
   const ref = createRef<HTMLDivElement>() as { current: HTMLDivElement | null };
   ref.current = screenEl;
   const onSwap = vi.fn();
   const onDone = vi.fn();
-  const view = render(<ViewSwitchCurtain from="Revenue" to="CRM" ready={ready} screen={ref} onSwap={onSwap} onDone={onDone} />);
-  return { screenEl, onSwap, onDone, rerender: (r: boolean) => view.rerender(<ViewSwitchCurtain from="Revenue" to="CRM" ready={r} screen={ref} onSwap={onSwap} onDone={onDone} />) };
+  const [from, to] = back ? ["CRM", "Revenue"] : ["Revenue", "CRM"];
+  const curtain = (r: boolean) => <ViewSwitchCurtain from={from} to={to} back={back} ready={r} screen={ref} press={press} onSwap={onSwap} onDone={onDone} />;
+  const view = render(curtain(ready));
+  return { screenEl, onSwap, onDone, rerender: (r: boolean) => view.rerender(curtain(r)) };
 }
 
-const panelOf = () => screen.getByRole("status", { name: "Opening CRM" });
+const panelOf = (to = "CRM") => screen.getByRole("status", { name: `Opening ${to}` });
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -118,6 +121,39 @@ describe("the curtain to the CRM", () => {
     draw(false);
     act(() => { vi.advanceTimersByTime(AT.textOut + HOLD_MAX + (AT.uncover - AT.textOut)); });
     expect(calls.some(c => c.el === panelOf() && JSON.stringify(c.frames).includes("-100%"))).toBe(true);
+  });
+
+  it("the way back is the mirror image: down from the top, the words rolling down, out through the bottom onto the app settling from above", async () => {
+    const calls = fakeAnimate();
+    const { screenEl, onSwap, onDone } = draw(true, { back: true });
+    expect(panelOf("Revenue")).toHaveTextContent("Now opening");
+    const panel = panelOf("Revenue");
+    expect(calls.find(c => c.el === panel)!.frames).toEqual([{ transform: "translateY(-100%)", borderRadius: "0 0 40px 40px" }, { transform: "translateY(0)", borderRadius: "0" }]);
+    expect(screenEl.style.transformOrigin).toBe("50% 60%");
+    expect(calls.filter(c => c.opts.delay === AT.roll).map(c => c.frames)).toEqual([
+      [{ transform: "translateY(0)" }, { transform: "translateY(100%)" }],
+      [{ transform: "translateY(-100%)" }, { transform: "translateY(0)" }],
+    ]);
+    act(() => { vi.advanceTimersByTime(AT.swap); });
+    expect(onSwap).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(AT.uncover - AT.swap); });
+    const out = calls.find(c => c.el === panel && JSON.stringify(c.frames[0]) === JSON.stringify({ transform: "translateY(0)", borderRadius: "0" }))!;
+    expect(out.frames[1]).toEqual({ transform: "translateY(100%)", borderRadius: "40px 40px 0 0" });
+    expect(calls.find(c => c.el === screenEl && JSON.stringify(c.frames).includes("px"))!.frames[0]).toEqual({ transform: "translateY(-36px)" });
+    await act(async () => { out.finish(); });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("presses a button it does not draw: the squeeze on it, the ripple laid over where it stands", () => {
+    const calls = fakeAnimate();
+    const house = document.createElement("span");
+    document.body.appendChild(house);
+    house.getBoundingClientRect = () => ({ left: 300, top: 52, width: 40, height: 40, right: 340, bottom: 92, x: 300, y: 52, toJSON() {} }) as DOMRect;
+    draw(true, { back: true, press: house });
+    expect(calls.find(c => c.el === house)!.frames).toEqual([{ transform: "scale(1)" }, { transform: "scale(.96)" }, { transform: "scale(1)" }]);
+    const ripple = calls.find(c => JSON.stringify(c.frames).includes("scale(1.6)"))!;
+    const over = ripple.el.parentElement as HTMLElement;
+    expect([over.style.left, over.style.top, over.style.width, over.style.height]).toEqual(["300px", "52px", "40px", "40px"]);
   });
 
   it("switches at once with reduced motion", () => {
