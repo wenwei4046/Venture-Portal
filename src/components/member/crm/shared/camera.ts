@@ -112,3 +112,39 @@ export function handToChat(inputId: string, file: File): boolean {
   input.dispatchEvent(new Event("change", { bubbles: true }));
   return true;
 }
+
+// ── Zoom (2026-10-17 — the owner: "the camera and video cannot zoom in, suppose for video when long press then move
+// upwards it will zoom in") ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** The camera's own zoom where the phone lends it (the track's `zoom`, Android), up to 10×; else the app's — the
+ * picture's middle, cropped — up to 4×, beyond which there is nothing left to see. */
+export const NATIVE_MAX_ZOOM = 10;
+export const DIGITAL_MAX_ZOOM = 4;
+export type ZoomRange = { min: number; max: number; step: number; native: boolean };
+type ZoomCaps = { zoom?: { min?: number; max?: number; step?: number } } | null | undefined;
+export function zoomRangeOf(caps: ZoomCaps): ZoomRange {
+  const z = caps?.zoom;
+  if (z && typeof z.min === "number" && typeof z.max === "number" && z.max > z.min) {
+    return { min: z.min, max: Math.min(z.max, Math.max(z.min, NATIVE_MAX_ZOOM)), step: z.step && z.step > 0 ? z.step : 0.1, native: true };
+  }
+  return { min: 1, max: DIGITAL_MAX_ZOOM, step: 0.1, native: false };
+}
+export function clampZoom(z: number, r: ZoomRange): number {
+  const kept = Math.min(r.max, Math.max(r.min, Number.isFinite(z) ? z : r.min));
+  const stepped = Number((Math.round(kept / r.step) * r.step).toFixed(3));
+  return Math.min(r.max, Math.max(r.min, stepped));
+}
+/** The held shutter slid up zooms in — 45% of the screen's height runs the whole range — and slid down zooms back out. */
+export function slideZoom(startZoom: number, risenPx: number, screenPx: number, r: ZoomRange): number {
+  return clampZoom(startZoom + (risenPx / Math.max(1, screenPx * 0.45)) * (r.max - r.min), r);
+}
+/** Two fingers on the picture: the zoom grows with their spread. */
+export function pinchZoom(startZoom: number, startSpread: number, spread: number, r: ZoomRange): number {
+  return clampZoom(startZoom * (spread / Math.max(1, startSpread)), r);
+}
+/** The middle of a frame a digital zoom keeps. */
+export function cropOf(w: number, h: number, zoom: number): { sx: number; sy: number; sw: number; sh: number } {
+  const z = Math.max(1, zoom), sw = w / z, sh = h / z;
+  return { sx: (w - sw) / 2, sy: (h - sh) / 2, sw, sh };
+}
+export const zoomLabel = (z: number) => `${(Math.round(z * 10) / 10).toFixed(1)}×`;

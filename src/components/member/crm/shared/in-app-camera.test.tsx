@@ -17,11 +17,11 @@ vi.mock("./camera", async importOriginal => {
 import { InAppCamera } from "./in-app-camera";
 import { cameraOpenFor, closeInAppCamera, HOLD_MS, MIN_RECORD_MS, openInAppCamera } from "./camera";
 
-type Track = { kind: string; stop: ReturnType<typeof vi.fn>; getCapabilities: () => Record<string, unknown>; applyConstraints: ReturnType<typeof vi.fn> };
+type Track = { kind: string; stop: ReturnType<typeof vi.fn>; getCapabilities: () => Record<string, unknown>; getSettings: () => Record<string, unknown>; applyConstraints: ReturnType<typeof vi.fn> };
 const tracks: Track[] = [];
-const stream = (torch = false) => {
-  const v: Track = { kind: "video", stop: vi.fn(), getCapabilities: () => (torch ? { torch: true } : {}), applyConstraints: vi.fn(async () => undefined) };
-  const a: Track = { kind: "audio", stop: vi.fn(), getCapabilities: () => ({}), applyConstraints: vi.fn() };
+const stream = (torch = false, zoom?: { min: number; max: number; step: number }) => {
+  const v: Track = { kind: "video", stop: vi.fn(), getCapabilities: () => ({ ...(torch ? { torch: true } : {}), ...(zoom ? { zoom } : {}) }), getSettings: () => (zoom ? { zoom: zoom.min } : {}), applyConstraints: vi.fn(async () => undefined) };
+  const a: Track = { kind: "audio", stop: vi.fn(), getCapabilities: () => ({}), getSettings: () => ({}), applyConstraints: vi.fn() };
   tracks.push(v, a);
   return { getTracks: () => [v, a], getVideoTracks: () => [v], getAudioTracks: () => [a] } as unknown as MediaStream;
 };
@@ -31,9 +31,10 @@ class FakeRecorder {
   static last: FakeRecorder | null = null;
   state = "inactive";
   mimeType: string;
+  stream: MediaStream;
   ondataavailable: ((e: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
-  constructor(_s: MediaStream, o: { mimeType?: string }) { this.mimeType = o.mimeType ?? ""; FakeRecorder.last = this; }
+  constructor(s: MediaStream, o: { mimeType?: string }) { this.stream = s; this.mimeType = o.mimeType ?? ""; FakeRecorder.last = this; }
   start() { this.state = "recording"; }
   stop() { this.state = "inactive"; this.ondataavailable?.({ data: new Blob(["v"], { type: "video/mp4" }) }); this.onstop?.(); }
 }
@@ -163,5 +164,88 @@ describe("the camera inside the app", () => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
     await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await Promise.resolve(); });
     expect(gum.mock.calls.length).toBe(calls + 1);
+  });
+});
+
+// Zoom (the same evening — the owner: "the camera and video cannot zoom in, suppose for video when long press then move
+// upwards it will zoom in").
+describe("the camera's zoom", () => {
+  const settle = async () => { await act(async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); }); };
+  const surface = () => document.querySelector("[data-camera-surface]")!;
+  const shown = () => document.querySelector("[data-in-app-camera] video")!.getAttribute("style") ?? "";
+  const pinchTo2 = () => {
+    fireEvent.pointerDown(surface(), { pointerId: 11, clientX: 100, clientY: 400 });
+    fireEvent.pointerDown(surface(), { pointerId: 12, clientX: 200, clientY: 400 });
+    fireEvent.pointerMove(surface(), { pointerId: 12, clientX: 300, clientY: 400 });
+    fireEvent.pointerUp(surface(), { pointerId: 11 });
+    fireEvent.pointerUp(surface(), { pointerId: 12 });
+  };
+
+  it("the held shutter slid up zooms the camera's own lens in, and slid down back out", async () => {
+    gum.mockReset().mockImplementation(async () => stream(false, { min: 1, max: 8, step: 0.1 }));
+    await openIt();
+    fireEvent.pointerDown(shutter(), { pointerId: 1, clientY: 700 });
+    await act(async () => { vi.advanceTimersByTime(HOLD_MS + 10); });
+    fireEvent.pointerMove(shutter(), { pointerId: 1, clientY: 700 - window.innerHeight * 0.45 });
+    await settle();
+    expect(tracks[0].applyConstraints).toHaveBeenLastCalledWith({ advanced: [{ zoom: 8 }] });
+    expect(screen.getByRole("button", { name: /Zoom 8.0×/ })).toBeInTheDocument();
+    // The lens zooms; the picture on screen is not scaled again.
+    expect(shown()).toContain("scale(1)");
+    fireEvent.pointerMove(shutter(), { pointerId: 1, clientY: 700 });
+    await settle();
+    expect(tracks[0].applyConstraints).toHaveBeenLastCalledWith({ advanced: [{ zoom: 1 }] });
+    expect(screen.queryByRole("button", { name: /^Zoom/ })).toBeNull();
+  });
+
+  it("two fingers pinch the app's own zoom: the picture larger, the photo cropped to its middle", async () => {
+    const draw = vi.fn();
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { configurable: true, value: () => ({ drawImage: draw }) });
+    await openIt();
+    pinchTo2();
+    expect(screen.getByRole("button", { name: /Zoom 2.0×/ })).toBeInTheDocument();
+    expect(shown()).toContain("scale(2)");
+    fireEvent.pointerDown(shutter(), { pointerId: 3 });
+    fireEvent.pointerUp(shutter(), { pointerId: 3 });
+    expect(draw).toHaveBeenCalledWith(expect.anything(), 270, 480, 540, 960, 0, 0, 1080, 1920);
+  });
+
+  it("a video with the app's own zoom is filmed from a canvas drawn with the crop, the camera's sound with it", async () => {
+    const picture = { kind: "video", stop: vi.fn() };
+    Object.defineProperty(HTMLCanvasElement.prototype, "captureStream", { configurable: true, value: () => ({ getVideoTracks: () => [picture], getTracks: () => [picture] }) });
+    class FakeMediaStream { constructor(public tracks: unknown[]) {} getTracks() { return this.tracks; } }
+    vi.stubGlobal("MediaStream", FakeMediaStream);
+    await openIt();
+    fireEvent.pointerDown(shutter(), { pointerId: 1, clientY: 700 });
+    await act(async () => { vi.advanceTimersByTime(HOLD_MS + 10); });
+    expect((FakeRecorder.last?.stream as unknown as FakeMediaStream).tracks).toEqual([picture, tracks[1]]);
+    fireEvent.pointerMove(shutter(), { pointerId: 1, clientY: 700 - window.innerHeight * 0.225 });
+    expect(screen.getByRole("button", { name: /Zoom 2.5×/ })).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(MIN_RECORD_MS + 100); });
+    fireEvent.pointerUp(shutter(), { pointerId: 1 });
+    await act(async () => { vi.advanceTimersByTime(10); });
+    expect(picture.stop).toHaveBeenCalled();
+    expect(hand.calls).toHaveLength(1);
+  });
+
+  it("on the Video side, pressed while recording and slid, it zooms — no tap that stops", async () => {
+    await openIt();
+    fireEvent.click(screen.getByRole("radio", { name: "Video" }));
+    fireEvent.pointerDown(shutter(), { pointerId: 1, clientY: 700 });
+    fireEvent.pointerUp(shutter(), { pointerId: 1, clientY: 700 });
+    expect(FakeRecorder.last?.state).toBe("recording");
+    fireEvent.pointerDown(shutter(), { pointerId: 2, clientY: 700 });
+    fireEvent.pointerMove(shutter(), { pointerId: 2, clientY: 700 - window.innerHeight * 0.45 });
+    fireEvent.pointerUp(shutter(), { pointerId: 2 });
+    expect(FakeRecorder.last?.state).toBe("recording");
+    expect(screen.getByRole("button", { name: /Zoom 4.0×/ })).toBeInTheDocument();
+  });
+
+  it("a tap on the zoom takes it back to 1×", async () => {
+    await openIt();
+    pinchTo2();
+    fireEvent.click(screen.getByRole("button", { name: /Zoom 2.0×/ }));
+    expect(screen.queryByRole("button", { name: /^Zoom/ })).toBeNull();
+    expect(shown()).toContain("scale(1)");
   });
 });

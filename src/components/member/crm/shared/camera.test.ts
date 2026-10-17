@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  ANDROID_CAMERA_ACCEPT, CAMERA_HELP, CAMERA_WAIT_MS, cameraOpenFor, closeInAppCamera, handToChat, inAppCameraWorks, openCamera, recClock, recordType, shotName,
+  ANDROID_CAMERA_ACCEPT, CAMERA_HELP, CAMERA_WAIT_MS, DIGITAL_MAX_ZOOM, NATIVE_MAX_ZOOM, cameraOpenFor, clampZoom, closeInAppCamera, cropOf, handToChat,
+  inAppCameraWorks, openCamera, pinchZoom, recClock, recordType, shotName, slideZoom, zoomLabel, zoomRangeOf,
 } from "./camera";
 
 // The camera button on Android: when the phone opens nothing (no camera, no chooser, no permission question — the owner,
@@ -102,5 +103,36 @@ describe("the camera inside the app", () => {
     expect(ok).toBe(typeof DataTransfer !== "undefined");
     if (ok) expect(seen).toEqual(["IMG_1.jpg"]);
     expect(handToChat("missing", new File(["x"], "a.jpg"))).toBe(false);
+  });
+});
+
+// Zoom (2026-10-17 — the owner: "the camera and video cannot zoom in, suppose for video when long press then move upwards
+// it will zoom in").
+describe("the camera's zoom", () => {
+  const lens = zoomRangeOf({ zoom: { min: 1, max: 30, step: 0.1 } });
+  const app = zoomRangeOf({});
+  it("the camera's own where the phone lends it (up to 10×), else the app's crop (up to 4×)", () => {
+    expect(lens).toEqual({ min: 1, max: NATIVE_MAX_ZOOM, step: 0.1, native: true });
+    expect(app).toEqual({ min: 1, max: DIGITAL_MAX_ZOOM, step: 0.1, native: false });
+    expect(zoomRangeOf({ zoom: { min: 1, max: 1 } }).native).toBe(false);
+    expect(zoomRangeOf(null).native).toBe(false);
+  });
+  it("kept within the range, on the lens's steps", () => {
+    expect([clampZoom(0.5, app), clampZoom(9, app), clampZoom(2.34, app), clampZoom(NaN, app)]).toEqual([1, 4, 2.3, 1]);
+  });
+  it("the held shutter slid up zooms in — 45% of the screen runs the whole range — and down zooms back out", () => {
+    expect(slideZoom(1, 0, 800, app)).toBe(1);
+    expect(slideZoom(1, 360, 800, app)).toBe(4);
+    expect(slideZoom(1, 180, 800, app)).toBe(2.5);
+    expect(slideZoom(2.5, -180, 800, app)).toBe(1);
+    expect(slideZoom(1, 360, 800, lens)).toBe(10);
+  });
+  it("two fingers: the zoom grows with their spread", () => {
+    expect([pinchZoom(1, 100, 200, app), pinchZoom(2, 200, 100, app), pinchZoom(1, 100, 900, app)]).toEqual([2, 1, 4]);
+  });
+  it("the app's zoom keeps the frame's middle; the label one decimal", () => {
+    expect(cropOf(1080, 1920, 2)).toEqual({ sx: 270, sy: 480, sw: 540, sh: 960 });
+    expect(cropOf(1080, 1920, 1)).toEqual({ sx: 0, sy: 0, sw: 1080, sh: 1920 });
+    expect([zoomLabel(1), zoomLabel(2.34), zoomLabel(10)]).toEqual(["1.0×", "2.3×", "10.0×"]);
   });
 });
