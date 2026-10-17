@@ -17,7 +17,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
  */
 const LISTS = "[data-chat-list]";
 /** The chats on screen: the phone's lists, and on the desktop the scroller around a conversation's end marker. */
-function chatLists(): HTMLElement[] {
+export function chatLists(): HTMLElement[] {
   const out = new Set<HTMLElement>(document.querySelectorAll<HTMLElement>(LISTS));
   document.querySelectorAll<HTMLElement>("[data-chat-end]").forEach(end => {
     for (let el = end.parentElement; el && el !== document.body; el = el.parentElement) {
@@ -28,6 +28,8 @@ function chatLists(): HTMLElement[] {
   return [...out];
 }
 const toBottom = () => chatLists().forEach(el => { el.scrollTop = el.scrollHeight; });
+/** A list is at its newest message: scrolled to within 120 px of its end — where the chat follows new ones. */
+export const atNewest = (el: HTMLElement) => el.scrollHeight - el.scrollTop - el.clientHeight < 120;
 
 export function useFollowNewest(chatId: string | null | undefined, count: number) {
   const last = useRef<{ id: string | null | undefined; n: number }>({ id: undefined, n: 0 });
@@ -35,7 +37,7 @@ export function useFollowNewest(chatId: string | null | undefined, count: number
   useEffect(() => {
     const onScroll = (e: Event) => {
       const el = e.target as HTMLElement | null;
-      if (el?.dataset?.chatList) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (el?.dataset?.chatList) atBottom.current = atNewest(el);
     };
     document.addEventListener("scroll", onScroll, true);
     return () => document.removeEventListener("scroll", onScroll, true);

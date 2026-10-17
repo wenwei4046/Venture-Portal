@@ -20,6 +20,7 @@ import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type Des
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace } from "./nav";
 import { useFollowNewest } from "../shared/stick";
+import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
 
@@ -54,6 +55,8 @@ export default function DeskScreens(p: DeskScreensProps) {
   // 看的是最新消息，而不是從上面慢慢滑到下面").
   const msgCount = (id: string | null) => (id ? data.customers.find(c => c.id === id)?.messages.length ?? 0 : 0);
   useFollowNewest(ui.chat || ui.awChat ? `${ui.tab}:${ui.chat ?? ""}:${ui.awChat ?? ""}` : null, msgCount(ui.chat) + msgCount(ui.awChat));
+  // One's own chat is read once its newest message is on screen — the window in front (shared/seen.ts, 2026-10-17).
+  useReadWhenSeen(ui.chat, ui.chat ? data.customers.find(c => c.id === ui.chat)?.unread ?? 0 : 0, act.readChat);
   const patch = useCallback((x: Partial<DeskUi>) => setUi(u => ({ ...u, ...x })), []);
   const [size, setSize] = useState({ W: 1440, H: 900 });
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});

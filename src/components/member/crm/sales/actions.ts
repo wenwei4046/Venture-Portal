@@ -21,6 +21,8 @@ import { dayLabel, timeLabel, windowShut } from "./vm/common";
 
 export interface SalesActions {
   openChat(customerId: string): void;
+  /** One's own chat's messages read (crm_mark_read) — from Mine, Team or the desktop, once its newest is on screen (shared/seen.ts). Anybody else's: nothing. */
+  readChat(customerId: string): void;
   /** A TL / STL gives their team's customer to someone in that team (crm_assign_member, 2026-10-14). */
   assignMember(customerId: string, staffId: string): Promise<boolean>;
   send(customerId: string, text: string, replyTo?: string | null): Promise<boolean>;
@@ -108,6 +110,14 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
   const room = (id: string) => data().rooms.find(r => r.id === id);
   const visit = (id: string) => data().visits.find(v => v.id === id);
   const setVisit = (id: string, f: (v: CrmVisit) => CrmVisit) => setData(d => ({ ...d, visits: d.visits.map(v => (v.id === id ? f(v) : v)) }));
+  // Only the owner reads a chat (crm_mark_read clears it for its owner alone): an upline looking at a downline's chat on
+  // the Team side leaves it unread for them (the owner, 2026-10-17: "Team 那边，我点进去任意的 chat 都不应该标记为已读").
+  const readChat = (customerId: string) => {
+    const c = data().customers.find(x => x.id === customerId);
+    if (!c || c.assignedTo !== me || c.unread === 0) return;
+    patchCustomer(customerId, x => ({ ...x, unread: 0 }));
+    if (live) void crmWrite("crm_mark_read", { p_contact: customerId }); // nothing to undo if it fails
+  };
 
   /** Send a card's words when the window allows; the card shows in the chat once it went. */
   async function sendCard(customerId: string, card: CrmCard): Promise<void> {
@@ -138,11 +148,9 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         setData(d => ({ ...d, prefs: { ...d.prefs, [customerId]: { ...d.prefs[customerId]!, markedUnread: false } } }));
         void write("crm_set_pref", { p_contact: customerId, p_pinned: null, p_muted: null, p_hidden: null, p_blocked: null, p_pinned_message: null, p_clear_pinned_message: false, p_marked_unread: false });
       }
-      const c = data().customers.find(x => x.id === customerId);
-      if (!c || c.assignedTo !== me || c.unread === 0) return;
-      patchCustomer(customerId, x => ({ ...x, unread: 0 }));
-      if (live) void crmWrite("crm_mark_read", { p_contact: customerId }); // nothing to undo if it fails
+      readChat(customerId);
     },
+    readChat,
     async send(customerId, text, replyTo) {
       if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "text", text: text.trim(), at: new Date().toISOString(), status: "sent", by: me, ...(replyTo ? { replyTo } : {}) }); return true; }
       const tempId = `sending-${uid()}`;
