@@ -113,12 +113,14 @@ describe("the camera's zoom", () => {
   const app = zoomRangeOf({});
   it("the camera's own where the phone lends it (up to 10×), else the app's crop (up to 4×)", () => {
     expect(lens).toEqual({ min: 1, max: NATIVE_MAX_ZOOM, step: 0.1, native: true });
-    expect(app).toEqual({ min: 1, max: DIGITAL_MAX_ZOOM, step: 0.1, native: false });
+    // The app's own moves in hundredths (2026-10-17 — an iPhone's zoom jumped a tenth bigger at a time: "一卡一卡").
+    expect(app).toEqual({ min: 1, max: DIGITAL_MAX_ZOOM, step: 0.01, native: false });
     expect(zoomRangeOf({ zoom: { min: 1, max: 1 } }).native).toBe(false);
     expect(zoomRangeOf(null).native).toBe(false);
   });
-  it("kept within the range, on the lens's steps", () => {
-    expect([clampZoom(0.5, app), clampZoom(9, app), clampZoom(2.34, app), clampZoom(NaN, app)]).toEqual([1, 4, 2.3, 1]);
+  it("kept within the range, on the lens's steps — the app's own in hundredths", () => {
+    expect([clampZoom(0.5, app), clampZoom(9, app), clampZoom(2.345, app), clampZoom(2.3449, app), clampZoom(NaN, app)]).toEqual([1, 4, 2.35, 2.34, 1]);
+    expect([clampZoom(2.34, lens), clampZoom(2.36, lens)]).toEqual([2.3, 2.4]);
   });
   it("the held shutter slid up zooms in — 45% of the screen runs the whole range — and down zooms back out", () => {
     expect(slideZoom(1, 0, 800, app)).toBe(1);
