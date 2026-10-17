@@ -1,7 +1,8 @@
-import { addDays, assignmentFor, dayMon, monthName, scheduleDay, statesCover, toMin, fromMin } from '@/lib/attendance/engine'
-import { hoursADay } from '@/lib/attendance/payroll'
+import { addDays, dayInfo, dayMon, indexMonth, monthName, toMin, fromMin } from '@/lib/attendance/engine'
+import { hoursADay, otDayType, otEnd, type OtDayType } from '@/lib/attendance/payroll'
 import type { ScheduleDay } from '@/lib/attendance/types'
 import { fmtN } from './format'
+import { ctxOf } from './month'
 import { correctionLine, goesTo, quotaFor, routeFor, routeShort } from './requests'
 import type { MeData, MeFair } from './types'
 
@@ -11,17 +12,14 @@ import type { MeData, MeFair } from './types'
  * each from the settings HR keeps (Settings › Schedules, OT rules, Policy). Pure.
  */
 
-/** The schedule's row for a person's day, and what kind of day it is (a covering holiday is a public holiday). */
-export function dayOf(d: MeData, day: string): { row: ScheduleDay | null; kind: 'work' | 'off' | 'rest' | 'ph'; hoursADay: number } {
-  if (!d.me) return { row: null, kind: 'work', hoursADay: 8 }
-  const a = assignmentFor(d.me, day, d.assignments)
-  const sched = a?.scheduleId ? d.schedules.find(s => s.id === a.scheduleId) ?? null : null
-  const loc = a?.locationId ? d.locations.find(l => l.id === a.locationId) ?? null : null
-  const row = scheduleDay(sched, day)
-  const holiday = d.holidays.some(h => h.day === day && statesCover(h.states, loc?.state))
-  const w = new Date(`${day}T00:00:00Z`).getUTCDay()
-  const kind = holiday ? 'ph' : row ? (row.type === 'work' ? 'work' : row.type) : w === 0 ? 'rest' : w === 6 ? 'off' : 'work'
-  return { row, kind, hoursADay: hoursADay(sched) }
+/**
+ * The schedule's row for a person's day, what kind of day it is, and whether they punch — as payroll reckons it
+ * (`otDayType`: a covering holiday is a public holiday, a company holiday an off day), so the sheet says what is paid.
+ */
+export function dayOf(d: MeData, day: string): { row: ScheduleDay | null; kind: OtDayType; hoursADay: number; clocks: boolean } {
+  if (!d.me) return { row: null, kind: 'work', hoursADay: 8, clocks: true }
+  const info = dayInfo(d.me, day, ctxOf(d), indexMonth(d.month))
+  return { row: info.sday, kind: otDayType({ detail: {} }, info, day), hoursADay: hoursADay(info.schedule), clocks: info.assignment?.mode !== 'no_clock' }
 }
 
 // ── Overtime ────────────────────────────────────────────────────────────────
@@ -35,10 +33,7 @@ export function otMax(d: MeData, day: string): number {
 }
 
 /** "After 18:00": the schedule's end that day (18:00 without one). */
-export const otAfter = (d: MeData, day: string) => {
-  const { row, kind } = dayOf(d, day)
-  return kind === 'work' && row?.end ? row.end : '18:00'
-}
+export const otAfter = (d: MeData, day: string) => otEnd(dayOf(d, day).row)
 
 /** The rate box's first line, from Settings › OT rules. */
 export function otRateLine(d: MeData, day: string): string {
@@ -64,22 +59,25 @@ export interface OtCheck {
   /** Anything that keeps Send off. */
   error: string
   rate: string
+  /** How payroll pays it — what `lib/attendance/payroll.ts` does, word for word (2026-10-17). */
   paid: string
-  after: string
+  /** Under the hours: where the time counts from — past the end on a work day, every hour on any other. */
+  steps: string
   route: string
 }
 
 export function checkOt(d: MeData, f: OtForm): OtCheck {
   const max = otMax(d, f.date)
-  const after = otAfter(d, f.date)
+  const { row, kind, clocks } = dayOf(d, f.date)
   const shown = f.hours > max ? `That makes the day longer than 12 h. The most you can ask is ${fmtN(max)} h.` : ''
+  const punched = kind === 'work' ? `past ${otEnd(row)}` : 'from IN to OUT'
   return {
     max,
     shown,
     error: shown || (!f.reason.trim() ? 'Say what needs the extra time.' : ''),
     rate: otRateLine(d, f.date),
-    paid: `Paid = the smaller of approved and punched past ${after}, rounded down to 30 min.`,
-    after,
+    paid: clocks ? `Paid = the smaller of approved and punched ${punched}, rounded down to 30 min.` : 'Paid = the hours approved.',
+    steps: `${kind === 'work' ? `After ${otEnd(row)}` : 'Every hour counts'} · in 30-minute steps`,
     route: goesTo(routeFor('OT', d), d.me),
   }
 }

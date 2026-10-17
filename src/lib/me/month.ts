@@ -2,6 +2,7 @@ import {
   addDays, dayInfo, dayMon, firstOfMonth, indexMonth, isLeaveCode, longDay, monthDays, monthLabel, monthName, toMin, weekday,
   type Ctx, type DayInfo,
 } from '@/lib/attendance/engine'
+import { clockOf, otPlansOf, type OtPlan } from '@/lib/attendance/payroll'
 import type { AttConfig, AttRequest } from '@/lib/attendance/types'
 import { dur, fmtN } from './format'
 import type { Tone } from './requests'
@@ -94,6 +95,17 @@ function pastEnd(info: DayInfo, day: string, requests: readonly AttRequest[]): n
   return past >= 30 ? past : 0
 }
 
+/**
+ * The day card's overtime: waiting; approved, while the day is not over; then the hours payroll pays — the smaller of
+ * approved and punched (2026-10-17), "of" the approved when the punches hold it lower.
+ */
+function otNote(r: AttRequest, plan: OtPlan | undefined, over: boolean): string {
+  const asked = fmtN(Number(r.hours ?? 0))
+  if (r.status !== 'approved') return `OT ${asked} h waiting`
+  if (!plan || !over) return `OT ${asked} h approved`
+  return plan.hours === plan.approved ? `OT ${fmtN(plan.hours)} h paid` : `OT ${fmtN(plan.hours)} of ${asked} h paid`
+}
+
 export function monthView(d: MeData): MonthView | null {
   if (!d.me) return null
   const me = d.me
@@ -123,8 +135,9 @@ export function monthView(d: MeData): MonthView | null {
   const missing = past.reduce((a, x) => a + (x.info.code === 'I' ? 1 : x.info.code === 'A' ? 2 : 0), 0)
   const lateDays = past.filter(x => x.info.code === 'L')
   const lateMin = lateDays.reduce((a, x) => a + x.info.lateMin, 0)
-  const otPaid = d.requests.filter(r => r.kind === 'ot' && r.status === 'approved' && r.from && r.from.slice(0, 7) === d.month.month.slice(0, 7))
-    .reduce((a, r) => a + Number(r.hours ?? 0), 0)
+  // What payroll pays for each approved request: approved, held to the day's punches (lib/attendance/payroll.ts).
+  const plans = otPlansOf(ctx, d.requests).rows.find(r => r.person.id === me.id)?.plans ?? []
+  const otPaid = plans.filter(p => p.day <= today).reduce((a, p) => a + p.hours, 0)
   const unclaimed = past.reduce((a, x) => a + pastEnd(x.info, x.day, d.requests), 0)
   const totals = [
     { label: 'Present', value: `${present} d`, note: `of ${workDays} work day${workDays === 1 ? '' : 's'}` },
@@ -153,6 +166,9 @@ export function monthView(d: MeData): MonthView | null {
         : day > today && info.sday?.type === 'work' ? ['neutral', 'Work day'] : ['neutral', info.tracked ? 'Work day' : 'Not counted']
     const corr = d.requests.find(r => isCorrection(r, day))
     const ot = d.requests.find(r => isOt(r, day))
+    const plan = ot ? plans.find(p => p.r.id === ot.id) : undefined
+    // The punches of a day the engine does not count as worked (a rest day's overtime is paid from them).
+    const clock = clockOf(me.id, day, idx)
     const extra = pastEnd(info, day, d.requests)
     const note = info.edited ? `Changed by HR${info.note ? ` · ${info.note}` : ''}`
       : corr ? (corr.status === 'approved' ? `${String(corr.detail.punch ?? '').toUpperCase() || 'Punch'} corrected · ${corr.ref}` : `Correction waiting · ${corr.ref}`)
@@ -161,7 +177,7 @@ export function monthView(d: MeData): MonthView | null {
       : code === 'L' ? `Late ${info.lateMin} min`
       : code === 'I' ? 'No OUT punch'
       : code === 'A' ? 'No punch'
-      : ot ? (ot.status === 'approved' ? `OT ${fmtN(Number(ot.hours ?? 0))} h paid` : `OT ${fmtN(Number(ot.hours ?? 0))} h waiting`)
+      : ot ? otNote(ot, plan, day < today || !!clock.out || plan?.punchedMin === null)
       : extra ? `${dur(extra * 60)} unclaimed`
       : info.flags.length ? info.flags.join(' · ')
       : day === today && info.in ? 'Today'
@@ -171,7 +187,7 @@ export function monthView(d: MeData): MonthView | null {
       : null
     return {
       day, title: longDay(day), tone, status, fix,
-      facts: [{ label: 'IN', value: info.in ?? '—', mono: true }, { label: 'OUT', value: info.out ?? '—', mono: true }, { label: 'Note', value: note }],
+      facts: [{ label: 'IN', value: info.in ?? clock.in ?? '—', mono: true }, { label: 'OUT', value: info.out ?? clock.out ?? '—', mono: true }, { label: 'Note', value: note }],
     }
   }
 

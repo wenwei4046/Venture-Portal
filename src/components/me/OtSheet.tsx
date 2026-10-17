@@ -35,7 +35,7 @@ export function OtSheet({ open, data, form, set, busy, onClose, onSend }: {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>{form.after ? 'Hours to claim' : 'Planned hours'}</div>
-            <div style={{ fontSize: 12, color: 'var(--ds-ink-3)', marginTop: 2 }}>After {c.after} · in 30-minute steps</div>
+            <div style={{ fontSize: 12, color: 'var(--ds-ink-3)', marginTop: 2 }}>{c.steps}</div>
           </div>
           <Stepper value={`${form.hours} h`} minWidth={56} onMinus={() => set({ hours: Math.max(0.5, form.hours - 0.5) })} onPlus={() => set({ hours: form.hours + 0.5 })} />
         </div>
