@@ -54,6 +54,8 @@ const WHITE = "rgb(255 255 255)", RED = "rgb(234 67 53)", FONT = "Inter, -apple-
 const ROUND = { width: "44px", height: "44px", borderRadius: "22px", border: 0, display: "grid", placeItems: "center", background: "rgba(0,0,0,.38)", color: WHITE, cursor: "pointer", padding: 0 } as const;
 
 type Press = { timer: ReturnType<typeof setTimeout> | null; holding: boolean; y: number; z: number; video: boolean; moved: boolean };
+/** A finger kept by the element it pressed, even off it — a pointer already gone (a quick tap) is none to keep. */
+const hold = (e: ReactPointerEvent<HTMLElement>) => { try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* gone already */ } };
 
 function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId: string; warn: (text: string) => void }) {
   const video = useRef<HTMLVideoElement | null>(null);
@@ -267,7 +269,7 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
   // on the Video side, pressed while recording — and slid up, it zooms in; down, back out.
   const down = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (status !== "live") return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    hold(e);
     const p: Press = { timer: null, holding: false, y: e.clientY, z: zoomNow.current, video: mode === "video", moved: false };
     if (!p.video) p.timer = setTimeout(() => { p.timer = null; if (press.current === p) p.holding = startRecording(); }, HOLD_MS);
     press.current = p;
@@ -306,7 +308,7 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
   };
   const fingerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    hold(e);
     fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (fingers.current.size === 2) pinch.current = { spread: spread(), z: zoomNow.current };
   };
