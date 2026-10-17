@@ -24,6 +24,7 @@ import { profileVM } from "./vm/profile";
 import { chatVM } from "./vm/chat";
 import type { SalesCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
+import { useReadWhenSeen } from "../shared/seen";
 import { useCloseOnOutside } from "./outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 import { typePx } from "../shared/type";
@@ -32,7 +33,10 @@ import { useBackCloses } from "../shared/back";
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
   const chat = chatVM(ctx);
-  useFollowNewest(ui.chat, ctx.data.customers.find(c => c.id === ui.chat)?.messages.length ?? 0);
+  const open = ctx.data.customers.find(c => c.id === ui.chat);
+  useFollowNewest(ui.chat, open?.messages.length ?? 0);
+  // Read once its newest message is on screen — one's own chat only (shared/seen.ts, 2026-10-17).
+  useReadWhenSeen(ui.chat, open?.unread ?? 0, ctx.act.readChat);
   const { set } = ctx;
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
   // The phone's Back closes the chat, back to the Inbox (2026-10-15).
