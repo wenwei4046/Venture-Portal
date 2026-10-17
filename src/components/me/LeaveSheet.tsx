@@ -42,7 +42,7 @@ export function LeaveSheet({ open, data, form, set, busy, onClose, onSend }: {
         {c.halfOk ? <SegmentedControl options={['Full day', 'Morning', 'Afternoon']} value={form.half} onChange={v => set({ half: v as LeaveForm['half'] })} block /> : null}
         <div style={{ border: '1px solid var(--ds-border)', background: 'var(--ds-surface-2)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>Working days · weekends and holidays skipped</span>
+            <span style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>Work days · days off and holidays skipped</span>
             <span style={{ ...NUM, fontSize: 18 }}>{c.days > 0 ? fmtN(c.days) : '0'}</span>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>{c.balanceLine}</div>

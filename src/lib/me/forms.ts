@@ -18,8 +18,9 @@ import type { MeData, MeFair } from './types'
  */
 export function dayOf(d: MeData, day: string): { row: ScheduleDay | null; kind: OtDayType; hoursADay: number; clocks: boolean } {
   if (!d.me) return { row: null, kind: 'work', hoursADay: 8, clocks: true }
-  const info = dayInfo(d.me, day, ctxOf(d), indexMonth(d.month))
-  return { row: info.sday, kind: otDayType({ detail: {} }, info, day), hoursADay: hoursADay(info.schedule), clocks: info.assignment?.mode !== 'no_clock' }
+  const idx = indexMonth(d.month)
+  const info = dayInfo(d.me, day, ctxOf(d), idx)
+  return { row: info.sday, kind: otDayType(info, idx.overrides.get(day)?.code), hoursADay: hoursADay(info.schedule), clocks: info.assignment?.mode !== 'no_clock' }
 }
 
 // ── Overtime ────────────────────────────────────────────────────────────────

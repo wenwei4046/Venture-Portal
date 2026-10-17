@@ -1,4 +1,4 @@
-import { addDays, assignmentFor, balanceOf, entitlement, scheduleDay, statesCover, type Balance } from '@/lib/attendance/engine'
+import { balanceOf, entitlement, leaveDaysFor, type Balance } from '@/lib/attendance/engine'
 import type { AttLeaveType, AttRequest } from '@/lib/attendance/types'
 import { fmtN } from './format'
 import { configOf } from './month'
@@ -100,24 +100,10 @@ export function footnote(d: MeData): string {
 
 // ── Apply for leave ─────────────────────────────────────────────────────────
 
-/** The days a request takes: the schedule's work days less holidays (or every day, for a type counted in calendar days). */
+/** The days a request takes: the schedule's work days less holidays (or every day, for a type counted in calendar days) — `leaveDaysFor`, as HR counts them. */
 export function leaveDays(d: MeData, code: string, from: string, to: string): number {
   if (!d.me || to < from) return -1
-  const type = d.leaveTypes.find(t => t.code === code)
-  const calendar = type?.counts === 'calendar'
-  let n = 0
-  for (let day = from; day <= to; day = addDays(day, 1)) {
-    if (calendar) { n++; continue }
-    const a = assignmentFor(d.me, day, d.assignments)
-    const sched = a?.scheduleId ? d.schedules.find(s => s.id === a.scheduleId) ?? null : null
-    const loc = a?.locationId ? d.locations.find(l => l.id === a.locationId) ?? null : null
-    const row = scheduleDay(sched, day)
-    const w = new Date(`${day}T00:00:00Z`).getUTCDay()
-    const work = row ? row.type === 'work' : w !== 0 && w !== 6
-    const holiday = d.holidays.some(h => h.day === day && statesCover(h.states, loc?.state))
-    if (work && !holiday) n++
-  }
-  return n
+  return leaveDaysFor(d.me, from, to, d, { calendar: d.leaveTypes.find(t => t.code === code)?.counts === 'calendar' })
 }
 
 export interface LeaveForm {
