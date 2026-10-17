@@ -23,7 +23,6 @@ import {
   canAccessDirectorPool,
   canAccessDirectorSalary,
   canAccessDocumentation,
-  canAccessMyBilling,
   canAccessOpex,
   canAccessReconciliation,
   canAccessReports,
@@ -155,7 +154,6 @@ const isHR = (v: NavViewer) => v.role === 'hr'
  *  Principal): Dept Pool lists each department's own P&L and Cash Flow
  *  (2026-10-09, user: 我要把每个 department 的 cash flow, P&L 放过来). */
 export const readsDeptStatements = (v: NavViewer) => canDo(v, 'dept_pool', 'view') && reportsCompanyWide(v)
-const keepsPoolBases = (v: NavViewer) => canAccessDeptPool(v) && !readsDeptStatements(v)
 const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
 
 /**
@@ -326,11 +324,6 @@ function navEntries(data: NavData): NavEntry[] {
       section: 'Departments',
       visible: canAccessDeptPool,
       children: [
-        // A department manager (and whoever reads one department, or no
-        // reports) keeps the two bases. Listed first so the activity log keeps
-        // naming /dept-pool "Dept Pool · Cash".
-        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: keepsPoolBases },
-        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: keepsPoolBases },
         // Whoever reads them all (2026-10-09): the overview — Cash | Accrual
         // P&L switched in its head — then each department's own P&L and Cash
         // Flow. A department still lights on the pool page it already had.
@@ -354,16 +347,11 @@ function navEntries(data: NavData): NavEntry[] {
     // when reasoning about money flow. Not under Treasury — Loo grouped it here.
     { href: '/venture-pool', label: 'Venture Pool', section: 'Departments', visible: canAccessVenturePool },
     // OPEX shows a department's payroll breakdown (per-employee Basic / KPI /
-    // Allowance / ER statutory). Dept Manager sees own dept only; Principal
-    // picks any dept via the in-page switcher.
+    // Allowance / ER statutory); whoever reads it picks the department in the
+    // page's switcher.
     { href: '/opex', label: 'OPEX', section: 'Departments', visible: canAccessOpex },
-    // Dept-manager billing workbench (2026-08-20): own-segment invoices with
-    // 回款 status, 开单 (draft-only), contract tracking with expiry.
-    { href: '/my-billing', label: 'My Billing', section: 'Departments', visible: canAccessMyBilling },
-    // Marketing dept_manager can create service contracts for their dept
-    // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
-    // clicking this would hit notFound().
-    { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: canAccessMyBilling },
+    // My Billing and its New Contract (the Dept Manager's, 2026-08-20) went
+    // with the kind (2026-10-17); a contract is made from Invoices.
     {
       label: 'Director',
       section: 'Departments',
@@ -463,18 +451,14 @@ function navEntries(data: NavData): NavEntry[] {
     {
       label: 'Reports',
       section: 'Reports & Admin',
-      // dept_manager sees the group for their own-department reports (P&L / Cash
-      // Flow / Debtor Aging); the whole-company reports below stay principal/finance.
       visible: canAccessDeptReports,
       children: [
         // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
         // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
         // no longer need their own sidebar rows.
-        // P&L opens month by month for whoever reads the reports company-wide
-        // (2026-10-09, the Finance revamp handoff: "P&L defaults to Monthly
-        // P&L"); a department manager's still opens their single month.
+        // P&L opens month by month (2026-10-09, the Finance revamp handoff:
+        // "P&L defaults to Monthly P&L").
         { href: '/reports/monthly-pnl', label: 'P&L', alsoPaths: ['/reports/income-statement'], visible: canAccessReports },
-        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: (v) => canAccessDeptReports(v) && !canAccessReports(v) },
         { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
         { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
@@ -655,18 +639,10 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
   ],
-  // Dept managers see one department. Billing and OPEX are the two pages they
-  // live in; reports is their read-only rollup.
-  dept_manager: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/my-billing', label: '账单', icon: 'billing' },
-    { href: '/opex', label: 'OPEX', icon: 'staff' },
-    { href: '/reports/income-statement', label: '报表', icon: 'report' },
-  ],
 }
 
 export function tabsForRole(role: UserRole): TabDef[] {
-  return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.dept_manager
+  return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.staff
 }
 
 /** The fifth tab's label. Finance's and the Principal's bar reads in English

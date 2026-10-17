@@ -115,9 +115,8 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
       tone: 'slate',
       items: [
         link('ledger', 'General Ledger', 'doc', '/reports/ledger', canAccessReports),
-        // Month by month for whoever reads the reports company-wide; a department's own reader keeps the single month.
+        // Month by month (the single month is its toggle).
         link('pnl', 'P&L', 'report', '/reports/monthly-pnl', canAccessReports, (p) => under(p, '/reports/monthly-pnl') || under(p, '/reports/income-statement')),
-        link('pnl-month', 'P&L', 'report', '/reports/income-statement', (v) => canAccessDeptReports(v) && !canAccessReports(v), (p) => under(p, '/reports/income-statement') || under(p, '/reports/monthly-pnl')),
         link('cf', 'Cash Flow', 'in', '/reports/cash-flow', canAccessDeptReports, (p) => under(p, '/reports/cash-flow') || under(p, '/reports/monthly-cash-flow')),
         link('rp', 'Receipt & Payment', 'receipt', '/reports/receipt-payment', canAccessDeptReports, (p) => under(p, '/reports/receipt-payment') || under(p, '/reports/monthly-receipt-payment')),
         link('bs', 'Balance Sheet', 'tree', '/reports/balance-sheet', canAccessReports),

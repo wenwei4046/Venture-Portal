@@ -204,23 +204,11 @@ export function canAccessOpex(u: PermissionHolder): boolean {
   return can(u, 'opex')
 }
 
-export function canAccessMyBilling(u: PermissionHolder): boolean {
-  return can(u, 'my_billing')
-}
-
-// The one thing still keyed off the role: a dept manager's pages read their
-// own `department_id`, and 16 RLS policies scope rows the same way. No
-// permission expresses "their own department", so this stays.
-export function isDeptManager(role: UserRole): boolean {
-  return role === 'dept_manager'
-}
-
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     principal: 'Principal',
     finance: 'Finance',
     hr: 'HR',
-    dept_manager: 'Dept Manager',
     revenue_member: 'Revenue Member',
     staff: 'Staff',
   }

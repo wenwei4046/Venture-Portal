@@ -1,4 +1,4 @@
-import { canDo, type ActionHolder, type FunctionKey } from '@/lib/permission-actions'
+import { canDo, type ActionHolder } from '@/lib/permission-actions'
 
 // What a page shows somebody and lets them do, read off their own cells —
 // never off their account's KIND (2026-10-09, Q7 of the People Management
@@ -16,18 +16,17 @@ import { canDo, type ActionHolder, type FunctionKey } from '@/lib/permission-act
 // as switch, the Principal's own powers (reopen a closed month, approve what
 // they raised themselves), labels and the phone's tab bar.
 
-export type OverviewKind = 'treasury' | 'hr' | 'department' | 'none'
+export type OverviewKind = 'treasury' | 'hr' | 'none'
 
 /**
  * Which Overview to draw: the treasury one for anybody who reads the treasury
  * (it is the company's money — Principal, Finance, a Director), else HR's for
- * whoever reads payroll, else a department's for whoever reads their own
- * department's pool, else none.
+ * whoever reads payroll, else none. (A department's own Overview went with the
+ * Dept Manager, 2026-10-17.)
  */
 export function overviewFor(holder: ActionHolder): OverviewKind {
   if (canDo(holder, 'treasury', 'view')) return 'treasury'
   if (canDo(holder, 'hr_costing', 'view')) return 'hr'
-  if (canDo(holder, 'dept_pool', 'view', 'own')) return 'department'
   return 'none'
 }
 
@@ -46,12 +45,12 @@ export function raisesForSignOff(holder: ActionHolder): boolean {
 }
 
 /**
- * Reads `fn` for their own department (or themselves) only — the old
- * `dept_manager`. Through `canDo`, so a cell held back (its pages not open to
- * them) reads as no reach at all, not as their department.
+ * Reads every department's pool — Dept Pool · View at All. Since the Dept Manager went (2026-10-17 — the user:
+ * "全删"), the pool pages are for this reader alone: anybody short of All reads none of them, never their own
+ * department's (no page draws that any more).
  */
-export function ownDepartmentOnly(holder: ActionHolder, fn: FunctionKey): boolean {
-  return canDo(holder, fn, 'view', 'own') && !canDo(holder, fn, 'view', 'all')
+export function readsEveryPool(holder: ActionHolder): boolean {
+  return canDo(holder, 'dept_pool', 'view', 'all')
 }
 
 /**
@@ -61,11 +60,6 @@ export function ownDepartmentOnly(holder: ActionHolder, fn: FunctionKey): boolea
  */
 export function decidesPoolClaims(holder: ActionHolder): boolean {
   return canDo(holder, 'claims', 'approve') && canDo(holder, 'treasury', 'view')
-}
-
-/** Raises their own department's requests (My Billing · Create at Dept) — the request tabs and expense form. */
-export function raisesDepartmentRequests(holder: ActionHolder): boolean {
-  return canDo(holder, 'my_billing', 'create', 'dept')
 }
 
 /** Every Settings tab (Settings · Manage); otherwise Finance's chart-of-accounts tabs. */
