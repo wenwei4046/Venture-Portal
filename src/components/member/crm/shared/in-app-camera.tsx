@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { createPortal } from "react-dom";
 import { useBackCloses } from "./back";
 import { typePx } from "./type";
+import { useStatusBarHold } from "@/components/pwa/status-bar";
 import {
   HOLD_MS, MAX_RECORD_S, MIN_RECORD_MS, cameraOpenFor, clampZoom, closeInAppCamera, cropOf, handToChat, openSystemCamera, pinchZoom,
   recClock, recordType, shotName, slideZoom, subscribeCamera, zoomLabel, zoomRangeOf, type ZoomRange,
@@ -34,6 +35,8 @@ export function InAppCamera({ inputId, galleryId, warn }: { inputId: string; gal
   // screen: one that mounts afresh at each opening would take its history step back at once wherever React mounts a
   // screen twice to check it (development), and the camera closed as it opened.
   useBackCloses(open, closeInAppCamera, "crmCamera");
+  // Black to the top of the screen, the phone's status bar too (pwa/status-bar.ts › holdStatusBar).
+  useStatusBarHold(open ? "#000000" : null);
   if (!open || typeof document === "undefined") return null;
   return createPortal(<CameraScreen inputId={inputId} galleryId={galleryId} warn={warn} />, document.body);
 }

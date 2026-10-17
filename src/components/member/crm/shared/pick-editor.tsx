@@ -11,6 +11,7 @@ import { filmStrip, lengthOf, STRIP_TILES } from "./film-strip";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
 import { typePx } from "./type";
+import { useStatusBarHold } from "@/components/pwa/status-bar";
 
 /**
  * The preview as WhatsApp's editor, full screen (the owner, 2026-10-14, with WhatsApp's photo and video editors beside
@@ -101,6 +102,8 @@ export function PickEditor({ pk }: { pk: PickVM }) {
   const setEdits = (e: PhotoEdits) => update({ edits: e, fill916: false });
   useEffect(() => { setMode(""); setTextEd(null); }, [at]);
   useEffect(() => () => { uprights.clear(); strips.clear(); }, []);
+  // Black to the top of the screen, the phone's status bar too (pwa/status-bar.ts › holdStatusBar).
+  useStatusBarHold("#000000");
 
   const save = async () => {
     if (saving) return;

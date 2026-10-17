@@ -18,6 +18,7 @@ vi.mock("./film-strip", async importOriginal => {
 });
 
 import { PickEditor } from "./pick-editor";
+import { paintStatusBar } from "@/components/pwa/status-bar";
 import { noEdits, type PhotoEdits } from "./edit-render";
 import { pickVM, type Picked, type PickedItem } from "./pick";
 
@@ -63,6 +64,17 @@ describe("a picked video in the editor", () => {
     expect(v.style.objectFit).toBe("contain");
     expect(v.style.maxHeight).toBe("");
     expect((v.parentElement as HTMLElement).style.paddingTop).toBe("");
+  });
+
+  it("holds the phone's status bar black while it is on, the chat's colour again once it goes (2026-10-18)", () => {
+    document.head.innerHTML = '<meta name="theme-color" content="#ffffff">';
+    paintStatusBar("rgb(255, 255, 255)");
+    const bar = () => document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content;
+    const { unmount } = render(<Editor item={{ seconds: 10 }} />);
+    expect(bar()).toBe("#000000");
+    unmount();
+    expect(bar()).toBe("rgb(255, 255, 255)");
+    paintStatusBar(null);
   });
 
   it("plays at a tap of Play and pauses at a tap on the video; Play shows only while it is paused", () => {
