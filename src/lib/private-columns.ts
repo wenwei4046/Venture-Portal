@@ -26,7 +26,7 @@ export type PrivateTable = keyof typeof PRIVATE_COLUMNS
  * and listed here when a page needs it.
  */
 export const STAFF_ROW_COLUMNS =
-  'id, employee_name, department_id, basic_salary, allowances, epf_er, socso_er, eis_er, total_ctc, status, created_by, created_at, updated_at, non_statutory_allowance, employee_code, hire_date, resignation_date, epf_category, socso_category, is_epf_exempt, pcb_category, children_count, employment_type, bank_name, address, contact_number, email, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, designation, tax_mode, withholding_rate, title_id, user_id, reports_to, bank_name_2, infotech_code, home_sub_department_id'
+  'id, employee_name, department_id, basic_salary, allowances, epf_er, socso_er, eis_er, total_ctc, status, created_by, created_at, updated_at, non_statutory_allowance, employee_code, hire_date, resignation_date, epf_category, socso_category, is_epf_exempt, pcb_category, children_count, employment_type, bank_name, address, contact_number, email, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, designation, tax_mode, withholding_rate, title_id, user_id, reports_to, bank_name_2, infotech_code, home_sub_department_id, first_name, last_name'
 
 /** Every column of a director but the NRIC. */
 export const DIRECTOR_ROW_COLUMNS =

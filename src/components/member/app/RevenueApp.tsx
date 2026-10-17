@@ -14,7 +14,8 @@ import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
-import { firstName, greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
+import { greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
+import { greetingName } from "@/lib/person-name";
 import { PRODUCTS_PATH, appHref, productsHref, useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
 import { ProductShellContext, type ProductShell } from "./product-shell";
 import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
@@ -334,9 +335,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const director = !principal && !!membership?.director;
 
   const me: Me = useMemo(() => {
-    if (viewed) return { name: viewed.name, first: firstName(viewed.name), ini: initials(viewed.name), title: viewed.title, rank: viewed.rank };
-    if (principal) return { name: data.profile.name || "Principal", first: firstName(data.profile.name || "Principal"), ini: initials(data.profile.name || "PR"), title: "Principal", rank: "All access" };
-    return { name: data.profile.name, first: firstName(data.profile.name), ini: initials(data.profile.name), title: membership?.title ?? "", rank: membership?.rank ?? "" };
+    // The greeting's name is one word (2026-10-17, the user: "只放一个字就好 … 只放 first name"): the first name People
+    // keeps, else the full name's first — "Hello, LOO", never "Hello, LOO WEN".
+    if (viewed) return { name: viewed.name, first: greetingName(viewed.name), ini: initials(viewed.name), title: viewed.title, rank: viewed.rank };
+    if (principal) return { name: data.profile.name || "Principal", first: greetingName(data.profile.name || "Principal", data.profile.firstName), ini: initials(data.profile.name || "PR"), title: "Principal", rank: "All access" };
+    return { name: data.profile.name, first: greetingName(data.profile.name, data.profile.firstName), ini: initials(data.profile.name), title: membership?.title ?? "", rank: membership?.rank ?? "" };
   }, [viewed, principal, data.profile.name, membership]);
 
   // ── the month being worked: last month while it is still being closed ──

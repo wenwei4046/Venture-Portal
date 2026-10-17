@@ -20,6 +20,7 @@ import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { initialsOf } from '@/lib/people-roster'
+import { keptParts } from '@/lib/person-name'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
 import type { UplineGroup } from '@/lib/upline-choices'
 import {
@@ -63,6 +64,9 @@ import s from './person-record.module.css'
 /** What the page reads, worded — and masked — by the server as this viewer may see it. */
 export interface PersonRecordView {
   name: string
+  /** What the apps call them (2026-10-17) — the full name above stays the one on their IC. */
+  firstName: string | null
+  lastName: string | null
   department: string
   code: string | null
   title: string | null
@@ -421,6 +425,20 @@ export default function PersonRecord({
   const wells = (
     <div className={s.wells}>
       <Well title="Identity" icon="idCard">
+        {/* First and last name (2026-10-17, the user: "大家的名字需要拆分为 first name 和 last name"): what the apps
+            call them — the Revenue app greets by the first. Filled from the full name's first word and the rest. */}
+        <Fact
+          label="First Name"
+          field="first_name"
+          value={view.firstName}
+          edit={e => <TextField name="first_name" defaultValue={keptParts(e.staff).first} maxLength={80} autoComplete="off" />}
+        />
+        <Fact
+          label="Last Name"
+          field="last_name"
+          value={view.lastName}
+          edit={e => <TextField name="last_name" defaultValue={keptParts(e.staff).last} maxLength={120} autoComplete="off" />}
+        />
         <Fact
           label="NRIC"
           field="nric"

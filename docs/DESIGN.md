@@ -228,7 +228,7 @@ No coloured shadow other than the Revenue accent's.
 - **Plain, factual English**, written like a careful office manager, in sentence case ("Invite user", "Save October brand weeks").
 - **Uppercase only as a typographic device:** eyebrows (PEOPLE · MANAGEMENT), small section labels, wordmarks, table head bands.
 - **The middle dot `·` joins facts:** "Sat, 3 Oct · Senior Executive · Rank B".
-- **The app speaks to *you*** ("Your workspace", "Hello, Jia Hui"), and the greeting bar is formal ("Good afternoon, Principal.").
+- **The app speaks to *you*** ("Your workspace", "Hello, Jia Hui"), and the greeting bar is formal ("Good afternoon, Principal."). The name in *Hello,* is ONE word — the first name People keeps, else the full name's first (v4.87: "Hello, LOO", never "Hello, LOO WEN").
   - No "I".
   - No exclamation marks — the one exception is "Congratulations on your sale!".
 - **A state says what to do:** "Replacement needs info — HR returned it", "Read-only while viewing as", "Nobody matches the current filter."
@@ -1292,7 +1292,7 @@ The dense kit for lists of short strings, never money. It now serves the payroll
   - **A link never used** reads *Invited* in Last seen (amber, the tile without its rim) and in the person window's login chip; *With a login* notes "N invited". Right-click *Invite again*, or the window's foot: the same window over the login's own email (fixed), a new link or a password now (*Set password*).
 - **The full page is a 360** (v4.63, the user's option C; `PersonRecord`, `person-record.module.css`). Its head is a card, not a `.page-head`.
   - **The card** (left, 280–340px, white, framed, radius 12; sticky from 1200px while it reads): their tile (64px, an orange rim on peach while they can sign in), the eyebrow, the name (Newsreader 30), code · title, the window's chips (Active / Resigned / Inactive, Has login / Login disabled / No login), *Edit* and *Invite* full width, then Department · Reports to (a link to their page, their title under it) · Level · Employment Type · Hire Date (with how long, "9 months").
-  - **The record** (right) in wells — panel grey, hairline, radius 12, two to a row where they fit, one to a row while editing: Identity · Contact · Emergency contact · Bank accounts · Salary · Statutory, each fact's label over its value, two to a row.
+  - **The record** (right) in wells — panel grey, hairline, radius 12, two to a row where they fit, one to a row while editing: Identity · Contact · Emergency contact · Bank accounts · Salary · Statutory, each fact's label over its value, two to a row. Identity opens on **First Name · Last Name** (v4.87 — what the apps call them; the full name in the card stays the one on their IC).
   - **The words** (the user's reference, 2026-10-16): a well's title 12px / 600 / .09em capitals beside its 15px icon (`idCard`, `phone`, `buoy`, `bank`, `payroll`, `shield` — kit icons); a label 11px / 500 / .08em capitals in brown over a 14.5px value in ink (13.5px mono for codes and numbers); an empty value a faint dash.
   - No Account and no Role (v4.63): the login's email is their Contact email and its role follows the title's template. **Reports to** is set here — a soft dropdown of "— None", then the uplines a department at a time, theirs first, and last a group *Can’t be their upline* greyed with why ("in their team", "lower level", "cannot lead").
   - The record keeps ONE element at the page's top level in both modes: the portal settles a newly inserted top-level block in from nothing (`route-fade`), so a form put there by *Edit* made the whole record blink.
@@ -1657,6 +1657,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.87** · 2026-10-17 · A person has a First Name and a Last Name (the user: "大家的名字需要拆分为 first name 和 last name … 只放 first name"): Identity opens on the two, filled from the full name's first word and the rest, HR's to change; the Revenue app's *Hello,* is the first name — one word → People › a person's page; Voice
 - **v4.86** · 2026-10-17 · The Finance app's Me card is a slim bar (the user: "这个 bar 本身太大了，做小一点"): one row in the page's 16px margins — the clock, the day over its line, a small *Clock in* — 42px where it took 91 → Me
 - **v4.85** · 2026-10-17 · One Edit profile (the user: "finance app 他原本的那个profile就不需要了，帮我删除掉，留new de 就好", on the computer too): Me › Profile's, which HR approves; the Finance app's Profile and the desktop's account menu lose theirs → Finance's view — its own shell
 - **v4.84** · 2026-10-17 · OT is paid as Me's sheet says (the user: "q1 我要跟着表格的pay"): the smaller of approved and punched — past the schedule's end on a work day, IN to OUT on any other — rounded down to 30 minutes; a rest day half a day, a day, then 2 × beyond. The sheet's words follow the day (*Every hour counts*, *punched from IN to OUT*; *Paid = the hours approved.* on fixed hours); Me's OT paid, day card and payslip note say the hours paid → Me

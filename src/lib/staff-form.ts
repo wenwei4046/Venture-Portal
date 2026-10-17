@@ -239,6 +239,9 @@ export interface TitleRow extends TitleOption {
 export interface StaffRow {
   id: string
   employee_name: string
+  /** What the apps call them (2026-10-17): filled from the full name's first word and the rest, HR's to change. */
+  first_name?: string | null
+  last_name?: string | null
   designation: string | null
   department_id: string
   department_name: string
