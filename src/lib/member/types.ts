@@ -238,7 +238,7 @@ export interface MemberData {
     id: string;
     userId: string;
     name: string;
-    /** What the app greets them by (2026-10-17): the first name People keeps — one word, never "LOO WEN". */
+    /** What the app greets them by (2026-10-17): the first name People keeps — WEN WEI for LOO WEN WEI, never "LOO WEN". */
     firstName?: string;
     email: string;
     salary: number | null;
