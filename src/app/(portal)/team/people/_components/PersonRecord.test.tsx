@@ -206,27 +206,28 @@ describe('Reports to', () => {
 
 // 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change email"
 // — somebody who signs in signs in with their Contact email.
-// The user, 2026-10-17: "大家的名字需要拆分为 first name 和 last name" — the Revenue app greets by the first.
+// The user, 2026-10-17: "大家的名字需要拆分为 first name 和 last name" — the Revenue app greets by the first; "full name =
+// loo wen wei, wen wei ( first name ) , loo ( last name )".
 describe('First Name and Last Name', () => {
   it('read in Identity — the full name stays the page’s title', () => {
-    render(<PersonRecord view={view({ name: 'LOO WEN WEI', firstName: 'LOO', lastName: 'WEN WEI' })} editor={null} inviteHref={null} />)
+    render(<PersonRecord view={view({ name: 'LOO WEN WEI', firstName: 'WEN WEI', lastName: 'LOO' })} editor={null} inviteHref={null} />)
     const identity = screen.getByRole('heading', { level: 2, name: 'Identity' }).closest('section') ?? document.body
-    expect(within(identity as HTMLElement).getByText('LOO')).toBeInTheDocument()
     expect(within(identity as HTMLElement).getByText('WEN WEI')).toBeInTheDocument()
+    expect(within(identity as HTMLElement).getByText('LOO')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'LOO WEN WEI' })).toBeInTheDocument()
   })
   it('edited, each is a field holding what the record keeps, and only a changed one is sent', async () => {
-    openEditor(view({ name: 'WONG JOEY', firstName: 'WONG', lastName: 'JOEY' }), editor({ employee_name: 'WONG JOEY', first_name: 'WONG', last_name: 'JOEY' }))
-    expect(screen.getByLabelText('First Name')).toHaveValue('WONG')
-    expect(screen.getByLabelText('Last Name')).toHaveValue('JOEY')
-    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'JOEY' } })
+    openEditor(view({ name: 'GOH JOEY', firstName: 'JOEY', lastName: 'GOH' }), editor({ employee_name: 'GOH JOEY', first_name: 'JOEY', last_name: 'GOH' }))
+    expect(screen.getByLabelText('First Name')).toHaveValue('JOEY')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('GOH')
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Joey' } })
     expect(screen.getByLabelText('First Name')).toHaveAttribute('data-dirty', 'true')
-    expect(await save()).toEqual({ first_name: 'JOEY' })
+    expect(await save()).toEqual({ first_name: 'Joey' })
   })
-  it('a record read before they were filled starts from the full name’s parts', () => {
+  it('a record read before they were filled starts from the full name’s parts — their own name first', () => {
     openEditor(view({ name: 'LOO WEN WEI' }), editor({ employee_name: 'LOO WEN WEI', first_name: null, last_name: null }))
-    expect(screen.getByLabelText('First Name')).toHaveValue('LOO')
-    expect(screen.getByLabelText('Last Name')).toHaveValue('WEN WEI')
+    expect(screen.getByLabelText('First Name')).toHaveValue('WEN WEI')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('LOO')
     expect(within(bar()).getByText(/No changes/)).toBeInTheDocument()
   })
 })

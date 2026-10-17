@@ -335,8 +335,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const director = !principal && !!membership?.director;
 
   const me: Me = useMemo(() => {
-    // The greeting's name is one word (2026-10-17, the user: "只放一个字就好 … 只放 first name"): the first name People
-    // keeps, else the full name's first — "Hello, LOO", never "Hello, LOO WEN".
+    // The greeting's name is the first name (2026-10-17, the user: "只放 first name" — "full name = loo wen wei, wen wei
+    // ( first name ) , loo ( last name )"): the one People keeps, else the full name's — "Hello, WEN WEI", never "Hello, LOO WEN".
     if (viewed) return { name: viewed.name, first: greetingName(viewed.name), ini: initials(viewed.name), title: viewed.title, rank: viewed.rank };
     if (principal) return { name: data.profile.name || "Principal", first: greetingName(data.profile.name || "Principal", data.profile.firstName), ini: initials(data.profile.name || "PR"), title: "Principal", rank: "All access" };
     return { name: data.profile.name, first: greetingName(data.profile.name, data.profile.firstName), ini: initials(data.profile.name), title: membership?.title ?? "", rank: membership?.rank ?? "" };
