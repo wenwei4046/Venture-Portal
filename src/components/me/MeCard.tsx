@@ -18,8 +18,9 @@ const ONE_LINE = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'elli
  * nothing to punch), never while viewing as somebody.
  *
  * A bar, not a card (2026-10-17 — the user, on an iPhone: "这个 bar 本身太大了，做小一点"): one row inside the page's
- * 16px margins like the cards around it — the clock, the day and its line beside it, a small *Clock in* — half the
- * height the hub's card takes.
+ * 16px margins like the cards around it — the clock, the day and its line beside it, a small *Clock in*. At 42 px it
+ * was then "too narrow" ("let the bar thicker a bit"): 56 px, its clock and lines a step larger — still well under the
+ * hub's card (91).
  */
 export function MeCard({ backLabel = 'Profile' }: { backLabel?: string }) {
   const me = useMe(true)
@@ -35,17 +36,17 @@ export function MeCard({ backLabel = 'Profile' }: { backLabel?: string }) {
   return (
     <>
       <div role="button" tabIndex={0} aria-label="Open Me" onClick={() => enter(null)} onKeyDown={e => { if (e.key === 'Enter') enter(null) }} data-me=""
-        style={{ borderRadius: 12, background: 'var(--ds-dark)', color: 'var(--ds-on-dark)', padding: '7px 10px 7px 14px', minHeight: 32, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'var(--ds-font-body)', margin: '12px 16px 0' }}>
-        <span style={{ ...NUM, fontSize: 18, lineHeight: 1, flex: 'none' }}>{hm(nowSec)}</span>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ ...ONE_LINE, fontSize: 9.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ds-dark-sub)' }}>Today · {card.chip}</span>
-          <span style={{ ...ONE_LINE, fontSize: 12, color: 'var(--ds-dark-sub)' }}>{card.line}</span>
+        style={{ borderRadius: 14, background: 'var(--ds-dark)', color: 'var(--ds-on-dark)', padding: '12px 12px 12px 16px', minHeight: 32, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', fontFamily: 'var(--ds-font-body)', margin: '12px 16px 0' }}>
+        <span style={{ ...NUM, fontSize: 21, lineHeight: 1, flex: 'none' }}>{hm(nowSec)}</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span style={{ ...ONE_LINE, fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ds-dark-sub)' }}>Today · {card.chip}</span>
+          <span style={{ ...ONE_LINE, fontSize: 13, color: 'var(--ds-dark-sub)' }}>{card.line}</span>
         </div>
         {card.punch ? (
           <span onClick={e => e.stopPropagation()} style={{ flex: 'none' }}>
             <Button size="sm" onClick={() => enter(card.punch)}>{card.punch === 'in' ? 'Clock in' : 'Clock out'}</Button>
           </span>
-        ) : <span aria-hidden="true" style={{ color: 'var(--ds-dark-sub)', fontSize: 18, flex: 'none' }}>›</span>}
+        ) : <span aria-hidden="true" style={{ color: 'var(--ds-dark-sub)', fontSize: 20, flex: 'none' }}>›</span>}
       </div>
       <MeOverlay me={me} open={open} onClose={() => { setOpen(false); setPunch(null); askedDone() }} backLabel={backLabel} startPunch={punch} startRequest={asked} />
     </>
