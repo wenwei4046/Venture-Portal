@@ -77,7 +77,7 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
     const turned = (track.rotation ?? 0) !== 0;
     let copyFile: File | null = null;
     if (!look && track.codec === "avc" && estimate <= maxBytes * 0.97) {
-      if (!cut && isMp4 && !turned && !("audio" in aac)) return { ok: true, file };
+      if (!cut && isMp4 && !turned && !("audio" in aac) && !(await isFragmentedMp4(file))) return { ok: true, file };
       const copy = await convert(mb, input, file, { ...trim, ...audio, ...aac }, onProgress);
       if (copy.file && copy.file.size <= maxBytes) {
         if (!turned) return { ok: true, file: copy.file };
@@ -120,6 +120,28 @@ export async function fitVideo(file: File, channelMax: number, channelName: stri
 }
 
 const HEVC = "This is an iPhone High Efficiency video, which this phone cannot convert for WhatsApp. On the iPhone: Settings › Camera › Formats › Most Compatible, then record it again.";
+
+/**
+ * A fragmented MP4 — what a phone's browser records (MediaRecorder: Chrome on Android, Safari on an iPhone): its
+ * pictures sit in fragments (`moof`) after an index (`moov`) that lists none. WhatsApp refuses it — "No video stream
+ * found in given video file" and "Media file scrutiny … failed" (131053, 2026-10-17: both videos the owner filmed with
+ * the CRM's camera on Android went as they were) — so such a file is copied into a plain MP4 first, as it is (no
+ * quality lost). Only the top-level boxes' headers are read.
+ */
+export async function isFragmentedMp4(file: Blob): Promise<boolean> {
+  let at = 0;
+  for (let i = 0; i < 64 && at + 8 <= file.size; i++) {
+    const head = new DataView(await file.slice(at, at + 16).arrayBuffer());
+    const type = String.fromCharCode(head.getUint8(4), head.getUint8(5), head.getUint8(6), head.getUint8(7));
+    if (type === "moof") return true;
+    let size = head.getUint32(0);
+    if (size === 1 && head.byteLength >= 16) size = Number(head.getBigUint64(8));
+    // 0 runs to the end of the file; anything under a box's own header is not a box.
+    if (size < 8) return false;
+    at += size;
+  }
+  return false;
+}
 
 /**
  * A voice note as WhatsApp plays it as a voice message (2026-10-14: the iPhone's recording — a fragmented MP4 — came

@@ -117,9 +117,12 @@ export function handToChat(inputId: string, file: File): boolean {
 // upwards it will zoom in") ─────────────────────────────────────────────────────────────────────────────────────────
 
 /** The camera's own zoom where the phone lends it (the track's `zoom`, Android), up to 10×; else the app's — the
- * picture's middle, cropped — up to 4×, beyond which there is nothing left to see. */
+ * picture's middle, cropped — up to 4×, beyond which there is nothing left to see. The app's own moves in hundredths
+ * (2026-10-17 — the owner on an iPhone, which has only this one: "zoom in 的时候一卡一卡的"): in tenths the picture
+ * jumped a tenth bigger at a time. */
 export const NATIVE_MAX_ZOOM = 10;
 export const DIGITAL_MAX_ZOOM = 4;
+const DIGITAL_ZOOM_STEP = 0.01;
 export type ZoomRange = { min: number; max: number; step: number; native: boolean };
 type ZoomCaps = { zoom?: { min?: number; max?: number; step?: number } } | null | undefined;
 export function zoomRangeOf(caps: ZoomCaps): ZoomRange {
@@ -127,7 +130,7 @@ export function zoomRangeOf(caps: ZoomCaps): ZoomRange {
   if (z && typeof z.min === "number" && typeof z.max === "number" && z.max > z.min) {
     return { min: z.min, max: Math.min(z.max, Math.max(z.min, NATIVE_MAX_ZOOM)), step: z.step && z.step > 0 ? z.step : 0.1, native: true };
   }
-  return { min: 1, max: DIGITAL_MAX_ZOOM, step: 0.1, native: false };
+  return { min: 1, max: DIGITAL_MAX_ZOOM, step: DIGITAL_ZOOM_STEP, native: false };
 }
 export function clampZoom(z: number, r: ZoomRange): number {
   const kept = Math.min(r.max, Math.max(r.min, Number.isFinite(z) ? z : r.min));

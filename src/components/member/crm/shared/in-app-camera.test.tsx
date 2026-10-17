@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Profiler } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The camera inside the app, as WhatsApp's (2026-10-17 — the owner: "一按相机就直接打开，拍照直接 capture。而不是先跳去系统的
@@ -247,5 +248,61 @@ describe("the camera's zoom", () => {
     fireEvent.click(screen.getByRole("button", { name: /Zoom 2.0×/ }));
     expect(screen.queryByRole("button", { name: /^Zoom/ })).toBeNull();
     expect(shown()).toContain("scale(1)");
+  });
+});
+
+// An iPhone's zoom went in jerks (2026-10-17 — the owner: "用 Apple 进行 zoom in 的时候一卡一卡的"): a page gets no lens zoom
+// there, so every step is the app's own, and each move of the finger drew the whole camera screen again — while
+// recording, beside a canvas drawn at every repaint of the screen.
+describe("the app's own zoom stays smooth", () => {
+  it("the finger moves the picture at every step; the screen is drawn again only when the pill's words change", async () => {
+    let commits = 0;
+    render(<Profiler id="camera" onRender={() => { commits++; }}><InAppCamera inputId="crm-pick-camera" galleryId="crm-pick-photo" warn={vi.fn()} /></Profiler>);
+    await act(async () => { openInAppCamera("crm-pick-camera"); });
+    await act(async () => { await Promise.resolve(); });
+    const surface = document.querySelector("[data-camera-surface]")!;
+    const scale = () => /scale\(([\d.]+)\)/.exec(document.querySelector("[data-in-app-camera] video")!.getAttribute("style") ?? "")?.[1];
+    fireEvent.pointerDown(surface, { pointerId: 11, clientX: 100, clientY: 400 });
+    fireEvent.pointerDown(surface, { pointerId: 12, clientX: 200, clientY: 400 });
+    fireEvent.pointerMove(surface, { pointerId: 12, clientX: 300, clientY: 400 });
+    expect(screen.getByRole("button", { name: /Zoom 2.0×/ })).toBeInTheDocument();
+    // 2.00× → 2.04× in ten moves: the picture follows each in hundredths, the pill stays "2.0×" — no screen drawn again.
+    const before = commits, seen: string[] = [];
+    for (let i = 1; i <= 10; i++) {
+      fireEvent.pointerMove(surface, { pointerId: 12, clientX: 300 + i * 0.4, clientY: 400 });
+      seen.push(scale() ?? "");
+    }
+    expect(seen).toEqual(["2", "2.01", "2.01", "2.02", "2.02", "2.02", "2.03", "2.03", "2.04", "2.04"]);
+    expect(screen.getByRole("button", { name: /Zoom 2.0×/ })).toBeInTheDocument();
+    expect(commits - before).toBe(0);
+  });
+
+  it("a video filmed through the canvas is drawn once for each picture the camera sends", async () => {
+    const picture = { kind: "video", stop: vi.fn() };
+    Object.defineProperty(HTMLCanvasElement.prototype, "captureStream", { configurable: true, value: () => ({ getVideoTracks: () => [picture], getTracks: () => [picture] }) });
+    class FakeMediaStream { constructor(public tracks: unknown[]) {} getTracks() { return this.tracks; } }
+    vi.stubGlobal("MediaStream", FakeMediaStream);
+    const frames: Array<() => void> = [];
+    const cancel = vi.fn();
+    Object.defineProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback", { configurable: true, value: (cb: () => void) => frames.push(cb) });
+    Object.defineProperty(HTMLVideoElement.prototype, "cancelVideoFrameCallback", { configurable: true, value: cancel });
+    const raf = vi.spyOn(window, "requestAnimationFrame");
+    const draw = vi.fn();
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { configurable: true, value: () => ({ drawImage: draw }) });
+    await openIt();
+    fireEvent.pointerDown(shutter(), { pointerId: 1, clientY: 700 });
+    await act(async () => { vi.advanceTimersByTime(HOLD_MS + 10); });
+    expect(draw).toHaveBeenCalledTimes(1);
+    // Two pictures from the camera, two drawings — none at the screen's own repaints.
+    frames.shift()!(); frames.shift()!();
+    expect(draw).toHaveBeenCalledTimes(3);
+    expect(raf.mock.calls.length).toBe(0);
+    await act(async () => { vi.advanceTimersByTime(MIN_RECORD_MS + 100); });
+    fireEvent.pointerUp(shutter(), { pointerId: 1 });
+    await act(async () => { vi.advanceTimersByTime(10); });
+    expect(cancel).toHaveBeenCalled();
+    expect(picture.stop).toHaveBeenCalled();
+    delete (HTMLVideoElement.prototype as unknown as Record<string, unknown>).requestVideoFrameCallback;
+    delete (HTMLVideoElement.prototype as unknown as Record<string, unknown>).cancelVideoFrameCallback;
   });
 });

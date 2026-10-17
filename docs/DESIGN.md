@@ -1657,6 +1657,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.93** · 2026-10-17 · The CRM chats: a message WhatsApp refused shows a "!" in a circle where the two ticks were, and *Not delivered · …* under its time in white — the Team chat too (it showed refused videos as sent); the camera's own zoom on an iPhone moves in hundredths, not tenths
 - **v4.92** · 2026-10-17 · The CRM editor's video full screen, as WhatsApp's (the owner, WhatsApp's editor beside ours: "Why is not full screen? Like this"): a picked or filmed video fills the screen at its middle as a photo does, the trim bar and the caption strip floating over it; no browser controls — a tap plays or pauses, a 64px round Play in the middle while paused, the kept part loops; the trim bar is a film strip of ten frames, dimmed outside the kept part, a white line where the video is
 - **v4.91** · 2026-10-17 · The Finance app's Me bar a step thicker (the user: "let the bar thicker as bit, too narrow"): 56px, not 42 — the clock 21px, the day 10px over its 13px line → Me
 - **v4.90** · 2026-10-17 · The schedule says which day is off (the user: "系统不可以默认哪一天是休息日 … everythings go with this schedule"): an overtime is paid as its day is on the person's schedule — no schedule, no rest day; HR's *On someone's behalf* loses its *Day* select; a leave counts the days the schedule works (*Work days · days off and holidays skipped*, Me and HR alike); Records' `W` is *Day off* → Me; Attendance

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useBackCloses } from "./back";
 import { typePx } from "./type";
@@ -78,9 +78,27 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
   const [elapsed, setElapsed] = useState(0);
   const [torch, setTorch] = useState<boolean | null>(null);
   const [flash, setFlash] = useState(false);
+  // The zoom as the pill says it (one decimal) — the screen is drawn again only when those words change.
   const [zoom, setZoomShown] = useState(1);
   const [nativeZoom, setNativeZoom] = useState(false);
+  const facingNow = useRef<Facing>("environment");
+  facingNow.current = facing;
   const canRecord = typeof MediaRecorder !== "undefined";
+
+  // The picture's zoom written straight onto the video, never through a render (2026-10-17 — the owner on an iPhone:
+  // "zoom in 的时候一卡一卡的"): the whole camera screen was drawn again at every move of the finger, and an iPhone has
+  // only the app's own zoom (no lens zoom for a page), so every step of it went that way.
+  const paint = useCallback(() => {
+    const v = video.current;
+    if (v) v.style.transform = `${facingNow.current === "user" ? "scaleX(-1) " : ""}scale(${range.current.native ? 1 : zoomNow.current})`;
+  }, []);
+  const pillZoom = useRef(1);
+  const showZoom = useCallback((z: number) => {
+    paint();
+    const words = Math.round(z * 10) / 10;
+    if (words !== pillZoom.current) { pillZoom.current = words; setZoomShown(words); }
+  }, [paint]);
+  useLayoutEffect(() => { paint(); }, [facing, nativeZoom, status, paint]);
 
   const close = useCallback(() => closeInAppCamera(), []);
 
@@ -123,9 +141,9 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
     setNativeZoom(range.current.native);
     const set = (track?.getSettings?.() ?? {}) as MediaTrackSettings & { zoom?: number };
     zoomNow.current = clampZoom(range.current.native ? set.zoom ?? range.current.min : 1, range.current);
-    setZoomShown(zoomNow.current);
+    showZoom(zoomNow.current);
     setStatus("live");
-  }, [release]);
+  }, [release, showZoom]);
 
   useEffect(() => {
     void start(facing);
@@ -158,7 +176,7 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
     const z = clampZoom(want, r);
     if (z === zoomNow.current) return;
     zoomNow.current = z;
-    setZoomShown(z);
+    showZoom(z);
     if (!r.native) return;
     const l = lens.current;
     l.want = z;
@@ -172,7 +190,7 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
       }
       l.busy = false;
     })();
-  }, []);
+  }, [showZoom]);
 
   const done = useCallback((file: File) => {
     close();
@@ -207,19 +225,28 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
     const k = Math.min(1, CANVAS_LONG_SIDE / Math.max(v.videoWidth, v.videoHeight));
     c.width = even(v.videoWidth * k);
     c.height = even(v.videoHeight * k);
-    const g = c.getContext("2d");
+    const g = c.getContext("2d", { alpha: false });
     if (!g) return s;
-    let frame = 0;
+    // Drawn once for each picture the camera sends (30 a second), not at every repaint of the screen (60 or 120): an
+    // iPhone films through here, and drawing twice as often as there were pictures took the time its zoom needed.
+    const fv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number; cancelVideoFrameCallback?: (h: number) => void };
+    const byFrame = typeof fv.requestVideoFrameCallback === "function";
+    let frame = 0, stopped = false;
     const draw = () => {
+      if (stopped) return;
       const { sx, sy, sw, sh } = cropOf(v.videoWidth, v.videoHeight, zoomNow.current);
       g.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
-      frame = requestAnimationFrame(draw);
+      frame = byFrame ? fv.requestVideoFrameCallback!(draw) : requestAnimationFrame(draw);
     };
     draw();
     let drawn: MediaStream | null = null;
     try { drawn = c.captureStream(30); } catch { drawn = null; }
     const picture = typeof drawn?.getVideoTracks === "function" ? drawn.getVideoTracks() : [];
-    drawing.current = () => { cancelAnimationFrame(frame); picture.forEach(t => t.stop()); };
+    drawing.current = () => {
+      stopped = true;
+      if (byFrame) fv.cancelVideoFrameCallback?.(frame); else cancelAnimationFrame(frame);
+      picture.forEach(t => t.stop());
+    };
     // A browser whose canvas lends no picture to record: the camera as it is.
     if (!picture.length) { stopDrawing(); return s; }
     return new MediaStream([...picture, ...s.getAudioTracks()]);
@@ -334,13 +361,13 @@ function CameraScreen({ inputId, galleryId, warn }: { inputId: string; galleryId
   const phoneCamera = () => { openSystemCamera(inputId, warn); close(); };
 
   const recording = since !== null;
-  const shownScale = nativeZoom ? 1 : zoom;
   const zoomed = zoom > range.current.min + 0.04;
   return (
     <div role="dialog" aria-modal="true" aria-label="Camera" data-in-app-camera=""
       style={{ position: "fixed", inset: 0, zIndex: 2147482100, background: "rgb(0 0 0)", color: WHITE, fontFamily: FONT, overflow: "hidden", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+      {/* Its transform (the zoom, the front camera's mirror) is written by `paint`, never by a render. */}
       <video ref={video} autoPlay playsInline muted aria-hidden="true"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transform: `${facing === "user" ? "scaleX(-1) " : ""}scale(${shownScale})`, opacity: status === "live" ? 1 : 0, transition: "opacity 120ms" }} />
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", willChange: "transform", opacity: status === "live" ? 1 : 0, transition: "opacity 120ms" }} />
       <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: WHITE, opacity: flash ? 0.85 : 0, transition: flash ? "none" : "opacity 160ms ease-out", pointerEvents: "none" }} />
       {/* The picture's own surface: two fingers here pinch the zoom. */}
       <div data-camera-surface="" aria-hidden="true" onPointerDown={fingerDown} onPointerMove={fingerMove} onPointerUp={fingerUp} onPointerCancel={fingerUp}
