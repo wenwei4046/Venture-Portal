@@ -20,7 +20,7 @@ import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor, tickPathOf } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
@@ -179,8 +179,8 @@ export function chatVM(ctx: SalesCtx) {
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
       tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
-      // Sending: a small clock until it went (then the two ticks).
-      tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
+      // Sending: a small clock until it went (then the two ticks); not delivered: a "!" (shared/chat-media.ts).
+      tickPath: tickPathOf(m.status),
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.

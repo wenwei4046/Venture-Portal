@@ -470,7 +470,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                         <path d={m.tickPath}>
                         </path>
                       </svg>
-                    </>)}</span>
+                    </>)}</span>{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "calc(11px * var(--rv-type, 1))", lineHeight: "1.35", color: "#FFFFFF" }}>{m.failNote}</span>)}
                 </div>
               </Fragment>))}
             </div></div>

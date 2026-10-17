@@ -151,7 +151,9 @@ const PATCHES = {
     // 2026-10-13: picked photos / videos wait on a preview with an HD switch (shared/pick.ts).
     ['{!!(v.hm.toast) && (<>', PICK_SHEET("v.pk") + '{!!(v.hm.toast) && (<>'],
     // 2026-10-13: a message that did not reach the customer says why under it (vm/chat.ts › failNote), not only a red tick.
-    [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/, '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#A3371A" }}>{m.failNote}</span>)}'],
+    // 2026-10-17: in white — only your own message is ever not delivered, and its bubble is orange since 2026-10-15,
+    // on which the old dark red could not be read.
+    [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/, '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#FFFFFF" }}>{m.failNote}</span>)}'],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).

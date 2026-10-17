@@ -121,3 +121,15 @@ export const MINE_TIME = "rgba(255,255,255,.82)";
 export function tickColor(status: string | undefined): string {
   return status === "read" ? "#A6DBFF" : status === "failed" ? "#FFD3C7" : "rgba(255,255,255,.82)";
 }
+
+/**
+ * The mark after your own message's time, in its 16 × 11 box: a small clock while it is sent, a "!" in a circle when it
+ * did not reach the customer, else the two ticks. Not delivered drew the two ticks too, a pale red WhatsApp's "delivered"
+ * white could not be told from on the orange (the owner, 2026-10-17: the Team chat on Android showed two videos WhatsApp
+ * had refused as sent).
+ */
+export function tickPathOf(status: string | undefined): string {
+  return status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1"
+    : status === "failed" ? "M8 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9ZM8 3.2v2.7M8 7.9v.1"
+    : "M1 6l3 3 6-7M7 8.5l.5.5 6-7";
+}
