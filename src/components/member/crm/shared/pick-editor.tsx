@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { CHAT_EMOJIS } from "./emoji";
+import { firstFrameSrc } from "./chat-media";
 import { clampCrop, drawBase, FULL, isEdited, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
 import { prepareImage } from "./image-prep";
 import { captionOf, crop916, pickedOf, type PickedItem, type PickVM } from "./pick";
@@ -165,7 +166,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
               </label>
               {p.items.map((x, i) => (
                 <button key={x.url} type="button" onClick={() => set({ ...p, at: i })} aria-label={`Item ${i + 1}`} style={{ flex: "none", width: "52px", height: "52px", padding: 0, borderRadius: "8px", overflow: "hidden", border: i === at ? "2px solid #fff" : "2px solid transparent", background: "#222", cursor: "pointer" }}>
-                  {x.video ? <video src={x.url} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <img src={x.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+                  {x.video ? <video src={firstFrameSrc(x.url)} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <img src={x.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
                 </button>
               ))}
             </div>

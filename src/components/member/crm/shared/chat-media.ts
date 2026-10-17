@@ -42,6 +42,14 @@ export const INLINE_TIME = { tDisp: "inline-flex", tFloat: "right", tML: "12px",
 
 const visual = (m: Msg) => m.media?.kind === "image" || m.media?.kind === "video";
 
+/**
+ * A video's address that shows its first picture before it plays: an iPhone draws a paused video black until asked for a
+ * moment into it (`#t=0.1`). The phone's own copy too (2026-10-17 — the owner, a video just sent black in the chat on an
+ * iPhone: "all video after send, before press in the video play, is show black view"): a `blob:` address takes the same
+ * moment — it was left out, and what this phone sends shows from its own copy.
+ */
+export const firstFrameSrc = (url: string) => (!url || url.includes("#") ? url : `${url}#t=0.1`);
+
 /** The chat's photos and videos, oldest first: what left / right steps through in the viewer. */
 export function galleryOf(messages: Msg[]): ViewerItem[] {
   return messages.flatMap(m => (m.media && visual(m) ? [{ kind: m.media.kind as "image" | "video", url: m.media.url }] : []));
@@ -87,7 +95,7 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     img: k === "image" ? url : "",
     vid: k === "video" ? url : "",
     // iPhone draws a video's first frame only when asked for a moment into it.
-    vidSrc: k === "video" ? (url.startsWith("blob:") ? url : `${url}#t=0.1`) : "",
+    vidSrc: k === "video" ? firstFrameSrc(url) : "",
     aud: k === "audio" ? url : "",
     file: k === "file" ? url : "",
     mh: k === "image" || k === "video" ? mediaHeight(url) : "",

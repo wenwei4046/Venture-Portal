@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { albumsOf, galleryOf, mediaOf, NO_MEDIA } from "./chat-media";
+import { albumsOf, firstFrameSrc, galleryOf, mediaOf, NO_MEDIA } from "./chat-media";
 import { docLabel, mediaHeight, rememberShape } from "./viewer";
 
 describe("a chat's photos, videos and documents (2026-10-14)", () => {
@@ -38,6 +38,13 @@ describe("a chat's photos, videos and documents (2026-10-14)", () => {
     rememberShape("/m/tall", 600, 3000);
     expect(mediaHeight("/m/tall")).toBe("320px");
     expect(mediaOf(msgs[3], []).vidSrc).toBe("/m/d#t=0.1");
+  });
+
+  it("a video just sent, shown from the phone's own copy, asks for its first picture too (an iPhone drew it black)", () => {
+    expect(firstFrameSrc("blob:https://erp.houzsventure.com/1f2e")).toBe("blob:https://erp.houzsventure.com/1f2e#t=0.1");
+    expect(firstFrameSrc("/member/crm-media/9")).toBe("/member/crm-media/9#t=0.1");
+    expect(firstFrameSrc("/member/crm-media/9#t=2")).toBe("/member/crm-media/9#t=2");
+    expect(firstFrameSrc("")).toBe("");
   });
 });
 
