@@ -125,7 +125,12 @@ export async function createRequestOnBehalf(r: NewRequest) {
  */
 export async function decideRequest(id: string, approve: boolean, note: string) {
   await requireActionOn('/attendance/requests', 'attendance', 'approve')
-  const decide = () => call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+  const decide = async () => {
+    const res = await call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+    // Decided (mig 20261017120000): the database told its person; their phone hears once the answer has gone back.
+    if (res.ok && res.data.status !== 'pending') pushSoon()
+    return res
+  }
   if (!approve) return decide()
   const move = await moveLoginForApproval(id)
   if (move.kind === 'refused') return { ok: false as const, reason: move.reason }

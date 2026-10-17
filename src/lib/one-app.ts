@@ -50,3 +50,17 @@ export function opensHrAppOnPhone(user: (PermissionHolder & { role: string }) | 
 export function opensFinApp(user: ShellViewer): boolean {
   return isFinanceShell(user)
 }
+
+/**
+ * Where the one app's start (`/`, app/page.tsx) sends somebody: the Revenue app, the HR app or the Finance app on a
+ * phone, else the portal. A tapped notice about one's own request (2026-10-17, `open=me:<id>`) goes on to Me in that
+ * face — the HR app (its avatar's Me), the Finance app's Profile (Me's card) or the portal's top bar (its panel); the
+ * Revenue app has no Me.
+ */
+export function startPlace(user: (PermissionHolder & { role: string }) | null | undefined, phone: boolean, meRequest: string | null = null): string {
+  if (user?.role === 'revenue_member') return '/member'
+  const me = meRequest ? `?open=me:${encodeURIComponent(meRequest)}` : ''
+  if (phone && opensHrAppOnPhone(user)) return `/hr-app${me}`
+  if (phone && opensFinApp(user)) return me ? `/fin-app/profile${me}` : '/fin-app'
+  return `/dashboard${me}`
+}

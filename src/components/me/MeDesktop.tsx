@@ -7,7 +7,7 @@ import { topLabel, todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
 import { Avatar } from './kit'
 import { MeApp } from './MeApp'
-import { useClock, useMe } from './useMe'
+import { useClock, useMe, useOpenedRequest } from './useMe'
 
 /**
  * Me on a computer (2026-10-17 — the user: a button on the top bar that says today, "Not in yet · Clock in", and a
@@ -22,7 +22,11 @@ export function MeDesktop({ hostLabel }: { hostLabel: string }) {
   const [mounted, setMounted] = useState(false)
   const nowSec = useClock(me.s.today?.now, me.s.todayAt)
   const card = todayCard(me.s.today, nowSec, officeToday())
-  useEscape(open, () => setOpen(false))
+  // A tapped notice about one's own request (`?open=me:<id>`, 2026-10-17): the panel opens on it, once.
+  const [asked, askedDone] = useOpenedRequest()
+  useEffect(() => { if (asked) setOpen(true) }, [asked])
+  const close = () => { setOpen(false); askedDone() }
+  useEscape(open, close)
   useEffect(() => {
     if (open) {
       setMounted(true)
@@ -47,12 +51,12 @@ export function MeDesktop({ hostLabel }: { hostLabel: string }) {
       </button>
       {mounted && typeof document !== 'undefined' ? createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60 }}>
-          <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, background: 'var(--ds-scrim)', opacity: shown ? 1 : 0, transition: 'opacity 250ms ease' }} />
+          <div onClick={close} style={{ position: 'absolute', inset: 0, background: 'var(--ds-scrim)', opacity: shown ? 1 : 0, transition: 'opacity 250ms ease' }} />
           <div role="dialog" aria-modal="true" aria-label="Me" style={{
             position: 'absolute', top: 0, right: 0, bottom: 0, width: 430, maxWidth: '100%', background: 'rgb(255 255 255)', boxShadow: '-12px 0 32px rgb(43 31 23 / .12)',
             transform: shown ? 'none' : 'translateX(40px)', opacity: shown ? 1 : 0, transition: 'transform 340ms cubic-bezier(.2,.8,.2,1), opacity 340ms cubic-bezier(.2,.8,.2,1)',
           }}>
-            <MeApp me={me} mode="panel" hostLabel={hostLabel} onClose={() => setOpen(false)} source="web" />
+            <MeApp me={me} mode="panel" hostLabel={hostLabel} onClose={close} source="web" startRequest={asked} />
           </div>
         </div>,
         document.body,

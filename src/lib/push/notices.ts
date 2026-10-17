@@ -10,7 +10,7 @@ export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo'
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
  */
-export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today'
+export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today' | 'att_request'
 
 export interface Notice {
   id: string
@@ -67,6 +67,10 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'crm_invite') return '/member?page=account&view=crm&crm=notifs'
   // Today › Remind all (2026-10-15): the app's front page, where its punch button will be. Never in a bell.
   if (n.refKind === 'att_today') return app === 'hr' ? '/hr-app' : '/member'
+  // One's own request, decided (2026-10-17, mig 20261017120000): Me on that request, in whichever face the one app
+  // opens for them (app/page.tsx carries `open=me:` to the HR app, the Finance app's Profile or the portal). The
+  // Revenue app has no Me: its front page. Never in a bell.
+  if (n.refKind === 'att_request') return app === 'hr' ? `/?open=me:${id}` : '/member'
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`
@@ -122,10 +126,16 @@ export function crmPushFromRow(v: unknown): CrmPush | null {
   }
 }
 
-export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo'; id: string }
+export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me'; id: string }
 
-/** What the HR app's `?open=` names: a hire, a booking, a member request or a memo. */
+/** What the HR app's `?open=` names: a hire, a booking, a member request, a memo — or one's own request in Me (`me:`). */
 export function openTarget(raw: string | null | undefined): OpenTarget | null {
-  const m = /^(hire|booking|req|memo):(.{1,80})$/.exec(raw ?? '')
+  const m = /^(hire|booking|req|memo|me):(.{1,80})$/.exec(raw ?? '')
   return m ? { k: m[1] as OpenTarget['k'], id: m[2] } : null
+}
+
+/** The request a tapped notice asks Me to open (`?open=me:<id>`, 2026-10-17), from an address's query. */
+export function meOpenTarget(search: string): string | null {
+  const t = openTarget(new URLSearchParams(search).get('open'))
+  return t?.k === 'me' ? t.id : null
 }

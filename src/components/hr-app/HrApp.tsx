@@ -19,7 +19,7 @@ import { useMe, useClock } from '@/components/me/useMe'
 import { ListCard, ListItem, Label } from '@/components/me/kit'
 import { todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
-import { kindLabel, whenLabel } from '@/lib/attendance/requests'
+import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
 import { missingAnswers } from '@/lib/hiring/view'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
@@ -162,6 +162,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const [busy, startBusy] = useTransition()
   const [toast, flash] = useToast()
   const [meOpen, setMeOpen] = useState(false)
+  const [meStart, setMeStart] = useState<string | null>(null)
 
   const top = stack[stack.length - 1]
   const att = d.att ?? null
@@ -270,10 +271,18 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
     if (d.notices.unread > 0) void actions.noticesRead(null).then(r => { if (r.ok) actions.refresh() })
   }
   // A tapped push opens the app at `?open=hire:HR-205` (lib/push/notices noticeUrl): go there once, then forget it.
+  // One's own request, decided (`open=me:<id>`, 2026-10-17): Me, on that request.
   useEffect(() => {
     const target = openTarget(new URLSearchParams(window.location.search).get('open'))
     if (!target) return
     window.history.replaceState(null, '', window.location.pathname)
+    if (target.k === 'me') {
+      if (mine) {
+        setMeStart(target.id)
+        setMeOpen(true)
+      }
+      return
+    }
     openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,6 +326,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const arView = ar && att ? requestView(ar, att.config, att.ledger, att.requests) : null
   const arCanDecide = !!ar && !!arView?.waitsAt && d.may.attDecide && !d.viewingAs
   const arOwn = !!ar && !!att && att.config.people.some(p => p.id === ar.staffId && p.hasLogin && p.name === att.config.me)
+  // At the upline's step: on their behalf — unless the viewer IS that upline (2026-10-17), whose own step it is.
+  const arBehalf = arView?.waitsAt === 'upline' && !(ar && att && waitsAtMe(ar, att.config))
   const decideAtt = (approve: boolean) => {
     if (!ar || !att) return
     if (!approve && !note.trim()) { flash('Add a note to reject'); return }
@@ -534,7 +545,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
 
       {top?.k === 'req' && arCanDecide && arView ? decideBar(
         <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => decideAtt(false)} style={{ color: note.trim() ? 'var(--ds-danger)' : 'var(--ds-ink-3)' }}>Reject</button>,
-        <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || arOwn} onClick={() => decideAtt(true)}>{arView.waitsAt === 'upline' ? 'Approve on behalf' : 'Approve'}</button>,
+        <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || arOwn} onClick={() => decideAtt(true)}>{arBehalf ? 'Approve on behalf' : 'Approve'}</button>,
       ) : null}
       {top?.k === 'mreq' && mr && isPendingRequest(mr) && mr.kind !== 'replacement' && d.may.decide && !d.viewingAs ? decideBar(
         <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => decideMember(false)} style={{ color: note.trim() ? 'var(--ds-danger)' : 'var(--ds-ink-3)' }}>Reject</button>,
@@ -589,7 +600,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         openGuide={() => setPopUpGuide(true)} flash={flash} />
       {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
       <Toast msg={toast} />
-      {mine ? <MeOverlay me={me} open={meOpen} onClose={() => setMeOpen(false)} backLabel="HR" accountRows={accountRows} /> : null}
+      {mine ? <MeOverlay me={me} open={meOpen} onClose={() => { setMeOpen(false); setMeStart(null) }} backLabel="HR" startRequest={meStart} accountRows={accountRows} /> : null}
     </div>
   )
 }

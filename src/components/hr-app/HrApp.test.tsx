@@ -8,7 +8,8 @@ vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.
 // Me (components/me) reads from the browser: drawn here as its layer only, with the rows the app hands it.
 vi.mock('@/components/me/useMe', () => ({ useMe: () => ({ s: { today: null, todayAt: 0 } }), useClock: () => 0 }))
 vi.mock('@/components/me/MeOverlay', () => ({
-  MeOverlay: ({ open, accountRows, backLabel }: { open: boolean; accountRows?: ReactNode; backLabel: string }) => (open ? <div data-testid="me" data-back={backLabel}>{accountRows}</div> : null),
+  MeOverlay: ({ open, accountRows, backLabel, startRequest }: { open: boolean; accountRows?: ReactNode; backLabel: string; startRequest?: string | null }) =>
+    (open ? <div data-testid="me" data-back={backLabel} data-start={startRequest ?? ''}>{accountRows}</div> : null),
 }))
 
 import HrApp, { type HrAppActions } from './HrApp'
@@ -150,6 +151,18 @@ describe('Approve', () => {
     await waitFor(() => expect(decide).toHaveBeenCalledWith('q-ot', true, ''))
   })
 
+  it('at the viewer’s own upline seat: a plain “Approve” — their own step, never on their own behalf (2026-10-17)', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    const mine = requests.map(r => (r.id === 'q-ot' ? { ...r, steps: [step({ role: 'upline', approver: 'Grace Lim', approverId: 's1' }), step({ id: 'y', seq: 2, state: 'queued', arrivedAt: null })] } : r))
+    render(<HrApp data={{ ...data, att: { config, month, requests: mine, ledger } }} actions={{ ...actions, attDecide: decide }} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /^At upline/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.queryByRole('button', { name: 'Approve on behalf' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q-ot', true, ''))
+  })
+
   it('without Approve’s box: the page, no decision bar', () => {
     render(<HrApp data={{ ...data, may: { ...data.may, attDecide: false } }} actions={actions} />)
     tab('Approve')
@@ -278,6 +291,19 @@ describe('the bell (2026-10-11)', () => {
     window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
     render(<HrApp data={{ ...data, hires: [hire], parts: { ...data.parts, hiring: true } }} actions={actions} />)
     expect(screen.getByRole('heading', { name: 'Revenue Specialist' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
+  it('one’s own request, decided (?open=me:…, 2026-10-17): Me opens on it — for a login of their own', () => {
+    window.history.pushState(null, '', '/hr-app?open=me:q-9')
+    render(<HrApp data={{ ...data, personalLogin: true }} actions={actions} />)
+    expect(screen.getByTestId('me')).toHaveAttribute('data-start', 'q-9')
+    expect(window.location.search).toBe('')
+    cleanup()
+    // A shared login has no Me: the app as it opens.
+    window.history.pushState(null, '', '/hr-app?open=me:q-9')
+    render(<HrApp data={{ ...data, personalLogin: false }} actions={actions} />)
+    expect(screen.queryByTestId('me')).toBeNull()
     expect(window.location.search).toBe('')
   })
 })
