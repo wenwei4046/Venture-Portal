@@ -81,7 +81,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
   // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
-  // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen).
+  // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
+  // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).
   const readyCall = useRef(onReady);
   readyCall.current = onReady;
   useEffect(() => {
