@@ -6,6 +6,7 @@ import { CHAT_EMOJIS } from "./emoji";
 import { clampCrop, drawBase, FULL, isEdited, noEdits, renderEdited, turnedSize, type Label, type PhotoEdits, type Rect, type Stroke } from "./edit-render";
 import { prepareImage } from "./image-prep";
 import { captionOf, crop916, pickedOf, type PickedItem, type PickVM } from "./pick";
+import { filmStrip, lengthOf, STRIP_TILES } from "./film-strip";
 import { STANDARD_VIDEO_MAX } from "./video-fit";
 import { saveToDevice } from "./viewer";
 import { typePx } from "./type";
@@ -36,6 +37,7 @@ const P = {
   mute: "M11 5 6 9H2v6h4l5 4V5ZM23 9l-6 6M17 9l6 6",
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
   trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
+  play: "M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2Z",
 };
 const uid = () => Math.random().toString(36).slice(2, 9);
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -97,7 +99,7 @@ export function PickEditor({ pk }: { pk: PickVM }) {
   // Any edit — the 9:16 fit among them — settles the camera photo's fit (`fill916`).
   const setEdits = (e: PhotoEdits) => update({ edits: e, fill916: false });
   useEffect(() => { setMode(""); setTextEd(null); }, [at]);
-  useEffect(() => () => { uprights.clear(); }, []);
+  useEffect(() => () => { uprights.clear(); strips.clear(); }, []);
 
   const save = async () => {
     if (saving) return;
@@ -383,20 +385,77 @@ function TextSheet({ value, onChange, onDone }: { value: { id: string | null; te
 }
 
 /* ── A video: the player, the part kept, its sound ───────────────────────────────────────────────────────────────── */
+/** Each video's film strip (shared/film-strip.ts), kept while the editor is open: a tool or another item draws it once. */
+const strips = new Map<string, string[]>();
+function useFilmStrip(url: string): (string | null)[] {
+  const [tiles, setTiles] = useState<(string | null)[]>(() => strips.get(url) ?? Array<string | null>(STRIP_TILES).fill(null));
+  useEffect(() => {
+    if (strips.has(url)) return;
+    let off = false;
+    const got = Array<string | null>(STRIP_TILES).fill(null);
+    void filmStrip(url, STRIP_TILES, (i, src) => { got[i] = src; if (!off) setTiles([...got]); }, () => off)
+      .then(ok => { if (ok) strips.set(url, got as string[]); }, () => {});
+    return () => { off = true; };
+  }, [url]);
+  return tiles;
+}
+
+// Full screen, as WhatsApp's (the owner, 2026-10-17, with WhatsApp's editor beside ours: "Why is not full screen? Like
+// this" — the video sat small under the trim bar, the browser's controls over it): the video fills the screen at its
+// middle as a photo does, the trim bar — a film strip — and the strip below float over it, a tap plays or pauses it.
 function VideoStage({ it, hd, update, edits }: { it: PickedItem; hd: boolean; update: (p: Partial<PickedItem>) => void; edits: PhotoEdits }) {
-  const [vbox, setVbox] = useState({ w: 0, h: 0 });
+  const box = useRef<HTMLDivElement>(null), video = useRef<HTMLVideoElement>(null), bar = useRef<HTMLDivElement>(null), head = useRef<HTMLSpanElement>(null);
+  const [area, setArea] = useState({ w: 0, h: 0 });
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [playing, setPlaying] = useState(false);
+  const tiles = useFilmStrip(it.url);
   const turned = edits.turn !== 0 || edits.crop.x !== 0 || edits.crop.y !== 0 || edits.crop.w !== 1 || edits.crop.h !== 1;
-  const video = useRef<HTMLVideoElement>(null), bar = useRef<HTMLDivElement>(null);
   const dur = it.seconds ?? 0;
   const cut = it.cut ?? { start: 0, end: dur, mute: false };
   const end = cut.end || dur;
   const drag = useRef<"start" | "end" | null>(null);
+  // What a frame, a length read late or the line along the strip reads: this render's, never the one they began in.
+  const now = useRef({ it, update, start: cut.start, end, dur });
+  now.current = { it, update, start: cut.start, end, dur };
 
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setArea({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => { const v = video.current; if (v) v.muted = cut.mute; }, [cut.mute]);
-  const onTime = () => {
+
+  // The white line along the strip stands where the video is; while it plays it moves each frame, and the kept part
+  // loops there.
+  const place = () => {
+    const v = video.current, h = head.current, n = now.current;
+    if (!v || !h || !n.dur) return;
+    if (!v.paused && (v.currentTime >= n.end - 0.02 || v.currentTime < n.start - 0.05)) v.currentTime = n.start;
+    h.style.left = `${Math.max(0, Math.min(100, (v.currentTime / n.dur) * 100))}%`;
+  };
+  useEffect(() => {
+    if (!playing) return;
+    let raf = requestAnimationFrame(function tick() { place(); raf = requestAnimationFrame(tick); });
+    return () => cancelAnimationFrame(raf);
+  }, [playing]);
+  const toggle = () => {
     const v = video.current;
-    if (!v || !dur) return;
-    if (v.currentTime < cut.start - 0.05 || v.currentTime > end) v.currentTime = cut.start;
+    if (!v) return;
+    if (!v.paused) { v.pause(); return; }
+    if (v.currentTime >= end - 0.02 || v.currentTime < cut.start) v.currentTime = cut.start;
+    void v.play()?.catch(() => {});
+  };
+  // Its size, then its length — a WebM the phone recorded is read through for it — then the kept part's first picture
+  // (an iPhone draws none until a seek).
+  const loaded = (v: HTMLVideoElement) => {
+    setSize({ w: v.videoWidth, h: v.videoHeight });
+    void lengthOf(v).then(d => {
+      const n = now.current;
+      if (d > 0 && !n.it.seconds) n.update({ seconds: d, cut: n.it.cut ?? { start: 0, end: d, mute: false } });
+      v.currentTime = Math.max(0.001, n.start);
+    });
   };
   const handle = (e: RPointerEvent) => {
     const r = bar.current?.getBoundingClientRect(), which = drag.current;
@@ -404,49 +463,68 @@ function VideoStage({ it, hd, update, edits }: { it: PickedItem; hd: boolean; up
     const s = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur;
     const next = which === "start" ? { ...cut, end, start: Math.min(s, end - 0.5) } : { ...cut, end: Math.max(s, cut.start + 0.5) };
     update({ cut: next });
-    if (video.current) video.current.currentTime = which === "start" ? next.start : next.end;
+    const v = video.current;
+    if (v) { v.pause(); v.currentTime = which === "start" ? next.start : next.end; }
+  };
+  const grab = (e: RPointerEvent, w: "start" | "end") => {
+    drag.current = w;
+    try { (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId); } catch { /* a pointer already gone */ }
   };
   const kept = Math.max(0, end - cut.start);
   const est = dur ? Math.min(it.file.size * (kept / dur), hd ? Infinity : STANDARD_VIDEO_MAX) : it.file.size;
   const pct = (s: number) => `${dur ? (s / dur) * 100 : 0}%`;
+  // The picture's own place on the screen (contained, at its middle), for what was drawn over it.
+  const k = size.w && size.h ? Math.min(area.w / size.w, area.h / size.h) : 0;
+  const W = Math.round(size.w * k), H = Math.round(size.h * k), u = Math.min(W, H);
+  const chip = { padding: "6px 10px", borderRadius: "8px", background: "rgba(40,40,40,.72)", fontSize: typePx(13), fontWeight: 600 } as const;
 
   return (
     <>
-      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 62px)", left: "12px", right: "12px", zIndex: 3, display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div ref={bar} onPointerMove={handle} onPointerUp={() => { drag.current = null; }} style={{ position: "relative", height: "44px", borderRadius: "8px", background: "rgba(255,255,255,.18)", touchAction: "none" }}>
-          <div style={{ position: "absolute", top: 0, bottom: 0, left: pct(cut.start), right: `calc(100% - ${pct(end)})`, border: "3px solid #fff", borderRadius: "8px", background: "rgba(255,255,255,.12)", boxSizing: "border-box" }} />
-          {(["start", "end"] as const).map(w => (
-            <span key={w} onPointerDown={e => { drag.current = w; (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId); }}
-              style={{ position: "absolute", top: 0, bottom: 0, left: pct(w === "start" ? cut.start : end), width: "22px", marginLeft: "-11px", display: "grid", placeItems: "center", touchAction: "none", cursor: "ew-resize" }}>
-              <span style={{ width: "10px", height: "44px", borderRadius: "4px", background: "#fff", color: "#111", fontSize: typePx(11), fontWeight: 800, display: "grid", placeItems: "center" }}>{w === "start" ? "‹" : "›"}</span>
-            </span>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Btn path={cut.mute ? P.mute : P.sound} label={cut.mute ? "Sound off" : "Sound on"} on={cut.mute} onClick={() => update({ cut: { ...cut, end, mute: !cut.mute } })} />
-          <span style={{ padding: "6px 10px", borderRadius: "8px", background: "rgba(40,40,40,.72)", fontSize: typePx(13), fontWeight: 600 }}>{clock(kept)} · {hd ? "" : "up to "}{mb(est)}</span>
-        </div>
-      </div>
-      <div style={{ flex: "1", minHeight: 0, display: "grid", placeItems: "center", paddingTop: "150px", position: "relative" }}>
-        <span style={{ position: "relative", display: "inline-block", lineHeight: 0, maxWidth: "100%", maxHeight: "100%" }}>
-        <video ref={video} src={it.url} playsInline controls onTimeUpdate={onTime}
-          onResize={e => setVbox({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
-          onLoadedData={e => setVbox({ w: e.currentTarget.clientWidth, h: e.currentTarget.clientHeight })}
-          onLoadedMetadata={e => { const d = e.currentTarget.duration; if (Number.isFinite(d) && d > 0 && !it.seconds) update({ seconds: d, cut: it.cut ?? { start: 0, end: d, mute: false } }); }}
-          style={{ maxWidth: "100%", maxHeight: "calc(100vh - 330px)", background: "#000" }} />
+      <div ref={box} style={{ flex: "1", minHeight: 0, position: "relative", overflow: "hidden" }}>
+        <video ref={video} src={it.url} data-editor-video="" playsInline loop preload="auto" onClick={toggle}
+          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={place} onSeeked={place}
+          onLoadedMetadata={e => loaded(e.currentTarget)}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", display: "block", cursor: "pointer" }} />
         {/* What was drawn, typed or stuck on shows over the video as it plays; a turn or crop shows once sent. */}
-        {!turned && vbox.w > 0 && (edits.strokes.length > 0 || edits.labels.length > 0) && (
-          <span style={{ position: "absolute", left: 0, top: 0, width: vbox.w + "px", height: vbox.h + "px", pointerEvents: "none" }}>
-            <svg width={vbox.w} height={vbox.h} style={{ position: "absolute", inset: 0 }}>
-              {edits.strokes.map((s, i) => <polyline key={i} points={s.pts.map(([x, y]) => `${x * vbox.w},${y * vbox.h}`).join(" ")} fill="none" stroke={s.color} strokeWidth={s.width * Math.min(vbox.w, vbox.h)} strokeLinecap="round" strokeLinejoin="round" />)}
+        {!turned && W > 0 && (edits.strokes.length > 0 || edits.labels.length > 0) && (
+          <span style={{ position: "absolute", left: `${Math.round((area.w - W) / 2)}px`, top: `${Math.round((area.h - H) / 2)}px`, width: W + "px", height: H + "px", pointerEvents: "none" }}>
+            <svg width={W} height={H} style={{ position: "absolute", inset: 0 }}>
+              {edits.strokes.map((s, i) => <polyline key={i} points={s.pts.map(([x, y]) => `${x * W},${y * H}`).join(" ")} fill="none" stroke={s.color} strokeWidth={s.width * u} strokeLinecap="round" strokeLinejoin="round" />)}
             </svg>
             {edits.labels.map(l => (
-              <span key={l.id} style={{ position: "absolute", left: `${l.x * 100}%`, top: `${l.y * 100}%`, transform: "translate(-50%, -50%)", fontSize: `${l.size * Math.min(vbox.w, vbox.h)}px`, lineHeight: 1.2, fontWeight: l.kind === "text" ? 700 : 400, color: l.color, whiteSpace: "pre", textAlign: "center" }}>{l.text}</span>
+              <span key={l.id} style={{ position: "absolute", left: `${l.x * 100}%`, top: `${l.y * 100}%`, transform: "translate(-50%, -50%)", fontSize: `${l.size * u}px`, lineHeight: 1.2, fontWeight: l.kind === "text" ? 700 : 400, color: l.color, whiteSpace: "pre", textAlign: "center" }}>{l.text}</span>
             ))}
           </span>
         )}
-        </span>
-        {turned && <span style={{ position: "absolute", left: "50%", bottom: "8px", transform: "translateX(-50%)", padding: "5px 10px", borderRadius: "10px", background: "rgba(40,40,40,.8)", fontSize: typePx(12), fontWeight: 600 }}>Turned or cropped · shown once sent</span>}
+        {!playing && (
+          <button type="button" aria-label="Play" onClick={toggle} style={{ position: "absolute", left: "50%", top: "50%", width: "64px", height: "64px", margin: "-32px 0 0 -32px", borderRadius: "32px", border: 0, background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24"><path d={P.play} fill="#fff" /></svg>
+          </button>
+        )}
+      </div>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "calc(env(safe-area-inset-top, 0px) + 170px)", zIndex: 2, pointerEvents: "none", background: "linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,0))" }} />
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 62px)", left: "12px", right: "12px", zIndex: 3, display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div ref={bar} data-trim-bar="" onPointerMove={handle} onPointerUp={() => { drag.current = null; }} style={{ position: "relative", height: "48px", touchAction: "none" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", borderRadius: "8px", overflow: "hidden", background: "rgba(255,255,255,.18)", pointerEvents: "none" }}>
+            {tiles.map((src, i) => <span key={i} style={{ flex: "1", minWidth: 0 }}>{src && <img src={src} alt="" draggable={false} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />}</span>)}
+          </div>
+          {/* Outside the kept part the strip is dimmed, as WhatsApp's. */}
+          <span style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: pct(cut.start), borderRadius: "8px 0 0 8px", background: "rgba(0,0,0,.55)", pointerEvents: "none" }} />
+          <span style={{ position: "absolute", top: 0, bottom: 0, left: pct(end), right: 0, borderRadius: "0 8px 8px 0", background: "rgba(0,0,0,.55)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", top: 0, bottom: 0, left: pct(cut.start), right: `calc(100% - ${pct(end)})`, border: "3px solid #fff", borderRadius: "8px", boxSizing: "border-box", pointerEvents: "none" }} />
+          <span ref={head} data-play-line="" style={{ position: "absolute", top: "3px", bottom: "3px", width: "2px", marginLeft: "-1px", borderRadius: "1px", background: "#fff", boxShadow: "0 0 2px rgba(0,0,0,.6)", pointerEvents: "none", display: dur ? "block" : "none" }} />
+          {(["start", "end"] as const).map(w => (
+            <span key={w} data-trim-handle={w} onPointerDown={e => grab(e, w)}
+              style={{ position: "absolute", top: 0, bottom: 0, left: pct(w === "start" ? cut.start : end), width: "22px", marginLeft: "-11px", display: "grid", placeItems: "center", touchAction: "none", cursor: "ew-resize" }}>
+              <span style={{ width: "10px", height: "48px", borderRadius: "4px", background: "#fff", color: "#111", fontSize: typePx(11), fontWeight: 800, display: "grid", placeItems: "center" }}>{w === "start" ? "‹" : "›"}</span>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <Btn path={cut.mute ? P.mute : P.sound} label={cut.mute ? "Sound off" : "Sound on"} on={cut.mute} onClick={() => update({ cut: { ...cut, end, mute: !cut.mute } })} />
+          <span style={chip}>{clock(kept)} · {hd ? "" : "up to "}{mb(est)}</span>
+          {turned && <span style={chip}>Turned or cropped · shown once sent</span>}
+        </div>
       </div>
     </>
   );
