@@ -79,21 +79,23 @@ describe('a full day’s hours', () => {
   })
 })
 
+// The user, 2026-10-17: "系统不可以默认哪一天是休息日，而是要跟着这个 schedule 去确定几时才是休息日、几时是工作日。如果今天我星期一到
+// 星期日全部放 work 的话，其实 by right 它就是没有休息日 … everythings go with this schedule".
 describe('the rate an OT line is paid at', () => {
-  it('is the day type on the request, else what the day is', () => {
-    const r = (dayType?: string) => ({ detail: dayType ? { dayType } : {} })
-    expect(otDayType(r('rest'), { code: 'P', sday: { day: 'Mon', type: 'work' } })).toBe('rest')
-    expect(otDayType(r('nonsense'), { code: 'P', sday: { day: 'Mon', type: 'work' } })).toBe('work')
-    expect(otDayType(r(), { code: 'H', sday: { day: 'Mon', type: 'work' } })).toBe('ph')
-    expect(otDayType(r(), { code: 'CH', sday: { day: 'Mon', type: 'work' } })).toBe('off')
-    expect(otDayType(r(), { code: 'W', sday: { day: 'Sun', type: 'rest' } })).toBe('rest')
-    expect(otDayType(r(), { code: 'W', sday: { day: 'Sat', type: 'off' } })).toBe('off')
-    expect(otDayType(r(), { code: '', sday: null })).toBe('work')
+  it('is what the day is on the schedule — a holiday that covers them, a company holiday, else the schedule’s row', () => {
+    expect(otDayType({ code: 'H', sday: { day: 'Mon', type: 'work' } })).toBe('ph')
+    expect(otDayType({ code: 'CH', sday: { day: 'Mon', type: 'work' } })).toBe('off')
+    expect(otDayType({ code: 'W', sday: { day: 'Sun', type: 'rest' } })).toBe('rest')
+    expect(otDayType({ code: 'W', sday: { day: 'Sat', type: 'off' } })).toBe('off')
+    expect(otDayType({ code: 'P', sday: { day: 'Sat', type: 'work', start: '09:00', end: '13:00', break: 0 } })).toBe('work')
   })
-  it('with no schedule, Sunday is a rest day and Saturday an off day — as Me’s sheet says', () => {
-    const r = { detail: {} }
-    expect([otDayType(r, { code: 'P', sday: null }, '2026-10-18'), otDayType(r, { code: 'P', sday: null }, '2026-10-17'), otDayType(r, { code: 'P', sday: null }, '2026-10-14')])
-      .toEqual(['rest', 'off', 'work'])
+  it('never the weekday: no schedule, no rest day — a Sunday is a work day', () => {
+    expect(otDayType({ code: 'P', sday: null })).toBe('work')
+    expect(otDayType({ code: '', sday: null })).toBe('work')
+  })
+  it('a whole day HR made a work day (WD) is a work day, whatever the schedule says', () => {
+    expect(otDayType({ code: 'P', sday: { day: 'Sun', type: 'rest' } }, 'WD')).toBe('work')
+    expect(otDayType({ code: 'H', sday: { day: 'Mon', type: 'work' } }, 'WD')).toBe('ph')
   })
 })
 
@@ -197,8 +199,14 @@ describe('what a closed month sends to payroll', () => {
     expect(() => attendanceFacts(ctxOf(c, ALI_MONTH), ALI_OT)).toThrow('Settings › OT rules has no rate for rest days.')
   })
 
+  it('a day type written on the request is not read — the schedule says what the day is', () => {
+    const [fact] = attendanceFacts(ctx, [ot('ali', '2026-10-14', 2, 'rest'), ot('ali', '2026-10-18', 2, 'work')])
+    expect(fact.ot.map(o => [o.day, o.dayType])).toEqual([['2026-10-14', 'work'], ['2026-10-18', 'rest']])
+  })
+
   it('the register counts the same unpaid days and adds the overtime columns', () => {
-    const [row] = registerOf(ctx, otHoursOf(ctx, [...ALI_OT, ot('ali', '2026-10-17', 3), ot('ali', '2026-10-20', 1, 'ph')]))
+    const c = ctxOf(config({ holidays: [{ id: 'h', day: '2026-10-20', name: 'Deepavali', kind: 'compulsory', states: 'All' }] }), ALI_MONTH)
+    const [row] = registerOf(c, otHoursOf(c, [...ALI_OT, ot('ali', '2026-10-17', 3), ot('ali', '2026-10-20', 1)]))
     expect([row.unpaid, row.ot, row.otRest, row.otPh]).toEqual([2, 9, 4, 1])
     expect(registerOf(ctx)[0]).toMatchObject({ unpaid: 2, ot: 0, otRest: 0, otPh: 0 })
   })

@@ -5,33 +5,38 @@ import { Button } from '@/components/ds/Button'
 import { DsSelect, Field, TextField, Textarea } from '@/components/ds/Field'
 import { CenterWindow } from '@/components/ds/Overlay'
 import { createRequestOnBehalf } from '@/lib/attendance/actions'
+import { leaveDaysFor } from '@/lib/attendance/engine'
 import type { AttConfig } from '@/lib/attendance/types'
-import { RangeCalendar, workingDaysIn } from './BalanceCalendar'
+import { RangeCalendar } from './BalanceCalendar'
 
 /**
  * Requests › + On someone's behalf (the handoff flashes "Opens the request
  * form · sent as HR on their behalf"; drawn here in Settings' window): a
  * person, what they ask for (a leave type or overtime), the days, the reason.
  * It takes the request's own route — the upline first where there is one.
+ * The days follow the person's schedule, never the weekday: a leave counts the
+ * days it works less the holidays, an overtime is paid as its day is on the
+ * schedule — nobody picks it (2026-10-17, the user: "everythings go with this
+ * schedule").
  */
 export function RequestOnBehalf({ config, onClose, onSent, onError }: { config: AttConfig; onClose: () => void; onSent: (m: string) => void; onError: (m: string) => void }) {
   const [staffId, setStaffId] = useState(config.people[0]?.id ?? '')
   const [kind, setKind] = useState(config.leaveTypes[0]?.code ?? 'OT')
   const [range, setRange] = useState({ from: '', to: '' })
   const [hours, setHours] = useState('')
-  const [dayType, setDayType] = useState('work')
   const [reason, setReason] = useState('')
   const [busy, start] = useTransition()
   const ot = kind === 'OT'
-  const days = workingDaysIn(range.from, range.to)
   const person = config.people.find(p => p.id === staffId)
+  const calendarDays = config.leaveTypes.find(t => t.code === kind)?.counts === 'calendar'
+  const days = person ? leaveDaysFor(person, range.from, range.to || range.from, config, { calendar: calendarDays }) : 0
   const blocked = busy || !staffId || !range.from || !reason.trim() || (ot ? !(Number(hours) > 0) : days === 0)
 
   const send = () =>
     start(async () => {
       const r = await createRequestOnBehalf(
         ot
-          ? { staffId, kind: 'ot', from: range.from, to: range.from, hours: Number(hours), detail: { dayType }, reason: reason.trim() }
+          ? { staffId, kind: 'ot', from: range.from, to: range.from, hours: Number(hours), detail: {}, reason: reason.trim() }
           : { staffId, kind: 'leave', leaveCode: kind, from: range.from, to: range.to || range.from, days, reason: reason.trim() },
       )
       if (!r.ok) return onError(r.reason)
@@ -62,13 +67,10 @@ export function RequestOnBehalf({ config, onClose, onSent, onError }: { config: 
             <Field label="Hours">
               <TextField type="number" step="0.5" min="0" value={hours} onChange={setHours} />
             </Field>
-            <Field label="Day">
-              <DsSelect value={dayType} onChange={setDayType} options={[{ value: 'work', label: 'Work day' }, { value: 'off', label: 'Off day' }, { value: 'rest', label: 'Rest day' }, { value: 'ph', label: 'Public holiday' }]} />
-            </Field>
           </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 10, background: 'var(--ds-surface-2)', fontSize: 12.5 }}>
-            <span style={{ color: 'var(--ds-ink-2)' }}>Working days · weekends skipped</span>
+            <span style={{ color: 'var(--ds-ink-2)' }}>{calendarDays ? 'Calendar days' : 'Work days · days off and holidays skipped'}</span>
             <span style={{ fontFamily: 'var(--font-mono)' }}>{days}</span>
           </div>
         )}

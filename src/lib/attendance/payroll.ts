@@ -1,4 +1,4 @@
-import { indexMonth, monthGrid, policyOn, toMin, weekday, type Ctx, type DayInfo, type MonthIndex, type OtHours } from './engine'
+import { indexMonth, monthGrid, policyOn, toMin, type Ctx, type DayInfo, type MonthIndex, type OtHours } from './engine'
 import { otRates } from './settings'
 import type { AttRequest, AttSchedule, OtEligibility, ScheduleDay } from './types'
 import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/lib/payroll-period'
@@ -41,7 +41,6 @@ import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/l
  */
 
 export type OtDayType = 'work' | 'off' | 'rest' | 'ph'
-const OT_DAY_TYPES: ReadonlySet<string> = new Set<OtDayType>(['work', 'off', 'rest', 'ph'])
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 const round4 = (n: number) => Math.round((n + Number.EPSILON) * 10000) / 10000
@@ -57,21 +56,17 @@ export function hoursADay(schedule: AttSchedule | null | undefined): number {
 }
 
 /**
- * The rate an OT line is paid at: the day type on the request (HR picks it), else what the day is — and with no
- * schedule, Sunday a rest day and Saturday an off day, as Me's sheet has always said (2026-10-17).
+ * The rate an OT line is paid at: what the day is on the person's schedule — a holiday that covers them a public
+ * holiday, a company holiday an off day, a whole day HR made a work day (`WD`) a work day, else the schedule's row.
+ * Never the weekday, never a pick on the request: no schedule, no rest day (2026-10-17, the user: "系统不可以默认哪一天
+ * 是休息日 … 如果今天我星期一到星期日全部放 work 的话，其实 by right 它就是没有休息日 … everythings go with this schedule").
  */
-export function otDayType(r: Pick<AttRequest, 'detail'>, info: Pick<DayInfo, 'code' | 'sday'>, day?: string): OtDayType {
-  const picked = typeof r.detail?.dayType === 'string' ? r.detail.dayType : ''
-  if (OT_DAY_TYPES.has(picked)) return picked as OtDayType
+export function otDayType(info: Pick<DayInfo, 'code' | 'sday'>, override?: string | null): OtDayType {
   if (info.code === 'H') return 'ph'
   if (info.code === 'CH' || info.code === 'SO') return 'off'
+  if (override === 'WD') return 'work'
   if (info.sday?.type === 'rest') return 'rest'
   if (info.sday?.type === 'off') return 'off'
-  if (!info.sday && day) {
-    const w = weekday(day)
-    if (w === 0) return 'rest'
-    if (w === 6) return 'off'
-  }
   return 'work'
 }
 
@@ -152,7 +147,7 @@ export function otPlansOf(ctx: Ctx, requests: readonly AttRequest[]) {
       const punched = new Map<string, number | null>()
       const earlier = new Map<string, number>()
       const plans = ot.map(({ r, day, info }): OtPlan => {
-        const dayType = otDayType(r, info, day)
+        const dayType = otDayType(info, idx.overrides.get(day)?.code)
         const approved = Number(r.hours)
         if (!left.has(day)) {
           const asked = ot.filter(o => o.day === day).reduce((a, o) => a + Math.round(Number(o.r.hours) * 60), 0)

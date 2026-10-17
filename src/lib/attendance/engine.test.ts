@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assignmentFor, balanceOf, completedMonths, dayInfo, monthGrid, workingDays, yearsOfService, type Ctx } from './engine'
+import { assignmentFor, balanceOf, completedMonths, dayInfo, leaveDaysFor, monthGrid, yearsOfService, type Ctx } from './engine'
 import type { AttAssignment, AttConfig, AttLedger, AttMonth, AttPerson } from './types'
 
 const person = (id: string, over: Partial<AttPerson> = {}): AttPerson => ({
@@ -96,9 +96,27 @@ describe('the month', () => {
 })
 
 describe('leave', () => {
-  it('counts working days, clipped to a year', () => {
-    expect(workingDays('2026-10-09', '2026-10-13')).toBe(3)
-    expect(workingDays('2026-12-30', '2027-01-04', 2026)).toBe(2)
+  // The user, 2026-10-17: "系统不可以默认哪一天是休息日，而是要跟着这个 schedule … everythings go with this schedule".
+  it('counts the days the person’s schedule works, less the holidays — never the weekday', () => {
+    const ann = person('ann')
+    // Fri 9 – Tue 13 on Office 9–6 (Sat off, Sun rest): Fri, Mon, Tue.
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', config())).toBe(3)
+    // A schedule that works Saturdays counts the Saturday.
+    const sixDays = config({ schedules: [{ id: 's1', name: 'Showroom', days: [
+      { day: 'Mon', ...work }, { day: 'Tue', ...work }, { day: 'Wed', ...work }, { day: 'Thu', ...work }, { day: 'Fri', ...work },
+      { day: 'Sat', ...work }, { day: 'Sun', type: 'rest' }] }] })
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', sixDays)).toBe(4)
+    // No schedule, no day off: every day counts.
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', config({ assignments: [] }))).toBe(5)
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', config({ assignments: [asg({ scheduleId: null })] }))).toBe(5)
+    // A holiday that covers them is not a leave day; a type counted in calendar days counts every day.
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', config({ holidays: [{ id: 'h', day: '2026-10-12', name: 'X', kind: 'compulsory', states: 'All' }] }))).toBe(2)
+    expect(leaveDaysFor(ann, '2026-10-09', '2026-10-13', config(), { calendar: true })).toBe(5)
+    expect(leaveDaysFor(ann, '', '', config())).toBe(0)
+  })
+  it('clipped to a year — a leave across 1 January', () => {
+    expect(leaveDaysFor(person('ann'), '2026-12-30', '2027-01-04', config(), { year: 2026 })).toBe(2)
+    expect(leaveDaysFor(person('ann'), '2026-12-30', '2027-01-04', config(), { year: 2027 })).toBe(2)
   })
   it('years of service and completed months', () => {
     expect(yearsOfService('2020-03-15', '2026-03-14')).toBe(5)

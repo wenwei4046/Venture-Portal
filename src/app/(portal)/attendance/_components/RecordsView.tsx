@@ -38,7 +38,7 @@ const LEGEND: Array<[string, string, string, string]> = [
   ['H', 'Public holiday', 'rgb(var(--tone-gold))', 'rgb(var(--tone-gold-deep))'],
   ['CH', 'Company holiday', 'rgb(var(--tone-walnut))', 'rgb(var(--tone-walnut-deep))'],
   ['SO', 'Special off', 'rgb(var(--tone-olive))', 'rgb(var(--tone-olive-deep))'],
-  ['W', 'Weekend', HATCH, 'var(--ds-ink-3)'],
+  ['W', 'Day off', HATCH, 'var(--ds-ink-3)'],
 ]
 
 const HEAD: CSSProperties = { background: 'rgb(235 231 224)', padding: '10px 4px', fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ds-ink-3)', textAlign: 'center', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
