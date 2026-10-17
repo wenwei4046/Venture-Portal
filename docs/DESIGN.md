@@ -21,7 +21,7 @@
 
 | Theme | Who and where | In code | Feel |
 |---|---|---|---|
-| **HR — the ledger** (the default) | Every portal page, whatever the department (HR, Finance, the Principal, a department manager), plus the HR phone app | `:root`; the white sheet (`.sheet-theme`), HR's shell (`.hrv-shell`), `[data-hr-app]` | Formal. Black ink on white sheets, orange as a marker (never text), Newsreader page titles, mono figures, dense grid tables |
+| **HR — the ledger** (the default) | Every portal page, whatever the department (HR, Finance, the Principal), plus the HR phone app | `:root`; the white sheet (`.sheet-theme`), HR's shell (`.hrv-shell`), `[data-hr-app]` | Formal. Black ink on white sheets, orange as a marker (never text), Newsreader page titles, mono figures, dense grid tables |
 | **Revenue — the sales app** | Salespeople (Fair, IR), Team Leaders, the Principal viewing as one: the Revenue app `/member` and the CRM | `[data-revenue-app]` | Warm. Brown ink, a rust accent that is also the link colour, the income as a statement, the Arena's boards as bank cards, big rounded cards, Inter Tight headlines and amounts. Mobile-first, desktop at 1440 |
 
 **Pick the theme first.**
@@ -407,7 +407,7 @@ A new page, or a prototype that brings a description, leaves it out. `src/lib/no
 
 Every sheet override in `globals.css` is written `:where(.sheet-theme) <base selector>`, so it has exactly the specificity of the rule it replaces. Never add a sheet rule with more weight than its base.
 
-**The Finance view (2026-10-09)** applies to Finance's pages only — the routes in `lib/finance-view.ts`, as Finance or the Principal sees them. HR's and a department manager's pages keep the sheet as above.
+**The Finance view (2026-10-09)** applies to Finance's pages only — the routes in `lib/finance-view.ts`, as Finance or the Principal sees them. HR's pages keep the sheet as above.
 - **How it hangs.** PortalFrame puts `.fin-view` on the sheet frame and `FinViewProvider` around the shell. Everything the view changes hangs off those two (`globals.css` › "THE FINANCE VIEW").
 - **Cards.** A card's figure is in the number face and coloured by meaning: ledger green for money in, danger red for money out, blue `wait` for anything waiting on someone, walnut for the page's one figure. Its label is in sentence case.
 - **Chips** are in the body face; pending is blue.
@@ -753,7 +753,7 @@ A page spec is the page's anatomy and its rules: what it shows and in what order
 
 ### Finance's pages on the sheet (v3.12, 2026-10-07)
 
-Every page Finance reads (and a department manager's My Billing and OPEX) moved onto the sheet by route. A page's anatomy changes only when it is converted (Part II › **How a page is built on it**); the Finance view redraws these pages from `.design/finance-revamp`.
+Every page Finance reads (and OPEX) moved onto the sheet by route. A page's anatomy changes only when it is converted (Part II › **How a page is built on it**); the Finance view redraws these pages from `.design/finance-revamp`.
 
 Converted so far:
 - **Payments and Receipts** — their hubs since v4.8 / v4.13 (`VoucherHub`).
@@ -1657,6 +1657,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.88** · 2026-10-17 · The Dept Manager is gone (the user: "全删：连程序一起拿掉" — each department gets a view of its own later): My Billing and its *New Contract*, the department Overview, Dept Pool's own-department page and its requests, the reports' own-segment mode (GlReportView's left rail, the month matrix and its controls), OPEX pinned to one department; Dept Pool's sidebar opens on its Overview for whoever reaches the pool, Cash Flow / Receipt & Payment / Debtor Aging list beside the company-wide reports → Part I › Themes; Finance view; Tables › `SheetReport`
 - **v4.87** · 2026-10-17 · A person has a First Name and a Last Name (the user: "大家的名字需要拆分为 first name 和 last name … 只放 first name"): Identity opens on the two, filled from the full name's first word and the rest, HR's to change; the Revenue app's *Hello,* is the first name — one word → People › a person's page; Voice
 - **v4.86** · 2026-10-17 · The Finance app's Me card is a slim bar (the user: "这个 bar 本身太大了，做小一点"): one row in the page's 16px margins — the clock, the day over its line, a small *Clock in* — 42px where it took 91 → Me
 - **v4.85** · 2026-10-17 · One Edit profile (the user: "finance app 他原本的那个profile就不需要了，帮我删除掉，留new de 就好", on the computer too): Me › Profile's, which HR approves; the Finance app's Profile and the desktop's account menu lose theirs → Finance's view — its own shell
