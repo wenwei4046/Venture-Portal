@@ -7,7 +7,7 @@ vi.mock('./config', () => ({
   VAPID_SUBJECT: 'https://venture.example',
 }))
 import { flushPush, outboxSecret, pushMessageOf } from './outbox'
-import { crmPushFromRow, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
+import { crmPushFromRow, meOpenTarget, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
 
 // RFC 8291's example keys stand in for the server's (any valid P-256 pair will do).
 const PRIVATE = 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw'
@@ -113,6 +113,18 @@ describe('a notice', () => {
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')
     expect(openTarget('hire:HR-301')).toEqual({ k: 'hire', id: 'HR-301' })
     expect(openTarget('nope:1')).toBeNull()
+  })
+
+  it('about one’s own request, decided (2026-10-17): Me on that request — through the start, which knows the face', () => {
+    expect(noticeUrl({ refKind: 'att_request', refId: 'a1b2' }, 'hr')).toBe('/?open=me:a1b2')
+    // The Revenue app has no Me: its front page.
+    expect(noticeUrl({ refKind: 'att_request', refId: 'a1b2' }, 'revenue')).toBe('/member')
+    expect(openTarget('me:a1b2')).toEqual({ k: 'me', id: 'a1b2' })
+    expect(meOpenTarget('?open=me:a1b2&x=1')).toBe('a1b2')
+    expect(meOpenTarget('?open=hire:HR-301')).toBeNull()
+    expect(meOpenTarget('')).toBeNull()
+    // Never in a bell.
+    expect(noticesFromRow({ unread: 0, items: [{ id: 'n', kind: 'attendance', title: 'T', refKind: 'att_request', refId: 'a1b2' }] }).items).toEqual([])
   })
 
   it('reads the database’s answer, keeping only well-formed notices', () => {

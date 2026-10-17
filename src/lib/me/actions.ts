@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { getAccountUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { pushSoon } from '@/lib/push/outbox'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
 import { viewingAsSomebody } from '@/lib/view-as-person'
 
@@ -117,8 +118,11 @@ export async function meCancel(requestId: string): Promise<MeAct> {
 /** An upline's decision on what waits at their own step (a note is needed to reject). */
 export async function meDecide(requestId: string, approve: boolean, note: string): Promise<MeAct<{ status: string }>> {
   if (!UUID.test(requestId ?? '')) return { ok: false, reason: 'That request is not there.' }
-  return call('att_decide', { p_request: requestId, p_approve: approve === true, p_note: typeof note === 'string' ? note.trim().slice(0, 500) : '' },
+  const res = await call<{ status: string }>('att_decide', { p_request: requestId, p_approve: approve === true, p_note: typeof note === 'string' ? note.trim().slice(0, 500) : '' },
     'The request could not be decided. Please try again.')
+  // Decided (mig 20261017120000): the database told its person; their phone hears once the answer has gone back.
+  if (res.ok && res.data.status !== 'pending') pushSoon()
+  return res
 }
 
 /** One's photo (the avatar's camera badge): profile/<login>/…, filed by the browser first. */

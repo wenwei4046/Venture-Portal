@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ds/Button'
 import { hm } from '@/lib/me/format'
 import { todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
 import { NUM } from './kit'
 import { MeOverlay } from './MeOverlay'
-import { useClock, useMe } from './useMe'
+import { useClock, useMe, useOpenedRequest } from './useMe'
 
 /**
  * The Finance app's way into Me (2026-10-17 — the user: the Finance app keeps its Profile tab, "a Me card (today's
@@ -19,6 +19,9 @@ export function MeCard({ backLabel = 'Profile' }: { backLabel?: string }) {
   const me = useMe(true)
   const [open, setOpen] = useState(false)
   const [punch, setPunch] = useState<'in' | 'out' | null>(null)
+  // A tapped notice about one's own request (`/fin-app/profile?open=me:<id>`, 2026-10-17): Me opens on it.
+  const [asked, askedDone] = useOpenedRequest()
+  useEffect(() => { if (asked) setOpen(true) }, [asked])
   const nowSec = useClock(me.s.today?.now, me.s.todayAt)
   const card = todayCard(me.s.today, nowSec, officeToday())
   if (!card) return null
@@ -38,7 +41,7 @@ export function MeCard({ backLabel = 'Profile' }: { backLabel?: string }) {
           </span>
         ) : <span aria-hidden="true" style={{ color: 'var(--ds-dark-sub)', fontSize: 20 }}>›</span>}
       </div>
-      <MeOverlay me={me} open={open} onClose={() => { setOpen(false); setPunch(null) }} backLabel={backLabel} startPunch={punch} />
+      <MeOverlay me={me} open={open} onClose={() => { setOpen(false); setPunch(null); askedDone() }} backLabel={backLabel} startPunch={punch} startRequest={asked} />
     </>
   )
 }

@@ -63,11 +63,13 @@ export interface MeAppProps {
   source: 'app' | 'web'
   /** Open straight on the camera (the card's Clock in). */
   startPunch?: 'in' | 'out' | null
+  /** Open on one's own request (a tapped notice that it was decided, 2026-10-17). */
+  startRequest?: string | null
   /** The HR app's account rows, under the record in Profile. */
   accountRows?: ReactNode
 }
 
-export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source, startPunch = null, accountRows }: MeAppProps) {
+export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source, startPunch = null, startRequest = null, accountRows }: MeAppProps) {
   const { s } = me
   const phone = mode === 'phone'
   const data = s.data
@@ -129,6 +131,14 @@ export function MeApp({ me, mode, hostLabel, backLabel = 'Back', onClose, source
     if (startPunch && !started.current && data) { started.current = true; punch(startPunch) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startPunch, data])
+  // A tapped notice: the request's sheet, once what Me read has it.
+  const opened = useRef<string | null>(null)
+  useEffect(() => {
+    if (startRequest && opened.current !== startRequest && data?.requests.some(r => r.id === startRequest)) {
+      opened.current = startRequest
+      setSheet({ k: 'req', id: startRequest })
+    }
+  }, [startRequest, data])
 
   const card = todayCard(s.today, nowSec, officeToday())
   const person = data?.me ?? null

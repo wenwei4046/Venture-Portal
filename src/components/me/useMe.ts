@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { addDays, firstOfMonth } from '@/lib/attendance/engine'
 import type { MyDocuments } from '@/lib/documentation/personal'
 import { secOf } from '@/lib/me/format'
+import { meOpenTarget } from '@/lib/push/notices'
 import { photoLink, readDocuments, readMe, readOrg, readPayslips, readRecord, readTeam, readToday } from '@/lib/me/read'
 import type { MeData, MeOrg, MePayslip, MeRecord, MeTeam, MeToday } from '@/lib/me/types'
 
@@ -109,6 +110,27 @@ export function useMe(enabled = true) {
 }
 
 export type MeHandle = ReturnType<typeof useMe>
+
+/**
+ * A tapped notice about one's own request (2026-10-17, `?open=me:<id>` — lib/push/notices noticeUrl): the request to
+ * open Me on, read once from the address the page started on, then taken off it so a refresh does not open it again;
+ * `done()` once Me has closed, so opening it again starts on its hub.
+ */
+export function useOpenedRequest(enabled = true): [string | null, () => void] {
+  const [id, setId] = useState<string | null>(null)
+  const done = useCallback(() => setId(null), [])
+  useEffect(() => {
+    if (!enabled) return
+    const want = meOpenTarget(window.location.search)
+    if (!want) return
+    const q = new URLSearchParams(window.location.search)
+    q.delete('open')
+    const rest = q.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`)
+    setId(want)
+  }, [enabled])
+  return [id, done]
+}
 
 /** The server's clock, to the second: its reading at `at`, carried on by the device's clock. */
 export function useClock(serverNow: string | null | undefined, at: number): number {

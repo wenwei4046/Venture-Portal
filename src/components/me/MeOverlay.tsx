@@ -10,12 +10,14 @@ import type { MeHandle } from './useMe'
  * Profile — pushed in as the HR app's sub screens are (28px from the right and a fade, .26s on the house curve) and
  * back out the same way.
  */
-export function MeOverlay({ me, open, onClose, backLabel, startPunch, accountRows }: {
+export function MeOverlay({ me, open, onClose, backLabel, startPunch, startRequest, accountRows }: {
   me: MeHandle
   open: boolean
   onClose: () => void
   backLabel: string
   startPunch?: 'in' | 'out' | null
+  /** A tapped notice's request (2026-10-17): Me opens on it. */
+  startRequest?: string | null
   accountRows?: ReactNode
 }) {
   const [mounted, setMounted] = useState(open)
@@ -37,7 +39,8 @@ export function MeOverlay({ me, open, onClose, backLabel, startPunch, accountRow
       transition: 'transform .26s cubic-bezier(.2,.8,.2,1), opacity .26s cubic-bezier(.2,.8,.2,1)',
     }}>
       <div style={{ height: '100%', maxWidth: 560, margin: '0 auto' }}>
-        <MeApp me={me} mode="phone" hostLabel="" backLabel={backLabel} onClose={onClose} source="app" startPunch={startPunch} accountRows={accountRows} />
+        <MeApp me={me} mode="phone" hostLabel="" backLabel={backLabel} onClose={onClose} source="app" startPunch={startPunch} startRequest={startRequest}
+          accountRows={accountRows} />
       </div>
     </div>,
     document.body,

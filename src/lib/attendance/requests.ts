@@ -13,6 +13,15 @@ export type Bucket = 'hr' | 'upline' | 'decided'
 
 export const waitingStep = (r: AttRequest): AttStep | null => (r.status === 'pending' ? r.steps.find(s => s.state === 'waiting') ?? null : null)
 
+/**
+ * The step waits at the viewer's OWN upline seat (2026-10-17): theirs to decide as the upline — `att_decide` records
+ * it so — never "on behalf" of themselves. Known as the request page knows its own (`config.me`, a login's name).
+ */
+export function waitsAtMe(r: AttRequest, config: { me: string; people: ReadonlyArray<{ id: string; name: string; hasLogin: boolean }> }): boolean {
+  const w = waitingStep(r)
+  return w?.role === 'upline' && !!w.approverId && config.people.some(p => p.id === w.approverId && p.hasLogin && p.name === config.me)
+}
+
 /** Pending (waiting for HR) · At upline · Decided. */
 export function bucketOf(r: AttRequest): Bucket {
   const w = waitingStep(r)
