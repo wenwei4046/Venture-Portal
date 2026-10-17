@@ -5,15 +5,22 @@
  * (Chrome, or Samsung Internet) has no camera permission in Android's settings, and Android no longer asks once it was
  * refused. The CRM's own permissions have nothing to do with it. An iPhone shows its own menu over the page, so it is not
  * watched there.
+ *
+ * On Android the button asks for a photo only (2026-10-17 — the owner: "我按 camera 的时候，它其实并没有帮我开 camera，
+ * 它跳出来反而是 select photo"): Chrome opens the camera straight away only when every accepted type is one kind
+ * (Chromium's SelectFileDialog: captureImage() is `capture` and image types only), so "image/*,video/*" went to the
+ * photo picker. A video is picked from the gallery; an iPhone keeps its own menu (photo or video).
  */
 export const CAMERA_HELP = "The camera didn't open. In Android Settings › Apps › Chrome (or Samsung Internet) › Permissions, allow Camera, then try again.";
 export const CAMERA_WAIT_MS = 1500;
+export const ANDROID_CAMERA_ACCEPT = "image/*";
 
 export function openCamera(inputId: string, warn: (text: string) => void): void {
   const input = typeof document !== "undefined" ? document.getElementById(inputId) as HTMLInputElement | null : null;
   if (!input) return;
   const android = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
   if (android) {
+    input.accept = ANDROID_CAMERA_ACCEPT;
     let left = false;
     const away = () => { left = true; };
     document.addEventListener("visibilitychange", away, { once: true });
