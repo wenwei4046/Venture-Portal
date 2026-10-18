@@ -1049,7 +1049,8 @@ interface AdListBits {
     rows: { name: string; nameless: boolean; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
   stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
 }
-const AD_GRID = "minmax(0,1fr) 52px 106px 64px";
+// The name keeps 136 px (the channel icon and "Not named yet"); the split bar gives way first on a narrow screen (the owner, 2026-10-18: "调一下 Split 宽度").
+const AD_GRID = "minmax(136px,1fr) 44px minmax(0,106px) 64px";
 
 /** Frame 06 · Assignment › Ads to teams: the summary and team legend, then every ad — channel, name, headline, leads, its split, Edit split / Set up. */
 export function DeskAdList4a({ v }: { v: AdListBits }) {

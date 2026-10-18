@@ -161,7 +161,10 @@ export function frameVM(ctx: DeskCtx) {
     ? { ini: "PR", name: "Principal", first: "Principal", sub: "Principal · All access" }
     : { ini: initials(me.name), name: me.name, first: first(me.name), sub: `${jobTitle(me)} · ${ctx.app.subName.replace(/ view$/, "")}` };
   const undo = ui.undo;
-  const sheetW = ui.sheetW ?? (W1440 ? 461 : 420) /* 4a: the docked editor (frame 06) */, menuW = ui.menuW ?? (W1440 ? 340 : 310);
+  // 4a: the docked editor (frame 06). On Ads to teams it stands beside Ad performance's and the Audit log's strips, so it
+  // starts narrower and the ad list keeps room for the names (the owner, 2026-10-18: "调一下 Split 宽度"); a drag still sets it.
+  const adsOp = opItem[0] === "Ads to teams";
+  const sheetW = ui.sheetW ?? (adsOp ? (W1440 ? 384 : 336) : W1440 ? 461 : 420), menuW = ui.menuW ?? (W1440 ? 340 : 310);
   const alertsN = alertsUnreadN(ctx);
   return {
     W, H, sbW, sbOpen: !collapsed, sbClosed: collapsed, sections, appTop, appBottom, crmItems, crmGroups,
