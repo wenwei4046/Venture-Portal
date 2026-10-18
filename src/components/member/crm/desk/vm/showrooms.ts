@@ -129,7 +129,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     srDtNoAdd: !okD, srDtAddBg: okD ? "var(--crm-rust)" : "var(--crm-line)",
     srDtAdd: () => { if (!okD || !dr) return; upd({ blocks: [...dr.blocks, { kind: "date", from: bk.from, to: bk.to || bk.from, allDay: bk.allDay, ranges: bk.allDay ? [] : bk.ranges, reason: bk.reason }] });
       patch({ srBlk: { ...bk, from: "", to: "", reason: "", allDay: true, ranges: [{ f: "11:00 am", t: "1:00 pm" }] } }); },
-    srApplyAll: () => void save(true), srSave: () => void save(false), srClose: () => patch({ srEdit: null, srDraft: null }),
+    srEditing: !!en, srApplyAll: () => void save(true), srSave: () => void save(false), srClose: () => patch({ srEdit: null, srDraft: null }),
     srE: dr ? {
       manual: dr.manual, showAuto: !dr.manual && !!dr.addr, showNoAddr: !dr.manual && !dr.addr, gmapUrl: dr.addr ? mapU(dr.addr).g : "", wazeUrl: dr.addr ? mapU(dr.addr).w : "",
       linkFields: ([["var(--crm-brand-maps)", "G", "gmap", "https://maps.app.goo.gl/…"], ["var(--crm-brand-waze)", "W", "waze", "https://waze.com/ul/…"]] as const).map(([bg, ch, k, ph]) => ({ bg, ch, ph, v: dr[k] || "", set: (e: { target: { value: string } }) => upd({ [k]: e.target.value }) })),

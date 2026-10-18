@@ -128,7 +128,7 @@ try {
   for (const [n, t] of pages) {
     await tap(t, "lastAside"); await shot("desktop", n, t);
     if (t === "Inbox") {
-      await js("[...document.querySelectorAll('[data-revenue-app] [style*=cursor]')].find(e => e.offsetParent && /Lim Wei Jie|Chong Li Na|Tan Mei Ling/.test(e.innerText) && e.innerText.length < 200)?.click()"); await sleep(1500);
+      await js("[...document.querySelectorAll('[data-revenue-app] [style*=cursor]')].find(e => e.offsetParent && /Lim Wei Jie|Chong Li Na|Tan Mei Ling/.test(e.innerText) && e.innerText.length < 260)?.click()"); await sleep(1500);
       await shot("desktop", "03-inbox-chat", "Inbox · a chat open");
     }
     if (t === "Contacts") {

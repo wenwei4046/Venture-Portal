@@ -36,6 +36,8 @@ for (const [from, to, why] of PATCHES) {
 body = require("./desk-motion.cjs")(body);
 // 4a's palette (2026-10-18, palette-4a.cjs): every hex the patches left becomes its --crm-* token.
 body = require("./palette-4a.cjs")(body, "DeskApp");
+// 4a's frame and pages (desk-4a.cjs), after the palette, whose tokens it matches.
+body = require("./desk-4a.cjs")(body);
 if (missed.length) console.log("patches not matched once:\n" + missed.join("\n"));
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";
@@ -49,6 +51,7 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
+import { ${[...new Set([...body.matchAll(/<(Desk\w*4a\w*)\b/g)].map(m => m[1]))].sort().join(", ")} } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 

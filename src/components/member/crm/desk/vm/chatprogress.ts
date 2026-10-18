@@ -91,7 +91,17 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
     owner: ibR ? `${ibR.c.assignedTo ? nameOf(ibR.c.assignedTo) : "No one yet"}${ibR.c.assignedTo && teamOf(ibR.c.assignedTo) ? ` · ${teamOf(ibR.c.assignedTo)}` : ""}` : "",
     steps: ibSteps.map((s, i) => ({ ...s, lL: i === 0 ? "transparent" : s.lL, lR: i === 4 ? "transparent" : s.lR })),
     rail: ibSteps.map((s, i) => ({ dot: s.dot, ring: s.ring, size: s.size, tip: `${s.label} · ${s.date}`, gap: i === 4 ? "transparent" : "var(--crm-rule)" })),
-    ev: ibR ? evRows(ibR, "12px") : [] };
+    ev: ibR ? evRows(ibR, "12px") : [],
+    // 4a's per-chat Audit log (frames 02b / 02c): the same journey, newest first, as a timeline — what, the detail, who.
+    audit4: ibR ? ibR.ev.slice().reverse().map(e => {
+      const came = e.text.startsWith("Came in");
+      const WHAT: Record<string, string> = { assign: "Assigned", move: "Moved", share: "Shared", reply: came ? "Lead arrived" : "First reply", appt: e.text.startsWith("Changed") ? "Visit changed" : "Visit booked",
+        visit: "Checked in", status: "Status changed", won: "Won", lost: "Lost", remind: "Reminder", note: "Note added" };
+      const t = new Date(e.at), hm = t.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
+      return { what: WHAT[e.kind] ?? "Change", detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note].filter(Boolean).join(" · "),
+        who: e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : came ? "Meta" : "Automatic",
+        time: t.toDateString() === now.toDateString() ? hm : `${dShort(e.at)}, ${hm}`, main: ["appt", "won", "lost"].includes(e.kind), hot: e.kind === "status" };
+    }) : [] };
   return {
     ibCp,
     cpOpen: open, isCpOp: opItem === "Chat progress",

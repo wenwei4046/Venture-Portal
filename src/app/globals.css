@@ -406,6 +406,8 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-delta-bad: #FFD9A0;
   --crm-peach: #F4A877;
   --crm-peach-soft: #F9D3BA;
+  --crm-hero-line: #EBD6C3;
+  --crm-track: #EFE7E1;
   /* channels — these two appear nowhere else */
   --crm-whatsapp: #25D366;
   --crm-messenger: #0A7CFF;

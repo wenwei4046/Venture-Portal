@@ -90,6 +90,14 @@ export function auditVM(ctx: DeskCtx) {
         avBg: sys ? "var(--crm-field)" : c[2], avFg: sys ? "var(--crm-ink-soft)" : c[1], action: e.action, target: e.target, detail: e.detail }; }),
     auGrid: `${w0[0]}px ${w0[1]}px ${w0[2]}px minmax(160px, 1fr)`,
     auDrag0: mk(0), auDrag1: mk(1), auDrag2: mk(2), auReset: () => patch({ auCols: null }),
+    // 4a's Export CSV (2026-10-18): the rows on screen — this filter, this search — as a CSV the browser saves.
+    auCount: rows.length,
+    auditCsv: () => {
+      const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+      const lines = [["When", "Who", "Change", "Area", "Before → after"], ...rows.map(e => [new Date(e.at).toISOString(), e.who, e.action, e.target, e.detail ?? ""])];
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map(l => l.map(x => esc(String(x))).join(",")).join("\n")], { type: "text/csv" }));
+      a.download = "CRM audit log.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    },
     auEmpty: !rows.length, auHas: rows.length > 0, auClear: () => patch({ auWho: "all", auQ: "" }),
   };
 }

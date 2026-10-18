@@ -45,6 +45,8 @@ export interface DeskUi {
   insPer: "day" | "week" | "month" | "custom";
   insRange: { a: number; b: number } | null;
   insOpen: boolean;
+  /** 4a's Insight: the team opened in place to its people (frame 01). */
+  insTeam: string | null;
   /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
   insCards: string[] | null;
   /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
@@ -53,6 +55,8 @@ export interface DeskUi {
   whoSel: string[];
   whoOpen: boolean;
   inbF: string;
+  /** 4a's Inbox search (frame 02): a name, a message or an ad. */
+  ibQ: string;
   // Assignment
   sendFor: string | null;
   awChat: string | null;
@@ -169,8 +173,8 @@ export type FormSection = CrmForm["sections"][number];
 export const initialDeskUi = (): DeskUi => ({
   tab: "insight", pane: "closed", kind: "chat", collapsed: false, fold: {}, stage: "menu", pick: null, menu: false, toast: "", undo: null,
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
-  insPer: "month", insRange: null, insOpen: false, insCards: null, mFor: "ads",
-  whoSel: [], whoOpen: false, inbF: "All",
+  insPer: "month", insRange: null, insOpen: false, insTeam: null, insCards: null, mFor: "ads",
+  whoSel: [], whoOpen: false, inbF: "All", ibQ: "",
   sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "all", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
   calView: "month", // the owner, 2026-10-15: "default month" (the prototype opens on Upcoming)
@@ -205,6 +209,14 @@ export interface DeskApp {
   openSubDept(): void;
   openBell(): void;
   signOut(): void;
+  /** 4a's Revenue sidebar (2026-10-18), as the Revenue app's own desktop sidebar has them: the screens their ticks close, */
+  hidden?: readonly string[];
+  /** the CRM's unread (its row's count), */
+  crmUnread?: number;
+  /** the Product List row (an account holding product_list), */
+  products?: { group: string; onOpen: () => void } | null;
+  /** and the module switcher (a Principal's). */
+  modules?: { current: string; onPick: (id: string) => void } | null;
 }
 
 /**

@@ -66,7 +66,7 @@ export function frameVM(ctx: DeskCtx) {
   const { ui, set, patch, W, H, me, data } = ctx;
   const tab = ui.tab, pane = ui.pane, kind = ui.kind;
   const collapsed = ui.collapsed;
-  const sbW = collapsed ? 72 : 240;
+  const sbW = collapsed ? 72 : 477; // 4a: the Revenue sidebar (216 + its 24 px padding) and the CRM nav (212 + 24 + its 1 px rule); shut, the 72 px rail
   const crmW = W - sbW;
   const role = me.role === "boss" ? "principal" : "director";
   const teamMine = role === "director";
@@ -74,10 +74,14 @@ export function frameVM(ctx: DeskCtx) {
   // Inbox's four columns (v2): list › chat › Customer info › Chat progress (a 44 px rail when shut), each dragged to size.
   const ibOn = tab === "inbox" && (pane === "docked" || pane === "empty");
   const ibHas = pane === "docked";
-  const ibCpOpen = !!ui.ibCp, ibCpDock = ibCpOpen && W1440;
-  const ibListW = ui.ibListW ?? (W1440 ? 320 : 300), ibInfoW = ui.ibInfoW ?? 260, ibCpW = ui.ibCpW ?? 260;
+  // 4a (frames 02 / 02b / 02c, change list 13): the list 290, Customer info 260, the chat's Audit log 290 — each a 44 px
+  // strip when folded, docked beside the chat at every width. From 1680 px both may be open; below, opening one folds
+  // the other (the toggles below).
+  const ibCpOpen = !!ui.ibCp, ibCpDock = ibCpOpen;
+  const ibListW = ui.ibListW ?? 290, ibInfoW = ui.ibInfoW ?? 260, ibCpW = ui.ibCpW ?? 290;
+  const BOTH = W >= 1680;
   let dockW = W1440 ? 440 : 400;
-  if (ibOn) dockW = crmW - ibListW - ibInfoW - (ibCpDock ? ibCpW : 44);
+  if (ibOn) dockW = crmW - ibListW - (ui.ibInfoShut ? 44 : ibInfoW) - (ibCpDock ? ibCpW : 44);
   const ibSpare = Math.max(0, dockW - 300);
   const manage = data.can.manage;
   const tabList = PANEL_TABS.filter(([id]) => manage || !MANAGE_TABS.has(id));
@@ -168,14 +172,14 @@ export function frameVM(ctx: DeskCtx) {
     // Inbox's columns (v2).
     ibCols: ibOn, ibInfoW, ibCpW, ibHas, ibNone: !ibHas,
     // Customer info folds to a strip and back (the owner, 2026-10-16: "右邊的 customer info 做也能收起的功能，但是 default 是開著的").
-    ibInfoShut: ui.ibInfoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false }) },
+    ibInfoShut: ui.ibInfoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false, ...(BOTH ? {} : { ibCp: false }) }) },
     dragList: edgeDrag(set, "ibListW", ibListW, 1, 260, ibListW + ibSpare), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
     dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(440, ibCpW + ibSpare) : 440),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),
     ibCpOpen: ibOn && ibCpOpen, ibCpClosed: ibOn && !ibCpDock,
     ibCpStyle: (ibCpDock ? { position: "relative", flex: `0 0 ${ibCpW}px`, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", minHeight: 0 }
       : { position: "absolute", top: 0, right: ibInfoW + 44, bottom: 0, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", boxShadow: "-16px 0 40px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", zIndex: 4 }) as CSSProperties,
-    ibCpToggle: () => patch({ ibCp: !ui.ibCp }),
+    ibCpToggle: () => patch({ ibCp: !ui.ibCp, ...(!ui.ibCp && !BOTH ? { ibInfoShut: true } : {}) }),
     // Every pane and editor is dragged to size; a double-click gives it back (v2).
     sheetW, dragSheet: edgeDrag(set, "sheetW", sheetW, -1, 360, W1440 ? 760 : 620), resetSheet: () => patch({ sheetW: null }),
     paneDrag: !ibOn && !sheetMode && !isOverlay && paneShown, dragPane: edgeDrag(set, "paneW", paneW, -1, 300, crmW - 320), resetPane: () => patch({ paneW: null }),

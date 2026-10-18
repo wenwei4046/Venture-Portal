@@ -15,6 +15,7 @@ import { numbersOf, pct } from "../../panel/vm/common";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
+import { isNewChat } from "../../shared/new-chat";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -70,6 +71,37 @@ export function inboxVM(ctx: DeskCtx) {
 
   return {
     kList: ui.tab === "inbox", chats, filters, showWho: true,
+    // 4a's Inbox list (frame 02): Everyone ▾, search, the eight status tabs Mine and Team share, the rows.
+    list4: (() => {
+      const isCold = (x: ChatRow) => x.key === "Cold";
+      const T4: [string, (x: ChatRow) => boolean, boolean][] = [
+        ["All", () => true, false], ["New", x => !isCold(x) && isNewChat(x.c), false], ["Attention", x => ["Overdue", "Urgent", "Reply soon"].includes(x.key), true],
+        ["Follow up", x => x.key === "Follow up", false], ["Appointment", x => x.key === "Appointment", false], ["Won", x => x.key === "Won", false],
+        ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false]];
+      const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
+      const q = (ui.ibQ ?? "").trim().toLowerCase();
+      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q);
+      const rows = [...shown.filter(cur[1]).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
+      const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
+      return {
+        q: ui.ibQ ?? "", setQ: (e: { target: { value: string } }) => patch({ ibQ: e.target.value }),
+        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        rows: rows.map(x => {
+          const p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread, [avBg, avFg] = avatarTint(x.name);
+          const u = urgencyOf(x.c, now), visit = data.visits.filter(v => v.customerId === x.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
+          const lastIn = x.c.lastCustomerAt ? new Date(x.c.lastCustomerAt).getTime() : null;
+          const note = u.level !== "none" ? { text: u.label, kind: u.level === "soon" ? "warm" : "hot" }
+            : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
+              : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
+          const sel = ui.pane === "docked" && ui.chat === x.id;
+          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: x.ad, msg: x.msg, time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
+            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel,
+            note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
+            noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",
+            open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) };
+        }),
+      };
+    })(),
     // v2 keeps the Action tab's markup (Organic leads); there is no such tab since 2026-10-13.
     isAction: false, notAction: true, actN: 0, actEmpty: false, whoOpen: ui.whoOpen, toggleWho: () => set(u => ({ ...u, whoOpen: !u.whoOpen })),
     whoLabel: !whoSel.length ? "Everyone" : whoSel.length === 1 ? whoName(whoSel[0]) : `${whoName(whoSel[0])} +${whoSel.length - 1}`,

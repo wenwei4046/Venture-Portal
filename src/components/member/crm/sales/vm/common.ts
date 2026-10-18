@@ -76,7 +76,8 @@ export function isCold(c: CrmCustomer, now: Date): boolean {
 /** Reply urgency, from the one rule (crm.ts: 3 h · 6 h · 9 h on real time). */
 export function urgencyOf(c: CrmCustomer, now: Date) {
   const u = replyUrgency(asLead(c), now);
-  const color = u.level === "overdue" ? RUST : u.level === "urgent" ? "var(--crm-brown)" : SUB;
+  // 4a (change list 3): Urgent and Overdue are urgent text in oxblood, Reply soon in ink.
+  const color = u.level === "overdue" || u.level === "urgent" ? "var(--crm-oxblood)" : "var(--crm-ink)";
   const label = u.level === "none" ? "" : `${u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : "Reply soon"} · ${Math.floor(u.waitingMinutes / 60)} h`;
   return { ...u, color, label };
 }

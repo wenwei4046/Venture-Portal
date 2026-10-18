@@ -5,6 +5,7 @@
  */
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
+import { frame4aVM, heads4a } from "./frame4a";
 import { clistVM, insightVM } from "./insight";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, teamPaneVM } from "./inbox";
 import { answerOf, formV2 } from "./form";
@@ -24,6 +25,8 @@ import { chatVM } from "./chat";
 import { railVM } from "./rail";
 import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
 import { adHref } from "../../shared/AdLink";
+import { urgencyOf } from "../../sales/vm/common";
+import { avatarTint } from "../../shared/palette";
 
 export function deskVM(ctx: DeskCtx) {
   const { ui, patch, data } = ctx;
@@ -53,7 +56,7 @@ export function deskVM(ctx: DeskCtx) {
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;
   const pp = peopleVM(ctx), cal = calendarVM(ctx);
   const undoOn = !!ui.undo && ui.undo.until > ctx.now.getTime();
-  return {
+  const out = {
     ...fr,
     ...insightVM(ctx),
     ...clist, ...team, ...info,
@@ -69,7 +72,11 @@ export function deskVM(ctx: DeskCtx) {
     ...channelsVM(ctx),
     ...adsPerfVM(ctx),
     ...chatProgressVM(ctx, op),
-    ph: heads[ui.kind] ?? heads.chat,
+    // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
+    // waiting 6 h") or its status in the muted line's colour.
+    ph: { avBg: undefined as string | undefined, avFg: undefined as string | undefined, status: "", statusColor: "var(--crm-muted)", ...(heads[ui.kind] ?? heads.chat),
+      ...(ui.kind === "chat" && cur ? (() => { const u = urgencyOf(cur, ctx.now), [avBg, avFg] = avatarTint(cur.name);
+        return { avBg, avFg, status: u.level !== "none" ? `Attention · waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)" }; })() : {}) },
     chatOwner: chat.owner, chatReply: chat.reply, msgs: chat.msgs, firstDay: chat.firstDay, draft: chat.draft, setDraft: chat.setDraft, draftKey: chat.draftKey, send: chat.send, micD: chat.micD, sendTitle: chat.sendTitle, photo: chat.photo,
     pinShown: chat.pinShown, pinText: chat.pinText, unpinMsg: chat.unpinMsg, replyOn: chat.replyOn, replyWho: chat.replyWho, replyText: chat.replyText, cancelReply: chat.cancelReply,
     attachOpen: chat.attachOpen, attachToggle: chat.attachToggle, attachClose: chat.attachClose, attachOpts: chat.attachOpts,
@@ -84,6 +91,8 @@ export function deskVM(ctx: DeskCtx) {
           return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
     awInfo: () => { if (awC) patch({ awMenuOpen: false, tab: ui.tab, pane: "overlay", kind: "info", infoId: awC.id, visit: null }); },
     awBook: () => { if (awC) patch({ awMenuOpen: false, pane: "overlay", kind: "book", chat: awC.id, book: null }); },
+    // 4a Customer info's Book a visit (frame 02): the chat's own Appointment, as its ⋮ menu opens it.
+    ibBook: () => { if (ui.chat) patch({ menu: false, kind: "book", book: null }); },
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
     editInfo: () => patch({ kind: "form", cform: null }),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
@@ -101,5 +110,7 @@ export function deskVM(ctx: DeskCtx) {
     // Meta Ads is not connected yet (PROPOSALS.md C): its columns read "—" and the line says why.
     metaSync: "Meta Ads not connected yet", metaDot: "var(--crm-faint)",
   };
+  // 4a's frame (2026-10-18): the Revenue sidebar, the CRM nav, the top bar and each page's head — vm/frame4a.ts.
+  return { ...out, f4: frame4aVM(ctx, out, heads4a(ctx, { ...out, ppCount: data.customers.length, showroomCount: data.rooms.length })) };
 }
 export type DeskVM = ReturnType<typeof deskVM>;

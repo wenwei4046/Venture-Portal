@@ -10,6 +10,7 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -18,99 +19,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
   return (<>
     <div style={{ width: `${v.W}px`, height: `${v.H}px`, position: "relative", overflow: "hidden", borderRadius: v.frameRadius, background: "var(--crm-page)", fontFamily: "Inter, sans-serif", color: "var(--crm-ink)", WebkitFontSmoothing: "antialiased", boxShadow: v.frameShadow }}>
       {!!(v.sbOpen) && (<>
-        <aside style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "240px", boxSizing: "border-box", display: "flex", flexDirection: "column", background: "var(--crm-cream-nav)", borderRight: "1px solid var(--crm-rule)", zIndex: "6" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "24px 14px 18px 26px" }}>
-            <span style={{ flex: "1", minWidth: "0" }}>
-              <span style={{ display: "block", fontSize: "16px", fontWeight: "700", letterSpacing: ".14em", color: "var(--crm-ink)", lineHeight: "1.2" }}>HOUZS VENTURE</span>
-              <span style={{ display: "block", fontSize: "12.5px", fontWeight: "600", color: "var(--crm-rust)", marginTop: "3px" }}>CRM</span>
-            </span>
-            <button type="button" onClick={v.toggleSb} title="Collapse sidebar" style={{ flex: "0 0 auto", width: "32px", height: "32px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-faint)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h1}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 3v18M16 15l-3-3 3-3">
-                </path>
-              </svg>
-            </button>
-          </div>
-          <div style={{ margin: "0 26px", height: "1px", background: "var(--crm-rule)" }}>
-          </div>
-          <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "14px 14px 10px", display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {!!(v.showScope) && (<>
-                <div style={{ display: "flex", margin: "2px 0 8px 0", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                  {(v.scopeOpts).map((o, o_i) => (<Fragment key={o_i}>
-                    {!!(o.on) && (<>
-                      <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "26px", borderRadius: "7px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "12.5px", fontWeight: "650", boxShadow: "rgba(42,22,12,.14) 0 1px 3px", cursor: "pointer" }}>{o.label}</button>
-                    </>)}
-                    {!!(o.off) && (<>
-                      <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "26px", borderRadius: "7px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "12.5px", fontWeight: "550", cursor: "pointer" }} className={DH.h2}>{o.label}</button>
-                    </>)}
-                  </Fragment>))}
-                </div>
-              </>)}
-              {(v.crmGroups).map((g, g_i) => (<Fragment key={g_i}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: g.pt }}>
-                  {!!(g.label) && (<>
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".1em", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{g.label}<span style={{ flex: "1", height: "1px", background: "var(--crm-rule)" }}>
-                      </span></span>
-                  </>)}
-                  {(g.items).map((n, n_i) => (<Fragment key={n_i}>
-                    {!!(n.on) && (<>
-                      <button type="button" onClick={n.pick} style={{ display: "flex", alignItems: "center", gap: "12px", height: "42px", padding: "0 12px", border: "0", borderRadius: "10px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", font: "inherit", fontSize: "15px", fontWeight: "650", cursor: "pointer", textAlign: "left" }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d={n.d}>
-                          </path>
-                        </svg>
-                        <span style={{ flex: "1" }}>{n.label}</span>
-                        {!!(n.count) && (<>
-                          <span style={{ minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "11px", fontWeight: "700", lineHeight: "20px", textAlign: "center" }}>{n.count}</span>
-                        </>)}
-                      </button>
-                    </>)}
-                    {!!(n.off) && (<>
-                      <button type="button" onClick={n.pick} style={{ display: "flex", alignItems: "center", gap: "12px", height: "42px", padding: "0 12px", border: "0", borderRadius: "10px", background: "transparent", color: "var(--crm-ink)", font: "inherit", fontSize: "15px", fontWeight: "550", cursor: "pointer", textAlign: "left" }} className={DH.h3}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d={n.d}>
-                          </path>
-                        </svg>
-                        <span style={{ flex: "1" }}>{n.label}</span>
-                        {!!(n.count) && (<>
-                          <span style={{ minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "11px", fontWeight: "700", lineHeight: "20px", textAlign: "center" }}>{n.count}</span>
-                        </>)}
-                      </button>
-                    </>)}
-                  </Fragment>))}
-                </div>
-              </Fragment>))}
-            </div>
-          </div>
-          <div style={{ position: "relative", padding: "12px 14px 18px", borderTop: "1px solid var(--crm-rule)" }}>
-            {!!(v.meMenuOpen) && (<>
-              <div onClick={v.closeMeMenu} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-              </div>
-              <div style={{ position: "absolute", left: "14px", right: "14px", bottom: "calc(100% - 4px)", zIndex: "8", padding: "6px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "14px", boxShadow: "0 10px 30px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <button type="button" onClick={v.signOutMe} style={{ display: "flex", alignItems: "center", gap: "10px", height: "42px", padding: "0 10px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "600", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }} className={DH.h4}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9">
-                    </path>
-                  </svg>Sign out</button>
-              </div>
-            </>)}
-            <button type="button" onClick={v.returnApp} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "40px", marginBottom: "10px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h5}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11">
-                </path>
-              </svg>Back to Revenue app</button>
-            <button type="button" onClick={v.toggleMeMenu} title="Profile" style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px", borderRadius: "14px", border: `1px solid ${v.meBd}`, background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h6}>
-              <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", fontSize: "12.5px", fontWeight: "650", display: "grid", placeItems: "center" }}>{v.me.ini}</span>
-              <span style={{ flex: "1", minWidth: "0" }}>
-                <span style={{ display: "block", fontSize: "14px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.me.name}</span>
-                <span style={{ display: "block", fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.me.sub}</span>
-              </span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m7 15 5 5 5-5M7 9l5-5 5 5">
-                </path>
-              </svg>
-            </button>
-          </div>
-        </aside>
+        <Desk4aSide v={v} />
       </>)}
       {!!(v.sbClosed) && (<>
         <aside style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "72px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", background: "var(--crm-cream-nav)", borderRight: "1px solid var(--crm-rule)", zIndex: "6" }}>
@@ -160,63 +69,10 @@ export default function DeskApp({ v }: { v: DeskVM }) {
           <span title={v.me.name} style={{ marginBottom: "18px", width: "36px", height: "36px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", fontSize: "12px", fontWeight: "650", display: "grid", placeItems: "center" }}>{v.me.ini}</span>
         </aside>
       </>)}
-      <header style={{ position: "absolute", left: `${v.sbW}px`, right: "0", top: "0", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "16px", padding: "0 28px", background: "var(--crm-cream-nav)", borderBottom: "1px solid var(--crm-rule)" }}>
-        <span style={{ flex: "1", minWidth: "0", fontSize: "15px" }}>{v.greetWord}, <span style={{ color: "var(--crm-rust)", fontWeight: "650" }}>{v.me.first}</span>.</span>
-        <span style={{ flex: "0 0 auto", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 10px 0 12px", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", fontSize: "14px", fontWeight: "650", boxSizing: "border-box", cursor: v.subCur }} onClick={v.openSubDept}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-rust)" }}>
-          </span>{v.subLabel}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m6 9 6 6 6-6">
-            </path>
-          </svg></span>
-        <span style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: "12.5px", color: "var(--crm-muted)", letterSpacing: ".02em", whiteSpace: "nowrap" }}>{v.dateLine}</span>
-      </header>
-      <div style={{ position: "absolute", left: `${v.sbW}px`, top: "60px", right: "0", bottom: "0", display: "flex", flexDirection: "column", background: "var(--crm-page)", fontSize: "14px" }}>
-        <div style={{ flex: "0 0 56px", height: "56px", boxSizing: "border-box", display: "flex", alignItems: "stretch", gap: "0", padding: "0 20px 0 24px", background: "var(--crm-page)", borderBottom: "1px solid var(--crm-rule)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "16px" }}>
-            <span style={{ display: "flex", alignItems: "baseline", gap: "10px", whiteSpace: "nowrap" }}>
-              <strong style={{ fontSize: "18px", fontWeight: "700", letterSpacing: "-.01em", color: "var(--crm-ink)" }}>{v.pageTitle}</strong>
-              {!!(v.pageBadge) && (<>
-                <span style={{ fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)" }}>{v.pageBadge} new</span>
-              </>)}
-            </span>
-          </div>
-          <div style={{ flex: "1" }}>
-          </div>
-          <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "12px", whiteSpace: "nowrap" }}>
-            {!!(v.showPeriodCompact) && (<>
-              <span onClick={v.cyclePeriod} style={{ cursor: "pointer",  display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 10px 0 14px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-rule)", background: "#fff", fontSize: "13px", fontWeight: "650", whiteSpace: "nowrap" }}>{v.periodNow}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6">
-                  </path>
-                </svg></span>
-            </>)}
-            {!!(v.showPeriod) && (<>
-              <div style={{ display: "inline-flex", background: "var(--crm-field)", borderRadius: "11px", padding: "3px", gap: "2px" }}>
-                {(v.periodOpts).map((o, o_i) => (<Fragment key={o_i}>
-                  {!!(o.on) && (<>
-                    <span style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", fontSize: "13px", fontWeight: "650", boxShadow: "rgba(42,22,12,.14) 0 1px 3px", whiteSpace: "nowrap" }}>{o.label}</span>
-                  </>)}
-                  {!!(o.off) && (<>
-                    <span onClick={o.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", color: "var(--crm-muted)", fontSize: "13px", fontWeight: "550", whiteSpace: "nowrap", cursor: "pointer" }}>{o.label}</span>
-                  </>)}
-                </Fragment>))}
-              </div>
-              <span style={{ width: "1px", height: "24px", background: "var(--crm-rule)" }}>
-              </span>
-            </>)}
-            <button type="button" onClick={v.openAlerts} title="CRM alerts: moves, shares, won, lost, overdue 9 h+" style={{ flex: "0 0 auto", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 8px 0 12px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "13px", fontWeight: "650", cursor: "pointer" }} className={DH.h8}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z">
-                </path>
-                <path d="M12 8v4M12 15.5h.01">
-                </path>
-              </svg>
-              {!!(v.alertsLabel) && (<>
-                <span>CRM alerts</span>
-              </>)}
-              {!!(v.alertsHas) && (<span style={{ minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "11px", fontWeight: "700", display: "inline-grid", placeItems: "center" }}>{v.alertsN}</span>)}
-            </button>
-          </div>
-        </div>
-        <div style={{ flex: "1", minHeight: "0", position: "relative", display: "flex" }}>
+      <Desk4aTop f4={v.f4} left={v.sbW} />
+      <div style={{ position: "absolute", left: `${v.sbW}px`, top: "56px", right: "0", bottom: "0", display: "flex", flexDirection: "column", background: "var(--crm-page)", fontSize: "14px" }}>
+        <Desk4aHead f4={v.f4} />
+        <div style={{ flex: "1", minHeight: "0", position: "relative", display: "flex", borderTop: v.f4.bodyTop }}>
           {!!(v.sheetMode) && (<>
             <div style={{ flex: "1", minWidth: `${v.listMin}px`, overflow: "auto", background: "#fff", padding: v.pagePad, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "18px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -2532,10 +2388,10 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </button>
                 </div>
                 <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.aw.owner}</p>
-                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", padding: "10px 20px", backgroundColor: "var(--crm-cream)", backgroundImage: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%20viewBox%3D%220%200%20240%20240%22%20xmlns%3Ac2pa%3D%22http%3A%2F%2Fc2pa.org%2Fmanifest%22%3E%3Cmetadata%3E%3Cc2pa%3Amanifest%3EAAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo5ZWFmOWIzOC1kNTkzLTQyOWQtOTkyNi1hNjdmZWE4ZjVmNDcAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaC5n%2B3GamVtjP1Nu48g4xPcAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo2ZTVkNDFiZi02MmFhLTQyMDctOWI3Mi01ZjZlODE4OGIzYjdscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoHNx5AoLe0IwABjDTTKVPyAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggmA28hKHq5ZZucVKZm8w1CnHJ%2BNSw7C98gSiG8i6awQGkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaI6watomDKJihMTdVS%2BG5MAAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCAn2KA2qq3Hfr2%2BBiY8Sgy%2BQNuiXnmF5YsIFByFf8DaeWRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiWZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjllYWY5YjM4LWQ1OTMtNDI5ZC05OTI2LWE2N2ZlYThmNWY0Ny9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjAyMjQ4MDljLWI2YmQtNDRkMi05YjhiLTA5YTExMzYyNDFmN3JjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCCYDbyEoerllm5xUpmbzDUKccn41LDsL3yBKIbyLprBAaJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgguHSE7PUzPOmyhR0uRwsvmsJwFG3dCIkkvUEl71ykvnKiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgg3VBiBu4TxTGlGeik8yy6aCcS6ZdyaPY0DKPa0IOmJNp0Y2xhaW1fZ2VuZXJhdG9yX2luZm%2BjZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g%2FoGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd%2F3cyjxFA3Qo5S46fX0%2FihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB%2FwQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB%2FwQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj%2BOPEz5o%2BnMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn%2FaArXyTwFAZfKrPzxF2vPoJNf1%2BUCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9%2B1rdDwSPLMOPOjKuiXjoU%2FpUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQINdsvbpy3jWu6IJsli1FAPfajxZrqIIYnIGv53ID%2Fk3teatYqNqVpsUQKnGE80cQQdlE1awJpC%2FV%2ByuaFcAZpo%3D%3C%2Fc2pa%3Amanifest%3E%3C%2Fmetadata%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%237A6457%22%20stroke-opacity%3D%22.13%22%20stroke-width%3D%221.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20transform%3D%22translate(14%2012)%20rotate(-12%2012%2012)%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(92%208)%20rotate(10%2012%2012)%22%20d%3D%22M20%209V6a2%202%200%200%200-2-2H6a2%202%200%200%200-2%202v3M2%2016a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v1.5a.5.5%200%200%201-.5.5h-11a.5.5%200%200%201-.5-.5V11a2%202%200%200%200-4%200zM4%2018v2M20%2018v2M12%204v9%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(176%2020)%20rotate(-6%2012%2012)%22%20d%3D%22M2%204v16M2%208h18a2%202%200%200%201%202%202v10M2%2017h20M6%208v9%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(40%2074)%20rotate(8%2012%2012)%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(124%2066)%20rotate(-14%2012%2012)%22%20d%3D%22M8%202h8l4%2010H4L8%202ZM12%2012v6M8%2022v-2c0-1.1.9-2%202-2h4a2%202%200%200%201%202%202v2H8Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(200%2092)%20rotate(12%2012%2012)%22%20d%3D%22M19%2014c1.49-1.46%203-3.21%203-5.5A5.5%205.5%200%200%200%2016.5%203c-1.76%200-3%20.5-4.5%202-1.5-1.5-2.74-2-4.5-2A5.5%205.5%200%200%200%202%208.5c0%202.3%201.5%204.05%203%205.5l7%207Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(10%20140)%20rotate(6%2012%2012)%22%20d%3D%22M12%202l3.09%206.26L22%209.27l-5%204.87%201.18%206.88L12%2017.77l-6.18%203.25L7%2014.14%202%209.27l6.91-1.01L12%202z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(78%20128)%20rotate(-8%2012%2012)%22%20d%3D%22M8%202v4M16%202v4M3%2010h18M5%204h14a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(160%20150)%20rotate(14%2012%2012)%22%20d%3D%22M19%209V6a2%202%200%200%200-2-2H7a2%202%200%200%200-2%202v3M3%2016a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v2H7v-2a2%202%200%200%200-4%200ZM5%2018v2M19%2018v2%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(34%20200)%20rotate(-10%2012%2012)%22%20d%3D%22M22%2016.92v3a2%202%200%200%201-2.18%202%2019.79%2019.79%200%200%201-8.63-3.07%2019.5%2019.5%200%200%201-6-6%2019.79%2019.79%200%200%201-3.07-8.67A2%202%200%200%201%204.11%202h3a2%202%200%200%201%202%201.72%2012.84%2012.84%200%200%200%20.7%202.81%202%202%200%200%201-.45%202.11L8.09%209.91a16%2016%200%200%200%206%206l1.27-1.27a2%202%200%200%201%202.11-.45%2012.84%2012.84%200%200%200%202.81.7A2%202%200%200%201%2022%2016.92z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(118%20196)%20rotate(4%2012%2012)%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(196%20206)%20rotate(-12%2012%2012)%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%3E%3C%2Fpath%3E%3C%2Fg%3E%3Cg%20fill%3D%22%237A6457%22%20fill-opacity%3D%22.12%22%3E%3Ccircle%20cx%3D%2266%22%20cy%3D%2240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%2240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22104%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22230%22%20cy%3D%2260%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%22170%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22140%22%20cy%3D%22120%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22160%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%22230%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22180%22%20cy%3D%22240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%22100%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E')", backgroundSize: "240px 240px" }}>
-                  <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#fff", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", color: "var(--crm-ink)", fontSize: "12px", fontWeight: "600" }}>{v.aw.time}</span>
+                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                  <span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.aw.time}</span>
                   {!!(v.aw.inn) && (<>
-                    <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>
+                    <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
                       <p style={{ margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{v.aw.msg}</p>
                       <span style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px", fontSize: "11px", color: "var(--crm-muted)" }}>{v.aw.clock}</span>
                     </div>
@@ -2635,232 +2491,12 @@ export default function DeskApp({ v }: { v: DeskVM }) {
             </div>
           </>)}
           {!!(v.notWide) && (<>
-            <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: "20px 24px", display: "flex", flexDirection: "column", gap: "14px", overflow: "auto" }}>
-              {!!(v.kList) && (<>
-                {!!(v.showWho) && (<>
-                  <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <span style={{ position: "relative", flex: "0 0 auto" }}>
-                      <button type="button" onClick={v.toggleWho} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px 0 6px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><span style={{ display: "flex", paddingLeft: "5px" }}>
-                          {(v.whoAvs).map((vi, vi_i) => (<Fragment key={vi_i}>
-                            <span style={{ width: "24px", height: "24px", marginLeft: "-5px", borderRadius: "50%", border: "2px solid #fff", boxSizing: "border-box", background: vi.bg, color: vi.fg, fontSize: "9.5px", fontWeight: "700", display: "grid", placeItems: "center" }}>{vi.ini}</span>
-                          </Fragment>))}
-                        </span>{v.whoLabel} <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m6 9 6 6 6-6">
-                          </path>
-                        </svg></button>
-                      {!!(v.whoOpen) && (<>
-                        <div onClick={v.toggleWho} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                        </div>
-                        <div style={{ position: "absolute", top: "40px", left: "0", zIndex: "8", width: "290px", maxHeight: "460px", overflow: "auto", padding: "8px", gap: "2px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 12px 32px rgba(42,22,12,.16)", display: "flex", flexDirection: "column" }}>
-                          <span style={{ padding: "6px 10px 8px", fontSize: "12px", fontWeight: "600", color: "var(--crm-muted)" }}>Show the inbox of · pick one or more</span>
-                          {(v.whoOpts).map((w, w_i) => (<Fragment key={w_i}>
-                            {!!(w.head) && (<>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "6px 4px 0", padding: "10px 6px 4px", borderTop: "1px solid var(--crm-field)", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".1em", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: w.color }}>
-                                </span>{w.label}</div>
-                            </>)}
-                            {!!(w.sel) && (<>
-                              <button type="button" onClick={w.pick} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "40px", padding: "6px 10px", border: "0", borderRadius: "10px", background: "var(--crm-tint-attention)", font: "inherit", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" }} className={DH.h11}>
-                                {!!(w.isGroup) && (<>
-                                  <span style={{ flex: "0 0 26px", width: "26px", height: "26px", display: "grid", placeItems: "center" }}>
-                                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.color }}>
-                                    </span>
-                                  </span>
-                                </>)}
-                                {!!(w.isPerson) && (<>
-                                  <span style={{ flex: "0 0 26px", width: "26px", height: "26px", borderRadius: "50%", background: w.avBg, color: w.avFg, fontSize: "10px", fontWeight: "650", display: "grid", placeItems: "center" }}>{w.ini}</span>
-                                </>)}
-                                <span style={{ flex: "1", minWidth: "0", fontSize: "14px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.label}</span>
-                                <span style={{ flex: "0 0 18px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "5px", border: "1.5px solid var(--crm-rust)", background: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="m5 12 5 5 9-10">
-                                    </path>
-                                  </svg>
-                                </span>
-                                {!!(w.hasN) && (<>
-                                  <span style={{ minWidth: "22px", height: "20px", padding: "0 7px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "11.5px", fontWeight: "700", display: "grid", placeItems: "center", fontVariantNumeric: "tabular-nums" }}>{w.n}</span>
-                                </>)}
-                                {!!(w.noN) && (<>
-                                  <span style={{ minWidth: "22px", textAlign: "center", fontSize: "12px", color: "var(--crm-faint-2)", fontVariantNumeric: "tabular-nums" }}>0</span>
-                                </>)}
-                              </button>
-                            </>)}
-                            {!!(w.unsel) && (<>
-                              <button type="button" onClick={w.pick} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "40px", padding: "6px 10px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className={DH.h8}>
-                                {!!(w.isGroup) && (<>
-                                  <span style={{ flex: "0 0 26px", width: "26px", height: "26px", display: "grid", placeItems: "center" }}>
-                                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.color }}>
-                                    </span>
-                                  </span>
-                                </>)}
-                                {!!(w.isPerson) && (<>
-                                  <span style={{ flex: "0 0 26px", width: "26px", height: "26px", borderRadius: "50%", background: w.avBg, color: w.avFg, fontSize: "10px", fontWeight: "650", display: "grid", placeItems: "center" }}>{w.ini}</span>
-                                </>)}
-                                <span style={{ flex: "1", minWidth: "0", fontSize: "14px", fontWeight: "550", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.label}</span>
-                                <span style={{ flex: "0 0 18px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "5px", border: "1.5px solid var(--crm-faint-2)", background: "#fff", display: "grid", placeItems: "center" }}>
-                                </span>
-                                {!!(w.hasN) && (<>
-                                  <span style={{ minWidth: "22px", height: "20px", padding: "0 7px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-field)", color: "var(--crm-ink)", fontSize: "11.5px", fontWeight: "700", display: "grid", placeItems: "center", fontVariantNumeric: "tabular-nums" }}>{w.n}</span>
-                                </>)}
-                                {!!(w.noN) && (<>
-                                  <span style={{ minWidth: "22px", textAlign: "center", fontSize: "12px", color: "var(--crm-faint-2)", fontVariantNumeric: "tabular-nums" }}>0</span>
-                                </>)}
-                              </button>
-                            </>)}
-                          </Fragment>))}
-                          <div style={{ position: "sticky", bottom: "-8px", display: "flex", gap: "8px", margin: "6px -8px -8px", padding: "10px", background: "#fff", borderTop: "1px solid var(--crm-field)" }}>
-                            <button type="button" onClick={v.whoClear} style={{ flex: "1", height: "36px", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>Clear</button>
-                            <button type="button" onClick={v.toggleWho} style={{ flex: "1", height: "36px", borderRadius: "18px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>Done</button>
-                          </div>
-                        </div>
-                      </>)}
-                    </span>
-                    {(v.whoChips).map((p, p_i) => (<Fragment key={p_i}>
-                      <span style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: "6px", height: "30px", padding: "0 4px 0 4px", boxSizing: "border-box", borderRadius: "15px", background: p.tint, color: p.ink, fontSize: "13px", fontWeight: "650", whiteSpace: "nowrap" }}><span style={{ width: "22px", height: "22px", borderRadius: "50%", background: p.bg, color: p.fg, fontSize: "9.5px", fontWeight: "700", display: "grid", placeItems: "center" }}>{p.ini}</span>{p.label}<button type="button" onClick={p.remove} title="Remove" style={{ width: "22px", height: "22px", border: "0", borderRadius: "50%", background: "transparent", color: "inherit", display: "grid", placeItems: "center", cursor: "pointer", padding: "0" }} className={DH.h31}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18M6 6l12 12">
-                            </path>
-                          </svg>
-                        </button></span>
-                    </Fragment>))}
-                    <span style={{ fontSize: "13px", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{v.whoCount}</span>
-                  </div>
-                </>)}
-                {!!(v.isAction) && (<>
-                  <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "3px", padding: "2px 2px 0" }}>
-                    <strong style={{ fontSize: "15px", fontWeight: "650" }}>Organic leads to assign · {v.actN}</strong>
-                  </div>
-                </>)}
-                {!!(v.notAction) && (<>
-                  <div style={{ flex: "0 0 auto", display: "flex", gap: "6px", flexWrap: "nowrap", alignItems: "center", minWidth: "0" }}>
-                    <div style={{ flex: "1", minWidth: "0", display: "flex", gap: "6px", flexWrap: "nowrap", overflowX: "auto", scrollbarWidth: "none", padding: "2px 24px 2px 0", WebkitMaskImage: "linear-gradient(to right, #000 calc(100% - 28px), transparent)", maskImage: "linear-gradient(to right, #000 calc(100% - 28px), transparent)" }}>
-                      {(v.filters).map((f, f_i) => (<Fragment key={f_i}>
-                        <span onClick={f.pick} style={{ cursor: "pointer",  flex: "0 0 auto", height: "32px", lineHeight: "30px", padding: "0 12px", boxSizing: "border-box", borderRadius: "16px", border: `1px solid ${f.bd}`, background: f.bg, color: f.fg, fontSize: "12.5px", fontWeight: "650", whiteSpace: "nowrap" }}>{f.label}</span>
-                      </Fragment>))}
-                    </div>
-                  </div>
-                </>)}
-                {!!(v.actEmpty) && (<>
-                  <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", textAlign: "center", border: "1px solid var(--crm-rule)", borderRadius: "14px", background: "#fff" }}>
-                    <span style={{ width: "44px", height: "44px", borderRadius: "50%", background: "var(--crm-tint-follow)", color: "var(--crm-brown)", display: "grid", placeItems: "center" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m5 12 5 5 9-10">
-                        </path>
-                      </svg>
-                    </span>
-                    <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>All organic leads sent</strong>
-                    <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>New ones land here.</span>
-                  </div>
-                </>)}
-                <div style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "14px", overflow: "hidden" }}>
-                  {(v.chats).map((c, c_i) => (<Fragment key={c_i}>
-                    <button type="button" onClick={c.open} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: c.rowBg, font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}>
-                      <span style={{ flex: "0 0 38px", width: "38px", height: "38px", borderRadius: "50%", background: c.avBg, color: "var(--crm-ink)", fontSize: "12px", fontWeight: "700", display: "grid", placeItems: "center" }}>{c.ini}</span>
-                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                          <strong style={{ fontSize: "14.5px", fontWeight: "650", whiteSpace: "nowrap" }}>{c.name}</strong>
-                          <span style={{ fontSize: "12.5px", color: "var(--crm-brown)", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.ad}</span>
-                          <span style={{ flex: "1" }}>
-                          </span>
-                          {!!(c.muted) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--crm-faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17.9 17.9 0 0 1 18 8M6.3 6.3A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.3-5M2 2l20 20"></path></svg>)}{!!(c.pinned) && (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--crm-faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", alignSelf: "center" }}><path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z"></path></svg>)}<small style={{ fontSize: "12px", color: c.timeFg, fontWeight: c.timeW, whiteSpace: "nowrap" }}>{c.time}</small>
-                        </span>
-                        <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "0" }}><span style={{ flex: "1", minWidth: "0", fontSize: "13.5px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.msg}</span>{!!(c.unreadN) && (<span style={{ flex: "0 0 auto", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "11px", fontWeight: "700", display: "inline-grid", placeItems: "center" }}>{c.unreadN}</span>)}{!!(c.unreadDot) && (<span style={{ flex: "0 0 auto", width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-rust)" }}></span>)}</span>
-                        <span style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px" }}>
-                          <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{c.owner}</span>
-                          <span style={{ height: "20px", lineHeight: "20px", padding: "0 8px", borderRadius: "10px", background: c.stBg, color: c.stFg, fontSize: "11.5px", fontWeight: "700", whiteSpace: "nowrap" }}>{c.status}</span>
-                          {!!(c.canSend) && (<>
-                            <span style={{ flex: "1" }}>
-                            </span>
-                            <span role="button" onClick={c.send} style={{ flex: "0 0 auto", height: "28px", padding: "0 12px", boxSizing: "border-box", borderRadius: "14px", border: "1px solid var(--crm-rust)", background: c.sendBg, color: "var(--crm-rust)", fontSize: "12.5px", fontWeight: "650", lineHeight: "26px", whiteSpace: "nowrap", cursor: "pointer" }} className={DH.h11}>Send to</span>
-                          </>)}
-                        </span>
-                      </span>
-                    </button>
-                  </Fragment>))}
-                </div>
-              </>)}
+            <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: v.f4.pad, display: "flex", flexDirection: "column", gap: v.f4.gap, overflow: "auto" }}>
+              {!!(v.kList) && (<DeskInboxList4a v={v} />)}
               {!!(v.kInsight) && (<>
-                <div style={{ flex: "0 0 auto", position: "relative", padding: "26px 30px 0", borderRadius: "26px", background: "linear-gradient(135deg, var(--crm-orange) 0%, var(--crm-orange) 50%, var(--crm-rust) 100%)", color: "#fff", boxShadow: "0 18px 40px rgba(189,74,25,.22)", overflow: "hidden" }}>
-                  <span style={{ fontSize: "15px", fontWeight: "550", opacity: ".92" }}>{v.hero.label}</span>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "14px", marginTop: "6px" }}>
-                    <button type="button" onClick={v.hero.open} style={{ display: "inline-flex", alignItems: "baseline", gap: "8px", padding: "0", border: "0", background: "none", color: "#fff", font: "inherit", cursor: "pointer" }} className={DH.h32}>
-                      <b style={{ fontSize: "64px", fontWeight: "700", letterSpacing: "-.04em", lineHeight: "1", fontVariantNumeric: "tabular-nums" }}>{v.hero.value}</b>
-                      <span style={{ fontSize: "22px", opacity: ".85" }}>›</span>
-                    </button>
-                    <span style={{ fontSize: "16px", opacity: ".92" }}>{v.hero.sub}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", marginTop: "26px", borderTop: "1px solid rgba(255,255,255,.28)" }}>
-                    {(v.heroStats).map((k, k_i) => (<Fragment key={k_i}>
-                      <div style={{ minWidth: "0", padding: `20px 16px 26px ${k.pl}px`, borderLeft: k.bl, display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", opacity: ".9" }}>{k.label}</span>
-                        <button type="button" onClick={k.open} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "baseline", gap: "6px", padding: "0", border: "0", background: "none", color: "#fff", font: "inherit", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,.45)", whiteSpace: "nowrap" }} className={DH.h33}>
-                          <b style={{ fontSize: "26px", fontWeight: "700", letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
-                          <span style={{ fontSize: "16px", opacity: ".85" }}>›</span>
-                        </button>
-                        <span style={{ fontSize: "12.5px", opacity: ".85" }}>{k.sub}</span>
-                        <span style={{ alignSelf: "flex-start", marginTop: "2px", padding: "2px 8px", borderRadius: "10px", background: "rgba(255,255,255,.18)", fontSize: "11.5px", fontWeight: "650", whiteSpace: "nowrap" }}>{k.delta}</span>
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </div>
+                <DeskInsight4a v={v} />
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>
-                  <strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Team performance</strong>
-                </div>
-                <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(5, 84px)", gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>
-                    <span>TEAM</span>
-                    <span style={{ textAlign: "right" }}>LEADS</span>
-                    <span style={{ textAlign: "right" }}>APPT</span>
-                    <span style={{ textAlign: "right" }}>SHOW-UP</span>
-                    <span style={{ textAlign: "right" }}>WON RATE</span>
-                    <span style={{ textAlign: "right" }}>LOST RATE</span>
-                  </div>
-                  {(v.teams).map((t, t_i) => (<Fragment key={t_i}>
-                    <button type="button" onClick={t.open} style={{ width: "100%", display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(5, 84px)", gap: "12px", alignItems: "center", padding: "14px 20px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", fontVariantNumeric: "tabular-nums" }} className={DH.h8}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "0" }}>
-                        <span style={{ flex: "0 0 9px", width: "9px", height: "9px", borderRadius: "50%", background: t.dot }}>
-                        </span>
-                        <span style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
-                          <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>{t.name}</strong>
-                          <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lead}</span>
-                        </span>
-                      </span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600" }}>{t.leads}</span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600" }}>{t.appt}</span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600" }}>{t.show}</span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600", color: "var(--crm-brown)" }}>{t.won}</span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600", color: "var(--crm-oxblood)" }}>{t.lost}</span>
-                    </button>
-                  </Fragment>))}
-                </div>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>
-                  <strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Leads by status</strong>
-                </div>
-                <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "180px minmax(0, 1fr) 84px 84px", gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>
-                    <span>STATUS</span>
-                    <span>
-                    </span>
-                    <span style={{ textAlign: "right" }}>LEADS</span>
-                    <span style={{ textAlign: "right" }}>SHARE</span>
-                  </div>
-                  {(v.leadStatus).map((r, r_i) => (<Fragment key={r_i}>
-                    <button type="button" onClick={r.open} style={{ width: "100%", display: "grid", gridTemplateColumns: "180px minmax(0, 1fr) 84px 84px", gap: "12px", alignItems: "center", padding: "14px 20px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", fontVariantNumeric: "tabular-nums" }} className={DH.h8}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ flex: "0 0 9px", width: "9px", height: "9px", borderRadius: "50%", background: r.color }}>
-                        </span>
-                        <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>{r.label}</strong>
-                      </span>
-                      <span style={{ height: "8px", borderRadius: "4px", background: "var(--crm-field)", overflow: "hidden" }}>
-                        <span style={{ display: "block", height: "100%", width: `${r.pct}%`, background: r.color, borderRadius: "4px" }}>
-                        </span>
-                      </span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600" }}>{r.n}</span>
-                      <span style={{ textAlign: "right", fontSize: "15px", fontWeight: "600", color: "var(--crm-muted)" }}>{r.share}</span>
-                    </button>
-                  </Fragment>))}
-                </div>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>
-                  <strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>
+                  <strong style={{ flex: "1", font: "500 18px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.metaDot }}>
                     </span>{v.metaSync}</span>
                   <DeskCardPicker v={v} />
@@ -4291,17 +3927,18 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.paneFull) && (<>
-                <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
+                <div style={{ flex: "0 0 62px", height: "62px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 22px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                   {!!(v.ph.avatar) && (<>
-                    <span style={{ flex: "0 0 auto", width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "700", background: "var(--crm-tint-cold)", color: "var(--crm-ink)" }}>{v.ph.avatar}</span>
+                    <span style={{ flex: "0 0 auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 12px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>
                   </>)}
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>
-                    <span style={{ fontSize: "12.5px", color: v.ph.subColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>
+                    <strong style={{ font: "500 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>
+                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>
                   </span>
+                  {!!(v.ph.status) && (<span style={{ flex: "0 0 auto", font: "600 12px Inter, sans-serif", color: v.ph.statusColor, whiteSpace: "nowrap" }}>{v.ph.status}</span>)}
                   {!!(v.ph.menu) && (<>
                     <span style={{ position: "relative", flex: "0 0 auto" }}>
-                      <button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: v.menuBtnBg, display: "grid", placeItems: "center", boxSizing: "border-box", cursor: "pointer" }} className={DH.h8}>
+                      <button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-line)", background: v.menuBtnBg, display: "grid", placeItems: "center", boxSizing: "border-box", cursor: "pointer" }} className={DH.h8}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--crm-ink)">
                           <circle cx="12" cy="5" r="1.8">
                           </circle>
@@ -4334,12 +3971,12 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </>)}
                     </span>
                   </>)}
-                  <button type="button" onClick={v.closePane} title="Close (Esc)" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "center", cursor: "pointer", color: "var(--crm-ink)" }} className={DH.h8}>
+                  {!!(!v.ibCols || !v.kChat) && (<button type="button" onClick={v.closePane} title="Close (Esc)" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "center", cursor: "pointer", color: "var(--crm-ink)" }} className={DH.h8}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 6 6 18M6 6l12 12">
                       </path>
                     </svg>
-                  </button>
+                  </button>)}
                 </div>
                 {!!(v.kChat) && (<>
                   {!!(v.chatFromList) && (<>
@@ -4355,8 +3992,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </svg>{v.backPersonLabel}</button>
                   </>)}
                   <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>
-                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", padding: "10px 20px", backgroundColor: "var(--crm-cream)", backgroundImage: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%20viewBox%3D%220%200%20240%20240%22%20xmlns%3Ac2pa%3D%22http%3A%2F%2Fc2pa.org%2Fmanifest%22%3E%3Cmetadata%3E%3Cc2pa%3Amanifest%3EAAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo5ZWFmOWIzOC1kNTkzLTQyOWQtOTkyNi1hNjdmZWE4ZjVmNDcAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaC5n%2B3GamVtjP1Nu48g4xPcAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo2ZTVkNDFiZi02MmFhLTQyMDctOWI3Mi01ZjZlODE4OGIzYjdscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoHNx5AoLe0IwABjDTTKVPyAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggmA28hKHq5ZZucVKZm8w1CnHJ%2BNSw7C98gSiG8i6awQGkZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaI6watomDKJihMTdVS%2BG5MAAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRNAAAAAAAAAAAAAAAAAGRoYXNoWCAn2KA2qq3Hfr2%2BBiY8Sgy%2BQNuiXnmF5YsIFByFf8DaeWRuYW1lbmp1bWJmIG1hbmlmZXN0amV4Y2x1c2lvbnOBomVzdGFydBiWZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjllYWY5YjM4LWQ1OTMtNDI5ZC05OTI2LWE2N2ZlYThmNWY0Ny9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjAyMjQ4MDljLWI2YmQtNDRkMi05YjhiLTA5YTExMzYyNDFmN3JjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCCYDbyEoerllm5xUpmbzDUKccn41LDsL3yBKIbyLprBAaJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgguHSE7PUzPOmyhR0uRwsvmsJwFG3dCIkkvUEl71ykvnKiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgg3VBiBu4TxTGlGeik8yy6aCcS6ZdyaPY0DKPa0IOmJNp0Y2xhaW1fZ2VuZXJhdG9yX2luZm%2BjZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g%2FoGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd%2F3cyjxFA3Qo5S46fX0%2FihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB%2FwQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB%2FwQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj%2BOPEz5o%2BnMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn%2FaArXyTwFAZfKrPzxF2vPoJNf1%2BUCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9%2B1rdDwSPLMOPOjKuiXjoU%2FpUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQINdsvbpy3jWu6IJsli1FAPfajxZrqIIYnIGv53ID%2Fk3teatYqNqVpsUQKnGE80cQQdlE1awJpC%2FV%2ByuaFcAZpo%3D%3C%2Fc2pa%3Amanifest%3E%3C%2Fmetadata%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%237A6457%22%20stroke-opacity%3D%22.13%22%20stroke-width%3D%221.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20transform%3D%22translate(14%2012)%20rotate(-12%2012%2012)%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(92%208)%20rotate(10%2012%2012)%22%20d%3D%22M20%209V6a2%202%200%200%200-2-2H6a2%202%200%200%200-2%202v3M2%2016a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v1.5a.5.5%200%200%201-.5.5h-11a.5.5%200%200%201-.5-.5V11a2%202%200%200%200-4%200zM4%2018v2M20%2018v2M12%204v9%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(176%2020)%20rotate(-6%2012%2012)%22%20d%3D%22M2%204v16M2%208h18a2%202%200%200%201%202%202v10M2%2017h20M6%208v9%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(40%2074)%20rotate(8%2012%2012)%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(124%2066)%20rotate(-14%2012%2012)%22%20d%3D%22M8%202h8l4%2010H4L8%202ZM12%2012v6M8%2022v-2c0-1.1.9-2%202-2h4a2%202%200%200%201%202%202v2H8Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(200%2092)%20rotate(12%2012%2012)%22%20d%3D%22M19%2014c1.49-1.46%203-3.21%203-5.5A5.5%205.5%200%200%200%2016.5%203c-1.76%200-3%20.5-4.5%202-1.5-1.5-2.74-2-4.5-2A5.5%205.5%200%200%200%202%208.5c0%202.3%201.5%204.05%203%205.5l7%207Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(10%20140)%20rotate(6%2012%2012)%22%20d%3D%22M12%202l3.09%206.26L22%209.27l-5%204.87%201.18%206.88L12%2017.77l-6.18%203.25L7%2014.14%202%209.27l6.91-1.01L12%202z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(78%20128)%20rotate(-8%2012%2012)%22%20d%3D%22M8%202v4M16%202v4M3%2010h18M5%204h14a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2Z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(160%20150)%20rotate(14%2012%2012)%22%20d%3D%22M19%209V6a2%202%200%200%200-2-2H7a2%202%200%200%200-2%202v3M3%2016a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v2H7v-2a2%202%200%200%200-4%200ZM5%2018v2M19%2018v2%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(34%20200)%20rotate(-10%2012%2012)%22%20d%3D%22M22%2016.92v3a2%202%200%200%201-2.18%202%2019.79%2019.79%200%200%201-8.63-3.07%2019.5%2019.5%200%200%201-6-6%2019.79%2019.79%200%200%201-3.07-8.67A2%202%200%200%201%204.11%202h3a2%202%200%200%201%202%201.72%2012.84%2012.84%200%200%200%20.7%202.81%202%202%200%200%201-.45%202.11L8.09%209.91a16%2016%200%200%200%206%206l1.27-1.27a2%202%200%200%201%202.11-.45%2012.84%2012.84%200%200%200%202.81.7A2%202%200%200%201%2022%2016.92z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(118%20196)%20rotate(4%2012%2012)%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%3E%3C%2Fpath%3E%3Cpath%20transform%3D%22translate(196%20206)%20rotate(-12%2012%2012)%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%3E%3C%2Fpath%3E%3C%2Fg%3E%3Cg%20fill%3D%22%237A6457%22%20fill-opacity%3D%22.12%22%3E%3Ccircle%20cx%3D%2266%22%20cy%3D%2240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%2240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22104%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22230%22%20cy%3D%2260%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%22170%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22140%22%20cy%3D%22120%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22160%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%22230%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%22180%22%20cy%3D%22240%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%22100%22%20r%3D%221.6%22%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E')", backgroundSize: "240px 240px" }}>
-                    {!!(v.firstDay) && (<><span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#fff", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", color: "var(--crm-ink)", fontSize: "12px", fontWeight: "600" }}>{v.firstDay}</span></>)}{!!(v.pinShown) && (<>
+                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                    {!!(v.firstDay) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.firstDay}</span></>)}{!!(v.pinShown) && (<>
                       <div style={{ position: "sticky", top: "-10px", zIndex: "3", margin: "-10px -20px 0", display: "flex", alignItems: "center", gap: "10px", padding: "8px 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z">
@@ -4368,9 +4005,9 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </>)}{(v.sysLines).map((x, x_i) => (<Fragment key={x_i}>
                       <span style={{ alignSelf: "center", maxWidth: "86%", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "var(--crm-ink-soft)", fontSize: "12px", fontWeight: "600", textAlign: "center" }}>{x.text} · {x.at}</span>
                     </Fragment>))}
-                    {(v.msgs).map((m, m_i) => (<Fragment key={m.key}>{!!(m.day) && (<><span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "#fff", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", color: "var(--crm-ink)", fontSize: "12px", fontWeight: "600" }}>{m.day}</span></>)}{!!(m.sys) && (<><span style={{ alignSelf: "center", maxWidth: "86%", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "var(--crm-ink-soft)", fontSize: "12px", fontWeight: "600", textAlign: "center" }}>{m.sys}</span></>)}{!!(m.inn) && (<>
+                    {(v.msgs).map((m, m_i) => (<Fragment key={m.key}>{!!(m.day) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{m.day}</span></>)}{!!(m.sys) && (<><span style={{ alignSelf: "center", maxWidth: "86%", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "var(--crm-ink-soft)", fontSize: "12px", fontWeight: "600", textAlign: "center" }}>{m.sys}</span></>)}{!!(m.inn) && (<>
                         <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: "flex-start", maxWidth: "80%", marginBottom: m.rxGap }}>
-                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>
+                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
                             {!!(m.quote) && (<span style={{ display: "flex", flexDirection: "column", gap: "1px", margin: m.quoteMargin, padding: "6px 10px", borderRadius: "10px", borderLeft: "3px solid var(--crm-rust)", background: "rgba(42,22,12,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-rust)" }}>{m.quote.who}</strong><span style={{ fontSize: "13px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.quote.text}</span></span>)}{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(42,22,12,.08)", cursor: "zoom-in" }} />)}{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}><ChatVideo src={m.vidSrc} base={m.vid} onLoadedMetadata={m.shape} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /><span style={{ position: "absolute", left: "50%", top: "50%", width: "52px", height: "52px", margin: "-26px 0 0 -26px", borderRadius: "26px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span></span>)}{!!(m.aud) && (<VoiceNote src={m.aud} mine={m.voiceMine} />)}{!!(m.file && m.isPdf) && (<PdfCard src={m.file} name={m.docName} onOpen={m.view} />)}{!!(m.file && !m.isPdf) && (<span onClick={m.view} style={{ display: "flex", alignItems: "center", gap: "10px", width: "250px", maxWidth: "100%", padding: "10px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-page)", cursor: "pointer" }}><span style={{ flex: "none", width: "34px", height: "40px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700", letterSpacing: ".02em" }}>{m.docType}</span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}><strong style={{ fontSize: "14px", fontWeight: "600", lineHeight: "1.3", color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.docName}</strong><small style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{m.docType}</small></span></span>)}{!!(m.text) && (<p style={{ display: m.pShow, padding: m.inPad, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>)}
                             <span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: "var(--crm-muted)" }}>{!!(m.starred) && (<>
                                 <span style={{ color: "var(--crm-brown)", fontSize: "12px" }}>★</span>
@@ -4407,7 +4044,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </div>
                       </>)}{!!(m.out) && (<>
                         <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: "flex-end", maxWidth: "80%", marginBottom: m.rxGap }}>
-                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>
+                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", border: `1px solid ${m.outBg ?? "var(--crm-tint-attention)"}`, background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>
                             {!!(m.quote) && (<span style={{ display: "flex", flexDirection: "column", gap: "1px", margin: m.quoteMargin, padding: "6px 10px", borderRadius: "10px", borderLeft: m.outBg ? "3px solid #fff" : "3px solid var(--crm-rust)", background: m.outBg ? "rgba(255,255,255,.18)" : "rgba(42,22,12,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: m.outBg ? "#fff" : "var(--crm-rust)" }}>{m.quote.who}</strong><span style={{ fontSize: "13px", color: m.outBg ? "rgba(255,255,255,.9)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.quote.text}</span></span>)}{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(42,22,12,.08)", cursor: "zoom-in" }} />)}{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}><ChatVideo src={m.vidSrc} base={m.vid} onLoadedMetadata={m.shape} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /><span style={{ position: "absolute", left: "50%", top: "50%", width: "52px", height: "52px", margin: "-26px 0 0 -26px", borderRadius: "26px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span></span>)}{!!(m.aud) && (<VoiceNote src={m.aud} mine={m.voiceMine} />)}{!!(m.file && m.isPdf) && (<PdfCard src={m.file} name={m.docName} onOpen={m.view} />)}{!!(m.file && !m.isPdf) && (<span onClick={m.view} style={{ display: "flex", alignItems: "center", gap: "10px", width: "250px", maxWidth: "100%", padding: "10px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-page)", cursor: "pointer" }}><span style={{ flex: "none", width: "34px", height: "40px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700", letterSpacing: ".02em" }}>{m.docType}</span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}><strong style={{ fontSize: "14px", fontWeight: "600", lineHeight: "1.3", color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.docName}</strong><small style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{m.docType}</small></span></span>)}{!!(m.text) && (<p style={{ display: m.pShow, padding: m.inPad, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>)}
                             <span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.outTime ?? "var(--crm-muted)" }}>{!!(m.starred) && (<>
                                 <span style={{ color: "var(--crm-brown)", fontSize: "12px" }}>★</span>
@@ -4446,40 +4083,18 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           </>)}
                         </div>
                       </>)}{!!(m.appt) && (<>
-                      <div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", width: "300px", maxWidth: "86%", padding: "6px 6px 4px", boxSizing: "border-box", borderRadius: "16px 16px 4px 16px", background: "var(--crm-tint-attention)", boxShadow: "rgba(42,22,12,.1) 0 1px 1px" }}>
-                        <div style={{ borderRadius: "12px", overflow: "hidden", background: "#fff" }}>
-                          <div style={{ display: "flex", gap: "12px", padding: "12px" }}>
-                            <span style={{ flex: "0 0 52px", width: "52px", padding: "6px 0", borderRadius: "10px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: "1.05" }}>
-                              <b style={{ fontSize: "10.5px", fontWeight: "700", letterSpacing: ".06em" }}>{m.appt.dow}</b>
-                              <b style={{ fontSize: "22px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{m.appt.day}</b>
-                              <b style={{ fontSize: "10.5px", fontWeight: "700", letterSpacing: ".06em" }}>{m.appt.mon}</b>
-                            </span>
-                            <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "3px" }}>
-                              <span style={{ padding: "2px 7px", borderRadius: "5px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".08em" }}>{m.appt.kind}</span>
-                              <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>Showroom visit</strong>
-                              <strong style={{ fontSize: "16px", fontWeight: "650", fontVariantNumeric: "tabular-nums", textDecoration: m.appt.deco }}>{m.appt.time}</strong>
-                            </span>
-                          </div>
-                          <div style={{ display: "flex", gap: "10px", padding: "10px 12px", borderTop: "1px solid var(--crm-field)", background: "var(--crm-page)" }}>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 15px", marginTop: "2px" }}>
-                              <path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z">
-                              </path>
-                            </svg>
-                            <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                              <strong style={{ fontSize: "13px", fontWeight: "650" }}>{m.appt.place}</strong>
-                              <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", lineHeight: "1.4" }}>{m.appt.addr}</span>
-                            </span>
-                          </div>
+                      <div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", maxWidth: "78%", padding: "10px 14px 8px", boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", background: "var(--crm-rust)", border: "1px solid var(--crm-rust)", color: "#FFFFFF", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "2px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--crm-rust-meta)" }}>Showroom visit · {m.appt.kind}</div>
+                          <div style={{ font: "500 16px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontVariantNumeric: "tabular-nums", textDecoration: m.appt.deco }}>{m.appt.dow} {m.appt.day} {m.appt.mon} · {m.appt.time}</div>
+                          <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-delta-good)" }}>{m.appt.place}</div>
                         </div>
-                        <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", padding: "4px 6px 0", fontSize: "11px", color: "var(--crm-muted)" }}>{m.appt.sent}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={m.tick} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 12.5 6.5 17 15 7.5M10 15.5l1.5 1.5L20 7.5">
-                            </path>
-                          </svg></span>
+                        <span style={{ alignSelf: "flex-end", display: "flex", alignItems: "center", gap: "4px", font: "400 11px Inter, sans-serif", color: "var(--crm-rust-meta)" }}>{m.appt.sent}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={m.tick} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12.5 6.5 17 15 7.5M10 15.5l1.5 1.5L20 7.5"></path></svg></span>
                       </div>
                     </>)}</Fragment>))}<span data-chat-end="1" style={{ display: "none" }}></span>
                   </div>
                   {!!(v.replyOn) && (<>
-                    <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "10px", padding: "8px 16px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
+                    <div style={{ position: "absolute", left: "24px", right: "24px", bottom: "82px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>
                       <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>
                         <strong style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-rust)" }}>{v.replyWho}</strong>
                         <span style={{ fontSize: "13px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.replyText}</span>
@@ -4492,51 +4107,33 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </button>
                     </div>
                   </>)}
-                  <div style={{ flex: "0 0 auto", background: "#fff", padding: "12px 16px", borderTop: "1px solid var(--crm-rule)", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ position: "relative", flex: "0 0 auto" }}>
-                      <button type="button" onClick={v.attachToggle} title="Attach" style={{ width: "44px", height: "44px", padding: "0", background: "#fff", cursor: "pointer", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", display: "grid", placeItems: "center", color: "var(--crm-muted)" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 5v14M5 12h14">
-                          </path>
-                        </svg>
-                      </button>
-                      {!!(v.attachOpen) && (<>
-                        <div onClick={v.attachClose} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                        </div>
-                        <div style={{ position: "absolute", bottom: "54px", left: "0", zIndex: "8", width: "220px", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 -6px 28px rgba(42,22,12,.16)", display: "flex", flexDirection: "column" }}>
-                          {(v.attachOpts).map((o, o_i) => (<Fragment key={o_i}>
-                            {!!(o.sep) && (<>
-                              <span style={{ height: "1px", margin: "4px 10px", background: "var(--crm-field)" }}>
-                              </span>
-                            </>)}
-                            <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "14px", height: "42px", padding: "0 12px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "550", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={o.bg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d={o.d}>
-                                </path>
-                              </svg>{o.label}</button>
-                          </Fragment>))}
-                        </div>
-                      </>)}
-                    </span>
-                    <span style={{ flex: "1", minWidth: "0", height: "44px", boxSizing: "border-box", padding: "0 6px 0 16px", borderRadius: "22px", border: "1px solid var(--crm-rule)", display: "flex", alignItems: "center", gap: "4px" }}>
-                      <input data-draft="1" value={v.draft} onChange={v.setDraft} onKeyDown={v.draftKey} placeholder={v.chatReply} style={{ flex: "1", minWidth: "0", fontSize: "15px", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", border: "0", outline: "none", background: "transparent", padding: "0", margin: "0", fontFamily: "inherit" }} />
-                      <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", width: "32px", height: "32px", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4">
-                          </path>
-                        </svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
+                  <div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
+                      <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
                       </span>
-                    </span>
-                    <span title="Send a photo" onClick={v.photo} style={{ flex: "0 0 auto", width: "38px", height: "44px", display: "grid", placeItems: "center", color: "var(--crm-muted)", cursor: "pointer" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z">
-                        </path>
-                      </svg>
-                    </span>
-                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "44px", height: "44px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d={v.micD}>
-                        </path>
-                      </svg>
+                      <input data-draft="1" value={v.draft} onChange={v.setDraft} onKeyDown={v.draftKey} placeholder="Message" aria-label={v.chatReply} style={{ flex: "1", minWidth: "0", font: "400 14px Inter, sans-serif", color: "var(--crm-ink)", border: "0", outline: "none", background: "transparent", padding: "0", margin: "0" }} />
+                      <span style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center" }}>
+                        <span title="Attach" onClick={v.attachToggle} style={{ display: "grid", placeItems: "center", cursor: "pointer" }}>
+                          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                        </span>
+                        {!!(v.attachOpen) && (<>
+                          <div onClick={v.attachClose} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
+                          </div>
+                          <div style={{ position: "absolute", bottom: "40px", right: "-40px", zIndex: "8", width: "220px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+                            {(v.attachOpts).map((o, o_i) => (<Fragment key={o_i}>
+                              {!!(o.sep) && (<span style={{ height: "1px", margin: "4px 10px", background: "var(--crm-rule-soft)" }}></span>)}
+                              <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", height: "38px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className="crm4a-row"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={o.d}></path></svg>{o.label}</button>
+                            </Fragment>))}
+                          </div>
+                        </>)}
+                      </span>
+                      <span title="Send a photo" onClick={v.photo} style={{ flex: "0 0 auto", display: "grid", placeItems: "center", cursor: "pointer" }}>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                      </span>
+                    </div>
+                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,22,12,.15)" }} className="crm4a-primary">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.micD}></path></svg>
                     </span>
                   </div>
                 </>)}
@@ -4847,142 +4444,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </>)}
             </aside>
           </>)}{!!(v.railOn) && (<DeskRail v={v.rail} />)}
-          {!!(v.ibCols) && (<>
-            {!(v.ibInfoShut) && (<><aside style={{ position: "relative", flex: `0 0 ${v.ibInfoW}px`, width: `${v.ibInfoW}px`, boxSizing: "border-box", minHeight: "0", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
-              <div onPointerDown={v.dragInfo} onDoubleClick={v.resetInfo} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", display: "flex", justifyContent: "center", touchAction: "none" }} className={DH.h23}>
-              </div>
-              <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", borderBottom: "1px solid var(--crm-rule)" }}>
-                <button type="button" onClick={v.ibInfoFold} title="Fold Customer info" className={DX.emo} style={{ flex: "0 0 30px", width: "30px", height: "30px", margin: "0 0 0 -8px", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5"></path></svg></button><strong style={{ flex: "1", minWidth: "0", fontSize: "15px", fontWeight: "650" }}>Customer info</strong>
-                <button type="button" disabled={v.ibNone} style={{ display: "inline-flex", alignItems: "center", gap: "5px", height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z">
-                    </path>
-                  </svg>Edit</button>
-              </div>
-              <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "4px 16px 20px", display: "flex", flexDirection: "column" }}>
-                {!!(v.ibNone) && (<>
-                  <span style={{ padding: "40px 8px", textAlign: "center", fontSize: "13px", lineHeight: "1.5", color: "var(--crm-muted)" }}>Pick a chat to see the customer</span>
-                </>)}
-                {!!(v.ibHas) && (<>
-                  {(v.ibInfo.groups).map((g, g_i) => (<Fragment key={g_i}>
-                    <div style={{ display: "flex", flexDirection: "column", padding: "14px 0 6px", borderBottom: "1px solid var(--crm-rule)" }}>
-                      <span style={{ paddingBottom: "6px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>{g.label}</span>
-                      {(g.rows).map((r, r_i) => (<Fragment key={r_i}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "7px 0" }}>
-                          <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{r.k}</span>
-                          <span style={{ fontSize: "13.5px", lineHeight: "1.35", fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>
-                        </div>
-                      </Fragment>))}
-                    </div>
-                  </Fragment>))}
-                </>)}
-              </div>
-            </aside></>)}{!!(v.ibInfoShut) && (<DeskFoldRail v={v.ibInfoRail} />)}
-            {!!(v.ibCpClosed) && (<>
-              <aside style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <button type="button" onClick={v.ibCpToggle} title="Open chat progress" style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h24}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m11 17-5-5 5-5M18 17l-5-5 5-5">
-                    </path>
-                  </svg>
-                </button>
-                {!!(v.ibHas) && (<>
-                  <button type="button" onClick={v.ibCpToggle} title="Open chat progress" style={{ marginTop: "18px", padding: "6px 0", border: "0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" }}>
-                    {(v.ibCp.rail).map((d, d_i) => (<Fragment key={d_i}>
-                      <span title={d.tip} style={{ width: `${d.size}px`, height: `${d.size}px`, boxSizing: "border-box", borderRadius: "50%", background: d.dot, border: `2px solid ${d.ring}` }}>
-                      </span>
-                      <span style={{ width: "2px", height: "18px", background: d.gap }}>
-                      </span>
-                    </Fragment>))}
-                  </button>
-                </>)}
-              </aside>
-            </>)}
-            {!!(v.ibCpOpen) && (<>
-              <aside style={v.ibCpStyle}>
-                <div onPointerDown={v.dragCp} onDoubleClick={v.resetCp} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", display: "flex", justifyContent: "center", touchAction: "none" }} className={DH.h23}>
-                </div>
-                <div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 0 16px", borderBottom: "1px solid var(--crm-rule)" }}>
-                  <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "3px" }}>
-                    {!!(v.ibNone) && (<>
-                      <span style={{ fontSize: "13px", fontWeight: "650", color: "var(--crm-muted)" }}>Chat progress</span>
-                    </>)}
-                    {!!(v.ibHas) && (<>
-                      {!!(v.ibCp.has) && (<>
-                        <span style={{ display: "inline-flex", alignItems: "center", height: "22px", padding: "0 9px", borderRadius: "11px", background: v.ibCp.sbg, color: v.ibCp.sfg, fontSize: "12px", fontWeight: "700", whiteSpace: "nowrap" }}>{v.ibCp.status}</span>
-                        <span style={{ maxWidth: "100%", fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ibCp.owner}</span>
-                      </>)}
-                    </>)}
-                  </span>
-                  <button type="button" onClick={v.ibCpToggle} title="Close" style={{ flex: "0 0 34px", width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-ink)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m13 17 5-5-5-5M6 17l5-5-5-5">
-                      </path>
-                    </svg>
-                  </button>
-                </div>
-                {!!(v.ibNone) && (<>
-                  <span style={{ padding: "40px 16px", textAlign: "center", fontSize: "13px", color: "var(--crm-muted)" }}>Pick a chat to see its steps</span>
-                </>)}
-                {!!(v.ibHas) && (<>
-                  <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "18px" }}>
-                    <div style={{ padding: "4px 0 14px", borderBottom: "1px solid var(--crm-rule)" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-                        {(v.ibCp.steps).map((p, p_i) => (<Fragment key={p_i}>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", minWidth: "0" }}>
-                            <div style={{ position: "relative", width: "100%", height: "14px", display: "grid", placeItems: "center" }}>
-                              <span style={{ position: "absolute", top: "6px", left: "0", width: "50%", height: "2px", background: p.lL }}>
-                              </span>
-                              <span style={{ position: "absolute", top: "6px", right: "0", width: "50%", height: "2px", background: p.lR }}>
-                              </span>
-                              <span style={{ position: "relative", width: `${p.size}px`, height: `${p.size}px`, boxSizing: "border-box", borderRadius: "50%", background: p.dot, border: `2px solid ${p.ring}` }}>
-                              </span>
-                            </div>
-                            <span style={{ fontSize: "11px", fontWeight: p.w, color: p.lab, whiteSpace: "nowrap" }}>{p.label}</span>
-                            <span style={{ fontSize: "10.5px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{p.date}</span>
-                          </div>
-                        </Fragment>))}
-                      </div>
-                    </div>
-                    {!!(v.ibCp.none) && (<>
-                      <span style={{ padding: "20px 8px", textAlign: "center", fontSize: "13px", color: "var(--crm-muted)" }}>No steps yet for this chat</span>
-                    </>)}
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {(v.ibCp.ev).map((e, e_i) => (<Fragment key={e_i}>
-                        <div style={{ display: "grid", gridTemplateColumns: "44px 24px minmax(0, 1fr)", columnGap: "10px", paddingTop: e.pt }}>
-                          <span style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: "4px", textAlign: "right" }}>
-                            <strong style={{ fontSize: "12px", fontWeight: "700", whiteSpace: "nowrap" }}>{e.date}</strong>
-                            <span style={{ fontSize: "11.5px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{e.time}</span>
-                          </span>
-                          <span style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                            <span style={{ flex: "0 0 24px", width: "24px", height: "24px", borderRadius: "50%", background: e.bg, color: e.fg, display: "grid", placeItems: "center" }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d={e.d}>
-                                </path>
-                              </svg>
-                            </span>
-                            <span style={{ flex: "1", width: "2px", minHeight: "12px", background: e.line }}>
-                            </span>
-                          </span>
-                          <span style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "4px 0 16px", minWidth: "0" }}>
-                            <span style={{ fontSize: "13px", fontWeight: "600", lineHeight: "1.35", textWrap: "pretty" }}>{e.text}</span>
-                            <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
-                              <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{e.who}</span>
-                              {!!(e.hasSt) && (<>
-                                <span style={{ display: "inline-flex", alignItems: "center", height: "20px", padding: "0 7px", borderRadius: "10px", background: e.stbg, color: e.stfg, fontSize: "11.5px", fontWeight: "700" }}>→ <span>{e.st}</span></span>
-                              </>)}
-                            </span>
-                            {!!(e.hasNote) && (<>
-                              <span style={{ padding: "8px 10px", borderRadius: "10px", background: "var(--crm-cream-nav)", fontSize: "12.5px", lineHeight: "1.4", color: "var(--crm-ink)", textWrap: "pretty" }}>{e.note}</span>
-                            </>)}
-                          </span>
-                        </div>
-                      </Fragment>))}
-                    </div>
-                  </div>
-                </>)}
-              </aside>
-            </>)}
-          </>)}
+          {!!(v.ibCols) && (<DeskInboxSide4a v={v} value={(x, h) => <InfoValue v={x} href={h} />} />)}
           {!!(v.showToast) && (<>
             <div style={{ position: "absolute", left: "50%", bottom: "24px", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: "16px", padding: "11px 14px 11px 18px", borderRadius: "12px", background: "var(--crm-ink)", color: "#fff", fontSize: "13.5px", fontWeight: "550", boxShadow: "0 8px 24px rgba(42,22,12,.28)", whiteSpace: "nowrap", zIndex: "5" }}>{v.toastText}{!!(v.canUndo) && (<>
                 <button type="button" onClick={v.undoSend} style={{ border: "0", padding: "0", background: "transparent", font: "inherit", color: "var(--crm-peach)", fontWeight: "700", cursor: "pointer" }}>Undo</button>

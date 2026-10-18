@@ -14,6 +14,8 @@ import { chatRows, initials, teamNameOf } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, ST_META, teamColours } from "./tokens";
 import { STATUS } from "../../shared/palette";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
+import { rangeLine } from "./frame4a";
+import { adsReportParam } from "@/lib/member/crm-ads-report";
 
 export const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -104,6 +106,19 @@ export function insightVM(ctx: DeskCtx) {
   };
   const dirRows = ctx.directors.length ? [{ name: DIRECTOR_TEAM, lead: ctx.directors.map(d => d.name).join(", "), ...rowOf(ctx.directors.map(d => d.id)), dot: DIRECTOR_C[0],
     open: () => patch({ pane: "overlay", kind: "team", team: DIRECTOR_TEAM, person: null }) }] : [];
+  // 4a's hero (frame 01): six figures, each with its change against the period before, worse ones in oxblood.
+  const pts = (a: number | null, b: number | null) => (a == null || b == null ? { d: "—", good: true } : { d: `${a - b >= 0 ? "+" : "−"}${Math.abs(Math.round((a - b) * 10) / 10)} pts`, good: a >= b });
+  const rel = (a: number, b: number) => (!b ? { d: a ? "+" + a : "—", good: true } : { d: `${a >= b ? "+" : "−"}${Math.abs(Math.round(((a - b) / b) * 100))}%`, good: a >= b });
+  const wonRate = (w: number, l: number) => (l ? Math.round((w / l) * 1000) / 10 : null);
+  const avgV = avgNow == null ? ["—", ""] : avgNow < 60 ? [String(avgNow), "min"] : [String(Math.round((avgNow / 60) * 10) / 10), "h"];
+  const metrics4 = [
+    { label: "Appt rate", value: pct(n.booked, n.leads), unit: "", ...pts(rate(n.booked, n.leads), rate(pn.booked, pn.leads)), open: hero.open },
+    { label: "Leads", value: String(n.leads), unit: "", ...rel(n.leads, prevLeads.length), open: openList("Leads") },
+    { label: "Show-up", value: pct(n.came, n.due), unit: "", ...pts(rate(n.came, n.due), rate(pn.came, pn.due)), open: openList("Show-up") },
+    { label: "Reply 24 h", value: pct(rep24, n.leads), unit: "", ...pts(rate(rep24, n.leads), rate(prevLeads.filter(replied24).length, prevLeads.length)), open: openList("Reply 24 h") },
+    { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
+    { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
+  ].map((m, i) => ({ ...m, first: i === 0, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
   const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: t.who, ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 
@@ -115,6 +130,13 @@ export function insightVM(ctx: DeskCtx) {
     ["Appointment", cnt(k => k === "Appointment"), STATUS.Appointment.dot, "st:Appointment"], ["Follow up", cnt(k => k === "Follow up"), STATUS["Follow up"].dot, "st:Follow up"],
     ["Cold leads", cnt(k => k === "Cold"), STATUS["Cold leads"].dot, "st:Cold"],
   ];
+  // 4a's Leads by status (frame 01): all seven of the ramp, in its order — Won and Lost joined (the chats' own states).
+  const L7: [string, number, string][] = [["New", cnt(k => k === "New"), "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), "st:Overdue"],
+    ["Follow up", cnt(k => k === "Follow up"), "st:Follow up"], ["Appointment", cnt(k => k === "Appointment"), "st:Appointment"], ["Won", cnt(k => k === "Won"), "st:Won"],
+    ["Lost", cnt(k => k === "Lost"), "st:Lost"], ["Cold leads", cnt(k => k === "Cold"), "st:Cold"]];
+  const tot7 = L7.reduce((a, x) => a + x[1], 0);
+  const status4 = L7.map(([label, c, list]) => ({ label, n: c, color: STATUS[label as keyof typeof STATUS].dot, text: label === "Attention" ? "var(--crm-oxblood)" : "var(--crm-ink)",
+    pct: tot7 ? `${Math.round((c / tot7) * 100)}%` : "—", open: openList(list) }));
   const max = Math.max(...LS.map(x => x[1]), 1), tot = LS.reduce((a, x) => a + x[1], 0) || 1;
   const leadStatus = LS.map(([label, c, color, list]) => ({ label, n: c, color, share: `${Math.round((c / tot) * 100)}%`, pct: Math.round((c / max) * 100), open: openList(list) }));
 
@@ -145,6 +167,31 @@ export function insightVM(ctx: DeskCtx) {
   return {
     kInsight: ctx.ui.tab === "insight",
     hero, heroStats, teams: teamsOut, leadStatus,
+    // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
+    metrics4, status4, statusTotal: tot7,
+    teams4: (() => {
+      const apptN = (s: string) => parseFloat(s) || 0;
+      const all = [...dirRows.map(t => ({ ...t, key: DIRECTOR_TEAM, people: ctx.directors })), ...teams.map((t, k) => ({ ...teamsOut[dirRows.length + k], key: t.id, people: t.people }))];
+      const max = Math.max(...all.map(t => apptN(t.appt)), 1);
+      return all.flatMap(t => {
+        const open = ctx.ui.insTeam === t.key;
+        const head = { name: t.name, sub: t.lead, leads: t.leads, appt: t.appt, apptW: `${Math.round((apptN(t.appt) / max) * 100)}%`, show: t.show, won: t.won, lost: t.lost,
+          dot: t.dot, person: false, open, pick: () => patch({ insTeam: open ? null : t.key }) };
+        const people = open ? t.people.map(p => { const f = rowOf([p.id]);
+          return { name: p.name, sub: "", ...f, apptW: `${Math.round((apptN(f.appt) / max) * 100)}%`, dot: "transparent", person: true, open: false,
+            pick: () => patch({ pane: "overlay", kind: "team", team: t.key, person: p.id }) }; }) : [];
+        return [head, ...people];
+      });
+    })(),
+    // 4a's head (2026-10-18): "1–31 Oct vs 1–30 Sep", and Export PDF — the period's figures and Team performance in the
+    // Ads Performance report's house style (the owner's OK: "PDF 照你建议做").
+    insightSub: `${rangeLine(r)} vs ${rangeLine(pr)}`,
+    insightPdf: () => {
+      const title = `CRM Insight · ${rangeLine(r)} vs ${rangeLine(pr)} · Appt rate ${hero.value} · ${heroStats.map(s => `${s.label} ${s.value}`).join(" · ")}`;
+      const head = ["Team", "Leads", "Appt rate", "Show-up", "Won", "Lost"];
+      const body = teamsOut.map(t => [t.name, t.leads, t.appt, t.show, t.won, t.lost]);
+      const a = document.createElement("a"); a.href = `/member/crm-ads-report?d=${adsReportParam({ title, head, rows: body })}`; a.download = `CRM Insight ${rangeLine(r)}.pdf`; a.click();
+    },
     insHead, insAdCols, insAdMinW,
     adPerf, adTot: { n: adPerf.length, spend: "—", reach: "—", clicks: "—", ctr: "—", leads: String(lt), cpl: "—", appt: String(at) },
     ...adCardsVM(ctx, r, name),

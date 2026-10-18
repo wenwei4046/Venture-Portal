@@ -1370,6 +1370,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
+        // The CRM's 4a frame draws this sidebar's rows itself (2026-10-18): the same screens, counts and switcher.
+        hidden: hiddenScreens, crmUnread: crmUnread ?? 0,
+        products: productList ? { group: productList.group, onOpen: openProducts } : null,
+        modules: principal ? { current: "revenue", onPick: id => pickModule(id as ModuleId) } : null,
       } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
