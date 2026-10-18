@@ -363,6 +363,79 @@
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }
 
+/* ─── The CRM, 4a "Espresso & White" (2026-10-18) ───
+   docs/design_handoff_crm_redesign/README.md › Design tokens, named as its table
+   names them, plus the few values its prototypes draw that the table leaves out.
+   Every colour of the CRM's screens (crm/sales, crm/panel, crm/desk, crm/shared)
+   reads one of these — generated screens through tools/crm-design/palette-4a.cjs,
+   hand-written ones through crm/shared/palette.ts. The rest of the Revenue app
+   keeps its own --rv-* palette. Light only, as the app. */
+:root {
+  /* text and lines */
+  --crm-ink: #422315;
+  --crm-ink-soft: #5A4034;
+  --crm-muted: #7A6255;
+  --crm-faint: #A8968B;
+  --crm-faint-2: #CDBFB5;
+  --crm-line: #E2D8D0;
+  --crm-rule: #EEE8E3;
+  --crm-rule-soft: #F4F0EC;
+  /* surfaces */
+  --crm-page: #FFFFFF;
+  --crm-field: #F7F3EF;
+  --crm-cream: #FCEEE2;
+  --crm-cream-nav: #FBF4EC;
+  --crm-cream-nav-active: #F3DFCC;
+  --crm-nav-line: #F0E2D4;
+  --crm-hover: #FBF7F3;
+  --crm-audit: #F6E7D8;
+  --crm-audit-line: #E3CDB8;
+  /* accents */
+  --crm-rust: #BD4A19;
+  --crm-rust-press: #A33F14;
+  --crm-rust-meta: #F3CDBB;
+  --crm-orange: #EE5E08;
+  --crm-amber: #FFA91F;
+  --crm-amber-line: #FFC75A;
+  --crm-oxblood: #8A1F0A;
+  --crm-brown: #6F402C;
+  --crm-deep: #2A160C;
+  --crm-on-light: #FFF8F1;
+  --crm-sidebar-text: #CDB7A8;
+  --crm-delta-good: #FBE6DC;
+  --crm-delta-bad: #FFD9A0;
+  --crm-peach: #F4A877;
+  --crm-peach-soft: #F9D3BA;
+  /* channels — these two appear nowhere else */
+  --crm-whatsapp: #25D366;
+  --crm-messenger: #0A7CFF;
+  /* status ramp: dot, tint, text */
+  --crm-st-new: #422315;
+  --crm-st-attention: #EE5E08;
+  --crm-st-follow: #6F402C;
+  --crm-st-appt: #FFA91F;
+  --crm-st-won: #C29C88;
+  --crm-st-lost: #DCC6B8;
+  --crm-st-cold: #EEE2D8;
+  --crm-tint-attention: #FDE3D2;
+  --crm-tint-appt: #FFF0D1;
+  --crm-tint-follow: #F1E3DA;
+  --crm-tint-new: #EFE5DE;
+  --crm-tint-won: #F3EBE5;
+  --crm-tint-lost: #F2EEEB;
+  --crm-tint-cold: #F1EEEC;
+  --crm-text-appt: #7A4E00;
+  /* teams after the design's five */
+  --crm-team-6: #C29C88;
+  --crm-team-7: #9A6B55;
+  /* outside the palette, kept for what they are: the read ticks on the orange bubble, a photo's black, brand logos */
+  --crm-tick-read: #A6DBFF;
+  --crm-black: #000000;
+  --crm-brand-waze: #33CCFF;
+  --crm-brand-maps: #34A853;
+  --crm-brand-instagram: #C13584;
+}
+
 /* ─── The design system's tokens (2026-10-14) ───
    The Claude Design project "HOUZS Venture Design System" (DESIGN.md › The
    design system) names what a screen needs once, as a semantic --ds-* token,

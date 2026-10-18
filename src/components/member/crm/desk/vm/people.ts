@@ -19,7 +19,7 @@ import { adHref, adKindLabel } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
 const BUDGET: [string, number, number][] = [["Under RM 5k", 0, 5000], ["RM 5k – 10k", 5000, 10000], ["RM 10k – 20k", 10000, 20000], ["RM 20k +", 20000, 1e12]];
-const COLS = ["#BD4A19", "#2F6FB5", "#8E4B6E", "#387557", "#A46312", "#6B574C", "#C9785A"];
+const COLS = ["var(--crm-rust)", "var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-ink-soft)", "var(--crm-orange)"];
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 
 /** One customer as Contacts reads it: every field's answer, the buckets the filters use. */
@@ -73,18 +73,18 @@ export function peopleVM(ctx: DeskCtx) {
   const mx = Math.max(1, ...counts, none);
   const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: COLS[i % COLS.length], on: F[by] === v,
     pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v }, ppPg: 0 })) })),
-  ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "#D9C9BD", on: false, pick: () => {} }] : [])]
-    .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "#FFF5EC" : "transparent" }));
+  ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "var(--crm-line)", on: false, pick: () => {} }] : [])]
+    .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "var(--crm-cream)" : "transparent" }));
   const two = typeOpts.slice(0, 2), aN = rows.filter(d => d.type === two[0]).length, bN = rows.filter(d => d.type === two[1]).length;
   const bs = rows.map(d => Number(d.budgetN)).filter(n => n > 0).sort((x, y) => x - y), med = bs.length ? bs[Math.floor(bs.length / 2)] : 0;
   const chips = Object.entries(F).filter(([k, v]) => v && KEYS[k]).map(([k, v]) => ({ label: `${KEYS[k][0]}: ${v}`, clear: () => set(u => ({ ...u, ppF: { ...u.ppF, [k]: null }, ppPg: 0 })) }));
   const sel = (k: string) => { const open = ui.ppOpen === k, cur = F[k] || null;
     const base = rows0.filter(d => Object.entries(F).every(([k2, v]) => k2 === k || !v || !KEYS[k2] || d[k2] === v));
     const put = (val: string | null) => set(u => ({ ...u, ppF: { ...u.ppF, [k]: val }, ppOpen: null, ppPg: 0 }));
-    return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "#BD4A19" : "#E2CFC1", bg: cur ? "#FFF5EC" : "#fff",
+    return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "var(--crm-rust)" : "var(--crm-line)", bg: cur ? "var(--crm-cream)" : "#fff",
       toggle: () => patch({ ppOpen: open ? null : k }), close: () => patch({ ppOpen: null }),
       opts: [{ v: "Any", n: base.length, on: !cur, pick: () => put(null) }, ...KEYS[k][1].map(v => ({ v, n: base.filter(d => d[k] === v).length, on: cur === v, pick: () => put(v) }))]
-        .map(o => ({ ...o, bg: o.on ? "#FFF5EC" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "#BD4A19" : "transparent" })) }; };
+        .map(o => ({ ...o, bg: o.on ? "var(--crm-cream)" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "var(--crm-rust)" : "transparent" })) }; };
   // The table's columns: every field of Customer info but the Contact itself (README: 13 with the design's form).
   const LBL: Record<string, string> = { type: lbl("type", "Property type"), size: lbl("size", "Unit size"), budget: lbl("budget", "Budget"), loc: lbl("loc", "Unit location"), req: lbl("req", "Requirement"),
     plat: "Platform", ad: "Ad", status: "Status", sp: "Salesperson", visit: "Visit", showroom: "Showroom", first: "First contact", last: "Last chat",
@@ -115,19 +115,19 @@ export function peopleVM(ctx: DeskCtx) {
     ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "", ppPg: 0 }),
     ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value, ppPg: 0 }),
     ppGrid: `${dw("contact")}px ${vis.map(k => `${dw(k)}px`).join(" ")} minmax(36px, 1fr)`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
-    ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "#3F2B22" : "#806B60",
+    ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "var(--crm-ink)" : "var(--crm-muted)",
       drag: mapDrag(set, "ppCW", dw(k), k, 80, 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
-    ppSortCols0: [{ arrow: so.k === "name" ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === "name" ? "#3F2B22" : "#806B60", pick: () => toggleSort("name") }],
+    ppSortCols0: [{ arrow: so.k === "name" ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === "name" ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => toggleSort("name") }],
     ppAddOpen: ui.ppAdd, ppAddToggle: () => patch({ ppAdd: !ui.ppAdd }), ppAddClose: () => patch({ ppAdd: false }),
-    ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "#BD4A19" : "transparent", bd: on ? "#BD4A19" : "#D9C9BD", bg: on ? "#FFF5EC" : "transparent",
+    ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "var(--crm-rust)" : "transparent", bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-cream)" : "transparent",
       toggle: () => set(u => { const cur = (u.ppVis ?? DEF).filter(x => ALL.includes(x)); return { ...u, ppVis: cur.includes(k) ? cur.filter(x => x !== k) : ALL.filter(x => cur.includes(x) || x === k) }; }) }; }),
     ppRows: shown.map(d => ({ ini: d.ini, name: d.name, phone: d.phone,
       cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
-        if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "#FFF0E4" : d.type ? "#E4EDF8" : "#F5EEE8", fg: isB ? "#BD4A19" : d.type ? "#2F6FB5" : "#A08E82" }; }
-        return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "#3F2B22" : "#A08E82" }; }),
+        if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "var(--crm-tint-attention)" : d.type ? "var(--crm-tint-cold)" : "var(--crm-field)", fg: isB ? "var(--crm-rust)" : d.type ? "var(--crm-ink-soft)" : "var(--crm-faint)" }; }
+        return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "var(--crm-ink)" : "var(--crm-faint)" }; }),
       // A row opens the customer in the side panel when the page is wide enough to show it (the owner, 2026-10-15: "右邊的
       // 畫面有點空" → 1); else, as before, the chat in Inbox with Customer info beside it.
-      on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "#FFF5EC" : "#fff",
+      on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "var(--crm-cream)" : "#fff",
       open: () => patch({ ppSel: ui.ppSel === d.id && ui.rail ? null : d.id, rail: true }),
       openChat: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
     ppEmpty: !rows.length, ppHas: rows.length > 0,

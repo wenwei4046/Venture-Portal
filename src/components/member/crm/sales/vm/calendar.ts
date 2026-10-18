@@ -23,7 +23,7 @@ interface Shown { v: CrmVisit; c: CrmCustomer; at: Date; room: string; attended:
 
 /** The design's fireworks: seven bursts of eighteen sparks, looping while the card shows. */
 function fireworks(): ReactNode {
-  const C = ["#BD4A19", "#387557", "#2F6FB5", "#E0A93B", "#8E4B6E"];
+  const C = ["var(--crm-rust)", "var(--crm-brown)", "var(--crm-ink-soft)", "var(--crm-amber)", "var(--crm-ink-soft)"];
   return createElement("div", { style: { position: "absolute", inset: 0, pointerEvents: "none" } },
     [[20, 20, 0], [80, 18, .35], [50, 10, .7], [24, 60, 1.05], [76, 64, 1.4], [50, 82, 1.75], [50, 42, 2.1]].map(([x, y, dl], b) =>
       createElement("div", { key: b, style: { position: "absolute", left: x + "%", top: y + "%" } },
@@ -46,7 +46,7 @@ export function calendarVM(ctx: SalesCtx) {
     .map(v => ({ v, c: byId.get(v.customerId)!, at: new Date(v.start), room: roomName(v.showroomId), attended: v.state === "attended", noshow: v.state === "no_show" }));
   const T = day0(now);
   const up = all.filter(a => a.v.state === "booked" && a.at > now).sort((x, y) => +x.at - +y.at);
-  const colOf = (a: Shown) => a.attended ? "#387557" : a.noshow ? "#806B60" : a.at <= now ? "#A46312" : "#BD4A19";
+  const colOf = (a: Shown) => a.attended ? "var(--crm-brown)" : a.noshow ? "var(--crm-muted)" : a.at <= now ? "var(--crm-brown)" : "var(--crm-rust)";
   const evOn = (t: number) => all.filter(a => day0(a.at) === t).sort((x, y) => +x.at - +y.at);
   const cv = ui.calView, ym = ui.calYM ?? [now.getFullYear(), now.getMonth()], sel = ui.calSel ?? T;
   const first = new Date(ym[0], ym[1], 1), lead0 = (first.getDay() + 6) % 7, dim = new Date(ym[0], ym[1] + 1, 0).getDate();
@@ -82,14 +82,14 @@ export function calendarVM(ctx: SalesCtx) {
   let outcomeWhen = oa ? `${oa.when} · ${oa.room}` : "";
   let outcomeOpts: { label: string; sub: string; fg: string; bg: string; icon: string; pick: () => void }[] = [];
   let outcomeClose = () => patch({ outcomeAsk: null });
-  const lost = { isLost: false, notLost: true, lostReasons: [] as { label: string; icon: string; pick: () => void; bg: string; fg: string; bd: string; ic: string; ring: string; dot: string }[], otherText: "", otherBd: "#EBDDD2", otherSet: (_: ChangeEvent<HTMLInputElement>) => {}, lostSave: undefined as undefined | (() => void), lostSaveBg: "#D9C7BA" };
-  const won = { isWon: false, wonAmount: "", wonSet: (_: ChangeEvent<HTMLInputElement>) => {}, wonSave: undefined as undefined | (() => void), wonSaveBg: "#D9C7BA" };
+  const lost = { isLost: false, notLost: true, lostReasons: [] as { label: string; icon: string; pick: () => void; bg: string; fg: string; bd: string; ic: string; ring: string; dot: string }[], otherText: "", otherBd: "var(--crm-rule)", otherSet: (_: ChangeEvent<HTMLInputElement>) => {}, lostSave: undefined as undefined | (() => void), lostSaveBg: "var(--crm-line)" };
+  const won = { isWon: false, wonAmount: "", wonSet: (_: ChangeEvent<HTMLInputElement>) => {}, wonSave: undefined as undefined | (() => void), wonSaveBg: "var(--crm-line)" };
   if (oa && !oa.wonStep && !oa.lostStep) {
-    const FU: [string, string, string, string, string] = ["Follow up", "", "#A46312", "#FBF1E3", "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"];
-    const LO: [string, string, string, string, string] = ["Lost", "", "#A3371A", "#FBEAE6", "M6 6l12 12M18 6 6 18"];
+    const FU: [string, string, string, string, string] = ["Follow up", "", "var(--crm-brown)", "var(--crm-tint-appt)", "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"];
+    const LO: [string, string, string, string, string] = ["Lost", "", "var(--crm-oxblood)", "var(--crm-tint-attention)", "M6 6l12 12M18 6 6 18"];
     const goFollow = async () => { if (await act.outcome(oa.visitId, oa.mode !== "noshow", "follow_up")) toChat(oa.customerId, "Follow up"); };
     const rows: [[string, string, string, string, string], () => void][] = oa.mode === "noshow" ? [
-      [["Rebook", "", "#BD4A19", "#FFF0E4", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14M12 14v4m-2-2h4"], () => {
+      [["Rebook", "", "var(--crm-rust)", "var(--crm-tint-attention)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14M12 14v4m-2-2h4"], () => {
         const a = all.find(x => x.v.id === oa.visitId); if (!a) return;
         const ri = Math.max(0, data.rooms.filter(r => r.active).findIndex(r => r.id === a.v.showroomId));
         set(u => ({ ...u, outcomeAsk: null, rebookFor: oa, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: T, slot: null }, hist: [...u.hist, u.tab].slice(-20) }));
@@ -98,7 +98,7 @@ export function calendarVM(ctx: SalesCtx) {
       [LO, () => patch({ outcomeAsk: { ...oa, lostStep: true } })],
     ] : [
       [FU, goFollow],
-      [["Won", "", "#387557", "#E4F1E8", "m5 12 5 5 9-10"], () => patch({ outcomeAsk: { ...oa, wonStep: true, amount: "" } })],
+      [["Won", "", "var(--crm-brown)", "var(--crm-tint-follow)", "m5 12 5 5 9-10"], () => patch({ outcomeAsk: { ...oa, wonStep: true, amount: "" } })],
       [LO, () => patch({ outcomeAsk: { ...oa, lostStep: true } })],
     ];
     outcomeOpts = rows.map(([[label, sub, fg, bg, icon], pick]) => ({ label, sub, fg, bg, icon, pick }));
@@ -107,7 +107,7 @@ export function calendarVM(ctx: SalesCtx) {
     outcomeTitle = "Amount"; outcomeWhen = "";
     const amt = (oa.amount ?? "").replace(/[^\d.]/g, ""), ok = Number(amt) > 0;
     Object.assign(won, {
-      isWon: true, wonAmount: oa.amount ?? "", wonSaveBg: ok ? "#387557" : "#D9C7BA",
+      isWon: true, wonAmount: oa.amount ?? "", wonSaveBg: ok ? "var(--crm-brown)" : "var(--crm-line)",
       wonSet: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^\d,.]/g, ""); set(u => (u.outcomeAsk ? { ...u, outcomeAsk: { ...u.outcomeAsk, amount: v } } : u)); },
       wonSave: ok ? async () => {
         if (!(await act.outcome(oa.visitId, true, "won", { amount: Number(amt) }))) return;
@@ -124,10 +124,10 @@ export function calendarVM(ctx: SalesCtx) {
     const opts = oa.mode === "noshow" ? [...LOST_OPTIONS, UNREACHABLE] : LOST_OPTIONS;
     const okO = !!selR && (selR !== "Other" || !!txt.trim());
     Object.assign(lost, {
-      isLost: true, notLost: false, otherText: txt, otherBd: selR === "Other" ? "#3F2B22" : "#EBDDD2",
-      lostReasons: opts.map(([label, , icon]) => { const on = selR === label; return { label, icon, pick: () => setO({ reason: on ? "" : label }), bg: on ? "#FBEAE6" : "#fff", fg: "#3F2B22", bd: on ? "#A3371A" : "#EBDDD2", ic: "#A3371A", ring: on ? "#A3371A" : "#D9C7BA", dot: on ? "#A3371A" : "transparent" }; }),
+      isLost: true, notLost: false, otherText: txt, otherBd: selR === "Other" ? "var(--crm-ink)" : "var(--crm-rule)",
+      lostReasons: opts.map(([label, , icon]) => { const on = selR === label; return { label, icon, pick: () => setO({ reason: on ? "" : label }), bg: on ? "var(--crm-tint-attention)" : "#fff", fg: "var(--crm-ink)", bd: on ? "var(--crm-oxblood)" : "var(--crm-rule)", ic: "var(--crm-oxblood)", ring: on ? "var(--crm-oxblood)" : "var(--crm-line)", dot: on ? "var(--crm-oxblood)" : "transparent" }; }),
       otherSet: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; setO({ otherText: v, reason: v.trim() ? "Other" : selR === "Other" ? "" : selR }); },
-      lostSaveBg: okO ? "#A3371A" : "#D9C7BA",
+      lostSaveBg: okO ? "var(--crm-oxblood)" : "var(--crm-line)",
       lostSave: okO ? async () => {
         const code = selR === "Other" ? "other" : opts.find(o => o[0] === selR)?.[1] ?? "other";
         if (await act.outcome(oa.visitId, oa.mode !== "noshow", "lost", { reason: code, note: selR === "Other" ? txt.trim() : undefined })) patch({ outcomeAsk: null });
@@ -150,23 +150,23 @@ export function calendarVM(ctx: SalesCtx) {
       });
     },
     calViews: ([["month", "Month"], ["week", "Week"], ["day", "Day"]] as const).map(([k, label]) => ({
-      label, pick: () => patch({ calView: k }), bg: cv === k ? "#fff" : "transparent", fg: cv === k ? "#3F2B22" : "#806B60", weight: cv === k ? 650 : 500, shadow: cv === k ? "0 1px 3px rgba(63,43,34,.12)" : "none",
+      label, pick: () => patch({ calView: k }), bg: cv === k ? "#fff" : "transparent", fg: cv === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: cv === k ? 650 : 500, shadow: cv === k ? "0 1px 3px rgba(42,22,12,.12)" : "none",
     })),
     calIsMonth: cv === "month", calIsWeek: cv === "week", calIsDay: cv === "day",
     // Three months back, eight ahead.
     calMonths: Array.from({ length: 12 }, (_, k) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 3 + k, 1), on = d.getFullYear() === ym[0] && d.getMonth() === ym[1];
       return { label: gb(d, { month: "short" }) + (d.getFullYear() !== now.getFullYear() ? " " + String(d.getFullYear()).slice(2) : ""),
-        bg: on ? "#BD4A19" : "#fff", fg: on ? "#fff" : "#3F2B22", border: on ? "#BD4A19" : BORDER, weight: on ? 650 : 500, pick: () => patch({ calYM: [d.getFullYear(), d.getMonth()], calSel: d.getTime() }) };
+        bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500, pick: () => patch({ calYM: [d.getFullYear(), d.getMonth()], calSel: d.getTime() }) };
     }),
     calWk: ["M", "T", "W", "T", "F", "S", "S"],
     calCells: Array.from({ length: weeks * 7 }, (_, k) => {
       const d = new Date(ym[0], ym[1], 1 - lead0 + k), t = d.getTime(), inM = d.getMonth() === ym[1], isT = t === T, isS = t === sel, ev = evOn(t);
-      return { n: d.getDate(), pick: guard(() => patch({ calSel: t, calYM: [d.getFullYear(), d.getMonth()] })), edge: k % 7 ? "1px solid #F3E9E1" : "0",
-        bg: isS && !isT ? "#FFF8F2" : "transparent", dotBg: isT ? "#BD4A19" : "transparent", fg: isT ? "#fff" : inM ? "#3F2B22" : "#C9B5A8", weight: isT || isS ? 700 : 500,
+      return { n: d.getDate(), pick: guard(() => patch({ calSel: t, calYM: [d.getFullYear(), d.getMonth()] })), edge: k % 7 ? "1px solid var(--crm-rule-soft)" : "0",
+        bg: isS && !isT ? "var(--crm-cream)" : "transparent", dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : inM ? "var(--crm-ink)" : "var(--crm-faint-2)", weight: isT || isS ? 700 : 500,
         ev: ev.slice(0, 2).map(a => ({ t: timeLabel(a.at).replace(":00", "").replace(" ", "") + " " + firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) as ((e: MouseEvent<HTMLElement>) => void) | undefined }))
           // "+N" keeps the cell's select-day.
-          .concat(ev.length > 2 ? [{ t: "+" + (ev.length - 2), bg: "#806B60", open: undefined }] : []) };
+          .concat(ev.length > 2 ? [{ t: "+" + (ev.length - 2), bg: "var(--crm-muted)", open: undefined }] : []) };
     }),
     calPrev: () => setSel(sel - step * DAY + 3 * 3_600_000), calNext: () => setSel(sel + step * DAY + 3 * 3_600_000),
     calSwDown: (e: PEvent) => { refs.calSw = { x: e.clientX, y: e.clientY }; },
@@ -181,8 +181,8 @@ export function calendarVM(ctx: SalesCtx) {
     weekLabel,
     weekCols: Array.from({ length: 7 }, (_, k) => {
       const d = wd(k), t = d.getTime(), isT = t === T, isS = t === sel;
-      return { wk: d.toLocaleDateString("en-GB", { weekday: "short" }), n: d.getDate(), edge: k ? "1px solid #F3E9E1" : "0", bg: isS && !isT ? "#FFF8F2" : "transparent",
-        dotBg: isT ? "#BD4A19" : "transparent", fg: isT ? "#fff" : "#3F2B22", weight: isT || isS ? 700 : 500, pick: guard(() => setSel(t)),
+      return { wk: d.toLocaleDateString("en-GB", { weekday: "short" }), n: d.getDate(), edge: k ? "1px solid var(--crm-rule-soft)" : "0", bg: isS && !isT ? "var(--crm-cream)" : "transparent",
+        dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : "var(--crm-ink)", weight: isT || isS ? 700 : 500, pick: guard(() => setSel(t)),
         ev: evOn(t).map(a => ({ time: timeLabel(a.at), name: firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) })) };
     }),
     selLabel: (sel === T ? "Today · " : "") + new Date(sel).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
@@ -209,7 +209,7 @@ export function calendarVM(ctx: SalesCtx) {
         // Sent once, it may go again (the owner, 2026-10-14: "upcoming 的 reminder 發過之後還可以再發"): the button keeps
         // its green "sent" look and reads Send again; one at a time per visit (a double tap sent twice before).
         rLabel: done ? "Send again" : "Send reminder", rIcon: done ? "m5 12 5 5 9-10" : "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
-        rBg: done ? "#fff" : "#BD4A19", rFg: done ? "#387557" : "#fff", rBd: done ? "#CFE3D6" : "#BD4A19", rCur: "pointer",
+        rBg: done ? "#fff" : "var(--crm-rust)", rFg: done ? "var(--crm-brown)" : "#fff", rBd: done ? "var(--crm-tint-follow)" : "var(--crm-rust)", rCur: "pointer",
         remind: () => { void oneAtATime(`remind:${a.v.id}`, () => act.remind(a.v.id)).then(ok => { if (ok && done) act.toast(`Reminder sent again to ${a.c.name}`); }); } };
     }),
     // Customer info (Edit · Open chat) and its form, as on Contacts (rev 1010 §3).

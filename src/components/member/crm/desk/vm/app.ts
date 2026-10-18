@@ -34,20 +34,20 @@ export function deskVM(ctx: DeskCtx) {
   const cur = ui.chat ? data.customers.find(c => c.id === ui.chat) : undefined;
   // The pane's head (the prototype's `ph`), per kind.
   const heads = {
-    chat: chat.head ?? { avatar: "", title: "", sub: "", subColor: "#387557", menu: false },
-    alerts: { avatar: "", title: "CRM alerts", sub: "Move · Share · Won · Lost · Overdue 9 h+", subColor: "#806B60", menu: false },
-    section: { avatar: "", title: op, sub: ui.tab === "assignment" ? "Assignment · CRM · Manage" : "Settings · CRM · Manage", subColor: "#806B60", menu: false },
-    assign: { avatar: "", title: "Assign to", sub: cur ? `${cur.name} · ${cur.ad}` : "", subColor: "#806B60", menu: false },
+    chat: chat.head ?? { avatar: "", title: "", sub: "", subColor: "var(--crm-brown)", menu: false },
+    alerts: { avatar: "", title: "CRM alerts", sub: "Move · Share · Won · Lost · Overdue 9 h+", subColor: "var(--crm-muted)", menu: false },
+    section: { avatar: "", title: op, sub: ui.tab === "assignment" ? "Assignment · CRM · Manage" : "Settings · CRM · Manage", subColor: "var(--crm-muted)", menu: false },
+    assign: { avatar: "", title: "Assign to", sub: cur ? `${cur.name} · ${cur.ad}` : "", subColor: "var(--crm-muted)", menu: false },
     // v2's Move / Share heads.
-    move: { avatar: "", title: "Move", sub: cur ? `${cur.name} · to your direct upline only` : "", subColor: "#806B60", menu: false },
-    share: { avatar: "", title: ctx.me.role === "boss" ? "Share · invite your team" : "Share", sub: cur ? `${cur.name}${ctx.me.role === "boss" ? " · they join the chat with you" : " · invite a teammate · same team only"}` : "", subColor: "#806B60", menu: false },
-    metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : "Pick the columns for Ads Performance", subColor: "#806B60", menu: false },
-    clist: { avatar: "", ...clist.clistHead, subColor: "#806B60", menu: false },
-    info: { avatar: "", ...info.infoHead, subColor: "#806B60", menu: false },
-    team: { avatar: "", ...team.teamHead, subColor: "#806B60", menu: false },
-    book: { avatar: "", title: "Appointment", sub: cur ? `${cur.name} · showroom visit` : "", subColor: "#806B60", menu: false },
-    note: { avatar: "", title: "Notes", sub: cur?.name ?? "", subColor: "#806B60", menu: false },
-    form: { avatar: "", title: "Edit customer", sub: data.customers.find(c => c.id === (ui.infoId ?? ""))?.name ?? "", subColor: "#806B60", menu: false },
+    move: { avatar: "", title: "Move", sub: cur ? `${cur.name} · to your direct upline only` : "", subColor: "var(--crm-muted)", menu: false },
+    share: { avatar: "", title: ctx.me.role === "boss" ? "Share · invite your team" : "Share", sub: cur ? `${cur.name}${ctx.me.role === "boss" ? " · they join the chat with you" : " · invite a teammate · same team only"}` : "", subColor: "var(--crm-muted)", menu: false },
+    metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : "Pick the columns for Ads Performance", subColor: "var(--crm-muted)", menu: false },
+    clist: { avatar: "", ...clist.clistHead, subColor: "var(--crm-muted)", menu: false },
+    info: { avatar: "", ...info.infoHead, subColor: "var(--crm-muted)", menu: false },
+    team: { avatar: "", ...team.teamHead, subColor: "var(--crm-muted)", menu: false },
+    book: { avatar: "", title: "Appointment", sub: cur ? `${cur.name} · showroom visit` : "", subColor: "var(--crm-muted)", menu: false },
+    note: { avatar: "", title: "Notes", sub: cur?.name ?? "", subColor: "var(--crm-muted)", menu: false },
+    form: { avatar: "", title: "Edit customer", sub: data.customers.find(c => c.id === (ui.infoId ?? ""))?.name ?? "", subColor: "var(--crm-muted)", menu: false },
   };
   const as = assignPageVM(ctx, op);
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;
@@ -81,7 +81,7 @@ export function deskVM(ctx: DeskCtx) {
     ibInfo: (() => { const c = cur; const secs = formV2(data);
       return { name: c?.name ?? "", ini: c ? initials(c.name) : "", groups: c ? secs.map(sec => ({ label: sec.label,
         rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = answerOf(data, c, fl, ctx.nameOf);
-          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid #F1E7DF" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "#A08E82" : "#3F2B22" }; }) })) : [] }; })(),
+          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
     awInfo: () => { if (awC) patch({ awMenuOpen: false, tab: ui.tab, pane: "overlay", kind: "info", infoId: awC.id, visit: null }); },
     awBook: () => { if (awC) patch({ awMenuOpen: false, pane: "overlay", kind: "book", chat: awC.id, book: null }); },
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
@@ -99,7 +99,7 @@ export function deskVM(ctx: DeskCtx) {
       if (u.kind === "delete" && u.ids) void ctx.deskAct.restoreNotifs(u.ids); },
     toastText: ui.toast,
     // Meta Ads is not connected yet (PROPOSALS.md C): its columns read "—" and the line says why.
-    metaSync: "Meta Ads not connected yet", metaDot: "#B4AEA4",
+    metaSync: "Meta Ads not connected yet", metaDot: "var(--crm-faint)",
   };
 }
 export type DeskVM = ReturnType<typeof deskVM>;

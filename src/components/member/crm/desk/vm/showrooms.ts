@@ -59,14 +59,14 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     const partial = d.times.length * 7 - n - wd.length * d.times.length, ds = d.blocks;
     const links = d.manual ? { g: d.gmap || "#", w: d.waze || "#" } : d.addr ? mapU(d.addr) : { g: "#", w: "#" };
     return { name: r.name, dispName: r.name, photo: d.photo, addr: d.addr || "No address yet", limit: String(d.limit), gUrl: links.g, wUrl: links.w,
-      addrFg: d.addr ? "#3F2B22" : "#A08E82", daysTxt: rangeTxt(openD), daysTxtFg: openD.length ? "#3F2B22" : "#A3371A", daysSub: closedD.length ? `Closed ${closedD.map(i => DN[i]).join(", ")}` : "",
-      timesTxt: d.times.length ? d.times.join(" · ") : "No times set", timesTxtFg: d.times.length ? "#3F2B22" : "#A3371A",
+      addrFg: d.addr ? "var(--crm-ink)" : "var(--crm-faint)", daysTxt: rangeTxt(openD), daysTxtFg: openD.length ? "var(--crm-ink)" : "var(--crm-oxblood)", daysSub: closedD.length ? `Closed ${closedD.map(i => DN[i]).join(", ")}` : "",
+      timesTxt: d.times.length ? d.times.join(" · ") : "No times set", timesTxtFg: d.times.length ? "var(--crm-ink)" : "var(--crm-oxblood)",
       timesSub: `${d.times.length} time${d.times.length === 1 ? "" : "s"} a day${partial > 0 ? ` · ${partial} slot${partial === 1 ? "" : "s"} closed on some days` : ""}`,
-      limitTxt: `${d.limit} visit${d.limit === 1 ? "" : "s"} per time`, limitTxtFg: "#3F2B22",
+      limitTxt: `${d.limit} visit${d.limit === 1 ? "" : "s"} per time`, limitTxtFg: "var(--crm-ink)",
       blocked: !ds.length ? "No blocked dates" : ds.length === 1 ? fd(ds[0].from) + (ds[0].to && ds[0].to !== ds[0].from ? ` – ${fd(ds[0].to)}` : "") : `${ds.length} dates`,
-      blockedFg: ds.length ? "#3F2B22" : "#A08E82",
+      blockedFg: ds.length ? "var(--crm-ink)" : "var(--crm-faint)",
       blockedSub: ds.length > 1 ? ds.slice(0, 3).map(b => `${fd(b.from)}${b.to && b.to !== b.from ? ` – ${fd(b.to)}` : ""} · ${timeTxt(b)}`).join("\n") : ds.length === 1 ? timeTxt(ds[0]) + (ds[0].reason ? ` · ${ds[0].reason}` : "") : "",
-      bd: sel ? "#BD4A19" : "#EBDDD2", ring: sel ? "0 0 0 3px #FFF0E4" : "none",
+      bd: sel ? "var(--crm-rust)" : "var(--crm-rule)", ring: sel ? "0 0 0 3px var(--crm-tint-attention)" : "none",
       edit: () => patch({ srEdit: r.id, srDraft: draftOf(r), srBlkOpen: false, srTab: "info", srCal: null }) }; });
 
   const bk: SrBlk = ui.srBlk ?? { days: [], from: "", to: "", allDay: true, ranges: [{ f: "11:00 am", t: "1:00 pm" }], reason: "", wkReason: "" };
@@ -78,11 +78,11 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const f = bk.from, t = bk.to || bk.from;
   const srCalCells = [
-    ...Array.from({ length: lead }, () => ({ n: "", dis: true, band: "transparent", br: "0", dot: "transparent", fg: "#3F2B22", ring: "0", w: 500, cur: "default", pick: () => {} })),
+    ...Array.from({ length: lead }, () => ({ n: "", dis: true, band: "transparent", br: "0", dot: "transparent", fg: "var(--crm-ink)", ring: "0", w: 500, cur: "default", pick: () => {} })),
     ...Array.from({ length: days }, (_, k) => { const io = isoD(k + 1), past = io < todayIso, edge = io === f || io === t, inR = !!f && !!t && io > f && io < t;
-      return { n: String(k + 1), dis: past, cur: past ? "not-allowed" : "pointer", band: inR || (edge && f !== t) ? "#FFF1E6" : "transparent",
-        br: f !== t && io === f ? "17px 0 0 17px" : f !== t && io === t ? "0 17px 17px 0" : "0", dot: edge ? "#BD4A19" : "transparent", fg: edge ? "#fff" : past ? "#D3C4B8" : "#3F2B22",
-        ring: io === todayIso && !edge ? "1.5px solid #BD4A19" : "0", w: edge || io === todayIso ? 700 : 500,
+      return { n: String(k + 1), dis: past, cur: past ? "not-allowed" : "pointer", band: inR || (edge && f !== t) ? "var(--crm-tint-attention)" : "transparent",
+        br: f !== t && io === f ? "17px 0 0 17px" : f !== t && io === t ? "0 17px 17px 0" : "0", dot: edge ? "var(--crm-rust)" : "transparent", fg: edge ? "#fff" : past ? "var(--crm-faint-2)" : "var(--crm-ink)",
+        ring: io === todayIso && !edge ? "1.5px solid var(--crm-rust)" : "0", w: edge || io === todayIso ? 700 : 500,
         pick: () => { if (past) return; if (which === "to") { if (f && io < f) updB({ from: io, to: io }); else updB({ to: io }); patch({ srCal: null }); } else { updB({ from: io, to: bk.to && bk.to >= io ? bk.to : io }); patch({ srCal: "to" }); } } }; }),
   ];
   const okD = !!bk.from, rng = bk.from ? fd(bk.from) + (bk.to && bk.to !== bk.from ? ` – ${fd(bk.to)}` : "") : "";
@@ -97,18 +97,18 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     }));
     if (results.every(Boolean)) patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });
   };
-  const empty = { manual: false, showAuto: false, showNoAddr: true, linkFields: [] as { bg: string; ch: string; ph: string; v: string; set: (e: { target: { value: string } }) => void }[], gmapUrl: "", wazeUrl: "", name: "", dispName: "", gmap: "", waze: "", photo: "", noPhoto: true, photoBd: "#D9B79F", addr: "", limit: "", blocks: [] as { tag: string; tagBg: string; tagFg: string; when: string; sub: string; remove: () => void }[], openN: "", allLabel: "", totN: "", slots: [] as { time: string; remove: () => void; cells: { on: boolean; bg: string; bd: string; toggle: () => void }[] }[] };
+  const empty = { manual: false, showAuto: false, showNoAddr: true, linkFields: [] as { bg: string; ch: string; ph: string; v: string; set: (e: { target: { value: string } }) => void }[], gmapUrl: "", wazeUrl: "", name: "", dispName: "", gmap: "", waze: "", photo: "", noPhoto: true, photoBd: "var(--crm-st-won)", addr: "", limit: "", blocks: [] as { tag: string; tagBg: string; tagFg: string; when: string; sub: string; remove: () => void }[], openN: "", allLabel: "", totN: "", slots: [] as { time: string; remove: () => void; cells: { on: boolean; bg: string; bd: string; toggle: () => void }[] }[] };
   return {
     srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
-    srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(63,43,34,.12)" : "none", fg: on ? "#3F2B22" : "#806B60", pick: () => upd({ manual: v }) }; }),
+    srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => upd({ manual: v }) }; }),
     srTabSlots: ui.srTab === "slots", srTabBlk: ui.srTab === "blk", srTabInfo: ui.srTab === "info",
     srTabs: ([["info", "Details", ""], ["slots", "Open slots", dr ? String(cnt(dr.off, dr.times)) : ""], ["blk", "Blocked", dr ? String(dr.blocks.length + dr.weekDays.length) : ""]] as const).map(([k, label, n]) => { const on = ui.srTab === k;
-      return { label, n, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(63,43,34,.12)" : "none", fg: on ? "#3F2B22" : "#806B60", nBg: on ? "#FFF0E4" : "#EBDDD2", nFg: on ? "#BD4A19" : "#6B574C", pick: () => patch({ srTab: k }) }; }),
-    srBlkOpen: ui.srBlkOpen, srBlkNone: !!dr && !dr.blocks.length && !ui.srBlkOpen, srBlkBtn: ui.srBlkOpen ? "Close" : "Block time", srBlkIc: ui.srBlkOpen ? "M18 6 6 18M6 6l12 12" : "M12 5v14M5 12h14", srBlkBtnBg: ui.srBlkOpen ? "#FFF1E6" : "#fff",
+      return { label, n, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", nBg: on ? "var(--crm-tint-attention)" : "var(--crm-rule)", nFg: on ? "var(--crm-rust)" : "var(--crm-ink-soft)", pick: () => patch({ srTab: k }) }; }),
+    srBlkOpen: ui.srBlkOpen, srBlkNone: !!dr && !dr.blocks.length && !ui.srBlkOpen, srBlkBtn: ui.srBlkOpen ? "Close" : "Block time", srBlkIc: ui.srBlkOpen ? "M18 6 6 18M6 6l12 12" : "M12 5v14M5 12h14", srBlkBtnBg: ui.srBlkOpen ? "var(--crm-tint-attention)" : "#fff",
     srBlkToggle: () => set(u => ({ ...u, srBlkOpen: !u.srBlkOpen, srBlk: null })),
-    srBlk: { ...bk, fromTxt: bk.from ? fd(bk.from) : "Pick date", toTxt: bk.to ? fd(bk.to) : "Pick date", fromBd: which === "from" ? "#BD4A19" : "#E8DBD0", toBd: which === "to" ? "#BD4A19" : "#E8DBD0", fromFg: bk.from ? "#3F2B22" : "#B9A89B", toFg: bk.to ? "#3F2B22" : "#B9A89B" },
-    srBlkDays: DN.map((l, i) => { const wd = dr?.weekDays ?? [], on = wd.includes(i); return { l, bd: on ? "#BD4A19" : "#E2CFC1", bg: on ? "#BD4A19" : "#fff", fg: on ? "#fff" : "#3F2B22", toggle: () => upd({ weekDays: on ? wd.filter(x => x !== i) : [...wd, i].sort() }) }; }),
-    srWkNote: dr?.weekDays.length ? `Closed every ${dr.weekDays.map(i => DN[i]).join(", ")}` : "", srWkFg: dr?.weekDays.length ? "#A3371A" : "#806B60",
+    srBlk: { ...bk, fromTxt: bk.from ? fd(bk.from) : "Pick date", toTxt: bk.to ? fd(bk.to) : "Pick date", fromBd: which === "from" ? "var(--crm-rust)" : "var(--crm-rule)", toBd: which === "to" ? "var(--crm-rust)" : "var(--crm-rule)", fromFg: bk.from ? "var(--crm-ink)" : "var(--crm-faint)", toFg: bk.to ? "var(--crm-ink)" : "var(--crm-faint)" },
+    srBlkDays: DN.map((l, i) => { const wd = dr?.weekDays ?? [], on = wd.includes(i); return { l, bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", toggle: () => upd({ weekDays: on ? wd.filter(x => x !== i) : [...wd, i].sort() }) }; }),
+    srWkNote: dr?.weekDays.length ? `Closed every ${dr.weekDays.map(i => DN[i]).join(", ")}` : "", srWkFg: dr?.weekDays.length ? "var(--crm-oxblood)" : "var(--crm-muted)",
     srBlkFrom: (e: { target: { value: string } }) => updB({ from: e.target.value, to: bk.to && bk.to >= e.target.value ? bk.to : e.target.value }),
     srBlkTo: (e: { target: { value: string } }) => updB({ to: e.target.value, from: bk.from && bk.from <= e.target.value ? bk.from : e.target.value }),
     srBlkReason: (e: { target: { value: string } }) => updB({ reason: e.target.value }),
@@ -118,32 +118,32 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     srCalPrev: () => patch({ srCalM: Math.max(0, mi - 1) }), srCalNext: () => patch({ srCalM: Math.min(14, mi + 1) }),
     srShowPicker: (e: { target: EventTarget & { showPicker?: () => void } }) => { try { e.target.showPicker?.(); } catch { /* not every browser */ } },
     srPickTime: !bk.allDay, srHasBlocks: !!dr?.blocks.length,
-    srTimeModes: ([[true, "All day"], [false, "Pick a time"]] as const).map(([v, label]) => { const on = bk.allDay === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(63,43,34,.12)" : "none", fg: on ? "#3F2B22" : "#806B60", pick: () => updB({ allDay: v }) }; }),
+    srTimeModes: ([[true, "All day"], [false, "Pick a time"]] as const).map(([v, label]) => { const on = bk.allDay === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => updB({ allDay: v }) }; }),
     srRanges: bk.ranges.map((r, i) => { const fi = HOURS.indexOf(r.f);
       return { f: r.f, t: r.t, fromHours: HOURS.slice(0, -1).map(v => ({ v })), toHours: HOURS.slice(fi + 1).map(v => ({ v })),
         setF: (e: { target: { value: string } }) => { const nfi = HOURS.indexOf(e.target.value); updB({ ranges: bk.ranges.map((x, j) => (j === i ? { f: e.target.value, t: HOURS.indexOf(x.t) > nfi ? x.t : HOURS[nfi + 1] } : x)) }); },
         setT: (e: { target: { value: string } }) => updB({ ranges: bk.ranges.map((x, j) => (j === i ? { ...x, t: e.target.value } : x)) }),
         remove: () => { const nr = bk.ranges.filter((_, j) => j !== i); updB(nr.length ? { ranges: nr } : { ranges: [{ f: "11:00 am", t: "1:00 pm" }], allDay: true }); } }; }),
     srAddRange: () => { const last = bk.ranges[bk.ranges.length - 1], li = last ? HOURS.indexOf(last.t) : 11; updB({ ranges: [...bk.ranges, { f: HOURS[Math.min(li + 1, 22)], t: HOURS[Math.min(li + 2, 23)] }] }); },
-    srDtCur: okD ? "pointer" : "not-allowed", srDtHint: okD ? `${rng} · ${bk.allDay ? "All day" : bk.ranges.map(r => `${r.f} – ${r.t}`).join(", ")}` : "", srDtHintFg: okD ? "#3F2B22" : "#A08E82",
-    srDtNoAdd: !okD, srDtAddBg: okD ? "#BD4A19" : "#D9C6B8",
+    srDtCur: okD ? "pointer" : "not-allowed", srDtHint: okD ? `${rng} · ${bk.allDay ? "All day" : bk.ranges.map(r => `${r.f} – ${r.t}`).join(", ")}` : "", srDtHintFg: okD ? "var(--crm-ink)" : "var(--crm-faint)",
+    srDtNoAdd: !okD, srDtAddBg: okD ? "var(--crm-rust)" : "var(--crm-line)",
     srDtAdd: () => { if (!okD || !dr) return; upd({ blocks: [...dr.blocks, { kind: "date", from: bk.from, to: bk.to || bk.from, allDay: bk.allDay, ranges: bk.allDay ? [] : bk.ranges, reason: bk.reason }] });
       patch({ srBlk: { ...bk, from: "", to: "", reason: "", allDay: true, ranges: [{ f: "11:00 am", t: "1:00 pm" }] } }); },
     srApplyAll: () => void save(true), srSave: () => void save(false), srClose: () => patch({ srEdit: null, srDraft: null }),
     srE: dr ? {
       manual: dr.manual, showAuto: !dr.manual && !!dr.addr, showNoAddr: !dr.manual && !dr.addr, gmapUrl: dr.addr ? mapU(dr.addr).g : "", wazeUrl: dr.addr ? mapU(dr.addr).w : "",
-      linkFields: ([["#34A853", "G", "gmap", "https://maps.app.goo.gl/…"], ["#33CCFF", "W", "waze", "https://waze.com/ul/…"]] as const).map(([bg, ch, k, ph]) => ({ bg, ch, ph, v: dr[k] || "", set: (e: { target: { value: string } }) => upd({ [k]: e.target.value }) })),
-      name: dr.dispName || "Showroom", dispName: dr.dispName, gmap: dr.gmap, waze: dr.waze, photo: dr.photo, noPhoto: !dr.photo, photoBd: dr.photo ? "transparent" : "#D9B79F", addr: dr.addr, limit: String(dr.limit),
-      blocks: dr.blocks.map((b, i) => ({ tag: "Date", tagBg: "#FFF0E4", tagFg: "#BD4A19", when: fd(b.from) + (b.to && b.to !== b.from ? ` – ${fd(b.to)}` : ""), sub: timeTxt(b) + (b.reason ? ` · ${b.reason}` : ""),
+      linkFields: ([["var(--crm-brand-maps)", "G", "gmap", "https://maps.app.goo.gl/…"], ["var(--crm-brand-waze)", "W", "waze", "https://waze.com/ul/…"]] as const).map(([bg, ch, k, ph]) => ({ bg, ch, ph, v: dr[k] || "", set: (e: { target: { value: string } }) => upd({ [k]: e.target.value }) })),
+      name: dr.dispName || "Showroom", dispName: dr.dispName, gmap: dr.gmap, waze: dr.waze, photo: dr.photo, noPhoto: !dr.photo, photoBd: dr.photo ? "transparent" : "var(--crm-st-won)", addr: dr.addr, limit: String(dr.limit),
+      blocks: dr.blocks.map((b, i) => ({ tag: "Date", tagBg: "var(--crm-tint-attention)", tagFg: "var(--crm-rust)", when: fd(b.from) + (b.to && b.to !== b.from ? ` – ${fd(b.to)}` : ""), sub: timeTxt(b) + (b.reason ? ` · ${b.reason}` : ""),
         remove: () => upd({ blocks: dr.blocks.filter((_, j) => j !== i) }) })),
       openN: String(cnt(dr.off, dr.times)), allLabel: cnt(dr.off, dr.times) === dr.times.length * 7 ? "Close all" : "Open all", totN: String(dr.times.length * 7),
       slots: dr.times.map(tm => ({ time: tm, remove: () => upd({ times: dr.times.filter(x => x !== tm) }),
-        cells: DI.map(di => { const k = `${tm}|${di}`, on = !dr.off[k]; return { on, bg: on ? "#BD4A19" : "#fff", bd: on ? "#BD4A19" : "#E2CFC1",
+        cells: DI.map(di => { const k = `${tm}|${di}`, on = !dr.off[k]; return { on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-line)",
           toggle: () => set(u => { if (!u.srDraft) return u; const o = { ...u.srDraft.off }; if (o[k]) delete o[k]; else o[k] = 1; return { ...u, srDraft: { ...u.srDraft, off: o } }; }) }; }) })),
     } : empty,
     srSetAddr: (e: { target: { value: string } }) => upd({ addr: e.target.value }),
-    srNewDays: DN.map((l, i) => { const on = nd.includes(i); return { l, bd: on ? "#BD4A19" : "#E2CFC1", bg: on ? "#BD4A19" : "#fff", fg: on ? "#fff" : "#3F2B22", toggle: () => patch({ srNewD: on ? nd.filter(x => x !== i) : [...nd, i].sort() }) }; }),
-    srNewHint: !nd.length ? "Pick at least one day" : "", srNewOpts: opts.map(v => ({ v })), srNewT: nt, srNoNewT: !okT, srAddTBg: okT ? "#BD4A19" : "#D9C6B8",
+    srNewDays: DN.map((l, i) => { const on = nd.includes(i); return { l, bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", toggle: () => patch({ srNewD: on ? nd.filter(x => x !== i) : [...nd, i].sort() }) }; }),
+    srNewHint: !nd.length ? "Pick at least one day" : "", srNewOpts: opts.map(v => ({ v })), srNewT: nt, srNoNewT: !okT, srAddTBg: okT ? "var(--crm-rust)" : "var(--crm-line)",
     srSetNewT: (e: { target: { value: string } }) => patch({ srNewT: e.target.value }),
     srAddTime: () => { if (!okT || !dr) return; const off = { ...dr.off }; DI.forEach(di => { if (!nd.includes(di)) off[`${nt}|${di}`] = 1; else delete off[`${nt}|${di}`]; });
       upd({ off, times: [...dr.times, nt].sort((a, b) => ALLT.indexOf(a) - ALLT.indexOf(b)) }); patch({ srNewT: null, srNewD: null }); },

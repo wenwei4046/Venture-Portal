@@ -54,7 +54,7 @@ describe("the Team chat is Mine's", () => {
     expect(back.style.border).toBe("");
     expect(back.querySelector("svg")).toHaveAttribute("width", "22");
     expect(head().querySelector<HTMLElement>('[title="More"]')!.style.border).toBe("");
-    expect(head().querySelector<HTMLElement>('[title="WhatsApp"] > span:last-child')).toHaveStyle({ background: "#387557" });
+    expect(head().querySelector<HTMLElement>('[title="WhatsApp"] > span:last-child')!.style.background).toBe("var(--crm-brown)");
     // The list runs under the header and the composer.
     expect(document.querySelector<HTMLElement>("main[data-chat-screen] [data-chat-list]")).toHaveStyle({ position: "absolute" });
   });

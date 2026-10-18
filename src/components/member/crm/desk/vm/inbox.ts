@@ -12,7 +12,8 @@ import { chatRows, initials, teamNameOf, type ChatRow } from "./data";
 import { panelLike } from "./frame";
 import { insightRange } from "./insight";
 import { numbersOf, pct } from "../../panel/vm/common";
-import { AV, DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
+import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
+import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
@@ -32,15 +33,15 @@ export function inboxVM(ctx: DeskCtx) {
   const list = shown.filter(fSel[1]);
   const short = (l: string) => (W >= 1440 ? l : l.replace("Needs a reply", "Reply").replace("Appointment", "Appt").replace("Follow up", "Follow"));
   const filters = F.map(([label, f]) => { const on = label === fSel[0];
-    return { label: short(`${label} ${shown.filter(f).length}`), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2", pick: () => patch({ inbF: label }) }; });
+    return { label: short(`${label} ${shown.filter(f).length}`), bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)", pick: () => patch({ inbF: label }) }; });
   // One's own marks on a chat (the ⋮ menu, README › To build): pinned first, then by the last message as before.
   const pref = (id: string) => data.prefs[id];
   const ordered = [...list].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
-  const chats = ordered.map((x, i) => { const c = chip(x.key), p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread;
-    return { ini: x.ini, name: x.name, time: x.time, ad: x.ad, msg: x.msg, owner: x.owner, status: x.status, stBg: c[0], stFg: c[1], avBg: AV[i % 5],
-      rowBg: ui.pane === "docked" && ui.chat === x.id ? "#FFF1E6" : "#fff",
+  const chats = ordered.map(x => { const c = chip(x.key), p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread;
+    return { ini: x.ini, name: x.name, time: x.time, ad: x.ad, msg: x.msg, owner: x.owner, status: x.status, stBg: c[0], stFg: c[1], avBg: avatarTint(x.name)[0], avFg: avatarTint(x.name)[1],
+      rowBg: ui.pane === "docked" && ui.chat === x.id ? "var(--crm-tint-attention)" : "#fff",
       pinned: !!p?.pinned, muted: !!p?.muted, unreadN: n > 0 ? (n > 99 ? "99+" : String(n)) : "", unreadDot: dot,
-      timeFg: n > 0 || dot ? "#BD4A19" : "#A8968B", timeW: n > 0 || dot ? 650 : undefined,
+      timeFg: n > 0 || dot ? "var(--crm-rust)" : "var(--crm-faint)", timeW: n > 0 || dot ? 650 : undefined,
       canSend: false, send: () => {}, sendBg: "#fff",
       open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) }; });
 
@@ -49,22 +50,22 @@ export function inboxVM(ctx: DeskCtx) {
     const sel = val ? whoSel.includes(val) : !whoSel.length;
     return { head: false, sel, unsel: !sel, label, n, hasN: n > 0, noN: n === 0, isGroup: !!grp, isPerson: !grp, isAll: !!grp && !val, isTeam: !!grp && !!val,
       letter: val?.startsWith("team:") ? label.replace(/^Team /, "").slice(0, 1) : "", tint: grp ? grp[0] : "", color: grp ? grp[1] : "", ini: initials(label),
-      avBg: av ? av[0] : "#F5EBE3", avFg: av ? av[1] : "#4E2F20",
+      avBg: av ? av[0] : "var(--crm-field)", avFg: av ? av[1] : "var(--crm-ink)",
       pick: () => set(u => ({ ...u, whoSel: !val ? [] : u.whoSel.includes(val) ? u.whoSel.filter(x => x !== val) : [...u.whoSel, val] })) };
   };
   type Opt = ReturnType<typeof opt> | { head: true; sel: false; unsel: false; label: string; color: string };
-  const whoOpts: Opt[] = [opt("Everyone", null, all.length, ["#F5EBE3", "#806B60"], null)];
+  const whoOpts: Opt[] = [opt("Everyone", null, all.length, ["var(--crm-field)", "var(--crm-muted)"], null)];
   for (const d of ctx.directors) whoOpts.push(opt(d.name, d.id, all.filter(x => x.ownerId === d.id).length, null, [DIRECTOR_C[1], DIRECTOR_C[0]]));
   teams.forEach((t, k) => {
     const [ink, tint] = teamColours(k);
     whoOpts.push({ head: true, sel: false, unsel: false, label: t.name.toUpperCase(), color: ink });
     whoOpts.push(opt("Whole team", `team:${t.id}`, all.filter(x => x.team === t.name || x.teamId === t.id).length, [tint, ink], null));
-    t.people.forEach((p, i) => whoOpts.push(opt(p.name, p.id, all.filter(x => x.ownerId === p.id).length, null, i === 0 ? [ink, "#FFFFFF"] : [tint, ink])));
+    t.people.forEach((p, i) => whoOpts.push(opt(p.name, p.id, all.filter(x => x.ownerId === p.id).length, null, i === 0 ? [ink, "var(--crm-page)"] : [tint, ink])));
   });
   const whoName = (w: string) => w.startsWith("team:") ? teams.find(t => t.id === w.slice(5))?.name ?? "" : ctx.nameOf(w);
   const whoChips = whoSel.map(w => { const team = w.startsWith("team:"), k = teams.findIndex(t => t.id === w.slice(5)), tc = team ? teamColours(k) : null;
     const label = whoName(w);
-    return { label, ini: team ? label.replace(/^Team /, "").slice(0, 1) : initials(label), bg: tc ? tc[0] : "#FFF0E4", fg: tc ? "#fff" : "#BD4A19", tint: tc ? tc[1] : "#F7F0EA", ink: tc ? tc[0] : "#3F2B22",
+    return { label, ini: team ? label.replace(/^Team /, "").slice(0, 1) : initials(label), bg: tc ? tc[0] : "var(--crm-tint-attention)", fg: tc ? "#fff" : "var(--crm-rust)", tint: tc ? tc[1] : "var(--crm-field)", ink: tc ? tc[0] : "var(--crm-ink)",
       remove: () => set(u => ({ ...u, whoSel: u.whoSel.filter(x => x !== w) })) }; });
 
   return {
@@ -72,7 +73,7 @@ export function inboxVM(ctx: DeskCtx) {
     // v2 keeps the Action tab's markup (Organic leads); there is no such tab since 2026-10-13.
     isAction: false, notAction: true, actN: 0, actEmpty: false, whoOpen: ui.whoOpen, toggleWho: () => set(u => ({ ...u, whoOpen: !u.whoOpen })),
     whoLabel: !whoSel.length ? "Everyone" : whoSel.length === 1 ? whoName(whoSel[0]) : `${whoName(whoSel[0])} +${whoSel.length - 1}`,
-    whoAvs: !whoSel.length ? [{ ini: "ALL", bg: "#F5EBE3", fg: "#806B60" }] : [{ ini: String(whoSel.length), bg: "#BD4A19", fg: "#fff" }],
+    whoAvs: !whoSel.length ? [{ ini: "ALL", bg: "var(--crm-field)", fg: "var(--crm-muted)" }] : [{ ini: String(whoSel.length), bg: "var(--crm-rust)", fg: "#fff" }],
     whoChips, whoCount: `${shown.length} chats`, whoClear: () => patch({ whoSel: [] }), whoOpts,
   };
 }
@@ -117,7 +118,7 @@ export function infoVM(ctx: DeskCtx) {
   const at = rows.findIndex(r => r[0] === "Status") + 1;
   const all: [string, string][] = c ? [...rows.slice(0, at), ...mid, ...rows.slice(at)] : [];
   return {
-    ci: { name: c?.name ?? "", ini: initials(c?.name ?? "?"), rows: all.map(([k, val], i) => ({ k, v: val || "—", href: k === "Ad" ? adHref(c?.adUrl) : null, bt: i ? "1px solid #F1E7DF" : "0", w: !val || val === "—" ? 400 : 650, c: !val || val === "—" ? "#A08E82" : "#3F2B22" })) },
+    ci: { name: c?.name ?? "", ini: initials(c?.name ?? "?"), rows: all.map(([k, val], i) => ({ k, v: val || "—", href: k === "Ad" ? adHref(c?.adUrl) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: !val || val === "—" ? 400 : 650, c: !val || val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" })) },
     infoChat: ui.kind === "info" && !!c, openInfoChat: () => { if (c) patch({ kind: "chat", chat: c.id, fromInfo: true }); },
     infoHead: { title: "Customer info", sub: c ? (visit ? `${c.name} · visit ${new Date(visit.start).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : c.name) : "" },
   };
@@ -132,7 +133,7 @@ export function assignVM(ctx: DeskCtx) {
     ...teams.map((t, k) => ({ label: t.name.toUpperCase(), color: teamColours(k)[0], people: t.people.map(p => ({ id: p.id, name: p.name, sub: t.name })) })),
   ];
   return {
-    showAssign: data.can.manage, showMove: false, menuOpen: ui.menu, menuBtnBg: ui.menu ? "#FFF1E6" : "#fff",
+    showAssign: data.can.manage, showMove: false, menuOpen: ui.menu, menuBtnBg: ui.menu ? "var(--crm-tint-attention)" : "#fff",
     toggleMenu: () => set(u => ({ ...u, menu: !u.menu })), closeMenu: () => patch({ menu: false }),
     openAssign: () => patch({ menu: false, kind: "assign" }), backToChat: () => patch({ kind: "chat" }),
     openInfo: () => { if (cid) patch({ menu: false, kind: "info", infoId: cid, visit: null }); },
@@ -167,12 +168,12 @@ export function alertsVM(ctx: DeskCtx) {
   const today = new Date(now).toDateString();
   const when = (iso: string) => { const d = new Date(iso), t = d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
     return d.toDateString() === today ? t : `${d.toLocaleDateString("en-MY", { day: "numeric", month: "short" })}, ${t}`; };
-  const KIND: Record<PanelNotif["kind"], [string, string]> = { move: ["Move", "#8E4B6E"], share: ["Share", "#2F6FB5"], won: ["Won", "#387557"], lost: ["Lost", "#806B60"], overdue: ["Overdue 9 h+", "#A3371A"] };
+  const KIND: Record<PanelNotif["kind"], [string, string]> = { move: ["Move", "var(--crm-ink-soft)"], share: ["Share", "var(--crm-ink-soft)"], won: ["Won", "var(--crm-brown)"], lost: ["Lost", "var(--crm-muted)"], overdue: ["Overdue 9 h+", "var(--crm-oxblood)"] };
   const rows = list.map(n => {
     const c = n.customerId ? data.customers.find(x => x.id === n.customerId) : undefined, unr = !isRead(n), [kind, color] = KIND[n.kind];
     const last = c ? lastReal(c) : undefined;
     const open = () => { if (unr) act.readNotifs([n.key]); if (c) patch({ tab: "inbox", pane: "docked", kind: "chat", chat: c.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }); };
-    return { key: n.key, kind, color, time: when(n.at), unread: unr, bg: unr ? "#FFFAF6" : "#fff", dot: unr ? color : "#E2D5CB",
+    return { key: n.key, kind, color, time: when(n.at), unread: unr, bg: unr ? "var(--crm-page)" : "#fff", dot: unr ? color : "var(--crm-rule)",
       title: c?.name ?? n.lead,
       line: n.kind === "overdue" ? `Waiting ${Math.floor(urgencyOf(c ?? ({} as never), now).waitingMinutes / 60) || 9} h for ${n.lead === "a reply" ? "a reply" : `${n.lead}'s reply`}`
         : [n.who, n.text.replace(/ ·$/, ""), n.tail.trim()].filter(Boolean).join(" "),
@@ -211,17 +212,17 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { if (!c) return; patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
   const top = me.role === "boss";
   const items: [string, string, string, () => void, string, boolean][] = [
-    ...(data.can.manage ? [["Assign to", "#2F6FB5", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
-    ["Move", "#BD4A19", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false],
-    ["Share", "#A46312", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
-    ["Customer info", "#387557", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null }); }, "", true],
-    ["Appointment", "#8E4B6E", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
-    ["Starred messages", "#A46312", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { patch({ menu: false }); chat.starredOpen(); }, `${chat.starCount} in this chat`, false],
-    [unread ? "Mark as read" : "Mark as unread", "#2F6FB5", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+    ...(data.can.manage ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
+    ["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false],
+    ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
+    ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null }); }, "", true],
+    ["Appointment", "var(--crm-ink-soft)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
+    ["Starred messages", "var(--crm-brown)", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { patch({ menu: false }); chat.starredOpen(); }, `${chat.starCount} in this chat`, false],
+    [unread ? "Mark as read" : "Mark as unread", "var(--crm-ink-soft)", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
       () => { if (!c) return; if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread"); }, "", true],
-    [muted ? "Unmute" : "Mute notifications", "#6B645A", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",
+    [muted ? "Unmute" : "Mute notifications", "var(--crm-ink-soft)", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",
       () => flag({ muted: !muted }, muted ? "Notifications on" : "Muted · no alerts for this chat"), muted ? "Muted" : "", false],
-    [pinned ? "Unpin chat" : "Pin chat", "#806B60", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", () => flag({ pinned: !pinned }, pinned ? "Unpinned" : "Pinned to the top of Inbox"), "", false],
+    [pinned ? "Unpin chat" : "Pin chat", "var(--crm-muted)", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", () => flag({ pinned: !pinned }, pinned ? "Unpinned" : "Pinned to the top of Inbox"), "", false],
   ];
   const chatMenuItems = items.map(([label, col, d, run, sub, sep]) => ({ label, c: col, d, run, sub: sub || null, sep }));
 
@@ -234,14 +235,14 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const stls = data.people.filter(p => p.role === "stl").map(p => ({ id: p.id, name: p.name, sub: "Senior TL" }));
   const teamGroups = teams.map((t, k) => [t.name.toUpperCase(), teamColours(k)[0], t.people.map(p => ({ id: p.id, name: p.name, sub: t.name }))] as [string, string, P[]]);
   const src: [string, string, P[]][] = kind === "move"
-    ? (top || !boss ? [] : [["YOUR DIRECT UPLINE", "#4E2F20", [{ id: boss.id, name: boss.name, sub: "Principal · Top level" }]]])
-    : top ? [["REVENUE DIRECTOR", "#4E2F20", ctx.directors.map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))], ["SENIOR TL", "#806B60", stls], ...teamGroups]
-      : [["ABOVE YOU", "#4E2F20", boss ? [{ id: boss.id, name: boss.name, sub: "Top level" }] : []], ["SAME LEVEL", "#BD4A19", ctx.directors.filter(d => d.id !== me.id).map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))],
-        ["BELOW YOU", "#387557", [...stls, ...teamGroups.flatMap(g => g[2])]]];
+    ? (top || !boss ? [] : [["YOUR DIRECT UPLINE", "var(--crm-ink)", [{ id: boss.id, name: boss.name, sub: "Principal · Top level" }]]])
+    : top ? [["REVENUE DIRECTOR", "var(--crm-ink)", ctx.directors.map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))], ["SENIOR TL", "var(--crm-muted)", stls], ...teamGroups]
+      : [["ABOVE YOU", "var(--crm-ink)", boss ? [{ id: boss.id, name: boss.name, sub: "Top level" }] : []], ["SAME LEVEL", "var(--crm-rust)", ctx.directors.filter(d => d.id !== me.id).map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))],
+        ["BELOW YOU", "var(--crm-brown)", [...stls, ...teamGroups.flatMap(g => g[2])]]];
   const btn = kind === "move" ? "Move" : top ? "Invite" : "Share";
   const pickGroups = src.map(([label, color, ps]) => [label, color, ps.filter(p => p.id !== me.id && p.id !== c?.assignedTo)] as [string, string, P[]]).filter(g => g[2].length)
     .map(([label, color, ps]) => ({ label, color, people: ps.map(p => { const on = done.has(p.id);
-      return { name: p.name, sub: p.sub, ini: initials(p.name), btn: on ? (kind === "move" ? "Requested" : top ? "Invited" : "Shared") : btn, bc: on ? "#387557" : "#BD4A19",
+      return { name: p.name, sub: p.sub, ini: initials(p.name), btn: on ? (kind === "move" ? "Requested" : top ? "Invited" : "Shared") : btn, bc: on ? "var(--crm-brown)" : "var(--crm-rust)",
         pick: () => {
           if (on || !c) return;
           if (kind === "move") { void act.sendTo(c.id, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `Moved ${cn} to ${p.name}`, undo: { kind: "send", customerId: c.id, prev: c.assignedTo, until: Date.now() + 30_000 } }); }); return; }

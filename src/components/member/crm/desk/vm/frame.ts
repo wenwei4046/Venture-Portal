@@ -99,10 +99,10 @@ export function frameVM(ctx: DeskCtx) {
   // beside it shifts left (the owner, 2026-10-15: "聊天在右边打开，日历往左缩"): 42 % of the CRM, never under the dock.
   const chatPane = !ibOn && ui.kind === "chat" && ui.pane === "docked" ? Math.max(dockW, Math.min(crmW - 560, Math.round(crmW * 0.42))) : 0;
   const paneW0 = isWide ? crmW - 380 : chatPane || dockW, paneW = Math.max(300, Math.min(crmW - 320, ui.paneW ?? paneW0));
-  const base: CSSProperties = { width: paneW, display: "flex", flexDirection: "column", background: "#FFFFFF", boxSizing: "border-box", overflow: "hidden" };
+  const base: CSSProperties = { width: paneW, display: "flex", flexDirection: "column", background: "var(--crm-page)", boxSizing: "border-box", overflow: "hidden" };
   const paneStyle: CSSProperties = isOverlay
-    ? { ...base, position: "absolute", top: 0, right: 0, bottom: 0, borderLeft: "1px solid #EBDDD2", boxShadow: "-16px 0 40px rgba(40,25,18,.16)", zIndex: 4 }
-    : { ...base, flex: `0 0 ${paneW}px`, minWidth: 0, position: "relative", overflow: ibOn ? "visible" : "hidden", borderLeft: isWide ? 0 : "1px solid #EBDDD2" };
+    ? { ...base, position: "absolute", top: 0, right: 0, bottom: 0, borderLeft: "1px solid var(--crm-rule)", boxShadow: "-16px 0 40px rgba(42,22,12,.16)", zIndex: 4 }
+    : { ...base, flex: `0 0 ${paneW}px`, minWidth: 0, position: "relative", overflow: ibOn ? "visible" : "hidden", borderLeft: isWide ? 0 : "1px solid var(--crm-rule)" };
 
   const L = lists(ctx), B = badges(ctx);
   const empties: Record<string, [string, string, string]> = {
@@ -114,7 +114,7 @@ export function frameVM(ctx: DeskCtx) {
   const pickIdx = pane === "wide" ? (ui.pick ?? SECTION_PICK[tab] ?? 0) : -1;
   const listCards = (L[tab] ?? []).map(([title, sub, ic], i) => ({
     title, sub, d: LI[ic], bg: TINTS[i % 4][0], fg: TINTS[i % 4][1],
-    rowBg: i === pickIdx ? "#FFF1E6" : "transparent", titleColor: i === pickIdx ? "#BD4A19" : "#3F2B22",
+    rowBg: i === pickIdx ? "var(--crm-tint-attention)" : "transparent", titleColor: i === pickIdx ? "var(--crm-rust)" : "var(--crm-ink)",
     pick: () => patch({ pane: "wide", kind: "section", pick: i }),
   }));
 
@@ -138,8 +138,8 @@ export function frameVM(ctx: DeskCtx) {
   const opIdx = ui.pick ?? SECTION_PICK[tab] ?? 0;
   const opItem = (L[tab] ?? [])[opIdx] ?? ["", "", ""];
   const sc = SHEET_COPY[tab] ?? ["", "", ""];
-  const sheetRows = (L[tab] ?? []).map(([title, sub, ic], i) => ({ title, sub, d: PHONE_IC[title] ?? LI[ic], badge: B[title] || null, bg: SOLID[i % 5], fg: "#FFFFFF",
-    tint: ["#FFF0E4", "#E4EDF8", "#F3E8EF", "#E8F3ED", "#F1E7DF"][i % 5], bt: i ? "1px solid #F1E7DF" : "0",
+  const sheetRows = (L[tab] ?? []).map(([title, sub, ic], i) => ({ title, sub, d: PHONE_IC[title] ?? LI[ic], badge: B[title] || null, bg: SOLID[i % 5], fg: "var(--crm-page)",
+    tint: ["var(--crm-tint-attention)", "var(--crm-tint-cold)", "var(--crm-tint-new)", "var(--crm-tint-follow)", "var(--crm-field)"][i % 5], bt: i ? "1px solid var(--crm-field)" : "0",
     pick: () => patch({ pick: i, stage: "op", adLog: false, mwtLog: false, sendFor: null, awChat: null, ad: null, ftEdit: null, cpSel: null, frmOpen: false, cltEdit: null }) }));
 
   const closePane = () => {
@@ -160,7 +160,7 @@ export function frameVM(ctx: DeskCtx) {
   return {
     W, H, sbW, sbOpen: !collapsed, sbClosed: collapsed, sections, appTop, appBottom, crmItems, crmGroups,
     // The profile (v2): its menu has Sign out; Back to Revenue app sits above it.
-    meMenuOpen: ui.meMenu, meBd: ui.meMenu ? "#BD4A19" : "#EBDDD2", toggleMeMenu: () => patch({ meMenu: !ui.meMenu }),
+    meMenuOpen: ui.meMenu, meBd: ui.meMenu ? "var(--crm-rust)" : "var(--crm-rule)", toggleMeMenu: () => patch({ meMenu: !ui.meMenu }),
     closeMeMenu: () => patch({ meMenu: false }), returnApp: () => { patch({ meMenu: false }); ctx.exit(); },
     signOutMe: () => { patch({ meMenu: false }); ctx.app.signOut(); },
     // CRM alerts' count: the alerts its pane lists (rev 1 drew the design's sample 7 whatever there was).
@@ -173,8 +173,8 @@ export function frameVM(ctx: DeskCtx) {
     dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(440, ibCpW + ibSpare) : 440),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),
     ibCpOpen: ibOn && ibCpOpen, ibCpClosed: ibOn && !ibCpDock,
-    ibCpStyle: (ibCpDock ? { position: "relative", flex: `0 0 ${ibCpW}px`, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", display: "flex", flexDirection: "column", minHeight: 0 }
-      : { position: "absolute", top: 0, right: ibInfoW + 44, bottom: 0, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid #EBDDD2", boxShadow: "-16px 0 40px rgba(40,25,18,.16)", display: "flex", flexDirection: "column", zIndex: 4 }) as CSSProperties,
+    ibCpStyle: (ibCpDock ? { position: "relative", flex: `0 0 ${ibCpW}px`, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", minHeight: 0 }
+      : { position: "absolute", top: 0, right: ibInfoW + 44, bottom: 0, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", boxShadow: "-16px 0 40px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", zIndex: 4 }) as CSSProperties,
     ibCpToggle: () => patch({ ibCp: !ui.ibCp }),
     // Every pane and editor is dragged to size; a double-click gives it back (v2).
     sheetW, dragSheet: edgeDrag(set, "sheetW", sheetW, -1, 360, W1440 ? 760 : 620), resetSheet: () => patch({ sheetW: null }),

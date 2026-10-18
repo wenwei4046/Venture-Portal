@@ -64,7 +64,7 @@ export function pickVM(p: Picked | null | undefined, set: (p: Picked | null) => 
   return {
     p, set,
     items: p.items.map(it => ({ img: it.video ? "" : it.url, vid: it.video ? it.url : "" })),
-    hdBg: p.hd ? "#3F2B22" : "#fff", hdFg: p.hd ? "#fff" : "#3F2B22", hdBd: p.hd ? "#3F2B22" : "#D9C7BA",
+    hdBg: p.hd ? "var(--crm-ink)" : "#fff", hdFg: p.hd ? "#fff" : "var(--crm-ink)", hdBd: p.hd ? "var(--crm-ink)" : "var(--crm-line)",
     toggleHd: () => set({ ...p, hd: !p.hd }),
     title: n === 1 ? (p.items[0].video ? "1 video" : "1 photo") : `${n} items`,
     note: p.hd ? `HD · ${photos ? "full size" : "full quality"}` : `Standard · made smaller to send quickly · tap HD for ${photos ? "full size" : "full quality"}`,

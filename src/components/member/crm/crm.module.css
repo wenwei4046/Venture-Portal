@@ -5,21 +5,21 @@
  */
 
 /* The design's hover states (style-hover in the prototype). */
-.hov1:hover { background: #FBF7F3 !important; }
-.hov2:hover { background: #FBF4EE !important; }
-.hov3:hover { background: #FFF8F2 !important; }
-.hov4:hover { border-color: #387557 !important; }
-.hov5:hover { background: #F5EEE9 !important; }
+.hov1:hover { background: var(--crm-page) !important; }
+.hov2:hover { background: var(--crm-cream) !important; }
+.hov3:hover { background: var(--crm-cream) !important; }
+.hov4:hover { border-color: var(--crm-brown) !important; }
+.hov5:hover { background: var(--crm-field) !important; }
 /* rev 1010 (Insight, Profile › Notifications). */
 .hov6:hover { color: rgb(150 58 20) !important; }
-.hov7:hover { background: #F5EBE3 !important; }
+.hov7:hover { background: var(--crm-field) !important; }
 /* rev 1011 (Control panel). */
-.hov8:hover { background: #963A14 !important; }
-.hov9:hover { background: #EEF3F9 !important; }
-.hov10:hover { border-color: #B9CCE3 !important; }
-.hov11:hover { border-color: #D9C7BA !important; }
-.hov12:hover { border-color: #E9BFA0 !important; }
-.hov13:hover { background: #EFE2D7 !important; }
+.hov8:hover { background: var(--crm-rust-press) !important; }
+.hov9:hover { background: var(--crm-tint-cold) !important; }
+.hov10:hover { border-color: var(--crm-faint-2) !important; }
+.hov11:hover { border-color: var(--crm-line) !important; }
+.hov12:hover { border-color: var(--crm-st-won) !important; }
+.hov13:hover { background: var(--crm-rule-soft) !important; }
 
 /* The app: full screen on a phone, the design's own font and colours. */
 .app {
@@ -29,8 +29,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #FFFFFF;
-  color: #3F2B22;
+  background: var(--crm-page);
+  color: var(--crm-ink);
   font-family: Inter, var(--font-sans), sans-serif;
   /* The prototype keeps the browser's own line height; the portal's body sets 1.55. */
   line-height: normal;
@@ -40,7 +40,7 @@
    it wants it). Tailwind and the member workspace switch everything to border-box, which shrinks every
    bordered chip and box by its border. Doubled class: above .workspace *. */
 .app.app, .app.app *, .app.app ::before, .app.app ::after { box-sizing: revert; }
-.app a { color: #BD4A19; }
+.app a { color: var(--crm-rust); }
 .app a:hover { color: rgb(150 58 20); }
 /* Inputs take the design's look, not the browser's. */
 .app input, .app textarea { font-family: inherit; }
@@ -62,18 +62,18 @@
 .app ::-webkit-scrollbar { display: none; }
 /* On a wide screen the CRM keeps a phone's width, centred. */
 @media (min-width: 560px) {
-  .app { left: 50%; right: auto; width: 430px; transform: translateX(-50%); box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63, 43, 34, .12); }
+  .app { left: 50%; right: auto; width: 430px; transform: translateX(-50%); box-shadow: 0 0 0 1px var(--crm-rule), 0 30px 60px rgba(42,22,12, .12); }
 }
-.loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: calc(14px * var(--rv-type, 1)); color: #806B60; }
-.problem { margin: 0; padding: 10px 20px; font-size: calc(13px * var(--rv-type, 1)); color: #A3371A; background: #FBEAE6; }
-.panel { background: #FBF7F3; }
+.loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: calc(14px * var(--rv-type, 1)); color: var(--crm-muted); }
+.problem { margin: 0; padding: 10px 20px; font-size: calc(13px * var(--rv-type, 1)); color: var(--crm-oxblood); background: var(--crm-tint-attention); }
+.panel { background: var(--crm-page); }
 
 /*
  * iPhone safe areas (rev 1010 / 1011, MUST): nothing in the CRM sits under the camera / Dynamic Island,
  * the status bar or the home indicator. The page is viewportFit "cover" and .app is fixed over it, so
  * .app pads itself by the insets (the bottom through --safe-bottom, globals.css, never the bare env —
- * src/lib/safe-area.test.ts). The status-bar strip shows the page's top colour: #FFFFFF (RS, any chat),
- * #FBF7F3 (Control panel); under the panel's white bottom bar the strip stays white.
+ * src/lib/safe-area.test.ts). The status-bar strip shows the page's top colour: var(--crm-page) (RS, any chat),
+ * var(--crm-page) (Control panel); under the panel's white bottom bar the strip stays white.
  * Round 2 (rev 1010 §8.2 / rev 1011 §8): with the top bar gone the title rows sit right under the inset, so on a phone
  * with one the first row starts at least 8 px below it (--crm-top); with no inset (a desktop) nothing is added and the
  * pages measure as the prototypes.
@@ -91,14 +91,14 @@
 .app [style*="overflow-y:auto"], .app [style*="overflow-y: auto"] { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
 .app [style*="overflow-x:auto"], .app [style*="overflow-x: auto"] { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
 .app [style*="overflow:auto"], .app [style*="overflow: auto"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.app.panel { background: linear-gradient(#FBF7F3, #FBF7F3) top / 100% calc(100% - var(--safe-bottom)) no-repeat, #FFFFFF; }
-.app.panel:has(main [data-chat-list]) { background: #FFFFFF; }
+.app.panel { background: linear-gradient(var(--crm-page), var(--crm-page)) top / 100% calc(100% - var(--safe-bottom)) no-repeat, var(--crm-page); }
+.app.panel:has(main [data-chat-list]) { background: var(--crm-page); }
 /* Both Profiles wear the Revenue app Profile's glow (2026-10-16, Mine's then the Team side's — tools/crm-design/
    profile-like-app.cjs): the status-bar strip above it takes the glow's top colour, as the app's own Profile turns its strip
    peach (RevenueApp › --status-bg), and the page under it is white, as the app's — on the Team side too, where it comes
    after .app.panel's cream (same weight, so this later rule wins). A chat open over it keeps its white strip
    (.app.panel:has(main [data-chat-list]) weighs more). */
-.app:has([data-prof-glow]) { background: linear-gradient(#F6B48A, #F6B48A) top / 100% var(--crm-top) no-repeat, #FFFFFF; }
+.app:has([data-prof-glow]) { background: linear-gradient(var(--crm-peach), var(--crm-peach)) top / 100% var(--crm-top) no-repeat, var(--crm-page); }
 /* A layer positioned against .app spans its padding, so it keeps its own content clear of the insets
    with a transparent border its own background paints under (the design's padding is left exactly as is):
    a bottom sheet lifts above the home indicator; a full-screen page (slideIn) starts below the status bar. */
@@ -106,7 +106,7 @@
 .app > [style*="slideIn"] { border-top: var(--crm-top) solid transparent; border-bottom: var(--safe-bottom) solid transparent; }
 /* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, in the composer handoff's muted
    brown (its textarea::placeholder, 2026-10-14), and the box shows no scrollbar. */
-.app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #A8968B; }
+.app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--crm-faint); }
 .app textarea[data-draft] { scrollbar-width: none; }
 /* A message bubble: an up / down drag scrolls the chat, a sideways one is ours: swipe right to reply (shared/msg-menu.tsx, 2026-10-14). */
 .app [data-msg] { touch-action: pan-y; }

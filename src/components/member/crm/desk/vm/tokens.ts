@@ -3,6 +3,8 @@
  * paths, colours and copy. Kept as the design writes them; a change here is a change to the design.
  */
 
+import { C, DIRECTOR_COLOUR, STATUS, teamColour } from "../../shared/palette";
+
 /** The Revenue app's sidebar: [label, icon path, count]. */
 export const NAV: [string, string][] = [
   ["Today", "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9"],
@@ -49,16 +51,19 @@ export const LI: Record<string, string> = {
   chat: "M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z",
   zap: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
 };
-export const TINTS: [string, string][] = [["#E8F3ED", "#387557"], ["#FFF0CC", "#A46312"], ["#FFE5CF", "#BD4A19"], ["#F1E7DF", "#4E2F20"]];
-/** Status chips: [background, ink]. Urgent and Reply soon are not in the design (it shows only Overdue): they take To mark's amber and Follow up's brown. */
+export const TINTS: [string, string][] = [[C.tintFollow, C.brown], [C.tintAppt, C.textAppt], [C.tintAttention, C.rust], [C.field, C.ink]];
+/**
+ * Status chips: [background, ink] — 4a's status ramp (crm/shared/palette.ts). Urgent and Overdue are urgent text
+ * (oxblood on the Attention tint), Reply soon ink on the field.
+ */
 export const ST: Record<string, [string, string]> = {
-  New: ["#FFF1E6", "#BD4A19"], Appointment: ["#E4EDF8", "#2F5E8C"], "Follow up": ["#F1E7DF", "#6B574C"], Overdue: ["#F8E1D8", "#A3371A"],
-  Booked: ["#E4EDF8", "#2F5E8C"], "Showed up": ["#E8F3ED", "#387557"], "To mark": ["#FFF0CC", "#A46312"],
-  Urgent: ["#FFF0CC", "#A46312"], "Reply soon": ["#F1E7DF", "#6B574C"], Won: ["#E8F3ED", "#387557"], Lost: ["#F8E1D8", "#A3371A"],
-  Cold: ["#F2F0EB", "#6B645A"], "No show": ["#F8E1D8", "#A3371A"], "No show yet": ["#F2F0EB", "#6B645A"],
+  New: [STATUS.New.tint, STATUS.New.text], Appointment: [STATUS.Appointment.tint, STATUS.Appointment.text],
+  "Follow up": [STATUS["Follow up"].tint, STATUS["Follow up"].text], Overdue: [C.tintAttention, C.oxblood],
+  Booked: [STATUS.Appointment.tint, STATUS.Appointment.text], "Showed up": [C.tintFollow, C.brown], "To mark": [C.tintAppt, C.textAppt],
+  Urgent: [C.tintAttention, C.oxblood], "Reply soon": [C.field, C.ink], Won: [STATUS.Won.tint, STATUS.Won.text], Lost: [STATUS.Lost.tint, STATUS.Lost.text],
+  Cold: [STATUS["Cold leads"].tint, STATUS["Cold leads"].text], "No show": [C.tintAttention, C.oxblood], "No show yet": [C.field, C.muted],
 };
-export const AV = ["#E4EDF8", "#F5EBE3", "#E8F3ED", "#FFF0CC", "#FFE5CF"];
-export const SOLID = ["#BD4A19", "#2F6FB5", "#8E4B6E", "#387557", "#4E2F20"];
+export const SOLID = [C.rust, C.ink, C.brown, C.oxblood, C.inkSoft];
 export const PHONE_IC: Record<string, string> = {
   "Organic Leads": "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 9h8M8 13h5",
   "Ads to teams": "M11 5 6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7",
@@ -66,8 +71,8 @@ export const PHONE_IC: Record<string, string> = {
 };
 /** Ad delivery (Meta): [label, dot, hint, tint, ink]. */
 export const ST_META: Record<string, [string, string, null, string, string]> = {
-  all: ["All ads", "#2F6FB5", null, "#E4EDF8", "#2F6FB5"], Running: ["Running", "#3FA06B", null, "#E8F3ED", "#387557"],
-  Paused: ["Paused", "#B4AEA4", null, "#F2F0EB", "#6B645A"], Pending: ["Pending", "#E1B04F", null, "#FFF0CC", "#A46312"],
+  all: ["All ads", C.ink, null, C.field, C.ink], Running: ["Running", C.brown, null, C.tintFollow, C.brown],
+  Paused: ["Paused", C.faint2, null, C.field, C.muted], Pending: ["Pending", C.amber, null, C.tintAppt, C.textAppt],
 };
 export const SHEET_COPY: Record<string, [string, string, string]> = {
   forms: ["Customer form", "What salespeople fill in for each customer", "Customer form"],
@@ -80,11 +85,7 @@ export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const DIRECTOR_TEAM = "Revenue Director";
 /** The Revenue Director's key in an ad's split — the database's fixed key for the directors' "team" (mig 20261016010000). */
 export const DIRECTOR_SPLIT_KEY = "ffffffff-ffff-ffff-ffff-ffffffffffff";
-export const DIRECTOR_C: [string, string] = ["#387557", "#E8F3ED"];
+export const DIRECTOR_C: [string, string] = DIRECTOR_COLOUR;
 
-/**
- * The teams' colours, in the panel's order: the design's three (Kelvin, Priya, Ryan), then — a fourth or fifth team
- * the design never drew — its other two hues.
- */
-const TEAM_HUES: [string, string][] = [["#BD4A19", "#FFF0E4"], ["#2F6FB5", "#E4EDF8"], ["#8E4B6E", "#F3E8EF"], ["#387557", "#E8F3ED"], ["#4E2F20", "#F5EBE3"]];
-export const teamColours = (k: number): [string, string] => TEAM_HUES[k % TEAM_HUES.length];
+/** The teams' colours, in the CRM's order (4a change list 6: after the Director, orange, amber, oxblood, brown, then the spares). */
+export const teamColours = (k: number): [string, string] => teamColour(k);

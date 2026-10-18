@@ -75,18 +75,18 @@ export function adsPerfVM(ctx: DeskCtx) {
     if (m[0] === "delivery") return { v: isTotal ? "" : status(adId) ?? "—", cv: "", d: "", dc: "", db: "" };
     const v = val(cs, m[0], ra, rb);
     if (!cmp) return { v: fmt(v, m[3]), cv: "", d: "", dc: "", db: "" };
-    const pv = val(cs, m[0], ca, cb); let dd = "—", dc = "#806B60", db = "#F5EBE3";
+    const pv = val(cs, m[0], ca, cb); let dd = "—", dc = "var(--crm-muted)", db = "var(--crm-field)";
     if (v != null && pv) { const p = ((v - pv) / pv) * 100, good = p > 0 !== COSTY.test(m[0]); dd = Math.abs(p) < 0.5 ? "0%" : `${p > 0 ? "▲ " : "▼ "}${Math.abs(p).toFixed(0)}%`;
-      if (Math.abs(p) >= 0.5) { dc = good ? "#387557" : "#A3371A"; db = good ? "#E4F1EA" : "#FBE9E4"; } }
-    else if (v && !pv) { dd = "New"; dc = "#387557"; db = "#E4F1EA"; }
+      if (Math.abs(p) >= 0.5) { dc = good ? "var(--crm-brown)" : "var(--crm-oxblood)"; db = good ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)"; } }
+    else if (v && !pv) { dd = "New"; dc = "var(--crm-brown)"; db = "var(--crm-tint-follow)"; }
     return { v: fmt(v, m[3]), cv: fmt(pv, m[3]), d: dd, dc, db };
   };
   const srt = ui.apSort;
   const sv = (a: (typeof ads)[number], k: string): number | string => (k === "name" ? a.name : k === "delivery" ? status(a.id) ?? "" : val(a.cs, k, ra, rb) ?? -Infinity);
   const ADs = srt ? AD.slice().sort((a, b) => { const x = sv(a, srt.k), y = sv(b, srt.k); const c = typeof x === "string" ? x.localeCompare(String(y)) : x - Number(y); return srt.dir === "asc" ? c : -c; }) : AD;
   const allCs = AD.flatMap(a => a.cs);
-  const rows = ADs.map(a => { const st = status(a.id); return { name: a.name, meta: `${a.ch} · ${st ?? "Not synced"}`, dot: st ? ST_META[st][1] : "#C9B8AC", bg: "#fff", w: 600, cells: cols.map(m => cell(a.cs, m, false, a.id)) }; });
-  rows.push({ name: `Total · ${AD.length} ads`, meta: rangeTxt(ra, rb), dot: "transparent", bg: "#FBF6F2", w: 700, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, ""))) });
+  const rows = ADs.map(a => { const st = status(a.id); return { name: a.name, meta: `${a.ch} · ${st ?? "Not synced"}`, dot: st ? ST_META[st][1] : "var(--crm-faint-2)", bg: "#fff", w: 600, cells: cols.map(m => cell(a.cs, m, false, a.id)) }; });
+  rows.push({ name: `Total · ${AD.length} ads`, meta: rangeTxt(ra, rb), dot: "transparent", bg: "var(--crm-cream-nav)", w: 700, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, ""))) });
   const CM: [string, string][] = [["Previous period", rangeTxt(ra - len * DAY, ra - DAY)], ["Same period last month", MON[(new Date(ra).getMonth() + 11) % 12].slice(0, 3)], ["Same period last year", `${MON[new Date(ra).getMonth()].slice(0, 3)} ${new Date(ra).getFullYear() - 1}`]];
   if (cmode === "custom") CM.push(["Custom", rangeTxt(ca, cb)]);
   // The date picker (F2): presets, a two-month calendar, typed DD/MM/YYYY dates (- or . too), Compare in blue.
@@ -103,13 +103,13 @@ export function adsPerfVM(ctx: DeskCtx) {
     const cells = Array.from({ length: Math.ceil((lead + days) / 7) * 7 }, (_, k) => { const dt = new Date(yr, mo, 1 - lead + k), io = isoOf(dt.getTime()), off = dt.getMonth() !== mo, future = dt.getTime() > T;
       const inM = !off && !!f && !!t && io >= f && io <= t, edgeM = !off && (io === f || io === t), inC = !!d?.cmp && !off && !!cf && !!ct && io >= cf && io <= ct && !inM, edgeC = !!d?.cmp && !off && !edgeM && (io === cf || io === ct);
       const [rf, rt] = inM || edgeM ? [f, t] : [cf, ct];
-      return { num: dt.getDate(), off: off || future, band: inM && f !== t ? "#FFF1E6" : inC && cf !== ct ? "#E4EDF8" : "transparent", br: io === rf && rf !== rt ? "19px 0 0 19px" : io === rt && rf !== rt ? "0 19px 19px 0" : "0",
-        dotBg: edgeM ? "#BD4A19" : edgeC ? "#2F6FB5" : "transparent", fg: edgeM || edgeC ? "#fff" : off || future ? "#D3C4B8" : "#3F2B22", w: edgeM || edgeC || io === isoOf(T) ? 700 : 500,
-        ring: io === isoOf(T) && !edgeM && !edgeC ? "1.5px solid #BD4A19" : "0",
+      return { num: dt.getDate(), off: off || future, band: inM && f !== t ? "var(--crm-tint-attention)" : inC && cf !== ct ? "var(--crm-tint-cold)" : "transparent", br: io === rf && rf !== rt ? "19px 0 0 19px" : io === rt && rf !== rt ? "0 19px 19px 0" : "0",
+        dotBg: edgeM ? "var(--crm-rust)" : edgeC ? "var(--crm-ink-soft)" : "transparent", fg: edgeM || edgeC ? "#fff" : off || future ? "var(--crm-faint-2)" : "var(--crm-ink)", w: edgeM || edgeC || io === isoOf(T) ? 700 : 500,
+        ring: io === isoOf(T) && !edgeM && !edgeC ? "1.5px solid var(--crm-rust)" : "0",
         pick: () => { if (off || future || !d) return; const F = d[fKey]; if (!d.step) upd({ [fKey]: io, [tKey]: io, step: 1, ...(tg === "main" ? { preset: "Custom" } : {}) }); else upd({ [fKey]: io < F ? io : F, [tKey]: io < F ? F : io, step: 0 }); } }; });
     const raw = d?.txt ?? {}, src: Record<string, string> = { from: f, to: t, cf, ct };
     const field = (k: "from" | "to" | "cf" | "ct") => { const isCmp = k === "cf" || k === "ct", bad = raw[k] != null && raw[k] !== "" && !parse(raw[k]);
-      return { v: raw[k] ?? (src[k] ? shown(src[k]) : ""), err: bad ? "#A3371A" : "transparent",
+      return { v: raw[k] ?? (src[k] ? shown(src[k]) : ""), err: bad ? "var(--crm-oxblood)" : "transparent",
         onIn: (e: { target: { value: string } }) => { const v = e.target.value; set(u => (u.dp ? { ...u, dp: { ...u.dp, txt: { ...u.dp.txt, [k]: v } } } : u)); },
         onFocus: () => upd({ target: isCmp ? "cmp" : "main", step: k === "to" || k === "ct" ? 1 : 0 }),
         onBlur: (e: { target: { value: string } }) => { const p = parse(e.target.value); set(u => { if (!u.dp) return u; const tx = { ...u.dp.txt }; if (p) { delete tx[k]; return { ...u, dp: { ...u.dp, [k]: p, txt: tx, preset: "Custom", month: +p.slice(5, 7) - 1, year: +p.slice(0, 4) } }; } if (!e.target.value) delete tx[k]; return { ...u, dp: { ...u.dp, txt: tx } }; }); },
@@ -119,13 +119,13 @@ export function adsPerfVM(ctx: DeskCtx) {
       toV: F2.v, toErr: F2.err, toIn: F2.onIn, toFocus: F2.onFocus, toBlur: F2.onBlur, toKey: F2.onKey,
       cfV: F3.v, cfErr: F3.err, cfIn: F3.onIn, cfFocus: F3.onFocus, cfBlur: F3.onBlur, cfKey: F3.onKey,
       ctV: F4.v, ctErr: F4.err, ctIn: F4.onIn, ctFocus: F4.onFocus, ctBlur: F4.onBlur, ctKey: F4.onKey };
-    return { open: !!d?.open, days: d?.days ?? 30, cmp: !!d?.cmp, cmpTrack: d?.cmp ? "#BD4A19" : "#E2CFC1", cmpKnob: d?.cmp ? 19 : 3, cmpHint: "Compared with the period just before",
+    return { open: !!d?.open, days: d?.days ?? 30, cmp: !!d?.cmp, cmpTrack: d?.cmp ? "var(--crm-rust)" : "var(--crm-line)", cmpKnob: d?.cmp ? 19 : 3, cmpHint: "Compared with the period just before",
       monthLabel: `${MON[mo]} ${yr}`, from: f ? shown(f) : "", to: t ? shown(t) : "", cf: cf ? shown(cf) : "", ct: ct ? shown(ct) : "",
-      fromBd: tg === "main" && d?.step !== 1 ? "#BD4A19" : tg === "main" ? "#E2CFC1" : "#EBDDD2", toBd: tg === "main" && d?.step === 1 ? "#BD4A19" : "#EBDDD2",
-      cfBd: tg === "cmp" && d?.step !== 1 ? "#2F6FB5" : "#EBDDD2", ctBd: tg === "cmp" && d?.step === 1 ? "#2F6FB5" : "#EBDDD2",
+      fromBd: tg === "main" && d?.step !== 1 ? "var(--crm-rust)" : tg === "main" ? "var(--crm-line)" : "var(--crm-rule)", toBd: tg === "main" && d?.step === 1 ? "var(--crm-rust)" : "var(--crm-rule)",
+      cfBd: tg === "cmp" && d?.step !== 1 ? "var(--crm-ink-soft)" : "var(--crm-rule)", ctBd: tg === "cmp" && d?.step === 1 ? "var(--crm-ink-soft)" : "var(--crm-rule)",
       pickMain: () => upd({ target: "main", step: 0 }), pickCmp: () => upd({ target: "cmp", step: 0 }), ...o,
       tgtHint: tg === "cmp" ? "Picking the compare range (blue) · tap a date on the calendar" : "Picking the main range (orange) · tap Compare start to pick the blue one",
-      presets: PR.map(([label, a, b]) => { const on = d?.preset === label; return { label, bg: on ? "#FFF1E6" : "transparent", fg: on ? "#BD4A19" : "#3F2B22", w: on ? 700 : 550,
+      presets: PR.map(([label, a, b]) => { const on = d?.preset === label; return { label, bg: on ? "var(--crm-tint-attention)" : "transparent", fg: on ? "var(--crm-rust)" : "var(--crm-ink)", w: on ? 700 : 550,
         pick: () => { if (tg === "cmp") { upd({ cf: isoOf(a), ct: isoOf(b), step: 0 }); return; } const L = Math.round((b - a) / DAY) + 1; upd({ preset: label, from: isoOf(a), to: isoOf(b), cf: isoOf(a - L * DAY), ct: isoOf(a - DAY), step: 0 }); } }; }),
       cells };
   })();
@@ -133,10 +133,10 @@ export function adsPerfVM(ctx: DeskCtx) {
     kAdsPerf: ui.tab === "adsperf",
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
     apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
-      return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "#3F2B22", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
-    apHead: cols.map(m => { const on = srt?.k === m[0]; return { resize: resizer(m[0], 104), unsize: () => unsize(m[0]), label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC", fg: on ? "#3F2B22" : "#806B60",
+      return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
+    apHead: cols.map(m => { const on = srt?.k === m[0]; return { resize: resizer(m[0], 104), unsize: () => unsize(m[0]), label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "var(--crm-rust)" : "var(--crm-faint-2)", fg: on ? "var(--crm-ink)" : "var(--crm-muted)",
       sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) }; }),
-    apNameArrow: srt?.k === "name" ? (srt.dir === "asc" ? "▲" : "▼") : "↕", apNameAc: srt?.k === "name" ? "#BD4A19" : "#C9B8AC",
+    apNameArrow: srt?.k === "name" ? (srt.dir === "asc" ? "▲" : "▼") : "↕", apNameAc: srt?.k === "name" ? "var(--crm-rust)" : "var(--crm-faint-2)",
     apSortName: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== "name" ? { k: "name", dir: "asc" } : c.dir === "asc" ? { k: "name", dir: "desc" } : null }; }),
     apNameResize: resizer("name", 220), apNameUnsize: () => unsize("name"),
     // A dragged column keeps its width; the others share what is left, as the design's.
@@ -146,7 +146,7 @@ export function adsPerfVM(ctx: DeskCtx) {
     apRangeLabel: `${custom ? ui.apPreset || "Custom" : R[ui.apRange as number][0]} · ${rangeTxt(ra, rb)}`, apCmpOn: cmp, apMainShort: rangeTxt(ra, rb), apCmpShort: rangeTxt(ca, cb),
     apCmpLabel: cmp ? `vs ${(CM[cmode === "custom" ? 3 : typeof cmode === "number" ? cmode : 0] ?? CM[0])[1]}` : "Compare",
     apDlOpen: ui.apDlOpen, apToggleDl: () => set(u => ({ ...u, apDlOpen: !u.apDlOpen })),
-    apDl: ([["XLS", "Excel (.xlsx)", "#E4F1EA", "#387557", "xlsx"], ["CSV", "CSV", "#F5EBE3", "#806B60", "csv"], ["PDF", "PDF report", "#FBE9E4", "#A3371A", "pdf"]] as const).map(([tag, label, bg, fg, kind]) => ({ tag, label, bg, fg, hint: "", v: kind,
+    apDl: ([["XLS", "Excel (.xlsx)", "var(--crm-tint-follow)", "var(--crm-brown)", "xlsx"], ["CSV", "CSV", "var(--crm-field)", "var(--crm-muted)", "csv"], ["PDF", "PDF report", "var(--crm-tint-attention)", "var(--crm-oxblood)", "pdf"]] as const).map(([tag, label, bg, fg, kind]) => ({ tag, label, bg, fg, hint: "", v: kind,
       pick: () => { patch({ apDlOpen: false }); void download(kind, ["Ad", ...cols.map(m => m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""))], rows.map(r => [r.name, ...r.cells.map(c => c.v)]), `Ads Performance ${rangeTxt(ra, rb)}`); } })),
     dpOpen: () => set(u => ({ ...u, dp: { open: true, from: custom ? u.apF : isoOf(ra), to: custom ? u.apT : isoOf(rb), cf: isoOf(ca), ct: isoOf(cb), preset: custom ? u.apPreset || "Custom" : R[u.apRange as number][0], cmp: u.apCmp, days: 30, step: 0, target: "main", month: new Date(ra).getMonth(), year: new Date(ra).getFullYear(), txt: {} } })),
     dpCancel: () => upd({ open: false }), dpToggleCmp: () => upd({ cmp: !d?.cmp, target: !d?.cmp ? "cmp" : "main", step: 0 }),
@@ -164,12 +164,12 @@ export function adsPerfVM(ctx: DeskCtx) {
     mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
       items: items.filter(m => !q || m[1].toLowerCase().includes(q)).map(m => { const on = dsel.includes(m[0]);
-        return { label: m[1], hint: m[2], on, bg: on ? "#BD4A19" : "#fff", bd: on ? "#BD4A19" : "#CDBCAE",
+        return { label: m[1], hint: m[2], on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
           toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
     mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
       const dragging = ui.mDrag === i;
-      return { n: i + 1, label: m[1], first: i === 0, last: i === dcols.length - 1, upC: i === 0 ? "#D8C9BE" : "#6B574C", dnC: i === dcols.length - 1 ? "#D8C9BE" : "#6B574C", bg: "#fff",
-        sh: dragging ? "0 6px 18px rgba(63,43,34,.22)" : "none", bd: dragging ? "transparent" : "#F1E7DF", z: dragging ? 2 : 1,
+      return { n: i + 1, label: m[1], first: i === 0, last: i === dcols.length - 1, upC: i === 0 ? "var(--crm-line)" : "var(--crm-ink-soft)", dnC: i === dcols.length - 1 ? "var(--crm-line)" : "var(--crm-ink-soft)", bg: "#fff",
+        sh: dragging ? "0 6px 18px rgba(42,22,12,.22)" : "none", bd: dragging ? "transparent" : "var(--crm-field)", z: dragging ? 2 : 1,
         up: () => { if (i > 0) mvTo(i - 1); }, down: () => { if (i < dcols.length - 1) mvTo(i + 1); },
         rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? baseOf(u)).filter(k => k !== m[0]) })),
         dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; patch({ mDrag: i }); },

@@ -56,7 +56,7 @@ export function contactsVM(ctx: SalesCtx) {
       typePh: (e: ChangeEvent<HTMLInputElement>) => { const ph = e.target.value; set(u => (u.rename ? { ...u, rename: { ...u.rename, ph } } : u)); },
       key: (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") void save(); if (e.key === "Escape") cancel(); },
       save, cancel,
-      rule: "0", lineBg: head ? "transparent" : "#EBDDD2",
+      rule: "0", lineBg: head ? "transparent" : "var(--crm-rule)",
     };
   });
   const have = new Set(contacts.map(p => letterOf(p.name)));
@@ -64,7 +64,7 @@ export function contactsVM(ctx: SalesCtx) {
     cq: ui.cq, setCq: (e: ChangeEvent<HTMLInputElement>) => patch({ cq: e.target.value }),
     contacts, contactsEmpty: !contacts.length, // stop comes with the customer form below
     azIndex: AZ.map((l, k) => ({
-      l, color: have.has(l) ? "#BD4A19" : "#C9B5A8",
+      l, color: have.has(l) ? "var(--crm-rust)" : "var(--crm-faint-2)",
       go: (e: MouseEvent<HTMLElement>) => {
         const list = e.currentTarget.parentElement?.parentElement?.querySelector<HTMLElement>("[data-contacts-list]");
         if (!list) return;

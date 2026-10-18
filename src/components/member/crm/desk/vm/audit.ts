@@ -14,7 +14,7 @@ import { arrayDrag } from "./columns";
 import { MON } from "./insight";
 
 const DAY = 86_400_000;
-const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "#BD4A19", "#FFF0E4"], marketing: ["Marketing", "#2F6FB5", "#E4EDF8"], management: ["Management", "#8E4B6E", "#F3E8EF"] };
+const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "var(--crm-rust)", "var(--crm-tint-attention)"], marketing: ["Marketing", "var(--crm-ink-soft)", "var(--crm-tint-cold)"], management: ["Management", "var(--crm-ink-soft)", "var(--crm-tint-new)"] };
 type E = { cat: "chat" | "marketing" | "management"; at: string; who: string; action: string; target: string; detail: string };
 const AREA: Record<string, string> = { crm_fulltime_rules: "Full time days set", crm_staff: "Work type changed", crm_showrooms: "Showroom changed", crm_forms: "Form edited", crm_templates: "Template changed", crm_channels: "Channel changed" };
 
@@ -81,13 +81,13 @@ export function auditVM(ctx: DeskCtx) {
       pick: () => patch({ auCat: k as typeof ui.auCat, auWho: "all" }) })),
     auPers: ([["today", "Today"], ["7d", "Last 7 days"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: k === ui.auPer, off: k !== ui.auPer, pick: () => patch({ auPer: k }) })),
     auWhoOpts: [{ label: "Anyone", on: who === "all", pick: () => patch({ auWho: "all" }) }, ...ppl.map(n => ({ label: n, on: who === n, pick: () => patch({ auWho: n }) }))]
-      .map(o => ({ ...o, bg: o.on ? "#3F2B22" : "#fff", fg: o.on ? "#fff" : "#3F2B22", bd: o.on ? "#3F2B22" : "#E2CFC1" })),
+      .map(o => ({ ...o, bg: o.on ? "var(--crm-ink)" : "#fff", fg: o.on ? "#fff" : "var(--crm-ink)", bd: o.on ? "var(--crm-ink)" : "var(--crm-line)" })),
     auQ: ui.auQ, setAuQ: (e: { target: { value: string } }) => patch({ auQ: e.target.value }),
     auStats: [["Changes", String(rows.length), ui.auPer === "today" ? "today" : ui.auPer === "7d" ? "last 7 days" : "this month"], ["People", String(new Set(rows.map(e => e.who)).size), "made a change"],
       ["Last change", rows[0] ? `${dayLbl(new Date(rows[0].at).getTime()).replace(/^(Today|Yesterday) · /, "")} · ${time(rows[0].at)}` : "—", rows[0]?.who ?? ""]].map(([k, v, sub]) => ({ k, v, sub })),
     auRows: rows.map(e => { const d = dayLbl(new Date(e.at).getTime()), showD = d !== prev; prev = d; const sys = e.who === "System" || e.who === "The CRM";
       return { day: showD ? d : "", showDay: showD, time: time(e.at), who: e.who, ini: sys ? "S" : e.who.split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase(),
-        avBg: sys ? "#F2F0EB" : c[2], avFg: sys ? "#6B645A" : c[1], action: e.action, target: e.target, detail: e.detail }; }),
+        avBg: sys ? "var(--crm-field)" : c[2], avFg: sys ? "var(--crm-ink-soft)" : c[1], action: e.action, target: e.target, detail: e.detail }; }),
     auGrid: `${w0[0]}px ${w0[1]}px ${w0[2]}px minmax(160px, 1fr)`,
     auDrag0: mk(0), auDrag1: mk(1), auDrag2: mk(2), auReset: () => patch({ auCols: null }),
     auEmpty: !rows.length, auHas: rows.length > 0, auClear: () => patch({ auWho: "all", auQ: "" }),

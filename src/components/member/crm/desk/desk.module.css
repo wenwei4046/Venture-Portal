@@ -8,8 +8,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #FBF7F3;
-  color: #3F2B22;
+  background: var(--crm-page);
+  color: var(--crm-ink);
   font-family: Inter, var(--font-sans), sans-serif;
   font-size: 14px;
   line-height: normal;

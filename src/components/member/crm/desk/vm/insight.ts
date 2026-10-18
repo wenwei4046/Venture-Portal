@@ -12,6 +12,8 @@ import { isCold, urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
 import { chatRows, initials, teamNameOf } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, ST_META, teamColours } from "./tokens";
+import { STATUS } from "../../shared/palette";
+import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 
 export const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -109,9 +111,9 @@ export function insightVM(ctx: DeskCtx) {
   const rows = chatRows(ctx).filter(x => inR(x.c.createdAt));
   const cnt = (f: (k: string) => boolean) => rows.filter(x => f(x.key)).length;
   const LS: [string, number, string, string][] = [
-    ["New", cnt(k => k === "New"), "#3B8FD9", "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), "#A3371A", "st:Overdue"],
-    ["Appointment", cnt(k => k === "Appointment"), "#8E4B6E", "st:Appointment"], ["Follow up", cnt(k => k === "Follow up"), "#A46312", "st:Follow up"],
-    ["Cold leads", cnt(k => k === "Cold"), "#3D5A75", "st:Cold"],
+    ["New", cnt(k => k === "New"), STATUS.New.dot, "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), STATUS.Attention.dot, "st:Overdue"],
+    ["Appointment", cnt(k => k === "Appointment"), STATUS.Appointment.dot, "st:Appointment"], ["Follow up", cnt(k => k === "Follow up"), STATUS["Follow up"].dot, "st:Follow up"],
+    ["Cold leads", cnt(k => k === "Cold"), STATUS["Cold leads"].dot, "st:Cold"],
   ];
   const max = Math.max(...LS.map(x => x[1]), 1), tot = LS.reduce((a, x) => a + x[1], 0) || 1;
   const leadStatus = LS.map(([label, c, color, list]) => ({ label, n: c, color, share: `${Math.round((c / tot) * 100)}%`, pct: Math.round((c / max) * 100), open: openList(list) }));
@@ -122,8 +124,8 @@ export function insightVM(ctx: DeskCtx) {
     const cs = data.customers.filter(c => c.ad === ad), m = numbersOf(cs, data.visits, r, now);
     const ch = cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger";
     const st = ST_META.Running;
-    return { name: ad, channel: ch, chFg: ch === "WhatsApp" ? "#387557" : "#2F6FB5", status: "—", stDot: "#C9B8AC", stInk: st[4], spend: "—", reach: "—", clicks: "—", ctr: "—",
-      leads: String(m.leads), cpl: "—", cplColor: "#3F2B22", appt: String(m.booked), _n: m.leads };
+    return { name: ad, channel: ch, chFg: ch === "WhatsApp" ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger, status: "—", stDot: "var(--crm-faint-2)", stInk: st[4], spend: "—", reach: "—", clicks: "—", ctr: "—",
+      leads: String(m.leads), cpl: "—", cplColor: "var(--crm-ink)", appt: String(m.booked), _n: m.leads };
   }).filter(a => a._n > 0).sort((a, b) => b._n - a._n);
   // Sorted and sized as Ads Performance's table (the owner, 2026-10-13): a header sorts ▼ ▲ off; its edge drags the width.
   const IH: [string, string][] = [["name", "Ad"], ["spend", "Spend (RM)"], ["reach", "Reach"], ["clicks", "Clicks"], ["ctr", "CTR"], ["leads", "Leads"], ["cpl", "Cost / lead (RM)"], ["appt", "Appt"]];
@@ -132,8 +134,8 @@ export function insightVM(ctx: DeskCtx) {
   if (srt) adPerf.sort((x, y) => { const p = x[srt.k as keyof typeof x], q = y[srt.k as keyof typeof y];
     const d = srt.k === "name" ? String(p).localeCompare(String(q)) : num(String(p)) - num(String(q)); return srt.dir === "asc" ? d : -d; });
   const insHead = IH.map(([k, label], i) => { const on = srt?.k === k;
-    return { label, align: (i ? "center" : "left") as "center" | "left", justify: i ? "center" : "flex-start", fg: on ? "#3F2B22" : "#806B60",
-      arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC",
+    return { label, align: (i ? "center" : "left") as "center" | "left", justify: i ? "center" : "flex-start", fg: on ? "var(--crm-ink)" : "var(--crm-muted)",
+      arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
       sort: () => ctx.set(u => { const c = u.insSort, first = k === "name" ? "asc" : "desc", second = first === "asc" ? "desc" : "asc";
         return { ...u, insSort: !c || c.k !== k ? { k, dir: first } : c.dir === first ? { k, dir: second } : null }; }),
       resize: sz.resize(k, i ? 64 : 140), unsize: sz.reset(k) }; });
@@ -204,7 +206,7 @@ export function clistVM(ctx: DeskCtx) {
     clistN: isList ? `${rows.length} ${rows.length === 1 ? "customer" : "customers"}` : `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`,
     clistEmpty: ui.kind === "clist" && !rows.length,
     clSortLabel: k, clSortOpen: ui.clSortOpen, clSortToggle: () => set(u => ({ ...u, clSortOpen: !u.clSortOpen })),
-    clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "#FFF1E6" : "transparent", fg: s === k ? "#BD4A19" : "#3F2B22", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
+    clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "var(--crm-tint-attention)" : "transparent", fg: s === k ? "var(--crm-rust)" : "var(--crm-ink)", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
     clistRows: sorted.map(x => { const c = ST[x.status.split(" · ")[0]] ?? ST["Follow up"];
       return { name: x.name, ini: x.ini, sub: x.sub, status: x.status, stBg: c[0], stFg: c[1],
         open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id }) }; }),

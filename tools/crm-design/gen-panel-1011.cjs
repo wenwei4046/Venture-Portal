@@ -28,6 +28,7 @@ for (const [a, b] of [...PATCHES, ...require("./panel-chat-composer-patches.cjs"
 body = require("./ad-link.cjs")(body);
 body = require("./profile-type.cjs")(body, "{!!(v.pf.onProfile) && (<>");
 body = require("./profile-like-app.cjs").team(body, "{!!(v.pf.onProfile) && (<>");
+body = require("./palette-4a.cjs")(body, "PanelApp");
 body = require("./type-scale.cjs")(body);
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";

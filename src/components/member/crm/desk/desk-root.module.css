@@ -12,8 +12,8 @@
    sets on the svg box itself goes back. */
 .root.root.root svg { display: revert; vertical-align: revert; box-sizing: revert; border: revert; }
 /* The prototype's canvas (CRM Desktop rev 1.dc.html) colours its links. */
-.root.root.root a { color: #BD4A19; }
-.root.root.root a:hover { color: #A3371A; }
+.root.root.root a { color: var(--crm-rust); }
+.root.root.root a:hover { color: var(--crm-oxblood); }
 
-/* The reply box's hint: the design draws it as text in #757575 — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
-.root.root.root ::placeholder { color: #757575; opacity: 1; }
+/* The reply box's hint: the design draws it as text in var(--crm-muted) — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
+.root.root.root ::placeholder { color: var(--crm-muted); opacity: 1; }

@@ -76,7 +76,7 @@ export function panelAppVM(ctx: PanelCtx) {
     accessLbl: ctx.data.can.viewAll ? "All access" : teamName(teamOf(ctx.me.id, ctx.data.people)) || "My team",
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.
     pfAdmin: ctx.data.can.manage,
-    chromeBg: "#FFFFFF",
+    chromeBg: "var(--crm-page)",
     cl: calendarListVM(ctx, cal), ci: calendarInfoVM(ctx),
     ov: show.ov ? overviewVM(ctx) : off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),

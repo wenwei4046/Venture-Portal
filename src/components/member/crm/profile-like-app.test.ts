@@ -87,15 +87,14 @@ for (const { side, page, ini, name, facts, banner, rows } of SIDES) describe(`${
     const glow = /<div data-prof-glow="1" style=\{\{([^}]*)\}\}>\s*<div style=\{\{([^}]*)\}\}>/.exec(page);
     expect(glow, "the glow and the card on it").not.toBeNull();
     const [, band, card] = glow!;
-    // the band is the app's --rv-profile-glow at the app's height, and the card sits as far down it as the app's
-    const appGlow = /--rv-profile-glow:\s*([^;]+);/.exec(GLOBALS)?.[1] ?? "";
-    expect(squash(prop(band, "background") ?? "")).toContain(squash(appGlow));
+    // the band is the app's glow in 4a's peach tokens (2026-10-18) at the app's height, and the card sits as far down it as the app's
+    expect(squash(prop(band, "background") ?? "")).toContain(squash("linear-gradient(180deg, var(--crm-peach) 0%, var(--crm-peach-soft) 70%, var(--crm-page) 100%)"));
     expect(prop(band, "background")).toContain(`100% ${app("glow", "height")}`);
     expect(prop(band, "padding")?.split(" ")[0]).toBe(app("cardWrap", "padding").split(" ")[0]);
     expect(prop(card, "borderRadius")).toBe(app("card", "border-radius"));
     expect(prop(card, "background")).toBe("#fff");
     expect(card).not.toContain("border:");
-    expect(squash(prop(card, "boxShadow") ?? "")).toBe(squash(app("card", "box-shadow").replace("var(--rv-ink-10)", "rgba(63,43,34,.10)")));
+    expect(squash(prop(card, "boxShadow") ?? "")).toBe(squash(app("card", "box-shadow").replace("var(--rv-ink-10)", "rgba(42,22,12,.10)"))); // 4a's shadow ink (2026-10-18)
     expect(prop(card, "padding")).toBe(app("cardBody", "padding"));
     expect(prop(card, "gap")).toBe(app("cardBody", "gap"));
   });
@@ -112,12 +111,13 @@ for (const { side, page, ini, name, facts, banner, rows } of SIDES) describe(`${
   });
 
   it("rules the rows edge to edge in the app's line, never under the last, with the app's chevron", () => {
-    expect(/--rv-rule:\s*#F1E7DF;/.test(GLOBALS)).toBe(true);
+    // 4a (2026-10-18): the CRM draws from its own palette — the app's rule is the CRM's field token
+    expect(/--crm-field:\s*#F7F3EF;/.test(GLOBALS)).toBe(true);
     // every line between two rows is --rv-rule, full width (a 1px rule of its own, or the row's own top edge)
     const lines = [...page.matchAll(/<div style=\{\{ height: "1px", background: "([^"]+)"(, marginLeft: "[^"]+")? \}\}>|borderTop: "1px solid ([^"]+)"/g)];
     expect(lines.length).toBe(rows.length - 1);
-    for (const l of lines) expect([l[1] ?? l[3], l[2] ?? ""]).toEqual(["#F1E7DF", ""]);
-    expect(page).not.toMatch(/borderBottom: "1px solid #EBDDD2"/);
+    for (const l of lines) expect([l[1] ?? l[3], l[2] ?? ""]).toEqual(["var(--crm-field)", ""]);
+    expect(page).not.toMatch(/borderBottom: "1px solid var\(--crm-rule\)"/);
     // the first row has no line over it (a row standing alone — a leader's Team side — has none), the last none under it
     const row = (label: string) => tagBefore(page, label, 3);
     expect(row(rows[0])).toContain("onClick=");
@@ -129,9 +129,9 @@ for (const { side, page, ini, name, facts, banner, rows } of SIDES) describe(`${
 
 describe("the Profiles' page under the glow", () => {
   it("turns the status-bar strip the glow's top colour and the page white, on both sides", () => {
-    const rule = ".app:has([data-prof-glow]) { background: linear-gradient(#F6B48A, #F6B48A) top / 100% var(--crm-top) no-repeat, #FFFFFF; }";
+    const rule = ".app:has([data-prof-glow]) { background: linear-gradient(var(--crm-peach), var(--crm-peach)) top / 100% var(--crm-top) no-repeat, var(--crm-page); }";
     expect(CRM_CSS).toContain(rule);
-    expect(/--rv-peach:\s*#F6B48A;/.test(GLOBALS)).toBe(true);
+    expect(/--crm-peach:\s*#F4A877;/.test(GLOBALS)).toBe(true);
     // as heavy as .app.panel's cream and after it, so it wins on the Team side too
     expect(CRM_CSS.indexOf(rule)).toBeGreaterThan(CRM_CSS.indexOf(".app.panel {"));
     expect(CRM_CSS).not.toContain(":not(.panel):has([data-prof-glow])");

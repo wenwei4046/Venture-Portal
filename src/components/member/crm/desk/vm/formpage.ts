@@ -96,7 +96,7 @@ export function formPageVM(ctx: DeskCtx) {
     cfDesk: !phone, cfPhone: phone,
     cfDevs: ([["phone", "Phone"], ["desktop", "Desktop"]] as const).map(([k, label]) => ({ label, on: ui.cfDev === k, off: ui.cfDev !== k, pick: () => patch({ cfDev: k }) })),
     cfSummary: `${total} fields · ${reqN} required · ${autoN} filled by the system`,
-    cfDirty: dirty, cfClean: !dirty, cfSaveBg: dirty ? "#BD4A19" : "#E2CFC1",
+    cfDirty: dirty, cfClean: !dirty, cfSaveBg: dirty ? "var(--crm-rust)" : "var(--crm-line)",
     cfSave: () => { if (!dirty || !ui.cfDraft) return;
       // Nameless questions are not kept.
       const clean = ui.cfDraft.map(s => ({ ...s, fields: s.fields.filter(f => f.label.trim()) }));
@@ -111,7 +111,7 @@ export function formPageVM(ctx: DeskCtx) {
       remove: () => edit(S => { S.splice(si, 1); }),
       // A section moves by its grip; a field dropped on it goes to its end.
       grip: start({ k: "s", si }), dragOver: over(`s:${si}`), drop: dropOn({ si }),
-      bd: ui.cfOver === `s:${si}` && drag ? "1px solid #BD4A19" : "1px solid #EBDDD2", ring: ui.cfOver === `s:${si}` && drag ? "0 0 0 3px #FFF0E4" : "none",
+      bd: ui.cfOver === `s:${si}` && drag ? "1px solid var(--crm-rust)" : "1px solid var(--crm-rule)", ring: ui.cfOver === `s:${si}` && drag ? "0 0 0 3px var(--crm-tint-attention)" : "none",
       op: drag?.k === "s" && drag.si === si ? 0.45 : 1,
       emptyHint: !sec.fields.some(f => f.kind !== "auto"),
       autoList: sec.fields.filter(f => f.kind === "auto").map(f => ({ label: f.label })), hasAuto: sec.fields.some(f => f.kind === "auto"),
@@ -125,17 +125,17 @@ export function formPageVM(ctx: DeskCtx) {
         const prevI = ei ? EL[ei - 1][1] : -1, nextI = ei < EL.length - 1 ? EL[ei + 1][1] : -1, core = f.kind === "core", fixedType = core || f.kind === "builtin", typeOpen = ui.cfType === `${si}:${f.id}`;
         return { label: f.label, type: f.type, opts: f.opts, auto: false, editable: true, core, removable: !core,
           hasOpts: f.type === "Choice", noOpts: f.type !== "Choice", optsRo: "—",
-          reqOn: f.req, reqLabel: f.req ? "Required" : "Optional", trk: f.req ? "#BD4A19" : "#E2D6CC", knob: f.req ? "18px" : "2px", reqFg: "#3F2B22",
-          upFg: prevI >= 0 ? "#806B60" : "#E2D6CC", dnFg: nextI >= 0 ? "#806B60" : "#E2D6CC",
-          bt: ui.cfOver === `f:${si}:${fi}` && drag ? "2px solid #BD4A19" : ei ? "1px solid #F5EEE8" : "0",
+          reqOn: f.req, reqLabel: f.req ? "Required" : "Optional", trk: f.req ? "var(--crm-rust)" : "var(--crm-rule)", knob: f.req ? "18px" : "2px", reqFg: "var(--crm-ink)",
+          upFg: prevI >= 0 ? "var(--crm-muted)" : "var(--crm-rule)", dnFg: nextI >= 0 ? "var(--crm-muted)" : "var(--crm-rule)",
+          bt: ui.cfOver === `f:${si}:${fi}` && drag ? "2px solid var(--crm-rust)" : ei ? "1px solid var(--crm-field)" : "0",
           grip: start({ k: "f", si, fi }), dragOver: over(drag?.k === "s" ? `s:${si}` : `f:${si}:${fi}`), drop: dropOn({ si, fi }), op: drag?.k === "f" && drag.si === si && drag.fi === fi ? 0.4 : 1,
           up: () => { if (prevI >= 0) edit(S => { const a = S[si].fields; [a[prevI], a[fi]] = [a[fi], a[prevI]]; }); },
           down: () => { if (nextI >= 0) edit(S => { const a = S[si].fields; [a[nextI], a[fi]] = [a[fi], a[nextI]]; }); },
           setLabel: (e: { target: { value: string } }) => upd(si, fi, { label: e.target.value }), setOpts: (e: { target: { value: string } }) => upd(si, fi, { opts: e.target.value }),
           toggleReq: () => { if (!core) upd(si, fi, { req: !f.req }); }, reqCur: core ? "default" : "pointer",
           remove: () => { if (!core) edit(S => { S[si].fields.splice(fi, 1); }); },
-          typeOpen, typeToggle: () => patch({ cfType: typeOpen ? null : `${si}:${f.id}` }), typeClose: () => patch({ cfType: null }), typeBd: typeOpen ? "#BD4A19" : "#E2CFC1",
-          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "#FFF5EC" : "transparent", fg: t === f.type ? "#BD4A19" : "#3F2B22", w: t === f.type ? 650 : 500, chk: t === f.type ? "#BD4A19" : "transparent",
+          typeOpen, typeToggle: () => patch({ cfType: typeOpen ? null : `${si}:${f.id}` }), typeClose: () => patch({ cfType: null }), typeBd: typeOpen ? "var(--crm-rust)" : "var(--crm-line)",
+          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "var(--crm-cream)" : "transparent", fg: t === f.type ? "var(--crm-rust)" : "var(--crm-ink)", w: t === f.type ? 650 : 500, chk: t === f.type ? "var(--crm-rust)" : "transparent",
             pick: () => upd(si, fi, { type: t }) })),
           pv: pv(f) }; }) })),
 

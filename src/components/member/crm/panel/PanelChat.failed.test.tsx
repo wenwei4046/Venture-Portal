@@ -43,7 +43,7 @@ describe("a message WhatsApp refused", () => {
     await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
     expect(refused().textContent).toContain(NOTE);
     expect(refused().querySelector("svg path")?.getAttribute("d")).toBe(tickPathOf("failed"));
-    expect(screen.getByText(NOTE)).toHaveStyle({ color: "#FFFFFF" });
+    expect(screen.getByText(NOTE).style.color).toBe("var(--crm-page)");
   });
 
   it("says so in Mine's chat too, in white on its orange", async () => {
@@ -52,7 +52,7 @@ describe("a message WhatsApp refused", () => {
     await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
     expect(refused().textContent).toContain(NOTE);
     expect(refused().querySelector('svg[aria-label="Not delivered"] path')?.getAttribute("d")).toBe(tickPathOf("failed"));
-    expect(screen.getByText(NOTE)).toHaveStyle({ color: "#FFFFFF" });
+    expect(screen.getByText(NOTE).style.color).toBe("var(--crm-page)");
   });
 });
 

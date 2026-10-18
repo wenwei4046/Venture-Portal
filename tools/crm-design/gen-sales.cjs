@@ -248,6 +248,8 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
   // match the prototype's px.
   body = require("./ad-link.cjs")(body);
   if (name === "SalesProfile") body = profileLikeApp(profileType(body, "{!!(v.profMain) && (<>"), "{!!(v.profMain) && (<>");
+  // 4a's palette (2026-10-18, palette-4a.cjs): every hex the patches left becomes its --crm-* token.
+  body = require("./palette-4a.cjs")(body, name);
   body = scaleType(body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
