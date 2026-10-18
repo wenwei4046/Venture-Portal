@@ -1340,8 +1340,8 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
   );
 }
 
-type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign";
-interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean }
+type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign" | "pushMessages" | "reminders";
+interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean; pushMessages: boolean; reminders: boolean }
 interface SettingsBits {
   set4: { title: string; sub: string; rows: { t: string; s: string; v: string; key?: SetKey }[] }[];
   settings4: { can: boolean; cur: SetVals; save: (st: SetVals) => Promise<boolean> };
@@ -1349,7 +1349,8 @@ interface SettingsBits {
 const HOUR_KEYS: SetKey[] = ["replySoonH", "replyUrgentH", "replyOverdueH"];
 /**
  * Frame 10 · Settings › General: two columns of groups in the frame's rows. A stored setting (Reply soon · Urgent ·
- * Overdue, Suggest a template, Auto-assign — mig 20261018100000) is a stepper or a switch for CRM · Manage; the rest keep
+ * Overdue, Suggest a template, Auto-assign, Push for new messages, Reminders — mig 20261018100000) is a stepper or a
+ * switch for CRM · Manage; the rest keep
  * the frame's locked row (a padlock and the value). Any change brings up Cancel / Save changes, as Showrooms.
  */
 export function DeskSettings4a({ v }: { v: SettingsBits }) {
@@ -1405,7 +1406,10 @@ export function DeskSettings4a({ v }: { v: SettingsBits }) {
       {dirty && (
         <div style={{ position: "sticky", bottom: 0, display: "flex", alignItems: "center", gap: "10px", padding: "14px 0", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
           <span style={{ flex: 1, font: "400 12px Inter, sans-serif", color: rising ? "var(--crm-muted)" : "var(--crm-oxblood)" }}>
-            {rising ? (d.autoAssign ? "Saved for everyone in the CRM." : "Auto-assign off: new leads go to nobody and wait in the Team inbox to be sent by hand.") : "Reply soon, Urgent and Overdue must rise, from 1 to 24 hours."}
+            {!rising ? "Reply soon, Urgent and Overdue must rise, from 1 to 24 hours."
+              : !d.autoAssign ? "Auto-assign off: new leads go to nobody and wait in the Team inbox to be sent by hand."
+              : !d.pushMessages || !d.reminders ? "Saved for everyone in the CRM — nobody's phone gets what is switched off."
+              : "Saved for everyone in the CRM."}
           </span>
           <button type="button" onClick={() => setDraft(null)} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
           <button type="button" onClick={save} disabled={!rising || busy} style={{ ...BTN, height: "36px", padding: "0 18px", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "#fff", background: rising ? "var(--crm-rust)" : "var(--crm-line)", cursor: rising && !busy ? "pointer" : "default" }} className={rising ? "crm4a-primary" : undefined}>{busy ? "Saving…" : "Save changes"}</button>

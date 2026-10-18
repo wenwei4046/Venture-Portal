@@ -247,10 +247,14 @@ export interface CrmSettings {
   suggestTemplate: boolean;
   /** Off: a new lead is dealt to nobody and waits in the Team inbox to be sent by hand. */
   autoAssign: boolean;
+  /** Off: no phone is told of a customer's message (the CRM's inbox is untouched). */
+  pushMessages: boolean;
+  /** Off: no reminders — the hourly sweep's pushes, and the screens' own. */
+  reminders: boolean;
 }
 
 /** What the CRM did before Settings were stored — and what it reads when the database gives nothing. */
-export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true };
+export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true };
 
 /** The database's answer, checked: the three lines rising within 1–24 h, else today's values. */
 export function settingsFrom(raw: unknown): CrmSettings {
@@ -259,7 +263,7 @@ export function settingsFrom(raw: unknown): CrmSettings {
   const D = DEFAULT_CRM_SETTINGS;
   const s = n(r.replySoonH, D.replySoonH), u = n(r.replyUrgentH, D.replyUrgentH), o = n(r.replyOverdueH, D.replyOverdueH);
   const lines = s >= 1 && u > s && o > u && o <= 24 ? { replySoonH: s, replyUrgentH: u, replyOverdueH: o } : { replySoonH: D.replySoonH, replyUrgentH: D.replyUrgentH, replyOverdueH: D.replyOverdueH };
-  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false };
+  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false };
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */

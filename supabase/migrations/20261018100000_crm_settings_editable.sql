@@ -7,18 +7,26 @@
 --   suggest_template                                 the template button on a cold chat (the screens read it).
 --   auto_assign                                      off = a new lead is dealt to nobody and waits for a manager to send it
 --                                                     by hand (crm_assign_contact); on = the dealing rules as before.
+--   push_messages                                    off = no phone is told of a customer's message (notify_crm_message);
+--                                                     the CRM's own inbox and counts are untouched.
+--   reminders                                        off = the hourly sweep tells nobody anything (notify_crm_due) and the
+--                                                     screens leave their reminders out.
+-- (Owner, later the same day, of the Notifications group: "这个适合打开的话也打开把" — Team inbox alerts stays locked Off,
+-- the owner's rule since 2026-10-16: every notification is one's own.)
 -- Written only by crm_save_settings (CRM · Manage); read by anybody in the CRM through crm_settings_read(). crm_settings is
 -- already in audit_tables, so every change shows in the Audit log.
 --
--- notify_crm_due and crm_assign_contact are PRODUCTION's bodies (read 2026-10-18: md5 f95c99e6… and 7e6b7c5f…) with only
--- the swaps named below.
+-- notify_crm_due, crm_assign_contact and notify_crm_message are PRODUCTION's bodies (read 2026-10-18: md5 f95c99e6…,
+-- 7e6b7c5f… and 30b251e5…) with only the swaps named below.
 
 alter table public.crm_settings
   add column if not exists reply_soon_h     integer not null default 3,
   add column if not exists reply_urgent_h   integer not null default 6,
   add column if not exists reply_overdue_h  integer not null default 9,
   add column if not exists suggest_template boolean not null default true,
-  add column if not exists auto_assign      boolean not null default true;
+  add column if not exists auto_assign      boolean not null default true,
+  add column if not exists push_messages    boolean not null default true,
+  add column if not exists reminders        boolean not null default true;
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'crm_settings_reply_lines') then
@@ -38,33 +46,36 @@ begin
   select * into s from crm_settings where id;
   return jsonb_build_object(
     'replySoonH', coalesce(s.reply_soon_h, 3), 'replyUrgentH', coalesce(s.reply_urgent_h, 6), 'replyOverdueH', coalesce(s.reply_overdue_h, 9),
-    'suggestTemplate', coalesce(s.suggest_template, true), 'autoAssign', coalesce(s.auto_assign, true));
+    'suggestTemplate', coalesce(s.suggest_template, true), 'autoAssign', coalesce(s.auto_assign, true),
+    'pushMessages', coalesce(s.push_messages, true), 'reminders', coalesce(s.reminders, true));
 end $$;
 
 revoke execute on function public.crm_settings_read() from public, anon;
 grant execute on function public.crm_settings_read() to authenticated;
 
 -- Save them (CRM · Manage): the three lines rising, 1–24 h.
-create or replace function public.crm_save_settings(p_soon integer, p_urgent integer, p_overdue integer, p_suggest boolean, p_auto boolean)
+create or replace function public.crm_save_settings(p_soon integer, p_urgent integer, p_overdue integer, p_suggest boolean, p_auto boolean,
+  p_push boolean, p_reminders boolean)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
   if not crm_manages() then perform crm_deny('change the CRM''s settings'); end if;
-  if p_soon is null or p_urgent is null or p_overdue is null or p_suggest is null or p_auto is null then
+  if p_soon is null or p_urgent is null or p_overdue is null or p_suggest is null or p_auto is null or p_push is null or p_reminders is null then
     raise exception 'Every setting needs a value.' using errcode = '22023';
   end if;
   if not (p_soon between 1 and 23 and p_urgent > p_soon and p_overdue > p_urgent and p_overdue <= 24) then
     raise exception 'Reply soon, Urgent and Overdue must rise, from 1 to 24 hours.' using errcode = '22023';
   end if;
-  insert into crm_settings (id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign, updated_by, updated_at)
-  values (true, p_soon, p_urgent, p_overdue, p_suggest, p_auto, crm_me(), now())
+  insert into crm_settings (id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign, push_messages, reminders, updated_by, updated_at)
+  values (true, p_soon, p_urgent, p_overdue, p_suggest, p_auto, p_push, p_reminders, crm_me(), now())
   on conflict (id) do update set reply_soon_h = excluded.reply_soon_h, reply_urgent_h = excluded.reply_urgent_h,
     reply_overdue_h = excluded.reply_overdue_h, suggest_template = excluded.suggest_template, auto_assign = excluded.auto_assign,
+    push_messages = excluded.push_messages, reminders = excluded.reminders,
     updated_by = excluded.updated_by, updated_at = now();
   return crm_settings_read();
 end $$;
 
-revoke execute on function public.crm_save_settings(integer, integer, integer, boolean, boolean) from public, anon;
-grant execute on function public.crm_save_settings(integer, integer, integer, boolean, boolean) to authenticated;
+revoke execute on function public.crm_save_settings(integer, integer, integer, boolean, boolean, boolean, boolean) from public, anon;
+grant execute on function public.crm_save_settings(integer, integer, integer, boolean, boolean, boolean, boolean) to authenticated;
 
 -- crm_assign_contact: production's body; one swap — with auto_assign off a new lead is dealt to nobody (Organic Leads, sent by hand).
 CREATE OR REPLACE FUNCTION public.crm_assign_contact(p_contact uuid)
@@ -153,7 +164,7 @@ begin
   return jsonb_build_object('assigned', true, 'team', v_team, 'member', v_who, 'member_by', v_how);
 end $function$;
 
--- notify_crm_due: production's body; part 2's three lines read Settings (3 · 6 · 9 h until changed).
+-- notify_crm_due: production's body; part 2's three lines read Settings (3 · 6 · 9 h until changed), and Reminders off stops it.
 CREATE OR REPLACE FUNCTION public.notify_crm_due()
  RETURNS integer
  LANGUAGE plpgsql
@@ -174,6 +185,8 @@ DECLARE
   v_s2    integer := coalesce((SELECT s.reply_urgent_h FROM public.crm_settings s WHERE s.id), 6);
   v_s3    integer := coalesce((SELECT s.reply_overdue_h FROM public.crm_settings s WHERE s.id), 9);
 BEGIN
+  -- Settings › Notifications › Reminders off (2026-10-18): the sweep tells nobody anything.
+  IF NOT coalesce((SELECT s.reminders FROM public.crm_settings s WHERE s.id), true) THEN RETURN 0; END IF;
   -- 1. Visits tomorrow, from 9:00 the day before.
   IF extract(hour FROM v_local) >= 9 THEN
     FOR r IN
@@ -287,5 +300,42 @@ BEGIN
     v_n := v_n + 1;
   END LOOP;
   RETURN v_n;
+END
+$function$;
+
+-- notify_crm_message: production's body; one swap — Settings › Notifications › Push for new messages off tells no phone.
+CREATE OR REPLACE FUNCTION public.notify_crm_message()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  c      public.crm_contacts;
+  v_name text;
+  v_line text;
+  v_who  uuid[];
+BEGIN
+  SELECT * INTO c FROM public.crm_contacts WHERE id = NEW.contact_id;
+  IF c.id IS NULL OR c.assigned_to IS NULL THEN
+    RETURN NULL;
+  END IF;
+  -- Settings › Notifications › Push for new messages off (2026-10-18): no phone is told.
+  IF NOT coalesce((SELECT s.push_messages FROM public.crm_settings s WHERE s.id), true) THEN
+    RETURN NULL;
+  END IF;
+  v_who := ARRAY(
+    SELECT w.staff
+      FROM (SELECT c.assigned_to AS staff UNION SELECT sh.staff_id FROM public.crm_contact_shares sh WHERE sh.contact_id = c.id) w
+     WHERE NOT EXISTS (SELECT 1 FROM public.crm_contact_prefs p
+                        WHERE p.staff_id = w.staff AND p.contact_id = c.id AND (p.muted OR p.hidden OR p.blocked)));
+  v_name := public.notify_crm_name(c.name, c.phone);
+  v_line := public.notify_crm_preview(NEW.kind, NEW.body);
+  PERFORM public.notify_crm_people(public.notify_crm_logins(v_who), v_name, v_line, 'crm_contact', c.id::text,
+    jsonb_build_object('ch', c.channel, 'name', v_name, 'line', v_line, 'at', coalesce(NEW.sent_at, NEW.created_at, now())));
+  RETURN NULL;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'notify_crm_message: %', SQLERRM;
+  RETURN NULL;
 END
 $function$;

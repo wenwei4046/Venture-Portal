@@ -59,8 +59,8 @@ const as = async (who, sql, params = []) => {
   try { return await q(sql, params) } finally { await db.exec(`reset role; set test.uid = ''`) }
 }
 const read = async who => (await as(who, `select public.crm_settings_read() as s`))[0].s
-const save = (who, ...a) => as(who, `select public.crm_save_settings($1, $2, $3, $4, $5) as s`, a)
-const today = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true }
+const save = (who, a, b, c, d, e, f = true, g = true) => as(who, `select public.crm_save_settings($1, $2, $3, $4, $5, $6, $7) as s`, [a, b, c, d, e, f, g])
+const today = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true }
 
 // ── 1. Defaults: exactly what the CRM does today ──
 check(await read('ann'), today, 'a salesperson reads 3 · 6 · 9, template on, auto-assign on')
@@ -80,6 +80,7 @@ for (const [a, b, c, why] of [[6, 6, 9, 'equal lines'], [0, 6, 9, 'under 1 h'], 
   await assert.rejects(save('boss', a, b, c, true, true), /must rise/, why); checks++
 }
 await assert.rejects(save('boss', 3, 6, 9, null, true), /needs a value/, 'a missing switch'); checks++
+await assert.rejects(save('boss', 3, 6, 9, true, true, null, true), /needs a value/, 'a missing notification switch'); checks++
 
 // ── 4. Auto-assign off: a new lead waits with nobody; on again: dealt ──
 await q(`insert into crm_ad_assign (ad_source_id, mode, started_at) values ('AD1', 'even', now())`).catch(() => {})
@@ -101,6 +102,11 @@ check([got.r.assigned, got.row.assigned_to], [true, id('s', 'hod')], 'on again: 
 const src = (await q(`select prosrc from pg_proc where proname = 'notify_crm_due'`))[0].prosrc
 check(/make_interval\(hours => v_s1\)/.test(src) && !/interval '3 hours'/.test(src), true, 'the waiting notices start at the saved first line')
 check(/reply_overdue_h/.test(src), true, '…and read the Overdue line')
+check(/s\.reminders/.test(src) && /RETURN 0/.test(src), true, 'Reminders off: the sweep tells nobody')
+const msg = (await q(`select prosrc from pg_proc where proname = 'notify_crm_message'`))[0]?.prosrc ?? ''
+check(/s\.push_messages/.test(msg), true, 'Push for new messages off: no phone is told of a message')
+check((await save('boss', 3, 6, 9, true, true, false, false))[0].s, { ...today, pushMessages: false, reminders: false }, 'both notification switches save off')
+await save('boss', 3, 6, 9, true, true)
 
 // ── 6. Grants ──
 for (const fn of ['crm_settings_read', 'crm_save_settings']) {

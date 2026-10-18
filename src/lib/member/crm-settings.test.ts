@@ -8,12 +8,12 @@ import { composerVM, initialComposer, type ComposerDom, type ComposerIn } from "
 
 describe("settingsFrom", () => {
   it("keeps today's values when the database gave nothing (before the migration)", () => {
-    expect(settingsFrom(null)).toEqual({ replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true });
+    expect(settingsFrom(null)).toEqual({ replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true });
     expect(settingsFrom(undefined)).toEqual(DEFAULT_CRM_SETTINGS);
   });
   it("takes saved values", () => {
-    expect(settingsFrom({ replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, suggestTemplate: false, autoAssign: false }))
-      .toEqual({ replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, suggestTemplate: false, autoAssign: false });
+    expect(settingsFrom({ replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, suggestTemplate: false, autoAssign: false, pushMessages: false, reminders: false }))
+      .toEqual({ replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, suggestTemplate: false, autoAssign: false, pushMessages: false, reminders: false });
   });
   it("refuses lines that do not rise within 1–24 h, keeping 3 · 6 · 9", () => {
     for (const bad of [{ replySoonH: 6, replyUrgentH: 6, replyOverdueH: 9 }, { replySoonH: 0, replyUrgentH: 6, replyOverdueH: 9 }, { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 25 }, { replySoonH: 2.5, replyUrgentH: 6, replyOverdueH: 9 }])

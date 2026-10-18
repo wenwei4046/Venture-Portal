@@ -204,8 +204,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       { t: "Move to Cold leads", s: "When the reply window shuts · only a template can reopen the chat", v: "24 h" },
       { t: "Suggest a template", s: "Shows the template button on a cold chat", v: cur.suggestTemplate ? "On" : "Off", key: "suggestTemplate" }] },
     { title: "Notifications", sub: "Only a person's own customers ever notify", rows: [
-      { t: "Push for new messages", s: "Each phone turns its own on · Revenue app › Settings", v: "On" },
-      { t: "Reminders", s: `Visits tomorrow, and chats waiting ${cur.replySoonH} · ${cur.replyUrgentH} · ${cur.replyOverdueH} h`, v: "On" },
+      { t: "Push for new messages", s: cur.pushMessages ? "Each phone turns its own on · Revenue app › Settings" : "Off · no phone is told of a customer's message", v: cur.pushMessages ? "On" : "Off", key: "pushMessages" },
+      { t: "Reminders", s: `Visits tomorrow and today, chats waiting ${cur.replySoonH} · ${cur.replyUrgentH} · ${cur.replyOverdueH} h, windows closing`, v: cur.reminders ? "On" : "Off", key: "reminders" },
       { t: "Team inbox alerts", s: "The Team inbox shows everyone but tells of nobody else", v: "Off" }] },
     { title: "New leads", sub: "What happens when a lead arrives", rows: [
       { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
