@@ -87,3 +87,5 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 4. Team Calendar opens on Month (Month · List; it opened on List).
 5. Member work type is Assignment's Work type tab only (it opens there); its row on Profile is gone.
 6. Desktop head: CRM alerts is the bell alone (a dot when unread), on every page; Insight's button reads Export.
+7. Contacts: the search bar and the table head stay at the top while the rows scroll.
+8. Customer form phone preview: a phone page under "‹ Customer info" (no dimmed backdrop or sheet corners).

@@ -17,3 +17,8 @@
 /* The Customer form's drag grips (2026-10-16): darker under the pointer, grabbing while held. */
 .grip:hover { color: var(--crm-muted) !important; background: var(--crm-field) !important; border-radius: 6px !important; }
 .grip:active { cursor: grabbing !important; }
+/* The Customer form's phone preview (DeskPhoneForm, the owner 2026-10-18: "phone preview 有点怪"): the phone's own form
+   drawn as a page of the phone — no dimmed backdrop, no sheet corners or grabber, filling the frame under its header. */
+.pvForm > div { background: #fff !important; animation: none !important; justify-content: flex-start !important; }
+.pvForm > div > div { max-height: none !important; height: 100% !important; border-radius: 0 !important; animation: none !important; padding-top: 6px !important; }
+.pvForm > div > div > span:first-child { display: none !important; }

@@ -352,10 +352,16 @@ export function DeskAnalysis({ v }: { v: ReturnType<typeof import("./vm/analysis
 
 /** The Customer form's phone preview: the phone's own form (SalesCustomerForm) at a 375px phone's size, scaled to the frame. */
 export function DeskPhoneForm({ v, scale }: { v: CustomerFormVM; scale: number }) {
+  // Drawn as a phone page (frame 08: "‹ Customer info"), not a sheet over a dimmed screen — desk-extras › pvForm.
   return (
-    <div style={{ position: "relative", flex: "1", minHeight: "0", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, width: "375px", height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <SalesCustomerForm v={v} />
+    <div style={{ flex: "1", minHeight: "0", display: "flex", flexDirection: "column", background: "#fff" }}>
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px", height: "44px", padding: "14px 12px 0", boxSizing: "content-box", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Customer info
+      </div>
+      <div style={{ position: "relative", flex: "1", minHeight: "0", overflow: "hidden" }}>
+        <div className={DX.pvForm} style={{ position: "absolute", top: 0, left: 0, width: "375px", height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+          <SalesCustomerForm v={v} />
+        </div>
       </div>
     </div>
   );
