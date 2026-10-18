@@ -125,8 +125,11 @@ try {
   await open(desk, 1440, 900, false, "js:document.querySelectorAll('aside').length > 1 && [...document.querySelectorAll('aside')].pop().innerText.includes('Audit log')");
   const pages = [["01-insight", "Insight"], ["02-inbox", "Inbox"], ["04-contacts", "Contacts"], ["06-calendar", "Calendar"], ["07-ads-performance", "Ads Performance"],
     ["08-assignment", "Assignment"], ["09-showrooms", "Showrooms"], ["10-customer-form", "Customer form"], ["11-channels", "Channels"], ["12-settings", "Settings"], ["13-audit-log", "Audit log"]];
-  for (const [n, t] of pages) {
+  // PAGES=Settings,Audit log takes only those (a full pass takes minutes).
+  const want = process.env.PAGES ? process.env.PAGES.split(",") : null;
+  for (const [n, t] of pages.filter(([, t]) => !want || want.includes(t))) {
     await tap(t, "lastAside"); await shot("desktop", n, t);
+    if (process.env.EVAL) console.log(JSON.stringify(await js(process.env.EVAL)));
     if (t === "Inbox") {
       await js("[...document.querySelectorAll('[data-revenue-app] [style*=cursor]')].find(e => e.offsetParent && /Lim Wei Jie|Chong Li Na|Tan Mei Ling/.test(e.innerText) && e.innerText.length < 260)?.click()"); await sleep(1500);
       await shot("desktop", "03-inbox-chat", "Inbox · a chat open");

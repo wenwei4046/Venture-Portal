@@ -198,6 +198,28 @@ export function channelsVM(ctx: DeskCtx) {
     waCallLog: [{ n: "Call history", t: "Kept by WhatsApp — View in WhatsApp Manager", at: "", c: "var(--crm-muted)" }],
     // Templates (WhatsApp's own list).
     chTplHint: "Message · use {{1}}, {{2}} for the customer's name, date…", chTplPh: "Hi {{1}}, your showroom visit is on {{2}}. See you there!",
+    // 4a's Connections (frame 09, the owner's choice 2026-10-18): grouped by phone number — each WhatsApp number with the
+    // Facebook Page whose listed phone is that number (Meta's own Page field; nothing new is stored), a Page listing none
+    // in a "No number" card — and the message templates beside them. Meta gives no expiry, so only Connected / Not linked.
+    ch4: (() => {
+      const digits = (s: string) => s.replace(/\D/g, "").replace(/^0+/, "");
+      const same = (a: string, b: string) => { const x = digits(a), y = digits(b); return !!x && !!y && (x.endsWith(y.slice(-8)) || y.endsWith(x.slice(-8))); };
+      const used = new Set<string>();
+      const pageRow = (p: (typeof pages)[number]) => ({ id: p.id, title: `Facebook · ${p.name}`, sub: `Messenger · Page ${p.id.length > 8 ? `${p.id.slice(0, 4)}…${p.id.slice(-4)}` : p.id}`, linked: p.on,
+        act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link" });
+      const cards = nums.map(n => {
+        const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number)); if (pg) used.add(pg.id);
+        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chTab: "wa" }),
+          wa: { title: "WhatsApp Business", sub: `${n.verifiedName ? "Verified · " : ""}message quality ${qualityWords(n.quality)}`, linked: n.on,
+            act: n.on ? () => patch({ chTab: "wa" }) : () => setLink("wa", n.id, n.number, true, false, `${n.number} linked · its chats come into Inbox`), actLabel: n.on ? "Manage" : "Link" },
+          page: pg ? pageRow(pg) : { id: "", title: "Facebook Page", sub: "Link a Page to receive its Messenger chats here", linked: false, act: () => open(META_SUITE), actLabel: "Link" } };
+      });
+      const loose = pages.filter(p => !used.has(p.id)).map(pageRow);
+      return { cards, loose, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
+        tpls: (M?.templates ?? []).map(t => { const st = stWord(t.status), mine = data.templates?.find(x => x.metaName === t.name);
+          return { name: t.name, body: mine?.body ?? "", cat: t.category.charAt(0) + t.category.slice(1).toLowerCase(), lang: LANG_WORDS[t.language] ?? t.language, st,
+            dot: st === "Approved" ? "var(--crm-brown)" : st === "Pending" ? "var(--crm-amber)" : "var(--crm-orange)", fg: st === "Rejected" ? "var(--crm-oxblood)" : "var(--crm-ink)" }; }) };
+    })(),
     chTpls: (M?.templates ?? []).map(t => { const st = stWord(t.status); return { n: t.name, c: t.category.charAt(0) + t.category.slice(1).toLowerCase(), l: LANG_WORDS[t.language] ?? t.language, stt: st, at: "—", bg: STC[st][0], fg: STC[st][1] }; }),
     chNewOpen: !!nt, chNewToggle: () => { if (can) patch({ chNew: nt ? null : { name: "", cat: "Marketing", lang: "English", body: "" } }); },
     chNewF: nt ? { name: nt.name, body: nt.body,

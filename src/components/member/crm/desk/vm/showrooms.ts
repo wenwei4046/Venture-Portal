@@ -98,8 +98,38 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     if (results.every(Boolean)) patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });
   };
   const empty = { manual: false, showAuto: false, showNoAddr: true, linkFields: [] as { bg: string; ch: string; ph: string; v: string; set: (e: { target: { value: string } }) => void }[], gmapUrl: "", wazeUrl: "", name: "", dispName: "", gmap: "", waze: "", photo: "", noPhoto: true, photoBd: "var(--crm-st-won)", addr: "", limit: "", blocks: [] as { tag: string; tagBg: string; tagFg: string; when: string; sub: string; remove: () => void }[], openN: "", allLabel: "", totN: "", slots: [] as { time: string; remove: () => void; cells: { on: boolean; bg: string; bd: string; toggle: () => void }[] }[] };
+  // 4a (frame 07): one showroom at a time (‹ 1 / 2 ›, + adds one), always open to edit — the first change makes the
+  // draft, Save in the page's head keeps it — its visits per slot, its closures, and the weekly slots as a 24 × 7 grid:
+  // an hour is open on a day when a visit time in it is; a tap opens the hour (a new time at :00 for that day) or closes it.
+  const at = Math.min(Math.max(0, ui.srAt ?? 0), Math.max(0, rooms.length - 1));
+  const curRoom = en === "new" ? null : rooms.find(r => r.id === en) ?? rooms[at] ?? null;
+  const d4: SrDraft = dr && en ? dr : draftOf(curRoom);
+  const edit4 = (x: Partial<SrDraft>) => set(u => ({ ...u, srEdit: u.srEdit ?? curRoom?.id ?? "new", srDraft: { ...(u.srDraft && u.srEdit ? u.srDraft : d4), ...x } }));
+  const hourOf = (label: string) => { const h = Number(hm(label).slice(0, 2)); return h; };
+  const sr4 = {
+    has: rooms.length > 0 || en === "new", isNew: en === "new",
+    pager: { at: en === "new" ? rooms.length + 1 : at + 1, n: rooms.length + (en === "new" ? 1 : 0), prev: () => patch({ srAt: Math.max(0, at - 1), srEdit: null, srDraft: null }),
+      next: () => patch({ srAt: Math.min(rooms.length - 1, at + 1), srEdit: null, srDraft: null }), prevOff: at === 0 || en === "new", nextOff: at >= rooms.length - 1 || en === "new" },
+    add: () => patch({ srEdit: "new", srDraft: draftOf(null), srBlkOpen: false }),
+    name: d4.dispName, setName: (e: { target: { value: string } }) => edit4({ dispName: e.target.value }),
+    addr: d4.addr, setAddr: (e: { target: { value: string } }) => edit4({ addr: e.target.value }),
+    links: d4.manual ? { g: d4.gmap || "", w: d4.waze || "" } : d4.addr ? mapU(d4.addr) : { g: "", w: "" },
+    limit: d4.limit, down: () => edit4({ limit: Math.max(1, d4.limit - 1) }), up: () => edit4({ limit: Math.min(20, d4.limit + 1) }),
+    closures: [...d4.weekDays.map(di => ({ when: `Every ${DN[di]}`, sub: "All day · weekly", remove: () => edit4({ weekDays: d4.weekDays.filter(x => x !== di) }) })),
+      ...d4.blocks.map((b, i) => ({ when: fd(b.from) + (b.to && b.to !== b.from ? ` – ${fd(b.to)}` : ""), sub: timeTxt(b) + (b.reason ? ` · ${b.reason}` : ""), remove: () => edit4({ blocks: d4.blocks.filter((_, j) => j !== i) }) }))],
+    grid: Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? `${h % 12 || 12} ${h < 12 ? "am" : "pm"}` : "", cells: DI.map(di => {
+      const ts = d4.times.filter(t => hourOf(t) === h), on = !d4.weekDays.includes(di) && ts.some(t => !d4.off[`${t}|${di}`]);
+      return { on, toggle: () => {
+        if (on) { const off = { ...d4.off }; ts.forEach(t => { off[`${t}|${di}`] = 1; }); edit4({ off }); return; }
+        if (ts.length) { const off = { ...d4.off }; ts.forEach(t => { delete off[`${t}|${di}`]; }); edit4({ off, weekDays: d4.weekDays.filter(x => x !== di) }); return; }
+        const t = t12(`${h}:00`), off = { ...d4.off }; DI.forEach(x => { if (x !== di) off[`${t}|${x}`] = 1; });
+        edit4({ off, times: [...d4.times, t].sort((a, b) => ALLT.indexOf(a) - ALLT.indexOf(b)), weekDays: d4.weekDays.filter(x => x !== di) }); } }; }) })),
+    // A new showroom saves on its own (the phone panel's + does the same); an existing one through the editor's save.
+    save: () => { if (en === "new" && dr) { void ctx.act.saveRoom(roomOf(dr)).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: rooms.length, toast: `${dr.dispName || "Showroom"} added` }); }); } else void save(false); },
+    dirty: !!en,
+  };
   return {
-    srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
+    sr4, srOpen: false && srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
     srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => upd({ manual: v }) }; }),
     srTabSlots: ui.srTab === "slots", srTabBlk: ui.srTab === "blk", srTabInfo: ui.srTab === "info",
     srTabs: ([["info", "Details", ""], ["slots", "Open slots", dr ? String(cnt(dr.off, dr.times)) : ""], ["blk", "Blocked", dr ? String(dr.blocks.length + dr.weekDays.length) : ""]] as const).map(([k, label, n]) => { const on = ui.srTab === k;

@@ -198,7 +198,7 @@ module.exports = function desk4a(body) {
   // performance, Audit log in its place, at its width (no strips) — the ad's name in an ink-ruled field with its
   // pencil and Meta's headline under it, and Save · Save and apply to all N ads at its foot.
   body = swap(body, '<div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>\n                {!!(v.showKicker) && (<>', "div",
-    '{!(v.adList) && (<span style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.opSub}</span>)}', "sheet head");
+    '{!(v.adList) && !!(v.opSub) && (<span style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.opSub}</span>)}', "sheet head");
   body = fragSwap(body, "{!!(v.adList) && (<>", "{!!(v.adList) && (<DeskAdList4a v={v} />)}", "ad list");
   body = once(body, "{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}", "", "perf strip");
   body = once(body, '{!!(v.adOpen) && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', '{!!(v.adOpen && v.adTab4 === "split") && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', "split tab");
@@ -234,6 +234,25 @@ module.exports = function desk4a(body) {
   body = swap(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 0 16px", borderBottom: "1px solid var(--crm-rule)" }}>\n                    <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n                      <strong style={{ fontSize: "15px", fontWeight: "650" }}>Audit log</strong>\n                      <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</span>', "div",
     "<DeskAdTabs4a v={v} />", "audit head");
 
+  // Frame 07 · Showrooms: one at a time, always open to edit, the weekly slots as a grid (DeskShowrooms4a); Save in the head.
+  body = fragSwap(body, "{!!(v.isSrOp) && (<>", "{!!(v.isSrOp) && (<DeskShowrooms4a v={v} />)}", "showrooms");
+
+  // Frame 09 · Channels: Connections grouped by phone number with the message templates beside them (DeskChannels4a);
+  // production's other tabs, its API access, webhook and permissions stay under it, in 4a's tabs and rules.
+  {
+    const k = body.indexOf("{!!(v.kCh) && (<>");
+    body = body.slice(0, k) + body.slice(k).replace('<div style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "1100px" }}>', '<div style={{ display: "flex", flexDirection: "column", gap: "20px", paddingTop: "8px" }}>');
+    const s0 = body.indexOf("{(v.chGroups).map((g, g_i) => (<Fragment key={g_i}>", k);
+    if (s0 < 0) throw new Error("desk-4a: channel groups");
+    const re = /<Fragment key=|<\/Fragment>\)\)\}/g; re.lastIndex = s0; let depth = 0, e0 = -1;
+    for (let m; (m = re.exec(body));) { depth += m[0].startsWith("<Fragment") ? 1 : -1; if (!depth) { e0 = m.index + m[0].length; break; } }
+    if (e0 < 0) throw new Error("desk-4a: channel groups end");
+    body = body.slice(0, s0) + "<DeskChannels4a v={v} />" + body.slice(e0);
+  }
+  // Underline tabs in 4a's size (Channels and Audit log share the markup): 13 px, the active ink over a 2 px rust line.
+  body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "13');
+  body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "13');
+
   // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a). The Ads
   // Performance part production keeps below them stays, under a 4a section head.
   {
@@ -244,6 +263,17 @@ module.exports = function desk4a(body) {
     body = body.slice(0, a) + "<DeskInsight4a v={v} />\n                " + body.slice(b);
     body = once(body, '<strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>',
       '<strong style={{ flex: "1", font: "500 18px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>', "insight ads head");
+  }
+  // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
+  // templates and Notifications, production's, stay as the head's other two tabs.
+  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  // Frame 11 · Audit log: a search, three menus and the five-column table (Desk4a.tsx › DeskAudit4a). Production's three
+  // tabs are the Area menu's areas; its stats band went into the head's count.
+  {
+    const start = '{!!(v.kAudit) && (<>', a = body.indexOf(start);
+    const end = '{!!(v.kAdsPerf) && (<>', b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: audit");
+    body = body.slice(0, a) + "{!!(v.kAudit) && (<DeskAudit4a v={v} />)} " + body.slice(b);
   }
   return body;
 };

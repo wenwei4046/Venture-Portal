@@ -56,20 +56,6 @@ attachClose
 attachOpen
 attachOpts
 attachToggle
-auClear
-auDrag0
-auDrag1
-auDrag2
-auEmpty
-auGrid
-auHas
-auPers
-auQ
-auReset
-auRows
-auStats
-auTabs
-auWhoOpts
 aw
 awAssign
 awBook
@@ -119,7 +105,6 @@ chDlgClose
 chDlgOpen
 chGreet
 chGreetHint
-chGroups
 chHasSave
 chHookC
 chHookLine
@@ -297,6 +282,7 @@ isCltOp
 isCpOp
 isFrmOp
 isFtOp
+isGenOp
 isHistOp
 isMwtOp
 isNtfOp
@@ -429,7 +415,6 @@ sendMeta
 sendName
 sendOpen
 sendTitle
-setAuQ
 setCpFrom
 setCpTo
 setDraft
@@ -463,7 +448,6 @@ srCalNext
 srCalOpen
 srCalPrev
 srCalTo
-srCards
 srClose
 srDays
 srDtAdd

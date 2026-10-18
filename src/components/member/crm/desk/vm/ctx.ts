@@ -96,6 +96,8 @@ export interface DeskUi {
   dp: { open: boolean; from: string; to: string; cf: string; ct: string; preset: string; cmp: boolean; days: number; step: number; target: "main" | "cmp"; month: number; year: number; txt: Record<string, string> } | null;
   // Showrooms
   srEdit: string | null;
+  /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
+  srAt: number;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
   srBlkOpen: boolean;
@@ -149,7 +151,7 @@ export interface DeskUi {
   ppF: Record<string, string | null>; ppBy: string; ppQ: string; ppOpen: string | null; ppVis: string[] | null;
   ppSort: { k: string | null; dir: 1 | -1 }; ppCW: Record<string, number>; ppAdd: boolean;
   // Audit log
-  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null;
+  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
   // Customer form (the page): its draft, the preview's device
   cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
@@ -185,7 +187,7 @@ export const initialDeskUi = (): DeskUi => ({
   calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
-  srEdit: null, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
+  srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
   mwt: null, mwtSaved: false,
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
@@ -196,7 +198,7 @@ export const initialDeskUi = (): DeskUi => ({
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
-  auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null,
+  auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
   cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
