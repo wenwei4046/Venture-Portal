@@ -16,10 +16,12 @@ import { mediaWord } from "../../shared/chat-media";
 import { answerOf } from "./form";
 import { phoneLabel } from "../../sales/vm/customer";
 import { adHref, adKindLabel } from "../../shared/AdLink";
+import { avatarTint, STATUS, type StatusName } from "../../shared/palette";
 
 const DAY = 86_400_000;
 const BUDGET: [string, number, number][] = [["Under RM 5k", 0, 5000], ["RM 5k – 10k", 5000, 10000], ["RM 10k – 20k", 10000, 20000], ["RM 20k +", 20000, 1e12]];
-const COLS = ["var(--crm-rust)", "var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-ink-soft)", "var(--crm-orange)"];
+// A chart's series in 4a's palette, in its order (a grouping that is not the status ramp's).
+const COLS = ["var(--crm-ink)", "var(--crm-orange)", "var(--crm-brown)", "var(--crm-amber)", "var(--crm-st-won)", "var(--crm-oxblood)", "var(--crm-team-7)", "var(--crm-st-lost)"];
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 
 /** One customer as Contacts reads it: every field's answer, the buckets the filters use. */
@@ -31,7 +33,8 @@ export function peopleVM(ctx: DeskCtx) {
   const secs = formV2(data);
   const field = (id: string) => secs.flatMap(s => s.fields).find(f => f.id === id);
   const own = secs.flatMap(s => s.fields.map(f => [s.label, f] as [string, FormFieldV2])).filter(([, f]) => f.kind === "own");
-  const statusOf = (key: string) => (["Overdue", "Urgent", "Reply soon"].includes(key) ? "Overdue" : key);
+  // 4a's status names (the ramp's seven): the waits are Attention, a cold chat Cold leads.
+  const statusOf = (key: string) => (["Overdue", "Urgent", "Reply soon"].includes(key) ? "Attention" : key === "Cold" ? "Cold leads" : key);
   const status = new Map(chatRows(ctx).map(r => [r.id, statusOf(r.key)]));
   const visitOf = (c: CrmCustomer) => data.visits.filter(v => v.customerId === c.id && v.state !== "cancelled").sort((a, b) => b.start.localeCompare(a.start))[0];
   const rows0: Row[] = data.customers.map(c => {
@@ -61,7 +64,7 @@ export function peopleVM(ctx: DeskCtx) {
     ...(field("loc") ? { loc: [lbl("loc", "Unit location"), uniq("loc"), "PROPERTY"] as [string, string[], string] } : {}),
     ...Object.fromEntries(own.filter(([, f]) => f.type === "Choice").map(([g, f]) => [f.id, [f.label, f.opts.split(",").map(x => x.trim()).filter(Boolean), g]])),
     plat: ["Platform", ["WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
-    status: ["Status", ["New", "Overdue", "Follow up", "Appointment", "Won", "Lost", "Cold"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"],
+    status: ["Status", ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"],
     visit: ["Visit", ["Showed up", "Booked", "No visit"], "VISIT"], showroom: ["Showroom", [...data.rooms.filter(r => r.active).map(r => r.name), "None"], "VISIT"],
     first: ["First contact", ["This week", "Last 2 weeks", "Earlier"], "CONTACT"], last: ["Last chat", ["Today", "This week", "Earlier"], "CONTACT"],
   };
@@ -71,7 +74,7 @@ export function peopleVM(ctx: DeskCtx) {
   const vals = KEYS[by][1], counts = vals.map(v => rows.filter(d => d[by] === v).length), none = rows.filter(d => !d[by]).length;
   const propKey = KEYS[by][2] === "PROPERTY" || own.some(([, f]) => f.id === by);
   const mx = Math.max(1, ...counts, none);
-  const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: COLS[i % COLS.length], on: F[by] === v,
+  const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: by === "status" ? (STATUS[v as StatusName]?.dot ?? COLS[i % COLS.length]) : COLS[i % COLS.length], on: F[by] === v,
     pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v }, ppPg: 0 })) })),
   ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "var(--crm-line)", on: false, pick: () => {} }] : [])]
     .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "var(--crm-cream)" : "transparent" }));
@@ -92,7 +95,8 @@ export function peopleVM(ctx: DeskCtx) {
   const GRP: Record<string, string> = { type: "Property", size: "Property", budget: "Property", loc: "Property", req: "Property", plat: "Lead", ad: "Lead", status: "Lead", sp: "Lead", visit: "Visit", showroom: "Visit", first: "Contact", last: "Contact",
     ...Object.fromEntries(own.map(([g, f]) => [f.id, g.charAt(0) + g.slice(1).toLowerCase()])) };
   const ALL = [...["type", "size", "budget", "loc", "req"].filter(k => !!field(k)), ...own.map(([, f]) => f.id), "plat", "ad", "status", "sp", "visit", "showroom", "first", "last"];
-  const DEF = ["type", "size", "budget", "loc", "req"].filter(k => ALL.includes(k));
+  // 4a's columns (frame 03): Status, Ad, Assigned to, Visit, Added — the rest from + Add columns.
+  const DEF = ["status", "ad", "sp", "visit", "first"].filter(k => ALL.includes(k));
   const vis = (ui.ppVis ?? DEF).filter(k => ALL.includes(k));
   const so = ui.ppSort, CW = ui.ppCW, dw = (k: string) => CW[k] || ({ req: 200, ad: 200, contact: 220 } as Record<string, number>)[k] || 130;
   const sk = (k: string) => (k === "budget" ? "budgetN" : k);
@@ -114,15 +118,17 @@ export function peopleVM(ctx: DeskCtx) {
     ppSelGroups: [["PROPERTY", "PROPERTY"], ["LEAD", "LEAD"], ["VISIT", "VISIT"], ["CONTACT", "CONTACT"]].map(([label, g]) => ({ label, sels: Object.keys(KEYS).filter(k => KEYS[k][2] === g).map(sel) })).filter(g => g.sels.length),
     ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "", ppPg: 0 }),
     ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value, ppPg: 0 }),
-    ppGrid: `${dw("contact")}px ${vis.map(k => `${dw(k)}px`).join(" ")} minmax(36px, 1fr)`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
+    // 4a (frame 03): the columns share the width as the design's do; one dragged keeps its px.
+    ppGrid: `${CW.contact ? `${CW.contact}px` : "minmax(0,1.6fr)"} ${vis.map(k => (CW[k] ? `${CW[k]}px` : `minmax(0,${({ status: 1.25, ad: 1.35, sp: 1.25, visit: 1.15, first: 0.6 } as Record<string, number>)[k] ?? 1.2}fr)`)).join(" ")} 28px`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
     ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "var(--crm-ink)" : "var(--crm-muted)",
       drag: mapDrag(set, "ppCW", dw(k), k, 80, 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
     ppSortCols0: [{ arrow: so.k === "name" ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === "name" ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => toggleSort("name") }],
     ppAddOpen: ui.ppAdd, ppAddToggle: () => patch({ ppAdd: !ui.ppAdd }), ppAddClose: () => patch({ ppAdd: false }),
     ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "var(--crm-rust)" : "transparent", bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-cream)" : "transparent",
       toggle: () => set(u => { const cur = (u.ppVis ?? DEF).filter(x => ALL.includes(x)); return { ...u, ppVis: cur.includes(k) ? cur.filter(x => x !== k) : ALL.filter(x => cur.includes(x) || x === k) }; }) }; }),
-    ppRows: shown.map(d => ({ ini: d.ini, name: d.name, phone: d.phone,
+    ppRows: shown.map(d => ({ ini: d.ini, name: d.name, phone: d.phone, avBg: avatarTint(d.name)[0], avFg: avatarTint(d.name)[1],
       cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
+        if (k === "status" && raw) { const st = STATUS[raw as StatusName]; if (st) return { pill: true, plain: false, v, bg: st.tint, fg: st.text, dot: st.dot }; }
         if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "var(--crm-tint-attention)" : d.type ? "var(--crm-tint-cold)" : "var(--crm-field)", fg: isB ? "var(--crm-rust)" : d.type ? "var(--crm-ink-soft)" : "var(--crm-faint)" }; }
         return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "var(--crm-ink)" : "var(--crm-faint)" }; }),
       // A row opens the customer in the side panel when the page is wide enough to show it (the owner, 2026-10-15: "右邊的
@@ -133,7 +139,9 @@ export function peopleVM(ctx: DeskCtx) {
     ppEmpty: !rows.length, ppHas: rows.length > 0,
     ppPagerOn: rows.length > 0, ppPager: { range: `${pg * per + 1}–${pg * per + shown.length} of ${sorted.length}`, page: `Page ${pg + 1} of ${pages}`,
       sizes: [10, 20, 50].map(n => ({ n, on: n === per, pick: () => patch({ ppPer: n, ppPg: 0 }) })),
-      prevOff: pg === 0, nextOff: pg >= pages - 1, prev: () => patch({ ppPg: pg - 1 }), next: () => patch({ ppPg: pg + 1 }) },
+      prevOff: pg === 0, nextOff: pg >= pages - 1, prev: () => patch({ ppPg: pg - 1 }), next: () => patch({ ppPg: pg + 1 }),
+      // 4a's numbered pager (frame 03): 1 2 3 … last, the page on in ink.
+      pages, cur: pg, go: (n: number) => patch({ ppPg: n }) },
     // The chart card: folded to its title and what it says until opened; open, a pie with each value's share beside the
     // rows that filter (the owner, 2026-10-15: "分析圖表，類似截圖，默認收起").
     ppRail: true, ppFoldable: true, ppChartOpen: ui.ppChart, ppChartToggle: () => patch({ ppChart: !ui.ppChart }), ppChev: ui.ppChart ? "rotate(180deg)" : "none", ppChartBtn: ui.ppChart ? "Hide chart" : "Show chart",

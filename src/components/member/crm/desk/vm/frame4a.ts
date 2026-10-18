@@ -67,7 +67,14 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     head: { title: fr.pageTitle, tabs: h?.tabs ?? [], sub: h?.sub ?? "", cta: h?.cta ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
-    pad: tab === "inbox" ? "0" : "0 36px 32px", gap: tab === "inbox" ? "0" : "24px", bodyTop: tab === "inbox" ? "1px solid var(--crm-rule)" : "0",
+    // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
+    bookPick: (() => {
+      const q = ui.bookQ.trim().toLowerCase();
+      const rows = data.customers.filter(c => c.status !== "won" && c.status !== "lost" && (!q || c.name.toLowerCase().includes(q) || c.phone.includes(q))).slice(0, 30);
+      return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
+        rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
+    })(),
+    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : "0 36px 32px", gap: tab === "inbox" ? "0" : "24px", bodyTop: tab === "inbox" || tab === "people" || tab === "calendar" ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -96,19 +103,20 @@ interface HeadBits {
   showroomCount: number;
   insightPdf: () => void;
   insightSub: string;
+  ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
+  dpOpen: () => void;
 }
 
 /** Each page's head (frames 01–11): its tabs, its line and its one primary button — each bound to what the page already does. */
 export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit<F4Head, "title">>> {
-  void ctx;
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
   const pdf = v.apDl.find(d => d.v === "pdf");
   return {
     insight: { tabs: v.periodOpts, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
     inbox: { tabs: [], sub: "", cta: null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
-    calendar: { tabs: v.calViews, sub: v.calTitle, cta: null },
-    adsperf: { tabs: [], sub: "", cta: pdf ? { label: "Download PDF", icon: "download", act: pdf.pick } : null },
+    calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },
+    adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: pdf ? { label: "Download PDF", icon: "download", act: pdf.pick } : null },
     assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: v.srEditing ? { label: "Save", icon: "check", act: v.srSave } : null },
     forms: { tabs: [], sub: "", cta: { label: "Publish", icon: "check", act: v.cfSave } },

@@ -10,7 +10,7 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdsTable4a, DeskCalFigures4a, DeskCalendar4a, DeskContactFigures4a, DeskContacts4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -3213,189 +3213,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.kPeople) && (<>
-                <div style={{ display: "flex", flexDirection: "column", gap: "18px", maxWidth: "1180px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "14px 16px", border: "1px solid var(--crm-rule)", borderRadius: "14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>Filter by Customer info</strong>
-                      <span style={{ flex: "0 1 320px", minWidth: "220px", display: "flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "18px", background: "#fff" }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z">
-                          </path>
-                        </svg>
-                        <input type="text" value={v.ppQ} onChange={v.setPpQ} placeholder="Search name, phone, requirement…" style={{ flex: "1", minWidth: "0", border: "0", background: "transparent", font: "inherit", fontSize: "13.5px", color: "var(--crm-ink)", outline: "none" }} />
-                      </span>
-                    </div>
-                    {(v.ppSelGroups).map((g, g_i) => (<Fragment key={g_i}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", paddingTop: "10px", borderTop: "1px solid var(--crm-field)" }}>
-                        <span style={{ flex: "0 0 72px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>{g.label}</span>
-                        {(g.sels).map((f, f_i) => (<Fragment key={f_i}>
-                          <span style={{ position: "relative" }}>
-                            <button type="button" onClick={f.toggle} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 9px 0 12px", boxSizing: "border-box", border: `1px solid ${f.bd}`, borderRadius: "18px", background: f.bg, font: "inherit", fontSize: "13px", color: "var(--crm-muted)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h35}>{f.label}<b style={{ fontWeight: "650", color: "var(--crm-ink)" }}>{f.value}</b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m6 9 6 6 6-6">
-                                </path>
-                              </svg></button>
-                            {!!(f.open) && (<>
-                              <div onClick={f.close} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                              </div>
-                              <div style={{ position: "absolute", top: "38px", left: "0", zIndex: "8", minWidth: "200px", maxHeight: "300px", overflow: "auto", padding: "6px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 28px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px" }}>
-                                {(f.opts).map((o, o_i) => (<Fragment key={o_i}>
-                                  <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", border: "0", borderRadius: "8px", background: o.bg, font: "inherit", fontSize: "13px", fontWeight: o.w, color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={o.chk} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="m5 12 5 5 9-10">
-                                      </path>
-                                    </svg>
-                                    <span style={{ flex: "1" }}>{o.v}</span>
-                                    <span style={{ fontSize: "12px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{o.n}</span>
-                                  </button>
-                                </Fragment>))}
-                              </div>
-                            </>)}
-                          </span>
-                        </Fragment>))}
-                      </div>
-                    </Fragment>))}
-                  </div>
-                  {!!(v.ppHasChips) && (<>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginTop: "-8px" }}>
-                      {(v.ppChips).map((c, c_i) => (<Fragment key={c_i}>
-                        <button type="button" onClick={c.clear} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px 0 12px", borderRadius: "14px", border: "0", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", font: "inherit", fontSize: "12.5px", fontWeight: "650", cursor: "pointer" }}>{c.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18M6 6l12 12">
-                            </path>
-                          </svg></button>
-                      </Fragment>))}
-                      <button type="button" onClick={v.ppClear} style={{ border: "0", background: "transparent", padding: "0 4px", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-muted)", cursor: "pointer" }} className={DH.h2}>Clear all</button>
-                    </div>
-                  </>)}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", border: "1px solid var(--crm-rule)", borderRadius: "14px", background: "var(--crm-cream-nav)" }}>
-                    {(v.ppStats).map((k, k_i) => (<Fragment key={k_i}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "16px 20px", borderLeft: "1px solid var(--crm-rule)", marginLeft: "-1px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", textTransform: "uppercase" }}>{k.k}</span>
-                        <span style={{ fontSize: "22px", fontWeight: "650", letterSpacing: "-.01em", fontVariantNumeric: "tabular-nums" }}>{k.v}</span>
-                        <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{k.sub}</span>
-                      </div>
-                    </Fragment>))}
-                  </div>
-                  {!(v.ppRail) && (<><div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px", border: "1px solid var(--crm-rule)", borderRadius: "14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                      <strong style={{ flex: "1", minWidth: "160px", fontSize: "15px", fontWeight: "650" }}>{v.ppChartTitle}</strong>
-                      <div style={{ display: "flex", flexWrap: "wrap", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                        {(v.ppBys).map((o, o_i) => (<Fragment key={o_i}>
-                          {!!(o.on) && (<>
-                            <button type="button" onClick={o.pick} style={{ border: "0", height: "28px", padding: "0 10px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "12.5px", fontWeight: "650", boxShadow: "0 1px 2px rgba(42,22,12,.12)", cursor: "pointer", whiteSpace: "nowrap" }}>{o.label}</button>
-                          </>)}
-                          {!!(o.off) && (<>
-                            <button type="button" onClick={o.pick} style={{ border: "0", height: "28px", padding: "0 10px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "12.5px", fontWeight: "550", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h2}>{o.label}</button>
-                          </>)}
-                        </Fragment>))}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "2px", height: "10px", borderRadius: "5px", overflow: "hidden", background: "var(--crm-field)" }}>
-                      {(v.ppStack).map((g, g_i) => (<Fragment key={g_i}>
-                        <span style={{ flex: `${g.n} 0 0`, background: g.color }}>
-                        </span>
-                      </Fragment>))}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {(v.ppBars).map((b, b_i) => (<Fragment key={b_i}>
-                        <button type="button" onClick={b.pick} title="Click to filter" style={{ display: "grid", gridTemplateColumns: "minmax(120px, 180px) minmax(0, 1fr) 36px 48px", gap: "14px", alignItems: "center", padding: "7px 8px", margin: "0 -8px", border: "0", borderRadius: "8px", background: b.bg, font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h12}>
-                          <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: b.fw, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: b.color }}>
-                            </span>{b.label}</span>
-                          <span style={{ display: "block", height: "8px", borderRadius: "4px", background: "var(--crm-field)" }}>
-                            <span style={{ display: "block", height: "8px", width: `${b.w}%`, borderRadius: "4px", background: b.color }}>
-                            </span>
-                          </span>
-                          <span style={{ textAlign: "right", fontSize: "13.5px", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{b.n}</span>
-                          <span style={{ textAlign: "right", fontSize: "12.5px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{b.pct}</span>
-                        </button>
-                      </Fragment>))}
-                    </div>
-                  </div></>)}
-                  {!!(v.ppHas) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "14px", overflow: "auto" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", padding: "10px 20px", background: "var(--crm-cream-nav)", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", minWidth: "max-content" }}>
-                        <span style={{ position: "relative", whiteSpace: "nowrap" }}>
-                          {(v.ppSortCols0).map((c, c_i) => (<Fragment key={c_i}>
-                            <button type="button" onClick={c.pick} title="Sort" style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0", border: "0", background: "transparent", font: "inherit", letterSpacing: "inherit", color: c.fg, cursor: "pointer" }}>CONTACT<span style={{ fontSize: "12px" }}>{c.arrow}</span></button>
-                          </Fragment>))}
-                          <span onPointerDown={v.ppDragC} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-11px", width: "9px", zIndex: "2", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
-                          </span>
-                        </span>
-                        {(v.ppHead).map((h, h_i) => (<Fragment key={h_i}>
-                          <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", minWidth: "0" }}>
-                            <button type="button" onClick={h.pick} title="Sort" style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0", border: "0", background: "transparent", font: "inherit", letterSpacing: "inherit", color: h.fg, cursor: "pointer" }}>{h.label}<span style={{ fontSize: "12px" }}>{h.arrow}</span></button>
-                            <button type="button" onClick={h.remove} title="Hide column" style={{ width: "18px", height: "18px", padding: "0", border: "0", borderRadius: "50%", background: "transparent", color: "var(--crm-faint)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h36}>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 6 6 18M6 6l12 12">
-                                </path>
-                              </svg>
-                            </button>
-                            <span onPointerDown={h.drag} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-11px", width: "9px", zIndex: "2", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
-                            </span>
-                          </span>
-                        </Fragment>))}
-                        <span style={{ position: "relative", display: "flex", justifyContent: "flex-end" }}>
-                          <button type="button" onClick={v.ppAddToggle} title="Add a column from Customer info" style={{ width: "26px", height: "26px", margin: "-4px 0", padding: "0", boxSizing: "border-box", borderRadius: "50%", border: "1px dashed var(--crm-faint-2)", background: "#fff", color: "var(--crm-rust)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h37}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 5v14M5 12h14">
-                              </path>
-                            </svg>
-                          </button>
-                          {!!(v.ppAddOpen) && (<>
-                            <div onClick={v.ppAddClose} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                            </div>
-                            <div style={{ position: "absolute", top: "30px", right: "0", zIndex: "8", width: "220px", padding: "6px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 28px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px", letterSpacing: "0", textTransform: "none" }}>
-                              <span style={{ padding: "6px 10px 4px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>ADD FROM CUSTOMER INFO</span>
-                              {(v.ppAddOpts).map((o, o_i) => (<Fragment key={o_i}>
-                                <button type="button" onClick={o.toggle} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "8px", background: o.bg, font: "inherit", fontSize: "13px", fontWeight: "550", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}>
-                                  <span style={{ flex: "0 0 16px", width: "16px", height: "16px", boxSizing: "border-box", borderRadius: "4px", border: `1.5px solid ${o.bd}`, display: "grid", placeItems: "center" }}>
-                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={o.chk} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="m5 12 5 5 9-10">
-                                      </path>
-                                    </svg>
-                                  </span>
-                                  <span style={{ flex: "1" }}>{o.label}</span>
-                                  <span style={{ fontSize: "11.5px", color: "var(--crm-faint)" }}>{o.grp}</span>
-                                </button>
-                              </Fragment>))}
-                            </div>
-                          </>)}
-                        </span>
-                      </div>
-                      {(v.ppRows).map((d, d_i) => (<Fragment key={d_i}>
-                        <button type="button" onClick={d.open} title="Open chat and Customer info" style={{ display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", padding: "10px 20px", border: "0", borderTop: "1px solid var(--crm-field)", background: d.rowBg, font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", minWidth: "max-content" }} className={DH.h12}>
-                          <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "0" }}>
-                            <span style={{ flex: "0 0 30px", width: "30px", height: "30px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "11px", fontWeight: "700", display: "grid", placeItems: "center" }}>{d.ini}</span>
-                            <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: "0" }}>
-                              <span style={{ fontSize: "13.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</span>
-                              <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{d.phone}</span>
-                            </span>
-                          </span>
-                          {(d.cells).map((x, x_i) => (<Fragment key={x_i}>
-                            <span style={{ minWidth: "0", display: "flex" }}>
-                              {!!(x.pill) && (<>
-                                <span style={{ display: "inline-flex", height: "22px", alignItems: "center", padding: "0 9px", borderRadius: "11px", background: x.bg, color: x.fg, fontSize: "12px", fontWeight: "650", whiteSpace: "nowrap" }}>{x.v}</span>
-                              </>)}
-                              {!!(x.plain) && (<>
-                                <span style={{ fontSize: "13px", color: x.fg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{x.v}</span>
-                              </>)}
-                            </span>
-                          </Fragment>))}
-                          <span>
-                          </span>
-                        </button>
-                      </Fragment>))}
-                    </div>
-                  </>)}
-                  {!!(v.ppPagerOn) && (<DeskPager v={v.ppPager} />)}
-                  {!!(v.ppEmpty) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "48px 20px", border: "1px dashed var(--crm-line)", borderRadius: "14px", textAlign: "center" }}>
-                      <strong style={{ fontSize: "15px", fontWeight: "650" }}>No contacts match these filters</strong>
-                      <button type="button" onClick={v.ppClear} style={{ border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Clear filters</button>
-                    </div>
-                  </>)}
-                </div>
-              </>)}
+              {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
               {!!(v.kAudit) && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "1100px" }}>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", borderBottom: "1px solid var(--crm-rule)" }}>
@@ -3483,34 +3301,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               {!!(v.kAdsPerf) && (<>
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: v.apStCur.dot }}>
-                      </span>{v.apStCur.label}<span style={{ color: "var(--crm-muted)", fontWeight: "500" }}>{v.apStCur.n}</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></button>
-                    {!!(v.apStOpen) && (<>
-                      <div style={{ position: "absolute", top: "42px", left: "0", zIndex: "30", width: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "14px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>
-                        {(v.apStOpts).map((o, o_i) => (<Fragment key={o_i}>
-                          <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "38px", padding: "0 10px", border: "0", borderRadius: "9px", background: o.bg, font: "inherit", fontSize: "14px", fontWeight: "600", color: o.fg, textAlign: "left", cursor: "pointer" }} className={DH.h4}>
-                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}>
-                            </span>
-                            <span style={{ flex: "1" }}>{o.label}</span>
-                            <span style={{ fontSize: "12.5px", fontWeight: "500", color: "var(--crm-muted)" }}>{o.n}</span>
-                          </button>
-                        </Fragment>))}
-                      </div>
-                    </>)}
+                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z">
-                        </path>
-                      </svg>{v.apRangeLabel}{!!(v.apCmpOn) && (<>
-                        <span style={{ height: "22px", padding: "0 8px", borderRadius: "11px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center" }}>{v.apCmpLabel}</span>
-                      </>)}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></button>
+                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg>{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.dp.open) && (<>
                       <div onClick={v.dpCancel} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
                       </div>
@@ -3592,31 +3387,13 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </div>
                     </>)}
                   </span>
-                  <span style={{ flex: "1" }}>
-                  </span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.metaDot }}>
-                    </span>{v.metaSync}</span>
-                  <button type="button" onClick={v.openMetrics} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14M5 12h14">
-                      </path>
-                    </svg>Metrics · <span>{v.apNSel}</span></button>
+                  <span style={{ flex: "1" }}></span>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apToggleDl} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 16px", boxSizing: "border-box", borderRadius: "18px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h26}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2">
-                        </path>
-                      </svg>Download report</button>
-                    {!!(v.apDlOpen) && (<>
-                      <div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                      </div>
-                      <div style={{ position: "absolute", top: "42px", zIndex: "8", padding: "8px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 12px 32px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px", right: "0", width: "240px" }}>
-                        <span style={{ padding: "6px 10px", fontSize: "12px", fontWeight: "600", color: "var(--crm-muted)" }}>{v.apRangeLabel} · {v.apNSel} metrics</span>
-                        {(v.apDl).map((o, o_i) => (<Fragment key={o_i}>
-                          <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "40px", padding: "0 12px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "600", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className={DH.h8}><span style={{ width: "34px", height: "22px", borderRadius: "6px", background: o.bg, color: o.fg, fontSize: "10.5px", fontWeight: "700", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>
-                        </Fragment>))}
-                      </div>
-                    </>)}
+                    <button type="button" onClick={v.apToggleDl} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apDlOpen) && (<><div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", right: "0" }}>{(v.apDl).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className="crm4a-row"><span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>))}</div></>)}
                   </span>
                 </div>
+                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Spend and cost per lead appear once Meta grants ads_read. Ad names are the ones managers typed in Assignment.</div>
                 {!!(v.apCmpOn) && (<>
                   <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "18px", fontSize: "13px", fontWeight: "650" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}><span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "var(--crm-rust)" }}>
@@ -3626,278 +3403,9 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <span style={{ color: "var(--crm-muted)", fontWeight: "500" }}>▲▼ change from blue to orange</span>
                   </div>
                 </>)}
-                <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflowX: "auto" }}>
-                  <div style={{ minWidth: `${v.apMinW}px` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: v.apCols, gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".06em", color: "var(--crm-muted)" }}>
-                      <button type="button" onClick={v.apSortName} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "5px", padding: "0", border: "0", background: "none", font: "inherit", color: "inherit", letterSpacing: "inherit", cursor: "pointer", textAlign: "left" }}>AD<span style={{ fontSize: "10px", color: v.apNameAc }}>{v.apNameArrow}</span><span onPointerDown={v.apNameResize} onDoubleClick={v.apNameUnsize} onClick={e => e.stopPropagation()} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-12px", bottom: "-12px", right: "-12px", width: "12px", cursor: "col-resize", display: "flex", justifyContent: "center" }}><span style={{ width: "1px", margin: "8px 0", background: "var(--crm-rule)" }}></span></span></button>
-                      {(v.apHead).map((h, h_i) => (<Fragment key={h_i}>
-                        <button type="button" onClick={h.sort} style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", padding: "0", border: "0", background: "none", font: "inherit", color: h.fg, letterSpacing: "inherit", textTransform: "uppercase", textAlign: "center", cursor: "pointer" }} className={DH.h2}>
-                          <span>{h.label}</span>
-                          <span style={{ flex: "0 0 auto", fontSize: "10px", color: h.ac }}>{h.arrow}</span><span onPointerDown={h.resize} onDoubleClick={h.unsize} onClick={e => e.stopPropagation()} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-12px", bottom: "-12px", right: "-12px", width: "12px", cursor: "col-resize", display: "flex", justifyContent: "center" }}><span style={{ width: "1px", margin: "8px 0", background: "var(--crm-rule)" }}></span></span>
-                        </button>
-                      </Fragment>))}
-                    </div>
-                    {(v.apRows).map((r, r_i) => (<Fragment key={r_i}>
-                      <div style={{ display: "grid", gridTemplateColumns: v.apCols, gap: "12px", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--crm-field)", background: r.bg, fontSize: "14px", fontWeight: r.w, fontVariantNumeric: "tabular-nums" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "0" }}>
-                          <span style={{ flex: "0 0 10px", width: "10px", height: "10px", borderRadius: "50%", background: r.dot }}>
-                          </span>
-                          <span style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "0" }}>
-                            <strong style={{ fontSize: "14.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
-                            <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--crm-muted)" }}>{r.meta}</span>
-                          </span>
-                        </span>
-                        {(r.cells).map((c, c_i) => (<Fragment key={c_i}>
-                          <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>{!!(c.cv) && (<>
-                                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--crm-rust)" }}>
-                                </span>
-                              </>)}{c.v}</span>
-                            {!!(c.cv) && (<>
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12.5px", fontWeight: "550", color: "var(--crm-ink-soft)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--crm-ink-soft)" }}>
-                                </span>{c.cv}</span>
-                            </>)}
-                            {!!(c.d) && (<>
-                              <span style={{ height: "18px", padding: "0 6px", borderRadius: "9px", background: c.db, fontSize: "11.5px", fontWeight: "700", color: c.dc, display: "inline-flex", alignItems: "center" }}>{c.d}</span>
-                            </>)}
-                          </span>
-                        </Fragment>))}
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </div>
+                <DeskAdsTable4a v={v} />
               </>)}
-              {!!(v.kCal) && (<>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.toggleRange} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z">
-                        </path>
-                      </svg>{v.rangeLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></button>
-                    {!!(v.rangeOpen) && (<>
-                      <div onClick={v.toggleRange} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                      </div>
-                      <div style={{ position: "absolute", top: "40px", left: "0", zIndex: "8", width: "280px", padding: "8px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 12px 32px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px" }}>
-                        {(v.rangeOpts).map((o, o_i) => (<Fragment key={o_i}>
-                          <button type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "40px", padding: "0 12px", border: "0", borderRadius: "10px", background: o.bg, font: "inherit", fontSize: "14px", fontWeight: "600", color: o.fg, cursor: "pointer", textAlign: "left" }} className={DH.h8}>
-                            <span style={{ flex: "1" }}>{o.label}</span>
-                            <span style={{ fontSize: "12px", color: "var(--crm-muted)", fontWeight: "500" }}>{o.hint}</span>
-                          </button>
-                        </Fragment>))}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px", padding: "10px 12px 6px", borderTop: "1px solid var(--crm-field)" }}>
-                          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>CUSTOM</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <input type="date" value={v.rangeFrom} min="2026-10-01" max="2026-10-31" onChange={v.setFrom} style={{ flex: "1", minWidth: "0", height: "34px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "9px", font: "inherit", fontSize: "13px", color: "var(--crm-ink)" }} />
-                            <span style={{ color: "var(--crm-muted)" }}>–</span>
-                            <input type="date" value={v.rangeTo} min="2026-10-01" max="2026-10-31" onChange={v.setTo} style={{ flex: "1", minWidth: "0", height: "34px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "9px", font: "inherit", fontSize: "13px", color: "var(--crm-ink)" }} />
-                          </div>
-                        </div>
-                      </div>
-                    </>)}
-                  </span>
-                  <select onChange={v.pickShowroom} value={v.calShowroom} style={{ height: "34px", minWidth: "200px", padding: "0 30px 0 12px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>
-                    {(v.showroomOpts).map((o, o_i) => (<Fragment key={o_i}>
-                      <option value={o.v}>{o.label}</option>
-                    </Fragment>))}
-                  </select>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ position: "relative", flex: "0 0 auto" }}>
-                    <button type="button" onClick={v.toggleCalWho} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "32px", padding: "0 10px 0 12px", boxSizing: "border-box", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75">
-                        </path>
-                      </svg>{v.calWhoLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></button>
-                    {!!(v.calWhoOpen) && (<>
-                      <div onClick={v.toggleCalWho} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
-                      </div>
-                      <div style={{ position: "absolute", top: "40px", left: "0", zIndex: "8", width: "280px", maxHeight: "420px", overflow: "auto", padding: "8px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 12px 32px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span style={{ padding: "6px 10px 6px", fontSize: "12px", fontWeight: "600", color: "var(--crm-muted)" }}>Show visits of · pick one or more</span>
-                        {(v.calWhoOpts).map((w, w_i) => (<Fragment key={w_i}>
-                          {!!(w.head) && (<>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "6px 4px 0", padding: "10px 6px 4px", borderTop: "1px solid var(--crm-field)", fontSize: "10.5px", fontWeight: "700", letterSpacing: ".1em", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: w.color }}>
-                              </span>{w.label}</div>
-                          </>)}
-                          {!!(w.sel) && (<>
-                            <button type="button" onClick={w.pick} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "38px", padding: "4px 10px", border: "0", borderRadius: "10px", background: "var(--crm-tint-attention)", font: "inherit", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" }} className={DH.h8}>
-                              <span style={{ flex: "0 0 26px", width: "26px", height: "26px", borderRadius: "50%", background: w.avBg, color: w.avFg, fontSize: "10px", fontWeight: "700", display: "grid", placeItems: "center" }}>{w.ini}</span>
-                              <span style={{ flex: "1", fontSize: "14px", fontWeight: "650", whiteSpace: "nowrap" }}>{w.label}</span>
-                              <span style={{ flex: "0 0 18px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "5px", border: "1.5px solid var(--crm-rust)", background: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="m5 12 5 5 9-10">
-                                  </path>
-                                </svg>
-                              </span>
-                            </button>
-                          </>)}
-                          {!!(w.unsel) && (<>
-                            <button type="button" onClick={w.pick} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "38px", padding: "4px 10px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className={DH.h8}>
-                              <span style={{ flex: "0 0 26px", width: "26px", height: "26px", borderRadius: "50%", background: w.avBg, color: w.avFg, fontSize: "10px", fontWeight: "700", display: "grid", placeItems: "center" }}>{w.ini}</span>
-                              <span style={{ flex: "1", fontSize: "14px", fontWeight: "550", whiteSpace: "nowrap" }}>{w.label}</span>
-                              <span style={{ flex: "0 0 18px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "5px", border: "1.5px solid var(--crm-faint-2)", background: "#fff", display: "grid", placeItems: "center" }}>
-                              </span>
-                            </button>
-                          </>)}
-                        </Fragment>))}
-                        <div style={{ position: "sticky", bottom: "-8px", display: "flex", gap: "8px", margin: "6px -8px -8px", padding: "10px", background: "#fff", borderTop: "1px solid var(--crm-field)" }}>
-                          <button type="button" onClick={v.calWhoClear} style={{ flex: "1", height: "36px", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>Clear</button>
-                          <button type="button" onClick={v.toggleCalWho} style={{ flex: "1", height: "36px", borderRadius: "18px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>Done</button>
-                        </div>
-                      </div>
-                    </>)}
-                  </span>
-                  <span style={{ width: "1px", height: "22px", background: "var(--crm-rule)" }}>
-                  </span>
-                  {(v.calTeams).map((o, o_i) => (<Fragment key={o_i}>
-                    <button type="button" onClick={o.pick} style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 12px", boxSizing: "border-box", borderRadius: "16px", border: `1px solid ${o.bd}`, background: o.bg, color: o.fg, font: "inherit", fontSize: "13px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap" }}>{!!(o.dot) && (<>
-                        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: o.dot }}>
-                        </span>
-                      </>)}{o.label}</button>
-                  </Fragment>))}
-                  <span style={{ flex: "1" }}>
-                  </span>
-                  <button type="button" onClick={v.goToday} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 8px 0 14px", boxSizing: "border-box", borderRadius: "18px", border: `1px solid ${v.todayBd}`, background: v.todayBg, color: "var(--crm-rust)", font: "inherit", fontSize: "13.5px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h11}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM12 14h.01">
-                      </path>
-                    </svg>Today's appt<span style={{ minWidth: "22px", height: "22px", padding: "0 7px", boxSizing: "border-box", borderRadius: "11px", background: "var(--crm-rust)", color: "#fff", fontSize: "12px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.todayN}</span></button>
-                  <div style={{ display: "inline-flex", background: "var(--crm-field)", borderRadius: "11px", padding: "3px", gap: "2px" }}>
-                    {(v.calViews).map((o, o_i) => (<Fragment key={o_i}>
-                      {!!(o.on) && (<>
-                        <button type="button" onClick={o.pick} style={{ border: "0", height: "30px", padding: "0 14px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "13px", fontWeight: "650", boxShadow: "rgba(42,22,12,.14) 0 1px 3px", cursor: "pointer" }}>{o.label}</button>
-                      </>)}
-                      {!!(o.off) && (<>
-                        <button type="button" onClick={o.pick} style={{ border: "0", height: "30px", padding: "0 14px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "13px", fontWeight: "550", cursor: "pointer" }} className={DH.h2}>{o.label}</button>
-                      </>)}
-                    </Fragment>))}
-                  </div>
-                </div>
-                {!(v.calRail) && (<><div style={{ flex: "0 0 auto", display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr)) minmax(0, 1.8fr)", gap: "14px", alignItems: "center", padding: "18px 22px", borderRadius: "20px", background: "linear-gradient(135deg, var(--crm-ink), var(--crm-deep))", color: "#fff" }}>
-                  {(v.calStats).map((k, k_i) => (<Fragment key={k_i}>
-                    <button type="button" onClick={k.open} style={{ display: "flex", flexDirection: "column", gap: "2px", margin: "-8px -10px", padding: "8px 10px", border: "0", borderRadius: "12px", background: "transparent", font: "inherit", color: "#fff", textAlign: "left", cursor: "pointer" }} className={DH.h38}>
-                      <b style={{ fontSize: "26px", fontWeight: "700", color: k.color, fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12.5px", opacity: ".85" }}>{k.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m9 6 6 6-6 6">
-                          </path>
-                        </svg></span>
-                    </button>
-                  </Fragment>))}
-                  <span style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <span style={{ display: "flex", gap: "4px", marginBottom: "2px" }}>
-                      {(v.calBarBy).map((o, o_i) => (<Fragment key={o_i}>
-                        <button type="button" onClick={o.pick} style={{ height: "22px", padding: "0 9px", border: "0", borderRadius: "11px", background: o.bg, opacity: o.op, font: "inherit", fontSize: "11.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>{o.l}</button>
-                      </Fragment>))}
-                    </span>
-                    {(v.calTeamBars).map((t, t_i) => (<Fragment key={t_i}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px" }}>
-                        <span style={{ flex: "0 0 60px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                        <span style={{ flex: "1", height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.15)", overflow: "hidden" }}>
-                          <span style={{ display: "block", height: "100%", width: `${t.pct}%`, background: t.color }}>
-                          </span>
-                        </span>
-                        <span style={{ flex: "0 0 auto", opacity: ".85", fontVariantNumeric: "tabular-nums" }}>{t.label}</span>
-                      </span>
-                    </Fragment>))}
-                  </span>
-                </div></>)}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <strong style={{ fontSize: "18px", fontWeight: "700" }}>{v.calTitle}</strong>
-                  <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>{v.calSub}</span>
-                </div>
-                {!!(v.calMonth) && (<>
-                  <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflow: "hidden" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid var(--crm-rule)" }}>
-                      {(v.dow).map((d, d_i) => (<Fragment key={d_i}>
-                        <span style={{ padding: "10px 12px", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>{d.l}</span>
-                      </Fragment>))}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
-                      {(v.monthCells).map((c, c_i) => (<Fragment key={c_i}>
-                        <div style={{ minHeight: "92px", padding: "6px", borderRight: "1px solid var(--crm-field)", borderBottom: "1px solid var(--crm-field)", background: c.bg, display: "flex", flexDirection: "column", gap: "3px", minWidth: "0" }}>
-                          <span style={{ alignSelf: "flex-start", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "12px", background: c.numBg, color: c.numFg, fontSize: "12.5px", fontWeight: "700", display: "grid", placeItems: "center", fontVariantNumeric: "tabular-nums" }}>{c.num}</span>
-                          {(c.visits).map((vi, vi_i) => (<Fragment key={vi_i}>
-                            <button type="button" onClick={vi.open} style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: "0", padding: "3px 6px", border: "0", borderRadius: "6px", background: vi.tint, color: vi.color, font: "inherit", fontSize: "11.5px", fontWeight: "650", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden" }}>
-                              <span style={{ flex: "0 0 auto", fontVariantNumeric: "tabular-nums" }}>{vi.short}</span>
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-ink)" }}>{vi.name}</span>
-                            </button>
-                          </Fragment>))}
-                        </div>
-                      </Fragment>))}
-                    </div>
-                  </div>
-                </>)}
-                {!!(v.calWeek) && (<>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "8px" }}>
-                    {(v.weekCols).map((c, c_i) => (<Fragment key={c_i}>
-                      <div style={{ minHeight: "320px", padding: "10px 8px", borderRadius: "16px", border: `1px solid ${c.bd}`, background: "#fff", display: "flex", flexDirection: "column", gap: "6px", minWidth: "0" }}>
-                        <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", paddingBottom: "6px", borderBottom: "1px solid var(--crm-field)" }}>
-                          <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: c.fg }}>{c.dow}</span>
-                          <b style={{ fontSize: "20px", fontWeight: "700", color: c.fg }}>{c.num}</b>
-                        </span>
-                        {(c.visits).map((vi, vi_i) => (<Fragment key={vi_i}>
-                          <button type="button" onClick={vi.open} style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px", border: "0", borderLeft: `3px solid ${vi.color}`, borderRadius: "8px", background: vi.tint, font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", minWidth: "0" }}>
-                            <b style={{ fontSize: "12px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{vi.time}</b>
-                            <span style={{ fontSize: "12.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vi.name}</span>
-                            <span style={{ fontSize: "11px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vi.rep}</span>
-                          </button>
-                        </Fragment>))}
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </>)}
-                {!!(v.calDay) && (<>
-                  <div style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflow: "hidden" }}>
-                    {(v.daySlots).map((t, t_i) => (<Fragment key={t_i}>
-                      <div style={{ display: "flex", alignItems: "stretch", gap: "14px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)", minHeight: "44px" }}>
-                        <b style={{ flex: "0 0 72px", paddingTop: "8px", fontSize: "14px", fontWeight: "700", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{t.time}</b>
-                        <span style={{ flex: "1", display: "flex", flexDirection: "column", gap: "6px" }}>
-                          {(t.visits).map((vi, vi_i) => (<Fragment key={vi_i}>
-                            <button type="button" onClick={vi.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", border: "0", borderLeft: `4px solid ${vi.color}`, borderRadius: "10px", background: vi.tint, font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }}>
-                              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                                <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>{vi.name}</strong>
-                                <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{vi.who}</span>
-                              </span>
-                              <span style={{ height: "22px", lineHeight: "22px", padding: "0 9px", borderRadius: "11px", background: vi.stBg, color: vi.stFg, fontSize: "11.5px", fontWeight: "700" }}>{vi.status}</span>
-                            </button>
-                          </Fragment>))}
-                          {!!(t.free) && (<>
-                            <span style={{ paddingTop: "8px", fontSize: "13px", color: "var(--crm-faint-2)" }}>{v.freeLabel}</span>
-                          </>)}
-                        </span>
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </>)}
-                {!!(v.calUp) && (<>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {(v.upDays).map((d, d_i) => (<Fragment key={d_i}>
-                      <div style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflow: "hidden" }}>
-                        <span style={{ display: "block", padding: "12px 16px 8px", fontSize: "13px", fontWeight: "700", color: d.fg }}>{d.label}</span>
-                        {(d.visits).map((vi, vi_i) => (<Fragment key={vi_i}>
-                          <button type="button" onClick={vi.open} style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "12px 16px", border: "0", borderTop: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}>
-                            <span style={{ flex: "0 0 4px", width: "4px", height: "38px", borderRadius: "2px", background: vi.color }}>
-                            </span>
-                            <b style={{ flex: "0 0 72px", fontSize: "15px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{vi.time}</b>
-                            <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                              <strong style={{ fontSize: "15px", fontWeight: "650" }}>{vi.name}</strong>
-                              <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{vi.who}</span>
-                            </span>
-                            <span style={{ height: "22px", lineHeight: "22px", padding: "0 9px", borderRadius: "11px", background: vi.stBg, color: vi.stFg, fontSize: "11.5px", fontWeight: "700", whiteSpace: "nowrap" }}>{vi.status}</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="m9 6 6 6-6 6">
-                              </path>
-                            </svg>
-                          </button>
-                        </Fragment>))}
-                      </div>
-                    </Fragment>))}
-                  </div>
-                </>)}
-              </>)}
+              {!!(v.kCal) && (<DeskCalendar4a v={v} />)}
             </div>
           </>)}
           {!!(v.showScrim) && (<>
@@ -4443,7 +3951,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </>)}
               </>)}
             </aside>
-          </>)}{!!(v.railOn) && (<DeskRail v={v.rail} />)}
+          </>)}{!!(v.railOn) && (<DeskRail4a v={v.rail} extra={v.kPeople ? <DeskContactFigures4a v={v.ppStats} /> : <DeskCalFigures4a v={v} />} />)}
           {!!(v.ibCols) && (<DeskInboxSide4a v={v} value={(x, h) => <InfoValue v={x} href={h} />} />)}
           {!!(v.showToast) && (<>
             <div style={{ position: "absolute", left: "50%", bottom: "24px", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: "16px", padding: "11px 14px 11px 18px", borderRadius: "12px", background: "var(--crm-ink)", color: "#fff", fontSize: "13.5px", fontWeight: "550", boxShadow: "0 8px 24px rgba(42,22,12,.28)", whiteSpace: "nowrap", zIndex: "5" }}>{v.toastText}{!!(v.canUndo) && (<>

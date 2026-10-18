@@ -28,3 +28,7 @@
 .root.root.root [data-rev-side] button:hover:not([aria-current]) { background: rgba(255, 255, 255, .06) !important; }
 .root.root.root :global(.crm4a-row):focus-visible, .root.root.root :global(.crm4a-nav):focus-visible, .root.root.root :global(.crm4a-outline):focus-visible,
 .root.root.root :global(.crm4a-primary):focus-visible, .root.root.root :global(.crm4a-metric):focus-visible { outline: 2px solid var(--crm-rust) !important; outline-offset: 2px !important; }
+
+/* A Contacts column header shows its hide (×) only under the pointer (frame 03 draws none). */
+.root.root.root :global(.crm4a-th) :global(.crm4a-th-x) { opacity: 0 !important; }
+.root.root.root :global(.crm4a-th):hover :global(.crm4a-th-x) { opacity: 1 !important; }

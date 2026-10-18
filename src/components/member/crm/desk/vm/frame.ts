@@ -88,7 +88,7 @@ export function frameVM(ctx: DeskCtx) {
   // Entering Inbox always gives its columns their standard widths and shuts Chat progress (README › Navigation).
   const go = (id: DeskTab) => set(u => ({ ...u, tab: id, pane: PANE_MODE[id], toast: "", pick: null, stage: id === "showrooms" || id === "forms" ? "op" : "menu",
     ...(id === "inbox" ? { ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null } : {}), adLog: false, mwtLog: false, meMenu: false,
-    chat: null, sendFor: null, awChat: null, ad: null, ftEdit: null, srEdit: null, srDraft: null, cpSel: null, frmOpen: false, cltEdit: null, menu: false, attachOpen: false, emo: null, msgMenu: null, rail: false, ppSel: null }));
+    chat: null, sendFor: null, awChat: null, ad: null, ftEdit: null, srEdit: null, srDraft: null, cpSel: null, frmOpen: false, cltEdit: null, menu: false, attachOpen: false, emo: null, msgMenu: null, rail: true, ppSel: null })); // 4a draws Contacts' and the Calendar's rails open (frames 03 / 04)
   const scopeOpts = ([["Team", false], ["Mine", true]] as const).map(([label, isMine]) => ({ label, on: !isMine, off: isMine,
     pick: () => { if (isMine) ctx.toMine?.(); } }));
   const periodOpts = ["Today", "This week", "This month", "Custom"].map((label, i) => ({ label, on: i === 2, off: i !== 2 }));

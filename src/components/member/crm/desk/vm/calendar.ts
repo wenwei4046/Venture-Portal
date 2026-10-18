@@ -34,8 +34,13 @@ export function calendarVM(ctx: DeskCtx) {
     .filter(v => ui.calShowroom === "all" || v.v.showroomId === ui.calShowroom)
     .filter(v => !ui.calWho.length || (!!v.repId && ui.calWho.includes(v.repId)))
     .filter(v => { const d = day0(v.at); return d >= r[0] && d <= r[1]; });
+  // 4a's visit blocks (change list 14): Came filled ink, Booked amber on its tint, No-show a dashed outline — told apart in greyscale.
+  const lookOf = (s: VisitRow["status"]) => s === "No show" ? { bg: "transparent", fg: "var(--crm-faint)", bd: "var(--crm-faint)", bs: "dashed" }
+    : s === "Booked" || s === "To mark" ? { bg: "var(--crm-tint-appt)", fg: "var(--crm-ink)", bd: "var(--crm-amber-line)", bs: "solid" }
+      : { bg: "var(--crm-ink)", fg: "#FFFFFF", bd: "var(--crm-ink)", bs: "solid" };
   const item = (v: VisitRow) => { const st = ST[v.status] ?? ST.Booked, [ink, tint] = teamColour(v.team);
-    return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint,
+    return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, room: v.room, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint, look: lookOf(v.status),
+      hour: v.at.getHours() + v.at.getMinutes() / 60, mins: v.v.minutes || 60,
       open: () => patch({ pane: "docked", kind: "info", visit: v.id, infoId: null }) }; };
 
   // The month on screen: the range's month (the prototype: October with 28–30 Sep and 1 Nov around it).
@@ -122,6 +127,42 @@ export function calendarVM(ctx: DeskCtx) {
         return { name: l.replace(/^Team /, ""), color: color ?? "var(--crm-muted)", pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; }),
     dow: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(l => ({ l })), monthCells, weekCols, daySlots, upDays,
     freeLabel: `Free · ${cap} per slot`, dueN: due.length,
+    // 4a's rail (frame 04): the visits on screen — Visits, Came, No-show (oxblood), Still to come, then Show-up and Not
+    // reminded (production's) — By showroom (or By team) bars, and today's visits with Send reminder (the customer's
+    // Reminder card, the phone's own — "Reminder sent · Send again" once it went).
+    // 4a's toolbar and week (frame 04): ‹ › step the period, Today goes to the one with today; the week a time grid.
+    calStep: (dir: 1 | -1) => () => {
+      if (view === "month") { const m = new Date(new Date(r[0]).getFullYear(), new Date(r[0]).getMonth() + dir, 1); patch({ calRange: [m.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 0).getTime()] }); }
+      else { const n = view === "week" ? 7 : 1; patch({ calRange: [r[0] + dir * n * DAY, r[1] + dir * n * DAY] }); }
+    },
+    calToday: () => patch({ calRange: view === "month" ? [monthA, monthB] : view === "week" ? [wkA, wkB] : view === "day" ? [T, T] : [T, monthB] }),
+    week4: (() => {
+      const a = view === "week" ? r[0] : wkA;
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dow, k) => { const t = a + k * DAY; return { dow, num: new Date(t).getDate(), today: t === T, visits: vs.filter(v => day0(v.at) === t).map(item) }; });
+      const hs = days.flatMap(d => d.visits.map(x => x.hour));
+      const h0 = Math.min(10, ...hs.map(Math.floor)), h1 = Math.max(20, ...hs.map(h => Math.ceil(h + 1)));
+      return { days, h0, hours: Array.from({ length: h1 - h0 + 1 }, (_, i) => { const h = h0 + i; return `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`; }) };
+    })(),
+    cal4: (() => {
+      const past = vs.filter(v => v.at < now), came = vs.filter(v => v.v.state === "attended").length;
+      const noShowN = past.filter(v => v.v.state !== "attended").length, toCome = vs.filter(v => v.at >= now && v.v.state === "booked").length;
+      const open = (k: string) => () => patch({ pane: "overlay", kind: "clist", clist: k, infoId: null, visit: null });
+      const byRoom = ui.calBy === "room" || !ui.calBy;
+      const groups = byRoom ? data.rooms.filter(x => x.active).map(x => ({ name: x.name.replace(/ showroom$/i, ""), n: vs.filter(v => v.v.showroomId === x.id).length }))
+        : teamsList.slice(1).map(([k, l]) => ({ name: l.replace(/^Team /, ""), n: vs.filter(v => v.team === k).length }));
+      const max = Math.max(1, ...groups.map(g => g.n));
+      return {
+        stats: [["Visits", String(vs.length), "var(--crm-ink)", "Leads"], ["Came", String(came), "var(--crm-ink)", "Showed up"], ["No-show", String(noShowN), "var(--crm-oxblood)", "No show"],
+          ["Still to come", String(toCome), "var(--crm-ink)", "Upcoming"], ["Show-up", came + noShowN ? `${Math.round((came / (came + noShowN)) * 100)}%` : "—", "var(--crm-ink)", "Show-up"],
+          ["Not reminded", String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "var(--crm-ink)", "Not reminded"]]
+          .map(([k, val, c, list]) => ({ k, v: val, c, open: open(list) })),
+        byLabel: byRoom ? "By showroom" : "By team", flip: () => patch({ calBy: byRoom ? "team" : "room" }), flipTo: byRoom ? "By team" : "By showroom",
+        groups: groups.map(g => ({ ...g, w: `${Math.round((g.n / max) * 100)}%` })),
+        today: all.filter(v => day0(v.at) === T && v.at >= now && v.v.state === "booked").sort((a, b) => a.at.getTime() - b.at.getTime()).map(v => ({
+          id: v.id, name: v.name, time: timeOf(v.at), room: v.room, owner: v.rep, sent: !!v.v.remindedAt,
+          remind: () => { void ctx.act.remind(v.id).then(ok => { if (ok) patch({ toast: `Reminder sent to ${v.name}` }); }); } })),
+      };
+    })(),
   };
 }
 

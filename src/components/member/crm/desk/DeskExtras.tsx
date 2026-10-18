@@ -441,34 +441,41 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
  * ‹ › on the right (vm/people.ts › ppPager; the owner, 2026-10-15).
  */
 export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").peopleVM>["ppPager"] }) {
-  const ARROW = (off: boolean) => ({ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", color: off ? "var(--crm-line)" : "var(--crm-ink)", display: "grid", placeItems: "center", cursor: off ? "default" : "pointer", padding: "0" }) as const;
-  const ICO = (d: string) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
-  // How many a page, as a dropdown (the owner, 2026-10-16: "數字用下拉式的"), opening upward — the pager is the page's foot.
+  // 4a (frame 03): "1–12 of 486", how many a page — still a dropdown (the owner, 2026-10-16: "數字用下拉式的"),
+  // opening upward — and the numbered pages on the right, the one on in ink.
   const [open, setOpen] = useState(false);
   const cur = v.sizes.find(o => o.on)?.n ?? 10;
+  const BTN = { border: 0, background: "transparent", font: "inherit", cursor: "pointer", padding: 0, margin: 0, boxSizing: "border-box" } as const;
+  const nums: (number | "…")[] = [];
+  for (let i = 0; i < v.pages; i++) {
+    if (i < 3 || i === v.pages - 1 || i === v.cur || v.pages <= 6) nums.push(i);
+    else if (nums[nums.length - 1] !== "…") nums.push("…");
+  }
+  const ICO = (d: string) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
+  const cell = (on: boolean) => ({ ...BTN, minWidth: "30px", height: "30px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums",
+    background: on ? "var(--crm-ink)" : "transparent", color: on ? "#FFFFFF" : "var(--crm-ink-soft)" } as const);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", padding: "2px 4px" }}>
-      <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>Show</span>
-      <span style={{ position: "relative" }}>
-        <button type="button" onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open}
-          style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px 0 14px", boxSizing: "border-box", borderRadius: "17px", border: `1px solid ${open ? "var(--crm-rust)" : "var(--crm-line)"}`, background: open ? "var(--crm-cream)" : "#fff", font: "inherit", fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
-          {cur} per page {ICO(open ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6")}</button>
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{v.range}</span>
+      <span style={{ marginLeft: "20px", display: "flex", alignItems: "center", gap: "6px", position: "relative", whiteSpace: "nowrap" }}>Show
+        <button type="button" onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "4px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-ink)" }}>
+          {cur}{ICO(open ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6")}</button>
         {open && <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "0", zIndex: "7" }}></div>
-          <div role="listbox" style={{ position: "absolute", bottom: "40px", left: "0", zIndex: "8", minWidth: "150px", padding: "6px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 28px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "2px" }}>
-            {v.sizes.map(o => <button key={o.n} type="button" role="option" aria-selected={o.on} onClick={() => { o.pick(); setOpen(false); }} className={DX.emo}
-              style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "8px", background: o.on ? "var(--crm-cream)" : "transparent", font: "inherit", fontSize: "13.5px", fontWeight: o.on ? "650" : "500", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }}>
-              <span style={{ flex: "1" }}>{o.n} per page</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={o.on ? "var(--crm-rust)" : "transparent"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "0", zIndex: 7 }}></div>
+          <div role="listbox" style={{ position: "absolute", bottom: "28px", left: "36px", zIndex: 8, minWidth: "140px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+            {v.sizes.map(o => <button key={o.n} type="button" role="option" aria-selected={o.on} onClick={() => { o.pick(); setOpen(false); }}
+              style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "32px", padding: "0 10px", borderRadius: "7px", background: o.on ? "var(--crm-cream)" : "transparent", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
+              <span style={{ flex: 1, textAlign: "left" }}>{o.n} per page</span>{o.on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg>}
             </button>)}
           </div>
         </>}
       </span>
-      <span style={{ flex: "1" }}></span>
-      <span style={{ fontSize: "13px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{v.range}</span>
-      <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={ARROW(v.prevOff)}>{ICO("m15 6-6 6 6 6")}</button>
-      <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.page}</span>
-      <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={ARROW(v.nextOff)}>{ICO("m9 6 6 6-6 6")}</button>
+      <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+        <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={{ ...cell(false), color: v.prevOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m15 18-6-6 6-6")}</button>
+        {nums.map((n, i) => n === "…" ? <span key={`d${i}`} style={{ ...cell(false), cursor: "default" }}>…</span>
+          : <button key={n} type="button" onClick={() => v.go(n)} aria-current={n === v.cur ? "page" : undefined} style={cell(n === v.cur)}>{n + 1}</button>)}
+        <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={{ ...cell(false), color: v.nextOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m9 18 6-6-6-6")}</button>
+      </div>
     </div>
   );
 }

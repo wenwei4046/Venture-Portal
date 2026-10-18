@@ -132,7 +132,7 @@ try {
       await shot("desktop", "03-inbox-chat", "Inbox · a chat open");
     }
     if (t === "Contacts") {
-      await js("document.querySelector('[data-revenue-app] tbody tr')?.click()"); await sleep(1200);
+      await js("[...document.querySelectorAll('[data-revenue-app] button[title=\"Show in the rail\"]')][0]?.click()"); await sleep(1200);
       await shot("desktop", "05-contacts-customer", "Contacts · a customer in the rail");
     }
   }

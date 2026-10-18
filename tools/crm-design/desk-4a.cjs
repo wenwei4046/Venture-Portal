@@ -146,6 +146,53 @@ module.exports = function desk4a(body) {
   body = once(body, '<button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-rule)"',
     '<button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-line)"', "pane menu");
 
+  // Frame 03 · Contacts: 4a's search, filters and table (DeskContacts4a); the rail is 4a's (DeskRail4a) — Breakdown,
+  // the page's figures under it, the customer picked — and the Calendar's rail the same component (frame 04).
+  body = fragSwap(body, "{!!(v.kPeople) && (<>", "{!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}", "contacts");
+  body = once(body, "{!!(v.railOn) && (<DeskRail v={v.rail} />)}", "{!!(v.railOn) && (<DeskRail4a v={v.rail} extra={v.kPeople ? <DeskContactFigures4a v={v.ppStats} /> : <DeskCalFigures4a v={v} />} />)}", "rail");
+
+  // Frame 04 · Calendar: 4a's toolbar and views (DeskCalendar4a) — the week a time grid, visits Came / Booked / No-show.
+  body = fragSwap(body, "{!!(v.kCal) && (<>", "{!!(v.kCal) && (<DeskCalendar4a v={v} />)}", "calendar");
+
+  // Frame 05 · Ads Performance: the head carries the period (tabs) and Download PDF; under it production's own controls
+  // in 4a's outline (which ads, the range with its date picker and compare, Export) and the info line; the table is
+  // 4a's (DeskAdsTable4a) with + for the columns (Customise metrics).
+  {
+    const k = body.indexOf("{!!(v.kAdsPerf) && (<>");
+    if (k < 0) throw new Error("desk-4a: ads");
+    const tbStart = '<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>';
+    const t0 = body.indexOf(tbStart, k);
+    const [ta, tb] = el(body.slice(t0), tbStart, "div", "ads toolbar");
+    const toolbar = body.slice(t0 + ta, t0 + tb);
+    const d0 = toolbar.indexOf("{!!(v.dp.open) && (<>");
+    let depth = 0, d1 = -1; const re = /\(<>|<\/>\)/g; re.lastIndex = d0;
+    for (let m; (m = re.exec(toolbar));) { depth += m[0] === "(<>" ? 1 : -1; if (!depth) { d1 = toolbar.indexOf("}", m.index) + 1; break; } }
+    if (d0 < 0 || d1 < 0) throw new Error("desk-4a: ads date picker");
+    const dp = toolbar.slice(d0, d1);
+    const OUT = 'display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap"';
+    const POP = 'position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column"';
+    const tb4 = `<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.apStToggle} style={{ ${OUT} }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
+                  </span>
+                  <span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.dpOpen} style={{ ${OUT} }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg>{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    ${dp}
+                  </span>
+                  <span style={{ flex: "1" }}></span>
+                  <span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.apToggleDl} style={{ ${OUT} }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apDlOpen) && (<><div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, right: "0" }}>{(v.apDl).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className="crm4a-row"><span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>))}</div></>)}
+                  </span>
+                </div>
+                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Spend and cost per lead appear once Meta grants ads_read. Ad names are the ones managers typed in Assignment.</div>`;
+    body = body.slice(0, t0 + ta) + tb4 + body.slice(t0 + tb);
+    // the table
+    const tStart = '<div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflowX: "auto" }}>\n                  <div style={{ minWidth: `${v.apMinW}px` }}>';
+    body = swap(body, tStart, "div", "<DeskAdsTable4a v={v} />", "ads table");
+  }
+
   // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a). The Ads
   // Performance part production keeps below them stays, under a 4a section head.
   {

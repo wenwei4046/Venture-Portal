@@ -57,6 +57,8 @@ export interface DeskUi {
   inbF: string;
   /** 4a's Inbox search (frame 02): a name, a message or an ad. */
   ibQ: string;
+  /** 4a Calendar's Book a visit: its customer picker (open, the search). */
+  bookPick: boolean; bookQ: string;
   // Assignment
   sendFor: string | null;
   awChat: string | null;
@@ -174,7 +176,7 @@ export const initialDeskUi = (): DeskUi => ({
   tab: "insight", pane: "closed", kind: "chat", collapsed: false, fold: {}, stage: "menu", pick: null, menu: false, toast: "", undo: null,
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
   insPer: "month", insRange: null, insOpen: false, insTeam: null, insCards: null, mFor: "ads",
-  whoSel: [], whoOpen: false, inbF: "All", ibQ: "",
+  whoSel: [], whoOpen: false, inbF: "All", ibQ: "", bookPick: false, bookQ: "",
   sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "all", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
   calView: "month", // the owner, 2026-10-15: "default month" (the prototype opens on Upcoming)
@@ -188,10 +190,10 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, adPerfShut: false, ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
+  adLog: false, adPerfShut: false, ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: true, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
-  calBy: "team",
-  ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
+  calBy: "room",
+  ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null,
   cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,

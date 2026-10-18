@@ -22,7 +22,10 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
 export const ALL = METRICS.flatMap(g => g[2]);
-export const DEF = ["spend", "impr", "reach", "results", "cpr", "leads", "appt"];
+// 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +.
+export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
+/** 4a's short headers (frame 05) for the columns it draws; others keep their names. */
+const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend", cpl: "Per lead" };
 const COSTY = /^(cpr|cpm|cpc|cpl|spend|cpp|cpmsg|cpcall|cpe|cpthru|cpappt|cpwon|blocks)$/;
 const DAY = 86_400_000;
 const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -55,7 +58,9 @@ export function adsPerfVM(ctx: DeskCtx) {
   const dcols = dsel.map(k => ALL.find(m => m[0] === k)).filter((x): x is NonNullable<typeof x> => !!x);
   // The range: five presets, or the date picker's (custom); the compare range is the period before, last month, last year, or picked.
   const R: [string, number, number, string][] = [["This month", monthA, T, "Previous period"], ["Last 7 days", T - 7 * DAY, T - DAY, ""], ["Last 30 days", T - 30 * DAY, T - DAY, ""],
-    ["Last month", new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), monthA - DAY, ""], ["Today", T, T, ""]];
+    ["Last month", new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), monthA - DAY, ""], ["Today", T, T, ""],
+    // 4a's head tab This week (frame 05).
+    ["This week", T - ((now.getDay() + 6) % 7) * DAY, T, ""]];
   const custom = ui.apRange === "custom";
   const [ra, rb] = custom ? [tOf(ui.apF), tOf(ui.apT)] : [R[ui.apRange as number][1], R[ui.apRange as number][2]];
   const len = Math.round((rb - ra) / DAY) + 1;
@@ -131,6 +136,17 @@ export function adsPerfVM(ctx: DeskCtx) {
   })();
   return {
     kAdsPerf: ui.tab === "adsperf",
+    // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
+    ap4: {
+      tabs: ([["Today", 4], ["This week", 5], ["This month", 0], ["Custom", "custom"]] as const).map(([label, k]) => ({ label, on: ui.apRange === k,
+        custom: k === "custom", pick: () => { if (k !== "custom") patch({ apRange: k }); } })),
+      cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
+        sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
+      rows: ADs.map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+        cells: cols.map(m => { const c = cell(a.cs, m, false, a.id), raw = val(a.cs, m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
+      total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, ""))) },
+      cmp,
+    },
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
     apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
