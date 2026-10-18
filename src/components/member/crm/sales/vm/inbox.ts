@@ -12,7 +12,7 @@ import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
 import { mediaWord } from "../../shared/chat-media";
 import { leaderAssignees } from "./chat";
-import { STATUS } from "../../shared/palette";
+import { STATUS, avatarTint } from "../../shared/palette";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -59,7 +59,7 @@ export function inboxVM(ctx: SalesCtx) {
   ];
   const chips3b = chipDefs.map(([label, type, dot, n]) => {
     const on = type ? !!f && f.type === type && f.v === label : !f;
-    return { label, n, dot, bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : INK, border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500,
+    return { label, n, dot, on, bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : INK, border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500,
       pick: () => patch({ filter: type ? { type, v: label } : null }) };
   });
 
@@ -135,6 +135,10 @@ export function inboxVM(ctx: SalesCtx) {
     const firstMarked = ctx.data.visits.filter(v => v.customerId === c.id && (v.state === "attended" || v.state === "no_show")).sort((a, b) => a.start.localeCompare(b.start))[0];
     const open = () => { set(u2 => ({ ...u2, chat: c.id, swipe: null })); act.openChat(c.id); };
     return {
+      // 4a (M01): the customer's avatar tint, the name 600 and the time rust while unread, the urgency line's icon.
+      avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], nameW: c.unread || marked(c) ? 600 : 500, whenC: c.unread || marked(c) ? "var(--crm-rust)" : "var(--crm-faint)",
+      chanIc: (c.channel === "whatsapp" ? "phone" : "message-circle") as "phone" | "message-circle",
+      urgW: u.level === "soon" ? 500 : 600, urgIc: (u.level === "overdue" ? "triangle-alert" : "clock") as "triangle-alert" | "clock",
       name: c.name, ini: ini(c.name), ad: c.ad, preview: previewOf(c), when: lastChat(new Date(lastAt(c)).toISOString(), now),
       // A chat marked unread shows the badge as a dot, as WhatsApp's.
       unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, cold,

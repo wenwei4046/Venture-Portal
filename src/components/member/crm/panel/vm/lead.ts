@@ -8,7 +8,8 @@
  */
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
-import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
+import { chatStripOf, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
+import { avatarTint } from "../../shared/palette";
 import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
@@ -97,6 +98,9 @@ export function leadVM(ctx: PanelCtx) {
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
+      // 4a (M04 / change list 18): the customer's tint, "ad · channel", the status strip.
+      avBg: avatarTint(c?.name ?? "")[0], avFg: avatarTint(c?.name ?? "")[1], sub: [c?.ad, c ? (c.channel === "messenger" ? "Messenger" : "WhatsApp") : ""].filter(Boolean).join(" · "),
+      strip: c ? chatStripOf(c, now) : { cold: false, left: "", right: "", dot: "transparent" },
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
       windowNote: "",

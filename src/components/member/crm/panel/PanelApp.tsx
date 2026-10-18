@@ -10,6 +10,8 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
+import { Phone4aBar, Phone4aStrip } from "../shared/phone4a";
+import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */
@@ -382,22 +384,18 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
           </>)}
           {!!(v.ld.lx.inbox) && (<>
-            <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
+            <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
             <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>
               <span onClick={v.ld.back} title="Back to Inbox" style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--crm-ink)", cursor: "pointer" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 12H5m6-6-6 6 6 6">
-                  </path>
-                </svg>
+                <Ic name="chevron-left" size={24} />
               </span>
               <span title={v.ld.lx.chanName} style={{ flex: "none", position: "relative", width: "40px", height: "40px" }}>
-                <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.ld.ld.ini}</span>
-                <span style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", background: "var(--crm-brown)" }}>
-                </span>
+                <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: v.ld.ld.avBg, color: v.ld.ld.avFg, fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "500" }}>{v.ld.ld.ini}</span>
+                
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
-                <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-brown)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.ad}</small>
+                <strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
+                <small style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}</small>
               </span>
               <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: v.ld.lx.menuBg, display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -424,7 +422,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </Fragment>))}
                 </div>
               </>)}
-            </div>
+            </div><Phone4aStrip s={v.ld.ld.strip} />
             <p style={{ flex: "none", margin: "0 16px 12px", fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ld.ld.ownerName}'s customer{v.ld.ld.windowNote}</p>
             {!!(v.ld.lx.cold) && (<>
               <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)" }}>
@@ -456,10 +454,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </div>
             </>)}
-            <div data-chat-list="1" onClick={v.ld.lx.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: "var(--crm-cream)", backgroundImage: "url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%20viewBox%3D%220%200%20240%20240%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%237A6457%22%20stroke-opacity%3D%22.13%22%20stroke-width%3D%221.3%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20transform%3D%22translate%2814%2012%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%2892%208%29%20rotate%2810%2012%2012%29%22%20d%3D%22M20%209V6a2%202%200%200%200-2-2H6a2%202%200%200%200-2%202v3M2%2016a2%202%200%200%200%202%202h16a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v1.5a.5.5%200%200%201-.5.5h-11a.5.5%200%200%201-.5-.5V11a2%202%200%200%200-4%200zM4%2018v2M20%2018v2M12%204v9%22%2F%3E%3Cpath%20transform%3D%22translate%28176%2020%29%20rotate%28-6%2012%2012%29%22%20d%3D%22M2%204v16M2%208h18a2%202%200%200%201%202%202v10M2%2017h20M6%208v9%22%2F%3E%3Cpath%20transform%3D%22translate%2840%2074%29%20rotate%288%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3Cpath%20transform%3D%22translate%28124%2066%29%20rotate%28-14%2012%2012%29%22%20d%3D%22M8%202h8l4%2010H4L8%202ZM12%2012v6M8%2022v-2c0-1.1.9-2%202-2h4a2%202%200%200%201%202%202v2H8Z%22%2F%3E%3Cpath%20transform%3D%22translate%28200%2092%29%20rotate%2812%2012%2012%29%22%20d%3D%22M19%2014c1.49-1.46%203-3.21%203-5.5A5.5%205.5%200%200%200%2016.5%203c-1.76%200-3%20.5-4.5%202-1.5-1.5-2.74-2-4.5-2A5.5%205.5%200%200%200%202%208.5c0%202.3%201.5%204.05%203%205.5l7%207Z%22%2F%3E%3Cpath%20transform%3D%22translate%2810%20140%29%20rotate%286%2012%2012%29%22%20d%3D%22M12%202l3.09%206.26L22%209.27l-5%204.87%201.18%206.88L12%2017.77l-6.18%203.25L7%2014.14%202%209.27l6.91-1.01L12%202z%22%2F%3E%3Cpath%20transform%3D%22translate%2878%20128%29%20rotate%28-8%2012%2012%29%22%20d%3D%22M8%202v4M16%202v4M3%2010h18M5%204h14a2%202%200%200%201%202%202v14a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6a2%202%200%200%201%202-2Z%22%2F%3E%3Cpath%20transform%3D%22translate%28160%20150%29%20rotate%2814%2012%2012%29%22%20d%3D%22M19%209V6a2%202%200%200%200-2-2H7a2%202%200%200%200-2%202v3M3%2016a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5a2%202%200%200%200-4%200v2H7v-2a2%202%200%200%200-4%200ZM5%2018v2M19%2018v2%22%2F%3E%3Cpath%20transform%3D%22translate%2834%20200%29%20rotate%28-10%2012%2012%29%22%20d%3D%22M22%2016.92v3a2%202%200%200%201-2.18%202%2019.79%2019.79%200%200%201-8.63-3.07%2019.5%2019.5%200%200%201-6-6%2019.79%2019.79%200%200%201-3.07-8.67A2%202%200%200%201%204.11%202h3a2%202%200%200%201%202%201.72%2012.84%2012.84%200%200%200%20.7%202.81%202%202%200%200%201-.45%202.11L8.09%209.91a16%2016%200%200%200%206%206l1.27-1.27a2%202%200%200%201%202.11-.45%2012.84%2012.84%200%200%200%202.81.7A2%202%200%200%201%2022%2016.92z%22%2F%3E%3Cpath%20transform%3D%22translate%28118%20196%29%20rotate%284%2012%2012%29%22%20d%3D%22M15%2021v-8a1%201%200%200%200-1-1h-4a1%201%200%200%200-1%201v8M3%2010a2%202%200%200%201%20.709-1.528l7-5.999a2%202%200%200%201%202.582%200l7%205.999A2%202%200%200%201%2021%2010v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2z%22%2F%3E%3Cpath%20transform%3D%22translate%28196%20206%29%20rotate%28-12%2012%2012%29%22%20d%3D%22M7.9%2020A9%209%200%201%200%204%2016.1L2%2022Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%237A6457%22%20fill-opacity%3D%22.12%22%3E%3Ccircle%20cx%3D%2266%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%2240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22100%22%20cy%3D%22104%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22230%22%20cy%3D%2260%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2256%22%20cy%3D%22170%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22140%22%20cy%3D%22120%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22224%22%20cy%3D%22160%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%22230%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%22180%22%20cy%3D%22240%22%20r%3D%221.6%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%22100%22%20r%3D%221.6%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')", backgroundSize: "240px 240px" }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div data-chat-list="1" onClick={v.ld.lx.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: "var(--crm-cream)" }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
               {(v.ld.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
                 {!!(m.sep) && (<>
-                  <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>
+                  <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>
                 </>)}
                 <div {...m.press} style={{ WebkitTouchCallout: "none", position: "relative", marginBottom: m.rxGap, display: m.vis, alignSelf: m.align, maxWidth: "80%", padding: m.pad, boxSizing: "border-box", borderRadius: m.radius, boxShadow: "0 1px 1px rgba(42,22,12,.10)", background: m.bg, border: `1px solid ${m.bd}`, color: m.fg }}>
                   {!!(m.ev) && (<><div onClick={m.ev.go} style={{ width: "248px", maxWidth: "100%", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden", textAlign: "left", cursor: "pointer" }}><div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px" }}><span style={{ flex: "none", width: "54px", padding: "6px 0", borderRadius: "12px", background: m.ev.bg, color: m.ev.fg, display: "flex", flexDirection: "column", alignItems: "center", lineHeight: "1.1" }}><small style={{ fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase" }}>{m.ev.wk}</small><strong style={{ fontSize: "calc(24px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{m.ev.dn}</strong><small style={{ fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase" }}>{m.ev.mon}</small></span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}><span style={{ alignSelf: "flex-start", padding: "2px 7px", borderRadius: "5px", background: m.ev.bg, color: m.ev.fg, fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", letterSpacing: ".05em", textTransform: "uppercase" }}>{m.ev.kind}</span><strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{m.ev.title}</strong><span style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)", textDecoration: m.ev.deco, fontVariantNumeric: "tabular-nums" }}>{m.ev.time}</span></span></div><div style={{ display: "flex", gap: "10px", padding: "11px 12px", borderTop: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}><svg style={{ flex: "none", marginTop: "1px", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"></path></svg><span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: "0" }}><strong style={{ fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{m.ev.room}</strong>{!!(m.ev.addr) && (<><span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)", lineHeight: "1.35" }}>{m.ev.addr}</span></>)}</span></div></div></>)}{!!(m.quote) && (<div style={{ margin: "0 0 6px", padding: "6px 10px", borderRadius: "8px", borderLeft: "3px solid var(--crm-rust)", background: "rgba(42,22,12,.06)", display: "flex", flexDirection: "column", gap: "2px" }}><strong style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)" }}>{m.quote.who}</strong><span style={{ fontSize: "calc(13px * var(--rv-type, 1))", lineHeight: "1.35", color: "var(--crm-muted)", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.quote.text}</span></div>)}{!!(m.reaction) && (<span style={{ position: "absolute", bottom: "-14px", left: m.rxSide, right: m.rxRight, padding: "1px 5px", borderRadius: "12px", background: "#fff", boxShadow: "0 1px 3px rgba(42,22,12,.25)", fontSize: "calc(15px * var(--rv-type, 1))", lineHeight: "22px" }}>{m.reaction}</span>)}{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(42,22,12,.08)", cursor: "zoom-in" }} />)}{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}><ChatVideo src={m.vidSrc} base={m.vid} onLoadedMetadata={m.shape} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /><span style={{ position: "absolute", left: "50%", top: "50%", width: "52px", height: "52px", margin: "-26px 0 0 -26px", borderRadius: "26px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span></span>)}{!!(m.aud) && (<VoiceNote src={m.aud} mine={m.voiceMine} />)}{!!(m.file && m.isPdf) && (<PdfCard src={m.file} name={m.docName} onOpen={m.view} />)}{!!(m.file && !m.isPdf) && (<span onClick={m.view} style={{ display: "flex", alignItems: "center", gap: "10px", width: "250px", maxWidth: "100%", padding: "10px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-page)", cursor: "pointer" }}><span style={{ flex: "none", width: "34px", height: "40px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", letterSpacing: ".02em" }}>{m.docType}</span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}><strong style={{ fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", lineHeight: "1.3", color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.docName}</strong><small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{m.docType}</small></span></span>)}<p style={{ display: m.pDisp, margin: "0", padding: m.inPad, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45" }}>{m.text}</p>
@@ -1685,7 +1683,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div data-prof-glow="1" style={{ margin: "-14px -20px 0", padding: "56px 20px 0", background: "linear-gradient(180deg, var(--crm-peach) 0%, var(--crm-peach-soft) 70%, var(--crm-page) 100%) top / 100% 150px no-repeat" }}>
+          <div data-prof-glow="1" style={{ margin: "-14px -20px 0", padding: "56px 20px 0", background: "radial-gradient(130% 100% at 50% 0%, var(--crm-peach) 0%, var(--crm-peach-soft) 48%, var(--crm-page) 100%) top / 100% 150px no-repeat" }}>
           <div style={{ position: "relative", borderRadius: "22px", background: "#fff", boxShadow: "0 6px 24px rgba(42,22,12,.10)", padding: "18px 18px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
             {!!(v.bellIn) && (<>
               <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", boxShadow: "0 2px 8px rgba(42,22,12,.06)", cursor: "pointer", position: "absolute", top: "14px", right: "14px" }}>
@@ -1699,7 +1697,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </span>
             </>)}
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <span style={{ flex: "none", width: "56px", height: "56px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", display: "grid", placeItems: "center", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meIni}</span>
+              <span style={{ flex: "none", width: "56px", height: "56px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meIni}</span>
               <div style={{ flex: "1", minWidth: "0" }}>
                 <h1 style={{ margin: "0", fontFamily: "var(--font-display-rv)", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
                 <p style={{ margin: "2px 0 0", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>HOUZS Venture · CRM</p>
@@ -1737,7 +1735,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           <div style={{ display: "flex", flexDirection: "column", marginTop: "8px" }}>
             <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.02em" }}>Your workspace</h2>
             <div onClick={v.pf.openNotifs} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)", display: "grid", placeItems: "center" }}>
+              <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4">
                   </path>
@@ -1756,7 +1754,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
             {!!(v.pfAdmin) && (<>
               <div onClick={v.fts.openPage} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-new)", color: "var(--crm-ink-soft)", display: "grid", placeItems: "center" }}>
+                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm4 10 2 2 4-4">
                     </path>
@@ -1771,7 +1769,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </div>
               <div onClick={v.pf.openRooms} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-appt)", color: "var(--crm-brown)", display: "grid", placeItems: "center" }}>
+                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z">
                     </path>
@@ -1801,7 +1799,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>
               </div>
               <div onClick={v.pf.openAdsPerf} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-follow)", color: "var(--crm-brown)", display: "grid", placeItems: "center" }}>
+                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12">
                     </path>
@@ -2667,22 +2665,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </>)}
       </div>
     </>)}
-    <nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px", padding: "0 4px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
-      {(v.nv.nav).map((t, t_i) => (<Fragment key={t_i}>
-        <span onClick={t.go} style={{ flex: "1", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", padding: "6px 0 8px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: t.w, color: t.color, cursor: "pointer" }}>
-          <span style={{ position: "relative", display: "grid", placeItems: "center", width: "56px", height: "30px" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-              <path d={t.icon}>
-              </path>
-            </svg>
-            {!!(t.badge) && (<>
-              <b style={{ position: "absolute", top: "0", right: "8px", minWidth: "16px", height: "16px", padding: "0 4px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-rust)", color: "#fff", fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", lineHeight: "16px", textAlign: "center", boxShadow: "0 0 0 2px #fff" }}>{t.badge}</b>
-            </>)}
-          </span>
-          <span>{t.label}</span>
-        </span>
-      </Fragment>))}
-    </nav>
+    <Phone4aBar items={v.nv.nav} hidden={!v.navOn} />
     {!!(v.toast) && (<>
       <div style={{ position: "absolute", left: "20px", right: "20px", bottom: v.toastBottom, zIndex: "30", padding: "12px 14px", borderRadius: "14px", background: "var(--crm-ink)", color: "#fff", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{v.toast}</div>
     </>)}

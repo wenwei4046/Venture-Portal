@@ -114,3 +114,23 @@ export interface SalesCtx {
     /** The Principal / Director give a customer to anyone (crm_send_to) — their chat menu's Assign to. */
     assignTo?: (customerId: string, staffId: string) => Promise<boolean> } | null;
 }
+
+/**
+ * 4a change list 18 · the chat's status strip, under the header (M04 / M08; the desktop's chat header says the same):
+ * the status and how long the customer has waited, and how long the 24-hour reply window has left — oxblood on the
+ * pale orange; a cold chat grey ("Cold · no reply for N days" / "Window closed"). From the status and the customer's
+ * last message time only.
+ */
+export function chatStripOf(c: CrmCustomer, now: Date) {
+  const H = 3_600_000, last = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
+  if (isCold(c, now)) {
+    const ours = lastReal(c), days = Math.max(1, Math.floor((now.getTime() - new Date(ours?.at ?? now).getTime()) / (24 * H)));
+    return { cold: true, left: `Cold · no reply for ${days} ${days === 1 ? "day" : "days"}`, right: "Window closed", dot: "var(--crm-faint-2)" };
+  }
+  const u = urgencyOf(c, now), attention = u.level !== "none", h = Math.floor(u.waitingMinutes / 60);
+  const left = (attention ? "Attention" : STATUS_LABEL[c.status]) + (attention && h >= 1 ? ` · waiting ${h} h` : "");
+  const leftMs = last == null ? 0 : last + 24 * H - now.getTime();
+  const right = last == null ? "" : leftMs <= 0 ? "Window closed" : leftMs >= H ? `Reply window · ${Math.floor(leftMs / H)} h left` : `Reply window · ${Math.max(1, Math.floor(leftMs / 60_000))} min left`;
+  const dot = attention ? "var(--crm-st-attention)" : c.status === "new" ? "var(--crm-st-new)" : c.status === "follow_up" ? "var(--crm-st-follow)" : c.status === "appointment" ? "var(--crm-st-appt)" : c.status === "won" ? "var(--crm-st-won)" : "var(--crm-st-lost)";
+  return { cold: false, left, right, dot };
+}

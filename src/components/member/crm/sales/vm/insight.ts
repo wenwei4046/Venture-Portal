@@ -58,6 +58,30 @@ export function insightVM(ctx: SalesCtx) {
   ];
   const tot = status.reduce((a, s) => a + s[1], 0);
 
+  // ── 4a (M11, change list 19): the rust hero's three rates with their change on the period before (in points), the
+  // counts as cards, and every status in the 2-column list.
+  const rates = (lo: number, hi: number) => {
+    const inP = (iso: string) => { const t = day0(new Date(iso)); return t >= lo && t <= hi; };
+    const ls = mine.filter(c => inP(c.createdAt)), vs = data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled" && inP(v.start));
+    const dueP = vs.filter(v => v.state !== "booked" || new Date(v.start) <= now), sh = vs.filter(v => v.state === "attended").length;
+    const bk = ls.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).length;
+    const r = (a: number, b: number) => (b ? (a / b) * 100 : null);
+    return [r(Math.min(bk, ls.length), ls.length), r(sh, dueP.length), r(vs.filter(v => v.state === "attended" && v.outcome === "won").length, sh)];
+  };
+  const len = R1 - R0 + DAY;
+  const [P0, P1] = per === "month" ? [new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth(), 0).getTime()] : [R0 - len, R0 - DAY];
+  const cur4 = rates(R0, R1), prev4 = rates(P0, P1);
+  const delta = (k: number) => { const a = cur4[k], b = prev4[k]; if (a == null || b == null) return { text: "", good: true };
+    const d = Math.round(a - b); return { text: d === 0 ? "±0 pts" : `${d > 0 ? "+" : "−"}${Math.abs(d)} pts`, good: d >= 0 }; };
+  const all7 = mine.filter(c => inR(c.createdAt));
+  const warm7 = all7.filter(c => !isCold(c, now)), att = (c: CrmCustomer) => urgencyOf(c, now).level !== "none";
+  const st7: [keyof typeof STATUS, number][] = [
+    ["New", warm7.filter(c => c.status === "new" && !att(c)).length], ["Attention", warm7.filter(att).length],
+    ["Follow up", warm7.filter(c => c.status === "follow_up" && !att(c)).length], ["Appointment", warm7.filter(c => c.status === "appointment" && !att(c)).length],
+    ["Won", all7.filter(c => c.status === "won").length], ["Lost", all7.filter(c => c.status === "lost").length], ["Cold leads", all7.filter(c => isCold(c, now) && c.status !== "won" && c.status !== "lost").length],
+  ];
+  const tot7 = st7.reduce((a, s) => a + s[1], 0);
+
   // Range sheet.
   const sh = ui.insSheet;
   const setS = (p: Partial<NonNullable<typeof ui.insSheet>>) => set(u => (u.insSheet ? { ...u, insSheet: { ...u.insSheet, ...p } } : u));
@@ -155,6 +179,16 @@ export function insightVM(ctx: SalesCtx) {
       won: pct(wonV, showed), wonNote: showed ? `${wonV} of ${showed} visits won` : "No visits yet",
       leads: leads.length, appts: visits.length, up: upcoming,
       reply: fmtM(reply), replyNote: gaps.length ? `across ${gaps.length} replies` : "No replies yet", replyFg: reply != null && reply > 60 ? "var(--crm-peach)" : "var(--crm-page)",
+    },
+    p4: {
+      periods: [...(["month", "week", "day"] as const).map(k => ({ label: k[0].toUpperCase() + k.slice(1), on: per === k, pick: () => patch({ insPeriod: k }) })),
+        { label: "Range", on: per === "range", pick: () => patch({ insSheet: { cm: rg ? [new Date(rg.a).getFullYear(), new Date(rg.a).getMonth()] : [now.getFullYear(), now.getMonth()], a: rg ? rg.a : null, b: rg ? rg.b : null } }) }],
+      range: per === "range" && rg ? (rg.a === rg.b ? f(new Date(rg.a)) : `${f(new Date(rg.a))} – ${f(new Date(rg.b))}`) : "",
+      hero: [["Appt rate", pct(Math.min(bookedLeads, leads.length), leads.length), delta(0)], ["Show-up", pct(showed, due.length), delta(1)], ["Won rate", pct(wonV, showed), delta(2)]]
+        .map(([label, value, d]) => ({ label: label as string, value: value as string, delta: (d as { text: string }).text, good: (d as { good: boolean }).good })),
+      counts: [["Leads", leads.length, "leads"], ["Appointments", visits.length, "appts"], ["Upcoming", upcoming, "up"]].map(([label, n, k]) => ({ label: label as string, n: n as number, open: openList(k as "leads" | "appts" | "up") })),
+      reply: reply == null ? { n: "—", unit: "" } : reply < 60 ? { n: String(reply), unit: "min" } : { n: `${Math.floor(reply / 60)}`, unit: reply % 60 ? `h ${reply % 60} min` : "h" },
+      status: st7.map(([label, n]) => ({ label, n, c: STATUS[label].dot, hot: label === "Attention" })), total: tot7,
     },
     pStatus: status.map(([label, n, c]) => ({ label, n, c, w: `${tot ? n / tot * 100 : 0}%` })),
     irOpen: !!sh, irClose: () => patch({ insSheet: null }),

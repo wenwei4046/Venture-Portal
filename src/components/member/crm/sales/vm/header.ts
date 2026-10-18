@@ -62,7 +62,7 @@ export function navVM(ctx: SalesCtx) {
   const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: todayAppts, insight: 0, profile: unread };
   return {
     nav3b: NAV.map(([id, label, icon]) => ({
-      label, icon, badge: badges[id], color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
+      label, icon, badge: badges[id], on: ui.tab === id, color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
       // Insight opens on Me, with no list or info sheet left open (rev 1010 §5.2).
       go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20), ...(id === "insight" ? { insList: null, insInfo: null } : {}) })); },
     })),

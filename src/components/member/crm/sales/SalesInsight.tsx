@@ -6,94 +6,14 @@
 import { Fragment } from "react";
 import H from "../crm.module.css";
 import { InfoValue } from "../shared/AdLink";
+import { Phone4aInsightMine } from "../shared/phone4a";
 import type { InsightVM } from "./vm/insight";
 
 /** Insight: Month / Week / Day / Range, the walnut hero and leads by status; Team | Me, the lists and Customer info. */
 export default function SalesInsight({ v }: { v: InsightVM }) {
   return (<>
             
-    <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: "0" }}>
-          <h1 style={{ margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Insight</h1>
-          <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.pRange}</span>
-        </div>
-        <span onClick={v.openRange} style={{ flex: "0 0 auto", width: "max-content", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", border: `1px solid ${v.rgBd}`, background: v.rgBg, color: v.rgFg, fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", boxShadow: "0 2px 8px rgba(42,22,12,.06)", cursor: "pointer" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
-            </path>
-          </svg>{v.rgLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m6 9 6 6 6-6">
-            </path>
-          </svg></span>
-      </div>
-      <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", background: "var(--crm-field)" }}>
-        {(v.pPeriods).map((vi, vi_i) => (<Fragment key={vi_i}>
-          <span onClick={vi.pick} style={{ flex: "1", height: "32px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: vi.weight, background: vi.bg, color: vi.fg, boxShadow: vi.shadow, cursor: "pointer" }}>{vi.label}</span>
-        </Fragment>))}
-      </div>
-      <div style={{ padding: "18px", borderRadius: "20px", background: "var(--crm-ink)", color: "#fff", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-line)" }}>Appt rate</span>
-            <strong style={{ fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.1", fontVariantNumeric: "tabular-nums" }}>{v.pHero.rate}</strong>
-            <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>{v.pHero.rateNote}</small>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingLeft: "14px", borderLeft: "1px solid rgba(255,255,255,.14)" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-line)" }}>Show-up rate</span>
-            <strong style={{ fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.1", fontVariantNumeric: "tabular-nums" }}>{v.pHero.show}</strong>
-            <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>{v.pHero.showNote}</small>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingLeft: "14px", borderLeft: "1px solid rgba(255,255,255,.14)" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-line)" }}>Won rate</span>
-            <strong style={{ fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.1", fontVariantNumeric: "tabular-nums" }}>{v.pHero.won}</strong>
-            <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>{v.pHero.wonNote}</small>
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,.14)" }}>
-          <div onClick={v.openLeads} title="See leads" style={{ display: "flex", flexDirection: "column", gap: "2px", cursor: "pointer" }}>
-            <strong style={{ fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{v.pHero.leads}</strong>
-            <span style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>Leads<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg></span>
-          </div>
-          <div onClick={v.openAppts} title="See appointments" style={{ display: "flex", flexDirection: "column", gap: "2px", cursor: "pointer" }}>
-            <strong style={{ fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{v.pHero.appts}</strong>
-            <span style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>Appointments<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg></span>
-          </div>
-          <div onClick={v.openUp} title="See upcoming" style={{ display: "flex", flexDirection: "column", gap: "2px", cursor: "pointer" }}>
-            <strong style={{ fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-peach)", fontVariantNumeric: "tabular-nums" }}>{v.pHero.up}</strong>
-            <span style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>Upcoming<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 6 6 6-6 6">
-                </path>
-              </svg></span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,.14)" }}>
-          <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-line)" }}>Avg. reply time</span>
-            <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-line)" }}>{v.pHero.replyNote}</small>
-          </span>
-          <strong style={{ fontSize: "calc(24px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: v.pHero.replyFg, fontVariantNumeric: "tabular-nums" }}>{v.pHero.reply}</strong>
-        </div>
-      </div>
-      <section style={{ padding: "16px", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", gap: "12px" }}>
-        <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.01em" }}>Leads by status</h2>
-        {(v.pStatus).map((b, b_i) => (<Fragment key={b_i}>
-          <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0, 1fr) 24px", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)" }}>{b.label}</span>
-            <span style={{ height: "8px", borderRadius: "4px", background: "var(--crm-field)", overflow: "hidden" }}>
-              <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "4px", background: b.c }}>
-              </i>
-            </span>
-            <strong style={{ textAlign: "right", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{b.n}</strong>
-          </div>
-        </Fragment>))}
-      </section>
-    </main>
+    <Phone4aInsightMine v={v} />
     {!!(v.irOpen) && (<>
       <div onClick={v.irClose} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(42,22,12,.32)", animation: "fadeIn 200ms ease-out", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: "12px" }}>

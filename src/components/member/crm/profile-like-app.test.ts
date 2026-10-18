@@ -88,7 +88,8 @@ for (const { side, page, ini, name, facts, banner, rows } of SIDES) describe(`${
     expect(glow, "the glow and the card on it").not.toBeNull();
     const [, band, card] = glow!;
     // the band is the app's glow in 4a's peach tokens (2026-10-18) at the app's height, and the card sits as far down it as the app's
-    expect(squash(prop(band, "background") ?? "")).toContain(squash("linear-gradient(180deg, var(--crm-peach) 0%, var(--crm-peach-soft) 70%, var(--crm-page) 100%)"));
+    // 4a change list 20 (2026-10-18): a stronger RADIAL glow in the same peach tokens, the app's height kept.
+    expect(squash(prop(band, "background") ?? "")).toContain(squash("radial-gradient(130% 100% at 50% 0%, var(--crm-peach) 0%, var(--crm-peach-soft) 48%, var(--crm-page) 100%)"));
     expect(prop(band, "background")).toContain(`100% ${app("glow", "height")}`);
     expect(prop(band, "padding")?.split(" ")[0]).toBe(app("cardWrap", "padding").split(" ")[0]);
     expect(prop(card, "borderRadius")).toBe(app("card", "border-radius"));

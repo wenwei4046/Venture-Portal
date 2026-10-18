@@ -30,6 +30,7 @@ body = require("./profile-type.cjs")(body, "{!!(v.pf.onProfile) && (<>");
 body = require("./profile-like-app.cjs").team(body, "{!!(v.pf.onProfile) && (<>");
 body = require("./palette-4a.cjs")(body, "PanelApp");
 body = require("./type-scale.cjs")(body);
+body = require("./phone-4a.cjs").panel(body);
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";
 ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */\n" : ""}
@@ -41,7 +42,7 @@ import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 ${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import type { PanelAppVM } from "./vm/app";
+${require("./phone-4a.cjs").IMPORT(body, "../shared/phone4a")}import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */
 export default function PanelApp({ v }: { v: PanelAppVM }) {

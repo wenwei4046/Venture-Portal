@@ -27,7 +27,7 @@ export function navVM(ctx: PanelCtx) {
     nav: NAV.filter(([id]) => id !== "assign" || data.can.manage).map(([id, label, icon]) => {
       // Ads Performance lives under Profile, so Profile stays lit while it is open.
       const on = ui.tab === id || (id === "profile" && ui.tab === "ads");
-      return { label, icon, badge: badge[id] || 0, color: on ? "var(--crm-rust)" : "var(--crm-muted)", w: on ? 600 : 500,
+      return { label, icon, badge: badge[id] || 0, on, color: on ? "var(--crm-rust)" : "var(--crm-muted)", w: on ? 600 : 500,
         // Leaving a tab closes what it had open: Assignment back to its overview, Calendar its list and Customer info (rev 1011).
         go: () => set(u => ({ ...u, tab: id, lead: null, toast: "", pMenu: false, reSheet: false, pick: "", asSec: null, ftx: null, hlOpen: false, calInfo: null, cLs: false, ftsOpen: false, tplOpen: false, tplEd: null })) };
     }),

@@ -10,6 +10,8 @@ import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import { Phone4aStrip } from "../shared/phone4a";
+import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";
 
 /** A chat: header menu, messages, booking, quick replies, templates and every sheet. */
@@ -17,22 +19,18 @@ export default function SalesChat({ v }: { v: ChatVM }) {
   return (<>
             
     <main data-chat-screen="" style={{ position: "relative", flex: "1 1 auto", minHeight: "0" }}>
-      <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>
+      <div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "2px 16px 12px" }}>
         <span onClick={v.closeChat} style={{ flex: "none", width: "40px", height: "40px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5m6-6-6 6 6 6">
-            </path>
-          </svg>
+          <Ic name="chevron-left" size={24} />
         </span>
         <span title={v.cl.chanName} style={{ flex: "none", position: "relative", width: "40px", height: "40px" }}>
-          <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{v.cl.ini}</span>
-          <span style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", background: "var(--crm-brown)" }}>
-          </span>
+          <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: v.cl.avBg, color: v.cl.avFg, fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "500" }}>{v.cl.ini}</span>
+          
         </span>
         <div style={{ display: "flex", flexDirection: "column", flex: "1", minWidth: "0" }}>
-          <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
-          <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-brown)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.ad}</span>
+          <strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
+          <span style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[v.cl.ad, v.cl.chanName].filter(Boolean).join(" · ")}</span>
         </div>
         <span style={{ flex: "none", position: "relative", display: "flex" }}>
           <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "40px", height: "40px", borderRadius: "50%", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -64,7 +62,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             </div>
           </>)}
         </span>
-      </div>
+      </div><Phone4aStrip s={v.cl.strip} />
       {!!(v.pinText) && (<>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", margin: "0 16px 12px", padding: "8px 12px", borderRadius: "12px", background: "var(--crm-field)", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-ink)" }}>
           <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
@@ -90,7 +88,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
       <div data-chat-list="1" onClick={v.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: v.wallBg, backgroundImage: v.wallImg, backgroundSize: v.wallSize }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
         {(v.msgs3b).map((m, m_i) => (<Fragment key={m_i}>
           {!!(m.sep) && (<>
-            <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>
+            <span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>
           </>)}
           {!!(m.plain) && (<>
             <div {...m.press} onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ WebkitTouchCallout: "none", position: "relative", alignSelf: m.align, maxWidth: m.max, display: "flex", flexDirection: m.rowDir, alignItems: "center", gap: "6px", marginBottom: m.rxGap }}>
