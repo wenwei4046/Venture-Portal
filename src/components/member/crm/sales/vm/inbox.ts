@@ -13,6 +13,7 @@ import { isNewChat } from "../../shared/new-chat";
 import { mediaWord } from "../../shared/chat-media";
 import { leaderAssignees } from "./chat";
 import { STATUS, avatarTint } from "../../shared/palette";
+import type { Icon4a } from "../../shared/icons4a";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -177,7 +178,23 @@ export function inboxVM(ctx: SalesCtx) {
   const ensure = async () => (data.labels.length ? data.labels : await act.saveLabels(labelList.map(l => ({ name: l.name, color: l.color }))));
   const togglePref = (k: "pinned" | "muted") => async () => { if (!ml) return; closeMore(); await act.setPref(ml.id, { [k]: !mp?.[k] }); };
 
+  // Frame M03: a filter (or a search) with nothing in it says what shows there and offers every chat again.
+  const EMPTY: Record<string, [Icon4a, string, string]> = {
+    New: ["inbox", "No new chats", "A chat shows here when it first comes to you, until you answer it."],
+    Attention: ["clock", "Nothing waiting", "A chat shows here when the customer has waited past your reply time."],
+    "Follow up": ["message-circle", "No follow-ups", "A chat moves here once you have answered it and are following up."],
+    Appointment: ["calendar-check", "No appointments yet", "A chat moves here when you book a showroom visit from it."],
+    Won: ["circle-check", "No won deals yet", "A chat moves here when you mark the customer Won."],
+    Lost: ["circle-x", "No lost chats", "A chat moves here when you mark the customer Lost."],
+    "Cold leads": ["lock", "No cold leads", "A chat moves here when its reply window shuts."],
+  };
+  const all = () => patch({ filter: null, q: "" });
+  const empty4 = leadsView.length ? null
+    : q ? { icon: "search" as Icon4a, title: "No chat matches", sub: `Nothing in this list matches “${ui.q.trim()}”.`, all }
+    : f ? (([icon, title, sub]) => ({ icon, title, sub, all }))(EMPTY[f.v] ?? ["inbox", `Nothing in ${f.v}`, "A chat shows here when it gets this label."])
+    : { icon: "inbox" as Icon4a, title: "No chats yet", sub: "A customer's first message to you shows here.", all: null };
   return {
+    empty4,
     q: ui.q, setQ: (e: ChangeEvent<HTMLInputElement>) => patch({ q: e.target.value }), clearQ: () => patch({ q: "" }),
     inboxToast: !ui.chat && ui.toast ? ui.toast : "",
     chips3b, leadsView, stop,

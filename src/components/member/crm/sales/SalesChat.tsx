@@ -29,8 +29,8 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           
         </span>
         <div style={{ display: "flex", flexDirection: "column", flex: "1", minWidth: "0" }}>
-          <strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
-          <span style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[v.cl.ad, v.cl.chanName].filter(Boolean).join(" · ")}</span>
+          <strong style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
+          <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[v.cl.ad, v.cl.chanName].filter(Boolean).join(" · ")}</span>
         </div>
         <span style={{ flex: "none", position: "relative", display: "flex" }}>
           <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "40px", height: "40px", borderRadius: "50%", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>

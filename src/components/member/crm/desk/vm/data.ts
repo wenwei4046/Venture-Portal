@@ -39,13 +39,14 @@ export function chatRows(ctx: DeskCtx): ChatRow[] {
     const team = c.assignedTo ? teamNameOf(ctx, c.assignedTo) : teamId ? ctx.teams.find(t => t.id === teamId)?.name ?? null : null;
     const owner = c.assignedTo ? nameOf(c.assignedTo) : team ? `${team} · to assign` : "Organic · to assign";
     const cold = c.status !== "won" && c.status !== "lost" && isCold(c, now);
-    const key: ChatRow["key"] = u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : u.level === "soon" ? "Reply soon"
+    // A closed window is Cold first, whatever the wait (2026-10-18): only a template can reach them.
+    const key: ChatRow["key"] = cold ? "Cold" : u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : u.level === "soon" ? "Reply soon"
       : cold ? "Cold" : (STATUS_LABEL[c.status] as ChatRow["key"]);
     return {
       id: c.id, c, ini: initials(c.name), name: c.name, time: last ? lastChat(last.at, now) : lastChat(c.createdAt, now), ad: c.ad,
       msg: last ? (last.from === "me" ? "You: " : "") + (last.text || mediaWord(last)) : "",
       owner, ownerId: c.assignedTo, teamId: c.teamId, team,
-      status: u.level !== "none" ? u.label : cold ? "Cold" : STATUS_LABEL[c.status], key,
+      status: cold ? "Cold" : u.level !== "none" ? u.label : STATUS_LABEL[c.status], key,
       last: new Date(last?.at ?? c.createdAt).getTime(),
     };
   }).sort((a, b) => b.last - a.last);

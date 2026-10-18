@@ -96,3 +96,15 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 11. Assignment › Ads to teams: Split starts narrower beside its two strips — 384 px at 1440, 336 px under it (461 / 420
     before; a drag still sets it) — and the list's name column keeps 136 px, the split bar giving way first, so every ad's
     name shows at 1280 and 1440.
+12. M02–M08 re-captured state by state against the frames (2026-10-18): Assign is the frame's person-plus and More's dots as
+    heavy as the frame's (M02); a filter with nothing in it shows the frame's empty state — icon, what shows there, See all
+    chats — and a chip picked past the row's edge slides into view (M03); the message words 15 px, Mine's chat header 16 / 12,
+    the composer 52 px with the frame's smiley (M04–M06); the cold chat's Send template message rust (M08).
+13. A closed reply window is a Cold lead whoever wrote last (it needed our message last); its strip says how long the
+    customer waited ("Cold · waited 30 h for a reply").
+14. Split leads (phone): Save counted the teams without the Revenue Director, so a split giving the director any share
+    stayed grey; a team's % saved for an earlier line-up opens as an even share; the reason shows above Save.
+15. Member work type (phone): the switches are a draft with Cancel / Save N changes (each saved itself on tap).
+16. No line after a team's name (phone Team performance, desktop Insight). Contacts: the "To fill in" list is gone; the
+    Contacts and Calendar rails start folded. Ads Performance: each column's width is dragged at its head (double-click
+    resets). Showrooms' weekly slots name every hour.

@@ -8,7 +8,7 @@
  * here is the frame's px scaled up by the phone's type step through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
 import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 
@@ -40,8 +40,11 @@ export function Phone4aBar({ items, hidden }: { items: { label: string; on: bool
 
 /** Change list 17 · a chip: 32 px, the active one rust with white words and a peach count; the rest on the field colour. */
 export function Phone4aChip({ label, count, on, hot, onClick, children }: { label: string; count?: number | string | null; on: boolean; hot?: boolean; onClick?: () => void; children?: ReactNode }) {
+  // A chip picked past the row's edge slides into view, as frame M03's Appointment (the row scrolls; the page does not).
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (on) ref.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" }); }, [on]);
   return (
-    <button type="button" onClick={onClick} style={{ ...BTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "16px", display: "flex", alignItems: "center", gap: "6px", fontWeight: 500, fontSize: fs(13), whiteSpace: "nowrap", background: on ? "var(--crm-rust)" : "var(--crm-field)", color: on ? "#fff" : "var(--crm-ink)" }}>
+    <button ref={ref} type="button" onClick={onClick} style={{ ...BTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "16px", display: "flex", alignItems: "center", gap: "6px", fontWeight: 500, fontSize: fs(13), whiteSpace: "nowrap", background: on ? "var(--crm-rust)" : "var(--crm-field)", color: on ? "#fff" : "var(--crm-ink)" }}>
       {children}{label}
       {count != null && count !== "" && <span style={{ fontVariantNumeric: "tabular-nums", color: on ? "var(--crm-rust-meta)" : hot ? "var(--crm-oxblood)" : "var(--crm-faint)" }}>{count}</span>}
     </button>
@@ -321,6 +324,18 @@ export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
           <button type="button" onClick={q.save} style={{ ...BTN, flex: 2, height: "46px", borderRadius: "23px", background: "var(--crm-rust)", color: "#fff", fontSize: fs(15), fontWeight: 500 }}>Save changes</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Frame M03 · a filter with no chat in it: the tinted circle and its icon, what shows here and why, and See all chats. */
+export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: string; all: (() => void) | null } }) {
+  return (
+    <div data-inbox-empty="" style={{ minHeight: "460px", padding: "48px 40px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      <span style={{ width: "72px", height: "72px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-rust)" }}><Ic name={e.icon} size={28} /></span>
+      <span style={{ marginTop: "16px", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(22), letterSpacing: "-0.02em", color: "var(--crm-ink)" }}>{e.title}</span>
+      <span style={{ marginTop: "8px", maxWidth: "270px", fontSize: fs(15), lineHeight: 1.5, color: "var(--crm-muted)" }}>{e.sub}</span>
+      {e.all && <button type="button" onClick={e.all} style={{ ...BTN, marginTop: "20px", height: "44px", padding: "0 20px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", fontWeight: 500, fontSize: fs(15), color: "var(--crm-ink)" }}>See all chats</button>}
     </div>
   );
 }

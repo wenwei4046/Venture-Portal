@@ -64,7 +64,8 @@ export function roomsVM(ctx: PanelCtx) {
       gmaps: `https://www.google.com/maps/search/?api=1&query=${q}`, waze: `https://waze.com/ul?q=${q}&navigate=yes`, hasAddr: !!d.addr,
       cap: d.cap, capMinus: d.cap > 1 ? () => begin({ cap: d.cap - 1 }) : undefined, capPlus: d.cap < 10 ? () => begin({ cap: d.cap + 1 }) : undefined,
       days: ["M", "T", "W", "T", "F", "S", "S"],
-      grid: Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? `${h % 12 || 12}${h < 12 ? "am" : "pm"}` : "", cells: WD.map((_, k) => ({ on: on(h, k), pick: () => toggle(h, k) })) })),
+      // Every hour named, as the desktop (2026-10-18).
+      grid: Array.from({ length: 24 }, (_, h) => ({ label: `${h % 12 || 12}${h < 12 ? "am" : "pm"}`, cells: WD.map((_, k) => ({ on: on(h, k), pick: () => toggle(h, k) })) })),
       // Off the hour (e.g. 11:30) a slot still counts for its hour on the grid; the editor keeps the exact times.
       odd: d.slots.filter(s => !s.split("@")[0].endsWith(":00")).map(s => t12(s)),
       closures: [...WI.filter(w => d.weekly.includes(w)).map(w => ({ day: `Every ${WD[WI.indexOf(w)]}`, what: "All day", rm: () => begin({ weekly: d.weekly.filter(x => x !== w) }) })),

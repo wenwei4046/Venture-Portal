@@ -166,8 +166,8 @@ export function assignVM(ctx: PanelCtx) {
     nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
   } : { canName: false, nameDraft: "", headline: "", onName: () => {}, saveName: () => {}, nameKey: () => {} };
   const ae = aeRow && E
-    ? { ...aeRow, ...naming, close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
-    : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, close: () => {}, saveBg: "var(--crm-faint-2)", save: undefined as (() => void) | undefined };
+    ? { ...aeRow, ...naming, why: "", close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
+    : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, why: "", close: () => {}, saveBg: "var(--crm-faint-2)", save: undefined as (() => void) | undefined };
 
   // Awaiting reply, on Assignment: counts per level, then every waiting customer.
   const by = waitingByLevel(ctx);
@@ -199,7 +199,7 @@ export function assignVM(ctx: PanelCtx) {
   return {
     onAssign: ui.tab === "assign" && !ui.lead,
     hasWaiting: organic.length > 0, waitingN: organic.length, waitList,
-    adRows, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
+    adTeams, adRows, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
     asgAttSum, asgAtt, openAtt: () => patch({ att: true }),
     ftSum, ftOpen: !!ui.ftEd, fe,
     // The Team Leader's own page (design 1a's TL view) is the salesperson CRM's; never shown here.

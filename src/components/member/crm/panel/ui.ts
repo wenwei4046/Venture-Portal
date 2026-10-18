@@ -48,6 +48,8 @@ export interface PanelUi {
   hlOpen: boolean;
   /** Profile › Member work type and Cold lead templates pages, and a template being edited. */
   ftsOpen: boolean;
+  /** Member work type's changes not saved yet (person → full time), the owner's Save (2026-10-18). */
+  ftsDraft: Record<string, boolean> | null;
   tplOpen: boolean;
   tplEd: { id: string | null; name: string; ch: "whatsapp" | "messenger"; body: string } | null;
   pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
@@ -109,7 +111,7 @@ export interface PanelUi {
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
   inbTeam: "", inbWho: "", inbCol: 0, pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, ftsDraft: null, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
   viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "all", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null, rmAt: 0, adNameDraft: null,
   cView: "grid", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,
