@@ -28,7 +28,8 @@ const lineOf = (names: string[]) => !names.length ? "" : names.length === 1 ? na
 
 export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | undefined) {
   const { ui, patch, data, now, teams, act, nameOf } = ctx;
-  const sec = ui.asSec, go = (k: NonNullable<typeof sec>) => () => patch({ asSec: k });
+  // 4a (T03): the sections are tabs under the title — Ads to teams first; Work type opens Profile's Member work type.
+  const sec = ui.asSec ?? "Ads", go = (k: NonNullable<typeof ui.asSec>) => () => patch({ asSec: k });
   const urgent = (c: CrmCustomer) => {
     const last = [...c.messages].reverse().find(m => !m.auto);
     return !!last && last.from === "lead";
@@ -44,7 +45,12 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const ftTeams = teams.filter(t => Object.values(ticks(ctx, t.id)).some(d => d.length)).length;
 
   const asx = {
-    onHome: !sec, inSub: !!sec, back: () => patch({ asSec: null }),
+    onHome: false, inSub: true, back: () => patch({ asSec: null }),
+    tabs4: [
+      { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
+      { label: "Full time", on: sec === "Ft", pick: go("Ft") },
+      ...(data.can.manage ? [{ label: "Work type", on: false, pick: () => patch({ tab: "profile", ftsOpen: true }) }] : []),
+    ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
     onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft",

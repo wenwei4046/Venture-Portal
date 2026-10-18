@@ -291,6 +291,80 @@ function teamInbox(body) {
   return body.slice(0, at) + b + body.slice(end);
 }
 
+/** T03 · Assignment: the title and its sections as underline tabs, a legend of team colours, every ad as a card. */
+function teamAssign(body) {
+  const at = body.indexOf("{!!(v.show.as) && (<>");
+  if (at < 0) throw new Error("phone-4a: team assign");
+  const home = body.indexOf("{!!(v.asx.onHome) && (<>", at);
+  const [, h1e] = el(body.slice(home), '<div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "8px" }}>', "div", "assign head");
+  const head = `<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}><h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1><div style={{ display: "flex", gap: "22px", borderBottom: "1px solid var(--crm-rule)" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ height: "36px", display: "inline-flex", alignItems: "center", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "${F(15)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>`;
+  // The home's title block becomes the tabs, shown on every section (onHome is false now — draw it unconditionally).
+  const blockEnd = body.indexOf("</>)}", home + h1e);
+  body = body.slice(0, home) + head + body.slice(blockEnd + 5);
+  // The Ads section: no tinted box or its own title; a legend; each ad a 4a card.
+  const ads = body.indexOf("{!!(v.asx.onAds) && (<>", at);
+  if (ads < 0) throw new Error("phone-4a: assign ads");
+  let rest = body.slice(ads);
+  rest = every(rest, '<section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-cold)", border: "1px solid var(--crm-tint-cold)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>',
+    '<section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>', "assign ads box");
+  rest = every(rest, '<span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-ink-soft)" }}>\n                </span>', "", "assign ads bar");
+  for (let k = rest.indexOf('<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"'); k >= 0; k = rest.indexOf('<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"', k + 1)) { const sub = rest.slice(k, k + 3000); const [ta, tb] = el(sub, '<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"', "div", "assign ads title");
+  rest = rest.slice(0, k) + `<div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", margin: "-2px 0 2px" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "${F(14)}", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>` + rest.slice(k + tb); }
+  for (let k = rest.indexOf('<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"'); k >= 0; k = rest.indexOf('<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"', k + 1)) { const nx = rest.indexOf('<div onClick={a.edit}', k + 1); const [ca, cb] = el(rest.slice(k, nx > 0 ? nx : undefined), '<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"', "div", "assign ad card"); rest = rest.slice(0, k + ca) + "<Phone4aAdCard a={a} />" + rest.slice(k + cb); }
+  return body.slice(0, ads) + rest;
+}
+
+/** T04 · Split leads: "‹ Split leads", the ad's name in a boxed field (typed in place), Meta's headline under it, the
+ * segments rust, Save (rust) over "Save and apply to all N ads"; the ‹ closes, as Cancel did. */
+function teamSplit(body) {
+  const at = body.indexOf("{!!(v.as.adEdOpen) && (<>");
+  if (at < 0) throw new Error("phone-4a: split");
+  let b = body.slice(at);
+  b = once(b, '<div style={{ flex: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "10px", borderBottom: "1px solid var(--crm-tint-cold)" }}>',
+    '<div style={{ flex: "none", padding: "10px 20px 6px", display: "flex", flexDirection: "column", gap: "12px" }}>', "split head");
+  b = swap(b, '<span onClick={v.as.ae.close} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "4px", height: "32px"', "span",
+    `<span onClick={v.as.ae.close} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "8px", marginLeft: "-4px", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="chevron-left" size={26} /><span style={{ fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em" }}>Split leads</span></span>`, "split back");
+  b = once(b, 'padding: "2px 0 4px", border: "0", borderBottom: "1px dashed var(--crm-line)", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "var(--crm-ink)", outline: "none" }} />)',
+    `padding: "0 44px 0 14px", height: "50px", border: "1px solid var(--crm-ink)", borderRadius: "12px", background: "#fff", font: "inherit", fontFamily: "${TIGHT}", fontSize: "${F(20)}", fontWeight: "500", letterSpacing: "-0.01em", color: "var(--crm-ink)", outline: "none" }} />)`, "split name");
+  b = once(b, '<small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.as.ae.page} · Total leads {v.as.ae.leads}</small>',
+    `<small style={{ marginTop: "6px", fontSize: "${F(13)}", lineHeight: "1.45", color: "var(--crm-muted)" }}>{v.as.ae.headline && !/^Ad /.test(v.as.ae.headline) ? <>Meta sends only the headline: “{v.as.ae.headline}”. </> : null}{v.as.ae.leads} leads · {v.as.ae.page}</small>`, "split sub");
+  b = once(b, '<div style={{ display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "var(--crm-tint-cold)" }}>\n                  {(v.as.ae.modes)',
+    '<div style={{ display: "flex", gap: "2px", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>\n                  {(v.as.ae.modes)', "split modes");
+  b = once(b, '<span onClick={m.pick} style={{ flex: "1", height: "34px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: m.w,',
+    `<span onClick={m.pick} style={{ flex: "1", height: "36px", borderRadius: "18px", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: m.w,`, "split mode");
+  b = once(b, 'padding: "12px 20px 26px", borderTop: "1px solid var(--crm-tint-cold)", background: "#fff", display: "grid", gridTemplateColumns: "1fr 2fr", gap: "8px" }}>',
+    'padding: "12px 20px 26px", borderTop: "1px solid var(--crm-rule)", background: "#fff", display: "flex", flexDirection: "column-reverse", gap: "8px" }}>', "split foot");
+  b = swap(b, '<span onClick={v.as.ae.close} style={{ height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-tint-cold)"', "span", "", "split cancel");
+  b = once(b, '<span onClick={v.as.ae.save} style={{ height: "48px", borderRadius: "24px", background: v.as.ae.saveBg,', '<span onClick={v.as.ae.save} style={{ height: "50px", borderRadius: "25px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)",', "split save");
+  return body.slice(0, at) + b;
+}
+
+/** T05 · the Team's Calendar: the title, chips and segments rust, each day's visits as white cards on the pale cream
+ * (a team colour bar, the time, customer, person · showroom and the state on the right). */
+function teamCalendar(body) {
+  const at = body.indexOf("{!!(v.show.cal) && (<>");
+  if (at < 0) throw new Error("phone-4a: team calendar");
+  let b = body.slice(at);
+  b = once(b, '<h1 style={{ margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Calendar</h1>',
+    `<h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Calendar</h1>`, "team cal title");
+  b = once(b, '<span onClick={c.pick} style={{ flex: "none", height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px",', '<span onClick={c.pick} style={{ flex: "none", height: "32px", padding: "0 12px", boxSizing: "border-box", borderRadius: "16px",', "team cal chip");
+  b = once(b, '<div style={{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "12px", background: "var(--crm-field)" }}>\n              {(v.cal.cViews)', '<div style={{ flex: "none", display: "flex", gap: "2px", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>\n              {(v.cal.cViews)', "team cal views");
+  b = once(b, '<span onClick={vi.pick} style={{ flex: "none", height: "32px", padding: "0 12px", borderRadius: "9px",', '<span onClick={vi.pick} style={{ flex: "none", height: "32px", padding: "0 14px", borderRadius: "16px",', "team cal view");
+  b = once(b, '<div style={{ flex: "none", display: "flex", flexDirection: "column", padding: "4px 14px", borderRadius: "18px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)" }}>',
+    '<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>', "team cal day");
+  b = once(b, '<span style={{ padding: "10px 0 8px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "700", color: d.color }}>{d.day}</span>',
+    `<span style={{ padding: "6px 2px 2px", fontFamily: "${TIGHT}", fontSize: "${F(18)}", fontWeight: "500", color: d.color }}>{d.day}</span>`, "team cal day head");
+  b = once(b, '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: a.rule, cursor: "pointer" }} className={H.hov3}>',
+    '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", cursor: "pointer" }}>', "team cal item");
+  b = once(b, '<span style={{ flex: "none", minWidth: "64px", whiteSpace: "nowrap", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{a.time}</span>',
+    `<span style={{ flex: "none", order: "-1", minWidth: "70px", whiteSpace: "nowrap", fontFamily: "${TIGHT}", fontSize: "${F(17)}", fontWeight: "500", fontVariantNumeric: "tabular-nums" }}>{a.time}</span>`, "team cal time");
+  b = once(b, '<strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{a.name}</strong>\n                    <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)",',
+    `<strong style={{ fontSize: "${F(17)}", fontWeight: "500" }}>{a.name}</strong>\n                    <small style={{ fontSize: "${F(14)}", color: "var(--crm-muted)",`, "team cal name");
+  b = once(b, '<span style={{ flex: "none", padding: "3px 8px", borderRadius: "6px", background: a.sBg, color: a.sFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700" }}>{a.status}</span>',
+    `<span style={{ flex: "none", color: a.sFg, fontSize: "${F(14)}", fontWeight: "500" }}>{a.status}</span>`, "team cal state");
+  return body.slice(0, at) + b;
+}
+
 /** gen-panel-1011.cjs: the whole Control panel. */
 function panel(body) {
   // Change list 16 · the bottom bar (T01).
@@ -298,6 +372,11 @@ function panel(body) {
   body = panelChat(body);
   body = teamInsight(body);
   body = teamInbox(body);
+  body = teamAssign(body);
+  body = teamSplit(body);
+  body = teamCalendar(body);
+  // T07 · Showrooms: the title in 4a's face (the page keeps production's card and Edit — see CHECKLIST).
+  body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>`, "showrooms title");
   body = profile(body, 5);
   return body;
 }

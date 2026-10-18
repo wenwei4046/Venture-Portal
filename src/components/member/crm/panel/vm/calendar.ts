@@ -31,7 +31,7 @@ export function calendarVM(ctx: PanelCtx) {
     const s = SS[a.v.state === "booked" && isPast(a) ? "mark" : (a.v.state as "attended" | "no_show" | "booked")];
     return { status: s[0], sBg: s[1], sFg: s[2] };
   };
-  const view = ui.cView, segv = (k: "list" | "grid", label: string) => ({ label, pick: () => patch({ cView: k }), bg: view === k ? "#fff" : "transparent", fg: view === k ? "var(--crm-ink)" : "var(--crm-muted)", w: view === k ? 650 : 500, sh: view === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" });
+  const view = ui.cView, segv = (k: "list" | "grid", label: string) => ({ label, pick: () => patch({ cView: k }), bg: view === k ? "var(--crm-rust)" : "transparent", fg: view === k ? "#fff" : "var(--crm-muted)", w: view === k ? 500 : 400, sh: "none" });
   const sel = ui.cDay, shown = view === "grid" && sel != null ? list.filter(a => day0(a.at) === sel) : list;
   const item = (a: typeof all[number], k: number) => ({ name: a.name, who: nameOf(a.who), room: a.room, time: tm(a.at), tc: a.seat.c, rule: k ? "1px solid var(--crm-rule)" : "0", ...statusOf(a),
     // rev 1011 §5.1: a visit opens Customer info first (Open chat there), as RS rev 1010 §3.
@@ -64,7 +64,7 @@ export function calendarVM(ctx: PanelCtx) {
     onCal: ui.tab === "calendar" && !ui.lead, stop,
     cRangeLabel: `${list.length} visits · ${up} upcoming`, cRangeBtn: `${f(rg.a)} – ${f(rg.b)}`,
     cTeams: [["all", "All teams", ""], ...(ctx.directors.length ? [["hod", "Director", "var(--crm-brown)"]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c])].map(([k, label, dot]) => ({ label, dot,
-      pick: () => patch({ cTeam: k, cPerson: "" }), bg: ts === k ? "var(--crm-ink)" : "#fff", fg: ts === k ? "#fff" : "var(--crm-ink)", bd: ts === k ? "var(--crm-ink)" : "var(--crm-rule)" })),
+      pick: () => patch({ cTeam: k, cPerson: "" }), on: ts === k, bg: ts === k ? "var(--crm-rust)" : "var(--crm-field)", fg: ts === k ? "#fff" : "var(--crm-ink)", bd: ts === k ? "var(--crm-rust)" : "var(--crm-field)" })),
     cPersonLabel: pp ? nameOf(pp) : "Everyone",
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
     cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-cream)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },

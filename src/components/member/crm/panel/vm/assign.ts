@@ -17,7 +17,8 @@ const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "HOD" };
 const digits = (e: ChangeEvent<HTMLInputElement>) => parseInt(e.target.value.replace(/\D/g, "")) || 0;
 const selAll = (e: FocusEvent<HTMLInputElement>) => e.target.select();
-const seg = (cur: string, k: string, label: string, pick: () => void) => ({ label, pick, bg: cur === k ? "#fff" : "transparent", fg: cur === k ? "var(--crm-ink)" : "var(--crm-muted)", w: cur === k ? 650 : 500, sh: cur === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" });
+// 4a change list 17: the active segment is rust with white words.
+const seg = (cur: string, k: string, label: string, pick: () => void) => ({ label, pick, bg: cur === k ? "var(--crm-rust)" : "transparent", fg: cur === k ? "#fff" : "var(--crm-muted)", w: cur === k ? 500 : 400, sh: "none" });
 
 /**
  * Auto-balance %: set one value and the others share what is left of 100 —
@@ -141,7 +142,10 @@ export function assignVM(ctx: PanelCtx) {
     });
     return act.saveAdRule(d.id, d.label, { mode: "split", split: d.split, pm: "pct", pp, tm });
   };
+  const head4 = (id: string) => data.customers.find(c => c.adId === id && c.adHeadline)?.adHeadline ?? "";
   const adRows = ads.map(a => ({
+    // 4a (T03): the channel, the ad's headline under its name, Set up while it has no rule.
+    head: head4(a.id), wa: a.page === "WhatsApp", setUp: !ruleOf(a.id),
     ...mkRow(adTeams, a, p => void saveAd({ ...a, ...p })),
     edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),
   }));
@@ -195,7 +199,7 @@ export function assignVM(ctx: PanelCtx) {
   return {
     onAssign: ui.tab === "assign" && !ui.lead,
     hasWaiting: organic.length > 0, waitingN: organic.length, waitList,
-    adRows, adEdOpen: !!E, ae,
+    adRows, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
     asgAttSum, asgAtt, openAtt: () => patch({ att: true }),
     ftSum, ftOpen: !!ui.ftEd, fe,
     // The Team Leader's own page (design 1a's TL view) is the salesperson CRM's; never shown here.
