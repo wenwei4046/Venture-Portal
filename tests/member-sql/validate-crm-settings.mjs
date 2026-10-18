@@ -66,6 +66,11 @@ const today = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplat
 check(await read('ann'), today, 'a salesperson reads 3 · 6 · 9, template on, auto-assign on')
 check(await read('boss'), today, '…and so does the Principal')
 check(await read(null), null, 'nobody signed in: nothing')
+// Somebody the CRM does not place (KRIS: CRM · View but not in IR's CRM) reads nothing (mig 20261018200000).
+await q(`insert into users values ($1, true, null)`, [id('u', 'out')])
+await q(`insert into hr_staff_costs (id, employee_name, user_id) values ($1, 'OUT', $2)`, [id('s', 'out'), id('u', 'out')])
+await q(`insert into test_crm_cells (uid, action, scope) values ($1, 'view', 'all')`, [id('u', 'out')])
+check(await read('out'), null, 'CRM · View but not in the CRM (no role): nothing')
 
 // ── 2. Who saves ──
 await assert.rejects(save('ann', 2, 4, 8, false, false), /may not|not allowed|change the CRM/i, 'a salesperson cannot save'); checks++

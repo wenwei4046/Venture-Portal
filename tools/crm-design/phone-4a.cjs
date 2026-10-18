@@ -121,6 +121,10 @@ function chat(body, v) {
   body = once(body, '<span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>',
     `<span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "${F(12)}", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>`, "chat day");
   body = chatHead(body);
+  // M08: the cold note is the composer's card at the foot now; the grey bar under the strip goes (the demo keeps its
+  // "simulate a reply" button there).
+  body = once(body, '{!!(v.chatCold) && (<>', '{!!(v.chatCold && v.simReplyShow) && (<>', "cold note demo only");
+  body = once(body, '<span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>Cold lead · {v.coldMsg}</span>', "", "cold note words");
   return body;
 }
 
@@ -237,6 +241,14 @@ function panelChat(body) {
   body = body.replace(wall, 'backgroundColor: "var(--crm-cream)"');
   // M04: the message words 15 px (the frame), as Mine's chat (vm/chat.ts).
   body = once(body, 'fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45" }}>{m.text}</p>', `fontSize: "${F(15)}", lineHeight: "1.45" }}>{m.text}</p>`, "panel bubble words");
+  // M04: the Team chat's header as Mine's — the name 16 px / 600, its line 12 px (the owner, 2026-10-18).
+  body = once(body, '<strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}',
+    `<strong style={{ fontSize: "${F(16)}", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}`, "team chat name");
+  body = once(body, '<small style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}',
+    `<small style={{ fontSize: "${F(12)}", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}`, "team chat line");
+  // M08: the cold note is the composer's card at the foot now; the grey box under the strip goes.
+  { const k = body.indexOf("{!!(v.ld.lx.cold) && (<>"); if (k < 0) throw new Error("phone-4a: team cold note");
+    const e = body.indexOf("</>)}", k) + "</>)}".length; body = body.slice(0, k) + body.slice(e); }
   return body;
 }
 

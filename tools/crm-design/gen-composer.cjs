@@ -77,10 +77,17 @@ const ABOVE = [
   '      </>)}',
   // After WhatsApp's 24 h (Messenger's window), approved templates only: the bar's place holds the CRM's template button.
   '      {!!(p.chatCold) && (<>',
-  '        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" }}>',
-  // Settings › Suggest a template off (2026-10-18): no button — the line says the chat waits for the customer.
-  '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
-  '          {!!(p.tplOff) && (<span style={{ flex: "1", minHeight: "48px", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: "13px", color: "#806B60" }}>The reply window is shut · the chat opens again when the customer writes</span>)}',
+  // The 4a frame M08 (2026-10-18): a white card at the foot — the lock, "This chat is cold", who last wrote when and what
+  // opens the chat again, and the template button inside it (Settings › Suggest a template off: the card without it).
+  '        <div data-cold-card="" style={{ flex: "none", margin: "8px 12px 10px", padding: "16px", borderRadius: "20px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.10), 0 8px 22px rgba(63,43,34,.08)", display: "flex", flexDirection: "column", gap: "14px" }}>',
+  '          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>',
+  '            <svg style={{ flex: "none", marginTop: "2px", color: "#3F2B22" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+  '            <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "0" }}>',
+  '              <strong style={{ fontSize: "16px", fontWeight: "600", color: "#3F2B22" }}>This chat is cold</strong>',
+  '              <span style={{ fontSize: "15px", lineHeight: "1.45", color: "#806B60" }}>{p.coldSub}</span>',
+  '            </div>',
+  '          </div>',
+  '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ height: "46px", borderRadius: "23px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
   '        </div>',
   '      </>)}',
   '      ',

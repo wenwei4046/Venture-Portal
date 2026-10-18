@@ -78,9 +78,9 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           </span>
         </div>
       </>)}
-      {!!(v.chatCold) && (<>
+      {!!(v.chatCold && v.simReplyShow) && (<>
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)" }}>
-          <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>Cold lead · {v.coldMsg}</span>
+          
           {!!v.simReplyShow && (<span onClick={v.simReply} style={{ alignSelf: "flex-start", height: "30px", padding: "0 12px", boxSizing: "border-box", borderRadius: "15px", border: "1px dashed var(--crm-muted)", display: "grid", placeItems: "center", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}>Demo: customer replies</span>)}
         </div>
       </>)}

@@ -331,8 +331,8 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 
               </span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
-                <strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
-                <small style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}</small>
+                <strong style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
+                <small style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}</small>
               </span>
               <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: v.ld.lx.menuBg, display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -361,11 +361,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </>)}
             </div><Phone4aStrip s={v.ld.ld.strip} />
             <p style={{ flex: "none", margin: "0 16px 12px", fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ld.ld.ownerName}'s customer{v.ld.ld.windowNote}</p>
-            {!!(v.ld.lx.cold) && (<>
-              <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)" }}>
-                <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>Cold lead · {v.ld.lx.coldMsg}</span>
-              </div>
-            </>)}
+            
             {!!(v.ld.ld.movedTo) && (<>
               <div style={{ flex: "none", margin: "0 16px 12px", padding: "8px 12px", borderRadius: "12px", background: "var(--crm-tint-follow)", color: "var(--crm-brown)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600" }}>{v.ld.ld.movedTo}</div>
             </>)}
