@@ -10,7 +10,7 @@ import type { CrmPerson } from "@/lib/member/crm-data";
 export const ROLE_TITLE: Record<CrmRole, string> = {
   boss: "Principal", hod: "Revenue Director", stl: "Senior Team Leader", tl: "Team Leader", ta: "Team Assistant", rs: "Revenue Specialist",
 };
-export const ROLE_SHORT: Record<CrmRole, string> = { boss: "Principal", hod: "HOD", stl: "Senior TL", tl: "TL", ta: "TA", rs: "RS" };
+export const ROLE_SHORT: Record<CrmRole, string> = { boss: "Principal", hod: "Revenue Director", stl: "Senior TL", tl: "TL", ta: "TA", rs: "RS" };
 /** Order inside a team: Senior TL, TL, TA, RS (full time before part time). */
 export const ROLE_ORDER: Record<CrmRole, number> = { boss: -2, hod: -1, stl: 0, tl: 1, ta: 3, rs: 5 };
 
