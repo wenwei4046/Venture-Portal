@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { HvPage, PageHead, btn } from '@/components/hrv/kit'
 import { draftLeadReply, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
 import { outcomeOf } from '@/lib/leads/ai'
+import { adLabel } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenShort } from '@/lib/leads/time'
@@ -66,7 +67,7 @@ export default function InboxView({
     return n
   }, [inBrand])
   const shown = inBrand.filter(c => (filter === 'all' || inboxState(c) === filter)
-    && (!q || `${c.name} ${c.phone ?? ''} ${c.lastText} ${c.sourceAd}`.toLowerCase().includes(q)))
+    && (!q || `${c.name} ${c.phone ?? ''} ${c.lastText} ${c.sourceAd} ${c.adName ?? ''}`.toLowerCase().includes(q)))
 
   const load = (id: string) => {
     startLoading(async () => {
@@ -243,7 +244,7 @@ function Chat({ contact, thread, brandName, today, canReply, aiOn, loading, onSe
           <span className={s.chatName}>{contact.name || '—'}</span>
           <span className={s.chatMeta}>
             <span>{brandName}</span><span>·</span><span>{CHANNEL_LABEL[contact.channel]}</span><span>·</span>
-            <span>{contact.sourceAd ? `Ad: ${contact.sourceAd}` : 'Organic'}</span>
+            <span>{adLabel(contact) ? `Ad: ${adLabel(contact)}` : 'Organic'}</span>
           </span>
         </div>
       </div>

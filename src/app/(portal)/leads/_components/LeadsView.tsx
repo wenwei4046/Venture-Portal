@@ -9,6 +9,7 @@ import { leadInsight, rate } from '@/lib/leads/insight'
 import { formatPhone } from '@/lib/leads/phone'
 import type { LeadPeriod } from '@/lib/leads/period'
 import { whenFull } from '@/lib/leads/time'
+import { adLabel } from '@/lib/leads/ads'
 import type { Appt, LeadConfig, LeadContact, Shown } from '@/lib/leads/types'
 import { Bi, BrandChip, CHANNEL_LABEL } from './bits'
 import s from './lead.module.css'
@@ -88,7 +89,7 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
                   <div className={s.hint}>{CHANNEL_LABEL[c.channel]}{c.isTest ? ' · TEST' : ''}</div>
                 </td>
                 <td><BrandChip brand={brands.get(c.brandId)} /></td>
-                <td className={s.muted}>{c.sourceAd || 'Organic'}</td>
+                <td className={s.muted}>{adLabel(c) || 'Organic'}</td>
                 <td className={s.mono}>{formatPhone(c.phone)}{c.phoneState === 'detected' ? <span className={s.hint}> · to confirm</span> : null}</td>
                 <td>{c.interest || <span className={s.muted}>—</span>}</td>
                 <td>{c.handedSalesName ?? (canEdit ? <Link href={`/leads?c=${c.id}`} style={{ fontWeight: 600 }}>Hand over →</Link> : '—')}</td>

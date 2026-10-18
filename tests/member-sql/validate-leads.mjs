@@ -412,4 +412,47 @@ check((await q('select public.lead_campaigns() l'))[0].l.some(k => k.id === draf
 // The flow runner leaves a campaign message alone.
 check((await q('select flow_state from public.lead_contacts where id = $1', [who.Eve]))[0].flow_state, 'none', 'no flow started or stopped')
 
+// ── Ads: name, source, link (migs 20261018100000 / 100100) ───────────────────
+await db.exec(await readFile(new URL('../../supabase/migrations/20261018100000_lead_ads.sql', import.meta.url), 'utf8'))
+const adsGuards = (await readFile(new URL('../../supabase/migrations/20261018100100_lead_ads_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(adsGuards.slice(adsGuards.indexOf('CREATE OR REPLACE FUNCTION pg_temp.guard_put')))
+for (const [fn, want] of [['lead_name_ad', 'leads.manage'], ['lead_save_meta_ads', 'leads.manage'], ['lead_test_ad', 'leads.create']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads/settings'], ARRAY['${want}']);`), true, `${fn} asks /leads/settings`)
+}
+// Applying it again changes nothing (the adCard's keys and join go in once).
+await db.exec(await readFile(new URL('../../supabase/migrations/20261018100000_lead_ads.sql', import.meta.url), 'utf8'))
+check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_ads' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on lead_ads')
+// A test conversation from an ad, with its id.
+const ida = (await q(`select public.lead_simulate($1, 'instagram', 'Ida', 'Chat with us', 'hi') c`, [b2990]))[0].c
+await refuses(`select public.lead_test_ad($1, 'abc')`, [ida], /digits only/, 'an ad id is digits')
+await q(`select public.lead_test_ad($1, '120210000000001')`, [ida])
+let adCard = (await q('select public.lead_thread($1) t', [ida]))[0].t.contact
+check([adCard.adId, adCard.sourceAd, adCard.adName, adCard.adLink], ['120210000000001', 'Chat with us', '', ''], 'the id and headline, no name yet')
+await db.exec(`update public.lead_contacts set is_test = false where id = '${ida}'`)
+await refuses(`select public.lead_test_ad($1, '120210000000001')`, [ida], /comes from Meta/, 'a real conversation’s ad is Meta’s')
+await db.exec(`update public.lead_contacts set is_test = true where id = '${ida}'`)
+// Meta fills it; a name given by hand wins and Meta keeps filling what the hand left empty.
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_name_ad('120210000000001', '{"name":"x"}')`, [], /Lead View · Manage/, 'naming needs Manage')
+await as(CS_USER, ALL)
+await refuses(`select public.lead_name_ad('120210000000001', '{"link":"http://x"}')`, [], /https/, 'links are https')
+const meta = [{ adId: '120210000000001', name: 'Oct Sofa Week · Video', campaign: 'Oct Sofa', adset: 'KL 25-45', accountId: '1234567', status: 'ACTIVE', link: 'https://www.facebook.com/111_222' },
+  { adId: 'nope', name: 'skipped' }]
+check((await q('select public.lead_save_meta_ads($1::jsonb) n', [JSON.stringify(meta)]))[0].n, 1, 'one kept, a bad id skipped')
+adCard = (await q('select public.lead_thread($1) t', [ida]))[0].t.contact
+check([adCard.adName, adCard.adCampaign, adCard.adSet, adCard.adAccount, adCard.adLink], ['Oct Sofa Week · Video', 'Oct Sofa', 'KL 25-45', '1234567', 'https://www.facebook.com/111_222'], 'the adCard shows Ads Manager’s')
+await q(`select public.lead_name_ad('120210000000001', '{"name":"Sofa video (our name)"}')`)
+await q('select public.lead_save_meta_ads($1::jsonb) n', [JSON.stringify([{ ...meta[0], name: 'Renamed in Meta', adset: 'KL 30-50' }])])
+adCard = (await q('select public.lead_thread($1) t', [ida]))[0].t.contact
+check([adCard.adName, adCard.adSet], ['Sofa video (our name)', 'KL 30-50'], 'the hand’s name wins; Meta fills what the hand left empty')
+const ads = (await q('select public.lead_ads() a'))[0].a
+const adRow = ads.find(a => a.adId === '120210000000001')
+check([adRow.headline, adRow.conversations, adRow.name, adRow.source], ['Chat with us', 1, 'Sofa video (our name)', 'manual'], 'Settings › Ads lists it')
+// Clearing the hand's name falls back to Meta's next fetch.
+await q(`select public.lead_name_ad('120210000000001', '{}')`)
+check((await q('select public.lead_thread($1) t', [ida]))[0].t.contact.adName, '', 'cleared')
+await q('select public.lead_save_meta_ads($1::jsonb) n', [JSON.stringify([meta[0]])])
+check((await q('select public.lead_thread($1) t', [ida]))[0].t.contact.adName, 'Oct Sofa Week · Video', 'Meta’s again')
+
 console.log(`validate-leads: ${checks} checks passed`)

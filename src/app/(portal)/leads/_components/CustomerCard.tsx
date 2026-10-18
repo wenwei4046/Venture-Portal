@@ -8,6 +8,7 @@ import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadEvent, Shown } from '@/lib/leads/types'
 import { Bi, CHANNEL_LABEL } from './bits'
+import AdInfo from './AdInfo'
 import HandoffWindow from './HandoffWindow'
 import s from './lead.module.css'
 
@@ -54,6 +55,8 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
         <span className={s.cardName}>{contact.name || '—'}</span>
         <span className={s.hint}>{CHANNEL_LABEL[contact.channel]} · first contact {whenFull(contact.createdAt)}</span>
       </div>
+
+      <AdInfo contact={contact} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span className={s.label}><Bi en="Phone" zh="电话" /></span>

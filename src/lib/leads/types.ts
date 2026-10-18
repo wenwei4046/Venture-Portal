@@ -68,6 +68,13 @@ export interface LeadContact {
   /** Promotions consent (mig 20261016340000): Meta's rule for a campaign past the 24-hour window. */
   optIn?: 'none' | 'in' | 'out'
   optInAt?: string | null
+  /** The ad it came from (mig 20261018100000): Meta's id, and what Ads Manager (or a person) calls it. sourceAd is Meta's headline. */
+  adId?: string | null
+  adName?: string
+  adCampaign?: string
+  adSet?: string
+  adAccount?: string
+  adLink?: string
 }
 
 export interface LeadMessage {

@@ -314,6 +314,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'lead_knowledge', 'lead_save_knowledge', 'lead_remove_knowledge', 'lead_personas', 'lead_save_persona', 'lead_ai_context',
   'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience',
   'lead_save_campaign', 'lead_send_campaign', 'lead_remove_campaign', 'lead_set_opt_in',
+  'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',

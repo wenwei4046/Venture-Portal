@@ -6,6 +6,8 @@ import { HvPage, PageHead, SectHead, btn } from '@/components/hrv/kit'
 import { removeLeadSales, saveLeadBrand, saveLeadSales, sendTestEnquiry } from '@/lib/leads/actions'
 import { formatPhone } from '@/lib/leads/phone'
 import type { BrandTone, LeadBrand, LeadConfig, LeadSales } from '@/lib/leads/types'
+import type { LeadAd } from '@/lib/leads/ads'
+import AdsPanel from './AdsPanel'
 import { Bi, BrandChip } from './bits'
 import s from './lead.module.css'
 
@@ -14,13 +16,14 @@ import s from './lead.module.css'
  * (filled once Meta is connected), how a lead is handed over, and its salespeople, who get the leads on
  * WhatsApp — and the test enquiry that stands in for Meta until then.
  */
-export default function SettingsView({ config, canManage, canTest }: { config: LeadConfig; canManage: boolean; canTest: boolean }) {
-  const [tab, setTab] = useState<'brands' | 'test'>('brands')
+export default function SettingsView({ config, ads, canManage, canTest }: { config: LeadConfig; ads: LeadAd[] | null; canManage: boolean; canTest: boolean }) {
+  const [tab, setTab] = useState<'brands' | 'ads' | 'test'>('brands')
   return (
     <HvPage>
       <PageHead eyebrow="Lead View" title="Settings" right={
         <div className={s.tabs} role="group" aria-label="Section">
           <button type="button" className={s.tab} aria-pressed={tab === 'brands'} onClick={() => setTab('brands')}><Bi en="Brands" zh="品牌" /></button>
+          <button type="button" className={s.tab} aria-pressed={tab === 'ads'} onClick={() => setTab('ads')}><Bi en="Ads" zh="广告" /></button>
           <button type="button" className={s.tab} aria-pressed={tab === 'test'} onClick={() => setTab('test')}><Bi en="Test" zh="测试" /></button>
         </div>
       } />
@@ -29,6 +32,8 @@ export default function SettingsView({ config, canManage, canTest }: { config: L
           {config.brands.map(b => <BrandPanel key={b.id} brand={b} canManage={canManage} />)}
           {canManage ? <NewBrand /> : null}
         </div>
+      ) : tab === 'ads' ? (
+        ads ? <AdsPanel ads={ads} brands={config.brands} canManage={canManage} /> : <div className={s.error}>The ads could not be read.</div>
       ) : (
         <TestPanel config={config} canTest={canTest} />
       )}
@@ -170,14 +175,14 @@ function NewBrand() {
 }
 
 function TestPanel({ config, canTest }: { config: LeadConfig; canTest: boolean }) {
-  const [form, setForm] = useState({ brand: config.brands[0]?.id ?? '', channel: 'messenger' as 'messenger' | 'instagram', name: 'Test customer 01', ad: '', body: 'Hi, is this sofa in stock?' })
+  const [form, setForm] = useState({ brand: config.brands[0]?.id ?? '', channel: 'messenger' as 'messenger' | 'instagram', name: 'Test customer 01', ad: '', adId: '', body: 'Hi, is this sofa in stock?' })
   const [busy, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState<string | null>(null)
   const send = () => start(async () => {
     setError(null)
     setSent(null)
-    const r = await sendTestEnquiry(form.brand, form.channel, form.name, form.ad, form.body)
+    const r = await sendTestEnquiry(form.brand, form.channel, form.name, form.ad, form.body, form.adId)
     if (!r.ok) setError(r.reason)
     else setSent(r.data)
   })
@@ -199,6 +204,7 @@ function TestPanel({ config, canTest }: { config: LeadConfig; canTest: boolean }
           </label>
           <label className={s.field}><Bi en="Customer name" zh="客户名字" /><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={80} /></label>
           <label className={s.field}><Bi en="From the ad" zh="从哪个广告来" /><input value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} maxLength={120} placeholder="Empty = organic" /></label>
+          <label className={s.field}><Bi en="Ad id (optional)" zh="广告编号（可不填）" /><input value={form.adId} onChange={e => setForm({ ...form, adId: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={30} placeholder="e.g. 120210000000001" /></label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Message" zh="消息" /><textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} maxLength={2000} /></label>
         </div>
         {error ? <div className={s.error} role="alert">{error}</div> : null}

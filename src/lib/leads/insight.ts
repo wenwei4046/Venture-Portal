@@ -1,6 +1,7 @@
 // Lead View › Insight (2026-10-16): the period's conversations counted the way Customer Service is judged —
 // the phone is the KPI (the user: 客服的 KPI 更多是在拿到電話號碼); handed, booked and came are for reference.
 
+import { adLabel } from './ads'
 import type { LeadBrand, LeadContact } from './types'
 
 export interface Tally {
@@ -54,8 +55,8 @@ export function leadInsight(contacts: LeadContact[], brands: Pick<LeadBrand, 'id
   for (const c of rows) {
     add(total, c)
     add(row(brand, c.brandId, brands.find(b => b.id === c.brandId)?.name ?? '—'), c)
-    const adName = c.sourceAd.trim()
-    add(row(ad, adName || '', adName || 'Organic'), c)
+    const adName = adLabel(c)
+    add(row(ad, c.adId || adName || '', adName || 'Organic'), c)
     if (c.handedByName) add(row(person, c.handedByName, c.handedByName), c)
   }
   const byCount = (a: TallyRow, b: TallyRow) => b.conversations - a.conversations || a.label.localeCompare(b.label)

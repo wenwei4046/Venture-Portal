@@ -1,16 +1,16 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { loadLeadConfig } from '@/lib/leads/server'
+import { loadAds, loadLeadConfig } from '@/lib/leads/server'
 import SettingsView from '../_components/SettingsView'
 
 export const dynamic = 'force-dynamic'
 
-/** Lead View › Settings (2026-10-16): brands, their salespeople, the test enquiry. Lead View · View reads it; Manage edits. */
+/** Lead View › Settings (2026-10-16): brands, their salespeople, the ads conversations came from, the test enquiry. Lead View · View reads it; Manage edits. */
 export default async function Page() {
   await requirePage('/leads/settings')
   const user = await requirePermission('leads')
-  const config = await loadLeadConfig()
+  const [config, ads] = await Promise.all([loadLeadConfig(), loadAds()])
   if (!config.ok) {
     return (
       <HvPage>
@@ -19,5 +19,5 @@ export default async function Page() {
       </HvPage>
     )
   }
-  return <SettingsView config={config.data} canManage={canDo(user, 'leads', 'manage')} canTest={canDo(user, 'leads', 'create')} />
+  return <SettingsView config={config.data} ads={ads.ok ? ads.data : null} canManage={canDo(user, 'leads', 'manage')} canTest={canDo(user, 'leads', 'create')} />
 }

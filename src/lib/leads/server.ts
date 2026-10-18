@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import type { KnowledgeCard, Persona } from './ai'
+import type { LeadAd } from './ads'
 import type { Campaign } from './campaign'
 import type { LeadFlow } from './flow'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
@@ -72,4 +73,9 @@ export function loadPersonas(): Promise<Read<Persona[]>> {
 /** Every campaign, newest first, with what came of the sent ones. */
 export function loadCampaigns(): Promise<Read<Campaign[]>> {
   return rpc<Campaign[]>('lead_campaigns', undefined, 'The campaigns')
+}
+
+/** Every ad conversations came from, with its name, campaign, ad set and link where known. */
+export function loadAds(): Promise<Read<LeadAd[]>> {
+  return rpc<LeadAd[]>('lead_ads', undefined, 'The ads')
 }

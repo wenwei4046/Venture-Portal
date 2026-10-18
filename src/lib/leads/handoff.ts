@@ -2,6 +2,7 @@
 // 銷售團隊不會在這個系統中 … 會用自己的手機去聯繫客戶) — Customer Service sends them the lead on WhatsApp
 // from the browser, the text filled in here, and the portal records who got it (lead_handoff).
 
+import { adLabel } from './ads'
 import { formatPhone } from './phone'
 import type { LeadBrand, LeadContact, LeadSales } from './types'
 
@@ -25,7 +26,7 @@ export function handoffText(contact: LeadContact, brandName: string, sales: Pick
     `Phone 电话: ${contact.phone ? formatPhone(contact.phone) : '[—]'}`,
     `Interest 意向: ${or(contact.interest, '[not asked 未问]')}${contact.budget.trim() ? ` (budget 预算 ${contact.budget.trim()})` : ''}`,
     `Showroom 分店: ${or(contact.showroom, '[not set 未定]')} · ${or(contact.preferredTime, '[time not set 时间未定]')}`,
-    `Source 来源: ${CHANNEL[contact.channel]}${contact.sourceAd.trim() ? ` · ${contact.sourceAd.trim()}` : ' · organic'}`,
+    `Source 来源: ${CHANNEL[contact.channel]}${adLabel(contact) ? ` · ${adLabel(contact)}` : ' · organic'}`,
   ]
   if (contact.note.trim()) lines.push(`Note 备注: ${contact.note.trim()}`)
   lines.push(`CS 客服: ${csName}`, `→ ${sales.name}, please call the customer to book a visit 🙏 请联络客户安排到店`)

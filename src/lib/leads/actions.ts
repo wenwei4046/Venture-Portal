@@ -6,6 +6,7 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel } from './ai-model'
+import { fetchMetaAds } from './ads-server'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
@@ -75,9 +76,15 @@ export async function setLeadOutcome(contactId: string, appt: Appt, shown: Shown
 // ── Settings ────────────────────────────────────────────────────────────────
 
 /** Settings › Test: a customer's message as if it came from Meta. */
-export async function sendTestEnquiry(brandId: string, channel: 'messenger' | 'instagram', name: string, ad: string, body: string) {
+export async function sendTestEnquiry(brandId: string, channel: 'messenger' | 'instagram', name: string, ad: string, body: string, adId = '') {
   await requireActionOn('/leads/settings', 'leads', 'create')
-  return call<string>('lead_simulate', { p_brand: brandId, p_channel: channel, p_name: name, p_ad: ad, p_body: body }, 'The test message was not sent.')
+  const sent = await call<string>('lead_simulate', { p_brand: brandId, p_channel: channel, p_name: name, p_ad: ad, p_body: body }, 'The test message was not sent.')
+  // An ad id, as Meta's message from an ad would carry it (mig 20261018100000).
+  if (sent.ok && adId.trim()) {
+    const tagged = await call<null>('lead_test_ad', { p_contact: sent.data, p_ad_id: adId.trim() }, 'The ad id was not kept.')
+    if (!tagged.ok) return tagged
+  }
+  return sent
 }
 
 export async function saveLeadBrand(brandId: string | null, data: { name: string; tone?: string; fbPageId?: string; igAccountId?: string; handoffMode?: 'rotate' | 'pick' }) {
@@ -245,4 +252,21 @@ export async function removeCampaign(campaignId: string) {
 export async function setOptIn(contactId: string, state: OptIn) {
   await requireActionOn('/leads', 'leads', 'edit')
   return call<null>('lead_set_opt_in', { p_contact: contactId, p_state: state }, 'The consent was not saved.')
+}
+
+// ── Ads: name, source, link (mig 20261018100000) ────────────────────────────
+
+/** Settings › Ads: name an ad by hand (all empty takes the hand's name away). */
+export async function nameAd(adId: string, data: { name: string; campaign: string; adset: string; link: string }) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<null>('lead_name_ad', { p_ad_id: adId, p_data: data }, 'The ad was not named.')
+}
+
+/** Settings › Ads: ask Ads Manager for these ads' names, campaigns, ad sets and posts (needs ads_read). */
+export async function fetchAdNames(adIds: string[]): Promise<LeadOutcome<number>> {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  const meta = await fetchMetaAds(adIds)
+  if (!meta.ok) return meta
+  if (meta.ads.length === 0) return { ok: true, data: 0 }
+  return call<number>('lead_save_meta_ads', { p_rows: meta.ads }, 'What Meta said was not kept.')
 }
