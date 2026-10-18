@@ -108,3 +108,6 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 16. No line after a team's name (phone Team performance, desktop Insight). Contacts: the "To fill in" list is gone; the
     Contacts and Calendar rails start folded. Ads Performance: each column's width is dragged at its head (double-click
     resets). Showrooms' weekly slots name every hour.
+17. Desktop: the Revenue sidebar folds to its icons (68 px) while the CRM is open — pointing at it or tabbing into it shows
+    it whole over the CRM; a count is a dot. Showrooms' "Closed every week on" and Add closure work on the always-open page
+    (the first change starts the draft from the showroom on screen; they did nothing before).

@@ -49,7 +49,10 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
   const rooms = data.rooms.filter(r => r.active);
   const dr = ui.srDraft, en = ui.srEdit;
   const srOpen = ui.stage !== "menu" && opItem === "Showrooms" && !!en && !!dr;
-  const upd = (x: Partial<SrDraft>) => set(u => (u.srDraft ? { ...u, srDraft: { ...u.srDraft, ...x } } : u));
+  // 4a's Showrooms is always open to edit, so the first change starts the draft from the showroom on screen (it did nothing
+  // then — "Closed every week on" and Add closure, the owner 2026-10-18: "点了没有功能").
+  const upd = (x: Partial<SrDraft>) => set(u => (u.srDraft ? { ...u, srDraft: { ...u.srDraft, ...x } }
+    : { ...u, srEdit: u.srEdit ?? curRoom?.id ?? "new", srDraft: { ...draftOf(curRoom), ...x } }));
   const cnt = (off: Record<string, 1>, tm: string[]) => tm.length * 7 - Object.keys(off).filter(k => tm.includes(k.split("|")[0])).length;
   const timeTxt = (b: SrBlock) => (b.allDay || !b.ranges.length ? "All day" : b.ranges.map(r => `${r.f} – ${r.t}`).join(", "));
   const rangeTxt = (arr: number[]) => { if (arr.length === 7) return "Every day"; if (!arr.length) return "Closed"; const runs: string[] = []; let st = arr[0], pv = arr[0];
@@ -138,7 +141,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     srBlkOpen: ui.srBlkOpen, srBlkNone: !!dr && !dr.blocks.length && !ui.srBlkOpen, srBlkBtn: ui.srBlkOpen ? "Close" : "Block time", srBlkIc: ui.srBlkOpen ? "M18 6 6 18M6 6l12 12" : "M12 5v14M5 12h14", srBlkBtnBg: ui.srBlkOpen ? "var(--crm-tint-attention)" : "#fff",
     srBlkToggle: () => set(u => ({ ...u, srBlkOpen: !u.srBlkOpen, srBlk: null })),
     srBlk: { ...bk, fromTxt: bk.from ? fd(bk.from) : "Pick date", toTxt: bk.to ? fd(bk.to) : "Pick date", fromBd: which === "from" ? "var(--crm-rust)" : "var(--crm-rule)", toBd: which === "to" ? "var(--crm-rust)" : "var(--crm-rule)", fromFg: bk.from ? "var(--crm-ink)" : "var(--crm-faint)", toFg: bk.to ? "var(--crm-ink)" : "var(--crm-faint)" },
-    srBlkDays: DN.map((l, i) => { const wd = dr?.weekDays ?? [], on = wd.includes(i); return { l, bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", toggle: () => upd({ weekDays: on ? wd.filter(x => x !== i) : [...wd, i].sort() }) }; }),
+    srBlkDays: DN.map((l, i) => { const wd = d4.weekDays ?? [], on = wd.includes(i); return { l, bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", toggle: () => upd({ weekDays: on ? wd.filter(x => x !== i) : [...wd, i].sort() }) }; }),
     srWkNote: dr?.weekDays.length ? `Closed every ${dr.weekDays.map(i => DN[i]).join(", ")}` : "", srWkFg: dr?.weekDays.length ? "var(--crm-oxblood)" : "var(--crm-muted)",
     srBlkFrom: (e: { target: { value: string } }) => updB({ from: e.target.value, to: bk.to && bk.to >= e.target.value ? bk.to : e.target.value }),
     srBlkTo: (e: { target: { value: string } }) => updB({ to: e.target.value, from: bk.from && bk.from <= e.target.value ? bk.from : e.target.value }),
@@ -158,7 +161,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     srAddRange: () => { const last = bk.ranges[bk.ranges.length - 1], li = last ? HOURS.indexOf(last.t) : 11; updB({ ranges: [...bk.ranges, { f: HOURS[Math.min(li + 1, 22)], t: HOURS[Math.min(li + 2, 23)] }] }); },
     srDtCur: okD ? "pointer" : "not-allowed", srDtHint: okD ? `${rng} · ${bk.allDay ? "All day" : bk.ranges.map(r => `${r.f} – ${r.t}`).join(", ")}` : "", srDtHintFg: okD ? "var(--crm-ink)" : "var(--crm-faint)",
     srDtNoAdd: !okD, srDtAddBg: okD ? "var(--crm-rust)" : "var(--crm-line)",
-    srDtAdd: () => { if (!okD || !dr) return; upd({ blocks: [...dr.blocks, { kind: "date", from: bk.from, to: bk.to || bk.from, allDay: bk.allDay, ranges: bk.allDay ? [] : bk.ranges, reason: bk.reason }] });
+    srDtAdd: () => { if (!okD) return; upd({ blocks: [...d4.blocks, { kind: "date", from: bk.from, to: bk.to || bk.from, allDay: bk.allDay, ranges: bk.allDay ? [] : bk.ranges, reason: bk.reason }] });
       patch({ srBlk: { ...bk, from: "", to: "", reason: "", allDay: true, ranges: [{ f: "11:00 am", t: "1:00 pm" }] } }); },
     srEditing: !!en, srApplyAll: () => void save(true), srSave: () => void save(false), srClose: () => patch({ srEdit: null, srDraft: null }),
     srE: dr ? {

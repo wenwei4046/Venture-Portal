@@ -66,7 +66,9 @@ export function frameVM(ctx: DeskCtx) {
   const { ui, set, patch, W, H, me, data } = ctx;
   const tab = ui.tab, pane = ui.pane, kind = ui.kind;
   const collapsed = ui.collapsed;
-  const sbW = collapsed ? 72 : 477; // 4a: the Revenue sidebar (216 + its 24 px padding) and the CRM nav (212 + 24 + its 1 px rule); shut, the 72 px rail
+  // 4a: the Revenue sidebar folded to its icons, 68 px (it opens over the CRM when pointed at — Desk4aSide; the owner
+  // 2026-10-18: "点入crm 后，左手边自动收起"; it was 240), and the CRM nav (237); shut, the 72 px rail.
+  const sbW = collapsed ? 72 : 305;
   const crmW = W - sbW;
   const role = me.role === "boss" ? "principal" : "director";
   const teamMine = role === "director";

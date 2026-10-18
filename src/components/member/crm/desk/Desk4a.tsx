@@ -30,18 +30,24 @@ interface SideBits {
 export function Desk4aSide({ v }: { v: SideBits }) {
   const f = v.f4;
   const [mods, setMods] = useState(false);
+  // The Revenue sidebar folds to its icons (68 px) while the CRM is open; pointing at it, tabbing into it or one of its menus
+  // open shows it whole over the CRM (the owner, 2026-10-18: "点入crm 后，左手边自动收起"). frame.ts › sbW counts 68.
+  const [hover, setHover] = useState(false), open = hover || mods || v.meMenuOpen;
   return (<>
-    <aside data-rev-side="" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "240px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "2px",
-      padding: "22px 12px 18px", background: "var(--crm-ink)", zIndex: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 20px" }}>
-        <div style={{ width: "30px", height: "30px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", font: `600 14px ${TIGHT}`, background: "var(--crm-orange)", color: "#fff" }}>H</div>
-        <div style={{ font: `600 15px ${TIGHT}`, letterSpacing: "0.14em", color: "var(--crm-on-light)" }}>HOUZS</div>
+    <aside data-rev-side="" data-open={open ? "" : undefined} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHover(false); }}
+      style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: open ? "240px" : "68px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "2px",
+      padding: "22px 12px 18px", background: "var(--crm-ink)", zIndex: open ? 9 : 6, overflow: open ? "visible" : "hidden", whiteSpace: "nowrap",
+      transition: "width 180ms ease, box-shadow 180ms ease", boxShadow: open ? "10px 0 28px rgba(20,10,4,.25)" : "none" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: open ? "0 10px 20px" : "0 0 20px 5px" }}>
+        <div style={{ flex: "none", width: "30px", height: "30px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", font: `600 14px ${TIGHT}`, background: "var(--crm-orange)", color: "#fff" }}>H</div>
+        <div style={{ font: `600 15px ${TIGHT}`, letterSpacing: "0.14em", color: "var(--crm-on-light)", visibility: open ? "visible" : "hidden" }}>HOUZS</div>
       </div>
-      {f.revNav.map(n => <RevRow key={n.label} label={n.label} on={n.on} pick={n.pick} badge={n.badge}><Ic name={n.icon} size={17} /></RevRow>)}
-      <RevRow label={f.notif.label} on={false} pick={f.notif.pick} badge={f.notif.count}><Ic name="bell" size={17} /></RevRow>
+      {f.revNav.map(n => <RevRow key={n.label} label={n.label} on={n.on} pick={n.pick} badge={n.badge} folded={!open}><Ic name={n.icon} size={17} /></RevRow>)}
+      <RevRow label={f.notif.label} on={false} pick={f.notif.pick} badge={f.notif.count} folded={!open}><Ic name="bell" size={17} /></RevRow>
       {f.products && (<>
-        <div style={{ padding: "16px 10px 6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{f.products.group}</div>
-        <RevRow label="Product List" on={false} pick={f.products.onOpen} badge=""><Ic name="layout-grid" size={17} /></RevRow>
+        <div style={{ padding: "16px 10px 6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", visibility: open ? "visible" : "hidden" }}>{f.products.group}</div>
+        <RevRow label="Product List" on={false} pick={f.products.onOpen} badge="" folded={!open}><Ic name="layout-grid" size={17} /></RevRow>
       </>)}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "12px", position: "relative" }}>
         {f.modules && (<>
@@ -58,8 +64,8 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             </div>
           </>)}
           <button type="button" aria-label="Switch module" aria-expanded={mods} onClick={() => setMods(o => !o)} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px",
-            height: "36px", padding: "0 10px", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "var(--crm-sidebar-text)", border: "1px solid rgba(255,255,255,.12)" }}>
-            <Ic name="layout-grid" size={15} />Revenue<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span>
+            height: "36px", padding: open ? "0 10px" : 0, justifyContent: open ? undefined : "center", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "var(--crm-sidebar-text)", border: "1px solid rgba(255,255,255,.12)" }}>
+            <Ic name="layout-grid" size={15} />{open && <>Revenue<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span></>}
           </button>
         </>)}
         {v.meMenuOpen && (<>
@@ -69,17 +75,17 @@ export function Desk4aSide({ v }: { v: SideBits }) {
               font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}><Ic name="x" size={15} />Sign out</button>
           </div>
         </>)}
-        <button type="button" onClick={v.toggleMeMenu} title="Profile" style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", padding: "12px 10px 0", borderTop: "1px solid rgba(255,255,255,.08)" }}>
+        <button type="button" onClick={v.toggleMeMenu} title="Profile" style={{ ...BTN, display: "flex", alignItems: "center", justifyContent: open ? undefined : "center", gap: "10px", padding: open ? "12px 10px 0" : "12px 0 0", borderTop: "1px solid rgba(255,255,255,.08)" }}>
           <span style={{ width: "32px", height: "32px", borderRadius: "50%", flex: "none", display: "flex", alignItems: "center", justifyContent: "center", font: `500 12px ${TIGHT}`,
             background: "var(--crm-on-light)", color: "var(--crm-ink)" }}>{f.account.ini}</span>
-          <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+          <span style={{ display: open ? "flex" : "none", flexDirection: "column", gap: "1px", minWidth: 0 }}>
             <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-on-light)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.account.name}</span>
             <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.account.sub}</span>
           </span>
         </button>
       </div>
     </aside>
-    <aside data-crm-nav="" style={{ position: "absolute", left: "240px", top: 0, bottom: 0, width: "237px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "1px",
+    <aside data-crm-nav="" style={{ position: "absolute", left: "68px", top: 0, bottom: 0, width: "237px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "1px",
       padding: "24px 12px 18px", background: "var(--crm-cream-nav)", borderRight: "1px solid var(--crm-nav-line)", zIndex: 6, overflow: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", padding: "0 10px 18px" }}>
         <span style={{ flex: 1, font: `500 22px ${TIGHT}`, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>CRM</span>
@@ -112,13 +118,16 @@ export function Desk4aSide({ v }: { v: SideBits }) {
   </>);
 }
 
-function RevRow({ label, on, pick, badge, children }: { label: string; on: boolean; pick: () => void; badge: string; children: ReactNode }) {
+function RevRow({ label, on, pick, badge, folded, children }: { label: string; on: boolean; pick: () => void; badge: string; folded?: boolean; children: ReactNode }) {
   return (
-    <button type="button" onClick={pick} aria-current={on ? "page" : undefined} style={{ ...BTN, flex: "none", display: "flex", alignItems: "center", gap: "12px", height: "38px", padding: "0 10px",
+    <button type="button" onClick={pick} aria-current={on ? "page" : undefined} aria-label={folded ? label : undefined} title={folded ? label : undefined}
+      style={{ ...BTN, flex: "none", position: "relative", display: "flex", alignItems: "center", justifyContent: folded ? "center" : undefined, gap: "12px", height: "38px", padding: folded ? 0 : "0 10px",
       borderRadius: "7px", font: "500 14px Inter, sans-serif", background: on ? "var(--crm-rust)" : "transparent", color: on ? "#fff" : "var(--crm-sidebar-text)" }}>
-      {children}<span>{label}</span>
-      {badge && <span style={{ marginLeft: "auto", minWidth: "20px", height: "18px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center",
+      {children}{!folded && <span>{label}</span>}
+      {badge && !folded && <span style={{ marginLeft: "auto", minWidth: "20px", height: "18px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center",
         justifyContent: "center", font: `600 10px ${TIGHT}`, background: on ? "rgba(255,255,255,.22)" : "var(--crm-rust)", color: "#fff" }}>{badge}</span>}
+      {/* Folded, a count is a dot on the icon. */}
+      {badge && folded && <span style={{ position: "absolute", top: "7px", right: "10px", width: "8px", height: "8px", borderRadius: "50%", background: on ? "#fff" : "var(--crm-orange)", boxShadow: "0 0 0 2px var(--crm-ink)" }} />}
     </button>
   );
 }
