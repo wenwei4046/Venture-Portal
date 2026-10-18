@@ -219,7 +219,7 @@ export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: strin
   const boss = ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
   if (boss.length) groups.push({ name: "Principal", c: "var(--crm-ink)", n: boss.length, people: boss });
   const dirs = ctx.directors.filter(d => d.id !== o.skip).map(d => row(d, DIRECTOR.c));
-  if (dirs.length) groups.push({ name: o.hodLabel ?? "HOD", c: DIRECTOR.c, n: dirs.length, people: dirs });
+  if (dirs.length) groups.push({ name: o.hodLabel ?? "Revenue Director", c: DIRECTOR.c, n: dirs.length, people: dirs });
   for (const t of ctx.teams) {
     const ps = t.people.filter(p => p.id !== o.skip).sort((a, b) => sortKey(a) - sortKey(b)).map(p => row(p, t.c));
     if (ps.length) groups.push({ name: t.name, c: t.c, n: ps.length, people: ps });

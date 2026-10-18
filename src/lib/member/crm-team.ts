@@ -34,7 +34,7 @@ import type { CrmAppointment, CrmLead } from "./crm";
 export type CrmRole = "boss" | "hod" | "stl" | "tl" | "ta" | "rs";
 
 export const ROLE_LABELS: Record<CrmRole, string> = {
-  boss: "Boss", hod: "HOD", stl: "Senior TL", tl: "TL", ta: "TA", rs: "RS",
+  boss: "Boss", hod: "Revenue Director", stl: "Senior TL", tl: "TL", ta: "TA", rs: "RS",
 };
 
 /** The most direct downlines anyone may have. */

@@ -48,7 +48,7 @@ export function calendarVM(ctx: PanelCtx) {
   const seatC = (id: string) => (id === "hod" ? "var(--crm-brown)" : ctx.teams.find(t => t.id === id)?.c ?? "var(--crm-muted)");
   // The person sheet: everyone in the chosen team (TAs book no visits).
   const inTeam = (id: string) => ts === "all" || (seatOf(ctx, id)?.id ?? "") === ts;
-  const groups = pickGroups(ctx, { sel: pp, pick: id => patch({ cPerson: id, cpSheet: false }), hodLabel: "Director" })
+  const groups = pickGroups(ctx, { sel: pp, pick: id => patch({ cPerson: id, cpSheet: false }), hodLabel: "Revenue Director" })
     .map(g => ({ ...g, people: g.people.filter(p => inTeam(p.id) && ctx.data.people.find(x => x.id === p.id)?.role !== "ta") })).map(g => ({ ...g, n: g.people.length })).filter(g => g.n);
   const persons = groups.reduce((n, g) => n + g.n, 0);
   // Leads in the range (rev 1011: the hero's first figure), by the team / person chips.

@@ -166,10 +166,10 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                     </>)}
                   </span>
                 </div>
-                <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "14px", background: p.stBg, color: p.stFg, fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.stDot }} />{p.st}</span><a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "50%", display: p.hasTel ? "grid" : "none", placeItems: "center", color: "var(--crm-faint)", textDecoration: "none" }}>
+                <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "14px", background: p.stBg, color: p.stFg, fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.stDot }} />{p.st}</span><a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "50%", display: "grid", placeItems: "center", color: "var(--crm-faint)", opacity: p.hasTel ? 1 : 0.5, pointerEvents: p.hasTel ? "auto" : "none", textDecoration: "none" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z">
-                    </path>
+                    </path>{!p.hasTel && (<path d="M3 3l18 18" />)}
                   </svg>
                 </a>
               </div>

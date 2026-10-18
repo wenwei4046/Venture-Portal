@@ -41,7 +41,7 @@ export function overviewVM(ctx: PanelCtx) {
     };
   };
   const dirRows = directors.length
-    ? [row("hod", "HOD", `Own customers · ${directors.map(d => d.name).join(", ")}`, DIRECTOR.c, directors.map(d => d.id), [], [DIRECTOR.tint, DIRECTOR.c])]
+    ? [row("hod", "Revenue Director", `Own customers · ${directors.map(d => d.name).join(", ")}`, DIRECTOR.c, directors.map(d => d.id), [], [DIRECTOR.tint, DIRECTOR.c])]
     : [];
   // 4a (T01, change list 19): the hero's four figures with their change on the comparison period — the one picked, else
   // the period before — and "vs Sep" on the period card; the greeting by the time of day.

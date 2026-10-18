@@ -115,3 +115,6 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
     Customer info — a 62 px head (icon, Breakdown / Figures, › folds) over what scrolls. Ads Performance: Appt rate is its
     figure, no bar. The desktop ad editor lists inside each team only the teams the split gives a share (the phone's rule).
     Customer form: + Add field with nothing typed adds "New field" and opens it.
+19. "HOD" reads "Revenue Director" on every screen (phone and desktop: Team performance, Send to / people lists, the
+    Calendar's people filter, role names). Phone Contacts: a contact with no number keeps a struck-through, untappable
+    phone, so every status pill sits in one line.

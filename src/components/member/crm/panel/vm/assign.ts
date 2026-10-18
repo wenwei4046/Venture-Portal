@@ -14,7 +14,7 @@ import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team }
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
-const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "HOD" };
+const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Revenue Director" };
 const digits = (e: ChangeEvent<HTMLInputElement>) => parseInt(e.target.value.replace(/\D/g, "")) || 0;
 const selAll = (e: FocusEvent<HTMLInputElement>) => e.target.select();
 // 4a change list 17: the active segment is rust with white words.
