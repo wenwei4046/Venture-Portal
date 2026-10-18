@@ -261,7 +261,6 @@ function Gallery({ onPick, onClose }: { onPick: (key: string) => void; onClose: 
                   <span style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <strong style={{ fontSize: 14 }}><Bi en={c.en} zh={c.zh} /></strong>
                     <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>{c.descEn}</span>
-                    <span className={s.hint}>{c.descZh}</span>
                     {c.soon ? <span className={s.brand} data-tone="plum" style={{ alignSelf: 'flex-start' }}>Coming soon</span> : null}
                   </span>
                 </button>
