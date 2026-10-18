@@ -159,11 +159,11 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
       {h.sub && <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{h.sub}</div>}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px", flex: "none" }}>
         {extra}
-        <button type="button" onClick={f4.openAlerts} title="CRM alerts: moves, shares, won, lost, overdue 9 h+" style={{ ...BTN, height: "36px", padding: "0 14px", borderRadius: "7px",
-          display: "flex", alignItems: "center", gap: "8px", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", whiteSpace: "nowrap", color: "var(--crm-ink)" }} className="crm4a-outline">
-          <Ic name="bell" size={15} />CRM alerts
-          {f4.alertsN && (<><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--crm-orange)" }} />
-            <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-oxblood)" }}>{f4.alertsN}</span></>)}
+        {/* The owner, 2026-10-18: CRM alerts is the bell alone (a dot when there are unread ones). */}
+        <button type="button" onClick={f4.openAlerts} title={f4.alertsN ? `CRM alerts · ${f4.alertsN} unread` : "CRM alerts"} aria-label="CRM alerts" style={{ ...BTN, position: "relative", width: "36px", height: "36px", borderRadius: "50%",
+          display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">
+          <Ic name="bell" size={16} />
+          {f4.alertsN && <span style={{ position: "absolute", top: "6px", right: "7px", width: "7px", height: "7px", boxSizing: "content-box", borderRadius: "50%", background: "var(--crm-orange)", border: "2px solid #fff" }} />}
         </button>
         {h.cta && (
           <span style={{ position: "relative" }}>

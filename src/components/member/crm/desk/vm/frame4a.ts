@@ -112,7 +112,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
   const pdf = v.apDl.find(d => d.v === "pdf");
   return {
-    insight: { tabs: v.periodOpts, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
+    insight: { tabs: v.periodOpts, sub: v.insightSub, cta: { label: "Export", icon: "file-text", act: v.insightPdf } },
     inbox: { tabs: [], sub: "", cta: null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
     calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },

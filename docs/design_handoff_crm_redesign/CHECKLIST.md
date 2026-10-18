@@ -86,3 +86,4 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 3. Split leads: each slider's part not reached is white with a hairline; the part reached and the dot are the team's colour.
 4. Team Calendar opens on Month (Month · List; it opened on List).
 5. Member work type is Assignment's Work type tab only (it opens there); its row on Profile is gone.
+6. Desktop head: CRM alerts is the bell alone (a dot when unread), on every page; Insight's button reads Export.
