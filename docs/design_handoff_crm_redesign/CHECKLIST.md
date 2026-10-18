@@ -93,3 +93,6 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
    Ad performance and the Audit log each fold to a 44 px strip with its name (as the Inbox's Customer info and Audit log),
    both folded at first; Split keeps × to close the ad.
 10. Ads Performance: the head's Download PDF is gone — the PDF is in Export (Excel · CSV · PDF report).
+11. Assignment › Ads to teams: Split starts narrower beside its two strips — 384 px at 1440, 336 px under it (461 / 420
+    before; a drag still sets it) — and the list's name column keeps 136 px, the split bar giving way first, so every ad's
+    name shows at 1280 and 1440.
