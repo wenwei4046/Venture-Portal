@@ -7,7 +7,7 @@
  * Sizes: the handoff's phone sizes are final on-screen px. The app scales type by --rv-type (.92 on a phone), so a size
  * here is the frame's px ÷ .92 through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
-import type { CSSProperties, MouseEvent as RMouseEvent, ReactNode } from "react";
+import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 
@@ -73,12 +73,13 @@ export function Phone4aSeg({ items }: { items: { label: string; on: boolean; pic
 }
 
 /** Change list 19 · the rust hero: three rates in white, an amber mark over the first, each one's change readable on rust. */
-export function Phone4aHero({ items }: { items: { label: string; value: string; delta: string; good: boolean }[] }) {
+export function Phone4aHero({ items, cols }: { items: { label: string; value: string; delta: string; good: boolean }[]; cols?: number }) {
+  const n = cols ?? items.length;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${items.length}, minmax(0,1fr))`, padding: "20px 16px", borderRadius: "20px", background: "var(--crm-rust)", color: "#fff" }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, rowGap: "22px", padding: n === 2 ? "20px 20px 22px" : "20px 16px", borderRadius: "20px", background: "var(--crm-rust)", color: "#fff" }}>
       {items.map((m, i) => (
-        <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: "4px", padding: i ? "0 0 0 16px" : "0 16px 0 0", borderLeft: i ? "1px solid rgba(255,255,255,.22)" : "0", minWidth: 0 }}>
-          <span style={{ width: "18px", height: "3px", borderRadius: "2px", background: i ? "transparent" : "var(--crm-amber)", marginBottom: "6px" }} />
+        <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: "4px", padding: i % n ? "0 0 0 20px" : "0 20px 0 0", borderLeft: i % n ? "1px solid rgba(255,255,255,.22)" : "0", minWidth: 0 }}>
+          <span style={{ width: "18px", height: "3px", borderRadius: "2px", background: i ? "transparent" : "var(--crm-amber)", marginBottom: "6px", display: i >= n ? "none" : "block" }} />
           <span style={{ fontSize: fs(13), color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}</span>
           <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(34), letterSpacing: "-0.035em", lineHeight: 1.05, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
           <span style={{ minHeight: "16px", fontSize: fs(12), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)" }}>{m.delta}</span>
@@ -133,5 +134,92 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
         </div>
       </div>
     </main>
+  );
+}
+
+const OUT: CSSProperties = { ...BTN, height: "34px", padding: "0 12px", borderRadius: "17px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", fontSize: fs(14), fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" };
+const MAIN: CSSProperties = { ...OUT, border: "1px solid var(--crm-rust)", background: "var(--crm-rust)", color: "#fff" };
+
+/** M10 · the Calendar's title row: "Calendar" and its views (Month · Week · Day — production's three; 4a's segmented look). */
+export function Phone4aCalHead({ v }: { v: { calViews: { label: string; weight: number; pick: () => void }[] } }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "0 20px" }}>
+      <h1 style={{ margin: 0, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(30), letterSpacing: "-0.025em", lineHeight: 1.2 }}>Calendar</h1>
+      <div style={{ display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>
+        {v.calViews.map(o => { const on = o.weight > 600;
+          return <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, height: "34px", padding: "0 14px", borderRadius: "17px", fontSize: fs(14), fontWeight: on ? 500 : 400, background: on ? "var(--crm-rust)" : "transparent", color: on ? "#fff" : "var(--crm-muted)" }}>{o.label}</button>; })}
+      </div>
+    </div>
+  );
+}
+
+type CalCell = { n: number; pick: () => void; isT: boolean; isS: boolean; inM: boolean; has: boolean; evC: string };
+/** M10 · the month: October 2026 with Today and ‹ ›, the weekday letters, a number per day and a dot under a day with visits. */
+export function Phone4aCalMonth({ v }: { v: { cal4: { month: string; prev: () => void; next: () => void }; calToday: (e: RMouseEvent<HTMLElement>) => void; calWk: string[]; calCells: CalCell[];
+  calSwDown: (e: RPointerEvent<HTMLElement>) => void; calSwUp: (e: RPointerEvent<HTMLElement>) => void } }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "0 10px 14px", borderBottom: "1px solid var(--crm-rule)" }}>
+      <div data-drag-scroll="" style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 10px 0" }}>
+        <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(19), color: "var(--crm-ink)" }}>{v.cal4.month}</span>
+        <button type="button" onClick={v.calToday} style={{ ...BTN, height: "30px", padding: "0 12px", marginRight: "6px", borderRadius: "15px", border: "1px solid var(--crm-line)", fontSize: fs(13), fontWeight: 500, color: "var(--crm-ink)" }}>Today</button>
+        <button type="button" onClick={v.cal4.prev} title="Previous month" style={{ ...BTN, width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-ink)" }}><Ic name="chevron-left" size={20} /></button>
+        <button type="button" onClick={v.cal4.next} title="Next month" style={{ ...BTN, width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-ink)" }}><Ic name="chevron-right" size={20} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
+        {v.calWk.map((w, i) => <span key={i} style={{ textAlign: "center", fontSize: fs(12), fontWeight: 500, color: "var(--crm-muted)", padding: "4px 0" }}>{w}</span>)}
+      </div>
+      <div onPointerDown={v.calSwDown} onPointerUp={v.calSwUp} style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0,1fr))", rowGap: "4px", touchAction: "pan-y", userSelect: "none" }}>
+        {v.calCells.map((c, i) => (
+          <button key={i} type="button" onClick={c.pick} style={{ ...BTN, height: "42px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", visibility: c.inM ? "visible" : "hidden" }}>
+            <span style={{ width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: fs(16), fontVariantNumeric: "tabular-nums", fontWeight: c.isT ? 500 : 400,
+              background: c.isT ? "var(--crm-rust)" : c.isS ? "var(--crm-cream)" : "transparent", color: c.isT ? "#fff" : "var(--crm-ink)" }}>{c.n}</span>
+            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: c.has ? c.evC : "transparent" }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type CalItem = { name: string; room: string; open: unknown; t: string; ap: string; kick: string };
+/** M10 · Today, Did they come? and Upcoming on the pale cream, a white card each — every button production's. */
+export function Phone4aCalLists({ v }: { v: {
+  hasToday: boolean; todayCount: string; noUpcoming: boolean; upTitle: string; upCount: string;
+  todayList: (CalItem & { due: boolean; change: unknown; came: () => void; noShow: () => void })[];
+  upList: (CalItem & { done: boolean; remind: () => void; rLabel: string })[]; cal4: { today: string } } }) {
+  const Kick = ({ children }: { children: ReactNode }) => <span style={{ fontSize: fs(12), fontWeight: 500, letterSpacing: "0.12em", color: "var(--crm-faint)", padding: "4px 4px 0" }}>{children}</span>;
+  const Card = ({ a, children }: { a: CalItem; children: ReactNode }) => (
+    <div style={{ display: "flex", gap: "16px", padding: "16px 14px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff" }}>
+      <button type="button" onClick={a.open as () => void} style={{ ...BTN, width: "58px", flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+        <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(18), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{a.t}</span>
+        <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{a.ap}</span>
+      </button>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+        <button type="button" onClick={a.open as () => void} style={{ ...BTN, display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
+          <span style={{ fontSize: fs(17), fontWeight: 500, color: "var(--crm-ink)" }}>{a.name}</span>
+          <span style={{ fontSize: fs(14), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
+        </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>{children}</div>
+      </div>
+    </div>
+  );
+  const today = v.todayList.filter(a => !a.due), due = v.todayList.filter(a => a.due);
+  const marks = (a: (typeof v.todayList)[number]) => (<>
+    <button type="button" onClick={a.came} style={MAIN}>Show up</button>
+    <button type="button" onClick={a.noShow} style={OUT}>No show</button>
+    <button type="button" onClick={a.change as () => void} style={OUT}><Ic name="pencil" size={13} />Change</button>
+  </>);
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "4px 0 -24px", padding: "18px 16px 28px", background: "var(--crm-hover)", flex: "1 0 auto" }}>
+      {v.hasToday && today.length > 0 && (<><Kick>TODAY · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={a}>{marks(a)}</Card>)}</>)}
+      {v.hasToday && due.length > 0 && (<><Kick>DID THEY COME?</Kick>{due.map((a, i) => <Card key={"d" + i} a={{ ...a, room: `${a.kick} · ${a.room}` }}>{marks(a)}</Card>)}</>)}
+      <Kick>{v.upTitle.toUpperCase()}{v.upCount ? ` · ${v.upCount.toUpperCase()}` : ""}</Kick>
+      {v.noUpcoming && <span style={{ padding: "6px 4px", fontSize: fs(14), color: "var(--crm-muted)" }}>No upcoming appointments.</span>}
+      {v.upList.map((a, i) => (
+        <Card key={"u" + i} a={{ ...a, room: `${a.kick} · ${a.room}` }}>
+          <button type="button" onClick={a.remind} style={a.done ? OUT : MAIN}>{a.done ? "Reminder sent · Send again" : a.rLabel}</button>
+        </Card>
+      ))}
+    </section>
   );
 }

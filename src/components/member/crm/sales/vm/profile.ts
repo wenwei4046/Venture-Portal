@@ -69,7 +69,8 @@ export function profileVM(ctx: SalesCtx) {
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
     openNotif: () => patch({ profSub: "notif", nTab: "all" }),
     nTabs: ([["all", "All", 0], ["unread", "Unread", unread], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
-      label, n: n || 0, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
+      // 4a (M13): every tab shows its count.
+      label, n: n || 0, on: nTab === k, cnt: k === "all" ? notifs.length : k === "unread" ? notifs.filter(x => !isRead(x)).length : notifs.filter(x => isRead(x)).length, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
     // Mark all as read: every update, never an invitation still to answer.
     canMarkAll: nTab !== "read" && notifs.some(n => !n.pending && !isRead(n)),
     markAll: () => act.readNotifs(notifs.filter(n => !n.pending && !isRead(n)).map(n => n.id), true),

@@ -130,18 +130,12 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
       </>)}
       {!!(v.profNotif) && (<>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px" }}>
-          <h1 style={{ margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Notifications</h1>
+          <h1 style={{ margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Notifications</h1>
           {!!(v.canMarkAll) && (<>
             <span onClick={v.markAll} style={{ flex: "none", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }} className={H.hov6}>Mark all as read</span>
           </>)}
         </div>
-        <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "12px", background: "var(--crm-field)" }}>
-          {(v.nTabs).map((t, t_i) => (<Fragment key={t_i}>
-            <span onClick={t.pick} style={{ flex: "1", height: "34px", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: t.weight, background: t.bg, color: t.fg, boxShadow: t.shadow, cursor: "pointer" }}>{t.label}{!!(t.n) && (<>
-                <span style={{ minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{t.n}</span>
-              </>)}</span>
-          </Fragment>))}
-        </div>
+        <div style={{ display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>{(v.nTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", background: t.on ? "var(--crm-rust)" : "transparent", color: t.on ? "#fff" : "var(--crm-muted)", cursor: "pointer" }}>{t.label}<span style={{ fontVariantNumeric: "tabular-nums", color: t.on ? "var(--crm-rust-meta)" : "var(--crm-faint)" }}>{t.cnt}</span></span>))}</div>
         {!!(v.nEmpty) && (<>
           <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", color: "var(--crm-muted)", textAlign: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -153,7 +147,7 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
         </>)}
         {!!(v.hasInv) && (<>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".05em", color: "var(--crm-muted)" }}>INVITATIONS</span>
+            <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "0.12em", color: "var(--crm-faint)" }}>INVITATIONS</span>
             {(v.notifInv).map((n, n_i) => (<Fragment key={n_i}>
               <section style={{ padding: "14px", borderRadius: "18px", background: "#fff", border: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -183,23 +177,23 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
         </>)}
         {!!(v.hasUpd) && (<>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".05em", color: "var(--crm-muted)" }}>UPDATES</span>
-            <div style={{ padding: "0 14px", borderRadius: "18px", background: "#fff", border: "1px solid var(--crm-rule)" }}>
+            <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "0.12em", color: "var(--crm-faint)" }}>UPDATES</span>
+            <div style={{ margin: "0 -20px" }}>
               {(v.notifUpd).map((u, u_i) => (<Fragment key={u_i}>
-                <div onClick={u.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: u.rule, cursor: "pointer" }}>
-                  <span style={{ flex: "none", width: "34px", height: "34px", borderRadius: "50%", background: u.bg, color: u.c, display: "grid", placeItems: "center" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <div onClick={u.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "12px 20px", background: u.unread ? "var(--crm-hover)" : "transparent", cursor: "pointer" }}>
+                  <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: u.bg, color: u.c, display: "grid", placeItems: "center" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d={u.icon}>
                       </path>
                     </svg>
                   </span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <span style={{ fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: u.weight, lineHeight: "1.3", color: u.fg }}>{u.text}</span>
-                    <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{u.meta}</span>
+                    <span style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: u.unread ? "600" : "400", lineHeight: "1.3", color: "var(--crm-ink)" }}>{u.text}</span>
+                    <span style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{u.meta}</span>
                     {!!(u.sum) && (<span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-ink)", lineHeight: "1.35", marginTop: "2px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{u.sum}</span>)}
                   </span>
                   {!!(u.unread) && (<>
-                    <span style={{ flex: "none", width: "9px", height: "9px", borderRadius: "50%", background: "var(--crm-rust)" }}>
+                    <span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-orange)" }}>
                     </span>
                   </>)}
                 </div>

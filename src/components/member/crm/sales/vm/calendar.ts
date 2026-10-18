@@ -137,7 +137,13 @@ export function calendarVM(ctx: SalesCtx) {
   if (oa && (oa.wonStep || oa.lostStep)) { if (oa.wonStep) outcomeOpts = []; outcomeClose = () => patch({ outcomeAsk: { ...oa, wonStep: false, lostStep: false } }); }
 
   const cel = ui.celebrate;
+  // 4a (M10): the month's own line (‹ October 2026 ›), a dot per day with visits (orange ahead, sand gone by), and the
+  // lists' time split in two lines and their day as a kicker.
+  const ap = (d: Date) => { const s = timeLabel(d); const m = /^(.*?)\s?([ap]m)$/i.exec(s); return m ? { t: m[1], ap: m[2].toLowerCase() } : { t: s, ap: "" }; };
+  const kick = (d: Date) => gb(d, { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
+  const cal4 = { month: first.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), prev: () => shiftMonth(-1), next: () => shiftMonth(1), today: kick(now) };
   return {
+    cal4,
     // stop comes with the customer form below
     calTitle: first.toLocaleDateString("en-GB", ym[0] === now.getFullYear() ? { month: "long" } : { month: "long", year: "numeric" }),
     calToday: (e: MouseEvent<HTMLElement>) => {
@@ -164,6 +170,7 @@ export function calendarVM(ctx: SalesCtx) {
       const d = new Date(ym[0], ym[1], 1 - lead0 + k), t = d.getTime(), inM = d.getMonth() === ym[1], isT = t === T, isS = t === sel, ev = evOn(t);
       return { n: d.getDate(), pick: guard(() => patch({ calSel: t, calYM: [d.getFullYear(), d.getMonth()] })), edge: k % 7 ? "1px solid var(--crm-rule-soft)" : "0",
         bg: isS && !isT ? "var(--crm-cream)" : "transparent", dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : inM ? "var(--crm-ink)" : "var(--crm-faint-2)", weight: isT || isS ? 700 : 500,
+        isT, isS, inM, has: ev.length > 0, evC: t >= T ? "var(--crm-orange)" : "var(--crm-st-lost)",
         ev: ev.slice(0, 2).map(a => ({ t: timeLabel(a.at).replace(":00", "").replace(" ", "") + " " + firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) as ((e: MouseEvent<HTMLElement>) => void) | undefined }))
           // "+N" keeps the cell's select-day.
           .concat(ev.length > 2 ? [{ t: "+" + (ev.length - 2), bg: "var(--crm-muted)", open: undefined }] : []) };
@@ -192,7 +199,7 @@ export function calendarVM(ctx: SalesCtx) {
     }),
     hasToday: todayV.length > 0 && inView(now), todayCount: earlier ? `${today} today · ${earlier} to mark` : `${todayV.length} today`,
     todayList: todayV.map(a => ({
-      name: a.c.name, room: a.room, open: openInfo(a.c),
+      name: a.c.name, room: a.room, open: openInfo(a.c), due: day0(a.at) !== T, kick: kick(a.at), ...ap(a.at),
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
       change: change(a), came: () => patch({ outcomeAsk: ask(a) }), noShow: () => patch({ outcomeAsk: ask(a, "noshow") }),
     })),
@@ -204,7 +211,7 @@ export function calendarVM(ctx: SalesCtx) {
     upCount: upV.length ? `${upV.length} booked` : "",
     upList: upV.map(a => {
       const done = !!a.v.remindedAt;
-      return { name: a.c.name, ini: ini(a.c.name), time: timeLabel(a.at), room: a.room, wk: a.at.toLocaleDateString("en-GB", { weekday: "short" }), dn: a.at.getDate(),
+      return { kick: kick(a.at), t: ap(a.at).t, ap: ap(a.at).ap, done, name: a.c.name, ini: ini(a.c.name), time: timeLabel(a.at), room: a.room, wk: a.at.toLocaleDateString("en-GB", { weekday: "short" }), dn: a.at.getDate(),
         open: openInfo(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }),
         // Sent once, it may go again (the owner, 2026-10-14: "upcoming 的 reminder 發過之後還可以再發"): the button keeps
         // its green "sent" look and reads Send again; one at a time per visit (a double tap sent twice before).

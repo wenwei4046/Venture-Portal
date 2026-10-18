@@ -7,6 +7,7 @@
 import { Fragment } from "react";
 import H from "../crm.module.css";
 import { InfoValue } from "../shared/AdLink";
+import { Phone4aCalHead, Phone4aCalLists, Phone4aCalMonth } from "../shared/phone4a";
 import type { CalendarVM } from "./vm/calendar";
 
 /** Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form. */
@@ -14,36 +15,12 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
   return (<>
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 0 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px" }}>
-        <h1 style={{ margin: "0", fontSize: "calc(26px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>{v.calTitle}</h1>
-        <span onClick={v.calToday} style={{ height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-rule)", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", cursor: "pointer" }}>Today</span>
-      </div>
-      <div style={{ display: "flex", gap: "4px", margin: "0 20px", padding: "3px", borderRadius: "12px", background: "var(--crm-field)" }}>
-        {(v.calViews).map((vi, vi_i) => (<Fragment key={vi_i}>
-          <span onClick={vi.pick} style={{ flex: "1", height: "32px", borderRadius: "9px", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: vi.weight, background: vi.bg, color: vi.fg, boxShadow: vi.shadow, cursor: "pointer" }}>{vi.label}</span>
-        </Fragment>))}
-      </div>
+      <Phone4aCalHead v={v} />
+      
       {!!(v.calIsMonth) && (<>
-        <div data-drag-scroll="1" style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", padding: "0 20px", userSelect: "none" }}>
-          {(v.calMonths).map((m, m_i) => (<Fragment key={m_i}>
-            <span onClick={m.pick} style={{ flex: "none", height: "34px", padding: "0 16px", boxSizing: "border-box", borderRadius: "17px", border: `1px solid ${m.border}`, background: m.bg, color: m.fg, display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: m.weight, cursor: "pointer" }}>{m.label}</span>
-          </Fragment>))}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", padding: "4px 6px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-          {(v.calWk).map((w, w_i) => (<Fragment key={w_i}>
-            <span style={{ paddingBottom: "6px", textAlign: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{w}</span>
-          </Fragment>))}
-        </div>
-        <div onPointerDown={v.calSwDown} onPointerUp={v.calSwUp} style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", padding: "0 6px", marginTop: "-10px", touchAction: "pan-y", userSelect: "none" }}>
-          {(v.calCells).map((c, c_i) => (<Fragment key={c_i}>
-            <div onClick={c.pick} style={{ minWidth: "0", height: "62px", boxSizing: "border-box", padding: "4px 2px", borderBottom: "1px solid var(--crm-rule-soft)", borderLeft: c.edge, background: c.bg, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", cursor: "pointer" }}>
-              <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: c.weight, background: c.dotBg, color: c.fg, fontVariantNumeric: "tabular-nums" }}>{c.n}</span>
-              {(c.ev).map((e, e_i) => (<Fragment key={e_i}>
-                <span onClick={e.open} style={{ alignSelf: "stretch", height: "14px", padding: "0 3px", borderRadius: "3px", background: e.bg, color: "#fff", fontSize: "9px", fontWeight: "650", lineHeight: "14px", whiteSpace: "nowrap", overflow: "hidden" }}>{e.t}</span>
-              </Fragment>))}
-            </div>
-          </Fragment>))}
-        </div>
+        <Phone4aCalMonth v={v} />
+        
+        
       </>)}
       {!!(v.calIsWeek) && (<>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px" }}>
@@ -105,81 +82,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
           </Fragment>))}
         </div>
       </>)}
-      {!!(v.hasToday) && (<>
-        <section style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 20px 0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-            <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.01em" }}>Today</h2>
-            <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-rust)" }}>{v.todayCount}</span>
-          </div>
-          {(v.todayList).map((a, a_i) => (<Fragment key={a_i}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "14px", borderRadius: "16px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)" }}>
-              <div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }}>
-                <span style={{ flex: "none", width: "4px", height: "40px", borderRadius: "2px", background: "var(--crm-brown)" }}>
-                </span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>{a.time} · {a.name}</strong>
-                  <small style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</small>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-faint)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m9 6 6 6-6 6">
-                  </path>
-                </svg>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
-                <span onClick={a.change} style={{ height: "40px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid var(--crm-tint-follow)", background: "#fff", color: "var(--crm-ink)", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4">
-                    </path>
-                  </svg>Change</span>
-                <span onClick={a.noShow} style={{ height: "40px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid var(--crm-tint-attention)", background: "#fff", color: "var(--crm-oxblood)", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-                    <path d="m6 6 12 12M18 6 6 18">
-                    </path>
-                  </svg>No show</span>
-                <span onClick={a.came} style={{ height: "40px", borderRadius: "20px", background: "var(--crm-brown)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m5 12 5 5 9-10">
-                    </path>
-                  </svg>Show up</span>
-              </div>
-            </div>
-          </Fragment>))}
-        </section>
-      </>)}
-      <section style={{ display: "flex", flexDirection: "column", padding: "12px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingBottom: "6px" }}>
-          <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.01em" }}>{v.upTitle}</h2>
-          <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-rust)" }}>{v.upCount}</span>
-        </div>
-        {!!(v.noUpcoming) && (<>
-          <p style={{ margin: "0", padding: "10px 0", fontSize: "calc(14px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>No upcoming appointments.</p>
-        </>)}
-        {(v.upList).map((a, a_i) => (<Fragment key={a_i}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-rule)" }}>
-            <div onClick={a.open} style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "44px", display: "flex", flexDirection: "column", alignItems: "center", padding: "4px 0", borderRadius: "10px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)" }}>
-                <small style={{ fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "650", textTransform: "uppercase" }}>{a.wk}</small>
-                <strong style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700", lineHeight: "1.1" }}>{a.dn}</strong>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{a.name}</strong>
-                <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.time} · {a.room}</small>
-              </span>
-            </div>
-            {!!(a.isToday) && (<>
-              <span onClick={a.came} style={{ flex: "none", height: "36px", padding: "0 14px", borderRadius: "18px", background: "var(--crm-brown)", color: "#fff", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m5 12 5 5 9-10">
-                  </path>
-                </svg>Show up</span>
-            </>)}
-            {!!(a.later) && (<>
-              <span style={{ flex: "none", display: "flex", gap: "6px" }}>
-                <span onClick={a.remind} style={{ height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "17px", border: `1px solid ${a.rBd}`, background: a.rBg, color: a.rFg, display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", whiteSpace: "nowrap", cursor: a.rCur }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={a.rIcon}>
-                    </path>
-                  </svg>{a.rLabel}</span>
-              </span>
-            </>)}
-          </div>
-        </Fragment>))}
-      </section>
+      <Phone4aCalLists v={v} />
     </main>
     {!!(v.outcomeOpen) && (<>
       <div onClick={v.outcomeClose} style={{ position: "absolute", inset: "0", zIndex: "9", boxSizing: "border-box", padding: "24px", background: "rgba(42,22,12,.40)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 180ms ease-out" }}>

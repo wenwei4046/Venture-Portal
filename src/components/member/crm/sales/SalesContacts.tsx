@@ -14,9 +14,9 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
     <div style={{ position: "relative", flex: "1 1 auto", minHeight: "0", display: "flex", flexDirection: "column" }}>
       <main data-contacts-list="1" style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 28px 24px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <h1 style={{ margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Contacts</h1>
+          <h1 style={{ margin: "0", display: "flex", alignItems: "baseline", gap: "10px", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Contacts<span style={{ fontFamily: "Inter, sans-serif", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "400", letterSpacing: "0", color: "var(--crm-faint)" }}>{v.cCount}</span></h1>
         </div>
-        <label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "14px", background: "var(--crm-field)", color: "var(--crm-muted)" }}>
+        <label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", boxSizing: "border-box", borderRadius: "20px", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35">
             </path>
@@ -124,7 +124,7 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
           </>)}
           {(v.contacts).map((p, p_i) => (<Fragment key={p_i}>
             {!!(p.head) && (<>
-              <div data-letter={p.head} style={{ padding: "14px 0 4px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-rust)" }}>{p.head}</div>
+              <div data-letter={p.head} style={{ padding: "14px 0 4px", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-rust)" }}>{p.head}</div>
             </>)}
             <div style={{ position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: "0", bottom: "0", right: "0", display: "flex", opacity: p.actOp, transition: "opacity 120ms" }}>
@@ -137,13 +137,13 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                     </path>
                   </svg>Delete</span>
               </div>
-              <div onPointerDown={p.sDown} onPointerMove={p.sMove} onPointerUp={p.sUp} onPointerCancel={p.sUp} style={{ position: "relative", display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", background: "#fff", transform: `translateX(${p.sx}px)`, transition: p.sTrans, touchAction: "pan-y" }}>
+              <div onPointerDown={p.sDown} onPointerMove={p.sMove} onPointerUp={p.sUp} onPointerCancel={p.sUp} style={{ position: "relative", display: "flex", alignItems: "center", gap: "10px", padding: "10px 0", borderBottom: "1px solid var(--crm-rule-soft)", background: "#fff", transform: `translateX(${p.sx}px)`, transition: p.sTrans, touchAction: "pan-y" }}>
                 <div onClick={p.open} style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", userSelect: "none" }}>
-                  <span style={{ flex: "none", width: "44px", height: "44px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700" }}>{p.ini}</span>
+                  <span style={{ flex: "none", width: "42px", height: "42px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.avBg, color: p.avFg, fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "500" }}>{p.ini}</span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
                     {!!(p.view) && (<>
                       <span style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: "0" }}>
-                        <strong style={{ minWidth: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{p.name}</strong>
+                        <strong style={{ minWidth: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-ink)" }}>{p.name}</strong>
                       </span>
                     </>)}
                     {!!(p.editing) && (<>
@@ -159,19 +159,19 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                       </span>
                     </>)}
                     {!!(p.view) && (<>
-                      <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{p.status} · {p.phone}</small>
+                      <small style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", letterSpacing: "0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{p.phone}</small>
                     </>)}
                     {!!(p.editing) && (<>
                       <input onClick={p.stop} value={p.draftPh} onChange={p.typePh} onKeyDown={p.key} inputMode="tel" placeholder="Phone" aria-label="Phone" style={{ width: "100%", height: "34px", marginTop: "4px", padding: "0 10px", boxSizing: "border-box", border: "1.5px solid var(--crm-rule)", borderRadius: "10px", outline: "none", font: "inherit", fontSize: "calc(14px * var(--rv-type, 1))", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }} />
                     </>)}
                   </span>
                 </div>
-                {!!p.hasTel && (<a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", display: "grid", placeItems: "center", color: "var(--crm-brown)", textDecoration: "none" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "14px", background: p.stBg, color: p.stFg, fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.stDot }} />{p.st}</span><a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "50%", display: p.hasTel ? "grid" : "none", placeItems: "center", color: "var(--crm-faint)", textDecoration: "none" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z">
                     </path>
                   </svg>
-                </a>)}
+                </a>
               </div>
             </div>
           </Fragment>))}
