@@ -82,7 +82,7 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 
 ## The owner's review of the phone preview (2026-10-18)
 1. Team | Mine is the symbol alone: a pale-orange circle (two people on Team, one on Mine).
-2. Team Insight: avatar · "Hello, Principal" · the house on the right (it was left, with a greeting by the time of day).
+2. Team Insight: "Hello, Principal" · the house · the avatar on the far right (the house was left of the avatar, with a greeting by the time of day).
 3. Split leads: each slider's part not reached is white with a hairline; the part reached and the dot are the team's colour.
 4. Team Calendar opens on Month (Month · List; it opened on List).
 5. Member work type is Assignment's Work type tab only (it opens there); its row on Profile is gone.
