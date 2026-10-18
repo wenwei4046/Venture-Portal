@@ -120,6 +120,8 @@ export interface DeskUi {
   adLog: boolean; mwtLog: boolean;
   /** Assignment's Ad performance folded to its strip (the owner, 2026-10-15). */
   adPerfShut: boolean;
+  /** 4a Assignment's editor tab (frame 06): Split · Ad performance · Audit log. */
+  adTab: "split" | "perf" | "audit";
   /** Inbox's Customer info column folded to its strip (the owner, 2026-10-16; open at first). */
   ibInfoShut: boolean;
   meMenu: boolean;
@@ -190,7 +192,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, adPerfShut: false, ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: true, cfPv: null,
+  adLog: false, adPerfShut: false, adTab: "split", ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: true, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,

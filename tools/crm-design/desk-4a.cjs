@@ -193,6 +193,47 @@ module.exports = function desk4a(body) {
     body = swap(body, tStart, "div", "<DeskAdsTable4a v={v} />", "ads table");
   }
 
+  // Frame 06 · Assignment: the section is the head's tab, so the sheet's own kicker and title go (its line stays); Ads to
+  // teams is 4a's table (DeskAdList4a); the editor docked at its right has 4a's tabs (DeskAdTabs4a) — Split, Ad
+  // performance, Audit log in its place, at its width (no strips) — the ad's name in an ink-ruled field with its
+  // pencil and Meta's headline under it, and Save · Save and apply to all N ads at its foot.
+  body = swap(body, '<div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>\n                {!!(v.showKicker) && (<>', "div",
+    '{!(v.adList) && (<span style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.opSub}</span>)}', "sheet head");
+  body = fragSwap(body, "{!!(v.adList) && (<>", "{!!(v.adList) && (<DeskAdList4a v={v} />)}", "ad list");
+  body = once(body, "{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}", "", "perf strip");
+  body = once(body, '{!!(v.adOpen) && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', '{!!(v.adOpen && v.adTab4 === "split") && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', "split tab");
+  body = swap(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid var(--crm-rule)" }}>\n                  <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n                    {v.ad.canName', "div",
+    `<DeskAdTabs4a v={v} />
+                <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 4px" }}>
+                  <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "42px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-ink)" }}>
+                    {v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ flex: "1", minWidth: "0", margin: "0", padding: "0", border: "0", background: "transparent", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} />) : (<span style={{ flex: "1", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>{v.ad.name}</span>)}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"></path></svg>
+                  </label>
+                  <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.ad.headline ? <>Meta sends only the headline: &ldquo;{v.ad.headline}&rdquo;. · {v.ad.meta}</> : v.ad.meta}</span>
+                </div>`, "split head");
+  body = swap(body, '<div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "12px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>\n                  <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", color: "var(--crm-ink)", cursor: "pointer" }}><input type="checkbox" checked={v.applyChk}', "div",
+    `<div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
+                  <button type="button" onClick={v.saveOne4} style={{ flex: "0 0 auto", height: "38px", padding: "0 18px", borderRadius: "7px", border: "0", background: "var(--crm-rust)", font: "500 13px Inter, sans-serif", color: "#fff", cursor: "pointer" }} className="crm4a-primary">Save</button>
+                  <button type="button" onClick={v.saveAll4} style={{ flex: "1", height: "38px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">{v.applyLabel}</button>
+                </div>`, "split foot");
+  // Ad performance and the Audit log: their own head becomes the tabs.
+  {
+    const p0 = body.indexOf("{!(v.perfShut) && (<><aside style={{ position: \"relative\", flex: `0 1 ${v.perfW}px`");
+    const hs = '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid var(--crm-rule)" }}>';
+    const h0 = body.indexOf(hs, p0);
+    if (p0 < 0 || h0 < 0) throw new Error("desk-4a: perf head");
+    const [a, b] = el(body.slice(h0), hs, "div", "perf head");
+    const head = body.slice(h0 + a, h0 + b);
+    // keep its period picker (Ad performance's own range), under the tabs
+    const pk0 = head.indexOf('<span style={{ position: "relative" }}>');
+    const [pa, pb] = el(head.slice(pk0), '<span style={{ position: "relative" }}>', "span", "perf period");
+    const picker = head.slice(pk0 + pa, pk0 + pb);
+    body = body.slice(0, h0 + a) + `<DeskAdTabs4a v={v} />\n                <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "14px 24px 0" }}>${picker}</div>` + body.slice(h0 + b);
+  }
+  body = swap(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 0 16px", borderBottom: "1px solid var(--crm-rule)" }}>\n                    <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n                      <strong style={{ fontSize: "15px", fontWeight: "650" }}>Audit log</strong>\n                      <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</span>', "div",
+    "<DeskAdTabs4a v={v} />", "audit head");
+
   // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a). The Ads
   // Performance part production keeps below them stays, under a 4a section head.
   {

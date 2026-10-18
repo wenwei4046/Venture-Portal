@@ -1041,3 +1041,74 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     </div>
   );
 }
+
+interface AdListBits {
+  adList4: { summary: string; unsetN: number; legend: { name: string; color: string }[];
+    rows: { name: string; nameless: boolean; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
+  stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
+}
+const AD_GRID = "minmax(0,1fr) 52px 106px 64px";
+
+/** Frame 06 · Assignment › Ads to teams: the summary and team legend, then every ad — channel, name, headline, leads, its split, Edit split / Set up. */
+export function DeskAdList4a({ v }: { v: AdListBits }) {
+  const L = v.adList4;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", paddingBottom: "16px" }}>
+        <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{L.summary}{L.unsetN > 0 && <span style={{ color: "var(--crm-oxblood)" }}> · {L.unsetN} not set up</span>}</div>
+        <span style={{ position: "relative" }}>
+          <button type="button" onClick={v.toggleSt} style={{ ...BTN, display: "flex", alignItems: "center", gap: "5px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>
+            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.stCur.color }} />{v.stCur.label}<Ic name="chevron-down" size={11} /></button>
+          {v.stOpen && (<>
+            <div onClick={v.toggleSt} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
+            <div style={{ position: "absolute", top: "22px", left: 0, zIndex: 8, width: "260px", padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+              {v.stOpts.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "36px", padding: "4px 8px", borderRadius: "7px", color: "var(--crm-ink)" }} className="crm4a-row">
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.color }} />
+                <span style={{ flex: 1, display: "flex", flexDirection: "column" }}><span style={{ font: "500 13px Inter, sans-serif" }}>{o.label}</span>{o.hint && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{o.hint}</span>}</span>
+                <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{o.n}</span></button>)}
+            </div>
+          </>)}
+        </span>
+        <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "6px 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+          {L.legend.map(t => <span key={t.name} style={{ display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}><span style={{ width: "8px", height: "8px", background: t.color }} />{t.name}</span>)}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: AD_GRID, gap: "12px", alignItems: "center", minHeight: "34px", padding: "0 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)",
+        font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
+        <span>Ad</span><span style={{ textAlign: "right" }}>Leads</span><span>Split</span><span />
+      </div>
+      {L.rows.map((r, i) => (
+        <div key={i} onClick={r.open} style={{ display: "grid", gridTemplateColumns: AD_GRID, gap: "12px", alignItems: "center", minHeight: "62px", padding: "0 12px", position: "relative", cursor: "pointer",
+          borderBottom: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-cream)" : "transparent" }} className={r.sel ? undefined : "crm4a-row"}>
+          <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-orange)" : "transparent" }} />
+          <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+            <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
+            <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.nameless ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{r.name}</span>
+              {r.headline && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.headline}</span>}
+            </span>
+          </span>
+          <span style={{ textAlign: "right", font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{r.leads}</span>
+          <span style={{ display: "flex", gap: "2px", height: "8px" }}>
+            {!r.set ? <span style={{ flex: 1, background: "var(--crm-rule-soft)", borderRadius: "2px" }} /> : r.segs.map((g, j) => <span key={j} style={{ flex: g.pct, background: g.color }} />)}
+          </span>
+          <span style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button type="button" onClick={e => { e.stopPropagation(); r.open(); }} style={{ ...BTN, height: "30px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", lineHeight: 1.1, textAlign: "center",
+              ...(!r.set ? { background: "var(--crm-rust)", color: "#FFFFFF" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }} className={!r.set ? "crm4a-primary" : "crm4a-outline"}>{!r.set ? "Set up" : "Edit split"}</button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Frame 06 · the docked editor's tabs: Split · Ad performance · Audit log, and ×. */
+export function DeskAdTabs4a({ v }: { v: { adTabs4: { label: string; on: boolean; pick: () => void }[]; closeAd: () => void } }) {
+  return (
+    <div style={{ flex: "none", height: "48px", display: "flex", alignItems: "flex-end", gap: "22px", padding: "0 24px", borderBottom: "1px solid var(--crm-rule)" }}>
+      {v.adTabs4.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "0 0 12px", font: "500 13px Inter, sans-serif", whiteSpace: "nowrap",
+        borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
+      <button type="button" onClick={v.closeAd} title="Close (Esc)" style={{ ...BTN, marginLeft: "auto", alignSelf: "center", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={16} /></button>
+    </div>
+  );
+}

@@ -86,7 +86,7 @@ export function frameVM(ctx: DeskCtx) {
   const manage = data.can.manage;
   const tabList = PANEL_TABS.filter(([id]) => manage || !MANAGE_TABS.has(id));
   // Entering Inbox always gives its columns their standard widths and shuts Chat progress (README › Navigation).
-  const go = (id: DeskTab) => set(u => ({ ...u, tab: id, pane: PANE_MODE[id], toast: "", pick: null, stage: id === "showrooms" || id === "forms" ? "op" : "menu",
+  const go = (id: DeskTab) => set(u => ({ ...u, tab: id, pane: PANE_MODE[id], toast: "", pick: null, stage: "op", // 4a: no right-hand menu — Assignment's sections are the head's tabs (frame 06)
     ...(id === "inbox" ? { ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null } : {}), adLog: false, mwtLog: false, meMenu: false,
     chat: null, sendFor: null, awChat: null, ad: null, ftEdit: null, srEdit: null, srDraft: null, cpSel: null, frmOpen: false, cltEdit: null, menu: false, attachOpen: false, emo: null, msgMenu: null, rail: true, ppSel: null })); // 4a draws Contacts' and the Calendar's rails open (frames 03 / 04)
   const scopeOpts = ([["Team", false], ["Mine", true]] as const).map(([label, isMine]) => ({ label, on: !isMine, off: isMine,
@@ -159,7 +159,7 @@ export function frameVM(ctx: DeskCtx) {
     ? { ini: "PR", name: "Principal", first: "Principal", sub: "Principal · All access" }
     : { ini: initials(me.name), name: me.name, first: first(me.name), sub: `${jobTitle(me)} · ${ctx.app.subName.replace(/ view$/, "")}` };
   const undo = ui.undo;
-  const sheetW = ui.sheetW ?? (W1440 ? 520 : 440), menuW = ui.menuW ?? (W1440 ? 340 : 310);
+  const sheetW = ui.sheetW ?? (W1440 ? 461 : 420) /* 4a: the docked editor (frame 06) */, menuW = ui.menuW ?? (W1440 ? 340 : 310);
   const alertsN = alertsUnreadN(ctx);
   return {
     W, H, sbW, sbOpen: !collapsed, sbClosed: collapsed, sections, appTop, appBottom, crmItems, crmGroups,
@@ -183,7 +183,7 @@ export function frameVM(ctx: DeskCtx) {
     // Every pane and editor is dragged to size; a double-click gives it back (v2).
     sheetW, dragSheet: edgeDrag(set, "sheetW", sheetW, -1, 360, W1440 ? 760 : 620), resetSheet: () => patch({ sheetW: null }),
     paneDrag: !ibOn && !sheetMode && !isOverlay && paneShown, dragPane: edgeDrag(set, "paneW", paneW, -1, 300, crmW - 320), resetPane: () => patch({ paneW: null }),
-    perfW: ui.perfW ?? 260, dragPerf: edgeDrag(set, "perfW", ui.perfW ?? 260, -1, 220, 420), resetPerf: () => patch({ perfW: null }),
+    perfW: ui.perfW ?? sheetW, dragPerf: edgeDrag(set, "perfW", ui.perfW ?? 260, -1, 220, 420), resetPerf: () => patch({ perfW: null }),
     dragMwtLog: edgeDrag(set, "mwtLogW", ui.mwtLogW ?? 280, -1, 220, 440), resetMwtLog: () => patch({ mwtLogW: null }),
     dragAudit: edgeDrag(set, "auditW", ui.auditW ?? 280, -1, 220, 420), resetAudit: () => patch({ auditW: null }),
     menuW, dragMenu: edgeDrag(set, "menuW", menuW, -1, 280, W1440 ? 760 : 620), resetMenu: () => patch({ menuW: null }),
@@ -205,7 +205,8 @@ export function frameVM(ctx: DeskCtx) {
     isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
-    pagePad: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "20px 20px" : "28px 40px",
+    // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.
+    pagePad: opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : "16px 36px 32px",
     h1Size: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "22px" : "34px",
     kAudit: tab === "auditlog", kPeople: tab === "people", kCh: tab === "channels", cfOn: tab === "forms",
     plainOp: !["Ads to teams", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && opItem[0] === "Notifications"),
