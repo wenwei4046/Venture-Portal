@@ -111,3 +111,7 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 17. Desktop: the Revenue sidebar folds to its icons (68 px) while the CRM is open — pointing at it or tabbing into it shows
     it whole over the CRM; a count is a dot. Showrooms' "Closed every week on" and Add closure work on the always-open page
     (the first change starts the draft from the showroom on screen; they did nothing before).
+18. Contacts' and the Calendar's rails: folded on every page (a page change opened them again), and open they are Inbox's
+    Customer info — a 62 px head (icon, Breakdown / Figures, › folds) over what scrolls. Ads Performance: Appt rate is its
+    figure, no bar. The desktop ad editor lists inside each team only the teams the split gives a share (the phone's rule).
+    Customer form: + Add field with nothing typed adds "New field" and opens it.

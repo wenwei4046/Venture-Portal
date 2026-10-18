@@ -118,7 +118,8 @@ export function formPageVM(ctx: DeskCtx) {
       hasEdit: sec.fields.some(f => f.kind !== "auto"), editN: `${sec.fields.filter(f => f.kind !== "auto").length} you can edit`,
       pvFields: sec.fields.map(pv),
       draft: ui.cfNew[si] ?? "", setDraft: (e: { target: { value: string } }) => { const v = e.target.value; set(u => ({ ...u, cfNew: { ...u.cfNew, [si]: v } })); },
-      add: () => { const t = (ui.cfNew[si] ?? "").trim(); if (!t) return;
+      // + with nothing typed adds "New field" (the editor opens on it to be named) — it did nothing (the owner, 2026-10-18).
+      add: (label?: string) => { const t = (label ?? ui.cfNew[si] ?? "").trim(); if (!t) return;
         edit(S => { S[si].fields.push({ id: `q${Date.now().toString(36)}`, label: t, type: "Short text", opts: "", req: false, kind: "own" }); });
         set(u => ({ ...u, cfNew: { ...u.cfNew, [si]: "" } })); },
       fields: sec.fields.map((f, fi) => [f, fi] as const).filter(([f]) => f.kind !== "auto").map(([f, fi], ei, EL) => {
