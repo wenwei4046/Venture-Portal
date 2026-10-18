@@ -61,6 +61,7 @@ export const ICONS_4A = {
   "pin-off": "<path d=\"M12 17v5\"></path> <path d=\"M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89\"></path> <path d=\"m2 2 20 20\"></path> <path d=\"M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11\"></path>",
   "pin": "<path d=\"M12 17v5\"></path> <path d=\"M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z\"></path>",
   "play": "<polygon points=\"6 3 20 12 6 21 6 3\"></polygon>",
+  "minus": "<path d=\"M5 12h14\"></path>",
   "plus": "<path d=\"M5 12h14\"></path> <path d=\"M12 5v14\"></path>",
   "reply": "<polyline points=\"9 17 4 12 9 7\"></polyline> <path d=\"M20 18v-2a4 4 0 0 0-4-4H4\"></path>",
   "search": "<circle cx=\"11\" cy=\"11\" r=\"8\"></circle> <path d=\"m21 21-4.3-4.3\"></path>",

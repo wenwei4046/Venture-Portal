@@ -42,6 +42,7 @@ import { NotifSummaryHost } from "./shared/notif-summary";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { paintStatusBar, topColorOf } from "@/components/pwa/status-bar";
 import { crmChatTag } from "@/lib/push/notices";
+import { setUrgencyThresholds } from "@/lib/member/crm";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
@@ -62,6 +63,8 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  */
 export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
+  // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
+  setUrgencyThresholds(data?.settings);
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
   const [problem, setProblem] = useState("");

@@ -480,7 +480,7 @@ export function chatVM(ctx: SalesCtx) {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: !shut,
-    openTpl: () => void openTpl(),
+    openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false,
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,

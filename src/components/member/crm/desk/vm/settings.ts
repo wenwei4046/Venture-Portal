@@ -8,7 +8,7 @@
 import type { CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
-import { URGENCY_THRESHOLDS } from "@/lib/member/crm";
+import { DEFAULT_CRM_SETTINGS, type CrmSettings } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
 import type { DeskCtx, FormField, FormSection } from "./ctx";
 import { panelLike } from "./frame";
@@ -27,6 +27,10 @@ export const BASE_FORM: FormSection[] = [
     { id: "budget", label: "Budget", type: "Number", req: 0, ph: "RM" }] },
 ];
 const TYPES: FormField["type"][] = ["Text", "Long text", "Choice", "Number", "Phone", "Date"];
+
+/** A row of Settings › General: `key` = a stored setting (editable with CRM · Manage), none = fixed. */
+export interface Set4Row { t: string; s: string; v: string; key?: keyof CrmSettings }
+export interface Set4Group { title: string; sub: string; rows: Set4Row[] }
 
 export function settingsVM(ctx: DeskCtx, opItem: string) {
   const { ui, set, patch, data, teams, act } = ctx;
@@ -185,28 +189,34 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
         patch({ tab: "assignment", pane: "wideEmpty", pick: 4, stage: "op", cpSel: n.cust, awChat: null, sendFor: null, cpF: "All", cpP: null, cpMine: false, cpT: "This month" }); },
       toggle: () => { if (u) act.readNotifs([n.key]); } }; }) })).filter(g => g.items.length);
   const ids = shown.map(n => n.key), nP = ids.filter(x => pickd[x]).length, allP = ids.length > 0 && nP === ids.length;
-  // ── General (frame 10): the rules the CRM runs on, as they stand. None is stored as a setting yet, so each row is
-  // locked (the frame's own locked row) and there is no Save — making them editable needs new settings fields (asked first).
-  const h = (m: number) => `${m / 60} h`;
-  const set4 = [
+  // ── General (frame 10): the rules the CRM runs on. Reply soon · Urgent · Overdue, Suggest a template and Auto-assign
+  // are stored (mig 20261018100000, the owner: "可以，照这三项做") and editable with CRM · Manage; the rest stay locked
+  // (set by Meta or by each phone). The draft lives in DeskSettings4a; Save sends the five together (crm_save_settings).
+  const cur = data.settings ?? DEFAULT_CRM_SETTINGS;
+  const h = (n: number) => `${n} h`;
+  const set4: Set4Group[] = [
     { title: "Reply targets", sub: "How long a customer waits before the urgency line changes", rows: [
-      { t: "Reply soon", s: "Shown in the list and on the phone", v: h(URGENCY_THRESHOLDS.soonMinutes) },
-      { t: "Urgent", s: "The row turns oxblood", v: h(URGENCY_THRESHOLDS.urgentMinutes) },
-      { t: "Overdue", s: "The person's own phone is told", v: `${h(URGENCY_THRESHOLDS.overdueMinutes)}+` }] },
+      { t: "Reply soon", s: "Shown in the list and on the phone", v: h(cur.replySoonH), key: "replySoonH" },
+      { t: "Urgent", s: "The row turns oxblood", v: h(cur.replyUrgentH), key: "replyUrgentH" },
+      { t: "Overdue", s: "The person's own phone is told", v: `${h(cur.replyOverdueH)}+`, key: "replyOverdueH" }] },
     { title: "Cold leads", sub: "Meta allows free replies for 24 hours after the customer's last message", rows: [
       { t: "Reply window", s: "Set by WhatsApp and Messenger", v: "24 h" },
       { t: "Move to Cold leads", s: "When the reply window shuts · only a template can reopen the chat", v: "24 h" },
-      { t: "Suggest a template", s: "Shows the template button on a cold chat", v: "On" }] },
+      { t: "Suggest a template", s: "Shows the template button on a cold chat", v: cur.suggestTemplate ? "On" : "Off", key: "suggestTemplate" }] },
     { title: "Notifications", sub: "Only a person's own customers ever notify", rows: [
-      { t: "Push for new messages", s: "Each phone turns its own on · Revenue app › Settings", v: "On" },
-      { t: "Reminders", s: "Visits tomorrow, and chats waiting 3 · 6 · 9 h", v: "On" },
+      { t: "Push for new messages", s: cur.pushMessages ? "Each phone turns its own on · Revenue app › Settings" : "Off · no phone is told of a customer's message", v: cur.pushMessages ? "On" : "Off", key: "pushMessages" },
+      { t: "Reminders", s: `Visits tomorrow and today, chats waiting ${cur.replySoonH} · ${cur.replyUrgentH} · ${cur.replyOverdueH} h, windows closing`, v: cur.reminders ? "On" : "Off", key: "reminders" },
       { t: "Team inbox alerts", s: "The Team inbox shows everyone but tells of nobody else", v: "Off" }] },
     { title: "New leads", sub: "What happens when a lead arrives", rows: [
-      { t: "Auto-assign by the ad's split", s: "Uses Assignment › Ads to teams", v: "On" },
+      { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
       { t: "Send auto-reply", s: "Saved on each person's Profile, not sent yet", v: "Off" }] },
   ];
+  const settings4 = {
+    can: !!data.can.manage, cur,
+    save: (st: CrmSettings) => act.saveSettings(st).then(okd => { if (okd) patch({ toast: "Saved · Settings" }); return okd; }),
+  };
   return {
-    set4,
+    set4, settings4,
     mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },

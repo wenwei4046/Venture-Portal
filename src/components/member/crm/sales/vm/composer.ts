@@ -162,6 +162,8 @@ export interface ComposerVM {
   replyText: string; replyWho: string; cancelReply: Click;
   slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit?: Click;
   openTpl: Click;
+  /** Settings › Suggest a template: the cold chat's template button, else the line saying the window is shut. */
+  tplOn: boolean; tplOff: boolean;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
   /** Slide to cancel: the hint follows the finger (a transform), red near the line. */
   recSlide: string; recHintC: string;
@@ -182,6 +184,8 @@ export interface ComposerIn {
   send: () => void;
   warm: boolean;
   openTpl: () => void;
+  /** Settings › Suggest a template (on unless Settings turned it off). */
+  tplOn?: boolean;
   reply: { who: string; text: string } | null;
   cancelReply: () => void;
   slash: { q: string; empty: boolean; list: { title: string; text: string; rule: string; pick: () => void }[] } | null;
@@ -263,7 +267,7 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
-    openTpl: () => v.openTpl(),
+    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false, tplOff: v.tplOn === false,
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
     recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "var(--crm-oxblood)" : "var(--crm-muted)",
   };
