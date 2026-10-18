@@ -128,7 +128,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const valOf = (t: (typeof T)[number], m: InMode, pid: string, k: number) => { const key = `${t.id}|${m}|${pid}`;
     if (mv[key] != null) return mv[key]; if (mv[pid] != null && m === inModeOf(t.id)) return mv[pid];
     return m === "pct" ? Math.round(100 / (t.people.length || 1)) + (k < 100 - Math.round(100 / (t.people.length || 1)) * t.people.length ? 0 : 0) : 0; };
-  const adTeams = TA.map(t => { const m = inModeOf(t.id), mem = t.people;
+  // Inside each team: only the teams the split gives a share, as the phone (the owner, 2026-10-18: "只有被选择%的team才会显示").
+  const adTeams = TA.filter(t => (pctDefault[t.id] ?? 0) > 0).map(t => { const m = inModeOf(t.id), mem = t.people;
     const totalMax = mem.reduce((a2, p, k) => a2 + valOf(t, "max", p.id, k), 0), totalPct = mem.reduce((a2, p, k) => a2 + valOf(t, "pct", p.id, k), 0);
     return { name: t.name, color: t.color, share: `${pctDefault[t.id] ?? 0}%`, field: m !== "evenly", unit: m === "pct" ? "%" : "max",
       note: m === "max" ? `Up to ${totalMax} leads in this team` : m === "pct" ? (totalPct === 100 ? "Adds up to 100%" : `Adds up to ${totalPct}% · needs 100%`) : `Shared evenly among ${mem.length} people`,
