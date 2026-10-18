@@ -73,8 +73,8 @@ function BrandPanel({ brand, canManage }: { brand: LeadBrand; canManage: boolean
           <label className={s.field}>Instagram ID<input value={form.igAccountId} onChange={e => setForm({ ...form, igAccountId: e.target.value })} inputMode="numeric" placeholder="When connecting" /></label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Hand-over" zh="转交方式" />
             <select value={form.handoffMode} onChange={e => setForm({ ...form, handoffMode: e.target.value as 'rotate' | 'pick' })}>
-              <option value="rotate">Suggest in turn · 轮流建议</option>
-              <option value="pick">Customer Service picks · 客服自己选</option>
+              <option value="rotate">Suggest in turn</option>
+              <option value="pick">Customer Service picks</option>
             </select>
           </label>
           {error ? <div className={`${s.error} ${s.wide}`} role="alert">{error}</div> : null}
@@ -85,12 +85,12 @@ function BrandPanel({ brand, canManage }: { brand: LeadBrand; canManage: boolean
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
-          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>FB Page</span><span className={s.mono} style={{ flex: 1 }}>{brand.fbPageId ?? '—'}</span><span className={s.brand} data-tone={brand.fbPageId ? 'olive' : 'clay'}>{brand.fbPageId ? 'Set · 已填' : 'Not connected · 未串接'}</span></div>
-          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>Instagram</span><span className={s.mono} style={{ flex: 1 }}>{brand.igAccountId ?? '—'}</span><span className={s.brand} data-tone={brand.igAccountId ? 'olive' : 'clay'}>{brand.igAccountId ? 'Set · 已填' : 'Not connected · 未串接'}</span></div>
-          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>Hand-over</span><span>{brand.handoffMode === 'rotate' ? 'Suggest in turn · 轮流建议' : 'Customer Service picks · 客服自己选'}</span></div>
+          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>FB Page</span><span className={s.mono} style={{ flex: 1 }}>{brand.fbPageId ?? '—'}</span><span className={s.brand} data-tone={brand.fbPageId ? 'olive' : 'clay'}>{brand.fbPageId ? 'Set' : 'Not connected'}</span></div>
+          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>Instagram</span><span className={s.mono} style={{ flex: 1 }}>{brand.igAccountId ?? '—'}</span><span className={s.brand} data-tone={brand.igAccountId ? 'olive' : 'clay'}>{brand.igAccountId ? 'Set' : 'Not connected'}</span></div>
+          <div className={s.salesLine}><span style={{ width: 90 }} className={s.muted}>Hand-over</span><span>{brand.handoffMode === 'rotate' ? 'Suggest in turn' : 'Customer Service picks'}</span></div>
         </div>
       )}
-      <SectHead title="Salespeople · 销售" count={String(brand.sales.length)} />
+      <SectHead title="Salespeople" count={String(brand.sales.length)} />
       {brand.sales.length === 0 ? <div className={s.hint}><Bi block en="No salespeople yet. A handed-over lead is sent to their phone on WhatsApp." zh="还没有销售。转交时，客户资料会用 WhatsApp 发到这里的电话。" /></div> : null}
       {brand.sales.map(x => <SalesLine key={x.id} sales={x} brandId={brand.id} canManage={canManage} />)}
       {canManage ? <SalesForm brandId={brand.id} /> : null}
@@ -104,7 +104,7 @@ function SalesLine({ sales, brandId, canManage }: { sales: LeadSales; brandId: s
   const [error, setError] = useState<string | null>(null)
   if (edit) return <SalesForm brandId={brandId} sales={sales} onDone={() => setEdit(false)} />
   const remove = () => {
-    if (!window.confirm(`Remove ${sales.name}? Leads handed to them keep their name. 把他从名单拿掉？`)) return
+    if (!window.confirm(`Remove ${sales.name}? Leads handed to them keep their name.`)) return
     start(async () => {
       setError(null)
       const r = await removeLeadSales(sales.id)
@@ -189,7 +189,7 @@ function TestPanel({ config, canTest }: { config: LeadConfig; canTest: boolean }
   return (
     <div className={s.twoCol}>
       <section className={s.panel} aria-label="Test enquiry">
-        <SectHead title="Test enquiry · 模拟客户来讯" />
+        <SectHead title="Test enquiry" />
         <p className={s.hint} style={{ margin: 0 }}><Bi block en="Until Meta is connected: the message lands in the Inbox as if a customer sent it, marked TEST. The same name is the same conversation; a phone number in it is picked up." zh="Meta 串接之前用来测试：消息会像客户发来的一样进 Inbox。" /></p>
         <div className={s.fieldGrid}>
           <label className={s.field}><Bi en="Brand" zh="品牌" />
@@ -208,7 +208,7 @@ function TestPanel({ config, canTest }: { config: LeadConfig; canTest: boolean }
           <label className={`${s.field} ${s.wide}`}><Bi en="Message" zh="消息" /><textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} maxLength={2000} /></label>
         </div>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        {sent ? <div className={s.ok}>Sent to the Inbox · 已送进 <Link href={`/leads?c=${sent}`} style={{ fontWeight: 600 }}>Open →</Link></div> : null}
+        {sent ? <div className={s.ok}>Sent to the Inbox · <Link href={`/leads?c=${sent}`} style={{ fontWeight: 600 }}>Open →</Link></div> : null}
         <div className={s.actions}>
           <button type="button" className={btn('primary')} onClick={send} disabled={!canTest || busy || !form.brand || !form.name.trim() || !form.body.trim()}>
             {busy ? 'Sending…' : <Bi en="Send to the Inbox" zh="送进 Inbox" />}
@@ -216,11 +216,11 @@ function TestPanel({ config, canTest }: { config: LeadConfig; canTest: boolean }
         </div>
       </section>
       <section className={s.panel} aria-label="Connection">
-        <SectHead title="Connection · 串接状态" />
-        <div className={s.salesLine}><span className={s.brand} data-tone="olive">Done</span><span>System, database, test enquiries · 系统、资料库</span></div>
+        <SectHead title="Connection" />
+        <div className={s.salesLine}><span className={s.brand} data-tone="olive">Done</span><span>System, database, test enquiries</span></div>
         <div className={s.salesLine}><span className={s.brand} data-tone="clay">Waiting</span><span>Meta App Review (Messenger)</span></div>
-        <div className={s.salesLine}><span className={s.brand} data-tone="clay">Waiting</span><span>Brand Pages into the business account, assigned to the System User · 品牌 Page 加入商业帐号</span></div>
-        <div className={s.salesLine}><span className={s.brand} data-tone="plum">Later</span><span>Instagram permission review · Instagram 权限审核</span></div>
+        <div className={s.salesLine}><span className={s.brand} data-tone="clay">Waiting</span><span>Brand Pages into the business account, assigned to the System User</span></div>
+        <div className={s.salesLine}><span className={s.brand} data-tone="plum">Later</span><span>Instagram permission review</span></div>
       </section>
     </div>
   )

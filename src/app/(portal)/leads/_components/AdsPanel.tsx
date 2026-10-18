@@ -23,13 +23,13 @@ export default function AdsPanel({ ads, brands, canManage }: { ads: LeadAd[]; br
   const fetchAll = () => start(async () => {
     setMsg(null)
     const r = await fetchAdNames(ads.map(a => a.adId))
-    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data} of ${ads.length} ads · 已更新 ${r.data} 个` } : { ok: false, text: r.reason })
+    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data} of ${ads.length} ads` } : { ok: false, text: r.reason })
   })
   return (
     <section className={s.panel} aria-label="Ads">
       <div className={s.panelHead} style={{ flexWrap: 'wrap', gap: 8 }}>
         <span className={s.cardTitle}><Bi en="Ads" zh="广告" /></span>
-        <span className={s.hint}>{ads.length} ads · {unnamed} without a name · {unnamed} 个还没有名称</span>
+        <span className={s.hint}>{ads.length} ads · {unnamed} without a name</span>
         <span className={s.spacer} />
         {canManage ? (
           <button type="button" className={btn('primary')} onClick={fetchAll} disabled={busy || ads.length === 0}>
@@ -49,7 +49,7 @@ export default function AdsPanel({ ads, brands, canManage }: { ads: LeadAd[]; br
           <table className={s.table}>
             <thead>
               <tr>
-                <th>Ad · 广告</th><th>Campaign › Ad set</th><th>Brand · Channel</th>
+                <th>Ad</th><th>Campaign › Ad set</th><th>Brand · Channel</th>
                 <th className={s.num}>Chats</th><th className={s.num}>Phones</th><th>Links</th><th />
               </tr>
             </thead>

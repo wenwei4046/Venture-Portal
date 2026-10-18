@@ -44,17 +44,17 @@ export interface LeadFlow {
 }
 
 export const STEP_KIND_LABEL: Readonly<Record<FlowStepKind, string>> = {
-  question: 'Question + buttons · 问题',
-  message: 'Message · 发消息',
-  phone: 'Ask for phone · 问电话',
-  handoff: 'Hand to CS · 交给客服',
+  question: 'Question + buttons',
+  message: 'Message',
+  phone: 'Ask for phone',
+  handoff: 'Hand to CS',
 }
 
 export const TRIGGER_LABEL: Readonly<Record<FlowTrigger, string>> = {
-  ad: 'From an ad · 从广告进来',
-  keyword: 'Keyword · 关键词',
-  first: 'Any first message · 第一则消息',
-  away: 'Outside opening hours · 下班时间',
+  ad: 'From an ad',
+  keyword: 'Keyword',
+  first: 'Any first message',
+  away: 'Outside opening hours',
 }
 
 /** What is wrong with these steps, or null. Twin of lead_flow_problem. */

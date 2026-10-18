@@ -48,10 +48,10 @@ export default function KnowledgeView({ cards, brands, today, canManage }: { car
         </div>
         <span className={s.spacer} />
         <select className={s.select} value={kind} onChange={e => setKind(e.target.value as KnowledgeKind | 'all')} aria-label="Kind">
-          <option value="all">Every kind · 全部类型</option>
-          {KINDS.map(k => <option key={k} value={k}>{KIND_LABEL[k].en} · {KIND_LABEL[k].zh}</option>)}
+          <option value="all">Every kind</option>
+          {KINDS.map(k => <option key={k} value={k}>{KIND_LABEL[k].en}</option>)}
         </select>
-        <input className={s.search} style={{ width: 220 }} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search · 搜索" aria-label="Search cards" />
+        <input className={s.search} style={{ width: 220 }} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search" aria-label="Search cards" />
       </div>
       {shown.length === 0 ? (
         <div className={s.empty}>
@@ -82,7 +82,7 @@ function CardPanel({ card, brand, today, canManage, onEdit }: { card: KnowledgeC
   const [error, setError] = useState<string | null>(null)
   const st = status(card, today)
   const remove = () => {
-    if (!window.confirm(`Remove "${card.title}"? The AI agent stops using it. 删除这张资料？`)) return
+    if (!window.confirm(`Remove "${card.title}"? The AI agent stops using it.`)) return
     start(async () => {
       setError(null)
       const r = await removeKnowledgeCard(card.id)
@@ -93,9 +93,9 @@ function CardPanel({ card, brand, today, canManage, onEdit }: { card: KnowledgeC
     <section className={s.panel} aria-label={card.title} style={{ opacity: inDate(card, today) ? 1 : 0.7 }}>
       <div className={s.panelHead} style={{ flexWrap: 'wrap', gap: 6 }}>
         <span className={s.brand} data-tone="ink">{KIND_LABEL[card.kind].en}</span>
-        {brand ? <BrandChip brand={brand} /> : <span className={s.brand} data-tone="blue">Every brand · 通用</span>}
+        {brand ? <BrandChip brand={brand} /> : <span className={s.brand} data-tone="blue">Every brand</span>}
         <span className={s.spacer} />
-        <span className={s.brand} data-tone={st.tone}>{st.en} · {st.zh}</span>
+        <span className={s.brand} data-tone={st.tone}>{st.en}</span>
       </div>
       <div className={s.cardTitle}>{card.title}</div>
       <div className={s.cardBody}>{card.body}</div>
@@ -135,21 +135,21 @@ function CardWindow({ draft, brands, onClose }: { draft: Draft; brands: LeadBran
         <div className={s.fieldGrid}>
           <label className={s.field}><Bi en="Brand" zh="品牌" />
             <select value={form.brandId ?? ''} onChange={e => set({ brandId: e.target.value || null })}>
-              <option value="">Every brand · 所有品牌</option>
+              <option value="">Every brand</option>
               {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </label>
           <label className={s.field}><Bi en="Kind" zh="类型" />
             <select value={form.kind} onChange={e => set({ kind: e.target.value as KnowledgeKind })}>
-              {KINDS.map(k => <option key={k} value={k}>{KIND_LABEL[k].en} · {KIND_LABEL[k].zh}</option>)}
+              {KINDS.map(k => <option key={k} value={k}>{KIND_LABEL[k].en}</option>)}
             </select>
           </label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Title" zh="标题" />
-            <input value={form.title} onChange={e => set({ title: e.target.value })} maxLength={80} placeholder="e.g. October Sofa Week · 十月沙发周" />
+            <input value={form.title} onChange={e => set({ title: e.target.value })} maxLength={80} placeholder="e.g. October Sofa Week" />
           </label>
           <label className={`${s.field} ${s.wide}`}><Bi en="What the agent may say" zh="AI 可以说的内容" />
             <textarea value={form.body} onChange={e => set({ body: e.target.value })} maxLength={4000} rows={8}
-              placeholder={'Write the facts plainly — prices, what is included, conditions, addresses.\n写清楚事实：价格、包含什么、条件、地址。'} />
+              placeholder={'Write the facts plainly — prices, what is included, conditions, addresses.'} />
             <span className={s.hint} style={{ alignSelf: 'flex-end' }}>{form.body.length} / 4,000</span>
           </label>
           <label className={s.field}><Bi en="From (optional)" zh="开始日期（可不填）" /><input type="date" value={form.startsOn} onChange={e => set({ startsOn: e.target.value })} /></label>

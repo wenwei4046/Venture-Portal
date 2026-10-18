@@ -43,11 +43,11 @@ export function FlowTree({ steps, canManage, onChange }: { steps: FlowStep[]; ca
   const ctx: TreeCtx = { steps, home, num, canManage, update, onChange }
   return (
     <section aria-label="Steps" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span className={s.label}>The conversation<span className={s.zh}>客户会收到的对话</span></span>
+      <span className={s.label}>The conversation</span>
       {steps[0] ? <StepNode id={steps[0].id} ctx={ctx} /> : null}
       {stray.length ? (
         <div className={s.panel} style={{ gap: 8 }}>
-          <span className={s.hint}>Steps nothing leads to (never sent) · 没有连到的步骤</span>
+          <span className={s.hint}>Steps nothing leads to (never sent)</span>
           {stray.map(id => (
             <div key={id} className={s.inline} style={{ alignItems: 'center' }}>
               <span style={{ flex: 1 }}>{steps.find(x => x.id === id)?.text || '(empty)'}</span>
@@ -90,12 +90,12 @@ function StepNode({ id, ctx }: { id: string; ctx: TreeCtx }) {
         <span className={s.spacer} />
         {ctx.canManage && !root ? (
           <button type="button" className={btn('outline')} onClick={() => {
-            if (window.confirm('Delete this step and what only it leads to? 删除这一步？')) ctx.onChange(removeBranch(ctx.steps, id))
+            if (window.confirm('Delete this step and what only it leads to?')) ctx.onChange(removeBranch(ctx.steps, id))
           }}>Delete step</button>
         ) : null}
       </div>
       <label className={s.field}>
-        {st.kind === 'question' ? 'Ask · 问客户' : st.kind === 'phone' ? 'Ask for the phone · 问电话' : st.kind === 'handoff' ? 'Say, then hand to CS · 交给客服前说' : 'Reply · 回复客户'}
+        {st.kind === 'question' ? 'Ask' : st.kind === 'phone' ? 'Ask for the phone' : st.kind === 'handoff' ? 'Say, then hand to CS' : 'Reply'}
         <textarea value={st.text} onChange={e => ctx.update(id, { text: e.target.value })} maxLength={1000} disabled={!ctx.canManage}
           placeholder={st.kind === 'question' ? 'e.g. Which one are you looking for?' : 'What to say…'} />
       </label>
@@ -110,7 +110,7 @@ function StepNode({ id, ctx }: { id: string; ctx: TreeCtx }) {
                     onChange={e => ctx.update(id, { buttons: (st.buttons ?? []).map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })}
                     style={{ height: 30, padding: '0 12px', borderRadius: 99, border: '1px solid rgb(var(--hv-blue))', color: 'rgb(var(--hv-blue))', font: 'inherit', fontSize: 13, minWidth: 0, width: 160 }} />
                 </span>
-                <span className={s.hint}>When tapped ↓ · 客户按了之后</span>
+                <span className={s.hint}>When tapped ↓</span>
                 <span className={s.spacer} />
                 {ctx.canManage && (st.buttons ?? []).length > 1 ? (
                   <button type="button" className={btn('outline')} aria-label="Remove button"
@@ -123,16 +123,16 @@ function StepNode({ id, ctx }: { id: string; ctx: TreeCtx }) {
           ))}
           {ctx.canManage && (st.buttons ?? []).length < 13 ? (
             <button type="button" className={btn('dashed')} style={{ alignSelf: 'flex-start' }}
-              onClick={() => ctx.update(id, { buttons: [...(st.buttons ?? []), { label: '', next: '' }] })}>+ Add a button · 加按钮</button>
+              onClick={() => ctx.update(id, { buttons: [...(st.buttons ?? []), { label: '', next: '' }] })}>+ Add a button</button>
           ) : null}
         </div>
       ) : st.kind !== 'handoff' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span className={s.hint}>{st.kind === 'phone' ? 'After the phone ↓ · 留了电话之后' : 'Then ↓ · 然后'}</span>
+          <span className={s.hint}>{st.kind === 'phone' ? 'After the phone ↓' : 'Then ↓'}</span>
           <Branch slot={`${id}:next`} target={st.next ?? ''} ctx={ctx} onPoint={next => ctx.update(id, { next: next || null })} />
         </div>
       ) : (
-        <span className={s.hint}>Ends here: the conversation shows as Waiting in the Inbox for Customer Service. · 交给客服</span>
+        <span className={s.hint}>Ends here: the conversation shows as Waiting in the Inbox for Customer Service.</span>
       )}
     </div>
   )
@@ -175,7 +175,7 @@ function Branch({ slot, target, ctx, button = false, onPoint }: {
       {linked ? (
         <span className={s.hint}>→ Goes to step {ctx.num(linked.id)}: {Array.from(linked.text || '').slice(0, 18).join('')}</span>
       ) : (
-        <span className={s.hint} style={{ color: button ? 'rgb(var(--hv-alert))' : undefined }}>{button ? 'No reply set yet · 还没设定' : 'Ends · 结束'}</span>
+        <span className={s.hint} style={{ color: button ? 'rgb(var(--hv-alert))' : undefined }}>{button ? 'No reply set yet' : 'Ends'}</span>
       )}
       {ctx.canManage ? (
         <>
@@ -225,16 +225,16 @@ export function TryIt({ steps, ok }: { steps: FlowStep[]; ok: boolean }) {
     const next = answerStep(steps, waiting, text)
     const out: Line[] = [{ who: 'me', text }]
     if (next === null) {
-      out.push({ who: 'note', text: 'Stopped → Customer Service replies · 交给客服' })
+      out.push({ who: 'note', text: 'Stopped → Customer Service replies' })
       setWaiting(null)
     } else if (next === '') {
-      out.push({ who: 'note', text: 'Done · 结束' })
+      out.push({ who: 'note', text: 'Done' })
       setWaiting(null)
     } else {
       const r = sendFrom(steps, next)
       out.push(...r.sent.map(m => ({ who: 'flow' as const, text: m.text, buttons: m.buttons })))
-      if (r.end === 'handoff') out.push({ who: 'note', text: 'Handed to Customer Service → Waiting in the Inbox · 交给客服' })
-      if (r.end === 'done') out.push({ who: 'note', text: 'Done · 结束' })
+      if (r.end === 'handoff') out.push({ who: 'note', text: 'Handed to Customer Service → Waiting in the Inbox' })
+      if (r.end === 'done') out.push({ who: 'note', text: 'Done' })
       setWaiting(r.waiting)
     }
     setLines(l => [...l, ...out])
@@ -245,13 +245,13 @@ export function TryIt({ steps, ok }: { steps: FlowStep[]; ok: boolean }) {
   return (
     <section className={s.panel} aria-label="Try it">
       <div className={s.panelHead}>
-        <span className={s.label}>Try it<span className={s.zh}>试跑</span></span>
+        <span className={s.label}>Try it</span>
         <span className={s.spacer} />
         <button type="button" className={btn('outline')} onClick={restart}>Restart</button>
       </div>
-      <span className={s.hint}>What the customer sees — tap or type; nothing is sent or saved. · 客户看到的样子</span>
+      <span className={s.hint}>What the customer sees — tap or type; nothing is sent or saved.</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 18, border: '1px solid rgb(var(--hv-hairline))', background: 'rgb(var(--hv-zebra))', minHeight: 320, maxHeight: 520, overflowY: 'auto' }}>
-        {!ok ? <span className={s.hint}>Finish the form to try it. · 填好就可以试跑</span> : null}
+        {!ok ? <span className={s.hint}>Finish the form to try it.</span> : null}
         {lines.map((l, i) => l.who === 'note' ? (
           <span key={i} className={s.hint} style={{ alignSelf: 'center', textAlign: 'center' }}>{l.text}</span>
         ) : l.who === 'me' ? (

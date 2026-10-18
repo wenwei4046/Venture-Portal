@@ -14,7 +14,7 @@ export default function AdInfo({ contact }: { contact: LeadContact }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className={s.label}><Bi en="Source" zh="来源" /></span>
-        <span style={{ fontSize: 13 }}>{CHANNEL_LABEL[contact.channel]} · Organic<span className={s.zh}>自然流量</span></span>
+        <span style={{ fontSize: 13 }}>{CHANNEL_LABEL[contact.channel]} · Organic</span>
       </div>
     )
   }

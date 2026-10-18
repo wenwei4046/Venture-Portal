@@ -20,12 +20,11 @@ export function initials(name: string): string {
   return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-/** English first, Simplified Chinese beside it, smaller (the user, 2026-10-16: 简体+英文；英文大点，中文辅助翻译). */
-export function Bi({ en, zh, block = false }: { en: string; zh: string; block?: boolean }) {
-  return (
-    <>
-      {en}
-      <span className={block ? s.zhBlock : s.zh}>{zh}</span>
-    </>
-  )
+/**
+ * A label in English. Until 2026-10-18 the Simplified Chinese helper showed beside it, smaller ("简体+英文"); the
+ * user then asked for English only ("改成纯英文，画面太乱了"), so `zh` is kept but not drawn — one line to bring
+ * it back, should a translation toggle be wanted.
+ */
+export function Bi({ en }: { en: string; zh?: string; block?: boolean }) {
+  return <>{en}</>
 }

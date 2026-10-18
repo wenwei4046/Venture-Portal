@@ -108,7 +108,7 @@ export default function InboxView({
                 <button key={b.id} type="button" className={s.tab} aria-pressed={brand === b.id} onClick={() => setBrand(b.id)}>{b.name}</button>
               ))}
             </div>
-            <input className={s.search} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, phone, message · 搜索" aria-label="Search conversations" />
+            <input className={s.search} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, phone, message" aria-label="Search conversations" />
             <div className={s.tabs} role="group" aria-label="Where they stand">
               {FILTERS.map(f => (
                 <button key={f.id} type="button" className={s.tab} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -142,7 +142,7 @@ export default function InboxView({
                       <span className={s.rowChips}>
                         <BrandChip brand={brands.get(c.brandId)} />
                         <StateChip state={st} />
-                        {c.flowState === 'running' ? <span className={s.brand} data-tone="blue">Automation · 自动</span> : null}
+                        {c.flowState === 'running' ? <span className={s.brand} data-tone="blue">Automation</span> : null}
                         {c.phone ? <span className={s.found}>{formatPhone(c.phone)}</span> : null}
                         {c.isTest ? <span className={s.brand} data-tone="plum">TEST</span> : null}
                       </span>
@@ -258,7 +258,7 @@ function Chat({ contact, thread, brandName, today, canReply, aiOn, loading, onSe
         {thread?.messages.map(m => m.direction === 'in' ? (
           <div key={m.id} className={s.msgIn}>
             <div className={s.bubbleIn}>{m.body}</div>
-            {m.phoneFound ? <span className={s.found}>Phone found {formatPhone(m.phoneFound)} → card · 侦测到电话</span> : null}
+            {m.phoneFound ? <span className={s.found}>Phone found {formatPhone(m.phoneFound)} → card</span> : null}
             <span className={s.msgMeta}>{whenShort(m.at, today)}</span>
           </div>
         ) : (
@@ -302,7 +302,7 @@ function Chat({ contact, thread, brandName, today, canReply, aiOn, loading, onSe
           <label style={{ flex: 1, display: 'flex' }}>
             <span className="sr-only">Reply</span>
             <textarea className={s.textarea} rows={2} value={text} onChange={e => setText(e.target.value)} maxLength={2000}
-              placeholder="Reply… (Ctrl + Enter to send) · 回复客户"
+              placeholder="Reply… (Ctrl + Enter to send)"
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send() } }} />
           </label>
           <button type="button" className={btn('primary')} onClick={send} disabled={sending || !text.trim()}>{sending ? 'Sending…' : <Bi en="Send" zh="发送" />}</button>

@@ -63,7 +63,7 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
     <div className={s.scrim} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
       <div className={s.window} role="dialog" aria-modal="true" aria-label="Hand over to sales">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 className={s.windowTitle} style={{ flex: 1 }}>Hand over to {brand.name} sales<span className={s.zh}>转交给销售</span></h2>
+          <h2 className={s.windowTitle} style={{ flex: 1 }}>Hand over to {brand.name} sales</h2>
           <button type="button" className={btn('outline')} onClick={onClose} disabled={busy} aria-label="Close">✕</button>
         </div>
         {brand.sales.length === 0 ? (
@@ -77,7 +77,7 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
                   <span className={s.salesName}>{x.name}</span>
                   <span className={s.salesMeta}>{formatPhone(x.phone)}{x.showroom ? ` · ${x.showroom}` : ''} · {x.week} this week</span>
                 </span>
-                {next?.id === x.id ? <span className={s.brand} data-tone="clay">Next · 轮到他</span> : null}
+                {next?.id === x.id ? <span className={s.brand} data-tone="clay">Next</span> : null}
               </button>
             ))}
           </div>

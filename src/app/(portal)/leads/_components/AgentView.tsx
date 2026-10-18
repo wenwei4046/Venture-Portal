@@ -94,27 +94,27 @@ function BrandAgent({ persona, cards, canManage }: { persona: Persona; cards: nu
           </label>
           <label className={s.field}><Bi en="Tone" zh="语气" />
             <select value={form.tone} onChange={e => set({ tone: e.target.value as AgentTone })} disabled={ro}>
-              {TONES.map(t => <option key={t} value={t}>{TONE_LABEL[t].en} · {TONE_LABEL[t].zh}</option>)}
+              {TONES.map(t => <option key={t} value={t}>{TONE_LABEL[t].en}</option>)}
             </select>
           </label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Personality — who the agent is" zh="灵魂 / 个性：AI 是谁" />
             <textarea value={form.personality} onChange={e => set({ personality: e.target.value })} maxLength={2000} rows={4} readOnly={ro}
-              placeholder={'e.g. A young interior lover who knows every sofa in the showroom; cheerful, never pushy.\n例：熟悉店里每张沙发的年轻家居达人，开朗、不推销。'} />
+              placeholder={'e.g. A young interior lover who knows every sofa in the showroom; cheerful, never pushy.'} />
           </label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Goal" zh="目标" />
             <textarea value={form.goal} onChange={e => set({ goal: e.target.value })} maxLength={1000} rows={2} placeholder={DEFAULT_GOAL} readOnly={ro} />
           </label>
           <label className={s.field}><Bi en="Always" zh="一定要" />
             <textarea value={form.dos} onChange={e => set({ dos: e.target.value })} maxLength={2000} rows={4} readOnly={ro}
-              placeholder={'e.g. Mention free delivery in the Klang Valley.\n例：提到巴生谷免运费。'} />
+              placeholder={'e.g. Mention free delivery in the Klang Valley.'} />
           </label>
           <label className={s.field}><Bi en="Never" zh="绝对不要" />
             <textarea value={form.donts} onChange={e => set({ donts: e.target.value })} maxLength={2000} rows={4} readOnly={ro}
-              placeholder={'e.g. Never talk about competitors.\n例：不提竞争对手。'} />
+              placeholder={'e.g. Never talk about competitors.'} />
           </label>
           <label className={`${s.field} ${s.wide}`}><Bi en="Example replies — the brand's voice" zh="回复范例：品牌的说话方式" />
             <textarea value={form.examples} onChange={e => set({ examples: e.target.value })} maxLength={4000} rows={5} readOnly={ro}
-              placeholder={'Paste two or three replies you like. The agent copies the voice, not the facts.\n贴上两三则满意的回复，AI 会学语气，不会照抄内容。'} />
+              placeholder={'Paste two or three replies you like. The agent copies the voice, not the facts.'} />
           </label>
           {error ? <div className={`${s.error} ${s.wide}`} role="alert">{error}</div> : null}
           {saved && !changed ? <div className={`${s.ok} ${s.wide}`} role="status"><Bi en="Saved." zh="已保存" /></div> : null}
@@ -125,12 +125,12 @@ function BrandAgent({ persona, cards, canManage }: { persona: Persona; cards: nu
             </div>
           ) : null}
         </div>
-        <SectHead title="Last 30 days · 近30天" />
+        <SectHead title="Last 30 days" />
         <div className={s.inline}>
-          <div className={s.stat}><span className={s.label}>Drafts · 草稿</span><span className={s.statValue}>{d.total}</span></div>
-          <div className={s.stat}><span className={s.label}>Sent as is · 直接发</span><span className={s.statValue}>{d.sent}</span></div>
-          <div className={s.stat}><span className={s.label}>Edited · 修改后发</span><span className={s.statValue}>{d.edited}</span></div>
-          <div className={s.stat}><span className={s.label}>Used · 采用率</span><span className={s.statValue}>{rate === null ? '—' : `${rate}%`}</span></div>
+          <div className={s.stat}><span className={s.label}>Drafts</span><span className={s.statValue}>{d.total}</span></div>
+          <div className={s.stat}><span className={s.label}>Sent as is</span><span className={s.statValue}>{d.sent}</span></div>
+          <div className={s.stat}><span className={s.label}>Edited</span><span className={s.statValue}>{d.edited}</span></div>
+          <div className={s.stat}><span className={s.label}>Used</span><span className={s.statValue}>{rate === null ? '—' : `${rate}%`}</span></div>
         </div>
         <div className={s.hint}><Bi block en={`${cards} Data Center card${cards === 1 ? '' : 's'} in use for this brand today.`} zh={`今天这个品牌可用的资料：${cards} 张。`} /></div>
       </section>
@@ -193,12 +193,12 @@ function TryIt({ brandId, fields, canTry }: { brandId: string; fields: PersonaFi
           <label style={{ flex: 1, display: 'flex' }}>
             <span className="sr-only">Customer message</span>
             <textarea className={s.textarea} rows={2} value={text} onChange={e => setText(e.target.value)} maxLength={2000}
-              placeholder="As the customer… (Ctrl + Enter) · 以客户身份输入"
+              placeholder="As the customer… (Ctrl + Enter)"
               onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); say() } }} />
           </label>
           <button type="button" className={btn('primary')} onClick={say} disabled={busy || !text.trim()}><Bi en="Send" zh="发送" /></button>
         </div>
-      ) : <div className={s.hint}><Bi en="Trying the agent needs Lead View · Manage." zh="需要 Lead View · Manage 权限" /></div>}
+      ) : <div className={s.hint}><Bi en="Trying the agent needs Lead View · Manage." zh="需要 Lead View" /></div>}
     </section>
   )
 }

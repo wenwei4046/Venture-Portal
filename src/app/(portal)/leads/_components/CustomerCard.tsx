@@ -99,7 +99,7 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
 
       {contact.handedAt ? (
         <div className={s.handed}>
-          <span className={s.handedTitle}>Handed to {contact.handedSalesName}<span className={s.zh}>已转交</span></span>
+          <span className={s.handedTitle}>Handed to {contact.handedSalesName}</span>
           <span className={s.hint}>{whenFull(contact.handedAt)} · {contact.handedByName}</span>
           {canEdit ? <Outcome contact={contact} onSaved={onSaved} /> : (
             <span className={s.hint}>Booked: {APPT[contact.appt]} · Came: {SHOWN[contact.shown]}</span>
@@ -108,8 +108,8 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
         </div>
       ) : canEdit && brand ? (
         <button type="button" className={btn('primary')} style={{ minHeight: 44 }} onClick={() => setHanding(true)} disabled={!contact.phone}
-          title={contact.phone ? undefined : 'Get the phone first · 先拿到客户电话'}>
-          Hand over to {brand.name} sales<span className={s.zh}>转交给销售</span>
+          title={contact.phone ? undefined : 'Get the phone first'}>
+          Hand over to {brand.name} sales
         </button>
       ) : null}
 
@@ -161,7 +161,7 @@ function Promotions({ contact, canEdit, onSaved }: { contact: LeadContact; canEd
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span className={s.label}><Bi en="Promotions" zh="推广消息" /></span>
       <div className={s.inline} style={{ alignItems: 'center' }}>
-        <span className={s.brand} data-tone={OPT_IN[state].tone}>{OPT_IN[state].en} · {OPT_IN[state].zh}</span>
+        <span className={s.brand} data-tone={OPT_IN[state].tone}>{OPT_IN[state].en}</span>
         {canEdit && contact.isTest ? (Object.keys(OPT_IN) as OptIn[]).filter(k => k !== state).map(k => (
           <button key={k} type="button" className={s.linkBtn} disabled={busy} onClick={() => put(k)}>Set {OPT_IN[k].en.toLowerCase()} (test)</button>
         )) : null}
@@ -172,8 +172,8 @@ function Promotions({ contact, canEdit, onSaved }: { contact: LeadContact; canEd
   )
 }
 
-const APPT: Readonly<Record<Appt, string>> ={ unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
-const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known · 未知', came: 'Came · 到了', no_show: 'No show · 没来' }
+const APPT: Readonly<Record<Appt, string>> ={ unknown: 'Not known', booked: 'Booked', not_booked: 'Not booked' }
+const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known', came: 'Came', no_show: 'No show' }
 
 function Outcome({ contact, onSaved }: { contact: LeadContact; onSaved: () => void }) {
   const [busy, start] = useTransition()

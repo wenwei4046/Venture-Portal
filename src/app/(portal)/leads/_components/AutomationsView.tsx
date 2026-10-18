@@ -70,7 +70,7 @@ export default function AutomationsView({ flows, categories, brands, canManage }
 
   const count = (id: string) => (id === 'all' ? flows.length : flows.filter(f => (f.categoryId ?? 'none') === id).length)
   const shown = flows.filter(f => cat === 'all' || (f.categoryId ?? 'none') === cat)
-  const catName = (id: string | null | undefined) => categories.find(c => c.id === id)?.name ?? 'No category · 未分类'
+  const catName = (id: string | null | undefined) => categories.find(c => c.id === id)?.name ?? 'No category'
 
   const toggle = (f: LeadFlow) => start(async () => {
     setError(null)
@@ -111,7 +111,7 @@ export default function AutomationsView({ flows, categories, brands, canManage }
 
   return (
     <HvPage>
-      <PageHead eyebrow="Lead View · 自动化" title="Automations" right={canManage ? <button type="button" className={btn('primary')} onClick={() => setGallery(true)}><Bi en="+ New automation" zh="新增" /></button> : undefined} />
+      <PageHead eyebrow="Lead View" title="Automations" right={canManage ? <button type="button" className={btn('primary')} onClick={() => setGallery(true)}><Bi en="+ New automation" zh="新增" /></button> : undefined} />
       {error ? <div className={s.error} role="alert" style={{ marginBottom: 12 }}>{error}</div> : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 22, alignItems: 'flex-start' }}>
         <Categories categories={categories} picked={cat} onPick={setCat} count={count} canManage={canManage} />
@@ -181,7 +181,7 @@ function Categories({ categories, picked, onPick, count, canManage }: {
     setAdding(false); setRenaming(null); setName('')
   })
   const remove = (c: AutoCategory) => {
-    if (!window.confirm(`Delete "${c.name}"? Its automations stay, with no category.\n删除这个分类？里面的自动化会保留。`)) return
+    if (!window.confirm(`Delete "${c.name}"? Its automations stay, with no category.`)) return
     start(async () => {
       const r = await removeAutoCategory(c.id)
       if (!r.ok) setError(r.reason)
@@ -218,7 +218,7 @@ function Categories({ categories, picked, onPick, count, canManage }: {
       {count('none') ? row('none', <Bi en="No category" zh="未分类" />, null) : null}
       {canManage ? (adding ? (
         <div className={s.inline} style={{ padding: '4px 0' }}>
-          <input className={s.search} style={{ flex: 1, minWidth: 0 }} value={name} onChange={e => setName(e.target.value)} maxLength={30} autoFocus placeholder="e.g. Festive · 节日活动" aria-label="New category" />
+          <input className={s.search} style={{ flex: 1, minWidth: 0 }} value={name} onChange={e => setName(e.target.value)} maxLength={30} autoFocus placeholder="e.g. Festive" aria-label="New category" />
           <button type="button" className={btn('primary')} onClick={() => save(null)} disabled={busy || !name.trim()}>Add</button>
         </div>
       ) : (
@@ -239,7 +239,7 @@ function Gallery({ onPick, onClose }: { onPick: (key: string) => void; onClose: 
       <div className={s.window} role="dialog" aria-modal="true" aria-label="Choose a template" style={{ width: 1000 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, borderBottom: '1px solid rgb(var(--hv-hairline))', paddingBottom: 12 }}>
           <div style={{ flex: 1 }}>
-            <h2 className={s.windowTitle}>Templates<span className={s.zh}>模板</span></h2>
+            <h2 className={s.windowTitle}>Templates</h2>
             <span className={s.hint}><Bi en="Choose a template, or start from scratch." zh="选择模板，或从零开始。" /></span>
           </div>
           <button type="button" className={btn('outline')} onClick={onClose} aria-label="Close">✕</button>
@@ -262,7 +262,7 @@ function Gallery({ onPick, onClose }: { onPick: (key: string) => void; onClose: 
                     <strong style={{ fontSize: 14 }}><Bi en={c.en} zh={c.zh} /></strong>
                     <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>{c.descEn}</span>
                     <span className={s.hint}>{c.descZh}</span>
-                    {c.soon ? <span className={s.brand} data-tone="plum" style={{ alignSelf: 'flex-start' }}>Coming soon · 即将推出</span> : null}
+                    {c.soon ? <span className={s.brand} data-tone="plum" style={{ alignSelf: 'flex-start' }}>Coming soon</span> : null}
                   </span>
                 </button>
               ))}
@@ -316,7 +316,7 @@ function Editor({ start, categories, brands, canManage, onClose }: {
     onClose()
   })
   const remove = () => {
-    if (!e.id || !window.confirm(`Delete "${e.name}"? 删除这个自动化？`)) return
+    if (!e.id || !window.confirm(`Delete "${e.name}"?`)) return
     go(async () => {
       const r = await removeLeadFlow(e.id!)
       if (!r.ok) setError(r.reason)
@@ -327,9 +327,9 @@ function Editor({ start, categories, brands, canManage, onClose }: {
   return (
     <HvPage>
       <div className={s.inline} style={{ alignItems: 'center', marginBottom: 12, fontSize: 14 }}>
-        <button type="button" className={s.linkBtn} onClick={onClose}>Automations<span className={s.zh}>自动化</span></button>
+        <button type="button" className={s.linkBtn} onClick={onClose}>Automations</button>
         <span className={s.muted}>›</span>
-        <strong>{tpl.en}<span className={s.zh}>{tpl.zh}</span></strong>
+        <strong>{tpl.en}</strong>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: '3 1 520px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -338,13 +338,13 @@ function Editor({ start, categories, brands, canManage, onClose }: {
               <label className={s.field}><Bi en="Name" zh="名字" /><input value={e.name} onChange={x => set({ name: x.target.value })} maxLength={60} disabled={!canManage} /></label>
               <label className={s.field}><Bi en="Category" zh="分类" />
                 <select value={e.categoryId ?? ''} onChange={x => set({ categoryId: x.target.value || null })} disabled={!canManage}>
-                  <option value="">No category · 未分类</option>
+                  <option value="">No category</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </label>
               <label className={s.field}><Bi en="Brand" zh="品牌" />
                 <select value={e.brandId ?? ''} onChange={x => set({ brandId: x.target.value || null })} disabled={!canManage}>
-                  <option value="">All brands · 全部品牌</option>
+                  <option value="">All brands</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </label>
@@ -558,7 +558,7 @@ function AdForm({ c, set, disabled }: FormProps<AdConfig>) {
                 </label>
                 <label className={s.field} style={{ flex: '0 1 160px' }}><Bi en="Keep the answer as" zh="答案存到客户卡" />
                   <select value={q.saveAs ?? ''} disabled={disabled} onChange={e => set({ questions: replaced(c.questions, i, { ...q, saveAs: (e.target.value || null) as SaveAs | null }) })}>
-                    {SAVE_AS.map(x => <option key={x.v} value={x.v}>{x.en} · {x.zh}</option>)}
+                    {SAVE_AS.map(x => <option key={x.v} value={x.v}>{x.en}</option>)}
                   </select>
                 </label>
                 {!disabled ? <button type="button" className={btn('outline')} onClick={() => set({ questions: without(c.questions, i) })}><Bi en="Remove" zh="删除" /></button> : null}

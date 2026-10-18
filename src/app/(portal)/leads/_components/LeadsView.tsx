@@ -14,8 +14,8 @@ import type { Appt, LeadConfig, LeadContact, Shown } from '@/lib/leads/types'
 import { Bi, BrandChip, CHANNEL_LABEL } from './bits'
 import s from './lead.module.css'
 
-const APPT: Readonly<Record<Appt, string>> = { unknown: 'Not known · 未知', booked: 'Booked · 已预约', not_booked: 'Not booked · 没约到' }
-const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known · 未知', came: 'Came · 到了', no_show: 'No show · 没来' }
+const APPT: Readonly<Record<Appt, string>> = { unknown: 'Not known', booked: 'Booked', not_booked: 'Not booked' }
+const SHOWN: Readonly<Record<Shown, string>> = { unknown: 'Not known', came: 'Came', no_show: 'No show' }
 
 /**
  * Lead View › Leads (the canvas's "Leads" board): the month's customers whose phone Customer Service got — who
@@ -48,10 +48,10 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
         </select>
       } />
       <Cards count={4} label="This month">
-        <Card label="Phones · 拿到电话" value={String(t.phones)} note={`of ${t.conversations} conversations · ${rate(t.phones, t.conversations) ?? '—'}%`} />
-        <Card label="Handed · 已转交" value={String(t.handed)} note={`${t.phones - t.handed} not handed yet · 还没转交`} />
-        <Card label="Booked · 已预约" value={String(t.booked)} note="Kept by Customer Service · 客服手动更新" />
-        <Card label="Came · 已到店" value={String(t.came)} note="For reference, not the CS KPI · 参考" />
+        <Card label="Phones" value={String(t.phones)} note={`of ${t.conversations} conversations · ${rate(t.phones, t.conversations) ?? '—'}%`} />
+        <Card label="Handed" value={String(t.handed)} note={`${t.phones - t.handed} not handed yet`} />
+        <Card label="Booked" value={String(t.booked)} note="Kept by Customer Service" />
+        <Card label="Came" value={String(t.came)} note="For reference, not the CS KPI" />
       </Cards>
 
       {onlyTests ? <div className={s.note} style={{ margin: '18px 0 0' }}><Bi block en="Only test conversations so far (Meta is not connected), so they are shown. Once real customers arrive, tests are left out of the numbers." zh="目前只有测试资料，所以先显示测试对话。" /></div> : null}
@@ -66,7 +66,7 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
         <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Bi en="Handed" zh="转交" />
           <select className={s.select} value={handed} onChange={e => setHanded(e.target.value as 'all' | 'yes' | 'no')}>
-            <option value="all">All · 全部</option><option value="no">Not yet · 还没转交</option><option value="yes">Handed · 已转交</option>
+            <option value="all">All</option><option value="no">Not yet</option><option value="yes">Handed</option>
           </select>
         </label>
         <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -77,7 +77,7 @@ export default function LeadsView({ config, contacts, period, months, canEdit }:
       <div className={s.tableBox}>
         <table className={s.table}>
           <thead>
-            <tr><th>Customer<span className={s.zh}>客户</span></th><th>Brand<span className={s.zh}>品牌</span></th><th>Source<span className={s.zh}>来源</span></th><th>Phone<span className={s.zh}>电话</span></th><th>Interest<span className={s.zh}>意向</span></th><th>Handed to<span className={s.zh}>转交给</span></th><th>When<span className={s.zh}>时间</span></th><th>Booked<span className={s.zh}>预约</span></th><th>Came<span className={s.zh}>到店</span></th></tr>
+            <tr><th>Customer</th><th>Brand</th><th>Source</th><th>Phone</th><th>Interest</th><th>Handed to</th><th>When</th><th>Booked</th><th>Came</th></tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (

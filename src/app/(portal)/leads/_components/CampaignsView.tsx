@@ -56,14 +56,14 @@ export default function CampaignsView({ campaigns, brands, canManage }: { campai
       </div>
       <div className={s.twoCol}>
         <section className={s.panel} aria-label="Campaigns">
-          <SectHead title="Campaigns · 群发记录" count={String(campaigns.length)} />
+          <SectHead title="Campaigns" count={String(campaigns.length)} />
           {campaigns.length === 0 ? (
             <div className={s.empty}><Bi block en="No campaigns yet." zh="还没有群发。" /></div>
           ) : (
             <div className={s.tableBox}>
               <table className={s.table}>
                 <thead>
-                  <tr><th>Name · 名称</th><th>Brand</th><th>Status</th><th className={s.num}>Sent</th><th className={s.num}>Replied</th><th className={s.num}>Phones</th></tr>
+                  <tr><th>Name</th><th>Brand</th><th>Status</th><th className={s.num}>Sent</th><th className={s.num}>Replied</th><th className={s.num}>Phones</th></tr>
                 </thead>
                 <tbody>
                   {campaigns.map(c => (
@@ -72,7 +72,7 @@ export default function CampaignsView({ campaigns, brands, canManage }: { campai
                       <td><BrandChip brand={byBrand.get(c.brandId)} /></td>
                       <td>
                         <span className={s.brand} data-tone={STATUS[c.status].tone}>
-                          {STATUS[c.status].en} · {STATUS[c.status].zh}{c.status === 'scheduled' && c.scheduledAt ? ` ${whenFull(c.scheduledAt)}` : ''}
+                          {STATUS[c.status].en}{c.status === 'scheduled' && c.scheduledAt ? ` ${whenFull(c.scheduledAt)}` : ''}
                         </span>
                       </td>
                       <td className={s.num}>{c.status === 'sent' ? c.sent : '—'}</td>
@@ -134,7 +134,7 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
     onDone(r.data)
   })
   const sendNow = () => {
-    if (!window.confirm(`Send "${form.name}" to ${reach} customer${reach === 1 ? '' : 's'} now? (Recorded only — Meta is not connected.)\n现在发送给 ${reach} 位客户？`)) return
+    if (!window.confirm(`Send "${form.name}" to ${reach} customer${reach === 1 ? '' : 's'} now? (Recorded only — Meta is not connected.)`)) return
     startBusy(async () => {
       setError(null)
       const saved = await saveCampaign(form.id, { ...data(), scheduledAt: null })
@@ -145,7 +145,7 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
     })
   }
   const remove = () => {
-    if (!form.id || !window.confirm(`Remove "${form.name}"? 删除这个群发？`)) return
+    if (!form.id || !window.confirm(`Remove "${form.name}"?`)) return
     startBusy(async () => {
       const r = await removeCampaign(form.id!)
       if (!r.ok) setError(r.reason)
@@ -161,10 +161,10 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
 
   return (
     <section className={s.panel} aria-label="Campaign">
-      <SectHead title={form.id ? `Edit · ${form.name}` : 'New campaign · 新群发'} />
+      <SectHead title={form.id ? `Edit · ${form.name}` : 'New campaign'} />
       <div className={s.fieldGrid}>
         <label className={`${s.field} ${s.wide}`}><Bi en="Name (only you see it)" zh="名称（内部用）" />
-          <input value={form.name} onChange={e => set({ name: e.target.value })} maxLength={60} placeholder="e.g. 11.11 sofa preview · 11.11 沙发预告" />
+          <input value={form.name} onChange={e => set({ name: e.target.value })} maxLength={60} placeholder="e.g. 11.11 sofa preview" />
         </label>
         <label className={s.field}><Bi en="Brand" zh="品牌" />
           <select value={form.brandId} onChange={e => set({ brandId: e.target.value })}>
@@ -180,35 +180,35 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
         </label>
       </div>
 
-      <SectHead title="Who · 对象" />
+      <SectHead title="Who" />
       <div className={s.fieldGrid}>
         <label className={s.field}><Bi en="Talked with us" zh="有对话" />
           <select value={form.audience.days} onChange={e => setAud({ days: Number(e.target.value) })}>
-            {DAY_CHOICES.map(d => <option key={d.days} value={d.days}>{d.en} · {d.zh}</option>)}
+            {DAY_CHOICES.map(d => <option key={d.days} value={d.days}>{d.en}</option>)}
           </select>
         </label>
         <label className={s.field}><Bi en="Interest contains" zh="意向包含" />
-          <input value={form.audience.interest} onChange={e => setAud({ interest: e.target.value })} maxLength={60} placeholder="e.g. sofa · 沙发" />
+          <input value={form.audience.interest} onChange={e => setAud({ interest: e.target.value })} maxLength={60} placeholder="e.g. sofa" />
         </label>
         <label className={s.field}><Bi en="Phone" zh="电话" />
           <select value={form.audience.phone} onChange={e => setAud({ phone: e.target.value as Audience['phone'] })}>
-            <option value="any">Any · 不限</option>
-            <option value="without">No phone yet · 还没电话</option>
-            <option value="with">Have phone · 有电话</option>
+            <option value="any">Any</option>
+            <option value="without">No phone yet</option>
+            <option value="with">Have phone</option>
           </select>
         </label>
         <label className={s.field}><Bi en="Handed to sales" zh="已转交" />
           <select value={form.audience.handed} onChange={e => setAud({ handed: e.target.value as Audience['handed'] })}>
-            <option value="any">Any · 不限</option>
-            <option value="no">Not yet · 未转交</option>
-            <option value="yes">Handed · 已转交</option>
+            <option value="any">Any</option>
+            <option value="no">Not yet</option>
+            <option value="yes">Handed</option>
           </select>
         </label>
         <label className={s.field}><Bi en="Came from" zh="来源" />
           <select value={form.audience.source} onChange={e => setAud({ source: e.target.value as Audience['source'] })}>
-            <option value="any">Any · 不限</option>
-            <option value="ad">An ad · 广告</option>
-            <option value="organic">Organic · 自然流量</option>
+            <option value="any">Any</option>
+            <option value="ad">An ad</option>
+            <option value="organic">Organic</option>
           </select>
         </label>
         <label className={s.check} style={{ alignSelf: 'end', minHeight: 36 }}>
@@ -217,19 +217,19 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
         </label>
       </div>
       <div className={s.inline} aria-live="polite">
-        <div className={s.stat}><span className={s.label}>Match · 符合</span><span className={s.statValue}>{count ? count.matched : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Will get it · 可发送</span><span className={s.statValue}>{count ? reach : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Paid (opt-in) · 收费</span><span className={s.statValue}>{count ? count.optin : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Left out · 排除</span><span className={s.statValue}>{count ? count.notOptedIn + count.unsubscribed : '—'}</span></div>
+        <div className={s.stat}><span className={s.label}>Match</span><span className={s.statValue}>{count ? count.matched : '—'}</span></div>
+        <div className={s.stat}><span className={s.label}>Will get it</span><span className={s.statValue}>{count ? reach : '—'}</span></div>
+        <div className={s.stat}><span className={s.label}>Paid (opt-in)</span><span className={s.statValue}>{count ? count.optin : '—'}</span></div>
+        <div className={s.stat}><span className={s.label}>Left out</span><span className={s.statValue}>{count ? count.notOptedIn + count.unsubscribed : '—'}</span></div>
       </div>
       {count ? (
         <span className={s.hint}>
           {counting ? 'Counting… ' : ''}{count.window} within 24 hours (free) · {count.optin} opted in (Meta charges) · {count.notOptedIn} past 24 hours without consent · {count.unsubscribed} unsubscribed
-          <span className={s.zhBlock}>24小时内 {count.window}（免费）· 已同意 {count.optin}（收费）· 超过24小时未同意 {count.notOptedIn} · 已退订 {count.unsubscribed}</span>
+
         </span>
       ) : null}
 
-      <SectHead title="Message · 消息" />
+      <SectHead title="Message" />
       <label className={s.field}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Bi en="Message" zh="内容" />
@@ -246,7 +246,7 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
           <>
             <label className={s.field} style={{ flex: '0 1 200px' }}>
               <span className="sr-only">New button</span>
-              <input value={button} onChange={e => setButton(e.target.value)} maxLength={20} placeholder="Button, e.g. Book a visit · 按钮"
+              <input value={button} onChange={e => setButton(e.target.value)} maxLength={20} placeholder="Button, e.g. Book a visit"
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addButton() } }} />
             </label>
             <button type="button" className={btn('outline')} onClick={addButton} disabled={!button.trim()}><Bi en="Add button" zh="加按钮" /></button>
@@ -255,7 +255,7 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
       </div>
       <span className={s.hint}><Bi block en="A tapped button comes back as the customer's message, so your keyword automations can answer it." zh="客户点按钮，会变成客户发来的消息，关键词自动回复可以接着回答。" /></span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={s.label}>Preview · 预览</span>
+        <span className={s.label}>Preview</span>
         <div className={s.tryChat} style={{ minHeight: 0 }}>
           <div className={s.msgOut}>
             <div className={s.bubbleOut} data-sender="flow" style={{ whiteSpace: 'pre-wrap' }}>{personalize(form.body, count?.sample[0] ?? 'Ann')}</div>
@@ -264,7 +264,7 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
         </div>
       </div>
 
-      <SectHead title="When · 时间" />
+      <SectHead title="When" />
       <label className={s.field}><Bi en="Schedule for (optional)" zh="排程时间（可不填）" />
         <input type="datetime-local" value={form.scheduledAt} onChange={e => set({ scheduledAt: e.target.value })} />
       </label>
@@ -296,13 +296,13 @@ function Results({ campaign: c, brand }: { campaign: Campaign; brand: LeadBrand 
       </span>
       {c.status === 'sent' ? (
         <div className={s.inline}>
-          <div className={s.stat}><span className={s.label}>Sent · 发送</span><span className={s.statValue}>{c.sent}</span></div>
-          <div className={s.stat}><span className={s.label}>Paid · 收费</span><span className={s.statValue}>{c.paid}</span></div>
-          <div className={s.stat}><span className={s.label}>Replied · 回复</span><span className={s.statValue}>{c.replied}{replied === null ? '' : ` · ${replied}%`}</span></div>
-          <div className={s.stat}><span className={s.label}>Phones · 电话</span><span className={s.statValue}>{c.phones}{phones === null ? '' : ` · ${phones}%`}</span></div>
+          <div className={s.stat}><span className={s.label}>Sent</span><span className={s.statValue}>{c.sent}</span></div>
+          <div className={s.stat}><span className={s.label}>Paid</span><span className={s.statValue}>{c.paid}</span></div>
+          <div className={s.stat}><span className={s.label}>Replied</span><span className={s.statValue}>{c.replied}{replied === null ? '' : ` · ${replied}%`}</span></div>
+          <div className={s.stat}><span className={s.label}>Phones</span><span className={s.statValue}>{c.phones}{phones === null ? '' : ` · ${phones}%`}</span></div>
         </div>
       ) : null}
-      <span className={s.label}>Message · 消息</span>
+      <span className={s.label}>Message</span>
       <div className={s.tryChat} style={{ minHeight: 0 }}>
         <div className={s.msgOut}>
           <div className={s.bubbleOut} data-sender="flow" style={{ whiteSpace: 'pre-wrap' }}>{c.body}</div>
