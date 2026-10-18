@@ -32,19 +32,19 @@ export function ActionSheetHost() {
   }, [s]);
   if (!s || typeof document === "undefined") return null;
   return createPortal(
-    <div onClick={close} role="dialog" aria-modal="true" aria-label={s.title} style={{ position: "fixed", inset: 0, zIndex: 2147480000, background: "rgba(63,43,34,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif", animation: "fadeIn 200ms ease-out" }}>
+    <div onClick={close} role="dialog" aria-modal="true" aria-label={s.title} style={{ position: "fixed", inset: 0, zIndex: 2147480000, background: "rgba(42,22,12,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif", animation: "fadeIn 200ms ease-out" }}>
       <div onClick={e => e.stopPropagation()} style={{ maxHeight: "88%", boxSizing: "border-box", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 18px calc(var(--safe-bottom, 0px) + 18px)", display: "flex", flexDirection: "column", gap: "10px", animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)" }}>
-        <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2" }} />
-        <strong style={{ flex: "none", fontSize: typePx(18), color: "#3F2B22", marginTop: "4px" }}>{s.title}</strong>
-        {!!s.sub && <span style={{ flex: "none", fontSize: typePx(14), color: "#806B60", lineHeight: 1.45, marginTop: "-4px" }}>{s.sub}</span>}
+        <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-rule)" }} />
+        <strong style={{ flex: "none", fontSize: typePx(18), color: "var(--crm-ink)", marginTop: "4px" }}>{s.title}</strong>
+        {!!s.sub && <span style={{ flex: "none", fontSize: typePx(14), color: "var(--crm-muted)", lineHeight: 1.45, marginTop: "-4px" }}>{s.sub}</span>}
         <div style={{ minHeight: 0, overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}>
           {s.actions.map((a, i) => (
             <button key={i} type="button" onClick={() => { close(); a.run(); }}
               style={a.detail
-                ? { flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", padding: "12px 16px", borderRadius: "16px", border: "1px solid #E2CFC1", background: "#fff", color: "#3F2B22", textAlign: "left", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }
-                : { flex: "none", height: "46px", borderRadius: "23px", border: a.primary ? 0 : "1px solid #E2CFC1", background: a.primary ? "#BD4A19" : "#fff", color: a.primary ? "#fff" : a.danger ? "#A3371A" : "#3F2B22", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>
+                ? { flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", padding: "12px 16px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", textAlign: "left", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }
+                : { flex: "none", height: "46px", borderRadius: "23px", border: a.primary ? 0 : "1px solid var(--crm-line)", background: a.primary ? "var(--crm-rust)" : "#fff", color: a.primary ? "#fff" : a.danger ? "var(--crm-oxblood)" : "var(--crm-ink)", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>
               {a.label}
-              {!!a.detail && <span style={{ fontSize: typePx(14), fontWeight: 400, lineHeight: 1.45, color: "#806B60", whiteSpace: "pre-wrap" }}>{a.detail}</span>}
+              {!!a.detail && <span style={{ fontSize: typePx(14), fontWeight: 400, lineHeight: 1.45, color: "var(--crm-muted)", whiteSpace: "pre-wrap" }}>{a.detail}</span>}
             </button>
           ))}
         </div>

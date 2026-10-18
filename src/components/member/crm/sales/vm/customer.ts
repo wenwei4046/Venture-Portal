@@ -59,7 +59,7 @@ export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
     // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).
     ...(f?.extra ?? []).flatMap(s => s.fields.map(q => [q.label, c.extra?.[q.id] || "—"])),
   ] as [string, string][]).filter(([k]) => !f || !dropped[k] || f.has[dropped[k]])
-    .map(([k, v], n) => ({ k, v, rule: n ? "1px solid #EBDDD2" : "0", vFg: v === "—" ? "#B5A398" : "#3F2B22",
+    .map(([k, v], n) => ({ k, v, rule: n ? "1px solid var(--crm-rule)" : "0", vFg: v === "—" ? "var(--crm-faint)" : "var(--crm-ink)",
       // The Ad opens the ad itself, so the salesperson sees what the customer saw (the owner, 2026-10-15).
       href: k === "Ad" ? adHref(c.adUrl) : null }));
 }
@@ -103,7 +103,7 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   if (!f || !c) return {
     stop, cfOpen: false, cfClose: () => {}, cfStep: "", cfName: "", cfSetName: (_: ChangeEvent<HTMLInputElement>) => {}, cfPhone: "", cfSetPhone: (_: ChangeEvent<HTMLInputElement>) => {},
     cfType: [] as Chip[], cfSize: [] as Chip[], cfLoc: "", cfSetLoc: (_: ChangeEvent<HTMLInputElement>) => {}, cfReq: "", cfSetReq: (_: ChangeEvent<HTMLTextAreaElement>) => {},
-    cfReqPh: "", cfBudget: "", cfSetBudget: (_: ChangeEvent<HTMLInputElement>) => {}, cfSave: undefined as undefined | (() => void), cfSaveBg: "#D9C7BA", cfSaveLabel: "",
+    cfReqPh: "", cfBudget: "", cfSetBudget: (_: ChangeEvent<HTMLInputElement>) => {}, cfSave: undefined as undefined | (() => void), cfSaveBg: "var(--crm-line)", cfSaveLabel: "",
     cfHas: formOf({}).has, cfExtra: [] as ExtraSection[], cfPaged: false, cfBack: undefined as undefined | (() => void),
   };
   const v = (k: "name" | "phone" | "type" | "size" | "loc" | "req" | "budget") => {
@@ -115,7 +115,7 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   const put = (p: Partial<CustomerForm>) => setForm(x => ({ ...x, ...p }));
   const chip = (k: "type" | "size", opts: string[]): Chip[] => opts.map(o => {
     const on = v(k) === o;
-    return { label: o, pick: () => put({ [k]: on ? "" : o }), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" };
+    return { label: o, pick: () => put({ [k]: on ? "" : o }), bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)" };
   });
   // The form's own questions (CRM Desktop rev 1, B5): typed into the form, else what the customer already has.
   const { has, extra, paged } = formOf(data);
@@ -142,7 +142,7 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     cfLoc: v("loc"), cfSetLoc: (e: ChangeEvent<HTMLInputElement>) => put({ loc: e.target.value }),
     cfReq: v("req"), cfSetReq: (e: ChangeEvent<HTMLTextAreaElement>) => put({ req: e.target.value }), cfReqPh: "e.g. Full renovation + kitchen",
     cfBudget: v("budget"), cfSetBudget: (e: ChangeEvent<HTMLInputElement>) => put({ budget: e.target.value.replace(/[^\d,.\s–-]/g, "") }),
-    cfSaveBg: (more ? pageOk : ok) ? "#BD4A19" : "#D9C7BA", cfSaveLabel: more ? "Next" : f.edit ? "Save" : "Save & choose a time",
+    cfSaveBg: (more ? pageOk : ok) ? "var(--crm-rust)" : "var(--crm-line)", cfSaveLabel: more ? "Next" : f.edit ? "Save" : "Save & choose a time",
     cfSave: more ? (pageOk ? () => put({ page: pg!.at + 1 }) : undefined) : ok ? async () => {
       const answers = f.extra ? Object.fromEntries(Object.entries(f.extra).map(([k, x]) => [k, x.trim() || null])) : undefined;
       const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
@@ -178,7 +178,7 @@ export function extraField(q: CrmFormField, value: string, put: (v: string) => v
     label: q.label, req: !!q.req, value, ph: q.ph ?? "", isInput: !choice && !long, isLong: long, isChoice: choice,
     inputType: q.type === "Date" ? "date" : "text", mode: q.type === "Number" ? "numeric" : q.type === "Phone" ? "tel" : "text",
     chips: choice ? (q.opts ?? []).map(o => { const on = value === o;
-      return { label: o, pick: () => put(on ? "" : o), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" }; }) : [],
+      return { label: o, pick: () => put(on ? "" : o), bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)" }; }) : [],
     set: e => put(e.target.value),
   };
 }

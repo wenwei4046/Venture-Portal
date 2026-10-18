@@ -7,7 +7,7 @@ export function InfoValue({ v, href }: { v: string; href?: string | null }) {
   if (!href) return <>{v}</>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" title="Open the ad"
-      style={{ color: "#BD4A19", textDecoration: "underline", textUnderlineOffset: "2px", cursor: "pointer" }}>{v} ↗</a>
+      style={{ color: "var(--crm-rust)", textDecoration: "underline", textUnderlineOffset: "2px", cursor: "pointer" }}>{v} ↗</a>
   );
 }
 

@@ -17,7 +17,8 @@ const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "HOD" };
 const digits = (e: ChangeEvent<HTMLInputElement>) => parseInt(e.target.value.replace(/\D/g, "")) || 0;
 const selAll = (e: FocusEvent<HTMLInputElement>) => e.target.select();
-const seg = (cur: string, k: string, label: string, pick: () => void) => ({ label, pick, bg: cur === k ? "#fff" : "transparent", fg: cur === k ? "#3F2B22" : "#806B60", w: cur === k ? 650 : 500, sh: cur === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" });
+// 4a change list 17: the active segment is rust with white words.
+const seg = (cur: string, k: string, label: string, pick: () => void) => ({ label, pick, bg: cur === k ? "var(--crm-rust)" : "transparent", fg: cur === k ? "#fff" : "var(--crm-muted)", w: cur === k ? 500 : 400, sh: "none" });
 
 /**
  * Auto-balance %: set one value and the others share what is left of 100 —
@@ -47,12 +48,12 @@ function mkPeople(teams: Team[], m: "cnt" | "pct", pp: Record<string, number>, t
   return {
     groups: teams.map(t => ({ team: t.name, c: t.c, people: t.people.map(p => {
       const n = pp[p.id] || 0;
-      return { name: p.name, role: ROLE[p.role] ?? p.role, v: n, vTxt: m === "pct" ? `${n}%` : String(n), nameFg: n > 0 ? "#3F2B22" : "#806B60",
+      return { name: p.name, role: ROLE[p.role] ?? p.role, v: n, vTxt: m === "pct" ? `${n}%` : String(n), nameFg: n > 0 ? "var(--crm-ink)" : "var(--crm-muted)",
         set: (e: ChangeEvent<HTMLInputElement>) => setP(p.id, +e.target.value), setN: (e: ChangeEvent<HTMLInputElement>) => setP(p.id, Math.min(m === "pct" ? 100 : 999, digits(e))), selAll,
-        minus: () => setP(p.id, n - 1), plus: () => setP(p.id, n + 1), minusFg: n > 0 ? "#3F2B22" : "#D9C7BA" };
+        minus: () => setP(p.id, n - 1), plus: () => setP(p.id, n + 1), minusFg: n > 0 ? "var(--crm-ink)" : "var(--crm-line)" };
     }) })),
     ok, note: m === "pct" ? (sum === 100 ? "Adds up to 100%." : `Adds up to ${sum}%. Make it 100%.`) : sum > 0 ? "" : "Set a maximum for at least one person.",
-    noteFg: ok ? "#387557" : "#A3371A",
+    noteFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
     line: teams.flatMap(t => t.people).filter(p => (pp[p.id] || 0) > 0).map(p => `${first(p.name)} ${m === "pct" ? pp[p.id] + "%" : pp[p.id]}`).join(", "),
   };
 }
@@ -71,21 +72,21 @@ function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
     name: a.label, page: a.page, leads: a.leads, isSplit: cur === "split", isPeople: cur === "people", isEven: cur === "even",
     tag: cur === "split" ? "By team" : cur === "people" ? (pm === "pct" ? "By people · %" : "By people · max") : a.mode === "even" ? "Evenly" : "Evenly · default",
     // §6.3: an ad with no setting is dealt evenly to every team — "Evenly · default", muted.
-    tagBg: a.mode === "unset" ? "#F5EBE3" : "#E6F0EA", tagFg: a.mode === "unset" ? "#806B60" : "#387557",
+    tagBg: a.mode === "unset" ? "var(--crm-field)" : "var(--crm-tint-follow)", tagFg: a.mode === "unset" ? "var(--crm-muted)" : "var(--crm-brown)",
     modes: [seg(cur, "even", "Evenly", () => set({ mode: "even" })), seg(cur, "split", "By team", () => set({ mode: "split" }))],
     evenN: teams.reduce((x, t) => x + t.people.length, 0),
     evenTeams: teams.map(t => ({ team: t.name, c: t.c, names: t.people.map(p => first(p.name)).join(", "), av: t.people.map((p, k) => ({ ini: ini(p.name), ml: k ? "-8px" : "0" })) })),
     splits: teams.map(t => {
       const v = a.split[t.id] || 0, isL = a.lockT.includes(t.id);
       const put = (n: number) => set({ mode: "split", split: { ...a.split, ...balance(teams.map(x => x.id), a.split, t.id, n, a.lockT) }, lockT: nextLock(a.lockT, t.id) });
-      return { team: t.name, c: t.c, v, w: `${v}%`, ppl: `${t.people.length} people`, lockTxt: isL ? "Set" : "Auto", lockBg: isL ? "#3F2B22" : "#EEF3F9", lockFg: isL ? "#fff" : "#806B60",
+      return { team: t.name, c: t.c, v, w: `${v}%`, ppl: `${t.people.length} people`, lockTxt: isL ? "Set" : "Auto", lockBg: isL ? "var(--crm-ink)" : "var(--crm-tint-cold)", lockFg: isL ? "#fff" : "var(--crm-muted)",
         set: (e: ChangeEvent<HTMLInputElement>) => put(+e.target.value), setN: (e: ChangeEvent<HTMLInputElement>) => put(digits(e)), selAll,
-        minus: () => put(v - 5), plus: () => put(v + 5), minusFg: v > 0 ? "#3F2B22" : "#D9C7BA", plusFg: v < 100 ? "#3F2B22" : "#D9C7BA" };
+        minus: () => put(v - 5), plus: () => put(v + 5), minusFg: v > 0 ? "var(--crm-ink)" : "var(--crm-line)", plusFg: v < 100 ? "var(--crm-ink)" : "var(--crm-line)" };
     }),
     sumOk: total === 100, sumTot: `${total}%`,
     splitReset: () => set({ mode: "split", split: Object.fromEntries(teams.map((t, k) => [t.id, Math.floor(100 / teams.length) + (k < 100 % teams.length ? 1 : 0)])), lockT: [] }),
-    sumNote: total === 100 ? "Adds up to 100%" : `Adds up to ${total}% · make it 100%`, sumFg: total === 100 ? "#387557" : "#A3371A", sumBg: total === 100 ? "#E4F1E8" : "#FBE4DE",
-    pModes: ([["cnt", "Max per person"], ["pct", "By %"]] as const).map(([k, label]) => ({ label, bg: pm === k ? "#2F6FB5" : "#fff", fg: pm === k ? "#fff" : "#3F2B22", bd: pm === k ? "#2F6FB5" : "#DCE6F2", pick: () => set({ mode: "people", pm: k, pp: {}, lockP: [] }) })),
+    sumNote: total === 100 ? "Adds up to 100%" : `Adds up to ${total}% · make it 100%`, sumFg: total === 100 ? "var(--crm-brown)" : "var(--crm-oxblood)", sumBg: total === 100 ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)",
+    pModes: ([["cnt", "Max per person"], ["pct", "By %"]] as const).map(([k, label]) => ({ label, bg: pm === k ? "var(--crm-ink-soft)" : "#fff", fg: pm === k ? "#fff" : "var(--crm-ink)", bd: pm === k ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", pick: () => set({ mode: "people", pm: k, pp: {}, lockP: [] }) })),
     pIsPct: pm === "pct", pIsCnt: pm === "cnt", pGroups: P.groups, pSumNote: P.note, pSumFg: P.noteFg,
     resNone: !segs.length,
     resLine: cur === "split" ? teams.filter(t => (a.split[t.id] || 0) > 0).map(t => `${t.name} ${a.split[t.id]}%`).join(" · ") : cur === "people" ? P.line : a.mode === "even" ? "Evenly to everyone" : "",
@@ -115,7 +116,7 @@ export function assignVM(ctx: PanelCtx) {
   // Organic Leads: no team and not held Over the limit (a held lead keeps its team).
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held)
     .map(c => ({ c, at: [...c.messages].reverse().find(m => m.from === "lead")?.at ?? c.createdAt })).sort((a, b) => b.at.localeCompare(a.at));
-  const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid #F3E9E1" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }),
+  const waitList = organic.map(({ c, at }, k) => ({ name: c.name, ad: `${c.ad} · ${c.channel === "messenger" ? "Messenger" : "WhatsApp"}`, when: ago(at, now), rule: k ? "1px solid var(--crm-rule-soft)" : "0", openSend: () => patch({ sendFor: c.id, sdSel: null }),
     // Tapping the name reads the chat first (and may answer it) before choosing who gets it.
     open: () => patch({ lead: c.id, pick: "", toast: "" }) }));
 
@@ -141,7 +142,10 @@ export function assignVM(ctx: PanelCtx) {
     });
     return act.saveAdRule(d.id, d.label, { mode: "split", split: d.split, pm: "pct", pp, tm });
   };
+  const head4 = (id: string) => data.customers.find(c => c.adId === id && c.adHeadline)?.adHeadline ?? "";
   const adRows = ads.map(a => ({
+    // 4a (T03): the channel, the ad's headline under its name, Set up while it has no rule.
+    head: head4(a.id), wa: a.page === "WhatsApp", setUp: !ruleOf(a.id),
     ...mkRow(adTeams, a, p => void saveAd({ ...a, ...p })),
     edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),
   }));
@@ -162,14 +166,14 @@ export function assignVM(ctx: PanelCtx) {
     nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
   } : { canName: false, nameDraft: "", headline: "", onName: () => {}, saveName: () => {}, nameKey: () => {} };
   const ae = aeRow && E
-    ? { ...aeRow, ...naming, close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "#2F6FB5" : "#C9D6E6", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
-    : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, close: () => {}, saveBg: "#C9D6E6", save: undefined as (() => void) | undefined };
+    ? { ...aeRow, ...naming, close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
+    : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, close: () => {}, saveBg: "var(--crm-faint-2)", save: undefined as (() => void) | undefined };
 
   // Awaiting reply, on Assignment: counts per level, then every waiting customer.
   const by = waitingByLevel(ctx);
-  const asgAttSum = by.map(g => { const on = ui.asgF === g.k; return { name: g.name, n: g.items.length, c: on ? "#fff" : g.c, bg: on ? g.c : "#fff", bd: on ? g.c : "#EEDCE6", pick: () => set(u => ({ ...u, asgF: u.asgF === g.k ? null : g.k })) }; });
+  const asgAttSum = by.map(g => { const on = ui.asgF === g.k; return { name: g.name, n: g.items.length, c: on ? "#fff" : g.c, bg: on ? g.c : "#fff", bd: on ? g.c : "var(--crm-tint-new)", pick: () => set(u => ({ ...u, asgF: u.asgF === g.k ? null : g.k })) }; });
   const asgAtt = by.filter(g => !ui.asgF || g.k === ui.asgF).flatMap(g => g.items.map(i => ({ ...i, c: g.c, lv: g.name })))
-    .map((i, k) => ({ ...i, rule: k ? "1px solid #EEDCE6" : "0", open: () => patch({ lead: i.id, pick: "", toast: "" }) }));
+    .map((i, k) => ({ ...i, rule: k ? "1px solid var(--crm-tint-new)" : "0", open: () => patch({ lead: i.id, pick: "", toast: "" }) }));
 
   // Full time: per team, on chosen weekdays.
   const rsOf = (t: Team) => t.people.filter(p => p.role === "rs" && p.fullTime);
@@ -188,14 +192,14 @@ export function assignVM(ctx: PanelCtx) {
     return { name: t.name, mode: on.length ? `${dLbl(on)} · ${c.m === "pct" ? "By %" : "Max"}` : "Off · follows Ads to teams",
       open: () => patch({ ftEd: { tid: t.id, m: c.m, on: [...on], v: JSON.parse(JSON.stringify(c.v)), sel: null, lockD: {} } }),
       rs: rsOf(t).map(p => ({ name: p.name, label: "", tagBg: "transparent", tagFg: "transparent",
-        days: ALL7.map(d => { const x = c.v[p.id]?.[d] || 0, o = on.includes(d); return { t: WK[d], bg: o && x > 0 ? "#387557" : o ? "#CFE3D6" : "#EEF3EF", fg: o && x > 0 ? "#fff" : o ? "#2E6B4C" : "#B5C4BA" }; }) })) };
+        days: ALL7.map(d => { const x = c.v[p.id]?.[d] || 0, o = on.includes(d); return { t: WK[d], bg: o && x > 0 ? "var(--crm-brown)" : o ? "var(--crm-tint-follow)" : "var(--crm-tint-follow)", fg: o && x > 0 ? "#fff" : o ? "var(--crm-brown)" : "var(--crm-faint-2)" }; }) })) };
   });
   const fe = feVM(ctx, ui.ftEd, rsOf, dLbl);
 
   return {
     onAssign: ui.tab === "assign" && !ui.lead,
     hasWaiting: organic.length > 0, waitingN: organic.length, waitList,
-    adRows, adEdOpen: !!E, ae,
+    adRows, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
     asgAttSum, asgAtt, openAtt: () => patch({ att: true }),
     ftSum, ftOpen: !!ui.ftEd, fe,
     // The Team Leader's own page (design 1a's TL view) is the salesperson CRM's; never shown here.
@@ -211,7 +215,7 @@ function feVM(ctx: PanelCtx, E: FtDraft | null, rsOf: (t: Team) => Team["people"
   const t = E ? teams.find(x => x.id === E.tid) : undefined;
   if (!E || !t) return { name: "", dayChips: [], onLbl: "", modes: [], heads: WK, isPct: false, isCnt: true, hasPeople: false, noPeople: true, people: [], totals: [], totLbl: "", restNote: "",
     hasSel: false, noSel: true, selTitle: "", selRest: "", selV: 0, selTxt: "", set: (_e: ChangeEvent<HTMLInputElement>) => {}, setN: (_e: ChangeEvent<HTMLInputElement>) => {}, selAllInput: selAll,
-    minus: () => {}, plus: () => {}, done: () => {}, giveAll: () => {}, giveLbl: "", close: () => {}, saveBg: "#387557", save: () => {} };
+    minus: () => {}, plus: () => {}, done: () => {}, giveAll: () => {}, giveLbl: "", close: () => {}, saveBg: "var(--crm-brown)", save: () => {} };
   const m = E.m, on = E.on, sel = E.sel, rs = rsOf(t), rsIds = rs.map(p => p.id);
   const setE = (p: Partial<FtDraft>) => set(u => (u.ftEd ? { ...u, ftEd: { ...u.ftEd, ...p } } : u));
   const val = (F: FtDraft, id: string, d: number) => F.v[id]?.[d] || 0;
@@ -250,25 +254,25 @@ function feVM(ctx: PanelCtx, E: FtDraft | null, rsOf: (t: Team) => Team["people"
     name: t.name,
     dayChips: ALL7.map(d => {
       const o = on.includes(d);
-      return { t: WKL[d], bg: o ? "#387557" : "#fff", fg: o ? "#fff" : "#806B60", bd: o ? "#387557" : "#D6E6DC",
+      return { t: WKL[d], bg: o ? "var(--crm-brown)" : "#fff", fg: o ? "#fff" : "var(--crm-muted)", bd: o ? "var(--crm-brown)" : "var(--crm-tint-follow)",
         pick: () => { const nOn = o ? on.filter(x => x !== d) : [...on, d].sort(), v: FtDraft["v"] = {}; rsIds.forEach(k => { v[k] = { ...(E.v[k] ?? {}), ...(o ? { [d]: 0 } : {}) }; }); setE({ on: nOn, v, sel: null, lockD: { ...E.lockD, [d]: [] } }); } };
     }),
     onLbl: on.length ? dLbl(on) : "No days chosen · all days follow Ads to teams",
-    modes: ([["cnt", "Max per person"], ["pct", "By %"]] as const).map(([k, label]) => ({ label, bg: m === k ? "#387557" : "#fff", fg: m === k ? "#fff" : "#3F2B22", bd: m === k ? "#387557" : "#D6E6DC", pick: () => setE({ m: k, v: blank(), sel: null, lockD: {} }) })),
+    modes: ([["cnt", "Max per person"], ["pct", "By %"]] as const).map(([k, label]) => ({ label, bg: m === k ? "var(--crm-brown)" : "#fff", fg: m === k ? "#fff" : "var(--crm-ink)", bd: m === k ? "var(--crm-brown)" : "var(--crm-tint-follow)", pick: () => setE({ m: k, v: blank(), sel: null, lockD: {} }) })),
     heads: WK, isPct: m === "pct", isCnt: m === "cnt", hasPeople: rsIds.length > 0, noPeople: !rsIds.length,
     people: rs.map(p => {
       const mine = sel && sel.id === p.id ? sel.days : [];
-      return { name: p.name, isSel: !!mine.length, bd: mine.length ? "#387557" : "#D6E6DC",
+      return { name: p.name, isSel: !!mine.length, bd: mine.length ? "var(--crm-brown)" : "var(--crm-tint-follow)",
         allDays: () => setE({ sel: on.length ? { id: p.id, days: [...on] } : null }), allLbl: on.length ? "All on days" : "",
         cells: ALL7.map(d => {
           const o = on.includes(d), x = val(E, p.id, d), sOn = mine.includes(d);
           return { off: !o, txt: "", num: !o ? "—" : m === "cnt" && x >= 999 ? "∞" : String(x), pctMark: o && m === "pct" ? "%" : "", pctW: o && m === "pct" ? "8px" : "0px",
-            bg: !o ? "#F2F1EF" : sOn ? "#387557" : x > 0 ? "#E4F1E8" : "#fff", fg: !o ? "#C9BFB7" : sOn ? "#fff" : x > 0 ? "#2E6B4C" : "#806B60", bd: !o ? "#ECE8E4" : sOn ? "#387557" : x > 0 ? "#CFE3D6" : "#D6E6DC",
+            bg: !o ? "var(--crm-field)" : sOn ? "var(--crm-brown)" : x > 0 ? "var(--crm-tint-follow)" : "#fff", fg: !o ? "var(--crm-faint-2)" : sOn ? "#fff" : x > 0 ? "var(--crm-brown)" : "var(--crm-muted)", bd: !o ? "var(--crm-rule-soft)" : sOn ? "var(--crm-brown)" : x > 0 ? "var(--crm-tint-follow)" : "var(--crm-tint-follow)",
             focus: (e: FocusEvent<HTMLInputElement>) => { if (!o) { e.target.blur(); return; } e.target.select(); setE({ sel: { id: p.id, days: [d] } }); },
             type: (e: ChangeEvent<HTMLInputElement>) => { if (!o) return; const n = digits(e); set(u => (u.ftEd ? { ...u, ftEd: { ...u.ftEd, ...applyDays(u.ftEd, p.id, [d], n) } } : u)); } };
         }) };
     }),
-    totals: ALL7.map(d => { const o = on.includes(d), x = sums[d]; return { t: !o ? "—" : m === "pct" ? `${x}%` : x >= 999 ? "∞" : String(x), fg: !o ? "#C9BFB7" : "#387557" }; }),
+    totals: ALL7.map(d => { const o = on.includes(d), x = sums[d]; return { t: !o ? "—" : m === "pct" ? `${x}%` : x >= 999 ? "∞" : String(x), fg: !o ? "var(--crm-faint-2)" : "var(--crm-brown)" }; }),
     totLbl: m === "pct" ? "Full time share" : "Daily max",
     restNote: m === "pct" ? "Whatever full time doesn't take that day follows Ads to teams." : "After full time reach their max, the rest follows Ads to teams.",
     hasSel: !!selDays.length, noSel: !selDays.length, selTitle: sel ? `${selName} · ${dLbl(selDays)}` : "",
@@ -277,7 +281,7 @@ function feVM(ctx: PanelCtx, E: FtDraft | null, rsOf: (t: Team) => Team["people"
     set: (e: ChangeEvent<HTMLInputElement>) => setVals(+e.target.value), setN: (e: ChangeEvent<HTMLInputElement>) => setVals(digits(e)), selAllInput: selAll,
     minus: () => setVals(selV - 1), plus: () => setVals(selV + 1), done: () => setE({ sel: null }),
     giveAll, giveLbl: m === "pct" ? `Give all leads to ${first(selName)}` : `No limit for ${first(selName)}`,
-    close: () => patch({ ftEd: null }), saveBg: "#387557",
+    close: () => patch({ ftEd: null }), saveBg: "var(--crm-brown)",
     save: () => {
       const vals = Object.fromEntries(Object.entries(E.v).map(([id, ds]) => [id, Object.fromEntries(Object.entries(ds).map(([d, n]) => [String(d), n]))]));
       void act.saveFtRule(E.tid, E.m, E.on, vals).then(ok => { if (ok) patch({ ftEd: null }); });

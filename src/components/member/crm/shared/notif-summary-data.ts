@@ -32,7 +32,7 @@ export function summaryFor(
   return {
     title: n.title, when: n.when,
     name, ini: ini(name || "?"),
-    chan: c ? [ch?.name, c.ad].filter(Boolean).join(" · ") : "", chanFg: ch?.fg ?? "#806B60",
+    chan: c ? [ch?.name, c.ad].filter(Boolean).join(" · ") : "", chanFg: ch?.fg ?? "var(--crm-muted)",
     facts: c ? ([
       ["Status", STATUS_LABEL[c.status] ?? c.status],
       ["Owner", c.assignedTo ? nameOf(c.assignedTo) : "No one yet"],

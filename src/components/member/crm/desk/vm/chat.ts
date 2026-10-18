@@ -1,6 +1,6 @@
 /**
  * A chat in the desktop's pane (CRM Desktop v2, README › Inbox › Chat column): the whole conversation in v2's bubbles
- * (ours #F9D5B8, theirs white, on the chat pattern), each day's pill, the CRM's own lines in v2's system pill
+ * (ours var(--crm-tint-attention), theirs white, on the chat pattern), each day's pill, the CRM's own lines in v2's system pill
  * ("{name} joined the chat · 9:48 am", "{name} took over this chat", Won / Lost, reminders), a photo / video / voice
  * note / document inside its bubble (the phone's markup and viewer), a visit card sent as v2's reminder card, ticks
  * (blue once read), and — on each message — v2's menu beside the bubble: the six reactions, Reply · Forward · Copy ·
@@ -86,7 +86,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       { label: star ? "Unstar" : "Star", d: MENU_ICON.star, run: () => { say(star ? "Unstarred" : "Starred"); void act.star(m.id, !star); } },
       { label: pinned ? "Unpin" : "Pin", d: MENU_ICON.pin, run: () => { patch({ msgMenu: null }); void act.setPref(c.id, { pinnedMessageId: pinned ? null : m.id }); } },
       { label: "Delete for me", d: MENU_ICON.del, run: () => { patch({ msgMenu: null }); void act.hideMessage(m.id); } },
-    ].map(a => ({ ...a, fg: a.label === "Delete for me" ? "#B3261E" : "#3F2B22" }));
+    ].map(a => ({ ...a, fg: a.label === "Delete for me" ? "var(--crm-oxblood)" : "var(--crm-ink)" }));
     const q = m.replyTo ? c.messages.find(x => x.id === m.replyTo) : undefined;
     const media = mediaOf(withUrl(m), gallery, al.lead.get(m.id));
     return {
@@ -101,7 +101,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       enter: () => { clearTimeout(hoverOut); if (ui.msgHov !== m.id) patch({ msgHov: m.id }); },
       leave: () => { clearTimeout(hoverOut); hoverOut = setTimeout(() => set(u => (u.msgHov === m.id ? { ...u, msgHov: null } : u)), HOVER_GRACE_MS); },
       hover: ui.msgHov === m.id || ui.msgMenu === m.id, menuToggle: () => menu(ui.msgMenu !== m.id), menuOpen: ui.msgMenu === m.id, menuClose: () => menu(false),
-      reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "#F5EBE3" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
+      reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "var(--crm-field)" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
       // Your own bubble: the brand's orange, white words, white time and ticks (the owner, 2026-10-16 — the phone's, chat-media.ts).
       outBg: MINE_BG, outFg: "#fff", outTime: MINE_TIME,
       acts, tick: tickColor(m.status), hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed",
@@ -135,10 +135,10 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
     : view === "auto" ? autoChoices(data.autoReplies) : [];
   const attachOpts = view ? [
-    { label: "Back", bg: "#806B60", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
-    ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "#A46312" : "#387557", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
+    { label: "Back", bg: "var(--crm-muted)", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
+    ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "var(--crm-brown)" : "var(--crm-brown)", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
       pick: () => { setD(x.text); patch({ attachOpen: false, attachView: "" }); } }))
-      : [{ label: view === "quick" ? "No quick replies yet" : "No auto replies yet", bg: "#A08E82", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
+      : [{ label: view === "quick" ? "No quick replies yet" : "No auto replies yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
   ] : ATTACH_TILES.map(([k, label, d, bg], i) => ({ label, bg, d, sep: i === 3,
     pick: () => {
       if (k === "quick" || k === "auto") { patch({ attachView: k }); return; }
@@ -150,7 +150,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const emo = ui.emo, mine = ui.recents ?? data.recentEmoji ?? [], ev = emo ? emojiView(emo, mine) : null;
   const emoSet = (o: Partial<NonNullable<typeof emo>>) => patch({ emo: { ...(emo ?? { ecat: "recent", searching: false, q: "" }), ...o } });
   return {
-    emojiOpen: !!emo, emojiFg: emo ? "#BD4A19" : "#806B60",
+    emojiOpen: !!emo, emojiFg: emo ? "var(--crm-rust)" : "var(--crm-muted)",
     emojiToggle: () => patch({ emo: emo ? null : { ecat: "recent", searching: false, q: "" }, attachOpen: false, attachView: "" }),
     emoji: { label: ev?.label ?? "", searching: !!emo?.searching, q: emo?.q ?? "", close: () => patch({ emo: null }),
       setQ: (e: { target: { value: string } }) => emoSet({ q: e.target.value }), toggleSearch: () => emoSet({ searching: !emo?.searching, q: "" }),
@@ -164,7 +164,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     photo: () => pick("image/*,video/*", true),
     // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
     // "沒有顯示他是從什麼平台過來".
-    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · ${adKindLabel(c)} · ${c.ad}` : c.ad, subColor: "#387557", menu: true } : null,
+    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · ${adKindLabel(c)} · ${c.ad}` : c.ad, subColor: "var(--crm-brown)", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },

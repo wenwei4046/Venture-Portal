@@ -9,7 +9,7 @@ import type { VisitRow } from "./data";
 import { pieSlices } from "./people";
 import { CHANNEL } from "../../sales/vm/common";
 
-const COLS = ["#BD4A19", "#2F6FB5", "#8E4B6E", "#387557", "#A46312", "#6B574C", "#C9785A", "#5B7FA6", "#9C6B3E", "#7A4FB0"];
+const COLS = ["var(--crm-rust)", "var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-ink-soft)", "var(--crm-orange)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-st-new)"];
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 
@@ -42,7 +42,7 @@ export function calendarAnalysisVM(ctx: DeskCtx, vs: VisitRow[]) {
     : (a: [string, number], b: [string, number]) => b[1] - a[1] || a[0].localeCompare(b[0]);
   const groups = [...counts].sort(order);
   const tot = vs.length, mx = Math.max(1, ...groups.map(g => g[1]));
-  const rows = groups.map(([label, n], i) => ({ label, n, pct: pct(n, tot), w: Math.round((n / mx) * 100), color: label === "Not filled yet" ? "#D9C9BD" : COLS[i % COLS.length] }));
+  const rows = groups.map(([label, n], i) => ({ label, n, pct: pct(n, tot), w: Math.round((n / mx) * 100), color: label === "Not filled yet" ? "var(--crm-line)" : COLS[i % COLS.length] }));
   const top = [...rows].filter(r => r.label !== "Not filled yet").sort((a, b) => b.n - a.n)[0];
   return {
     open: ui.calAn, toggle: () => patch({ calAn: !ui.calAn }), chev: ui.calAn ? "rotate(180deg)" : "none", btn: ui.calAn ? "Hide chart" : "Show chart",

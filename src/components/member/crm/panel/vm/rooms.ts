@@ -32,21 +32,61 @@ export function roomsVM(ctx: PanelCtx) {
   const setD = (p: Partial<RoomDraft>) => set(u => (u.rmEdit ? { ...u, rmEdit: { ...u.rmEdit, ...p } } : u));
   // A showroom being added shows as one more row, in edit.
   const shown: (CrmRoom | null)[] = [...rooms, ...(ed && ed.id === null ? [null] : [])];
+  const quickNew = !!ed && ed.id === null && !!ed.quick;
+  void quickNew;
   const T = iso(now);
   // One showroom at a time (the owner, 2026-10-16: "如果都在下面太長了"): the one being edited, else the one ‹ › reached.
   const at = ed ? ed.i : Math.min(Math.max(0, ui.rmAt ?? 0), Math.max(0, shown.length - 1));
   const step = (d: 1 | -1) => () => { if (!ed) set(u => ({ ...u, rmAt: Math.min(Math.max(0, at + d), shown.length - 1) })); };
 
+  // ── 4a (T07): the showroom as one page you edit in place — its name and address typed where they stand, the map
+  // links, visits per slot, the weekly slots as a 24 × 7 grid (a cell is that hour that weekday: tapping it opens or
+  // closes the slot on the hour), and the closures. Any change starts a draft; a Save bar comes up; Save writes the
+  // whole showroom as the editor does (act.saveRoom → crm_save_showroom). Add closure opens the full editor.
+  const quick4 = (r: CrmRoom | null, i: number) => {
+    const mine = !!ed && ed.i === i && !!ed.quick, d: RoomDraft = mine ? ed! : draftOf(r, i);
+    const begin = (p: Partial<RoomDraft>) => set(u => ({ ...u, rmEdit: { ...(u.rmEdit && u.rmEdit.i === i && u.rmEdit.quick ? u.rmEdit : { ...draftOf(r, i), quick: true }), ...p } }));
+    const saved = draftOf(r, i);
+    const dirty = mine && (d.name !== saved.name || d.addr !== saved.addr || d.cap !== saved.cap || JSON.stringify(srt(d.slots)) !== JSON.stringify(srt(saved.slots)) || JSON.stringify([...d.weekly].sort()) !== JSON.stringify([...saved.weekly].sort()));
+    const q = encodeURIComponent(d.addr || d.name);
+    const hourOf = (s: string) => Number(s.split("@")[0].split(":")[0]);
+    const on = (h: number, k: number) => d.slots.some(s => hourOf(s) === h && sDays(s).includes(k)) && !d.weekly.includes(WI[k]);
+    const toggle = (h: number, k: number) => {
+      const isOn = d.slots.some(s => hourOf(s) === h && sDays(s).includes(k));
+      let next = d.slots;
+      if (isOn) next = d.slots.flatMap(s => { if (hourOf(s) !== h) return [s]; const ds = sDays(s).filter(x => x !== k), b = s.split("@")[0]; return ds.length ? [ds.length === 7 ? b : `${b}@${ds.join("")}`] : []; });
+      else { const b = `${String(h).padStart(2, "0")}:00`, ex = d.slots.find(s => s.split("@")[0] === b), ds = ex ? [...sDays(ex), k].sort() : [k];
+        next = [...d.slots.filter(s => s !== ex), ds.length === 7 ? b : `${b}@${ds.join("")}`]; }
+      begin({ slots: srt(next), ...(isOn ? {} : { weekly: d.weekly.filter(x => x !== WI[k]) }) });
+    };
+    return {
+      name: d.name, addr: d.addr, setName: (e: ChangeEvent<HTMLInputElement>) => begin({ name: e.target.value }), setAddr: (e: ChangeEvent<HTMLInputElement>) => begin({ addr: e.target.value }),
+      gmaps: `https://www.google.com/maps/search/?api=1&query=${q}`, waze: `https://waze.com/ul?q=${q}&navigate=yes`, hasAddr: !!d.addr,
+      cap: d.cap, capMinus: d.cap > 1 ? () => begin({ cap: d.cap - 1 }) : undefined, capPlus: d.cap < 10 ? () => begin({ cap: d.cap + 1 }) : undefined,
+      days: ["M", "T", "W", "T", "F", "S", "S"],
+      grid: Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? `${h % 12 || 12}${h < 12 ? "am" : "pm"}` : "", cells: WD.map((_, k) => ({ on: on(h, k), pick: () => toggle(h, k) })) })),
+      // Off the hour (e.g. 11:30) a slot still counts for its hour on the grid; the editor keeps the exact times.
+      odd: d.slots.filter(s => !s.split("@")[0].endsWith(":00")).map(s => t12(s)),
+      closures: [...WI.filter(w => d.weekly.includes(w)).map(w => ({ day: `Every ${WD[WI.indexOf(w)]}`, what: "All day", rm: () => begin({ weekly: d.weekly.filter(x => x !== w) }) })),
+        ...d.blocks.map(b => ({ day: b.a === (b.b || b.a) ? dF(b.a) : `${dF(b.a)} – ${dF(b.b)}`, what: [(b as CrmBlock).t1 && (b as CrmBlock).t2 ? `${t12((b as CrmBlock).t1!)} – ${t12((b as CrmBlock).t2!)}` : "All day", b.why].filter(Boolean).join(" · "),
+          rm: () => begin({ blocks: d.blocks.filter(x => x !== b) }) }))],
+      addClosure: () => patch({ rmEdit: { ...(mine ? d : draftOf(r, i)), quick: false } }),
+      dirty, cancel: () => patch({ rmEdit: null }),
+      save: () => void act.saveRoom({ id: d.id, name: d.name.trim() || "Showroom", address: d.addr.trim(), active: true, slots: d.slots, cap: d.cap, weekly: d.weekly, blocks: d.blocks }).then(ok => { if (ok) patch({ rmEdit: null }); }),
+      del: () => patch({ rmDel: i }), canDel: !!r,
+    };
+  };
   const rmList = shown.map((r, i) => {
-    const editing = !!ed && ed.i === i, name = r?.name ?? "", addr = r?.address ?? "", slots = r?.slots ?? [], weekly = r?.weekly ?? [], blocks = r?.blocks ?? [], cap = r?.cap ?? 2;
+    const editing = !!ed && ed.i === i && !ed.quick, name = r?.name ?? "", addr = r?.address ?? "", slots = r?.slots ?? [], weekly = r?.weekly ?? [], blocks = r?.blocks ?? [], cap = r?.cap ?? 2;
     const q = encodeURIComponent(addr || name);
     const view = {
-      view: !editing, editing, name: name || "New showroom", addrShow: addr || "No address yet", addrFg: addr ? "#3F2B22" : "#B5A398",
-      slotChips: slots.map(s => { const ds = sDays(s); return { t: t12(s), days: ["M", "T", "W", "T", "F", "S", "S"].map((n, k) => { const o = ds.includes(k); return { n, bg: o ? "#BD4A19" : "#F5EEE9", fg: o ? "#fff" : "#C9B5A8", open: o, closed: !o, cBg: o ? "#BD4A19" : "#FBF7F3", cBd: o ? "#BD4A19" : "#F0E6DE", cFg: o ? "#fff" : "#D9C7BA" }; }) }; }),
+      view: !editing, editing, name: name || "New showroom", addrShow: addr || "No address yet", addrFg: addr ? "var(--crm-ink)" : "var(--crm-faint)",
+      slotChips: slots.map(s => { const ds = sDays(s); return { t: t12(s), days: ["M", "T", "W", "T", "F", "S", "S"].map((n, k) => { const o = ds.includes(k); return { n, bg: o ? "var(--crm-rust)" : "var(--crm-field)", fg: o ? "#fff" : "var(--crm-faint-2)", open: o, closed: !o, cBg: o ? "var(--crm-rust)" : "var(--crm-page)", cBd: o ? "var(--crm-rust)" : "var(--crm-rule-soft)", cFg: o ? "#fff" : "var(--crm-line)" }; }) }; }),
       noSlots: !slots.length, capShort: `${cap} per slot`,
       noBlock: !(blocks.length || weekly.length), blockChips: [...(weekly.length ? [`Every ${wkTxt(weekly)}`] : []), ...blocks.map(bTxt)].map(t => ({ t })),
       waze: `https://waze.com/ul?q=${q}&navigate=yes`, gmaps: `https://www.google.com/maps/search/?api=1&query=${q}`, navOp: addr ? 1 : 0.4,
       edit: () => patch({ rmEdit: draftOf(r, i) }), del: () => patch({ rmDel: i }),
+      q4: quick4(r, i),
     };
     if (!editing || !ed) return { ...view, ...closedEditor };
     // The From / To month calendar for a blocked date (a phone's own date picker cannot open in here).
@@ -59,7 +99,7 @@ export function roomsVM(ctx: PanelCtx) {
       ...Array.from({ length: lead }, () => ({ n: "" as number | string, bg: "transparent", fg: "#fff", fw: 500, cur: "default", pick: undefined as (() => void) | undefined })),
       ...Array.from({ length: dim }, (_, k) => {
         const v = iso(new Date(y, m, k + 1)), off = v < min, on = v === cur, inR = !!ed.bA && v >= ed.bA && v <= (ed.bB || ed.bA);
-        return { n: k + 1 as number | string, pick: off ? undefined : () => pickV(v), bg: on ? "#BD4A19" : inR ? "#FFF0E4" : "transparent", fg: on ? "#fff" : off ? "#D9C7BA" : "#3F2B22", fw: on || v === T ? 700 : 500, cur: off ? "default" : "pointer" };
+        return { n: k + 1 as number | string, pick: off ? undefined : () => pickV(v), bg: on ? "var(--crm-rust)" : inR ? "var(--crm-tint-attention)" : "transparent", fg: on ? "#fff" : off ? "var(--crm-line)" : "var(--crm-ink)", fw: on || v === T ? 700 : 500, cur: off ? "default" : "pointer" };
       }),
     ];
     const tog = (k: "A" | "B") => () => setD({ calFor: ed.calFor === k ? null : k, calYM: null });
@@ -69,14 +109,14 @@ export function roomsVM(ctx: PanelCtx) {
       ...view,
       dName: ed.name, dAddr: ed.addr, setName: (e: ChangeEvent<HTMLInputElement>) => setD({ name: e.target.value }), setAddr: (e: ChangeEvent<HTMLTextAreaElement>) => setD({ addr: e.target.value }),
       // Every week: tap a weekday to close it each week.
-      dWeek: WI.map((d, k) => { const on = ed.weekly.includes(d); return { label: WD[k], on, pick: () => setD({ weekly: on ? ed.weekly.filter(x => x !== d) : [...ed.weekly, d] }), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" }; }),
+      dWeek: WI.map((d, k) => { const on = ed.weekly.includes(d); return { label: WD[k], on, pick: () => setD({ weekly: on ? ed.weekly.filter(x => x !== d) : [...ed.weekly, d] }), bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)" }; }),
       dBlocks: ed.blocks.map(b => ({ t: bTxt(b), rm: () => setD({ blocks: ed.blocks.filter(x => x !== b) }) })),
       dBAtxt: ed.bA ? dF(ed.bA) : "Pick date", dBBtxt: ed.bB || ed.bA ? dF(ed.bB || ed.bA) : "Pick date",
-      dBAfg: ed.bA ? "#3F2B22" : "#B5A398", dBBfg: ed.bB || ed.bA ? "#3F2B22" : "#B5A398", dBWhy: ed.bWhy, setBWhy: (e: ChangeEvent<HTMLInputElement>) => setD({ bWhy: e.target.value }),
+      dBAfg: ed.bA ? "var(--crm-ink)" : "var(--crm-faint)", dBBfg: ed.bB || ed.bA ? "var(--crm-ink)" : "var(--crm-faint)", dBWhy: ed.bWhy, setBWhy: (e: ChangeEvent<HTMLInputElement>) => setD({ bWhy: e.target.value }),
       calOpen: !!who, calTitle: gb(firstD, { month: "long", year: "numeric" }), calWk: ["M", "T", "W", "T", "F", "S", "S"], calDays,
       calPrev: () => setD({ calYM: [m ? y : y - 1, (m + 11) % 12] }), calNext: () => setD({ calYM: [m === 11 ? y + 1 : y, (m + 1) % 12] }),
-      openA: tog("A"), openB: tog("B"), dBAbd: who === "A" ? "#BD4A19" : "#EBDDD2", dBBbd: who === "B" ? "#BD4A19" : "#EBDDD2",
-      blockBg: blockOk ? "#3F2B22" : "#D9C7BA",
+      openA: tog("A"), openB: tog("B"), dBAbd: who === "A" ? "var(--crm-rust)" : "var(--crm-rule)", dBBbd: who === "B" ? "var(--crm-rust)" : "var(--crm-rule)",
+      blockBg: blockOk ? "var(--crm-ink)" : "var(--crm-line)",
       addBlock: blockOk ? () => setD({
         blocks: [...ed.blocks, { a: ed.bA, b: ed.bB && ed.bB >= ed.bA ? ed.bB : ed.bA, why: ed.bWhy.trim(), ...(ed.bAll ? {} : { t1: ed.bT1, t2: ed.bT2 }) }].sort((x, z) => (x.a < z.a ? -1 : 1)),
         bA: "", bB: "", bWhy: "", bAll: true, bT1: "", bT2: "",
@@ -86,11 +126,11 @@ export function roomsVM(ctx: PanelCtx) {
       dBAll: ed.bAll, dBHours: !ed.bAll,
       dBMode: ([["All day", true], ["Set hours", false]] as const).map(([label, v]) => {
         const on = ed.bAll === v;
-        return { label, pick: () => setD({ bAll: v }), bg: on ? "#fff" : "transparent", fg: on ? "#3F2B22" : "#806B60", w: on ? 650 : 500, sh: on ? "0 1px 3px rgba(63,43,34,.12)" : "none" };
+        return { label, pick: () => setD({ bAll: v }), bg: on ? "#fff" : "transparent", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", w: on ? 650 : 500, sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none" };
       }),
       dBT1txt: ed.bT1 ? t12(ed.bT1) : "From", dBT2txt: ed.bT2 ? t12(ed.bT2) : "To",
-      dBT1fg: ed.bT1 ? "#3F2B22" : "#B5A398", dBT2fg: ed.bT2 ? "#3F2B22" : "#B5A398",
-      dBT1bd: ed.bPick === "t1" ? "#BD4A19" : "#EBDDD2", dBT2bd: ed.bPick === "t2" ? "#BD4A19" : "#EBDDD2",
+      dBT1fg: ed.bT1 ? "var(--crm-ink)" : "var(--crm-faint)", dBT2fg: ed.bT2 ? "var(--crm-ink)" : "var(--crm-faint)",
+      dBT1bd: ed.bPick === "t1" ? "var(--crm-rust)" : "var(--crm-rule)", dBT2bd: ed.bPick === "t2" ? "var(--crm-rust)" : "var(--crm-rule)",
       openT1: () => setD({ bPick: ed.bPick === "t1" ? null : "t1" }), openT2: () => setD({ bPick: ed.bPick === "t2" ? null : "t2" }),
       dBTOpen: !!ed.bPick, dBTTitle: ed.bPick === "t2" ? "Blocked until" : "Blocked from",
       // The whole day, 12 am to 11 pm, every half hour (the owner, 2026-10-15; it ran 8 am – 10 pm).
@@ -98,28 +138,28 @@ export function roomsVM(ctx: PanelCtx) {
         const mm = k * 30, v = String(Math.floor(mm / 60)).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0");
         const key = ed.bPick === "t2" ? "bT2" : "bT1", on = ed[key] === v, off = key === "bT2" && !!ed.bT1 && v <= ed.bT1;
         return {
-          t: t12(v).replace(":00", ""), bg: on ? "#BD4A19" : off ? "#FBF6F2" : "#fff", fg: on ? "#fff" : off ? "#C9B5A8" : "#3F2B22", bd: on ? "#BD4A19" : off ? "#FBF6F2" : "#EBDDD2",
+          t: t12(v).replace(":00", ""), bg: on ? "var(--crm-rust)" : off ? "var(--crm-cream-nav)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint-2)" : "var(--crm-ink)", bd: on ? "var(--crm-rust)" : off ? "var(--crm-cream-nav)" : "var(--crm-rule)",
           cur: off ? "not-allowed" : "pointer", pick: off ? undefined : () => setD({ [key]: v, bPick: key === "bT1" && !ed.bT2 ? "t2" : null }),
         };
       }),
       dBTimeErr: !ed.bAll && !!ed.bT1 && !!ed.bT2 && ed.bT2 <= ed.bT1,
       // Groups per slot (1–10): a slot that reaches it shows Full in Book visit.
       dCap: ed.cap, capMinus: ed.cap > 1 ? () => setD({ cap: ed.cap - 1 }) : undefined, capPlus: ed.cap < 10 ? () => setD({ cap: ed.cap + 1 }) : undefined,
-      capMinusFg: ed.cap > 1 ? "#3F2B22" : "#D9C7BA", capPlusFg: ed.cap < 10 ? "#3F2B22" : "#D9C7BA",
+      capMinusFg: ed.cap > 1 ? "var(--crm-ink)" : "var(--crm-line)", capPlusFg: ed.cap < 10 ? "var(--crm-ink)" : "var(--crm-line)",
       // One row per time, one column per weekday: tap a cell to open / close that time that day.
       dGrid: ed.slots.map(s => {
         const ds = sDays(s), b = s.split("@")[0];
         return { t: t12(s), cnt: ds.length === 7 ? "Every day" : `${ds.length} days`, rm: () => setD({ slots: ed.slots.filter(x => x !== s) }),
-          cells: WD.map((_, k) => { const on = ds.includes(k); return { on, bg: on ? "#BD4A19" : k > 4 ? "#F5EEE9" : "#FBF7F3", fg: on ? "#fff" : "#C9B5A8",
+          cells: WD.map((_, k) => { const on = ds.includes(k); return { on, bg: on ? "var(--crm-rust)" : k > 4 ? "var(--crm-field)" : "var(--crm-page)", fg: on ? "#fff" : "var(--crm-faint-2)",
             pick: () => { const nds = on ? ds.filter(x => x !== k) : [...ds, k].sort(); setD({ slots: nds.length ? ed.slots.map(x => (x === s ? (nds.length === 7 ? b : `${b}@${nds.join("")}`) : x)) : ed.slots.filter(x => x !== s) }); } }; }) };
       }),
       dGridHead: ["M", "T", "W", "T", "F", "S", "S"],
       // The weekdays the next time added opens on (every day to start).
-      dNewDays: WD.map((n, k) => { const on = nd.includes(k); return { label: n[0], on, bg: on ? "#BD4A19" : "#fff", fg: on ? "#fff" : "#806B60", bd: on ? "#BD4A19" : "#EBDDD2", pick: () => setD({ newD: on ? (nd.length > 1 ? nd.filter(x => x !== k) : nd) : [...nd, k].sort() }) }; }),
+      dNewDays: WD.map((n, k) => { const on = nd.includes(k); return { label: n[0], on, bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : "var(--crm-muted)", bd: on ? "var(--crm-rust)" : "var(--crm-rule)", pick: () => setD({ newD: on ? (nd.length > 1 ? nd.filter(x => x !== k) : nd) : [...nd, k].sort() }) }; }),
       dNewDaysTxt: dTxt(nd), dNoSlots: !ed.slots.length,
-      newTLbl: ed.newT ? t12(ed.newT) : "Pick a time", newTFg: ed.newT ? "#3F2B22" : "#B5A398",
+      newTLbl: ed.newT ? t12(ed.newT) : "Pick a time", newTFg: ed.newT ? "var(--crm-ink)" : "var(--crm-faint)",
       openTP: () => { const [H, M] = (ed.newT || "11:00").split(":").map(Number); patch({ rmTP: { h: H % 12 || 12, m: M, ap: H < 12 ? "am" : "pm" } }); },
-      addBg: ed.newT ? "#BD4A19" : "#D9C7BA",
+      addBg: ed.newT ? "var(--crm-rust)" : "var(--crm-line)",
       addSlot: ed.newT ? () => setD({ slots: srt([...ed.slots.filter(x => x.split("@")[0] !== ed.newT), ed.newT + (nd.length < 7 ? `@${nd.join("")}` : "")]), newT: "", newD: null }) : undefined,
       cancel: () => patch({ rmEdit: null }),
       save: () => void act.saveRoom({ id: ed.id, name: ed.name.trim() || "Showroom", address: ed.addr.trim(), active: true, slots: ed.slots, cap: ed.cap, weekly: ed.weekly, blocks: ed.blocks }).then(ok => { if (ok) patch({ rmEdit: null }); }),
@@ -129,12 +169,12 @@ export function roomsVM(ctx: PanelCtx) {
 
   const tp = ui.rmTP;
   const setT = (p: Partial<NonNullable<typeof tp>>) => set(u => (u.rmTP ? { ...u, rmTP: { ...u.rmTP, ...p } } : u));
-  const opt = (on: boolean, pick: () => void, t: string) => ({ t, pick, bg: on ? "#BD4A19" : "transparent", fg: on ? "#fff" : "#3F2B22", w: on ? 700 : 500 });
+  const opt = (on: boolean, pick: () => void, t: string) => ({ t, pick, bg: on ? "var(--crm-rust)" : "transparent", fg: on ? "#fff" : "var(--crm-ink)", w: on ? 700 : 500 });
   const H24 = tp ? (tp.h % 12) + (tp.ap === "pm" ? 12 : 0) : 0, val = tp ? `${String(H24).padStart(2, "0")}:${String(tp.m).padStart(2, "0")}` : "";
   const del = ui.rmDel != null ? shown[ui.rmDel] : undefined;
   return {
     rmOpen: ui.roomsOpen, stop, closeRooms: () => patch({ roomsOpen: false, rmEdit: null }),
-    rmAdd: () => patch({ rmEdit: draftOf(null, rooms.length), rmAt: rooms.length }),
+    rmAdd: () => patch({ rmEdit: { ...draftOf(null, rooms.length), quick: true }, rmAt: rooms.length }),
     rmList: rmList.filter((_, i) => i === at),
     rmPager: shown.length > 1, rmPos: `${at + 1} / ${shown.length}`, rmPrev: step(-1), rmNext: step(1),
     rmPrevOp: !ed && at > 0 ? 1 : 0.3, rmNextOp: !ed && at < shown.length - 1 ? 1 : 0.3,

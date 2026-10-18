@@ -8,11 +8,13 @@
 import type { CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
+import { URGENCY_THRESHOLDS } from "@/lib/member/crm";
 import { jobTitle } from "../../shared/people";
 import type { DeskCtx, FormField, FormSection } from "./ctx";
 import { panelLike } from "./frame";
 import { initials } from "./data";
 import { teamColours } from "./tokens";
+import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 
 /** The Customer info form as the phone draws it today (sales/vm/customer.ts): the base every edit starts from. */
 export const BASE_FORM: FormSection[] = [
@@ -35,29 +37,29 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const on = ui.mwt ?? saved;
   const dirty = !!ui.mwt && Object.keys(on).some(id => !!on[id] !== !!saved[id]);
   const mwtTeams = teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], count: `${t.people.filter(p => on[p.id]).length} of ${t.people.length} full time`,
-    people: t.people.map(p => ({ name: p.name, role: jobTitle(p), wt: on[p.id] ? "Full time" : "Part time", wtBg: on[p.id] ? "#E4F1EA" : "#F5EBE3", wtFg: on[p.id] ? "#2E6B4E" : "#806B60",
-      ini: initials(p.name), track: on[p.id] ? "#2E6B4E" : "#DCCBBF", knob: on[p.id] ? 19 : 3,
+    people: t.people.map(p => ({ name: p.name, role: jobTitle(p), wt: on[p.id] ? "Full time" : "Part time", wtBg: on[p.id] ? "var(--crm-tint-follow)" : "var(--crm-field)", wtFg: on[p.id] ? "var(--crm-brown)" : "var(--crm-muted)",
+      ini: initials(p.name), track: on[p.id] ? "var(--crm-brown)" : "var(--crm-line)", knob: on[p.id] ? 19 : 3,
       toggle: () => set(u => ({ ...u, mwt: { ...(u.mwt ?? saved), [p.id]: !(u.mwt ?? saved)[p.id] }, mwtSaved: false })) })) }));
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 
   // ── Cold lead templates (H2).
-  const SC: Record<string, [string, string]> = { Approved: ["#E4F1EA", "#387557"], "In review": ["#FDF1D8", "#8A5A12"], Draft: ["#F2ECE6", "#806B60"], Rejected: ["#FBE4DE", "#A3371A"] };
-  const DOT: Record<string, string> = { all: "#806B60", Approved: "#387557", "In review": "#C08A2A", Draft: "#B9A89B", Rejected: "#A3371A" };
+  const SC: Record<string, [string, string]> = { Approved: ["var(--crm-tint-follow)", "var(--crm-brown)"], "In review": ["var(--crm-tint-appt)", "var(--crm-brown)"], Draft: ["var(--crm-rule-soft)", "var(--crm-muted)"], Rejected: ["var(--crm-tint-attention)", "var(--crm-oxblood)"] };
+  const DOT: Record<string, string> = { all: "var(--crm-muted)", Approved: "var(--crm-brown)", "In review": "var(--crm-brown)", Draft: "var(--crm-faint)", Rejected: "var(--crm-oxblood)" };
   const stName = (s: CrmTemplate["st"]) => (s === "approved" ? "Approved" : s === "review" ? "In review" : s === "rejected" ? "Rejected" : "Draft");
   const tpls = (data.templates ?? []).map(t => ({ t, status: stName(t.st), ch: t.ch === "messenger" ? "Messenger" : "WhatsApp" }));
   const f = ui.cltF, ed = ui.cltEdit;
   const segs = (s: string) => s.split(/(\{[a-z_]+\})/).filter(Boolean).map(x => ({ t: x, tag: /^\{[a-z_]+\}$/.test(x), txt: !/^\{[a-z_]+\}$/.test(x) }));
   const card = (x: (typeof tpls)[number]) => { const ok = x.status === "Approved", o = ok && x.t.on, editing = ed === x.t.id, draft = editing ? ui.cltDraft ?? x.t.body : x.t.body;
     const ch = editing ? ui.cltDC ?? x.ch : x.ch;
-    return { name: x.t.name, status: x.status, channel: x.ch, stBg: SC[x.status][0], stFg: SC[x.status][1], chFg: x.ch === "WhatsApp" ? "#387557" : "#2F6FB5", chBg: x.ch === "WhatsApp" ? "#E4F1EA" : "#E4EDF8",
-      bd: editing ? "#BD4A19" : "#EBDDD2", onLabel: o ? "On" : "Off", onFg: !ok ? "#A08E82" : o ? "#2E6B4E" : "#806B60", segs: segs(x.t.body), view: true, editing, draft, dsegs: segs(String(draft)),
+    return { name: x.t.name, status: x.status, channel: x.ch, stBg: SC[x.status][0], stFg: SC[x.status][1], chFg: x.ch === "WhatsApp" ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger, chBg: x.ch === "WhatsApp" ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger,
+      bd: editing ? "var(--crm-rust)" : "var(--crm-rule)", onLabel: o ? "On" : "Off", onFg: !ok ? "var(--crm-faint)" : o ? "var(--crm-brown)" : "var(--crm-muted)", segs: segs(x.t.body), view: true, editing, draft, dsegs: segs(String(draft)),
       edit: () => patch({ cltEdit: x.t.id, cltDraft: x.t.body, cltDN: x.t.name, cltDC: x.ch as "WhatsApp" | "Messenger", cltIsNew: false, frmOpen: false }),
       cancel: () => patch({ cltEdit: null, cltDraft: null, cltIsNew: false }),
-      empty: !String(draft).trim(), subBg: String(draft).trim() ? "#BD4A19" : "#D9C6B8", subCur: String(draft).trim() ? "pointer" : "not-allowed",
+      empty: !String(draft).trim(), subBg: String(draft).trim() ? "var(--crm-rust)" : "var(--crm-line)", subCur: String(draft).trim() ? "pointer" : "not-allowed",
       mode: ui.cltIsNew && editing ? "New template" : "", hasMode: ui.cltIsNew && editing, dname: x.t.name, dn: editing ? ui.cltDN ?? x.t.name : x.t.name,
       setDN: (e: { target: { value: string } }) => patch({ cltDN: e.target.value }),
-      chOpts: (["WhatsApp", "Messenger"] as const).map(c => { const sel = ch === c; return { label: c, bg: sel ? "#fff" : "transparent", sh: sel ? "0 1px 3px rgba(63,43,34,.14)" : "none", fw: sel ? 700 : 600, fg: sel ? "#3F2B22" : "#806B60", pick: () => patch({ cltDC: c }) }; }),
+      chOpts: (["WhatsApp", "Messenger"] as const).map(c => { const sel = ch === c; return { label: c, bg: sel ? "#fff" : "transparent", sh: sel ? "0 1px 3px rgba(42,22,12,.14)" : "none", fw: sel ? 700 : 600, fg: sel ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => patch({ cltDC: c }) }; }),
       subHint: "", askDel: ui.cltAsk === x.t.id, noAsk: ui.cltAsk !== x.t.id,
       ask: (e: { stopPropagation(): void }) => { e.stopPropagation(); patch({ cltAsk: x.t.id }); }, askNo: () => patch({ cltAsk: null }),
       delNow: () => void act.deleteTemplate(x.t.id).then(okd => { if (okd) patch({ cltAsk: null, cltEdit: ed === x.t.id ? null : ed, toast: `Deleted · ${x.t.name}` }); }),
@@ -70,7 +72,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
         .map(([v, d]) => ({ v, d, pick: () => set(u => ({ ...u, cltVars: [...u.cltVars, v], cltMore: false })) })),
       moreNone: ["{visit_date}", "{visit_time}", "{ad}", "{phone}"].every(v => ui.cltVars.includes(v)),
       saveHint: x.ch === "WhatsApp" ? "WhatsApp templates go back to In review after a change" : "Saved straight away",
-      track: o ? "#2E6B4E" : ok ? "#DCCBBF" : "#EFE6DF", knob: o ? 19 : 3, locked: !ok, cur: ok ? "pointer" : "not-allowed", tip: ok ? "" : "Only approved templates can be switched on",
+      track: o ? "var(--crm-brown)" : ok ? "var(--crm-line)" : "var(--crm-rule-soft)", knob: o ? 19 : 3, locked: !ok, cur: ok ? "pointer" : "not-allowed", tip: ok ? "" : "Only approved templates can be switched on",
       toggle: () => { if (ok) void act.templateOn(x.t.id, !o).then(okt => { if (okt) patch({ toast: `${x.t.name} ${o ? "off" : "on"} for salespeople` }); }); } }; };
   const insertVar = (v: string, body: string) => {
     const el = typeof document !== "undefined" ? document.activeElement as HTMLTextAreaElement | null : null, curB = ui.cltDraft ?? body;
@@ -117,18 +119,18 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       fields: sec.fields.map((fl, fi) => { const open = exp === fl.id, isC = fl.type === "Choice", last = fi === sec.fields.length - 1;
         const addOpt = () => { const v = (oi[fl.id] ?? "").trim(); if (!v || (fl.opts ?? []).includes(v)) return; upd(d => { const x = d[si].fields[fi]; x.opts = [...(x.opts ?? []), v]; }); set(u => ({ ...u, frmOptIn: { ...u.frmOptIn, [fl.id]: "" } })); };
         return { label: fl.label || "Untitled field", star: fl.req ? " *" : "", summary: fl.type + (isC ? ` · ${(fl.opts ?? []).length} options` : "") + (fl.locked ? " · Always on" : ""), isNew: !!fl.isNew, open, closed: !open,
-          bt: fi ? "1px solid #F1E7DF" : "0", bg: open ? "#FFFAF6" : "#fff", chev: open ? "rotate(180deg)" : "none", toggle: () => patch({ frmExp: open ? null : fl.id }),
+          bt: fi ? "1px solid var(--crm-field)" : "0", bg: open ? "var(--crm-page)" : "#fff", chev: open ? "rotate(180deg)" : "none", toggle: () => patch({ frmExp: open ? null : fl.id }),
           up: () => upd(d => { const L = d[si].fields; if (fi > 0) [L[fi - 1], L[fi]] = [L[fi], L[fi - 1]]; else if (si > 0) d[si - 1].fields.push(L.splice(fi, 1)[0]); }),
           down: () => upd(d => { const L = d[si].fields; if (!last) [L[fi + 1], L[fi]] = [L[fi], L[fi + 1]]; else if (si < d.length - 1) d[si + 1].fields.unshift(L.splice(fi, 1)[0]); }),
-          upFg: fi === 0 && si === 0 ? "#E2D5CB" : "#806B60", dnFg: last && si === fs.length - 1 ? "#E2D5CB" : "#806B60",
+          upFg: fi === 0 && si === 0 ? "var(--crm-rule)" : "var(--crm-muted)", dnFg: last && si === fs.length - 1 ? "var(--crm-rule)" : "var(--crm-muted)",
           lab: fl.label, setLabel: (e: { target: { value: string } }) => { const v = e.target.value; upd(d => { d[si].fields[fi].label = v; }); },
           ph: fl.ph ?? "", setPh: (e: { target: { value: string } }) => { const v = e.target.value; upd(d => { d[si].fields[fi].ph = v; }); }, notC: !isC,
-          types: TYPES.map(t => { const o = fl.type === t; return { label: t, bg: o ? "#3F2B22" : "#fff", fg: o ? "#fff" : "#3F2B22", bd: o ? "#3F2B22" : "#E2CFC1", pick: () => upd(d => { const x = d[si].fields[fi]; x.type = t; if (t === "Choice" && !x.opts) x.opts = []; }) }; }),
+          types: TYPES.map(t => { const o = fl.type === t; return { label: t, bg: o ? "var(--crm-ink)" : "#fff", fg: o ? "#fff" : "var(--crm-ink)", bd: o ? "var(--crm-ink)" : "var(--crm-line)", pick: () => upd(d => { const x = d[si].fields[fi]; x.type = t; if (t === "Choice" && !x.opts) x.opts = []; }) }; }),
           typeLocked: !!fl.locked, typeFree: !fl.locked, isC,
           opts: (fl.opts ?? []).map((t, k) => ({ t, rm: () => upd(d => { d[si].fields[fi].opts?.splice(k, 1); }) })),
           optIn: oi[fl.id] ?? "", setOptIn: (e: { target: { value: string } }) => { const v = e.target.value; set(u => ({ ...u, frmOptIn: { ...u.frmOptIn, [fl.id]: v } })); }, addOpt,
           optKey: (e: { key: string; preventDefault(): void }) => { if (e.key === "Enter") { e.preventDefault(); addOpt(); } },
-          track: fl.req ? "#2E6B4E" : "#DCCBBF", knob: fl.req ? 19 : 3, toggleReq: () => upd(d => { const x = d[si].fields[fi]; x.req = x.req ? 0 : 1; }),
+          track: fl.req ? "var(--crm-brown)" : "var(--crm-line)", knob: fl.req ? 19 : 3, toggleReq: () => upd(d => { const x = d[si].fields[fi]; x.req = x.req ? 0 : 1; }),
           reqLocked: !!fl.locked && fl.id === "name", reqFree: !(fl.locked && fl.id === "name"),
           del: () => upd(d => { d[si].fields.splice(fi, 1); }), canDel: !fl.locked, noDel: !!fl.locked }; }) })),
   };
@@ -136,10 +138,10 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   // ── Notifications (H4): the phone's events (same read state), plus To assign; Select → read / delete (30 s Undo).
   const base = panelNotifs(panelLike(ctx));
   const TY: Record<string, [string, string, string]> = {
-    "To assign": ["#BD4A19", "#FFF0E4", "M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6"], Overdue: ["#A3371A", "#F8E1D8", "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"],
-    Move: ["#2F6FB5", "#E4EDF8", "M5 12h14M13 6l6 6-6 6"], Assign: ["#3D5A75", "#E3EAF1", "M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M16 11h6"],
-    Share: ["#8E4B6E", "#F3E8EF", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"], Appointment: ["#8A5A12", "#FDF1D8", "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"],
-    Won: ["#387557", "#E4F1EA", "M20 6 9 17l-5-5"], Lost: ["#806B60", "#F2ECE6", "M18 6 6 18M6 6l12 12"], General: ["#4E2F20", "#F5EBE3", "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"],
+    "To assign": ["var(--crm-rust)", "var(--crm-tint-attention)", "M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.17-2.87L3 3M15 9l6-6"], Overdue: ["var(--crm-oxblood)", "var(--crm-tint-attention)", "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"],
+    Move: ["var(--crm-ink-soft)", "var(--crm-tint-cold)", "M5 12h14M13 6l6 6-6 6"], Assign: ["var(--crm-muted)", "var(--crm-tint-cold)", "M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M16 11h6"],
+    Share: ["var(--crm-ink-soft)", "var(--crm-tint-new)", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"], Appointment: ["var(--crm-brown)", "var(--crm-tint-appt)", "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"],
+    Won: ["var(--crm-brown)", "var(--crm-tint-follow)", "M20 6 9 17l-5-5"], Lost: ["var(--crm-muted)", "var(--crm-rule-soft)", "M18 6 6 18M6 6l12 12"], General: ["var(--crm-ink)", "var(--crm-field)", "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"],
   };
   const typeOf: Record<string, string> = { move: "Move", share: "Share", won: "Won", lost: "Lost", overdue: "Overdue" };
   type N = { key: string; at: string; type: string; who: string; rest: string; sub: string; cust: string | null; adId?: string };
@@ -172,7 +174,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     return { cols: selMode ? "20px 10px 46px minmax(0, 1fr) auto" : "10px 46px minmax(0, 1fr) auto",
       click: selMode ? () => set(s => ({ ...s, ntfPick: { ...s.ntfPick, [n.key]: !s.ntfPick[n.key] } })) : openChat,
       who: n.who, rest: n.rest, sub: n.sub, time: new Date(n.at).getTime() >= T ? new Date(n.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }) : new Date(n.at).toLocaleDateString("en-MY", { weekday: "short" }),
-      type: n.type, unread: u, bg: selMode && pk ? "#FBF6F2" : "#fff", dotC: u ? "#BD4A19" : "transparent", sel: selMode, nosel: !selMode, pk, cbBg: pk ? "#BD4A19" : "#fff", cbBd: pk ? "#BD4A19" : "#CDBCAE",
+      type: n.type, unread: u, bg: selMode && pk ? "var(--crm-cream-nav)" : "#fff", dotC: u ? "var(--crm-rust)" : "transparent", sel: selMode, nosel: !selMode, pk, cbBg: pk ? "var(--crm-rust)" : "#fff", cbBd: pk ? "var(--crm-rust)" : "var(--crm-faint-2)",
       pickT: (e: { stopPropagation(): void }) => { e.stopPropagation(); set(s => ({ ...s, ntfPick: { ...s.ntfPick, [n.key]: !s.ntfPick[n.key] } })); },
       icFg: ty[0], icBg: ty[1], ic: ty[2], tip: n.cust ? "Open chat" : u ? "Mark as read" : "Mark as unread",
       goAs: n.type === "To assign", goAsLabel: "Assign now",
@@ -183,32 +185,53 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
         patch({ tab: "assignment", pane: "wideEmpty", pick: 4, stage: "op", cpSel: n.cust, awChat: null, sendFor: null, cpF: "All", cpP: null, cpMine: false, cpT: "This month" }); },
       toggle: () => { if (u) act.readNotifs([n.key]); } }; }) })).filter(g => g.items.length);
   const ids = shown.map(n => n.key), nP = ids.filter(x => pickd[x]).length, allP = ids.length > 0 && nP === ids.length;
+  // ── General (frame 10): the rules the CRM runs on, as they stand. None is stored as a setting yet, so each row is
+  // locked (the frame's own locked row) and there is no Save — making them editable needs new settings fields (asked first).
+  const h = (m: number) => `${m / 60} h`;
+  const set4 = [
+    { title: "Reply targets", sub: "How long a customer waits before the urgency line changes", rows: [
+      { t: "Reply soon", s: "Shown in the list and on the phone", v: h(URGENCY_THRESHOLDS.soonMinutes) },
+      { t: "Urgent", s: "The row turns oxblood", v: h(URGENCY_THRESHOLDS.urgentMinutes) },
+      { t: "Overdue", s: "The person's own phone is told", v: `${h(URGENCY_THRESHOLDS.overdueMinutes)}+` }] },
+    { title: "Cold leads", sub: "Meta allows free replies for 24 hours after the customer's last message", rows: [
+      { t: "Reply window", s: "Set by WhatsApp and Messenger", v: "24 h" },
+      { t: "Move to Cold leads", s: "When the reply window shuts · only a template can reopen the chat", v: "24 h" },
+      { t: "Suggest a template", s: "Shows the template button on a cold chat", v: "On" }] },
+    { title: "Notifications", sub: "Only a person's own customers ever notify", rows: [
+      { t: "Push for new messages", s: "Each phone turns its own on · Revenue app › Settings", v: "On" },
+      { t: "Reminders", s: "Visits tomorrow, and chats waiting 3 · 6 · 9 h", v: "On" },
+      { t: "Team inbox alerts", s: "The Team inbox shows everyone but tells of nobody else", v: "Off" }] },
+    { title: "New leads", sub: "What happens when a lead arrives", rows: [
+      { t: "Auto-assign by the ad's split", s: "Uses Assignment › Ads to teams", v: "On" },
+      { t: "Send auto-reply", s: "Saved on each person's Profile, not sent yet", v: "Off" }] },
+  ];
   return {
-    mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "#BD4A19" : "#D9C6B8", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
+    set4,
+    mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },
     cltNewT: () => patch({ frmOpen: false, frmDraft: null, cltF: "all", cltEdit: "new", cltDraft: "", cltDN: "", cltDC: "WhatsApp", cltIsNew: true }),
     cltCards: cards, cltEmpty: !cards.length, cltFOpen: ui.cltFOpen, cltToggleF: () => set(u => ({ ...u, cltFOpen: !u.cltFOpen })),
-    cltFLabel: f === "all" ? "All statuses" : f, cltFDot: DOT[f] ?? "#806B60",
+    cltFLabel: f === "all" ? "All statuses" : f, cltFDot: DOT[f] ?? "var(--crm-muted)",
     cltFOpts: [["all", "All statuses"], ["Approved", "Approved"], ["In review", "In review"], ["Draft", "Draft"], ["Rejected", "Rejected"]].map(([k, label]) => ({ label, dot: DOT[k], n: String(tpls.filter(t => k === "all" || t.status === k).length),
-      bg: k === f ? "#FFF1E6" : "transparent", fg: k === f ? "#BD4A19" : "#3F2B22", pick: () => patch({ cltF: k, cltFOpen: false }) })),
+      bg: k === f ? "var(--crm-tint-attention)" : "transparent", fg: k === f ? "var(--crm-rust)" : "var(--crm-ink)", pick: () => patch({ cltF: k, cltFOpen: false }) })),
     ...frm,
     ntfCats: CAT.map(([k, label]) => { const o = cat === k, n = inTab.filter(x => inCat(x, k)).length;
-      return { label, n: String(n), hasN: true, bg: o ? "#fff" : "transparent", sh: o ? "0 1px 3px rgba(63,43,34,.14)" : "none", fg: o ? "#3F2B22" : "#806B60", fw: o ? 700 : 600,
-        nbg: o ? "#BD4A19" : n ? "#E9DCD2" : "transparent", nfg: o ? "#fff" : n ? "#6B574C" : "#B4A396", pick: () => patch({ ntfCat: k }) }; }),
+      return { label, n: String(n), hasN: true, bg: o ? "#fff" : "transparent", sh: o ? "0 1px 3px rgba(42,22,12,.14)" : "none", fg: o ? "var(--crm-ink)" : "var(--crm-muted)", fw: o ? 700 : 600,
+        nbg: o ? "var(--crm-rust)" : n ? "var(--crm-rule)" : "transparent", nfg: o ? "#fff" : n ? "var(--crm-ink-soft)" : "var(--crm-faint)", pick: () => patch({ ntfCat: k }) }; }),
     ntfHead: unreadN ? `${unreadN} unread · ${NL.filter(n => new Date(n.at).getTime() >= T - 6 * 86_400_000).length} this week` : "All caught up",
     ntfSelMode: selMode, ntfNoSel: !selMode, ntfSelOn: () => patch({ ntfSel: true, ntfPick: {} }), ntfSelOff: () => patch({ ntfSel: false, ntfPick: {} }),
     ntfSelN: nP ? `${nP} selected` : "Select messages", ntfAllLabel: allP ? "Clear all" : "Select all", ntfHasPick: nP > 0,
-    ntfActBd: nP ? "#E2CFC1" : "#EFE5DC", ntfActFg: nP ? "#3F2B22" : "#C9B6A8", ntfDelFg: nP ? "#A3371A" : "#D8B7AC", ntfDelBd: nP ? "#F0C9BC" : "#F3E4DE", ntfActCur: nP ? "pointer" : "default", ntfActOp: nP ? 1 : 0.45,
+    ntfActBd: nP ? "var(--crm-line)" : "var(--crm-rule-soft)", ntfActFg: nP ? "var(--crm-ink)" : "var(--crm-faint-2)", ntfDelFg: nP ? "var(--crm-oxblood)" : "var(--crm-st-won)", ntfDelBd: nP ? "var(--crm-tint-attention)" : "var(--crm-tint-attention)", ntfActCur: nP ? "pointer" : "default", ntfActOp: nP ? 1 : 0.45,
     ntfSelAll: () => patch({ ntfPick: allP ? {} : Object.fromEntries(ids.map(x => [x, true])) }),
     ntfReadSel: () => { if (!nP) return; act.readNotifs(ids.filter(x => pickd[x])); patch({ ntfPick: {}, ntfSel: false }); },
     ntfDelSel: () => { if (!nP) return; const keys = ids.filter(x => pickd[x]);
       void ctx.deskAct.deleteNotifs(keys).then(okd => { if (okd) patch({ ntfPick: {}, ntfSel: false, toast: `Deleted ${keys.length} ${keys.length === 1 ? "notification" : "notifications"}`, undo: { kind: "delete", ids: keys, until: Date.now() + 30_000 } }); }); },
     ntfGroups, ntfEmpty: !shown.length, ntfEmptyMsg: tabK === "unread" ? "No unread notifications" : tabK === "read" ? "No read notifications" : "No notifications yet",
-    ntfNoUnread: !unreadN, ntfMarkFg: unreadN ? "#BD4A19" : "#C9B6A8", ntfMarkCur: unreadN ? "pointer" : "default",
+    ntfNoUnread: !unreadN, ntfMarkFg: unreadN ? "var(--crm-rust)" : "var(--crm-faint-2)", ntfMarkCur: unreadN ? "pointer" : "default",
     ntfMarkAll: () => { const k = NL.filter(n => !isRead(n)).map(n => n.key); if (k.length) act.readNotifs(k, true); },
     ntfTabs: ([["all", "All", 0], ["unread", "Unread", unreadN], ["read", "Read", 0]] as const).map(([k, label, n]) => { const o = tabK === k;
-      return { label, n: String(n), hasN: n > 0, bg: o ? "#fff" : "transparent", sh: o ? "0 1px 3px rgba(63,43,34,.14)" : "none", fw: o ? 700 : 600, fg: o ? "#3F2B22" : "#806B60", pick: () => patch({ ntfTab: k }) }; }),
+      return { label, n: String(n), hasN: n > 0, bg: o ? "#fff" : "transparent", sh: o ? "0 1px 3px rgba(42,22,12,.14)" : "none", fw: o ? 700 : 600, fg: o ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => patch({ ntfTab: k }) }; }),
     urgency: (id: string) => { const c = data.customers.find(x => x.id === id); return c ? urgencyOf(c, ctx.now) : null; },
   };
 }

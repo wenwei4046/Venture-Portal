@@ -62,10 +62,10 @@ export const TABS: readonly (readonly [string, string, string])[] = [["emoji", "
 
 /** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies, Auto replies. */
 export const TILES = [
-  ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8"],
-  ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19"],
-  ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312"],
-  ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "#387557"],
+  ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
+  ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "var(--crm-rust)"],
+  ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "var(--crm-brown)"],
+  ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "var(--crm-brown)"],
 ] as const;
 export type TileLabel = (typeof TILES)[number][0];
 
@@ -80,7 +80,7 @@ export const BOX_MIN = 46;
 /** What a tap on the mic says (the prototype's toast): it is held to record. */
 export const HOLD_HINT = "Hold to record a voice note";
 
-const RUST = "#BD4A19", SUB = "rgb(128 107 96)", MUTED = "#806B60";
+const RUST = "var(--crm-rust)", SUB = "rgb(128 107 96)", MUTED = "var(--crm-muted)";
 
 /** A string's user-perceived characters — a flag, a family or a skin tone is one (the prototype's split). */
 export function graphemes(s: string): string[] {
@@ -139,7 +139,7 @@ export const toggleSearch = (s: ComposerState): ComposerState => ({ ...s, search
 export const pickCat = (s: ComposerState, id: string): ComposerState => ({ ...s, ecat: id, searching: false, q: "" });
 
 /** The strip under the composer takes the colour of what sits above it. */
-export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : panel === "attach" ? "#FBF7F3" : "transparent");
+export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : panel === "attach" ? "var(--crm-page)" : "transparent");
 
 // ── The binding surface SalesComposer reads (every p.<name>; tools/crm-design/composer-bindings.txt) ──
 
@@ -249,9 +249,9 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     mainDown: has ? noop : d.mainDown, noMenu, keep,
     sticker: shown === "sticker", attach: shown === "attach", panelH: `${d.panelH}px`,
     searching: s.searching, notSearching: !s.searching, q: s.q, onQ: e => set(x => ({ ...x, q: e.target.value })),
-    searchPh: "Search emoji", searchBg: s.searching ? "#FFE5CF" : "#F3EAE2", searchFg: s.searching ? RUST : "#3F2B22",
+    searchPh: "Search emoji", searchBg: s.searching ? "var(--crm-tint-attention)" : "var(--crm-rule-soft)", searchFg: s.searching ? RUST : "var(--crm-ink)",
     toggleSearch: () => set(toggleSearch),
-    tabs: TABS.map(([, label, icon]) => ({ label, icon, bg: "#fff", sh: "0 1px 3px rgba(63,43,34,.14)", fg: RUST, pick: noop })),
+    tabs: TABS.map(([, label, icon]) => ({ label, icon, bg: "#fff", sh: "0 1px 3px rgba(42,22,12,.14)", fg: RUST, pick: noop })),
     delKey: d.delKey,
     isEmoji: true, emoLabel: emo.label, emojis: emo.list.map(e => ({ e, pick: () => add(e) })),
     barIcons: true,
@@ -265,6 +265,6 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
     openTpl: () => v.openTpl(),
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
-    recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "#A3371A" : "#806B60",
+    recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "var(--crm-oxblood)" : "var(--crm-muted)",
   };
 }

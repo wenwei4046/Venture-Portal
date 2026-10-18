@@ -12,6 +12,10 @@ import { isCold, urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
 import { chatRows, initials, teamNameOf } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, ST_META, teamColours } from "./tokens";
+import { STATUS } from "../../shared/palette";
+import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
+import { rangeLine } from "./frame4a";
+import { adsReportParam } from "@/lib/member/crm-ads-report";
 
 export const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -102,6 +106,19 @@ export function insightVM(ctx: DeskCtx) {
   };
   const dirRows = ctx.directors.length ? [{ name: DIRECTOR_TEAM, lead: ctx.directors.map(d => d.name).join(", "), ...rowOf(ctx.directors.map(d => d.id)), dot: DIRECTOR_C[0],
     open: () => patch({ pane: "overlay", kind: "team", team: DIRECTOR_TEAM, person: null }) }] : [];
+  // 4a's hero (frame 01): six figures, each with its change against the period before, worse ones in oxblood.
+  const pts = (a: number | null, b: number | null) => (a == null || b == null ? { d: "—", good: true } : { d: `${a - b >= 0 ? "+" : "−"}${Math.abs(Math.round((a - b) * 10) / 10)} pts`, good: a >= b });
+  const rel = (a: number, b: number) => (!b ? { d: a ? "+" + a : "—", good: true } : { d: `${a >= b ? "+" : "−"}${Math.abs(Math.round(((a - b) / b) * 100))}%`, good: a >= b });
+  const wonRate = (w: number, l: number) => (l ? Math.round((w / l) * 1000) / 10 : null);
+  const avgV = avgNow == null ? ["—", ""] : avgNow < 60 ? [String(avgNow), "min"] : [String(Math.round((avgNow / 60) * 10) / 10), "h"];
+  const metrics4 = [
+    { label: "Appt rate", value: pct(n.booked, n.leads), unit: "", ...pts(rate(n.booked, n.leads), rate(pn.booked, pn.leads)), open: hero.open },
+    { label: "Leads", value: String(n.leads), unit: "", ...rel(n.leads, prevLeads.length), open: openList("Leads") },
+    { label: "Show-up", value: pct(n.came, n.due), unit: "", ...pts(rate(n.came, n.due), rate(pn.came, pn.due)), open: openList("Show-up") },
+    { label: "Reply 24 h", value: pct(rep24, n.leads), unit: "", ...pts(rate(rep24, n.leads), rate(prevLeads.filter(replied24).length, prevLeads.length)), open: openList("Reply 24 h") },
+    { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
+    { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
+  ].map((m, i) => ({ ...m, first: i === 0, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
   const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: t.who, ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 
@@ -109,10 +126,17 @@ export function insightVM(ctx: DeskCtx) {
   const rows = chatRows(ctx).filter(x => inR(x.c.createdAt));
   const cnt = (f: (k: string) => boolean) => rows.filter(x => f(x.key)).length;
   const LS: [string, number, string, string][] = [
-    ["New", cnt(k => k === "New"), "#3B8FD9", "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), "#A3371A", "st:Overdue"],
-    ["Appointment", cnt(k => k === "Appointment"), "#8E4B6E", "st:Appointment"], ["Follow up", cnt(k => k === "Follow up"), "#A46312", "st:Follow up"],
-    ["Cold leads", cnt(k => k === "Cold"), "#3D5A75", "st:Cold"],
+    ["New", cnt(k => k === "New"), STATUS.New.dot, "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), STATUS.Attention.dot, "st:Overdue"],
+    ["Appointment", cnt(k => k === "Appointment"), STATUS.Appointment.dot, "st:Appointment"], ["Follow up", cnt(k => k === "Follow up"), STATUS["Follow up"].dot, "st:Follow up"],
+    ["Cold leads", cnt(k => k === "Cold"), STATUS["Cold leads"].dot, "st:Cold"],
   ];
+  // 4a's Leads by status (frame 01): all seven of the ramp, in its order — Won and Lost joined (the chats' own states).
+  const L7: [string, number, string][] = [["New", cnt(k => k === "New"), "st:New"], ["Attention", cnt(k => k === "Overdue" || k === "Urgent" || k === "Reply soon"), "st:Overdue"],
+    ["Follow up", cnt(k => k === "Follow up"), "st:Follow up"], ["Appointment", cnt(k => k === "Appointment"), "st:Appointment"], ["Won", cnt(k => k === "Won"), "st:Won"],
+    ["Lost", cnt(k => k === "Lost"), "st:Lost"], ["Cold leads", cnt(k => k === "Cold"), "st:Cold"]];
+  const tot7 = L7.reduce((a, x) => a + x[1], 0);
+  const status4 = L7.map(([label, c, list]) => ({ label, n: c, color: STATUS[label as keyof typeof STATUS].dot, text: label === "Attention" ? "var(--crm-oxblood)" : "var(--crm-ink)",
+    pct: tot7 ? `${Math.round((c / tot7) * 100)}%` : "—", open: openList(list) }));
   const max = Math.max(...LS.map(x => x[1]), 1), tot = LS.reduce((a, x) => a + x[1], 0) || 1;
   const leadStatus = LS.map(([label, c, color, list]) => ({ label, n: c, color, share: `${Math.round((c / tot) * 100)}%`, pct: Math.round((c / max) * 100), open: openList(list) }));
 
@@ -122,8 +146,8 @@ export function insightVM(ctx: DeskCtx) {
     const cs = data.customers.filter(c => c.ad === ad), m = numbersOf(cs, data.visits, r, now);
     const ch = cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger";
     const st = ST_META.Running;
-    return { name: ad, channel: ch, chFg: ch === "WhatsApp" ? "#387557" : "#2F6FB5", status: "—", stDot: "#C9B8AC", stInk: st[4], spend: "—", reach: "—", clicks: "—", ctr: "—",
-      leads: String(m.leads), cpl: "—", cplColor: "#3F2B22", appt: String(m.booked), _n: m.leads };
+    return { name: ad, channel: ch, chFg: ch === "WhatsApp" ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger, status: "—", stDot: "var(--crm-faint-2)", stInk: st[4], spend: "—", reach: "—", clicks: "—", ctr: "—",
+      leads: String(m.leads), cpl: "—", cplColor: "var(--crm-ink)", appt: String(m.booked), _n: m.leads };
   }).filter(a => a._n > 0).sort((a, b) => b._n - a._n);
   // Sorted and sized as Ads Performance's table (the owner, 2026-10-13): a header sorts ▼ ▲ off; its edge drags the width.
   const IH: [string, string][] = [["name", "Ad"], ["spend", "Spend (RM)"], ["reach", "Reach"], ["clicks", "Clicks"], ["ctr", "CTR"], ["leads", "Leads"], ["cpl", "Cost / lead (RM)"], ["appt", "Appt"]];
@@ -132,8 +156,8 @@ export function insightVM(ctx: DeskCtx) {
   if (srt) adPerf.sort((x, y) => { const p = x[srt.k as keyof typeof x], q = y[srt.k as keyof typeof y];
     const d = srt.k === "name" ? String(p).localeCompare(String(q)) : num(String(p)) - num(String(q)); return srt.dir === "asc" ? d : -d; });
   const insHead = IH.map(([k, label], i) => { const on = srt?.k === k;
-    return { label, align: (i ? "center" : "left") as "center" | "left", justify: i ? "center" : "flex-start", fg: on ? "#3F2B22" : "#806B60",
-      arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "#BD4A19" : "#C9B8AC",
+    return { label, align: (i ? "center" : "left") as "center" | "left", justify: i ? "center" : "flex-start", fg: on ? "var(--crm-ink)" : "var(--crm-muted)",
+      arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
       sort: () => ctx.set(u => { const c = u.insSort, first = k === "name" ? "asc" : "desc", second = first === "asc" ? "desc" : "asc";
         return { ...u, insSort: !c || c.k !== k ? { k, dir: first } : c.dir === first ? { k, dir: second } : null }; }),
       resize: sz.resize(k, i ? 64 : 140), unsize: sz.reset(k) }; });
@@ -143,6 +167,31 @@ export function insightVM(ctx: DeskCtx) {
   return {
     kInsight: ctx.ui.tab === "insight",
     hero, heroStats, teams: teamsOut, leadStatus,
+    // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
+    metrics4, status4, statusTotal: tot7,
+    teams4: (() => {
+      const apptN = (s: string) => parseFloat(s) || 0;
+      const all = [...dirRows.map(t => ({ ...t, key: DIRECTOR_TEAM, people: ctx.directors })), ...teams.map((t, k) => ({ ...teamsOut[dirRows.length + k], key: t.id, people: t.people }))];
+      const max = Math.max(...all.map(t => apptN(t.appt)), 1);
+      return all.flatMap(t => {
+        const open = ctx.ui.insTeam === t.key;
+        const head = { name: t.name, sub: t.lead, leads: t.leads, appt: t.appt, apptW: `${Math.round((apptN(t.appt) / max) * 100)}%`, show: t.show, won: t.won, lost: t.lost,
+          dot: t.dot, person: false, open, pick: () => patch({ insTeam: open ? null : t.key }) };
+        const people = open ? t.people.map(p => { const f = rowOf([p.id]);
+          return { name: p.name, sub: "", ...f, apptW: `${Math.round((apptN(f.appt) / max) * 100)}%`, dot: "transparent", person: true, open: false,
+            pick: () => patch({ pane: "overlay", kind: "team", team: t.key, person: p.id }) }; }) : [];
+        return [head, ...people];
+      });
+    })(),
+    // 4a's head (2026-10-18): "1–31 Oct vs 1–30 Sep", and Export PDF — the period's figures and Team performance in the
+    // Ads Performance report's house style (the owner's OK: "PDF 照你建议做").
+    insightSub: `${rangeLine(r)} vs ${rangeLine(pr)}`,
+    insightPdf: () => {
+      const title = `CRM Insight · ${rangeLine(r)} vs ${rangeLine(pr)} · Appt rate ${hero.value} · ${heroStats.map(s => `${s.label} ${s.value}`).join(" · ")}`;
+      const head = ["Team", "Leads", "Appt rate", "Show-up", "Won", "Lost"];
+      const body = teamsOut.map(t => [t.name, t.leads, t.appt, t.show, t.won, t.lost]);
+      const a = document.createElement("a"); a.href = `/member/crm-ads-report?d=${adsReportParam({ title, head, rows: body })}`; a.download = `CRM Insight ${rangeLine(r)}.pdf`; a.click();
+    },
     insHead, insAdCols, insAdMinW,
     adPerf, adTot: { n: adPerf.length, spend: "—", reach: "—", clicks: "—", ctr: "—", leads: String(lt), cpl: "—", appt: String(at) },
     ...adCardsVM(ctx, r, name),
@@ -204,7 +253,7 @@ export function clistVM(ctx: DeskCtx) {
     clistN: isList ? `${rows.length} ${rows.length === 1 ? "customer" : "customers"}` : `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`,
     clistEmpty: ui.kind === "clist" && !rows.length,
     clSortLabel: k, clSortOpen: ui.clSortOpen, clSortToggle: () => set(u => ({ ...u, clSortOpen: !u.clSortOpen })),
-    clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "#FFF1E6" : "transparent", fg: s === k ? "#BD4A19" : "#3F2B22", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
+    clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "var(--crm-tint-attention)" : "transparent", fg: s === k ? "var(--crm-rust)" : "var(--crm-ink)", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
     clistRows: sorted.map(x => { const c = ST[x.status.split(" · ")[0]] ?? ST["Follow up"];
       return { name: x.name, ini: x.ini, sub: x.sub, status: x.status, stBg: c[0], stFg: c[1],
         open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id }) }; }),

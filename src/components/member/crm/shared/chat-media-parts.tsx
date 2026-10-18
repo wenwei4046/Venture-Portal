@@ -28,15 +28,15 @@ export function PdfCard({ src, name, onOpen }: { src: string; name: string; onOp
   }, [src, facts]);
   const line = [facts?.pages ? `${facts.pages} page${facts.pages === 1 ? "" : "s"}` : "", facts ? sizeLabel(facts.bytes) : "", "pdf"].filter(Boolean).join(" · ");
   return (
-    <span ref={box} onClick={onOpen} style={{ display: "block", width: "250px", maxWidth: "100%", borderRadius: "12px", overflow: "hidden", background: "#FBF7F3", cursor: "pointer" }}>
-      <span style={{ display: "block", height: "120px", background: facts ? "#fff" : "rgba(63,43,34,.05)", overflow: "hidden" }}>
+    <span ref={box} onClick={onOpen} style={{ display: "block", width: "250px", maxWidth: "100%", borderRadius: "12px", overflow: "hidden", background: "var(--crm-page)", cursor: "pointer" }}>
+      <span style={{ display: "block", height: "120px", background: facts ? "#fff" : "rgba(42,22,12,.05)", overflow: "hidden" }}>
         {facts && <img src={facts.img} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />}
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px" }}>
-        <span style={{ flex: "none", width: "30px", height: "36px", borderRadius: "5px", background: "#C8402A", color: "#fff", display: "grid", placeItems: "center", fontSize: typePx(9), fontWeight: 700 }}>PDF</span>
+        <span style={{ flex: "none", width: "30px", height: "36px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: typePx(9), fontWeight: 700 }}>PDF</span>
         <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
-          <strong style={{ fontSize: typePx(14), fontWeight: 600, lineHeight: 1.3, color: "#3F2B22", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name}</strong>
-          <small style={{ fontSize: typePx(12), color: "#806B60" }}>{line}</small>
+          <strong style={{ fontSize: typePx(14), fontWeight: 600, lineHeight: 1.3, color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name}</strong>
+          <small style={{ fontSize: typePx(12), color: "var(--crm-muted)" }}>{line}</small>
         </span>
       </span>
     </span>

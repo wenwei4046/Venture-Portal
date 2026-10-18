@@ -43,14 +43,33 @@ export function overviewVM(ctx: PanelCtx) {
   const dirRows = directors.length
     ? [row("hod", "HOD", `Own customers · ${directors.map(d => d.name).join(", ")}`, DIRECTOR.c, directors.map(d => d.id), [], [DIRECTOR.tint, DIRECTOR.c])]
     : [];
+  // 4a (T01, change list 19): the hero's four figures with their change on the comparison period — the one picked, else
+  // the period before — and "vs Sep" on the period card; the greeting by the time of day.
+  const D1 = 86_400_000, prevR = ui.cmp ?? (ui.period === "month" && !isC
+    ? { a: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), b: new Date(now.getFullYear(), now.getMonth(), 0).getTime() }
+    : { a: cur.a - (cur.b - cur.a + D1), b: cur.a - D1 });
+  const P = numbersOf(data.customers, data.visits, prevR, now);
+  const r100 = (x: number, y: number) => (y ? (x / y) * 100 : null);
+  const pts = (a: number | null, b: number | null) => { if (a == null || b == null) return { delta: "", good: true }; const d = Math.round((a - b) * 10) / 10;
+    return { delta: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(d)} pts vs last`, good: d >= 0 }; };
+  const grow = all.leads - P.leads, growP = P.leads ? Math.round((grow / P.leads) * 100) : null;
+  const hero4 = [
+    { label: "Appt rate", value: pct(all.booked, all.leads), ...pts(r100(all.booked, all.leads), r100(P.booked, P.leads)) },
+    { label: "Leads", value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
+    { label: "Show-up", value: pct(all.came, all.due), ...pts(r100(all.came, all.due), r100(P.came, P.due)) },
+    { label: "Reply 24 h", value: pct(all.replied24, all.waits), ...pts(r100(all.replied24, all.waits), r100(P.replied24, P.waits)) },
+  ];
+  const vsLabel = "vs " + (ui.cmp ? gb(new Date(prevR.a), { day: "numeric", month: "short" }) : ui.period === "month" && !isC ? gb(new Date(prevR.a), { month: "short" }) : "last");
+  const h = now.getHours(), greet = `Hello, ${me.role === "boss" ? "Principal" : first(me.name)}`; void h; // the owner, 2026-10-18: "改成 hello"
   return {
+    hero4, vsLabel, greet,
     ...dateSheetVM(ctx),
     onOverview: ui.tab === "overview",
     exitApp: ctx.exitApp,
     meIni: ini(me.name), meFirst: me.role === "boss" ? "Principal" : first(me.name), meTitle: me.role === "boss" ? "Principal" : jobTitle(me),
     todayLabel: gb(now, { weekday: "short", day: "numeric", month: "short" }),
-    rdToggle: !!ctx.toMyCrm, rdPanelBg: "#fff", rdPanelFg: "#3F2B22", rdPanelSh: "0 1px 3px rgba(63,43,34,.14)",
-    rdCrmBg: "transparent", rdCrmFg: "#806B60", rdCrmSh: "none", toPanel: () => {}, toCrm: () => ctx.toMyCrm?.(),
+    rdToggle: !!ctx.toMyCrm, rdPanelBg: "#fff", rdPanelFg: "var(--crm-ink)", rdPanelSh: "0 1px 3px rgba(42,22,12,.14)",
+    rdCrmBg: "transparent", rdCrmFg: "var(--crm-muted)", rdCrmSh: "none", toPanel: () => {}, toCrm: () => ctx.toMyCrm?.(),
     heroLabel: isC && ui.ovRange ? `${gb(ui.ovRange.a, { day: "numeric", month: "short" })} – ${gb(ui.ovRange.b, { day: "numeric", month: "short" })}` : { day: "Today", week: "This week", month: gb(now, { month: "long" }), custom: "" }[ui.period],
     all: { leads: all.leads, rate: pct(all.booked, all.leads), booked: all.booked },
     heroStats: ([["Leads", String(all.leads)], ["Show-up", pct(all.came, all.due)], ["Reply 24 h", pct(all.replied24, all.waits)]] as const).map(([label, v], k) => ({ label, v, fg: "#fff", bl: k ? "1px solid rgba(255,255,255,.25)" : "0" })),

@@ -45,16 +45,18 @@ async function type(text: string) {
 const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style*="repeat(8"] > span')];
 
 describe("the Team chat is Mine's", () => {
-  it("the header: back and ⋮ with no ring, the green dot, whose customer it is under the row — over the wallpaper", async () => {
+  it("the header (4a, M04): back and ⋮ with no ring, no dot on the avatar, whose customer it is under the row, the status strip", async () => {
     await openTeamChat();
     expect(head()).not.toBeNull();
     expect(head().textContent).toContain("Lim Wei Jie");
     expect(head().textContent).toContain("'s customer");
     const back = head().querySelector<HTMLElement>('[title="Back to Inbox"]')!;
     expect(back.style.border).toBe("");
-    expect(back.querySelector("svg")).toHaveAttribute("width", "22");
+    expect(back.querySelector("svg")).toHaveAttribute("width", "24");
     expect(head().querySelector<HTMLElement>('[title="More"]')!.style.border).toBe("");
-    expect(head().querySelector<HTMLElement>('[title="WhatsApp"] > span:last-child')).toHaveStyle({ background: "#387557" });
+    // 4a: the avatar has no channel dot (the channel is in the line under the name), and the status strip closes the header.
+    expect(head().querySelector('[title="WhatsApp"]')!.children.length).toBe(1);
+    expect(head().querySelector("[data-chat-strip]")).not.toBeNull();
     // The list runs under the header and the composer.
     expect(document.querySelector<HTMLElement>("main[data-chat-screen] [data-chat-list]")).toHaveStyle({ position: "absolute" });
   });

@@ -26,7 +26,6 @@ const swapToMine = () => screen.queryByLabelText("Team · switch to Mine");
 const swapToTeam = () => screen.queryByLabelText("Mine · switch to Team");
 const house = () => screen.queryByLabelText("Back to Revenue app");
 const bell = () => screen.queryByTitle("Notifications");
-const iconOf = (el: Element) => el.querySelector("path")?.getAttribute("d");
 async function tap(el: Element | null) {
   expect(el).not.toBeNull();
   fireEvent.click(el!);
@@ -42,11 +41,13 @@ const noButtons = () => expect([swapToMine(), swapToTeam(), house(), bell()]).to
 describe("the CRM's three round buttons, on the first page alone", () => {
   it("the Principal: Team's Inbox has two people, the bell, then Contacts — no house; a tap is Mine's Inbox, and back", async () => {
     await open("boss");
+    // the owner, 2026-10-18: "Hello", not by the time of day.
     expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
     onlyHouse();
     await go("Inbox");
     const toMine = swapToMine()!;
-    expect(iconOf(toMine)).toBe(TEAM_ICON);
+    // 4a (M01 / T02): the side one is on, as a pill with its name.
+    expect(toMine.getAttribute("title")).toMatch(/^Team/); // 4a + the owner 2026-10-18: the symbol alone
     // 2026-10-16 (the owner: "人像，鈴鐺，contacts（小房子不需要）"): no house on Team's Inbox; the bell beside Team | Mine.
     expect(house()).toBeNull();
     expect(bell()!.previousElementSibling).toBe(toMine);
@@ -56,7 +57,7 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     await tap(toMine);
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     const toTeam = swapToTeam()!;
-    expect(iconOf(toTeam)).toBe(MINE_ICON);
+    expect(toTeam.getAttribute("title")).toMatch(/^Mine/);
     expect(house()!.previousElementSibling).toBe(toTeam);
 
     await tap(toTeam);
@@ -99,7 +100,7 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     await open("lkv");
     await tap(swapToTeam());
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
-    expect(screen.getByText("Contacts", { exact: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("Contacts")).toBeInTheDocument(); // 4a (T02): a round button
     await tap(swapToMine());
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
   });
