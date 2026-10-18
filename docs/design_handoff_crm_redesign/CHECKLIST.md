@@ -122,3 +122,7 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
     wrote N hours / days ago. WhatsApp only lets an approved template open the chat again." and Send template message
     inside it — in Mine's chat and the Team chat; the grey note under the strip is gone. The Team chat's header is Mine's
     16 / 12. Settings are read only by somebody the CRM places (mig 20261018200000: KRIS, CRM · View outside IR, reads none).
+21. Customer form: "+ Add field" is one button — a click adds "New field", opens its editor and puts the cursor in its name
+    (the words were a text box's placeholder; only its + added). Channels: a Facebook Page goes under the number whose
+    listed phone it has, else under the number whose verified business has its name (Dream Crafter Design's Page lists
+    no number and sat under No number).

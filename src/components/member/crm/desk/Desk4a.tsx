@@ -1585,7 +1585,7 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
                   </div>
                   {isOpen && (
                     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: "10px", padding: "2px 34px 14px" }}>
-                      <label style={CF_LABEL}>Name<input type="text" value={f.label} onChange={f.setLabel} style={CF_FIELD} /></label>
+                      <label style={CF_LABEL}>Name<input type="text" value={f.label} onChange={f.setLabel} style={CF_FIELD} data-cf-new-name={f.label === "New field" ? "" : undefined} /></label>
                       <span style={{ ...CF_LABEL, position: "relative" }}>Answer type
                         <button type="button" onClick={f.typeToggle} style={{ ...BTN, ...CF_FIELD, display: "flex", alignItems: "center", border: `1px solid ${f.typeBd}` }}><span style={{ flex: 1 }}>{f.type}</span><Ic name="chevron-down" size={14} /></button>
                         {f.typeOpen && (<>
@@ -1607,10 +1607,12 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
                   )}
                 </div>
               ); })}
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 6px", color: "var(--crm-rust)" }}>
-              <button type="button" onClick={() => { if (s.draft.trim()) s.add(); else { s.add("New field"); setOpen(`${si}:${s.fields.length}`); } }} title="Add field" style={{ ...BTN, display: "flex", color: "var(--crm-rust)" }}><Ic name="plus" size={14} /></button>
-              <input type="text" value={s.draft} onChange={s.setDraft} onKeyDown={e => { if (e.key === "Enter") s.add(); }} placeholder="Add field" style={{ flex: 1, minWidth: 0, border: 0, padding: 0, background: "transparent", font: "500 14px Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} className="crm4a-add" />
-            </label>
+            {/* One click adds "New field" and opens its editor, the name ready to type (the owner, 2026-10-18: "add field 没有反应" —
+                the words were a text box's placeholder; only its + added). */}
+            <button type="button" onClick={() => { s.add("New field"); setOpen(`${si}:${s.fields.length}`); setTimeout(() => { const el = document.querySelector<HTMLInputElement>("[data-cf-new-name]"); el?.focus(); el?.select(); }, 60); }}
+              style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 6px", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }} className="crm4a-row">
+              <Ic name="plus" size={14} />Add field
+            </button>
           </section>
         ))}
       </div>
