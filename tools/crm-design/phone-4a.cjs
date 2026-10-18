@@ -365,6 +365,22 @@ function teamCalendar(body) {
   return body.slice(0, at) + b;
 }
 
+/** T07 · Showrooms: ‹ 1 / 2 › as round buttons, a rust +, and each showroom as the 4a page (Desk-like, edited in place). */
+function teamRooms(body) {
+  const ROUND36 = ROUND.replace('width: "40px", height: "40px"', 'width: "36px", height: "36px"');
+  const v0 = body.indexOf("{!!(r.view) && (<>"), e0 = body.indexOf("{!!(r.editing) && (<>", v0);
+  if (v0 < 0 || e0 < 0) throw new Error("phone-4a: rooms view");
+  body = body.slice(0, v0) + "{!!(r.view) && (<Phone4aRoom r={r} />)}\n            " + body.slice(e0);
+  body = once(body, '<section style={{ flex: "none", borderRadius: "18px", border: "1px solid var(--crm-rule)", background: "#fff", overflow: "hidden", boxShadow: "0 2px 8px rgba(42,22,12,.04)" }}>\n            {!!(r.view)',
+    '<section style={{ flex: "none", borderRadius: r.view ? "0" : "18px", border: r.view ? "0" : "1px solid var(--crm-rule)", background: "#fff", overflow: r.view ? "visible" : "hidden", boxShadow: r.view ? "none" : "0 2px 8px rgba(42,22,12,.04)" }}>\n            {!!(r.view)', "rooms section");
+  // The pager: two round buttons with the count between, and the + filled rust.
+  const a = body.indexOf('{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "inline-flex", alignItems: "center", height: "40px"');
+  const b = body.indexOf('<span onClick={v.rm.rmAdd}', a), c = body.indexOf('</span></div>', b);
+  if (a < 0 || b < 0 || c < 0) throw new Error("phone-4a: rooms pager");
+  body = body.slice(0, a) + `{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ ${ROUND36}, opacity: v.rm.rmPrevOp }}><Ic name="chevron-left" size={16} /></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "${F(15)}", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ ${ROUND36}, opacity: v.rm.rmNextOp }}><Ic name="chevron-right" size={16} /></span></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><Ic name="plus" size={20} /></span>` + body.slice(c + "</span>".length);
+  return body;
+}
+
 /** gen-panel-1011.cjs: the whole Control panel. */
 function panel(body) {
   // Change list 16 · the bottom bar (T01).
@@ -375,6 +391,7 @@ function panel(body) {
   body = teamAssign(body);
   body = teamSplit(body);
   body = teamCalendar(body);
+  body = teamRooms(body);
   // T07 · Showrooms: the title in 4a's face (the page keeps production's card and Edit — see CHECKLIST).
   body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>`, "showrooms title");
   body = profile(body, 5);

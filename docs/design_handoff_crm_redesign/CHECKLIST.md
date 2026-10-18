@@ -74,8 +74,8 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 - Team Insight: the greeting goes by the time of day ("Good morning, …"). The Comparison card shows only once a period is picked; the "vs Sep" chip picks it. Team performance is a list; production has no W/L per team, so that figure isn't shown.
 - Team Inbox: Contacts is a round icon button. Columns are 300 px on pale cream, and the status row is underline tabs.
 - Assignment: the sections are tabs under the title (Ads to teams · Full time · Work type, where Work type opens Profile's Member work type). There is no "‹ Assignment" bar. The legend is in team colours, and each ad is a card with Edit split / Set up.
+- Showrooms (T07): one page you edit in place, as frame T07. The name is the title (a tap turns it into a field; phone fields are 16 px), the address is typed where it stands, then Google Maps / Waze, Visits per slot and the 24 × 7 weekly slots. A cell is that hour that weekday, and tapping it opens or closes a slot on the hour. A slot off the hour (e.g. 11:30) shows on its hour, with a line naming it. Closures are listed with × to remove; **Add** opens production's full editor (dates, set hours). Any change brings up Cancel / **Save changes** (crm_save_showroom, as before). Delete showroom stays at the foot. ‹ 1 / 2 › are round buttons and + is rust.
 - Split leads: "‹ Split leads" title, the name in a boxed field, Meta's headline under it, Save above "Save and apply to all". The ‹ closes the editor, as Cancel did.
 
 **Not matched (⚠️)**
-- T07 Showrooms on the phone: only the title is restyled. Production's view card with Edit is kept; the frame's always-editable 24 × 7 page is not built on the phone yet. The desktop has it (frame 07).
 - M02–M08 detail states (the swipe colours, empty Appointment, the long-press menu and the cold chat card) carry the 4a palette and the strip. They were not re-captured state by state.

@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aStrip } from "../shared/phone4a";
+import { Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -1698,108 +1698,11 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </path>
           </svg>Profile</span>
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "inline-flex", alignItems: "center", height: "40px", padding: "0 2px", boxSizing: "border-box", borderRadius: "20px", border: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-rust)", opacity: v.rm.rmPrevOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-rust)", opacity: v.rm.rmNextOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-rust)", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ flex: "none", width: "36px", height: "36px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer", opacity: v.rm.rmPrevOp }}><Ic name="chevron-left" size={16} /></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "calc(16.3px * var(--rv-type, 1))", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ flex: "none", width: "36px", height: "36px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer", opacity: v.rm.rmNextOp }}><Ic name="chevron-right" size={16} /></span></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><Ic name="plus" size={20} /></span></div>
         </div>
         {(v.rm.rmList).map((r, r_i) => (<Fragment key={r_i}>
-          <section style={{ flex: "none", borderRadius: "18px", border: "1px solid var(--crm-rule)", background: "#fff", overflow: "hidden", boxShadow: "0 2px 8px rgba(42,22,12,.04)" }}>
-            {!!(r.view) && (<>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 12px 12px 16px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
-                <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "10px", background: "var(--crm-tint-appt)", color: "var(--crm-brown)", display: "grid", placeItems: "center" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 21h18M5 21V9l7-5 7 5v12M10 21v-6h4v6">
-                    </path>
-                  </svg>
-                </span>
-                <strong style={{ flex: "1", minWidth: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>{r.name}</strong>
-                <span onClick={r.edit} title="Edit" style={{ flex: "none", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "17px", border: "1px solid var(--crm-rule)", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4">
-                    </path>
-                  </svg>Edit</span>
-                <span onClick={r.del} title="Delete" style={{ flex: "none", width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", display: "grid", placeItems: "center", color: "var(--crm-oxblood)", cursor: "pointer" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3">
-                    </path>
-                  </svg>
-                </span>
-              </div>
-              <div style={{ padding: "4px 16px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "14px 0", borderBottom: "1px solid var(--crm-field)" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--crm-faint)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Zm0-9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z">
-                      </path>
-                    </svg>Address</span>
-                  <span style={{ fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45", color: r.addrFg }}>{r.addrShow}</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "14px 0", borderBottom: "1px solid var(--crm-field)" }}>
-                  <span style={{ display: "grid", gridTemplateColumns: "76px minmax(0, 1fr)", alignItems: "center", gap: "10px" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--crm-faint)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v5l3 2">
-                        </path>
-                      </svg>Slots</span>
-                    <span style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "4px", textAlign: "center", fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700", color: "var(--crm-faint)" }}>
-                      <span>M</span>
-                      <span>T</span>
-                      <span>W</span>
-                      <span>T</span>
-                      <span>F</span>
-                      <span>S</span>
-                      <span>S</span>
-                    </span>
-                  </span>
-                  {(r.slotChips).map((c, c_i) => (<Fragment key={c_i}>
-                    <span style={{ display: "grid", gridTemplateColumns: "76px minmax(0, 1fr)", alignItems: "center", gap: "10px" }}>
-                      <strong style={{ fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{c.t}</strong>
-                      <span style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "4px" }}>
-                        {(c.days).map((d, d_i) => (<Fragment key={d_i}>
-                          <span style={{ height: "24px", boxSizing: "border-box", borderRadius: "7px", background: d.cBg, border: `1px solid ${d.cBd}`, color: d.cFg, display: "grid", placeItems: "center" }}>
-                            {!!(d.open) && (<>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m5 12 5 5 9-10">
-                                </path>
-                              </svg>
-                            </>)}
-                            {!!(d.closed) && (<>
-                              <span style={{ width: "6px", height: "2px", borderRadius: "1px", background: "currentColor" }}>
-                              </span>
-                            </>)}
-                          </span>
-                        </Fragment>))}
-                      </span>
-                    </span>
-                  </Fragment>))}
-                  {!!(r.noSlots) && (<>
-                    <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>No time slots yet</span>
-                  </>)}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "14px 0" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px", background: "var(--crm-page)" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--crm-faint)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm14 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8">
-                        </path>
-                      </svg>Booking limit</span>
-                    <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)" }}>{r.capShort}</strong>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "12px", borderRadius: "14px", background: "var(--crm-page)" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: "var(--crm-faint)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM5 5l14 14">
-                        </path>
-                      </svg>Blocked</span>
-                    <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                      {(r.blockChips).map((c, c_i) => (<Fragment key={c_i}>
-                        <span style={{ padding: "2px 8px", borderRadius: "7px", background: "#fff", border: "1px solid var(--crm-rule)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{c.t}</span>
-                      </Fragment>))}
-                      {!!(r.noBlock) && (<>
-                        <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-faint)" }}>None</strong>
-                      </>)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderTop: "1px solid var(--crm-rule-soft)" }}>
-                <a href={r.waze} target="_blank" rel="noopener" style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)", textDecoration: "none", opacity: r.navOp }}><span style={{ width: "22px", height: "22px", borderRadius: "6px", background: "var(--crm-brand-waze)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "800" }}>W</span>Waze</a>
-                <a href={r.gmaps} target="_blank" rel="noopener" style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", borderLeft: "1px solid var(--crm-rule-soft)", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)", textDecoration: "none", opacity: r.navOp }}><span style={{ width: "22px", height: "22px", borderRadius: "6px", background: "var(--crm-brand-maps)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "800" }}>G</span>Google Maps</a>
-              </div>
-            </>)}
+          <section style={{ flex: "none", borderRadius: r.view ? "0" : "18px", border: r.view ? "0" : "1px solid var(--crm-rule)", background: "#fff", overflow: r.view ? "visible" : "hidden", boxShadow: r.view ? "none" : "0 2px 8px rgba(42,22,12,.04)" }}>
+            {!!(r.view) && (<Phone4aRoom r={r} />)}
             {!!(r.editing) && (<>
               <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px", background: "#fff" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

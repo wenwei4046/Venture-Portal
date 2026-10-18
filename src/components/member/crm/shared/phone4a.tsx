@@ -7,7 +7,8 @@
  * Sizes: the handoff's phone sizes are final on-screen px. The app scales type by --rv-type (.92 on a phone), so a size
  * here is the frame's px ÷ .92 through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
-import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
+import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
+import { useState } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 
@@ -244,6 +245,82 @@ export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: bool
         <span style={{ flex: "none", height: "34px", padding: "0 14px", borderRadius: "17px", display: "grid", placeItems: "center", fontSize: fs(14), fontWeight: 500,
           ...(a.setUp ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }}>{a.setUp ? "Set up" : "Edit split"}</span>
       </div>
+    </div>
+  );
+}
+
+type Room4 = {
+  name: string; addr: string; setName: (e: RChangeEvent<HTMLInputElement>) => void; setAddr: (e: RChangeEvent<HTMLInputElement>) => void;
+  gmaps: string; waze: string; hasAddr: boolean; cap: number; capMinus?: () => void; capPlus?: () => void;
+  days: string[]; grid: { label: string; cells: { on: boolean; pick: () => void }[] }[]; odd: string[];
+  closures: { day: string; what: string; rm: () => void }[]; addClosure: () => void; dirty: boolean; cancel: () => void; save: () => void; del: () => void; canDel: boolean;
+};
+/** T07 · a showroom as one page: name and address in place, map chips, Visits per slot, the 24 × 7 weekly slots, Closures. */
+export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
+  const q = r.q4;
+  const [editName, setEditName] = useState(false);
+  const chip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", borderRadius: "18px", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: fs(15), textDecoration: "none" };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingBottom: q.dirty ? "70px" : "0" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        {/* A phone field is 16 px (the app's rule, so iOS does not zoom): the name is the title until tapped, then a field. */}
+        {editName || !q.name
+          ? <input autoFocus={editName} value={q.name} onChange={q.setName} onBlur={() => setEditName(false)} placeholder="Showroom name" aria-label="Showroom name" style={{ height: "40px", padding: "0 12px", border: "1px solid var(--crm-line)", borderRadius: "10px", background: "#fff", outline: "none", fontWeight: 500, color: "var(--crm-ink)" }} />
+          : <button type="button" onClick={() => setEditName(true)} title="Rename" style={{ ...BTN, textAlign: "left", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(26), letterSpacing: "-0.02em", lineHeight: 1.15, color: "var(--crm-ink)" }}>{q.name}</button>}
+        <input value={q.addr} onChange={q.setAddr} placeholder="Add the address" aria-label="Address" style={{ border: 0, padding: 0, background: "transparent", outline: "none", fontSize: fs(15), color: q.addr ? "var(--crm-ink-soft)" : "var(--crm-faint)" }} />
+      </div>
+      <div style={{ display: "flex", gap: "8px", opacity: q.hasAddr ? 1 : 0.45 }}>
+        <a href={q.gmaps} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Google Maps</a>
+        <a href={q.waze} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Waze</a>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 14px 14px 16px", border: "1px solid var(--crm-line)", borderRadius: "16px" }}>
+        <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span style={{ fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)" }}>Visits per slot</span>
+          <span style={{ fontSize: fs(14), color: "var(--crm-muted)" }}>Each slot is one hour</span>
+        </span>
+        <span style={{ display: "flex", alignItems: "center", height: "40px", border: "1px solid var(--crm-line)", borderRadius: "20px" }}>
+          <button type="button" onClick={q.capMinus} aria-label="Fewer" style={{ ...BTN, width: "40px", height: "40px", fontSize: fs(18), color: q.capMinus ? "var(--crm-ink)" : "var(--crm-line)" }}>−</button>
+          <span style={{ minWidth: "26px", textAlign: "center", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(18), fontVariantNumeric: "tabular-nums" }}>{q.cap}</span>
+          <button type="button" onClick={q.capPlus} aria-label="More" style={{ ...BTN, width: "40px", height: "40px", fontSize: fs(18), color: q.capPlus ? "var(--crm-ink)" : "var(--crm-line)" }}>+</button>
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+          <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17) }}>Weekly slots</span>
+          <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>12 am – 11 pm · tap to open or close</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, minmax(0,1fr))", columnGap: "5px", rowGap: "5px" }}>
+          <span />
+          {q.days.map((d, i) => <span key={i} style={{ textAlign: "center", fontSize: fs(12), fontWeight: 500, color: "var(--crm-muted)" }}>{d}</span>)}
+          {q.grid.map((row, h) => [
+            <span key={"l" + h} style={{ fontSize: fs(11), color: "var(--crm-faint)", lineHeight: "14px" }}>{row.label}</span>,
+            ...row.cells.map((c, k) => <button key={h + ":" + k} type="button" onClick={c.pick} aria-label={`${h}:00 day ${k + 1} ${c.on ? "open" : "closed"}`} style={{ ...BTN, height: "14px", borderRadius: "3px", background: c.on ? "var(--crm-brown)" : "var(--crm-field)" }} />),
+          ])}
+        </div>
+        {q.odd.length > 0 && <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>Also off the hour: {q.odd.join(", ")}</span>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "baseline", paddingBottom: "6px" }}>
+          <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17) }}>Closures</span>
+          <button type="button" onClick={q.addClosure} style={{ ...BTN, fontSize: fs(15), fontWeight: 500, color: "var(--crm-rust)" }}>Add</button>
+        </div>
+        {!q.closures.length && <span style={{ padding: "8px 0", fontSize: fs(14), color: "var(--crm-faint)" }}>None</span>}
+        {q.closures.map((c, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "48px", borderBottom: "1px solid var(--crm-rule)" }}>
+            <span style={{ display: "flex", color: "var(--crm-rust)" }}><Ic name="calendar-x" size={16} /></span>
+            <span style={{ fontSize: fs(16), color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{c.day}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fs(14), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.what}</span>
+            <button type="button" onClick={c.rm} aria-label="Remove closure" style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={15} /></button>
+          </div>
+        ))}
+      </div>
+      {q.canDel && <button type="button" onClick={q.del} style={{ ...BTN, alignSelf: "flex-start", fontSize: fs(14), fontWeight: 500, color: "var(--crm-oxblood)" }}>Delete showroom</button>}
+      {q.dirty && (
+        <div style={{ position: "sticky", bottom: "0", display: "flex", gap: "8px", margin: "0 -20px", padding: "12px 20px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={q.cancel} style={{ ...BTN, flex: 1, height: "46px", borderRadius: "23px", border: "1px solid var(--crm-line)", fontSize: fs(15), fontWeight: 500 }}>Cancel</button>
+          <button type="button" onClick={q.save} style={{ ...BTN, flex: 2, height: "46px", borderRadius: "23px", background: "var(--crm-rust)", color: "#fff", fontSize: fs(15), fontWeight: 500 }}>Save changes</button>
+        </div>
+      )}
     </div>
   );
 }
