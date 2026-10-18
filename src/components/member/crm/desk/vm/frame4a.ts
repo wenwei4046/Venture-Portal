@@ -96,6 +96,7 @@ interface HeadBits {
   apDl: { v: string; pick: () => void }[];
   sr4: { save: () => void; dirty: boolean };
   cfSave: () => void;
+  cfSummary: string;
   ppCount: number;
   auditCsv: () => void;
   auCount: number;
@@ -118,7 +119,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: pdf ? { label: "Download PDF", icon: "download", act: pdf.pick } : null },
     assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
-    forms: { tabs: [], sub: "", cta: { label: "Publish", icon: "check", act: v.cfSave } },
+    forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },

@@ -275,6 +275,13 @@ module.exports = function desk4a(body) {
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: audit");
     body = body.slice(0, a) + "{!!(v.kAudit) && (<DeskAudit4a v={v} />)} " + body.slice(b);
   }
+  // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
+  {
+    const start = '{!!(v.cfOn) && (<>', a = body.indexOf(start);
+    const end = '{!!(v.isFrmOp) && (<>', b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: customer form");
+    body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
+  }
   return body;
 };
 module.exports.el = el;

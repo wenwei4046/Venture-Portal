@@ -206,7 +206,7 @@ export function frameVM(ctx: DeskCtx) {
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
     // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.
-    pagePad: opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && opItem[0] === "General" ? "6px 36px 32px" : "16px 36px 32px",
+    pagePad: tab === "forms" ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && opItem[0] === "General" ? "6px 36px 32px" : "16px 36px 32px",
     h1Size: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "22px" : "34px",
     kAudit: tab === "auditlog", kPeople: tab === "people", kCh: tab === "channels", cfOn: tab === "forms",
     plainOp: !["Ads to teams", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General")),

@@ -91,7 +91,7 @@ export function formPageVM(ctx: DeskCtx) {
     onSaved: () => {},
   });
   return {
-    cfRealOn: true, cfReal, cfRealScale: ((W >= 1440 ? 270 : 222) - 20) / 375,
+    cfRealOn: true, cfReal, cfRealScale: ((W >= 1440 ? 270 : 222) - 16) / 375,
     cfOn: ui.tab === "forms", cfFields: true, cfPhoneH: W >= 1440 ? 560 : 460, cfPhoneW: W >= 1440 ? 270 : 222,
     cfDesk: !phone, cfPhone: phone,
     cfDevs: ([["phone", "Phone"], ["desktop", "Desktop"]] as const).map(([k, label]) => ({ label, on: ui.cfDev === k, off: ui.cfDev !== k, pick: () => patch({ cfDev: k }) })),

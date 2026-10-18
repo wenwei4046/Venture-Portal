@@ -1430,3 +1430,137 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
     </div>
   );
 }
+
+type FormBits = Pick<ReturnType<typeof import("./vm/formpage").formPageVM>, "cfPages" | "cfSecs" | "cfDirty" | "cfReset" | "cfDevs" | "cfDesk" | "cfDragEnd">;
+const Switch = ({ on, act, locked }: { on: boolean; act?: () => void; locked?: boolean }) => (
+  <span role="switch" aria-checked={on} onClick={locked ? undefined : act} style={{ position: "relative", width: "30px", height: "18px", flex: "none", borderRadius: "9px", background: on ? "var(--crm-rust)" : "var(--crm-track)", cursor: locked ? "default" : "pointer", opacity: locked ? 0.6 : 1, transition: "background .15s" }}>
+    <span style={{ position: "absolute", top: "2px", left: on ? "14px" : "2px", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left .15s" }} />
+  </span>
+);
+const CHIP: CSSProperties = { flex: "none", maxWidth: "64px", padding: "2px 7px", borderRadius: "4px", background: "var(--crm-cream-nav)", font: "500 11px Inter, sans-serif", color: "var(--crm-ink-soft)", textAlign: "center", overflow: "hidden" };
+const CF_FIELD: CSSProperties = { height: "34px", boxSizing: "border-box", padding: "0 10px", border: "1px solid var(--crm-line)", borderRadius: "6px", background: "#fff", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", outline: "none" };
+const CF_LABEL: CSSProperties = { display: "flex", flexDirection: "column", gap: "4px", font: "500 11px Inter, sans-serif", color: "var(--crm-muted)" };
+const CF_KICK: CSSProperties = { font: "500 10.5px Inter, sans-serif", letterSpacing: "0.1em", color: "var(--crm-faint)" };
+/**
+ * Frame 08 · Customer form: the pages down the left, the open page's sections and fields in the middle (a field opens
+ * to its editor on its chevron), the live preview on the right. Appearance only — every control is vm/formpage.ts's,
+ * as before (pages, sections and fields dragged, rename, add, delete, answer type, choices, Required, Discard).
+ */
+export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const P = v.cfPages;
+  return (
+    <div onDragEnd={v.cfDragEnd} style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "242px minmax(0,1fr) 340px" }}>
+      <div style={{ padding: "18px 16px 24px 36px", borderRight: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", gap: "4px", overflowY: "auto" }}>
+        <span style={{ ...CF_KICK, paddingBottom: "10px" }}>PAGES</span>
+        {P.tabs.map(t => (
+          <button key={t.num} type="button" onClick={t.pick} onDragOver={t.over} onDrop={t.drop} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "6px",
+            background: t.lit ? "var(--crm-tint-attention)" : t.on ? "var(--crm-cream-nav-active)" : "transparent", outline: t.lit ? "2px dashed var(--crm-rust)" : "none", outlineOffset: "-3px",
+            font: `${t.on ? 500 : 400} 14px Inter, sans-serif`, color: "var(--crm-ink)" }} className={t.on ? undefined : "crm4a-nav"}>
+            <span style={{ display: "flex", color: "var(--crm-faint-2)" }}><Ic name="grip-vertical" size={13} /></span>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</span>
+            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{t.count}</span>
+          </button>
+        ))}
+        <button type="button" onClick={P.addPage} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 10px", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }}><Ic name="plus" size={14} />Add page</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--crm-rule-soft)" }}>
+          <span style={CF_KICK}>PAGE NAME</span>
+          <input type="text" value={P.title} onChange={P.setTitle} placeholder="Page name" style={CF_FIELD} />
+          <button type="button" onClick={P.addSection} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "32px", font: "500 13px Inter, sans-serif", color: "var(--crm-rust)" }}><Ic name="plus" size={13} />Add section</button>
+          {P.many && <button type="button" onClick={P.remove} disabled={!P.canDelete} title={P.deleteTip} style={{ ...BTN, height: "28px", font: "500 13px Inter, sans-serif", color: P.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: P.canDelete ? "pointer" : "not-allowed" }}>Delete page</button>}
+          {v.cfDirty && <button type="button" onClick={v.cfReset} style={{ ...BTN, height: "28px", font: "500 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Discard changes</button>}
+          {P.dragging && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Drop on a page to move it there</span>}
+        </div>
+      </div>
+      <div style={{ padding: "16px 28px 32px", display: "flex", flexDirection: "column", gap: "28px", overflowY: "auto" }}>
+        {v.cfSecs.map((s, si) => (
+          <section key={s.anchor} id={s.anchor} onDragOver={s.dragOver} onDrop={s.drop} style={{ display: "flex", flexDirection: "column", opacity: s.op, borderRadius: "6px", boxShadow: s.ring }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "8px", borderBottom: "1px solid var(--crm-ink)" }}>
+              <span draggable onDragStart={s.grip} title="Drag to move this section" style={{ display: "flex", color: "var(--crm-faint-2)", cursor: "grab" }}><Ic name="grip-vertical" size={14} /></span>
+              {s.custom
+                ? <input type="text" value={s.title} onChange={s.setTitle} placeholder="Section name" style={{ flex: 1, minWidth: 0, border: 0, padding: 0, background: "transparent", font: `500 18px ${TIGHT}`, color: "var(--crm-ink)", outline: "none" }} />
+                : <span style={{ flex: 1, font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>{s.title}</span>}
+              <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{s.count} {s.count === 1 ? "field" : "fields"}</span>
+              {s.removable && <button type="button" onClick={s.remove} title="Delete section" style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>}
+            </div>
+            {s.autoList.map(a => (
+              <div key={a.label} style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "53px", padding: "6px 10px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+                <span style={{ width: "14px" }} />
+                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{a.label}</span>
+                  <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Filled by the CRM</span>
+                </span>
+                <span style={CHIP}>Automatic</span>
+                <Switch on={false} locked />
+                <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", width: "58px" }}>Required</span>
+                <span style={{ width: "14px" }} />
+              </div>
+            ))}
+            {s.fields.map((f, fi) => { const key = `${si}:${fi}`, isOpen = open === key;
+              return (
+                <div key={key} data-cf-row onDragOver={f.dragOver} onDrop={f.drop} style={{ display: "flex", flexDirection: "column", opacity: f.op, borderTop: f.bt.startsWith("2px") ? f.bt : undefined, borderBottom: "1px solid var(--crm-rule-soft)", background: isOpen ? "var(--crm-cream-nav)" : undefined }} className={isOpen ? undefined : "crm4a-row"}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "53px", padding: "6px 10px", boxSizing: "border-box" }}>
+                    <span draggable onDragStart={f.grip} title="Drag to move" style={{ display: "flex", color: "var(--crm-faint-2)", cursor: "grab" }}><Ic name="grip-vertical" size={14} /></span>
+                    <span onClick={() => setOpen(isOpen ? null : key)} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }}>
+                      <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{f.label || "Untitled field"}</span>
+                      <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.hasOpts && f.opts ? f.opts : f.core ? "Always asked" : f.type}</span>
+                    </span>
+                    <span style={CHIP}>{f.type}</span>
+                    <Switch on={f.reqOn} act={f.toggleReq} locked={f.core} />
+                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", width: "58px" }}>Required</span>
+                    <button type="button" onClick={() => setOpen(isOpen ? null : key)} title={isOpen ? "Close" : "Edit field"} style={{ ...BTN, display: "flex", color: "var(--crm-faint)", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Ic name="chevron-right" size={14} /></button>
+                  </div>
+                  {isOpen && (
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: "10px", padding: "2px 34px 14px" }}>
+                      <label style={CF_LABEL}>Name<input type="text" value={f.label} onChange={f.setLabel} style={CF_FIELD} /></label>
+                      <span style={{ ...CF_LABEL, position: "relative" }}>Answer type
+                        <button type="button" onClick={f.typeToggle} style={{ ...BTN, ...CF_FIELD, display: "flex", alignItems: "center", border: `1px solid ${f.typeBd}` }}><span style={{ flex: 1 }}>{f.type}</span><Ic name="chevron-down" size={14} /></button>
+                        {f.typeOpen && (<>
+                          <span onClick={f.typeClose} style={{ position: "fixed", inset: 0, zIndex: 7 }} />
+                          <span style={{ position: "absolute", top: "58px", left: 0, right: 0, zIndex: 8, padding: "4px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "8px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>
+                            {f.types.map(t => <button key={t.t} type="button" onClick={() => { t.pick(); f.typeClose(); }} style={{ ...BTN, display: "flex", alignItems: "center", height: "32px", padding: "0 10px", borderRadius: "6px", background: t.bg, font: `${t.w} 13px Inter, sans-serif`, color: t.fg }} className="crm4a-row"><span style={{ flex: 1 }}>{t.t}</span>{t.on && <Ic name="check" size={13} />}</button>)}
+                          </span>
+                        </>)}
+                      </span>
+                      {f.hasOpts && <label style={{ ...CF_LABEL, gridColumn: "1 / -1" }}>Choices · separated by commas<input type="text" value={f.opts} onChange={f.setOpts} style={CF_FIELD} /></label>}
+                      <span style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "14px" }}>
+                        <button type="button" onClick={f.up} title="Move up" style={{ ...BTN, display: "flex", color: f.upFg }}><Ic name="arrow-down" size={14} style={{ transform: "rotate(180deg)" }} /></button>
+                        <button type="button" onClick={f.down} title="Move down" style={{ ...BTN, display: "flex", color: f.dnFg }}><Ic name="arrow-down" size={14} /></button>
+                        <span style={{ flex: 1 }} />
+                        {f.core && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Core · always on the form</span>}
+                        {f.removable && <button type="button" onClick={f.remove} style={{ ...BTN, display: "flex", alignItems: "center", gap: "6px", font: "500 13px Inter, sans-serif", color: "var(--crm-oxblood)" }}><Ic name="trash-2" size={13} />Remove field</button>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ); })}
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 6px", color: "var(--crm-rust)" }}>
+              <button type="button" onClick={s.add} title="Add field" style={{ ...BTN, display: "flex", color: "var(--crm-rust)" }}><Ic name="plus" size={14} /></button>
+              <input type="text" value={s.draft} onChange={s.setDraft} onKeyDown={e => { if (e.key === "Enter") s.add(); }} placeholder="Add field" style={{ flex: 1, minWidth: 0, border: 0, padding: 0, background: "transparent", font: "500 14px Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} className="crm4a-add" />
+            </label>
+          </section>
+        ))}
+      </div>
+      <div style={{ background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 24px", overflow: "hidden" }}>
+        <span style={{ ...CF_KICK, display: "flex", gap: "6px", paddingBottom: "16px" }}>
+          LIVE PREVIEW ·
+          {v.cfDevs.map(d => <button key={d.label} type="button" onClick={d.pick} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", color: d.on ? "var(--crm-ink-soft)" : "var(--crm-faint-2)" }}>{d.label.toUpperCase()}</button>)}
+        </span>
+        {v.cfDesk
+          ? <div style={{ width: "290px", flex: 1, minHeight: 0, overflowY: "auto", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "10px", padding: "14px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "10px" }}>
+              {v.cfSecs.map(s => (
+                <div key={s.anchor} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <span style={{ font: `500 14px ${TIGHT}`, color: "var(--crm-ink)" }}>{s.title}</span>
+                  {s.pvFields.map(p => (
+                    <span key={p.label} style={{ display: "flex", flexDirection: "column", gap: "3px", font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{p.label}{p.star ? " *" : ""}
+                      <span style={{ height: p.isLong ? "48px" : "28px", border: "1px solid var(--crm-line)", borderRadius: "6px", background: p.isAuto ? "var(--crm-field)" : "#fff" }} />
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          : <div style={{ width: "270px", height: "560px", boxSizing: "border-box", border: "8px solid var(--crm-deep)", borderRadius: "36px", background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>{preview}</div>}
+      </div>
+    </div>
+  );
+}
