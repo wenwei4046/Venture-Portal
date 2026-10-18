@@ -5,7 +5,7 @@
  * stays in the screens' view models; these only draw.
  *
  * Sizes: the handoff's phone sizes are final on-screen px. The app scales type by --rv-type (.92 on a phone), so a size
- * here is the frame's px ÷ .92 through typePx (`fs`) — on a phone it lands on the frame's px exactly.
+ * here is the frame's px scaled up by the phone's type step through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
 import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
 import { useState } from "react";
