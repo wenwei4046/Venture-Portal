@@ -110,13 +110,12 @@ interface HeadBits {
 /** Each page's head (frames 01–11): its tabs, its line and its one primary button — each bound to what the page already does. */
 export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit<F4Head, "title">>> {
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
-  const pdf = v.apDl.find(d => d.v === "pdf");
   return {
     insight: { tabs: v.periodOpts, sub: v.insightSub, cta: { label: "Export", icon: "file-text", act: v.insightPdf } },
     inbox: { tabs: [], sub: "", cta: null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
     calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },
-    adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: pdf ? { label: "Download PDF", icon: "download", act: pdf.pick } : null },
+    adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: null }, // the owner, 2026-10-18: "删掉download，已经有export了" — PDF is in Export (PDF report)
     assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },

@@ -737,11 +737,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 <span style={{ maxWidth: "280px", fontSize: "13px", lineHeight: "1.5", color: "var(--crm-muted)", textWrap: "pretty" }}>Its split, performance and audit log open here</span>
               </aside>
             </>)}
-            {!!(v.adOpen && v.adTab4 === "split") && (<>
+            {!!(v.adOpen) && (<>
               <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
-                <DeskAdTabs4a v={v} />
+                <DeskAdTabs4a v={v} which="split" />
                 <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 4px" }}>
                   <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "42px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-ink)" }}>
@@ -882,7 +882,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               {!(v.perfShut) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragPerf} onDoubleClick={v.resetPerf} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
-                <DeskAdTabs4a v={v} />
+                <DeskAdTabs4a v={v} which="perf" />
                 <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "14px 24px 0" }}><span style={{ position: "relative" }}>
                     <button type="button" onClick={v.adPerToggle} style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "30px", padding: "0 8px 0 12px", borderRadius: "15px", border: "1px solid var(--crm-rule)", background: v.adPerBg, font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h8}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14">
@@ -983,30 +983,13 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </path>
                     </svg></button>
                 </div>
-              </aside></>)}
-              {!!(v.adLogClosed) && (<>
-                <aside style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <button type="button" onClick={v.adLogToggle} title="Open audit log" style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h24}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m11 17-5-5 5-5M18 17l-5-5 5-5">
-                      </path>
-                    </svg>
-                  </button>
-                  <button type="button" onClick={v.adLogToggle} title="Open audit log" style={{ marginTop: "18px", padding: "6px 0", border: "0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" }}>
-                    {(v.adLogRail).map((d, d_i) => (<Fragment key={d_i}>
-                      <span title={d.tip} style={{ width: "10px", height: "10px", boxSizing: "border-box", borderRadius: "50%", background: d.dot }}>
-                      </span>
-                      <span style={{ width: "2px", height: "18px", background: d.gap }}>
-                      </span>
-                    </Fragment>))}
-                  </button>
-                </aside>
-              </>)}
+              </aside></>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}
+              {!!(v.adLogClosed) && (<DeskFoldRail v={{ title: "Audit log", open: v.adLogToggle }} />)}
               {!!(v.adLogOpen) && (<>
                 <aside className={DX.slideIn} style={v.adLogStyle}>
                   <div onPointerDown={v.dragAudit} onDoubleClick={v.resetAudit} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                   </div>
-                  <DeskAdTabs4a v={v} />
+                  <DeskAdTabs4a v={v} which="audit" />
                   <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "16px", display: "flex", flexDirection: "column" }}>
                     {(v.adLog).map((e, e_i) => (<Fragment key={e_i}>
                       <div style={{ display: "grid", gridTemplateColumns: "44px 24px minmax(0, 1fr)", columnGap: "10px" }}>

@@ -121,7 +121,6 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const noun = ui.adSt === "all" ? "" : ` ${ui.adSt.toLowerCase()}`;
   // 4a (frame 06): the ads as a table — channel, the name managers typed (oxblood "Not named yet" with Set up when it has
   // none), Meta's headline, leads, the split in team colours — and one docked editor with Split · Ad performance · Audit log.
-  const adTab = ui.adTab ?? "split";
   const named = (a: (typeof ads)[number]) => !!data.adNames?.[a.id];
   const adList4 = {
     summary: `${ads.length} ads`, unsetN: ads.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
@@ -134,8 +133,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
         segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set && !nameless, sel: ui.ad === a?.id, open: c.open }; }),
   };
   return {
-    adList4, adTab4: adTab,
-    adTabs4: ([["split", "Split"], ["perf", "Ad performance"], ["audit", "Audit log"]] as const).map(([k, label]) => ({ label, on: adTab === k, pick: () => patch({ adTab: k, adPerfShut: false, adLog: k === "audit" }) })),
+    adList4,
     saveOne4: as.saveAd, saveAll4: as.applyAll,
     adList: frame.isAdsOp, adGrid: false, adOverview: !as.adOpen, adNone: frame.isAdsOp && inSheet && !as.adOpen, adNoneW: frame.sheetW + 304,
     listMin: frame.isAdsOp ? 240 : 0, splitFlex: `0 1 ${frame.sheetW}px`,
@@ -151,10 +149,11 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     adCalOpen: ui.adCal, adCalList: !ui.adCal, adCalHint: t0.step === 1 ? "Now pick the end date" : "Pick the start date", adCalLabel: calLbl(t0),
     adCalBack: () => patch({ adCal: false }), adCalApply: () => patch({ adCust: { a: t0.a, b: t0.b }, adPer: "Custom", adCal: false, adPerOpen: false }), adCalDays,
     openAdsPerf: () => patch({ tab: "adsperf", pane: "closed", ad: null, adLog: false, toast: "" }),
-    // 4a: Ad performance and the Audit log are the editor's other tabs, at its width.
-    perfShut: (ui.adTab ?? "split") !== "perf", perfFold: () => patch({ adPerfShut: true }),
+    // Ad performance and the Audit log are panels of their own beside Split, each folding to its strip (the owner,
+    // 2026-10-18: "ads performance, audit log 分开"); both start folded so the split keeps its room.
+    perfShut, perfFold: () => patch({ adPerfShut: true }),
     perfRail: { title: "Ad performance", open: () => patch({ adPerfShut: false, ...(dock ? {} : { adLog: false }) }) },
-    adLogOpen: (ui.adTab ?? "split") === "audit", adLogClosed: false, adLogToggle: () => patch({ adLog: !logOpen }), adLog: adL.rows, adLogRail: adL.rail, adLogStyle,
+    adLogOpen: logOpen, adLogClosed: !logOpen, adLogToggle: () => patch({ adLog: !logOpen }), adLog: adL.rows, adLogRail: adL.rail, adLogStyle,
     mwtLogOpen: mwtOpen, mwtLogClosed: mwtShow && !mwtOpen, mwtLogW: ui.mwtLogW ?? 280, mwtLogToggle: () => patch({ mwtLog: !ui.mwtLog }), mwtLog: mwtL.rows, mwtLogRail: mwtL.rail,
     ftSame, ftApplyDis: !ftSame, ftApplyOn, ftApplyFg: ftSame ? "var(--crm-ink)" : "var(--crm-faint)", ftApplyCur: ftSame ? "pointer" : "not-allowed", ftApplyTip: ftSame ? "" : "Everyone in this team needs the same days",
     toggleFtApplyChk: () => { if (ftSame) patch({ ftApplyChk: !ui.ftApplyChk }); }, ftSaveOrApply: () => (ftApplyOn ? as.ftApplyAll : as.ftSave)(),

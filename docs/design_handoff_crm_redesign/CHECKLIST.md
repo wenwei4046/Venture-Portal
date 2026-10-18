@@ -89,3 +89,7 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 6. Desktop head: CRM alerts is the bell alone (a dot when unread), on every page; Insight's button reads Export.
 7. Contacts: the list sits in a box of its own — the rows scroll inside it under the table head; the search bar and the pager stay put.
 8. Customer form phone preview: a phone page under "‹ Customer info" (no dimmed backdrop or sheet corners).
+9. Assignment › Ads to teams: Split, Ad performance and the Audit log are three panels side by side, not tabs of one —
+   Ad performance and the Audit log each fold to a 44 px strip with its name (as the Inbox's Customer info and Audit log),
+   both folded at first; Split keeps × to close the ad.
+10. Ads Performance: the head's Download PDF is gone — the PDF is in Export (Excel · CSV · PDF report).

@@ -18,7 +18,6 @@ adList
 adLog
 adLogClosed
 adLogOpen
-adLogRail
 adLogStyle
 adLogToggle
 adModes
@@ -33,7 +32,6 @@ adPerToggle
 adPerf
 adSplit
 adSum
-adTab4
 adTeams
 adTot
 adTotals
@@ -359,6 +357,7 @@ paneFull
 paneShown
 paneStyle
 people
+perfRail
 perfShut
 perfW
 personChats

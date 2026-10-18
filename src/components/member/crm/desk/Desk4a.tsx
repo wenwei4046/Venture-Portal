@@ -1056,9 +1056,9 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
   const L = v.adList4;
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", paddingBottom: "16px" }}>
-        <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{L.summary}{L.unsetN > 0 && <span style={{ color: "var(--crm-oxblood)" }}> · {L.unsetN} not set up</span>}</div>
-        <span style={{ position: "relative" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "10px 14px", paddingBottom: "16px" }}>
+        <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", alignSelf: "center" }}>{L.summary}{L.unsetN > 0 && <span style={{ color: "var(--crm-oxblood)" }}> · {L.unsetN} not set up</span>}</div>
+        <span style={{ position: "relative", alignSelf: "center" }}>
           <button type="button" onClick={v.toggleSt} style={{ ...BTN, display: "flex", alignItems: "center", gap: "5px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.stCur.color }} />{v.stCur.label}<Ic name="chevron-down" size={11} /></button>
           {v.stOpen && (<>
@@ -1071,7 +1071,7 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
             </div>
           </>)}
         </span>
-        <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "6px 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+        <div style={{ marginLeft: "auto", alignSelf: "center", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "6px 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
           {L.legend.map(t => <span key={t.name} style={{ display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}><span style={{ width: "8px", height: "8px", background: t.color }} />{t.name}</span>)}
         </div>
       </div>
@@ -1104,13 +1104,18 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
   );
 }
 
-/** Frame 06 · the docked editor's tabs: Split · Ad performance · Audit log, and ×. */
-export function DeskAdTabs4a({ v }: { v: { adTabs4: { label: string; on: boolean; pick: () => void }[]; closeAd: () => void } }) {
+/** Frame 06 · each docked panel's head — Split (× closes the ad), Ad performance and Audit log (» folds each to its strip):
+ *  three panels side by side, as the Inbox's Customer info and Audit log (the owner, 2026-10-18: "ads performance, audit log 分开"). */
+export function DeskAdTabs4a({ v, which }: { v: { closeAd: () => void; perfFold: () => void; adLogToggle: () => void; ad?: { name?: string } | null }; which: "split" | "perf" | "audit" }) {
+  const title = which === "split" ? "Split" : which === "perf" ? "Ad performance" : "Audit log";
+  const act = which === "split" ? v.closeAd : which === "perf" ? v.perfFold : v.adLogToggle;
   return (
-    <div style={{ flex: "none", height: "48px", display: "flex", alignItems: "flex-end", gap: "22px", padding: "0 24px", borderBottom: "1px solid var(--crm-rule)" }}>
-      {v.adTabs4.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "0 0 12px", font: "500 13px Inter, sans-serif", whiteSpace: "nowrap",
-        borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
-      <button type="button" onClick={v.closeAd} title="Close (Esc)" style={{ ...BTN, marginLeft: "auto", alignSelf: "center", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={16} /></button>
+    <div style={{ flex: "none", height: "48px", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 0 24px", borderBottom: "1px solid var(--crm-rule)" }}>
+      <span style={{ font: `500 15px ${TIGHT}`, color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{title}</span>
+      {which === "audit" && v.ad?.name && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{v.ad.name}</span>}
+      <button type="button" onClick={act} title={which === "split" ? "Close (Esc)" : `Fold ${title}`} aria-label={which === "split" ? "Close" : `Fold ${title}`} style={{ ...BTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}>
+        {which === "split" ? <Ic name="x" size={16} /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5" /></svg>}
+      </button>
     </div>
   );
 }

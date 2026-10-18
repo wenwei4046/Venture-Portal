@@ -200,10 +200,10 @@ module.exports = function desk4a(body) {
   body = swap(body, '<div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>\n                {!!(v.showKicker) && (<>', "div",
     '{!(v.adList) && !!(v.opSub) && (<span style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.opSub}</span>)}', "sheet head");
   body = fragSwap(body, "{!!(v.adList) && (<>", "{!!(v.adList) && (<DeskAdList4a v={v} />)}", "ad list");
-  body = once(body, "{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}", "", "perf strip");
-  body = once(body, '{!!(v.adOpen) && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', '{!!(v.adOpen && v.adTab4 === "split") && (<>\n              <aside className={DX.slideIn} style={{ flex: v.splitFlex,', "split tab");
+  // The owner, 2026-10-18 ("ads performance, audit log 分开"): Split, Ad performance and the Audit log are three panels,
+  // the last two folding to their strips as the Inbox's Customer info and Audit log do — not tabs of one panel.
   body = swap(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 20px", borderBottom: "1px solid var(--crm-rule)" }}>\n                  <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n                    {v.ad.canName', "div",
-    `<DeskAdTabs4a v={v} />
+    `<DeskAdTabs4a v={v} which="split" />
                 <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 4px" }}>
                   <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</span>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "42px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-ink)" }}>
@@ -229,10 +229,13 @@ module.exports = function desk4a(body) {
     const pk0 = head.indexOf('<span style={{ position: "relative" }}>');
     const [pa, pb] = el(head.slice(pk0), '<span style={{ position: "relative" }}>', "span", "perf period");
     const picker = head.slice(pk0 + pa, pk0 + pb);
-    body = body.slice(0, h0 + a) + `<DeskAdTabs4a v={v} />\n                <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "14px 24px 0" }}>${picker}</div>` + body.slice(h0 + b);
+    body = body.slice(0, h0 + a) + `<DeskAdTabs4a v={v} which="perf" />\n                <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "14px 24px 0" }}>${picker}</div>` + body.slice(h0 + b);
   }
   body = swap(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 0 16px", borderBottom: "1px solid var(--crm-rule)" }}>\n                    <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>\n                      <strong style={{ fontSize: "15px", fontWeight: "650" }}>Audit log</strong>\n                      <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</span>', "div",
-    "<DeskAdTabs4a v={v} />", "audit head");
+    '<DeskAdTabs4a v={v} which="audit" />', "audit head");
+
+  // The Audit log folded is a strip with its name, as Ad performance's beside it and the Inbox's (the owner, 2026-10-18: "可收缩式，像inbox一样").
+  body = fragSwap(body, "{!!(v.adLogClosed) && (<>", "{!!(v.adLogClosed) && (<DeskFoldRail v={{ title: \"Audit log\", open: v.adLogToggle }} />)}", "audit strip");
 
   // Frame 07 · Showrooms: one at a time, always open to edit, the weekly slots as a grid (DeskShowrooms4a); Save in the head.
   body = fragSwap(body, "{!!(v.isSrOp) && (<>", "{!!(v.isSrOp) && (<DeskShowrooms4a v={v} />)}", "showrooms");
