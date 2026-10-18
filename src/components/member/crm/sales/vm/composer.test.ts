@@ -21,7 +21,9 @@ describe("the composer's content is the prototype's", () => {
   });
   it("the search keywords, the icons and the Attach tiles, word for word", () => {
     for (const [k, e] of Object.entries(NAMES)) expect(PROTO).toMatch(new RegExp(`${k}: '${e}'`));
-    for (const [k, d] of Object.entries(ICON)) if (k !== "send" && k !== "mic") expect(PROTO).toContain(`${k}: '${d}'`);
+    // The sticker button is the 4a frames' smiley (2026-10-18, docs/design_handoff_crm_redesign wins on look).
+    for (const [k, d] of Object.entries(ICON)) if (k !== "send" && k !== "mic" && k !== "stk") expect(PROTO).toContain(`${k}: '${d}'`);
+    expect(ICON.stk).toMatch(/^M12 22a10 10/);
     expect(PROTO).toContain(`'${ICON.send}'`);
     expect(PROTO).toContain(`'${ICON.mic}'`);
     // 4a (2026-10-18): the tiles keep the prototype's colours as their --crm-* tokens (tools/crm-design/palette-4a.cjs)

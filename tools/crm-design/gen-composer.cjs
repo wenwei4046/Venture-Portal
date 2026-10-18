@@ -79,7 +79,7 @@ const ABOVE = [
   '      {!!(p.chatCold) && (<>',
   '        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" }}>',
   // Settings › Suggest a template off (2026-10-18): no button — the line says the chat waits for the customer.
-  '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "#3E5C7A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
+  '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
   '          {!!(p.tplOff) && (<span style={{ flex: "1", minHeight: "48px", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: "13px", color: "#806B60" }}>The reply window is shut · the chat opens again when the customer writes</span>)}',
   '        </div>',
   '      </>)}',
@@ -142,6 +142,23 @@ for (const [from, to, why] of PATCHES) {
 for (const [from, to, why] of ICONS) {
   const n = (body.match(new RegExp(from.source, "g")) || []).length;
   if (n !== 1) throw new Error(`SalesComposer: icon size (${why}) matched ${n} times`);
+  body = body.replace(from, to);
+}
+// The 4a redesign's frames M04–M08 (2026-10-18, docs/design_handoff_crm_redesign — that folder wins on size): the bar's
+// pill and the round buttons beside it are 52 px (the composer handoff's 46), the recording row with them.
+const SIZES_4A = [
+  ['width: "46px", height: "46px", boxSizing: "border-box", borderRadius: "50%"', 'width: "52px", height: "52px", boxSizing: "border-box", borderRadius: "50%"', "the recording row's bin"],
+  ['minWidth: "0", height: "46px", boxSizing: "border-box", borderRadius: "23px"', 'minWidth: "0", height: "52px", boxSizing: "border-box", borderRadius: "26px"', "the recording row"],
+  ['alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px"', 'alignItems: "flex-end", minHeight: "52px", boxSizing: "border-box", padding: "0 4px", borderRadius: "26px"', "the pill"],
+  ['title="Sticker" style={{ flex: "none", width: "38px", height: "46px"', 'title="Sticker" style={{ flex: "none", width: "38px", height: "52px"', "Sticker's height"],
+  ['title="Attach" style={{ flex: "none", width: "40px", height: "46px"', 'title="Attach" style={{ flex: "none", width: "40px", height: "52px"', "Attach's height"],
+  ['title="Camera" style={{ flex: "none", width: "40px", height: "46px"', 'title="Camera" style={{ flex: "none", width: "40px", height: "52px"', "Camera's height"],
+  ['maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "12px 2px"', 'maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "15px 2px"', "the reply box centred in 52 px"],
+  ['title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px"', 'title={p.mainTitle} style={{ flex: "none", width: "52px", height: "52px"', "the main button"],
+];
+for (const [from, to, why] of SIZES_4A) {
+  const n = body.split(from).length - 1;
+  if (n !== 1) throw new Error(`SalesComposer: 4a size (${why}) matched ${n} times`);
   body = body.replace(from, to);
 }
 body = require("./palette-4a.cjs")(body, "SalesComposer");

@@ -29,6 +29,11 @@ const ROUND = 'flex: "none", width: "40px", height: "40px", boxSizing: "border-b
 
 /** M01 · the Inbox: title row (Team | Mine pill, house, bell with a dot), All ads beside the search, 4a chips and rows. */
 function inbox(body) {
+  // M02 (the owner, 2026-10-18 — the swipe states checked against the frame): Assign is the frame's person-plus, More's
+  // three dots as heavy as the frame's.
+  body = once(body, '<path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3" />', '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />', "assign icon");
+  body = once(body, 'strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">\n                <path d="M5 12h.01M12 12h.01M19 12h.01">',
+    'strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">\n                <path d="M5 12h.01M12 12h.01M19 12h.01">', "more dots");
   body = once(body, '<h1 style={{ flex: "1 0 auto", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Inbox</h1>',
     `<h1 style={{ flex: "1 0 auto", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Inbox</h1>`, "inbox title");
   // All ads leaves the title row for the search row (M01: "All ads ▾ + search").
@@ -83,11 +88,20 @@ function inbox(body) {
     `<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "${F(12)}", fontWeight: "500", color: "var(--crm-brown)" }}><Ic name="calendar-check" size={12} />1st visit {l.firstVisit}</span>`, "row first visit");
   body = swap(body, '<span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 6px", borderRadius: "4px", background: "var(--crm-tint-cold)"', "span",
     `<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "${F(12)}", fontWeight: "500", color: "var(--crm-faint)", whiteSpace: "nowrap" }}><Ic name="lock" size={12} />Cold lead</span>`, "row cold");
+  // M03: a filter with nothing in it shows the frame's empty state under the chips.
+  body = once(body, '<section style={{ flex: "none", margin: "-4px -20px 0" }}>', '{!!(v.empty4) && (<Phone4aEmpty e={v.empty4} />)}<section style={{ flex: "none", margin: "-4px -20px 0" }}>', "inbox empty");
   return body;
 }
 
 
 /** M04 / M08 · the chat: the header (‹, the customer's tint, "ad · channel"), the status strip (change list 18), a plain cream wall, day labels. */
+
+/** M04 (2026-10-18, measured against the frame): the chat header's name 16 px / 600 and its line 12 px. */
+function chatHead(b) {
+  b = once(b, '<strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap"', `<strong style={{ fontSize: "${F(16)}", fontWeight: "600", whiteSpace: "nowrap"`, "chat head name");
+  b = once(b, '<span style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap"', `<span style={{ fontSize: "${F(12)}", color: "var(--crm-muted)", whiteSpace: "nowrap"`, "chat head line");
+  return b;
+}
 function chat(body, v) {
   body = once(body, `<div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "rgba(255,255,255,.96)", borderBottom: "1px solid rgb(235 221 210)" }}>`,
     `<div data-chat-head="" style={{ position: "absolute", left: "0", right: "0", top: "0", zIndex: "4", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>`, "chat head");
@@ -106,6 +120,7 @@ function chat(body, v) {
   body = body.slice(0, rowEnd) + `<Phone4aStrip s={${v}.strip} />` + body.slice(rowEnd);
   body = once(body, '<span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>',
     `<span style={{ alignSelf: "center", margin: "6px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "${F(12)}", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>`, "chat day");
+  body = chatHead(body);
   return body;
 }
 
@@ -218,6 +233,8 @@ function panelChat(body) {
   const wall = /backgroundColor: "var\(--crm-cream\)", backgroundImage: "url\('data:image\/svg\+xml[^"]*", backgroundSize: "240px 240px"/;
   if (!wall.test(body)) throw new Error("phone-4a: team chat wall");
   body = body.replace(wall, 'backgroundColor: "var(--crm-cream)"');
+  // M04: the message words 15 px (the frame), as Mine's chat (vm/chat.ts).
+  body = once(body, 'fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45" }}>{m.text}</p>', `fontSize: "${F(15)}", lineHeight: "1.45" }}>{m.text}</p>`, "panel bubble words");
   return body;
 }
 
@@ -245,6 +262,8 @@ function teamInsight(body) {
   body = once(body, '<div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', '<div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', "team row rule");
   body = swap(body, '<div onClick={t.toggle} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px"', "div",
     `<div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "14px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "0" }}><span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "${F(17)}", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0", fontSize: "${F(14)}", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: \`rotate(\${t.rot})\`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", paddingLeft: "20px", fontSize: "${F(14)}", color: "var(--crm-muted)" }}><span>Leads <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.show}</b></span></span></div>`, "team row");
+  // The owner, 2026-10-18 (circled "Own customers · PETER", "TL ANTHONY"): no line after a team's name.
+  body = once(body, '<span style={{ flex: "1", minWidth: "0", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>', '<span style={{ flex: "1", minWidth: "0" }} />', "team who");
   return body;
 }
 
@@ -336,6 +355,12 @@ function teamSplit(body) {
     'padding: "12px 20px 26px", borderTop: "1px solid var(--crm-rule)", background: "#fff", display: "flex", flexDirection: "column-reverse", gap: "8px" }}>', "split foot");
   b = swap(b, '<span onClick={v.as.ae.close} style={{ height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-tint-cold)"', "span", "", "split cancel");
   b = once(b, '<span onClick={v.as.ae.save} style={{ height: "48px", borderRadius: "24px", background: v.as.ae.saveBg,', '<span onClick={v.as.ae.save} style={{ height: "50px", borderRadius: "25px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)",', "split save");
+  // Why Save is off, above it (the owner, 2026-10-18: "为什么我调整后，save处于灰色？" — a team's own split was the reason, out of sight).
+  {
+    const i = b.indexOf("<span onClick={v.as.ae.save}");
+    const [, e] = el(b.slice(i), "<span onClick={v.as.ae.save}", "span", "split save end");
+    b = b.slice(0, i + e) + `{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "${F(13)}", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}` + b.slice(i + e);
+  }
   return body.slice(0, at) + b;
 }
 
@@ -400,6 +425,17 @@ function panel(body) {
   { const a = body.indexOf('<div onClick={v.fts.openPage}'); if (a < 0) throw new Error("phone-4a: work type row");
     const [x, y] = el(body.slice(a, a + 4000), '<div onClick={v.fts.openPage}', "div", "work type row"); body = body.slice(0, a + x) + body.slice(a + y); }
   body = profile(body, 4);
+  // Member work type saves on Save (the owner, 2026-10-18: "新加save按钮"): Cancel · Save N changes at the page's foot
+  // once a switch is changed (vm/profile-1011.ts › memberWorkTypeVM).
+  {
+    const f = body.indexOf("{!!(v.fts.open) && (<>");
+    const S = '<div style={{ flex: "1", minHeight: "0", overflowY: "auto"';
+    const s0 = body.indexOf(S, f);
+    if (f < 0 || s0 < 0) throw new Error("phone-4a: work type list");
+    const end = body.indexOf("{!!(v.tp.open) && (<>", s0);
+    const [, e] = el(body.slice(s0, end > 0 ? end : undefined), S, "div", "work type list");
+    body = body.slice(0, s0 + e) + `{!!(v.fts.dirty) && (<div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.fts.cancel} role="button" style={{ flex: "0 0 auto", height: "48px", padding: "0 20px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "500", color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</span><span onClick={v.fts.save} role="button" style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "600", cursor: "pointer" }}>{v.fts.saveLabel}</span></div>)}` + body.slice(s0 + e);
+  }
   return body;
 }
 

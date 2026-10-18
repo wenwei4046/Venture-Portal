@@ -16,16 +16,25 @@ import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 
 export function memberWorkTypeVM(ctx: PanelCtx) {
   const { ui, patch, teams } = ctx;
-  const all = teams.flatMap(t => t.people), on = all.filter(p => p.fullTime).length;
+  // A switch changes the draft; Save writes what changed, Cancel drops it (the owner, 2026-10-18: "新加save按钮" — each
+  // switch used to save itself the moment it was tapped).
+  const draft = ui.ftsDraft ?? {}, cur = (p: { id: string; fullTime: boolean }) => draft[p.id] ?? p.fullTime;
+  const all = teams.flatMap(t => t.people), on = all.filter(cur).length;
+  const changed = all.filter(p => draft[p.id] != null && draft[p.id] !== p.fullTime);
   return {
-    open: !!ui.ftsOpen && (ui.tab === "profile" || ui.tab === "assign"), openPage: () => patch({ ftsOpen: true }), close: () => patch({ ftsOpen: false }),
+    open: !!ui.ftsOpen && (ui.tab === "profile" || ui.tab === "assign"), openPage: () => patch({ ftsOpen: true, ftsDraft: null }), close: () => patch({ ftsOpen: false, ftsDraft: null }),
     sub: on + " of " + all.length + " members full time",
+    dirty: changed.length > 0, saveLabel: changed.length === 1 ? "Save 1 change" : "Save " + changed.length + " changes",
+    cancel: () => patch({ ftsDraft: null }),
+    save: () => void Promise.all(changed.map(p => ctx.act.setFullTime(p.id, !!draft[p.id]))).then(rs => {
+      if (rs.every(Boolean)) patch({ ftsDraft: null, toast: "Saved · Member work type" });
+    }),
     groups: teams.map(t => ({
-      name: t.name, c: t.c, count: t.people.filter(p => p.fullTime).length + " of " + t.people.length + " full time",
+      name: t.name, c: t.c, count: t.people.filter(cur).length + " of " + t.people.length + " full time",
       people: t.people.map((p, k) => ({
         name: p.name, ini: ini(p.name), title: jobTitle(p), rule: k ? "1px solid var(--crm-rule-soft)" : "0",
-        swBg: p.fullTime ? "var(--crm-brown)" : "var(--crm-line)", swX: p.fullTime ? "21px" : "3px",
-        toggle: () => { const on = !p.fullTime; void ctx.act.setFullTime(p.id, on).then(ok => { if (ok) patch({ toast: p.name + (on ? " is now full time" : " is now part time") }); }); },
+        swBg: cur(p) ? "var(--crm-brown)" : "var(--crm-line)", swX: cur(p) ? "21px" : "3px",
+        toggle: () => patch({ ftsDraft: { ...draft, [p.id]: !cur(p) } }),
       })),
     })),
   };

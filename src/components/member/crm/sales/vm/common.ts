@@ -64,13 +64,13 @@ export function windowShut(c: CrmCustomer, now: Date): boolean {
 }
 
 /**
- * Cold lead (README): the reply window has closed and WE sent the last
- * message. It leaves All for Cold leads, and comes back when the customer
- * writes again (their message reopens the window).
+ * Cold lead: the reply window has closed — only a template can reach the customer now, whoever wrote last. It leaves All
+ * for Cold leads, and comes back when the customer writes again (their message reopens the window). Until 2026-10-18 it
+ * also needed OUR message to be the last, so a customer left unanswered past 24 h stayed in Attention though nothing but
+ * a template could reach them (the owner: "这个客户已经超过30h没被我们回复，他是否也应该在cold lead?").
  */
 export function isCold(c: CrmCustomer, now: Date): boolean {
-  const last = lastReal(c);
-  return !!last && last.from === "me" && windowShut(c, now);
+  return !!lastReal(c) && windowShut(c, now);
 }
 
 /** Reply urgency, from the one rule (crm.ts: 3 h · 6 h · 9 h on real time). */
@@ -124,8 +124,12 @@ export interface SalesCtx {
 export function chatStripOf(c: CrmCustomer, now: Date) {
   const H = 3_600_000, last = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
   if (isCold(c, now)) {
-    const ours = lastReal(c), days = Math.max(1, Math.floor((now.getTime() - new Date(ours?.at ?? now).getTime()) / (24 * H)));
-    return { cold: true, left: `Cold · no reply for ${days} ${days === 1 ? "day" : "days"}`, right: "Window closed", dot: "var(--crm-faint-2)" };
+    const lr = lastReal(c), since = now.getTime() - new Date(lr?.at ?? now).getTime(), days = Math.max(1, Math.floor(since / (24 * H)));
+    // The customer wrote last and nobody answered: how long they have waited (hours under two days).
+    const left = lr?.from === "lead"
+      ? (since < 48 * H ? `Cold · waited ${Math.floor(since / H)} h for a reply` : `Cold · waited ${days} days for a reply`)
+      : `Cold · no reply for ${days} ${days === 1 ? "day" : "days"}`;
+    return { cold: true, left, right: "Window closed", dot: "var(--crm-faint-2)" };
   }
   const u = urgencyOf(c, now), attention = u.level !== "none", h = Math.floor(u.waitingMinutes / 60);
   const left = (attention ? "Attention" : STATUS_LABEL[c.status]) + (attention && h >= 1 ? ` · waiting ${h} h` : "");

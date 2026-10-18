@@ -43,38 +43,38 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
       </>)}
       {!!(p.chatCold) && (<>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" }}>
-          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-muted)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}
+          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}
           {!!(p.tplOff) && (<span style={{ flex: "1", minHeight: "48px", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>The reply window is shut · the chat opens again when the customer writes</span>)}
         </div>
       </>)}
       {!!(p.isA) && (<>
         <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", padding: "8px 12px 10px" }}>
           {!!(p.recOn) && (<>
-            <span ref={p.trashRef} onClick={p.recCancel} title="Cancel" style={{ flex: "none", width: "46px", height: "46px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-oxblood)", cursor: "pointer" }}>
+            <span ref={p.trashRef} onClick={p.recCancel} title="Cancel" style={{ flex: "none", width: "52px", height: "52px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid rgb(235 221 210)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-oxblood)", cursor: "pointer" }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
             </span>
-            <span style={{ flex: "1", minWidth: "0", height: "46px", boxSizing: "border-box", borderRadius: "23px", background: "var(--crm-cream)", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ flex: "1", minWidth: "0", height: "52px", boxSizing: "border-box", borderRadius: "26px", background: "var(--crm-cream)", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>
               <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-oxblood)", animation: "fadeIn 700ms ease-in-out infinite alternate" }}></span>{p.recTime}
               <span style={{ flex: "1", minWidth: "0", textAlign: "right", transform: p.recSlide, color: p.recHintC, fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden" }}>‹ Slide to cancel</span>
             </span>
           </>)}
-          {!(p.recOn) && (<span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.14)" }}>
-            <span onClick={p.toggleSticker} onMouseDown={p.keep} title="Sticker" style={{ flex: "none", width: "38px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: p.stkFg }}>
+          {!(p.recOn) && (<span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "52px", boxSizing: "border-box", padding: "0 4px", borderRadius: "26px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.14)" }}>
+            <span onClick={p.toggleSticker} onMouseDown={p.keep} title="Sticker" style={{ flex: "none", width: "38px", height: "52px", display: "grid", placeItems: "center", cursor: "pointer", color: p.stkFg }}>
               <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
                 <path d={p.stkIcon}>
                 </path>
               </svg>
             </span>
-            <textarea ref={p.taRef} data-draft="1" value={p.draft} onChange={p.onDraft} onFocus={p.focus} onBlur={p.blur} onClick={p.focus} placeholder={p.placeholder} rows={1} style={{ flex: "1", minWidth: "0", height: p.taH, maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "12px 2px", border: "0", outline: "none", resize: "none", background: "transparent", font: "inherit", fontSize: "calc(16px * var(--rv-type, 1))", lineHeight: "22px", color: "var(--crm-ink)", scrollbarWidth: "none" }}>
+            <textarea ref={p.taRef} data-draft="1" value={p.draft} onChange={p.onDraft} onFocus={p.focus} onBlur={p.blur} onClick={p.focus} placeholder={p.placeholder} rows={1} style={{ flex: "1", minWidth: "0", height: p.taH, maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "15px 2px", border: "0", outline: "none", resize: "none", background: "transparent", font: "inherit", fontSize: "calc(16px * var(--rv-type, 1))", lineHeight: "22px", color: "var(--crm-ink)", scrollbarWidth: "none" }}>
             </textarea>
             {(<>
-              <span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: p.attFg }}>
+              <span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{ flex: "none", width: "40px", height: "52px", display: "grid", placeItems: "center", cursor: "pointer", color: p.attFg }}>
                 <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "rotate(-45deg)" }}>
                   <path d="M16.5 7.5v8.25a4.5 4.5 0 0 1-9 0V6a3 3 0 0 1 6 0v9.5a1.5 1.5 0 0 1-3 0V8">
                   </path>
                 </svg>
               </span>
-              <span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{ flex: "none", width: "40px", height: "46px", display: "grid", placeItems: "center", cursor: "pointer", color: "rgb(128 107 96)" }}>
+              <span onClick={p.camera} onMouseDown={p.keep} title="Camera" style={{ flex: "none", width: "40px", height: "52px", display: "grid", placeItems: "center", cursor: "pointer", color: "rgb(128 107 96)" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 9a2 2 0 0 1 2-2h2l1.5-2.2A1.5 1.5 0 0 1 9.75 4h4.5a1.5 1.5 0 0 1 1.25.8L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z">
                   </path>
@@ -84,7 +84,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
               </span>
             </>)}
           </span>)}
-          <span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+          <span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d={p.mainIcon}>
               </path>

@@ -243,7 +243,8 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
             <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, paddingLeft: r.person ? "18px" : 0 }}>
               <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: r.dot }} />
               <span style={{ fontWeight: r.person ? 400 : 500, whiteSpace: "nowrap", color: r.person ? "var(--crm-ink-soft)" : "var(--crm-ink)" }}>{r.name}</span>
-              <span style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>
+              {/* No line after a team's name (the owner, 2026-10-18); a person keeps theirs. */}
+              {r.person && <span style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>}
             </span>
             <span style={{ textAlign: "right", fontWeight: 500 }}>{r.leads}</span>
             <span style={{ display: "flex", alignItems: "center", gap: "10px", paddingLeft: "24px" }}>
@@ -729,23 +730,7 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
           <button type="button" onClick={s.edit} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Customer info</button>
         </div>
       </>)}
-      {people && s && !s.has && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <div style={KICK}>To fill in</div>
-          <div style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{s.todoTitle}</div>
-          <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Pick a contact in the table to see them here.</div>
-          {s.todo.map(t => (
-            <div key={t.id} onClick={t.pick} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid var(--crm-rule-soft)", cursor: "pointer" }}>
-              <span style={{ width: "28px", height: "28px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 10px ${TIGHT}`, background: avatarTint(t.name)[0], color: avatarTint(t.name)[1] }}>{t.ini}</span>
-              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-                <span style={{ font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.sub}</span>
-              </span>
-              <button type="button" onClick={t.fill} style={{ ...BTN, height: "26px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Fill in</button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* The owner, 2026-10-18: no "To fill in · Property info missing" list here. */}
       {!people && v.stats && (<>
         <div style={{ display: "flex", alignItems: "center" }}>
           <button type="button" onClick={v.toggle} title="Fold" style={{ ...BTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={14} /></button>
@@ -998,7 +983,25 @@ interface AdsBits {
 /** Frame 05 · Ads Performance's table: the ad (channel, the name managers typed, Meta's headline), the CRM's figures, Meta's "—", the total under an ink rule. */
 export function DeskAdsTable4a({ v }: { v: AdsBits }) {
   const A = v.ap4;
-  const grid = `minmax(180px,2.4fr) ${A.cols.map(c => (c.id === "apptrate" ? "minmax(100px,1.4fr)" : "minmax(48px,0.8fr)")).join(" ")} 28px`;
+  // Each column's width can be dragged by its head's right edge, double-click to reset (the owner, 2026-10-18: the table's
+  // columns marked one by one, "可调整宽度"); kept in this browser only.
+  const [colW, setColW] = useState<Record<string, number>>(() => { try { return JSON.parse(localStorage.getItem("crm-ads-cols") ?? "{}") as Record<string, number>; } catch { return {}; } });
+  const keepW = (next: Record<string, number>) => { setColW(next); try { localStorage.setItem("crm-ads-cols", JSON.stringify(next)); } catch { /* private window */ } };
+  const widthOf = (id: string, dflt: string) => (colW[id] ? `${colW[id]}px` : dflt);
+  const grid = `${widthOf("ad", "minmax(180px,2.4fr)")} ${A.cols.map(c => widthOf(c.id, c.id === "apptrate" ? "minmax(100px,1.4fr)" : "minmax(48px,0.8fr)")).join(" ")} 28px`;
+  const Resize = ({ id }: { id: string }) => (
+    <span role="separator" aria-orientation="vertical" title="Drag to resize · double-click to reset" className="crm4a-colgrip"
+      onDoubleClick={() => { const n = { ...colW }; delete n[id]; keepW(n); }}
+      onPointerDown={e => {
+        e.preventDefault(); e.stopPropagation();
+        const cell = (e.currentTarget.parentElement as HTMLElement), x0 = e.clientX, w0 = cell.getBoundingClientRect().width;
+        let last = colW;
+        const move = (m: PointerEvent) => { last = { ...colW, [id]: Math.max(id === "ad" ? 120 : 44, Math.round(w0 + m.clientX - x0)) }; setColW(last); };
+        const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); keepW(last); };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+      }}
+      style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-8px", width: "10px", cursor: "col-resize", zIndex: 2, touchAction: "none" }} />
+  );
   const Cell = ({ c, id, total }: { c: AdsCell; id: string; total?: boolean }) => {
     const meta = id === "spend" || id === "cpl" || c.v === "—";
     return (
@@ -1016,8 +1019,8 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     <div style={{ display: "flex", flexDirection: "column", overflowX: "auto", minWidth: 0 }}>
       <div style={{ display: "grid", gridTemplateColumns: grid, gap: "12px", alignItems: "center", minHeight: "44px", padding: "0 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)",
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
-        <button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button>
-        {A.cols.map(c => <button key={c.id} type="button" onClick={c.sort} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", textAlign: c.id === "apptrate" ? "left" : "right", lineHeight: 1.25 }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button>)}
+        <span style={{ position: "relative", minWidth: 0, display: "flex" }}><button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button><Resize id="ad" /></span>
+        {A.cols.map(c => <span key={c.id} style={{ position: "relative", minWidth: 0, display: "flex", justifyContent: c.id === "apptrate" ? "flex-start" : "flex-end" }}><button type="button" onClick={c.sort} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", textAlign: c.id === "apptrate" ? "left" : "right", lineHeight: 1.25 }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button><Resize id={c.id} /></span>)}
         <button type="button" onClick={v.openMetrics} title="Add columns" style={{ ...BTN, justifySelf: "end", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px dashed var(--crm-rust)", color: "var(--crm-rust)" }}><Ic name="plus" size={12} /></button>
       </div>
       {A.rows.map((r, i) => (

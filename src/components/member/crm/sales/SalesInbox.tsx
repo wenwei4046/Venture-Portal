@@ -4,7 +4,7 @@
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/inbox.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
-import { Phone4aChip } from "../shared/phone4a";
+import { Phone4aChip, Phone4aEmpty } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { InboxVM } from "./vm/inbox";
 import type { ShellExtras } from "./vm/header";
@@ -50,13 +50,13 @@ export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
           <Phone4aChip label={c.label} count={c.n} on={c.on} hot={c.label === "Attention"} onClick={c.pick} />
         </Fragment>))}
       </div>
-      <section style={{ flex: "none", margin: "-4px -20px 0" }}>
+      {!!(v.empty4) && (<Phone4aEmpty e={v.empty4} />)}<section style={{ flex: "none", margin: "-4px -20px 0" }}>
         {(v.leadsView).map((l, l_i) => (<Fragment key={l_i}>
           <div data-inbox-row="1" style={{ position: "relative", overflow: "hidden", borderTop: "1px solid var(--crm-rule-soft)" }}>
             {!!(l.canRead) && (<span onClick={l.read} style={{ position: "absolute", top: "0", bottom: "0", left: "0", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-ink-soft)", color: "#fff", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7l9 6 9-6M3 7v10h18V7M3 7l9-4 9 4" /></svg>{l.readLabel}</span>)}
             <span onClick={l.pin} style={{ position: "absolute", top: "0", bottom: "0", left: l.canRead ? "84px" : "0", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-faint)", color: "#fff", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z" /></svg>{l.pinLabel}</span>
-            {!!(l.canAssign) && (<span onClick={l.assign} style={{ position: "absolute", top: "0", bottom: "0", right: "84px", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-amber)", color: "var(--crm-deep)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3" /></svg>Assign</span>)}
-            <span onClick={l.more} style={{ opacity: l.moreOp, transition: "opacity 120ms", position: "absolute", top: "0", bottom: "0", right: "0", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-ink)", color: "var(--crm-on-light)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+            {!!(l.canAssign) && (<span onClick={l.assign} style={{ position: "absolute", top: "0", bottom: "0", right: "84px", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-amber)", color: "var(--crm-deep)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>Assign</span>)}
+            <span onClick={l.more} style={{ opacity: l.moreOp, transition: "opacity 120ms", position: "absolute", top: "0", bottom: "0", right: "0", width: "84px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", background: "var(--crm-ink)", color: "var(--crm-on-light)", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h.01M12 12h.01M19 12h.01">
                 </path>
               </svg>More</span>

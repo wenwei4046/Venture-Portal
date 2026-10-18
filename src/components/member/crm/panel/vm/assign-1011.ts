@@ -124,19 +124,25 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const B = isSp && E ? (ui.bp && ui.bp.adId === E.id ? ui.bp : { adId: E.id, tm: { ...(rule?.tm ?? {}) }, pv: { ...(rule?.pp ?? {}) }, touch: {} as Record<string, string[]> }) : null;
   const takenOf = (adId: string, pid: string) => data.customers.filter(c => c.adId === adId && c.assignedTo === pid).length;
   const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[] };
-  let aeSave: { saveBg: string; save: (() => void) | undefined } | null = null;
+  let aeSave: { why: string; saveBg: string; save: (() => void) | undefined } | null = null;
   let byTeamRule: CrmRuleIn | null = null;
   function innerOf(t: Team, B0: NonNullable<typeof B>, split: Record<string, number>) {
     const putB = (p: Partial<NonNullable<typeof B>>) => patch({ bp: { ...B0, ...p } });
     const mode: Mode = B0.tm[t.id] ?? "pct", ps = t.people, es = evenShare(ps.length || 1), custom = mode !== "even";
-    const val = (p: Team["people"][number], k: number) => B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0);
+    // A % saved for the team as it was (somebody since joined or left) no longer adds up: it opens as an even share, as
+    // a team never set does — it was Save's silent block (the owner, 2026-10-18: "为什么我调整后，save处于灰色？").
+    const stored = ps.reduce((x, p) => x + (B0.pv[p.id] ?? 0), 0), touched = (B0.touch[t.id] ?? []).length > 0;
+    const stale = mode === "pct" && !touched && ps.some(p => B0.pv[p.id] != null) && stored !== 100;
+    const val = (p: Team["people"][number], k: number) => (stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
     const sum = ps.reduce((x, p, k) => x + val(p, k), 0);
-    const ok = mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
+    // A team with nobody in it has nothing to split.
+    const ok = !ps.length || mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
+    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + sum + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
     const setMode = (m: Mode) => { const pv = { ...B0.pv }; ps.forEach((p, k) => { if (m === "even") delete pv[p.id]; else pv[p.id] = m === "pct" ? es(k) : 0; }); putB({ tm: { ...B0.tm, [t.id]: m }, pv, touch: { ...B0.touch, [t.id]: [] } }); };
     const ftr = data.ftRules.find(f => f.tlId === t.id);
     const ftDays = ftr ? [...new Set(Object.entries(ftr.vals).flatMap(([, v]) => Object.entries(v).filter(([, n]) => Number(n) > 0).map(([d]) => Number(d))))].sort((a, b) => a - b) : [];
     return {
-      ok, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
+      ok, why, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
       name: t.name, c: t.c, pct: (split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
       evenLine: "In turn among " + ps.map(p => p.name.split(" ")[0]).join(", ") + " · Full time days apply",
       modes: ([["even", "Evenly"], ["pct", "By %"], ["cnt", "By max"]] as const).map(([k, label]) => ({ label, pick: () => { if (mode !== k) setMode(k); },
@@ -168,16 +174,22 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     };
   }
   if (B && E && asv?.ae) {
+    // The Revenue Director's row too (mig 20261016010000): Save counted the teams alone, so a split giving the director any
+    // share never reached 100 and Save stayed grey (the owner, 2026-10-18).
+    const T = asv.adTeams ?? teams;
     const split = E.split;
-    bp.inner = teams.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
-    const tot = teams.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
+    bp.inner = T.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
+    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
     const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
-    teams.forEach(t => {
+    T.forEach(t => {
       const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
-      const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
+      // What is saved is what the editor shows (a stale % is saved as its even share).
+      const shown = bp.inner.find(x => x.name === t.name);
+      const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = shown ? Number(shown.people[k]?.v ?? 0) : B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
     });
     if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
-    aeSave = { saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
+    const why = tot !== 100 ? "The teams add up to " + tot + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
+    aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
         if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
@@ -209,7 +221,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   // The ad cards (compact): a legend per team, and "N waiting" when a full By max team holds leads of that ad.
   const adRows = (asv?.adRows ?? []).map(row => {
     const r = data.adRules.find(x => x.label === row.name), tm = r?.tm ?? {}, sp = r && (r.mode === "split" || r.mode === "people") ? r.split : null;
-    const leg = sp ? teams.filter(t => (sp[t.id] || 0) > 0).map(t => ({ c: t.c, name: t.name.replace(/^Team /, ""), pct: sp[t.id] + "%", mode: tm[t.id] === "cnt" ? " · max" : tm[t.id] === "even" ? " · evenly" : "" })) : [];
+    const leg = sp ? (asv?.adTeams ?? teams).filter(t => (sp[t.id] || 0) > 0).map(t => ({ c: t.c, name: t.name.replace(/^Team /, ""), pct: sp[t.id] + "%", mode: tm[t.id] === "cnt" ? " · max" : tm[t.id] === "even" ? " · evenly" : "" })) : [];
     const hn = heldC.filter(c => c.ad === row.name).length;
     return { ...row, held: hn > 0, heldTxt: hn + " waiting", hasLeg: !!leg.length, leg, tag: row.tag === "Evenly · default" ? "Not set · evenly" : row.tag };
   });

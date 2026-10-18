@@ -39,7 +39,8 @@ export const ICON = {
   hand: "M7 10v10H4V10h3Zm0 0 4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7",
   home: "M4 11 12 4l8 7M6 9.5V20h12V9.5",
   heart: "M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10Z",
-  stk: "M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4",
+  // The 4a frames (M04–M06) draw a smiley where the composer handoff drew a sticker (2026-10-18).
+  stk: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
   kb: "M3 6h18v12H3V6Zm4 3h.01M10 9h.01M13 9h.01M16 9h.01M7 12h.01M10 12h.01M13 12h.01M16 12h.01M8 15h8",
   send: "M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9",
   mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3",
@@ -76,7 +77,8 @@ export const PANEL_H = 280;
 /** The tallest the reply box grows before it scrolls (the handoff: 154px — six lines). */
 export const BOX_MAX = 154;
 /** One line of the reply box: 12px padding, a 22px line, 12px padding. */
-export const BOX_MIN = 46;
+/** The reply box's least height: the 4a frames' 52 px bar (it was the composer handoff's 46). */
+export const BOX_MIN = 52;
 /** What a tap on the mic says (the prototype's toast): it is held to record. */
 export const HOLD_HINT = "Hold to record a voice note";
 

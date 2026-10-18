@@ -117,7 +117,8 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     limit: d4.limit, down: () => edit4({ limit: Math.max(1, d4.limit - 1) }), up: () => edit4({ limit: Math.min(20, d4.limit + 1) }),
     closures: [...d4.weekDays.map(di => ({ when: `Every ${DN[di]}`, sub: "All day · weekly", remove: () => edit4({ weekDays: d4.weekDays.filter(x => x !== di) }) })),
       ...d4.blocks.map((b, i) => ({ when: fd(b.from) + (b.to && b.to !== b.from ? ` – ${fd(b.to)}` : ""), sub: timeTxt(b) + (b.reason ? ` · ${b.reason}` : ""), remove: () => edit4({ blocks: d4.blocks.filter((_, j) => j !== i) }) }))],
-    grid: Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? `${h % 12 || 12} ${h < 12 ? "am" : "pm"}` : "", cells: DI.map(di => {
+    // Every hour named (the owner, 2026-10-18: "时间上是否可以加多一些，找不到8am在哪"; it named every third).
+    grid: Array.from({ length: 24 }, (_, h) => ({ label: `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`, cells: DI.map(di => {
       const ts = d4.times.filter(t => hourOf(t) === h), on = !d4.weekDays.includes(di) && ts.some(t => !d4.off[`${t}|${di}`]);
       return { on, toggle: () => {
         if (on) { const off = { ...d4.off }; ts.forEach(t => { off[`${t}|${di}`] = 1; }); edit4({ off }); return; }
