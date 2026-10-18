@@ -137,7 +137,7 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
   );
 }
 
-const OUT: CSSProperties = { ...BTN, height: "34px", padding: "0 12px", borderRadius: "17px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", fontSize: fs(14), fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" };
+const OUT: CSSProperties = { ...BTN, height: "32px", padding: "0 11px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", fontSize: fs(13), fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" };
 const MAIN: CSSProperties = { ...OUT, border: "1px solid var(--crm-rust)", background: "var(--crm-rust)", color: "#fff" };
 
 /** M10 · the Calendar's title row: "Calendar" and its views (Month · Week · Day — production's three; 4a's segmented look). */
@@ -189,8 +189,8 @@ export function Phone4aCalLists({ v }: { v: {
   upList: (CalItem & { done: boolean; remind: () => void; rLabel: string })[]; cal4: { today: string } } }) {
   const Kick = ({ children }: { children: ReactNode }) => <span style={{ fontSize: fs(12), fontWeight: 500, letterSpacing: "0.12em", color: "var(--crm-faint)", padding: "4px 4px 0" }}>{children}</span>;
   const Card = ({ a, children }: { a: CalItem; children: ReactNode }) => (
-    <div style={{ display: "flex", gap: "16px", padding: "16px 14px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff" }}>
-      <button type="button" onClick={a.open as () => void} style={{ ...BTN, width: "58px", flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+    <div style={{ display: "flex", gap: "12px", padding: "16px 14px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff" }}>
+      <button type="button" onClick={a.open as () => void} style={{ ...BTN, width: "50px", flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
         <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(18), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{a.t}</span>
         <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{a.ap}</span>
       </button>
@@ -199,7 +199,7 @@ export function Phone4aCalLists({ v }: { v: {
           <span style={{ fontSize: fs(17), fontWeight: 500, color: "var(--crm-ink)" }}>{a.name}</span>
           <span style={{ fontSize: fs(14), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
         </button>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>{children}</div>
+        <div style={{ display: "flex", flexWrap: "nowrap", gap: "6px" }}>{children}</div>
       </div>
     </div>
   );
