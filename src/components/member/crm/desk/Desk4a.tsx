@@ -5,7 +5,7 @@
  * by hand from the frames' markup, placed into the generated DeskApp by tools/crm-design/desk-4a.cjs, and bound to
  * vm/frame4a.ts — the same links, counts, menus and permissions the frame had before.
  */
-import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Ic } from "../shared/icons4a";
 import { avatarTint } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
@@ -510,13 +510,11 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
   const main = MAIN_FILTERS.map(l => all.find(s => s.label === l)).filter((s): s is (typeof all)[number] => !!s);
   const rest = all.filter(s => !main.includes(s));
   const moreOn = rest.filter(s => s.value !== "Any").length;
-  // The owner, 2026-10-18: the search bar and the table head stay at the top while the rows scroll under them.
+  // The owner, 2026-10-18: the list sits in a box of its own — its rows scroll inside it under the table head.
   const barRef = useRef<HTMLDivElement>(null);
-  const [barH, setBarH] = useState(64);
-  useLayoutEffect(() => { const el = barRef.current; if (!el) return; const ro = new ResizeObserver(() => setBarH(el.offsetHeight)); ro.observe(el); setBarH(el.offsetHeight); return () => ro.disconnect(); }, []);
   return (
-    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <div ref={barRef} style={{ position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "16px 0 12px", background: "#fff" }}>
+    <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div ref={barRef} style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "16px 0 12px" }}>
         <label style={{ width: "210px", height: "36px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", font: "400 13px Inter, sans-serif", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
           <Ic name="search" size={14} />
           <input value={v.ppQ} onChange={v.setPpQ} placeholder="Search name or phone" aria-label="Search contacts" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", font: "inherit", color: "var(--crm-ink)", padding: 0 }} />
@@ -553,8 +551,8 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
         </div>
       )}
       {v.ppHas && (
-        <div style={{ marginTop: "4px", display: "flex", flexDirection: "column" }}>
-          <div style={{ position: "sticky", top: `${barH}px`, zIndex: 4, display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", minHeight: "34px", padding: "0 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)",
+        <div style={{ flex: "1 1 auto", minHeight: "240px", marginTop: "4px", display: "flex", flexDirection: "column", overflow: "auto", border: "1px solid var(--crm-line)", borderRadius: "10px" }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 4, display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", minHeight: "34px", padding: "0 12px", background: "var(--crm-cream-nav)", borderBottom: "1px solid var(--crm-rule)",
             font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
             <span style={{ position: "relative", whiteSpace: "nowrap" }}>
               {v.ppSortCols0.map((c, i) => <button key={i} type="button" onClick={c.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", display: "inline-flex", gap: "4px" }}>Name <span>{c.arrow === "↕" ? "" : c.arrow}</span></button>)}
@@ -612,7 +610,7 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
           ))}
         </div>
       )}
-      {v.ppPagerOn && <div style={{ marginTop: "14px" }}>{pager}</div>}
+      {v.ppPagerOn && <div style={{ flex: "none", marginTop: "12px" }}>{pager}</div>}
       {v.ppEmpty && (
         <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "48px 20px", borderTop: "1px solid var(--crm-ink)", textAlign: "center" }}>
           <span style={{ font: "500 15px Inter, sans-serif", color: "var(--crm-ink)" }}>No contacts match these filters</span>
