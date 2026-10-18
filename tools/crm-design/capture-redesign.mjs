@@ -122,7 +122,7 @@ try {
   // ── Desktop · the Control panel ──
   const desk = `${base}&device=desktop&role=principal&crmAs=boss`;
   // The CRM's own sidebar (the Revenue app's comes first): wait until it is drawn.
-  await open(desk, 1440, 900, false, "js:document.querySelectorAll('aside').length > 1 && [...document.querySelectorAll('aside')].pop().innerText.includes('Audit log')");
+  await open(desk, Number(process.env.DESK_W ?? 1440), 900, false, "js:document.querySelectorAll('aside').length > 1 && [...document.querySelectorAll('aside')].pop().innerText.includes('Audit log')");
   const pages = [["01-insight", "Insight"], ["02-inbox", "Inbox"], ["04-contacts", "Contacts"], ["06-calendar", "Calendar"], ["07-ads-performance", "Ads Performance"],
     ["08-assignment", "Assignment"], ["09-showrooms", "Showrooms"], ["10-customer-form", "Customer form"], ["11-channels", "Channels"], ["12-settings", "Settings"], ["13-audit-log", "Audit log"]];
   // PAGES=Settings,Audit log takes only those (a full pass takes minutes).

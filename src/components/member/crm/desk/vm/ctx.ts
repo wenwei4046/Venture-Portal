@@ -125,7 +125,8 @@ export interface DeskUi {
   /** 4a Assignment's editor tab (frame 06): Split · Ad performance · Audit log. */
   adTab: "split" | "perf" | "audit";
   /** Inbox's Customer info column folded to its strip (the owner, 2026-10-16; open at first). */
-  ibInfoShut: boolean;
+  /** null = as the width decides (open, unless the chat would fall under 300 px — a 1280 screen). */
+  ibInfoShut: boolean | null;
   meMenu: boolean;
   // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
   attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
@@ -194,7 +195,7 @@ export const initialDeskUi = (): DeskUi => ({
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, adPerfShut: false, adTab: "split", ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: true, cfPv: null,
+  adLog: false, adPerfShut: false, adTab: "split", ibInfoShut: null, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: true, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
