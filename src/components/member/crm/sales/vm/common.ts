@@ -73,6 +73,18 @@ export function isCold(c: CrmCustomer, now: Date): boolean {
   return !!lastReal(c) && windowShut(c, now);
 }
 
+/**
+ * Frame M08's cold card line: "Ahmad last wrote 2 days ago. WhatsApp only lets an approved template open the chat again."
+ * Messenger has no templates here (Meta reviews WhatsApp's only), so its line says the chat opens when they write.
+ */
+export function coldLine(c: CrmCustomer, now: Date): string {
+  const first = c.name.trim().split(/\s+/)[0] || "The customer", at = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
+  const h = at == null ? null : Math.max(1, Math.floor((now.getTime() - at) / 3_600_000));
+  const when = h == null ? "a while ago" : h < 48 ? (h + (h === 1 ? " hour" : " hours") + " ago") : (Math.floor(h / 24) + " days ago");
+  return c.channel === "messenger" ? first + " last wrote " + when + ". Messenger opens the chat again when they write."
+    : first + " last wrote " + when + ". WhatsApp only lets an approved template open the chat again.";
+}
+
 /** Reply urgency, from the one rule (crm.ts: 3 h · 6 h · 9 h on real time). */
 export function urgencyOf(c: CrmCustomer, now: Date) {
   const u = replyUrgency(asLead(c), now);

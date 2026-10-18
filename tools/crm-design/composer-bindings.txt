@@ -6,6 +6,7 @@ blur
 camera
 cancelReply
 chatCold
+coldSub
 delKey
 draft
 emoLabel
@@ -54,6 +55,5 @@ toast
 toggleAttach
 toggleSearch
 toggleSticker
-tplOff
 tplOn
 trashRef

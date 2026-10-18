@@ -166,6 +166,8 @@ export interface ComposerVM {
   openTpl: Click;
   /** Settings › Suggest a template: the cold chat's template button, else the line saying the window is shut. */
   tplOn: boolean; tplOff: boolean;
+  /** Frame M08: the cold card's line — who last wrote when, and what opens the chat again. */
+  coldSub: string;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
   /** Slide to cancel: the hint follows the finger (a transform), red near the line. */
   recSlide: string; recHintC: string;
@@ -188,6 +190,8 @@ export interface ComposerIn {
   openTpl: () => void;
   /** Settings › Suggest a template (on unless Settings turned it off). */
   tplOn?: boolean;
+  /** The cold card's line (common.ts › coldLine). */
+  coldSub?: string;
   reply: { who: string; text: string } | null;
   cancelReply: () => void;
   slash: { q: string; empty: boolean; list: { title: string; text: string; rule: string; pick: () => void }[] } | null;
@@ -269,7 +273,7 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
-    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false, tplOff: v.tplOn === false,
+    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false, tplOff: v.tplOn === false, coldSub: v.coldSub ?? "",
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
     recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "var(--crm-oxblood)" : "var(--crm-muted)",
   };

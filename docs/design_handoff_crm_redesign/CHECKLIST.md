@@ -118,3 +118,7 @@ phone at 430 × 932. CRM + Revenue app tests: 798 passed; type check clean.
 19. "HOD" reads "Revenue Director" on every screen (phone and desktop: Team performance, Send to / people lists, the
     Calendar's people filter, role names). Phone Contacts: a contact with no number keeps a struck-through, untappable
     phone, so every status pill sits in one line.
+20. M08 matched: a cold chat's note is the composer's white card at the foot — the lock, "This chat is cold", "{name} last
+    wrote N hours / days ago. WhatsApp only lets an approved template open the chat again." and Send template message
+    inside it — in Mine's chat and the Team chat; the grey note under the strip is gone. The Team chat's header is Mine's
+    16 / 12. Settings are read only by somebody the CRM places (mig 20261018200000: KRIS, CRM · View outside IR, reads none).

@@ -310,3 +310,5 @@ Kaiyee: `shared/video-fit.ts`, `shared/back.ts`, `shared/viewer.tsx`, `shared/in
 
 **SPLIT LEADS COUNTS THE REVENUE DIRECTOR (2026-10-18; "为什么我调整后，save处于灰色？"):** the phone editor's Save (panel/vm/assign-1011.ts) summed the teams without the director's row (`asv.adTeams` now), so any director share kept it grey; a team's % saved for an earlier line-up opens as an even share; `ae.why` says above Save what is off. Member work type on the phone saves on Save (`ftsDraft`).
 
+**SETTINGS ARE READ ONLY INSIDE THE CRM (2026-10-18; the owner: "Kris不用读"; mig `20261018200000_crm_settings_read_in_crm`, applied after a rolled-back dry run):** `crm_settings_read()` asks `crm_my_role()` (was `crm_me()`), so a login with CRM · View that the CRM does not place — KRIS, Fair's director — reads nothing (the app then keeps the defaults). principal@ and PETER read as before. md5 cfc942be… → d5af5ac5….
+
