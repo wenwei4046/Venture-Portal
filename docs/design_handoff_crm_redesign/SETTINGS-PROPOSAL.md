@@ -1,6 +1,6 @@
 # Settings (frame 10) — proposal to make its rows editable
 
-Status: **proposal only. No migration is written or applied** until the owner says yes.
+Status (2026-10-18): the owner chose three — Reply targets, Suggest a template, Auto-assign ("可以，照这三项做"). Built as mig `20261018100000_crm_settings_editable`, dry-run on production (rolled back); **applied only on the owner's yes.** The rest of this page is the proposal as written.
 
 Today the desktop Settings › General tab draws frame 10's four groups, each row locked, showing what the CRM does now.
 None of these is stored as a setting. They are constants in code (`URGENCY_THRESHOLDS` in `src/lib/member/crm.ts`) or

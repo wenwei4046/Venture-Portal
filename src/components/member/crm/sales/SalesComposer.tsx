@@ -43,7 +43,8 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
       </>)}
       {!!(p.chatCold) && (<>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" }}>
-          <span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-muted)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>
+          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-muted)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}
+          {!!(p.tplOff) && (<span style={{ flex: "1", minHeight: "48px", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>The reply window is shut · the chat opens again when the customer writes</span>)}
         </div>
       </>)}
       {!!(p.isA) && (<>

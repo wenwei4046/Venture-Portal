@@ -1340,30 +1340,77 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
   );
 }
 
-interface SettingsBits { set4: { title: string; sub: string; rows: { t: string; s: string; v: string }[] }[] }
-/** Frame 10 · Settings › General: two columns of groups, each row the frame's locked row (a padlock and the value). */
+type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign";
+interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean }
+interface SettingsBits {
+  set4: { title: string; sub: string; rows: { t: string; s: string; v: string; key?: SetKey }[] }[];
+  settings4: { can: boolean; cur: SetVals; save: (st: SetVals) => Promise<boolean> };
+}
+const HOUR_KEYS: SetKey[] = ["replySoonH", "replyUrgentH", "replyOverdueH"];
+/**
+ * Frame 10 · Settings › General: two columns of groups in the frame's rows. A stored setting (Reply soon · Urgent ·
+ * Overdue, Suggest a template, Auto-assign — mig 20261018100000) is a stepper or a switch for CRM · Manage; the rest keep
+ * the frame's locked row (a padlock and the value). Any change brings up Cancel / Save changes, as Showrooms.
+ */
 export function DeskSettings4a({ v }: { v: SettingsBits }) {
+  const S = v.settings4;
+  const [draft, setDraft] = useState<SetVals | null>(null);
+  const [busy, setBusy] = useState(false);
+  const d = draft ?? S.cur;
+  const dirty = !!draft && (Object.keys(S.cur) as SetKey[]).some(k => draft[k] !== S.cur[k]);
+  const rising = d.replySoonH >= 1 && d.replyUrgentH > d.replySoonH && d.replyOverdueH > d.replyUrgentH && d.replyOverdueH <= 24;
+  const put = (k: SetKey, val: number | boolean) => setDraft({ ...d, [k]: val });
+  const step = (k: SetKey, by: number) => put(k, Math.min(24, Math.max(1, (d[k] as number) + by)));
+  const save = () => { if (!dirty || !rising || busy) return; setBusy(true); void S.save(d).then(ok => { setBusy(false); if (ok) setDraft(null); }); };
+  const round: CSSProperties = { ...BTN, width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: "48px", rowGap: "32px", alignItems: "start" }}>
-      {v.set4.map(g => (
-        <div key={g.title} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingBottom: "10px", borderBottom: "1px solid var(--crm-ink)" }}>
-            <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>{g.title}</span>
-            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{g.sub}</span>
-          </div>
-          {g.rows.map(r => (
-            <div key={r.t} style={{ display: "flex", alignItems: "center", gap: "16px", minHeight: "58px", padding: "8px 0", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)" }}>
-              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{r.t}</span>
-                <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{r.s}</span>
-              </span>
-              <span title="Fixed in the CRM for now" style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
-                <Ic name="lock" size={13} />{r.v}
-              </span>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: "48px", rowGap: "32px", alignItems: "start" }}>
+        {v.set4.map(g => (
+          <div key={g.title} style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingBottom: "10px", borderBottom: "1px solid var(--crm-ink)" }}>
+              <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>{g.title}</span>
+              <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{g.sub}</span>
             </div>
-          ))}
+            {g.rows.map(r => {
+              const k = r.key, edit = !!k && S.can, hours = !!k && HOUR_KEYS.includes(k);
+              return (
+                <div key={r.t} style={{ display: "flex", alignItems: "center", gap: "16px", minHeight: "58px", padding: "8px 0", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+                  <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                    <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{r.t}</span>
+                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{r.s}</span>
+                  </span>
+                  {!edit ? (
+                    <span title={k ? "Only CRM · Manage changes this" : "Fixed in the CRM"} style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+                      <Ic name="lock" size={13} />{r.v}
+                    </span>
+                  ) : hours ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button type="button" onClick={() => step(k!, -1)} aria-label={`${r.t} one hour less`} style={round} className="crm4a-outline"><Ic name="minus" size={13} /></button>
+                      <span style={{ minWidth: "44px", textAlign: "center", font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{d[k!] as number} h{k === "replyOverdueH" ? "+" : ""}</span>
+                      <button type="button" onClick={() => step(k!, 1)} aria-label={`${r.t} one hour more`} style={round} className="crm4a-outline"><Ic name="plus" size={13} /></button>
+                    </span>
+                  ) : (
+                    <button type="button" role="switch" aria-checked={!!d[k!]} aria-label={r.t} onClick={() => put(k!, !d[k!])}
+                      style={{ ...BTN, width: "40px", height: "24px", borderRadius: "12px", position: "relative", background: d[k!] ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .15s" }}>
+                      <span style={{ position: "absolute", top: "3px", left: d[k!] ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left .15s" }} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {dirty && (
+        <div style={{ position: "sticky", bottom: 0, display: "flex", alignItems: "center", gap: "10px", padding: "14px 0", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
+          <span style={{ flex: 1, font: "400 12px Inter, sans-serif", color: rising ? "var(--crm-muted)" : "var(--crm-oxblood)" }}>
+            {rising ? (d.autoAssign ? "Saved for everyone in the CRM." : "Auto-assign off: new leads go to nobody and wait in the Team inbox to be sent by hand.") : "Reply soon, Urgent and Overdue must rise, from 1 to 24 hours."}
+          </span>
+          <button type="button" onClick={() => setDraft(null)} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={save} disabled={!rising || busy} style={{ ...BTN, height: "36px", padding: "0 18px", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "#fff", background: rising ? "var(--crm-rust)" : "var(--crm-line)", cursor: rising && !busy ? "pointer" : "default" }} className={rising ? "crm4a-primary" : undefined}>{busy ? "Saving…" : "Save changes"}</button>
         </div>
-      ))}
+      )}
     </div>
   );
 }
