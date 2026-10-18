@@ -49,7 +49,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     tabs4: [
       { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
       { label: "Full time", on: sec === "Ft", pick: go("Ft") },
-      ...(data.can.manage ? [{ label: "Work type", on: false, pick: () => patch({ tab: "profile", ftsOpen: true }) }] : []),
+      ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
     ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",

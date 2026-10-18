@@ -127,3 +127,8 @@
 @media (prefers-reduced-motion: reduce) {
   .app [data-composer], .app [data-composer] *, .app [data-composer-toast] { animation: none !important; transition: none !important; }
 }
+
+/* 4a (2026-10-18, the owner: "没被拉伸的就白色就好"): the split's sliders — the part reached in the team's colour, the
+   rest white, the thumb a dot in the team's colour (phone-4a.cjs draws the track; --thumb is the team's colour). */
+.app input[data-crm-range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb, var(--crm-rust)); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(42,22,12,.3); cursor: pointer; }
+.app input[data-crm-range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--thumb, var(--crm-rust)); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(42,22,12,.3); cursor: pointer; }

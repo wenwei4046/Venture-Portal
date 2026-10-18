@@ -18,7 +18,7 @@ export function memberWorkTypeVM(ctx: PanelCtx) {
   const { ui, patch, teams } = ctx;
   const all = teams.flatMap(t => t.people), on = all.filter(p => p.fullTime).length;
   return {
-    open: !!ui.ftsOpen && ui.tab === "profile", openPage: () => patch({ ftsOpen: true }), close: () => patch({ ftsOpen: false }),
+    open: !!ui.ftsOpen && (ui.tab === "profile" || ui.tab === "assign"), openPage: () => patch({ ftsOpen: true }), close: () => patch({ ftsOpen: false }),
     sub: on + " of " + all.length + " members full time",
     groups: teams.map(t => ({
       name: t.name, c: t.c, count: t.people.filter(p => p.fullTime).length + " of " + t.people.length + " full time",

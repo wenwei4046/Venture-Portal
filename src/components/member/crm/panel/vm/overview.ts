@@ -60,7 +60,7 @@ export function overviewVM(ctx: PanelCtx) {
     { label: "Reply 24 h", value: pct(all.replied24, all.waits), ...pts(r100(all.replied24, all.waits), r100(P.replied24, P.waits)) },
   ];
   const vsLabel = "vs " + (ui.cmp ? gb(new Date(prevR.a), { day: "numeric", month: "short" }) : ui.period === "month" && !isC ? gb(new Date(prevR.a), { month: "short" }) : "last");
-  const h = now.getHours(), greet = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${me.role === "boss" ? "Principal" : first(me.name)}`;
+  const h = now.getHours(), greet = `Hello, ${me.role === "boss" ? "Principal" : first(me.name)}`; void h; // the owner, 2026-10-18: "改成 hello"
   return {
     hero4, vsLabel, greet,
     ...dateSheetVM(ctx),

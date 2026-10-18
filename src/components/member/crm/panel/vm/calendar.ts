@@ -68,7 +68,7 @@ export function calendarVM(ctx: PanelCtx) {
     cPersonLabel: pp ? nameOf(pp) : "Everyone",
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
     cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-cream)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
-    cViews: [segv("list", "List"), segv("grid", "Calendar")], cIsGrid: view === "grid",
+    cViews: [segv("grid", "Month"), segv("list", "List")], cIsGrid: view === "grid",
     // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
     cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
       open: label === "Show-up" ? undefined : () => patch({ cLs: label === "Leads" ? "leads" as const : label === "Upcoming" ? "up" as const : "came" as const }),

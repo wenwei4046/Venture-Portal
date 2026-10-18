@@ -28,7 +28,7 @@ const SIDES = [
     side: "Team",
     page: mainPage("src/components/member/crm/panel/PanelApp.tsx", "{!!(v.pf.onProfile) && (<>", "</main>"),
     ini: "{v.pf.meIni}", name: "{v.pf.meName}", facts: ["{v.pf.meTitle}", "{v.pf.meAccess}"],
-    banner: "View as a team member", rows: ["Notifications", "Member work type", "Showrooms", "Cold lead templates", "Ads Performance"],
+    banner: "View as a team member", rows: ["Notifications", "Showrooms", "Cold lead templates", "Ads Performance"],
   },
 ] as const;
 

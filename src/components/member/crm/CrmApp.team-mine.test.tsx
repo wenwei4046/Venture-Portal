@@ -41,13 +41,13 @@ const noButtons = () => expect([swapToMine(), swapToTeam(), house(), bell()]).to
 describe("the CRM's three round buttons, on the first page alone", () => {
   it("the Principal: Team's Inbox has two people, the bell, then Contacts — no house; a tap is Mine's Inbox, and back", async () => {
     await open("boss");
-    // 4a (T01): the greeting goes by the time of day.
-    expect(screen.getByRole("heading", { name: /^Good (morning|afternoon|evening), Principal$/ })).toBeInTheDocument();
+    // the owner, 2026-10-18: "Hello", not by the time of day.
+    expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
     onlyHouse();
     await go("Inbox");
     const toMine = swapToMine()!;
     // 4a (M01 / T02): the side one is on, as a pill with its name.
-    expect(toMine.textContent?.trim()).toBe("Team");
+    expect(toMine.getAttribute("title")).toMatch(/^Team/); // 4a + the owner 2026-10-18: the symbol alone
     // 2026-10-16 (the owner: "人像，鈴鐺，contacts（小房子不需要）"): no house on Team's Inbox; the bell beside Team | Mine.
     expect(house()).toBeNull();
     expect(bell()!.previousElementSibling).toBe(toMine);
@@ -57,7 +57,7 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     await tap(toMine);
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     const toTeam = swapToTeam()!;
-    expect(toTeam.textContent?.trim()).toBe("Mine");
+    expect(toTeam.getAttribute("title")).toMatch(/^Mine/);
     expect(house()!.previousElementSibling).toBe(toTeam);
 
     await tap(toTeam);
