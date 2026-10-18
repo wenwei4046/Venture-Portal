@@ -3239,7 +3239,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           </>)}
                         </div>
                       </>)}{!!(m.appt) && (<>
-                      <div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", maxWidth: "78%", padding: "10px 14px 8px", boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", background: "var(--crm-rust)", border: "1px solid var(--crm-rust)", color: "#FFFFFF", display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", maxWidth: "78%", padding: "10px 14px 8px", boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", background: "var(--crm-rust)", border: "1px solid var(--crm-rust)", color: "#fff", display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "2px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--crm-rust-meta)" }}>Showroom visit · {m.appt.kind}</div>
                           <div style={{ font: "500 16px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontVariantNumeric: "tabular-nums", textDecoration: m.appt.deco }}>{m.appt.dow} {m.appt.day} {m.appt.mon} · {m.appt.time}</div>

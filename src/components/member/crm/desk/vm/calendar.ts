@@ -37,7 +37,7 @@ export function calendarVM(ctx: DeskCtx) {
   // 4a's visit blocks (change list 14): Came filled ink, Booked amber on its tint, No-show a dashed outline — told apart in greyscale.
   const lookOf = (s: VisitRow["status"]) => s === "No show" ? { bg: "transparent", fg: "var(--crm-faint)", bd: "var(--crm-faint)", bs: "dashed" }
     : s === "Booked" || s === "To mark" ? { bg: "var(--crm-tint-appt)", fg: "var(--crm-ink)", bd: "var(--crm-amber-line)", bs: "solid" }
-      : { bg: "var(--crm-ink)", fg: "#FFFFFF", bd: "var(--crm-ink)", bs: "solid" };
+      : { bg: "var(--crm-ink)", fg: "#fff", bd: "var(--crm-ink)", bs: "solid" };
   const item = (v: VisitRow) => { const st = ST[v.status] ?? ST.Booked, [ink, tint] = teamColour(v.team);
     return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, room: v.room, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint, look: lookOf(v.status),
       hour: v.at.getHours() + v.at.getMinutes() / 60, mins: v.v.minutes || 60,

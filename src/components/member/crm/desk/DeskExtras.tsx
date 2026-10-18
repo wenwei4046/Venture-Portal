@@ -453,7 +453,7 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
   }
   const ICO = (d: string) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
   const cell = (on: boolean) => ({ ...BTN, minWidth: "30px", height: "30px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums",
-    background: on ? "var(--crm-ink)" : "transparent", color: on ? "#FFFFFF" : "var(--crm-ink-soft)" } as const);
+    background: on ? "var(--crm-ink)" : "transparent", color: on ? "#fff" : "var(--crm-ink-soft)" } as const);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{v.range}</span>

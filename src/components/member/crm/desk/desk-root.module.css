@@ -18,7 +18,7 @@
 /* The reply box's hint: the design draws it as text in var(--crm-muted) — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
 .root.root.root ::placeholder { color: var(--crm-muted); opacity: 1; }
 
-/* 4a's states (2026-10-18, docs/design_handoff_crm_redesign › README › Interactions): a row under the pointer #FBF7F3,
+/* 4a's states (2026-10-18, docs/design_handoff_crm_redesign › README › Interactions): a row under the pointer in pale cream,
    an outline button tinted with the nav's cream, a primary button pressed darker, and the keyboard's focus ring in rust.
    Desk4a.tsx marks its parts with these classes; !important — inline styles and the reset above would win otherwise. */
 .root.root.root :global(.crm4a-row):hover, .root.root.root :global(.crm4a-metric):hover { background: var(--crm-hover) !important; }

@@ -34,7 +34,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
     <aside data-rev-side="" style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "240px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "2px",
       padding: "22px 12px 18px", background: "var(--crm-ink)", zIndex: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 10px 20px" }}>
-        <div style={{ width: "30px", height: "30px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", font: `600 14px ${TIGHT}`, background: "var(--crm-orange)", color: "#FFFFFF" }}>H</div>
+        <div style={{ width: "30px", height: "30px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", font: `600 14px ${TIGHT}`, background: "var(--crm-orange)", color: "#fff" }}>H</div>
         <div style={{ font: `600 15px ${TIGHT}`, letterSpacing: "0.14em", color: "var(--crm-on-light)" }}>HOUZS</div>
       </div>
       {f.revNav.map(n => <RevRow key={n.label} label={n.label} on={n.on} pick={n.pick} badge={n.badge}><Ic name={n.icon} size={17} /></RevRow>)}
@@ -47,7 +47,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
         {f.modules && (<>
           {mods && (<>
             <div onClick={() => setMods(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-            <div role="menu" aria-label="Switch module" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 8px)", zIndex: 8, padding: "6px", background: "#FFFFFF",
+            <div role="menu" aria-label="Switch module" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 8px)", zIndex: 8, padding: "6px", background: "#fff",
               borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
               <span style={{ padding: "6px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>SWITCH MODULE</span>
               {MODULE_ROWS.map(([id, label]) => { const on = id === f.modules!.current;
@@ -64,7 +64,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
         </>)}
         {v.meMenuOpen && (<>
           <div onClick={v.closeMeMenu} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 4px)", zIndex: 8, padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 4px)", zIndex: 8, padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
             <button type="button" onClick={v.signOutMe} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 8px", borderRadius: "7px",
               font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}><Ic name="x" size={15} />Sign out</button>
           </div>
@@ -102,7 +102,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             <span style={{ position: "absolute", left: "-12px", top: "9px", bottom: "9px", width: "2px", background: n.on ? "var(--crm-orange)" : "transparent" }} />
             <Ic name={n.icon} size={16} /><span>{n.label}</span>
             {n.badge && <span style={{ marginLeft: "auto", minWidth: "20px", height: "18px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center",
-              justifyContent: "center", font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#FFFFFF" }}>{n.badge}</span>}
+              justifyContent: "center", font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#fff" }}>{n.badge}</span>}
           </button>
         ))}
       </div>))}
@@ -115,10 +115,10 @@ export function Desk4aSide({ v }: { v: SideBits }) {
 function RevRow({ label, on, pick, badge, children }: { label: string; on: boolean; pick: () => void; badge: string; children: ReactNode }) {
   return (
     <button type="button" onClick={pick} aria-current={on ? "page" : undefined} style={{ ...BTN, flex: "none", display: "flex", alignItems: "center", gap: "12px", height: "38px", padding: "0 10px",
-      borderRadius: "7px", font: "500 14px Inter, sans-serif", background: on ? "var(--crm-rust)" : "transparent", color: on ? "#FFFFFF" : "var(--crm-sidebar-text)" }}>
+      borderRadius: "7px", font: "500 14px Inter, sans-serif", background: on ? "var(--crm-rust)" : "transparent", color: on ? "#fff" : "var(--crm-sidebar-text)" }}>
       {children}<span>{label}</span>
       {badge && <span style={{ marginLeft: "auto", minWidth: "20px", height: "18px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center",
-        justifyContent: "center", font: `600 10px ${TIGHT}`, background: on ? "rgba(255,255,255,.22)" : "var(--crm-rust)", color: "#FFFFFF" }}>{badge}</span>}
+        justifyContent: "center", font: `600 10px ${TIGHT}`, background: on ? "rgba(255,255,255,.22)" : "var(--crm-rust)", color: "#fff" }}>{badge}</span>}
     </button>
   );
 }
@@ -168,12 +168,12 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
         {h.cta && (
           <span style={{ position: "relative" }}>
             <button type="button" onClick={h.cta.act} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
-              font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", background: "var(--crm-rust)", color: "#FFFFFF" }} className="crm4a-primary">
+              font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">
               <Ic name={h.cta.icon} size={15} />{h.cta.label}
             </button>
             {f4.bookPick.open && h.cta.label === "Book a visit" && (<>
               <div onClick={f4.bookPick.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-              <div style={{ position: "absolute", top: "42px", right: 0, zIndex: 8, width: "300px", maxHeight: "420px", display: "flex", flexDirection: "column", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: "42px", right: 0, zIndex: 8, width: "300px", maxHeight: "420px", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", overflow: "hidden" }}>
                 <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>Book a visit for</div>
                   <label style={{ height: "34px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
@@ -305,7 +305,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
             </button>
             {v.whoOpen && (<>
               <div onClick={v.toggleWho} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-              <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "260px", maxHeight: "440px", overflow: "auto", padding: "6px", background: "#FFFFFF", borderRadius: "10px",
+              <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "260px", maxHeight: "440px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px",
                 boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
                 <span style={{ padding: "6px 8px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>SHOW THE INBOX OF</span>
                 {v.whoOpts.map((w, i) => w.head
@@ -319,9 +319,9 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
                       <span style={{ fontVariantNumeric: "tabular-nums", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{w.n ?? ""}</span>
                       <span style={{ width: "16px", display: "flex", color: "var(--crm-rust)" }}>{w.sel && <Ic name="check" size={14} />}</span>
                     </button>)}
-                <div style={{ position: "sticky", bottom: "-6px", display: "flex", gap: "8px", margin: "6px -6px -6px", padding: "8px", background: "#FFFFFF", borderTop: "1px solid var(--crm-rule-soft)" }}>
+                <div style={{ position: "sticky", bottom: "-6px", display: "flex", gap: "8px", margin: "6px -6px -6px", padding: "8px", background: "#fff", borderTop: "1px solid var(--crm-rule-soft)" }}>
                   <button type="button" onClick={v.whoClear} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Clear</button>
-                  <button type="button" onClick={v.toggleWho} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#FFFFFF" }} className="crm4a-primary">Done</button>
+                  <button type="button" onClick={v.toggleWho} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">Done</button>
                 </div>
               </div>
             </>)}
@@ -361,7 +361,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
               <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ flex: 1, minWidth: 0, font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.msg}</span>
                 {r.unread && <span style={{ minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center",
-                  font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#FFFFFF" }}>{r.unread}</span>}
+                  font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#fff" }}>{r.unread}</span>}
                 {r.dot && <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-rust)" }} />}
               </span>
               {(r.note || r.owner) && (
@@ -425,7 +425,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
               </div>
             ))}
             <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button type="button" onClick={v.ibBook} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#FFFFFF" }} className="crm4a-primary">Book a visit</button>
+              <button type="button" onClick={v.ibBook} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">Book a visit</button>
               <button type="button" onClick={v.editInfo} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Edit customer info</button>
             </div>
           </>)}
@@ -444,7 +444,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
           {v.ibHas && v.ibCp.audit4.map((a, i) => (
             <div key={i} style={{ display: "flex", gap: "12px" }}>
               <div style={{ width: "10px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <span style={{ width: "9px", height: "9px", marginTop: "4px", borderRadius: "50%", boxSizing: "border-box", background: a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "#FFFFFF",
+                <span style={{ width: "9px", height: "9px", marginTop: "4px", borderRadius: "50%", boxSizing: "border-box", background: a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "#fff",
                   border: `2px solid ${a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "var(--crm-faint)"}` }} />
                 {i < v.ibCp.audit4.length - 1 && <span style={{ flex: 1, width: "1px", background: "var(--crm-audit-line)" }} />}
               </div>
@@ -489,7 +489,7 @@ function FilterButton({ f, label }: { f: PpSel; label?: string }) {
       </button>
       {f.open && (<>
         <div onClick={f.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, minWidth: "200px", maxHeight: "300px", overflow: "auto", padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
+        <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, minWidth: "200px", maxHeight: "300px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
           {f.opts.map(o => (
             <button key={o.v} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", borderRadius: "7px", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`,
               background: o.on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">
@@ -526,13 +526,13 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
             </button>
             {more && (<>
               <div onClick={() => setMore(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-              <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "340px", maxHeight: "420px", overflow: "auto", padding: "10px 12px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "340px", maxHeight: "420px", overflow: "auto", padding: "10px 12px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "12px" }}>
                 {rest.map(f => (
                   <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{f.group} · {f.label}</span>
                     <span style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                       {f.opts.map(o => <button key={o.v} type="button" onClick={o.pick} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "14px", font: "500 12px Inter, sans-serif",
-                        background: o.on ? "var(--crm-rust)" : "var(--crm-field)", color: o.on ? "#FFFFFF" : "var(--crm-ink-soft)" }}>{o.v}<span style={{ marginLeft: "5px", opacity: 0.7 }}>{o.n}</span></button>)}
+                        background: o.on ? "var(--crm-rust)" : "var(--crm-field)", color: o.on ? "#fff" : "var(--crm-ink-soft)" }}>{o.v}<span style={{ marginLeft: "5px", opacity: 0.7 }}>{o.n}</span></button>)}
                     </span>
                   </div>
                 ))}
@@ -569,7 +569,7 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
               </button>
               {v.ppAddOpen && (<>
                 <div onClick={v.ppAddClose} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-                <div style={{ position: "absolute", top: "32px", right: 0, zIndex: 8, width: "240px", maxHeight: "420px", overflow: "auto", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", textTransform: "none", letterSpacing: 0 }}>
+                <div style={{ position: "absolute", top: "32px", right: 0, zIndex: 8, width: "240px", maxHeight: "420px", overflow: "auto", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", textTransform: "none", letterSpacing: 0 }}>
                   <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
                     <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>Add columns</div>
                     <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Any field from the Customer form</div>
@@ -577,7 +577,7 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
                   <div style={{ padding: "6px" }}>
                     {v.ppAddOpts.map(o => { const on = o.chk !== "transparent";
                       return <button key={o.label} type="button" onClick={o.toggle} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 8px", borderRadius: "7px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-row">
-                        <span style={{ width: "16px", height: "16px", borderRadius: "4px", boxSizing: "border-box", display: "grid", placeItems: "center", border: `1.5px solid ${on ? "var(--crm-rust)" : "var(--crm-faint-2)"}`, background: on ? "var(--crm-rust)" : "transparent", color: "#FFFFFF" }}>{on && <Ic name="check" size={11} sw={3} />}</span>
+                        <span style={{ width: "16px", height: "16px", borderRadius: "4px", boxSizing: "border-box", display: "grid", placeItems: "center", border: `1.5px solid ${on ? "var(--crm-rust)" : "var(--crm-faint-2)"}`, background: on ? "var(--crm-rust)" : "transparent", color: "#fff" }}>{on && <Ic name="check" size={11} sw={3} />}</span>
                         <span style={{ flex: 1 }}>{o.label}</span><span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>{o.grp}</span>
                       </button>; })}
                   </div>
@@ -660,7 +660,7 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
             </button>
             {byOpen && (<>
               <div onClick={() => setByOpen(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-              <div style={{ position: "absolute", top: "24px", right: 0, zIndex: 8, minWidth: "180px", padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+              <div style={{ position: "absolute", top: "24px", right: 0, zIndex: 8, minWidth: "180px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
                 {c.bys.map(b => <button key={b.label} type="button" onClick={() => { b.pick(); setByOpen(false); }} style={{ ...BTN, height: "32px", padding: "0 10px", borderRadius: "7px", font: `${b.on ? 500 : 400} 13px Inter, sans-serif`,
                   background: b.on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">{b.label}</button>)}
               </div>
@@ -670,7 +670,7 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
           <div style={{ width: "112px", height: "112px", flex: "none", borderRadius: "50%", position: "relative", background: donut }}>
-            <div style={{ position: "absolute", inset: "18px", borderRadius: "50%", background: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", inset: "18px", borderRadius: "50%", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
               <div style={{ font: `500 20px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{total.toLocaleString("en-MY")}</div>
               <div style={{ font: "400 10px Inter, sans-serif", color: "var(--crm-faint)" }}>customers</div>
             </div>
@@ -716,14 +716,14 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
               <div style={KICK}>Latest messages</div>
               {s.msgs.map((m, i) => <span key={i} style={{ alignSelf: m.mine ? "flex-end" : "flex-start", maxWidth: "92%", padding: "6px 10px", borderRadius: m.mine ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                background: m.mine ? "var(--crm-rust)" : "var(--crm-field)", color: m.mine ? "#FFFFFF" : "var(--crm-ink)", font: "400 12px Inter, sans-serif" }}>
+                background: m.mine ? "var(--crm-rust)" : "var(--crm-field)", color: m.mine ? "#fff" : "var(--crm-ink)", font: "400 12px Inter, sans-serif" }}>
                 <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.text}</span>
                 <small style={{ display: "block", textAlign: "right", fontSize: "10px", opacity: 0.75 }}>{m.at}</small></span>)}
             </div>
           )}
         </div>
         <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <button type="button" onClick={s.openChat} style={{ ...BTN, height: "38px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#FFFFFF" }} className="crm4a-primary"><Ic name="message-circle" size={15} />Open chat</button>
+          <button type="button" onClick={s.openChat} style={{ ...BTN, height: "38px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary"><Ic name="message-circle" size={15} />Open chat</button>
           <button type="button" onClick={s.edit} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Customer info</button>
         </div>
       </>)}
@@ -815,7 +815,7 @@ export function DeskCalFigures4a({ v }: { v: CalBits }) {
           </div>
           <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{u.room} · {u.owner}</div>
           <button type="button" onClick={u.remind} style={{ ...BTN, alignSelf: "flex-start", height: "30px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif",
-            background: u.sent ? "transparent" : "var(--crm-rust)", color: u.sent ? "var(--crm-ink)" : "#FFFFFF", border: `1px solid ${u.sent ? "var(--crm-line)" : "var(--crm-rust)"}` }} className={u.sent ? "crm4a-outline" : "crm4a-primary"}>
+            background: u.sent ? "transparent" : "var(--crm-rust)", color: u.sent ? "var(--crm-ink)" : "#fff", border: `1px solid ${u.sent ? "var(--crm-line)" : "var(--crm-rust)"}` }} className={u.sent ? "crm4a-outline" : "crm4a-primary"}>
             {u.sent ? "Reminder sent · Send again" : "Send reminder"}
           </button>
         </div>
@@ -839,7 +839,7 @@ interface CalPageBits {
   upDays: { label: string; visits: CalVisit[] }[];
 }
 const TOOL: CSSProperties = { ...BTN, height: "32px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" };
-const POP: CSSProperties = { position: "absolute", top: "38px", left: 0, zIndex: 8, minWidth: "220px", maxHeight: "360px", overflow: "auto", padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" };
+const POP: CSSProperties = { position: "absolute", top: "38px", left: 0, zIndex: 8, minWidth: "220px", maxHeight: "360px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" };
 
 function Pop({ label, open, onToggle, children }: { label: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
   return (
@@ -911,7 +911,7 @@ export function DeskCalendar4a({ v }: { v: CalPageBits }) {
           {v.week4.days.map(d => (
             <div key={d.dow} style={{ flex: 1, minWidth: 0, height: "44px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", font: "500 12px Inter, sans-serif", borderLeft: "1px solid var(--crm-rule-soft)", color: d.today ? "var(--crm-ink)" : "var(--crm-muted)" }}>
               {d.dow}<span style={{ minWidth: "26px", height: "26px", borderRadius: "13px", display: "flex", alignItems: "center", justifyContent: "center", font: `500 14px ${TIGHT}`, fontVariantNumeric: "tabular-nums",
-                background: d.today ? "var(--crm-rust)" : "transparent", color: d.today ? "#FFFFFF" : "var(--crm-ink)" }}>{d.num}</span>
+                background: d.today ? "var(--crm-rust)" : "transparent", color: d.today ? "#fff" : "var(--crm-ink)" }}>{d.num}</span>
             </div>
           ))}
         </div>
@@ -1061,7 +1061,7 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.stCur.color }} />{v.stCur.label}<Ic name="chevron-down" size={11} /></button>
           {v.stOpen && (<>
             <div onClick={v.toggleSt} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-            <div style={{ position: "absolute", top: "22px", left: 0, zIndex: 8, width: "260px", padding: "6px", background: "#FFFFFF", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+            <div style={{ position: "absolute", top: "22px", left: 0, zIndex: 8, width: "260px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
               {v.stOpts.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "36px", padding: "4px 8px", borderRadius: "7px", color: "var(--crm-ink)" }} className="crm4a-row">
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.color }} />
                 <span style={{ flex: 1, display: "flex", flexDirection: "column" }}><span style={{ font: "500 13px Inter, sans-serif" }}>{o.label}</span>{o.hint && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{o.hint}</span>}</span>
@@ -1094,7 +1094,7 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
           </span>
           <span style={{ display: "flex", justifyContent: "flex-end" }}>
             <button type="button" onClick={e => { e.stopPropagation(); r.open(); }} style={{ ...BTN, height: "30px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", lineHeight: 1.1, textAlign: "center",
-              ...(!r.set ? { background: "var(--crm-rust)", color: "#FFFFFF" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }} className={!r.set ? "crm4a-primary" : "crm4a-outline"}>{!r.set ? "Set up" : "Edit split"}</button>
+              ...(!r.set ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }} className={!r.set ? "crm4a-primary" : "crm4a-outline"}>{!r.set ? "Set up" : "Edit split"}</button>
           </span>
         </div>
       ))}
@@ -1130,7 +1130,7 @@ interface RoomsBits {
   srE: { manual: boolean; linkFields: { ch: string; ph: string; v: string; set: (e: { target: { value: string } }) => void }[]; photo: string; noPhoto: boolean };
   srSetPhoto: (e: { target: { files: FileList | null } }) => void; srRemovePhoto: () => void;
 }
-const FIELD: CSSProperties = { height: "32px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "6px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)", background: "#FFFFFF" };
+const FIELD: CSSProperties = { height: "32px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "6px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)", background: "#fff" };
 
 /** Frame 07 · Showrooms: one at a time — its name and address typed in place, the map links, visits per slot, closures — and the weekly slots, 24 × 7. */
 export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
@@ -1140,7 +1140,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
   if (!S.has) return (
     <div style={{ padding: "60px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
       <div style={{ font: "500 15px Inter, sans-serif", color: "var(--crm-ink)" }}>No showroom yet</div>
-      <button type="button" onClick={S.add} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: "var(--crm-rust)", color: "#FFFFFF", font: "500 13px Inter, sans-serif" }} className="crm4a-primary">Add a showroom</button>
+      <button type="button" onClick={S.add} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: "var(--crm-rust)", color: "#fff", font: "500 13px Inter, sans-serif" }} className="crm4a-primary">Add a showroom</button>
     </div>
   );
   return (
@@ -1150,7 +1150,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           <button type="button" onClick={S.pager.prev} disabled={S.pager.prevOff} title="Previous showroom" style={round(S.pager.prevOff)}><Ic name="chevron-left" size={14} /></button>
           <span style={{ font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{S.pager.at} / {S.pager.n}</span>
           <button type="button" onClick={S.pager.next} disabled={S.pager.nextOff} title="Next showroom" style={round(S.pager.nextOff)}><Ic name="chevron-right" size={14} /></button>
-          <button type="button" onClick={S.add} title="Add showroom" aria-label="Add showroom" style={{ ...BTN, marginLeft: "auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#FFFFFF" }} className="crm4a-primary"><Ic name="plus" size={16} /></button>
+          <button type="button" onClick={S.add} title="Add showroom" aria-label="Add showroom" style={{ ...BTN, marginLeft: "auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary"><Ic name="plus" size={16} /></button>
         </div>
         <input value={S.name} onChange={S.setName} placeholder="Showroom name" aria-label="Showroom name" style={{ marginTop: "20px", width: "100%", border: 0, outline: "none", padding: 0, background: "transparent",
           font: `500 26px ${TIGHT}`, letterSpacing: "-0.02em", color: "var(--crm-ink)" }} />
@@ -1164,10 +1164,10 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
         </div>
         {more && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px", padding: "12px", borderRadius: "10px", background: "var(--crm-field)" }}>
-            <div style={{ display: "flex", gap: "6px" }}>{v.srLinkModes.map(m => <button key={m.label} type="button" onClick={() => { if (!S.dirty) S.setName({ target: { value: S.name } }); m.pick(); }} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", background: m.fg === "var(--crm-ink)" ? "#FFFFFF" : "transparent", color: m.fg }}>{m.label}</button>)}</div>
+            <div style={{ display: "flex", gap: "6px" }}>{v.srLinkModes.map(m => <button key={m.label} type="button" onClick={() => { if (!S.dirty) S.setName({ target: { value: S.name } }); m.pick(); }} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", background: m.fg === "var(--crm-ink)" ? "#fff" : "transparent", color: m.fg }}>{m.label}</button>)}</div>
             {S.dirty && v.srE.manual && v.srE.linkFields.map(f => <input key={f.ch} value={f.v} onChange={f.set} placeholder={f.ph} aria-label={f.ch === "G" ? "Google Maps link" : "Waze link"} style={{ ...FIELD, width: "100%" }} />)}
             {S.dirty && (v.srE.noPhoto
-              ? <label style={{ ...BTN, alignSelf: "flex-start", height: "30px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", background: "#FFFFFF", color: "var(--crm-ink)" }}>
+              ? <label style={{ ...BTN, alignSelf: "flex-start", height: "30px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
                   <Ic name="image" size={13} />Add a photo<input type="file" accept="image/*" onChange={v.srSetPhoto} style={{ display: "none" }} /></label>
               : <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={v.srE.photo} alt="" style={{ width: "56px", height: "40px", objectFit: "cover", borderRadius: "6px" }} />
                   <button type="button" onClick={v.srRemovePhoto} style={{ ...BTN, font: "500 12px Inter, sans-serif", color: "var(--crm-oxblood)" }}>Remove photo</button></div>)}
@@ -1195,7 +1195,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
             <div style={{ display: "flex", gap: "8px", alignItems: "center", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>
               <input type="date" value={v.srBlk.from} onChange={v.srBlkFrom} aria-label="From" style={{ ...FIELD, flex: 1 }} />–<input type="date" value={v.srBlk.to} onChange={v.srBlkTo} aria-label="To" style={{ ...FIELD, flex: 1 }} />
             </div>
-            <div style={{ display: "flex", gap: "6px" }}>{v.srTimeModes.map(m => <button key={m.label} type="button" onClick={m.pick} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", background: m.fg === "var(--crm-ink)" ? "#FFFFFF" : "transparent", color: m.fg }}>{m.label}</button>)}</div>
+            <div style={{ display: "flex", gap: "6px" }}>{v.srTimeModes.map(m => <button key={m.label} type="button" onClick={m.pick} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", background: m.fg === "var(--crm-ink)" ? "#fff" : "transparent", color: m.fg }}>{m.label}</button>)}</div>
             {v.srPickTime && v.srRanges.map((r, i) => (
               <div key={i} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                 <select value={r.f} onChange={r.setF} aria-label="From time" style={{ ...FIELD, flex: 1 }}>{r.fromHours.map(h => <option key={h.v}>{h.v}</option>)}</select>–
@@ -1206,7 +1206,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
             {v.srPickTime && <button type="button" onClick={v.srAddRange} style={{ ...BTN, alignSelf: "flex-start", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>+ Add a time</button>}
             <input value={v.srBlk.reason} onChange={v.srBlkReason} placeholder="Reason (optional)" style={{ ...FIELD, width: "100%" }} />
             <button type="button" onClick={v.srDtAdd} disabled={v.srDtNoAdd} style={{ ...BTN, alignSelf: "flex-start", height: "30px", padding: "0 14px", borderRadius: "6px", font: "500 12px Inter, sans-serif",
-              background: v.srDtNoAdd ? "var(--crm-line)" : "var(--crm-rust)", color: "#FFFFFF" }}>Add closure</button>
+              background: v.srDtNoAdd ? "var(--crm-line)" : "var(--crm-rust)", color: "#fff" }}>Add closure</button>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px", borderTop: "1px solid var(--crm-line)" }}>
               <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Closed every week on</span>
               <div style={{ display: "flex", gap: "4px" }}>{v.srBlkDays.map(dd => <button key={dd.l} type="button" onClick={dd.toggle} style={{ ...BTN, flex: 1, height: "28px", borderRadius: "6px", textAlign: "center", font: "500 11px Inter, sans-serif", background: dd.bg, color: dd.fg, border: "1px solid var(--crm-line)" }}>{dd.l}</button>)}</div>
@@ -1269,7 +1269,7 @@ function ChannelRow({ r, wa }: { r: ChRow; wa: boolean }) {
         <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: r.linked ? "var(--crm-brown)" : "var(--crm-faint-2)" }} />{r.linked ? "Connected" : "Not linked"}
       </span>
       <button type="button" onClick={r.act} style={{ ...BTN, height: "28px", padding: "0 12px", borderRadius: "6px", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap",
-        ...(r.linked ? { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" } : { background: "var(--crm-rust)", color: "#FFFFFF" }) }} className={r.linked ? "crm4a-outline" : "crm4a-primary"}>{r.actLabel}</button>
+        ...(r.linked ? { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" } : { background: "var(--crm-rust)", color: "#fff" }) }} className={r.linked ? "crm4a-outline" : "crm4a-primary"}>{r.actLabel}</button>
     </div>
   );
 }
@@ -1290,12 +1290,12 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
         {C4.cards.map(c => (
           <Card key={c.number} head={
             <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", background: "var(--crm-cream)" }}>
-              <span style={{ width: "36px", height: "36px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-ink)", color: "#FFFFFF" }}><Ic name="phone" size={16} /></span>
+              <span style={{ width: "36px", height: "36px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-ink)", color: "#fff" }}><Ic name="phone" size={16} /></span>
               <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
                 <span style={{ font: `500 18px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{c.number}</span>
                 <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{c.label} · {c.route}</span>
               </span>
-              <button type="button" onClick={c.edit} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", background: "#FFFFFF", color: "var(--crm-ink)" }} className="crm4a-outline">Edit</button>
+              <button type="button" onClick={c.edit} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }} className="crm4a-outline">Edit</button>
             </div>}>
             <ChannelRow r={c.wa} wa />
             <ChannelRow r={c.page} wa={false} />
@@ -1303,7 +1303,7 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
         ))}
         {C4.loose.length > 0 && (
           <Card head={<div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", background: "var(--crm-cream)" }}>
-            <span style={{ width: "36px", height: "36px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-faint-2)", color: "#FFFFFF" }}><Ic name="message-circle" size={16} /></span>
+            <span style={{ width: "36px", height: "36px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-faint-2)", color: "#fff" }}><Ic name="message-circle" size={16} /></span>
             <span style={{ display: "flex", flexDirection: "column" }}><span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>No number</span>
               <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Pages whose listed phone is none of these numbers</span></span></div>}>
             {C4.loose.map(p => <ChannelRow key={p.id} r={p} wa={false} />)}
@@ -1374,12 +1374,12 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
   const A = v.au4;
   const Menu = ({ k, label, opts }: { k: "who" | "area" | "per"; label: string; opts: AuOpt[] }) => (
     <span style={{ position: "relative" }}>
-      <button type="button" onClick={() => A.toggle(k)} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--crm-line)", background: "#FFFFFF", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }} className="crm4a-outline">
+      <button type="button" onClick={() => A.toggle(k)} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }} className="crm4a-outline">
         {label}<Ic name="chevron-down" size={14} />
       </button>
       {A.open === k && (<>
         <span onClick={A.close} style={{ position: "fixed", inset: 0, zIndex: 7 }} />
-        <span style={{ position: "absolute", top: "40px", left: 0, zIndex: 8, minWidth: "180px", maxHeight: "320px", overflowY: "auto", padding: "4px", background: "#FFFFFF", border: "1px solid var(--crm-line)", borderRadius: "10px", boxShadow: "var(--crm-shadow-pop, 0 10px 30px rgba(42,22,12,.14))", display: "flex", flexDirection: "column" }}>
+        <span style={{ position: "absolute", top: "40px", left: 0, zIndex: 8, minWidth: "180px", maxHeight: "320px", overflowY: "auto", padding: "4px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "10px", boxShadow: "var(--crm-shadow-pop, 0 10px 30px rgba(42,22,12,.14))", display: "flex", flexDirection: "column" }}>
           {opts.map(o => (
             <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", borderRadius: "6px", font: `${o.on ? 600 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: o.on ? "var(--crm-cream-nav)" : "transparent", whiteSpace: "nowrap" }} className="crm4a-row">
               <span style={{ flex: 1 }}>{o.label}</span>{o.on && <Ic name="check" size={14} />}
