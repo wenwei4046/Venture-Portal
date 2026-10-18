@@ -208,7 +208,13 @@ export function channelsVM(ctx: DeskCtx) {
       const pageRow = (p: (typeof pages)[number]) => ({ id: p.id, title: `Facebook · ${p.name}`, sub: `Messenger · Page ${p.id.length > 8 ? `${p.id.slice(0, 4)}…${p.id.slice(-4)}` : p.id}`, linked: p.on,
         act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link" });
       const cards = nums.map(n => {
-        const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number)); if (pg) used.add(pg.id);
+        // The Page whose listed phone is this number, else (it lists none, or another) the Page named as the number's
+        // verified business (the owner, 2026-10-18: "channel 一直保持这样" — Dream Crafter Design's Page lists no number,
+        // so it sat under No number beside its own WhatsApp).
+        const nm = (x: string) => x.trim().toLowerCase();
+        const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number))
+          ?? (n.verifiedName ? pages.find(p => !used.has(p.id) && nm(p.name) === nm(n.verifiedName!)) : undefined);
+        if (pg) used.add(pg.id);
         return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chTab: "wa" }),
           wa: { title: "WhatsApp Business", sub: `${n.verifiedName ? "Verified · " : ""}message quality ${qualityWords(n.quality)}`, linked: n.on,
             act: n.on ? () => patch({ chTab: "wa" }) : () => setLink("wa", n.id, n.number, true, false, `${n.number} linked · its chats come into Inbox`), actLabel: n.on ? "Manage" : "Link" },
