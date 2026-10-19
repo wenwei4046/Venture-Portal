@@ -126,7 +126,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: "600", color: "var(--crm-brown)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01">
                             </path>
-                          </svg>Not assigned yet · dealt evenly across teams</span>
+                          </svg>Not assigned yet · goes to the Revenue Director</span>
                       </>)}
                       <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: "8px", paddingTop: "12px", borderTop: "1px solid var(--crm-field)" }}>
                         <span style={{ flex: "1", fontSize: "13px", color: "var(--crm-muted)" }}>{c.mode}</span>

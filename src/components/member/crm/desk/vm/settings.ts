@@ -160,7 +160,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   for (const c of data.customers.filter(x => !x.assignedTo && !x.teamId && !x.held)) list0.push({ key: `a${c.id}`, at: c.createdAt, type: "To assign", who: c.name, rest: "is a new organic lead waiting to be assigned", sub: `${c.ad} · ${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"}`, cust: c.id });
   const adIds = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))].filter(a => !data.adRules.some(r => r.adId === a));
   for (const a of adIds) { const cs = data.customers.filter(c => c.adId === a).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
-    list0.push({ key: `ad${a}`, at: cs[0].createdAt, type: "To assign", who: cs[0].ad, rest: "is a new ad with no team split yet", sub: `${cs.length} leads so far · they go evenly to every team`, cust: null, adId: a }); }
+    list0.push({ key: `ad${a}`, at: cs[0].createdAt, type: "To assign", who: cs[0].ad, rest: "is a new ad with no team split yet", sub: `${cs.length} leads so far · they go to the Revenue Director`, cust: null, adId: a }); }
   const deleted = new Set(data.notifDeleted ?? []);
   const NL = list0.filter(n => !deleted.has(n.key) && !(ui.undo?.kind === "delete" && ui.undo.ids?.includes(n.key))).sort((a, b) => b.at.localeCompare(a.at));
   const isRead = (n: N) => data.notifRead.includes(n.key) || (!!data.notifsSeenAt && n.at <= data.notifsSeenAt);
@@ -208,8 +208,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       { t: "Reminders", s: `Visits tomorrow and today, chats waiting ${cur.replySoonH} · ${cur.replyUrgentH} · ${cur.replyOverdueH} h, windows closing`, v: cur.reminders ? "On" : "Off", key: "reminders" },
       { t: "Team inbox alerts", s: "The Team inbox shows everyone but tells of nobody else", v: "Off" }] },
     { title: "New leads", sub: "What happens when a lead arrives", rows: [
-      { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
-      { t: "Send auto-reply", s: "Saved on each person's Profile, not sent yet", v: "Off" }] },
+      { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams · an ad with no split goes to the Revenue Director" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
+      { t: "Send auto-reply", s: "Each person's own, switched on in their Profile › Auto-reply · sent to their customers", v: "On" }] },
   ];
   const settings4 = {
     can: !!data.can.manage, cur,

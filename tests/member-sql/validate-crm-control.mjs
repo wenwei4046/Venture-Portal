@@ -72,16 +72,12 @@ const as = async (who, sql, params = []) => {
 const refused = async (who, sql, params, pattern, what) => { await assert.rejects(() => as(who, sql, params), pattern, what); checks++ }
 const name = staff => ({ [S('ann')]: 'ann', [S('amir')]: 'amir', [S('ben')]: 'ben', [S('tla')]: 'tla', [S('tlb')]: 'tlb', [S('hod')]: 'hod' })[staff] ?? staff
 
-// 1. rev 1011 §6.4: an ad nobody set is dealt evenly across the teams; an enquiry from no ad goes to the Revenue Director
-// (mig 20261013260000 — it waited in Organic Leads before).
+// 1. An ad nobody set goes to the Revenue Director, who sends it on (mig 20261019110000; the owner, 2026-10-19 — it was
+// dealt evenly across the teams and the director before); an enquiry from no ad goes to the Revenue Director too.
 {
   const a = await arrive('AD-NONE'), b = await arrive('AD-NONE')
-  check([name(a.team_id), name(b.team_id)].sort(), ['tla', 'tlb'], 'an ad nobody set: one enquiry to each team')
-  check(!!a.assigned_to && !!b.assigned_to, true, '…each given to somebody in it')
+  check([a, b], [{ assigned_to: S('hod'), team_id: null }, { assigned_to: S('hod'), team_id: null }], 'an ad nobody set: every enquiry to the Revenue Director, no team')
   check(await arrive(null), { assigned_to: S('hod'), team_id: null }, 'an enquiry from no ad goes to the Revenue Director')
-  // The Revenue Director is one more "team" of the default even split (mig 20261016010000; the owner, 2026-10-16), last on a tie.
-  check(await arrive('AD-NONE'), { assigned_to: S('hod'), team_id: null }, 'an ad nobody set: the third enquiry to the Revenue Director, no team')
-  check(name((await arrive('AD-NONE')).team_id) !== null, true, '…and the fourth back to a team')
 }
 
 // 2. Evenly: everyone in the teams in turn.

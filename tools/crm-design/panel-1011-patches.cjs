@@ -88,7 +88,7 @@ module.exports = [
   // nobody set says what really happens to its leads.
   [/<h2 style=\{\{[^}]*\}\}>Needs your action<\/h2>\s*<section[\s\S]*?<\/section>\s*/, ""],
   // The Team inbox's "Needs a reply" column is Attention, as everybody's Mine inbox calls it (vm/inbox.ts).
-  ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · dealt evenly across teams"],
+  ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · goes to the Revenue Director"],
   // Team inbox (the owner, 2026-10-14: "我不知道哪一個應該先處理，沒有數字提示"; "只要在 mine 有的，team 也要有"): a row of the
   // same categories as Mine, each with its count, above the board — a tap slides the board to that column.
   ['<div data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden",',
