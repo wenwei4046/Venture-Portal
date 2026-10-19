@@ -1643,6 +1643,8 @@ The Revenue app's `profile/TrackPage` + `track.module.css`.
 
 What the ERP says EXISTS is plain text; what the portal DECIDES is an input — a price (amber while edited), a tick, a toggle. A row's state is a chip in its first cell: NEW, Inactive, Removed. Modular opens a model in a window (option tick tiles, *Select all* / *Clear all*, Save, Save & next, an unsaved guard). **A price moves margins only from the moment it is saved; a landed month waits for Recost.**
 
+**A sofa's model name (2026-10-19):** a sofa's window ends its calculator panel with **MODEL NAME** — the panel's label over a 38px box (`.fieldInput`), the portal's own name in it and the ERP's as its placeholder (*Add a name* when the ERP has none). A sofa's panel lays its fields in a row that wraps rather than squeezes the switch (`.calc[data-named]`, flex): a branded sofa's three sit in one row, a brandless sofa's name takes a second line, and a phone gives each field its own. Once saved the name reads after the code — the window's title `5066 · ROMA`, the card's second line, SKU Master's MODEL cell under the code and its Model list `5066 · ROMA`. A mattress, a bed frame or an accessory has no such box: its model is its name.
+
 **Combo Pricing is the portal's own:** a row per set, a column band per fabric tier; *+ Add combo* builds a set and prices it per fabric × seat height, a two-sided module adding a card for the pair (`1A(R)`, *LHF / RHF*). *Edit prices* pins a **Remove** column right: Remove marks a set (faded, prices read-only), Keep unmarks, Save deletes the marked sets.
 
 ### Revenue member C release (2026-09-16)
