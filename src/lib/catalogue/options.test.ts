@@ -10,6 +10,7 @@ import {
   erpAllows,
   isRestricted,
   isRiderModel,
+  leadNameOf,
   MAINTENANCE_SECTIONS,
   modelLabelOf,
   needsBrandPick,
@@ -355,5 +356,17 @@ describe('a model name of the portal’s own', () => {
     expect(modelLabelOf('5066', '5066')).toBe('5066')
     expect(modelLabelOf('5066', null)).toBe('5066')
     expect(modelLabelOf('5066', '')).toBe('5066')
+  })
+
+  // The user, on 5071's card: "以名字先，然后下面再 code … 只要你一下名字，就这样子倒反".
+  it('leads a named sofa with its name — its own or the ERP’s — and every other model with its code', () => {
+    expect(leadNameOf('SOFA', '5071', 'AAAA')).toBe('AAAA')
+    expect(leadNameOf('sofa', '5535', 'NOVA')).toBe('NOVA')
+    expect(leadNameOf('SOFA', '5066', null)).toBeNull()
+    expect(leadNameOf('SOFA', '5066', '')).toBeNull()
+    expect(leadNameOf('SOFA', '5066', '5066')).toBeNull()
+    expect(leadNameOf('MATTRESS', 'APEX', 'Apex Firm')).toBeNull()
+    expect(leadNameOf('BEDFRAME', 'BF-1', 'Oslo')).toBeNull()
+    expect(leadNameOf(null, 'X', 'Y')).toBeNull()
   })
 })

@@ -6,7 +6,8 @@
 // own (trimmed, 1–80 characters, NULL = none); the Quote names a sofa "5066 ROMA" by it, as an ERP-named one reads
 // "8030 SOFFIO"; no name of the portal's leaves every model as the ERP names it; a name never moves a model's
 // calculator section; the swap refuses a body production no longer runs, keeps the function the service role's
-// alone, and a second run changes nothing. No live I/O.
+// alone, and a second run changes nothing. Then 20261019160000, verbatim twice: a name saved before the window kept
+// capitals reads in capitals, and nothing else moves. No live I/O.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -157,6 +158,27 @@ try {
   await db.exec(`INSERT INTO public.erp_product_models(erp_id, model_code, name, category) VALUES ('${id(9)}', '9999', '9999', 'SOFA');
     INSERT INTO public.catalogue_models(erp_model_id) VALUES ('${id(9)}')`)
   check(await one(`SELECT model_name FROM public.catalogue_models WHERE erp_model_id = '${id(9)}'`), null, 'a model starts with no name of the portal\'s')
+
+  // ── 20261019160000: a name saved before the window kept capitals reads in capitals (the user, of 5071's "aaaa":
+  // "AAAA 大写"). Verbatim, twice; a name already in capitals, a model with none and every other column stay. ──
+  await db.exec(`UPDATE public.catalogue_models SET model_name = 'aaaa', updated_at = '2026-10-19 15:38:13+00' WHERE erp_model_id = '${M.sofa}';
+    UPDATE public.catalogue_models SET model_name = 'Soffio Plus' WHERE erp_model_id = '${M.named}';
+    UPDATE public.catalogue_models SET model_name = NULL WHERE erp_model_id = '${M.pillow}';
+    INSERT INTO public.erp_product_models(erp_id, model_code, name, category) VALUES ('${id(10)}', '5543', 'ALTAY', 'SOFA');
+    INSERT INTO public.catalogue_models(erp_model_id, offered, model_name) VALUES ('${id(10)}', true, 'NOVA PLUS')`)
+  const capitals = await text(new URL('20261019160000_sofa_model_names_in_capitals.sql', migrations))
+  const rows = async () => q(`SELECT erp_model_id, offered, enabled, gift, calc_category, brand_code, updated_at, model_name
+    FROM public.catalogue_models ORDER BY erp_model_id`)
+  const beforeCaps = await rows()
+  await db.exec(capitals)
+  const afterCaps = await rows()
+  check(Object.fromEntries(afterCaps.map(r => [r.erp_model_id, r.model_name])), {
+    [M.sofa]: 'AAAA', [M.named]: 'SOFFIO PLUS', [M.apex]: null, [M.pillow]: null, [id(9)]: null, [id(10)]: 'NOVA PLUS',
+  }, 'every name in capitals; none stays none')
+  check(afterCaps.map(({ model_name: _, ...r }) => r), beforeCaps.map(({ model_name: _, ...r }) => r), 'nothing else on a row moved')
+  check((await names())['5066-1S'], '5066 AAAA', 'the Quote reads it in capitals')
+  await db.exec(capitals)
+  check(await rows(), afterCaps, 'a second run changes nothing')
 
   console.log(`validate-sofa-model-names: ${checks} checks passed`)
 } finally {

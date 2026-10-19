@@ -981,6 +981,9 @@
   outline: 0;
 }
 .fieldInput::placeholder { color: var(--rv-placeholder); }
+/* A model name is kept in capitals (2026-10-19): the box shows them as it is typed; its hint stays as written. */
+.capsInput { text-transform: uppercase; }
+.capsInput::placeholder { text-transform: none; }
 .fieldNote { font-size: 12px; color: var(--rv-sub); }
 .emptyBox { margin: 0; padding: 22px; border-radius: 12px; border: 1px dashed var(--rv-line-strong); text-align: center; font-size: 13.5px; color: var(--rv-sub); }
 .pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }

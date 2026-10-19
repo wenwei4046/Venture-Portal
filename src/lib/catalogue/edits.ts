@@ -95,9 +95,13 @@ export interface ModelEdit {
 /** The longest model name `catalogue_models_model_name_valid` takes. */
 export const MODEL_NAME_MAX = 80
 
-/** A typed model name as it is kept: one space between words, none around them. */
+/**
+ * A typed model name as it is kept: in capitals, as the ERP writes every name
+ * (NOVA, SOFFIO — the user 2026-10-19: "aaaa" reads "AAAA"), one space between
+ * words, none around them.
+ */
 export function tidyModelName(raw: string | null | undefined): string {
-  return String(raw ?? '').replace(/\s+/g, ' ').trim()
+  return String(raw ?? '').replace(/\s+/g, ' ').trim().toUpperCase()
 }
 
 /** A model name as `catalogue_models.model_name` stores it: tidied, blank = none. */

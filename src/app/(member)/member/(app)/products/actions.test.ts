@@ -82,9 +82,9 @@ describe('Modular settings ownership validation', () => {
   })
 
   // 2026-10-19: a sofa's name is written only when the window sends one (it sends one only when it changed).
-  it('writes a model name only when the edit carries one, tidied, blank as none', async () => {
+  it('writes a model name only when the edit carries one, tidied into capitals, blank as none', async () => {
     await saveModelSettings({ ...edit({}), modelName: '  Roma   Grande ' })
-    expect(mocks.modelUpsert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ erp_model_id: MODEL, model_name: 'Roma Grande' }), { onConflict: 'erp_model_id' })
+    expect(mocks.modelUpsert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ erp_model_id: MODEL, model_name: 'ROMA GRANDE' }), { onConflict: 'erp_model_id' })
     mocks.modelUpsert.mockClear()
     await saveModelSettings({ ...edit({}), modelName: '' })
     expect(mocks.modelUpsert.mock.calls[0][0]).toMatchObject({ model_name: null })

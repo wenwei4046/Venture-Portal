@@ -183,6 +183,17 @@ export function modelLabelOf(code: string, name: string | null): string {
   return name && name !== code ? `${code} · ${name}` : code
 }
 
+/**
+ * The name a sofa leads with where its name and code are drawn one above the
+ * other — a Modular card, the window's title, SKU Master's MODEL cell — its
+ * code under it (2026-10-19, the user: "以名字先，然后下面再 code … 只要你一下
+ * 名字，就这样子倒反"). Null for a sofa with no name of its own (the code
+ * leads) and for every other category, whose code leads as before.
+ */
+export function leadNameOf(category: string | null, code: string | null, name: string | null): string | null {
+  return takesModelName(category) && name && name !== code ? name : null
+}
+
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
 export function calcCategoryOf(category: string | null, name: string | null): string {
   const c = (category ?? '').trim().toUpperCase()

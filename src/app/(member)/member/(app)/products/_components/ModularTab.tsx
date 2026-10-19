@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { isRiderModel, RIDER } from '@/lib/catalogue/options'
+import { isRiderModel, leadNameOf, RIDER } from '@/lib/catalogue/options'
 import { useProductShell } from '@/components/member/app/product-shell'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import ModelEditor, { type ModelLeave } from './ModelEditor'
@@ -155,13 +155,16 @@ function ModelCard({ model: m, brands, open, onOpen }: { model: CatalogueModel; 
   const ladder = m.brand && m.brand !== RIDER ? brands.find(b => b.code === m.brand)?.name ?? m.brand
     : isRiderModel(m.category, m.brandOverride) ? 'Rider' : 'No ladder'
   const flag = !m.active ? 'Inactive' : m.isNew ? 'New model' : m.skus.some(s => s.isNew && !s.removed) ? 'New SKU' : null
+  // A named sofa leads with its name, its code under it (2026-10-19); everything else leads with its code.
+  const lead = leadNameOf(m.category, m.code, m.name)
+  const second = lead ? m.code : m.name && m.name !== m.code ? m.name : null
   return (
     <button type="button" className={c.card} data-offered={m.offered} data-open={open} aria-label={`Configure ${m.code}`} onClick={onOpen}>
       <span className={c.cardTop}>
-        <strong className={c.cardCode}>{m.code}</strong>
+        <strong className={c.cardCode}>{lead ?? m.code}</strong>
         <span className={c.cardState}>{m.offered ? 'Offered' : 'Not offered'}</span>
       </span>
-      {m.name && m.name !== m.code ? <span className={c.cardName}>{m.name}</span> : null}
+      {second ? <span className={c.cardName}>{second}</span> : null}
       <span className={c.cardMeta}>
         <span>{ladder}</span>
         <span>{ticked} / {plural(activeSkus.length, 'SKU')}</span>

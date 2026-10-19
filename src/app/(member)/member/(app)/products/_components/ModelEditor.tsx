@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, useTransition, type Mutabl
 import { useRouter } from 'next/navigation'
 import { MODEL_NAME_MAX, tidyModelName } from '@/lib/catalogue/edits'
 import { valueKey } from '@/lib/catalogue/keys'
-import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, needsBrandPick, optionKeysOf, RIDER, skuKeyOf, takesModelName, type OptionKey } from '@/lib/catalogue/options'
+import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, leadNameOf, needsBrandPick, optionKeysOf, RIDER, skuKeyOf, takesModelName, type OptionKey } from '@/lib/catalogue/options'
 import { saveModelSettings } from '../actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import FloatingWindow from './FloatingWindow'
@@ -123,6 +123,9 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
   // The section follows the ERP's own name, never one typed here.
   const derivedCalc = calcCategoryOf(model.category, model.erpName ?? model.code)
   const erpNamed = model.erpName && model.erpName !== model.code ? model.erpName : null
+  // The title reads as the card: a named sofa by its name, its code after it (2026-10-19).
+  const lead = leadNameOf(model.category, model.code, model.name)
+  const titleRest = lead ? model.code : model.name && model.name !== model.code ? model.name : null
   const liveSkus = model.skus.filter(s => !s.removed && s.active)
   const missingLadder = picks && !brand
   const hasPrev = !!position && position.index > 0
@@ -229,7 +232,7 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
       <header className={c.winHead}>
         <div className={c.winHeadText}>
           <span className={c.eyebrow}><span className={c.eyebrowDash} />MODULAR{position ? ` · ${position.index + 1} OF ${position.total}` : ''}</span>
-          <h2 id={titleId} className={c.winTitle}>{model.code}{model.name && model.name !== model.code ? <span className={c.winTitleName}> · {model.name}</span> : null}</h2>
+          <h2 id={titleId} className={c.winTitle}>{lead ?? model.code}{titleRest ? <span className={c.winTitleName}> · {titleRest}</span> : null}</h2>
           <div className={c.metaChips}>
             {metaChips.map(m => <span key={m.label} className={c.metaChip} data-flag={m.flag || undefined}>{m.label}</span>)}
           </div>
@@ -290,7 +293,7 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
               {named ? (
                 <label className={c.field}>
                   <span className={c.fieldLabel}>MODEL NAME</span>
-                  <input type="text" aria-label="Model name" className={c.fieldInput} value={name} maxLength={MODEL_NAME_MAX}
+                  <input type="text" aria-label="Model name" className={`${c.fieldInput} ${c.capsInput}`} value={name} maxLength={MODEL_NAME_MAX}
                     placeholder={erpNamed ?? 'Add a name'} autoComplete="off" spellCheck={false} onChange={e => setName(e.target.value)} />
                 </label>
               ) : null}
