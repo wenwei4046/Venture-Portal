@@ -14,7 +14,7 @@ import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
 import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { BORDER, chatStripOf, coldLine, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
-import { customerFormVM, infoRows } from "./customer";
+import { bookingSkipsForm, customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
@@ -245,8 +245,8 @@ export function chatVM(ctx: SalesCtx) {
   const assignSel = assigning ? assignList.find(p => p.id === hm.sel) : undefined;
   const sNames = teamPeople.filter(p => ss.includes(p.id)).map(p => p.name);
   const goBook = () => {
-    // A first booking asks for the customer's details first (step 1 of 2).
-    if (c.detailsSaved) set(u => ({ ...u, hm: null, book: { customerId: c.id, room: 0, day: firstOpenDay(0, day0(now)), slot: null } }));
+    // Booking asks for the customer's details first (step 1 of 2) until they are complete (bookingSkipsForm, 2026-10-19).
+    if (bookingSkipsForm(c, data)) set(u => ({ ...u, hm: null, book: { customerId: c.id, room: 0, day: firstOpenDay(0, day0(now)), slot: null } }));
     else set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: false } }));
   };
   const firstOpenDay = (ri: number, from: number) => { for (let k = 0; k < 60; k++) { const d = from + k * DAY; if (!roomClosed(rooms[ri], d)) return d; } return from; };
