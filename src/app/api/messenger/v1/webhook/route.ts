@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
 import { pushSoon } from '@/lib/push/outbox'
+import { adIdsOf, nameAdsFromMeta } from '@/lib/member/crm-ad-names-meta'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
@@ -21,7 +22,8 @@ import { pageToken, profileName } from '@/lib/messenger/send'
  *   - only our own Pages (META_PAGE_IDS) are taken; anything else is ignored.
  *   - the service-role client is used for ONE thing: the ingest RPC
  *     `crm_ingest_messenger`, which owns every write and the delivery log; a
- *     refused delivery is logged straight to crm_channel_events.
+ *     refused delivery is logged straight to crm_channel_events; after the answer, an ad with no name yet is named
+ *     from Ads Manager through crm_ads_unnamed / crm_meta_name_ad (service role only, mig 20261019100000).
  *   - before it, the customer's name is asked of Meta with the Page's token
  *     (best effort, 3 s): Messenger, unlike WhatsApp, does not send it.
  *   - excluded from the session middleware.
@@ -96,5 +98,8 @@ export async function POST(request: Request) {
   }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
+  // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).
+  const ads = adIdsOf(messages)
+  if (ads.length) after(() => nameAdsFromMeta(client(), ads, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
   return NextResponse.json({ ok: true, result: data })
 }

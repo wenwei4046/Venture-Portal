@@ -221,6 +221,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_note_channel_save',
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
   'crm_settings_read',
+  // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
+  'crm_ads_unnamed', 'crm_meta_name_ad',
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
   // Product List · View, the cost setting Product List · Edit, both running as their owner.
   'revenue_costing_gaps', 'catalogue_save_cost_setting',
