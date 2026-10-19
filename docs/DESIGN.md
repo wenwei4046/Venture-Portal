@@ -1659,6 +1659,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.96** · 2026-10-19 · A sofa takes a model name of the portal's own: *MODEL NAME* ends its Modular window's calculator panel (the ERP's name as its placeholder) and the panel wraps rather than squeezing the switch; the name reads after the code on SKU Master, Modular, Combo Pricing and the Quote (`5066 · ROMA`) → Product List — the mirror beside the portal's decisions
 - **v4.95** · 2026-10-18 · A photo, a video or a document opened from a CRM chat, the camera and the editor turn the phone's status bar their own colour while they are on — black (a document's #201814) to the top of the screen, as WhatsApp's viewer; closed, the chat's colour comes back
 - **v4.94** · 2026-10-18 · The phone's status bar takes the colour at the top of the screen on show — the Revenue app white or Profile's peach, the CRM white (Mine, a chat), cream (the Team side) or peach (either Profile) — written into the page's theme-color and background as the screen changes; a video in a CRM chat shows its first picture before it plays, one just sent too (an iPhone drew it black)
 - **v4.93** · 2026-10-17 · The CRM chats: a message WhatsApp refused shows a "!" in a circle where the two ticks were, and *Not delivered · …* under its time in white — the Team chat too (it showed refused videos as sent); the camera's own zoom on an iPhone moves in hundredths, not tenths
