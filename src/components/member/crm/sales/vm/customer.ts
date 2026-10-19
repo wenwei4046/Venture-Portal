@@ -81,6 +81,21 @@ export function pagedQuestions(form: CrmForm, page: number) {
   return { n: pages.length, at, here: secs.filter(s => s.page === pages[at]), all: secs.flatMap(s => s.fields) };
 }
 
+/**
+ * Whether Book visit may go straight to the time (2026-10-19; the owner: "book appointment 没有跳出customer info 让我先填写",
+ * then "B" — ask whenever the details are not complete, not only on the first booking): the details were saved once,
+ * every built-in question the form keeps is answered, and every question of its own it marks required. Else the
+ * booking asks Customer info first (step 1 of 2), filled with what is already known.
+ */
+export function bookingSkipsForm(c: CrmCustomer, data: Pick<CrmData, "forms">): boolean {
+  if (!c.detailsSaved) return false;
+  const builtIn = (k: BuiltIn) => (k === "name" ? c.name : k === "phone" ? c.phone : c.details[k]) ?? "";
+  const answer = (id: string) => (isBuiltIn(id) ? builtIn(id) : c.extra?.[id] ?? "").trim();
+  const { has, extra, paged } = formOf(data);
+  if (paged) return pagedQuestions(data.forms![0], 0).all.every(q => (isBuiltIn(q.id) || q.req ? !!answer(q.id) : true));
+  return BUILT_IN.every(k => !has[k] || !!answer(k)) && extra.every(s => s.fields.every(q => !q.req || !!answer(q.id)));
+}
+
 /** The customer form's fields and Save (the first booking goes on to choose a time). */
 export function customerFormVM(ctx: SalesCtx) {
   const { set } = ctx;

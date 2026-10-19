@@ -11,7 +11,7 @@ import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
 import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
-import { infoRows } from "../../sales/vm/customer";
+import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
@@ -129,8 +129,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const B = c && ui.pBook && ui.pBook.customerId === c.id ? ui.pBook : null;
   const T = day0(now);
   const toBook = (id: string) => patch({ pMenu: false, pInfo: false, pForm: null, pBook: { customerId: id, room: 0, day: T + DAY, slot: null, view: "month" } });
-  // A first booking asks for the customer's details first (step 1 of 2), as the salesperson's does.
-  const openBook = () => { if (!c) return; if (c.detailsSaved) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
+  // Booking asks for the customer's details first (step 1 of 2) until they are complete, as the salesperson's does.
+  const openBook = () => { if (!c) return; if (bookingSkipsForm(c, data)) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
   // ⋮ › Appointment with a visit booked (2026-10-14, "成功 book visit 之後 … 無法修改 & cancel 預約"): the visit with
   // Change (the booking sheet on its showroom, day and time; Book moves it — crm_move_appointment) and Cancel visit
   // (asked again; crm_set_appointment_state), as Mine's chat. No visit booked: Book visit, as before.
