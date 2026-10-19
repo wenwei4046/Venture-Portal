@@ -349,7 +349,7 @@ export interface CrmDeal {
   teamId: string | null;
   memberId: string | null;
   held?: boolean;
-  by: "organic" | "organic_director" | "even" | "full_time" | "percent" | "max" | "over_the_limit" | `default_${"even" | "full_time"}`;
+  by: "organic" | "organic_director" | "even" | "full_time" | "percent" | "max" | "over_the_limit" | `default_${"even" | "full_time"}` | "default_director";
 }
 
 /** The weekday in Kuala Lumpur, 0 = Monday — as the database counts it. */
@@ -391,11 +391,11 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
     return director ? { teamId: null, memberId: director, by: "organic_director" } : organic;
   }
   const tls = allTeams(members).map(t => t.id);
+  // An ad nobody set: every lead to the Revenue Director, who sends it on (2026-10-19, the owner: "新广告还没设分配规则时，
+  // crm 名单全部先给peter, peter 后续可再分配") — the directors evenly between them, as the SQL's crm_pick_inside does.
   if (!rule) {
-    const teamId = fewest(tls, id => counts.team[id] ?? 0);
-    if (!teamId) return organic;
-    const p = pickInside(teamId, "even", {}, at, fullTime[teamId], counts, members);
-    return p.memberId ? { teamId, memberId: p.memberId, by: p.by === "full_time" ? "default_full_time" : "default_even" } : organic;
+    const director = fewest(members.filter(m => m.role === "hod").map(m => m.id), id => counts.given[id] ?? 0);
+    return director ? { teamId: null, memberId: director, by: "default_director" } : organic;
   }
   if (rule.mode === "even") {
     const all = [...new Set(tls.flatMap(t => teamHandlers(t, members).map(m => m.id)))];
