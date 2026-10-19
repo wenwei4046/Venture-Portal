@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, accOrder, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
-  moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
+  modelMatches, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
   type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
@@ -94,6 +94,23 @@ describe("catalogFromProducts", () => {
     const c = zanotti();
     expect(c.sofa).toBe(true);
     expect(c.models[0].modules.map(x => x.code)).toEqual(["L(LHF)", "2S", "Console"]);
+  });
+
+  // 2026-10-20, the user: "quote show aaaa enought, not need the code" — member_catalogue names a named sofa by its name alone.
+  it("shows a named sofa by its name, keeps two sofas named alike apart, and still finds one by its code", () => {
+    const sofa = (id: string, name: string, baseModel: string, modelId: string) =>
+      product({ id, name, baseModel, modelId, brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "1S", moduleCode: "1S" });
+    const c = catalogFromProducts([
+      sofa("5071-1s", "AAAA", "5071", "m-5071"), sofa("5066-1s", "5066", "5066", "m-5066"),
+      sofa("8030-1s", "SOFFIO", "8030", "m-8030"), sofa("9999-1s", "SOFFIO", "9999", "m-9999"),
+    ], "ZANOTTI", "Zanotti");
+    expect(c.models.map(m => [m.name, m.desc])).toEqual([["5066", "5066"], ["AAAA", "5071"], ["SOFFIO", "8030"], ["SOFFIO", "9999"]]);
+    const find = (q: string) => c.models.filter(m => modelMatches(m, q)).map(m => m.name);
+    expect(find("5071")).toEqual(["AAAA"]);
+    expect(find("aaaa")).toEqual(["AAAA"]);
+    expect(find("soffio")).toEqual(["SOFFIO", "SOFFIO"]);
+    expect(find("9999")).toEqual(["SOFFIO"]);
+    expect(find("")).toHaveLength(4);
   });
 
   it("reads the size words the Product List writes", () => {

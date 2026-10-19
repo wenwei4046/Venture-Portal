@@ -7,7 +7,9 @@
 // "8030 SOFFIO"; no name of the portal's leaves every model as the ERP names it; a name never moves a model's
 // calculator section; the swap refuses a body production no longer runs, keeps the function the service role's
 // alone, and a second run changes nothing. Then 20261019160000, verbatim twice: a name saved before the window kept
-// capitals reads in capitals, and nothing else moves. No live I/O.
+// capitals reads in capitals, and nothing else moves. Then 20261020000000, verbatim twice: the Quote names a named
+// sofa by its name alone ("AAAA", "SOFFIO"), one with none by its code, and refuses a body production no longer
+// runs. No live I/O.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -179,6 +181,36 @@ try {
   check((await names())['5066-1S'], '5066 AAAA', 'the Quote reads it in capitals')
   await db.exec(capitals)
   check(await rows(), afterCaps, 'a second run changes nothing')
+
+  // ── 20261020000000: the Quote names a named sofa by its name alone (the user, 2026-10-20: "quote show aaaa
+  // enought, not need the code"). Verbatim, twice, over the body the two migrations above left. ──
+  const NAME_ONLY = '99957d1999e752def202b3d2006ff683'
+  const nameOnly = await text(new URL('20261020000000_quote_names_a_sofa_by_its_name.sql', migrations))
+  const withCode = await one(`SELECT pg_get_functiondef('${SIG}'::regprocedure)`)
+  await db.exec(withCode.replace('v_company  BIGINT := 1;', 'v_company  BIGINT := 1; -- changed straight on production'))
+  await assert.rejects(() => db.exec(nameOnly), /member_catalogue changed on production since 2026-10-19/, 'a drifted body is refused')
+  checks++
+  await db.exec(withCode)
+  check(await bodyMd5(), AFTER, 'the body 20261019140000 left, back in place')
+  await db.exec(nameOnly)
+  check(await bodyMd5(), NAME_ONLY, 'member_catalogue landed as written')
+  await db.exec(nameOnly)
+  check(await bodyMd5(), NAME_ONLY, 'a second run changes nothing')
+  const nameOnlySrc = await one(`SELECT prosrc FROM pg_proc WHERE oid = '${SIG}'::regprocedure`)
+  check(md5(nameOnlySrc
+    .replace(`WHEN c.model_kind = 'SOFA' THEN BTRIM(c.model_name)`, `WHEN c.model_kind = 'SOFA' THEN BTRIM(c.model_code) || ' ' || BTRIM(c.model_name)`)
+    .replace('(a named sofa by its name alone: "SOFFIO")', '(a sofa\'s code first: "8030 SOFFIO")')), AFTER, 'the sofa\'s branch and its note moved, nothing else')
+  check(await header(), headerBefore, 'nor its language, volatility, rights or settings')
+  check([await one(`SELECT has_function_privilege('authenticated', '${SIG}', 'EXECUTE')`),
+    await one(`SELECT has_function_privilege('anon', '${SIG}', 'EXECUTE')`),
+    await one(`SELECT has_function_privilege('service_role', '${SIG}', 'EXECUTE')`)], [false, false, true],
+  'still the service role\'s alone')
+  check(await names(), { '5066-1S': 'AAAA', '8030-2S': 'SOFFIO PLUS', 'AKEMI APEX MATT (Q)': 'APEX', 'LATEX PILLOW': 'LATEX PILLOW' },
+    'a named sofa reads its name alone; a mattress and an accessory read as before')
+  check((await names(true))['5066-1S'], 'AAAA', 'the priced answer names it the same')
+  await db.exec(`UPDATE public.catalogue_models SET model_name = NULL WHERE erp_model_id IN ('${M.sofa}', '${M.named}')`)
+  check(await names(), { ...before, '8030-2S': 'SOFFIO' },
+    'with no name of the portal\'s: a sofa the ERP names reads that name alone, one it does not still reads its number')
 
   console.log(`validate-sofa-model-names: ${checks} checks passed`)
 } finally {

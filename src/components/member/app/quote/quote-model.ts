@@ -53,7 +53,7 @@ export interface QModule {
 export interface QModel {
   key: string;
   name: string;
-  /** What a search also reads: the prototype's `desc`; the Product List has none. */
+  /** What a search also reads: the prototype's `desc`; from the Product List, a sofa's code (5071), which its name alone does not show. */
   desc: string;
   /** A mattress: the SKU of each size it comes in. */
   sizes: Partial<Record<SizeKey, string>>;
@@ -289,7 +289,8 @@ export function catalogFromProducts(
     if (kind === "SOFA") {
       sofa = true;
       const key = p.modelId ?? p.baseModel ?? p.name;
-      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
+      // A named sofa is shown by its name alone (2026-10-20); its code stays searchable.
+      const model = models.get(key) ?? { key, name: p.name, desc: (p.baseModel ?? "").trim(), sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
       const code = (p.moduleCode ?? p.size ?? "").trim() || p.code;
       const info = moduleInfo(code);
       model.modules.push({ code, desc: info.desc, seats: info.seats, chaise: info.chaise, productId: p.id, options: p.options ?? [] });
@@ -335,6 +336,13 @@ export function catalogFromProducts(
 /** The sizes a mattress model comes in, smallest first: `Single · Queen · King`. */
 export function sizesText(model: QModel): string {
   return SIZES.filter(z => model.sizes[z.key]).map(z => z.label).join(" · ");
+}
+
+/** *All models*' search: a model by its name, its `desc` (a sofa's code), its sizes or its modules. `q` comes trimmed and in small letters. */
+export function modelMatches(model: QModel, q: string): boolean {
+  if (!q) return true;
+  const hay = [model.name, model.desc, sizesText(model), ...model.modules.map(x => `${x.code} ${x.desc}`)].join(" ").toLowerCase();
+  return hay.includes(q);
 }
 
 /** The size a sheet opens on: Queen when the model has it, else the nearest one. */
