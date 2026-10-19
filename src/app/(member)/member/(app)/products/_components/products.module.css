@@ -816,6 +816,9 @@
   border: 1px solid var(--rv-line);
 }
 .calc[data-picks] { grid-template-columns: auto repeat(3, minmax(200px, 280px)); }
+/* A sofa's window adds its Model name box (2026-10-19) after Free gift. */
+.calc[data-named] { grid-template-columns: auto repeat(2, minmax(200px, 280px)); }
+.calc[data-picks][data-named] { grid-template-columns: auto repeat(4, minmax(150px, 230px)); }
 .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .fieldLabel { font-size: 11px; font-weight: 700; letter-spacing: .07em; color: var(--rv-sub); }
 .fieldSelect {
@@ -1063,7 +1066,7 @@
   .winFoot { padding: 10px 16px; }
   .winFootRow { flex-wrap: wrap; justify-content: flex-end; }
   .winFootRow .status { flex-basis: 100%; }
-  .calc, .calc[data-picks] { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .calc, .calc[data-picks], .calc[data-named], .calc[data-picks][data-named] { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .sectionHead { flex-wrap: wrap; }
   .sectionCount { white-space: nowrap; }
 }

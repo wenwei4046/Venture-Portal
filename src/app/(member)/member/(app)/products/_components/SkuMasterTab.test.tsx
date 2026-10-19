@@ -206,6 +206,24 @@ describe('SKU Master price workspace', () => {
     expect(screen.getByText('BOLSTER')).toBeInTheDocument()
   })
 
+  // 2026-10-19, the user: "sofa category same as mattress have the model name".
+  it('shows a sofa’s name under its model and names it in the Model list; a mattress stays by its own name', () => {
+    render(<SkuMasterTab sofaSizes={['24']} skus={[
+      sku({ modelName: 'ROMA' }), fixtures[1],
+      sku({ erpId: 'm1', code: 'APEX-K', description: 'APEX K', category: 'MATTRESS', modelId: 'apex', modelCode: 'APEX', modelName: 'APEX', grid: null, price: 900 }),
+      sku({ erpId: 'm2', code: 'ZEN-K', description: 'ZEN K', category: 'MATTRESS', modelId: 'zen', modelCode: 'ZEN', modelName: 'ZEN SLEEP', grid: null, price: 900 }),
+    ]} />)
+    openSofa()
+    expect(within(screen.getByRole('combobox', { name: 'Model' })).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All models', '2376 · ROMA', '9999'])
+    expect(screen.getByText('ROMA')).toBeInTheDocument()
+    chooseModel('model-a')
+    expect(screen.getByText(/· Model 2376 · ROMA/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mattress' }))
+    expect(within(screen.getByRole('combobox', { name: 'Model' })).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All models', 'APEX', 'ZEN'])
+  })
+
   it('lets the reader rearrange the columns, apart for the sofa sheet, without losing a typed price', async () => {
     render(<SkuMasterTab skus={fixtures} sofaSizes={['24']} />)
     // The prototype's table card: the rows scroll in a window of their own, the footer under it in the same card.

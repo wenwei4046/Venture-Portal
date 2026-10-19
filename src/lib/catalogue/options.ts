@@ -167,6 +167,22 @@ export function isRiderModel(category: string | null, brandPick: string | null):
   return brandPick === RIDER
 }
 
+/**
+ * Whether Modular offers a model a name of the portal's own (2026-10-19, user:
+ * "sofa category same as mattress have the model name … then it can be add and
+ * edit"): a sofa only. A mattress's model IS its name (APEX); a sofa's is a
+ * number (5066), and the ERP names a dozen of them. Kept in
+ * `catalogue_models.model_name`, shown before the ERP's own name.
+ */
+export function takesModelName(category: string | null): boolean {
+  return (category ?? '').trim().toUpperCase() === 'SOFA'
+}
+
+/** A model as a list names it: `5066 · ROMA`, or the code alone when it has no other name. */
+export function modelLabelOf(code: string, name: string | null): string {
+  return name && name !== code ? `${code} · ${name}` : code
+}
+
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
 export function calcCategoryOf(category: string | null, name: string | null): string {
   const c = (category ?? '').trim().toUpperCase()

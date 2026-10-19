@@ -50,7 +50,7 @@ export default function ModularTab({ models, brands, options }: {
       if (show === 'offered' && !m.offered) return false
       if (show === 'not-offered' && m.offered) return false
       if (show === 'new' && !m.isNew && !m.skus.some(s => s.isNew && !s.removed)) return false
-      return !q || [m.code, m.name, m.brand, m.branding, ...m.skus.map(s => s.code)]
+      return !q || [m.code, m.name, m.erpName, m.brand, m.branding, ...m.skus.map(s => s.code)]
         .some(v => (v ?? '').toLowerCase().includes(q))
     })
     return modularBoard(matching, categories, brands)

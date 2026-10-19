@@ -167,6 +167,7 @@ export interface CatalogueSku {
   category: string | null
   modelId: string | null
   modelCode: string | null
+  /** The model's name: the portal's own (`catalogue_models.model_name`) before the ERP's. */
   modelName: string | null
   /** A sofa module's base model as the ERP writes it — what a combo is keyed on (`erp_products.base_model`). */
   baseModel: string | null
@@ -195,11 +196,23 @@ interface SkuTables {
   prices: Map<string, Row>
   models: Map<string, Row>
   offeredModels: Set<string>
+  /** The names the portal gave its models (Modular, 2026-10-19), by ERP model id. */
+  ownNames: Map<string, string>
   brands: BrandRef[]
 }
 
+/** The names the portal gave its models, out of `catalogue_models` rows. */
+function ownNamesOf(rows: Row[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const r of rows) {
+    const name = str(r.model_name)
+    if (name) out.set(String(r.erp_model_id), name)
+  }
+  return out
+}
+
 async function loadSkuTables(sb: SupabaseClient): Promise<SkuTables> {
-  const [products, prices, models, brands, modelTicks] = await Promise.all([
+  const [products, prices, models, brands, modelRows] = await Promise.all([
     all((f, t) =>
       sb
         .from('erp_products')
@@ -227,14 +240,15 @@ async function loadSkuTables(sb: SupabaseClient): Promise<SkuTables> {
     ),
     loadBrands(sb),
     all((f, t) =>
-      sb.from('catalogue_models').select('erp_model_id').eq('offered', true).order('erp_model_id').range(f, t),
+      sb.from('catalogue_models').select('erp_model_id, offered, model_name').order('erp_model_id').range(f, t),
     ),
   ])
   return {
     products,
     prices: new Map(prices.map(p => [String(p.erp_product_id), p])),
     models: new Map(models.map(m => [String(m.erp_id), m])),
-    offeredModels: new Set(modelTicks.map(m => String(m.erp_model_id))),
+    offeredModels: new Set(modelRows.filter(m => m.offered === true).map(m => String(m.erp_model_id))),
+    ownNames: ownNamesOf(modelRows),
     brands,
   }
 }
@@ -259,7 +273,7 @@ function toSku(r: Row, t: SkuTables, isNew: (s: string | null) => boolean): Cata
     category,
     modelId: str(r.model_erp_id),
     modelCode: model ? str(model.model_code) : null,
-    modelName: model ? str(model.name) : null,
+    modelName: model ? t.ownNames.get(String(r.model_erp_id)) ?? str(model.name) : null,
     baseModel: str(r.base_model),
     moduleCode: sku.module_code,
     sizeCode: sku.size_code,
@@ -290,7 +304,12 @@ export async function loadSkus(): Promise<CatalogueSku[]> {
 export interface CatalogueModel {
   erpId: string
   code: string
+  /** The name it is shown by: `ownName` before `erpName`. */
   name: string | null
+  /** The ERP's own name for it, as mirrored — also what its calculator section is read from. */
+  erpName: string | null
+  /** The name the portal gave it on Modular (`catalogue_models.model_name`, a sofa's — 2026-10-19). */
+  ownName: string | null
   category: string | null
   branding: string | null
   active: boolean
@@ -339,7 +358,7 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
     all((f, tt) =>
       sb
         .from('catalogue_models')
-        .select('erp_model_id, offered, enabled, gift, calc_category, brand_code')
+        .select('erp_model_id, offered, enabled, gift, calc_category, brand_code, model_name')
         .order('erp_model_id')
         .range(f, tt),
     ),
@@ -372,10 +391,13 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
       const calc = calcOverride ?? derivedCalc
       const giftOverride = s && s.gift !== null && s.gift !== undefined ? s.gift === true : null
       const brandOverride = picks && s ? str(s.brand_code) : null
+      const ownName = s ? str(s.model_name) : null
       return {
         erpId,
         code: String(m.model_code),
-        name: str(m.name),
+        name: ownName ?? str(m.name),
+        erpName: str(m.name),
+        ownName,
         category,
         branding: str(m.branding),
         active: m.active !== false,
@@ -528,7 +550,7 @@ export interface ComboRow {
  */
 export async function loadCombos(): Promise<ComboRow[]> {
   const sb = await untyped()
-  const [combos, prices, models] = await Promise.all([
+  const [combos, prices, models, modelRows] = await Promise.all([
     all((f, t) =>
       sb
         .from('catalogue_combos')
@@ -550,13 +572,15 @@ export async function loadCombos(): Promise<ComboRow[]> {
         .range(f, t),
     ),
     all((f, t) =>
-      sb.from('erp_product_models').select('model_code, name, category').eq('category', 'SOFA').order('model_code').order('erp_id').range(f, t),
+      sb.from('erp_product_models').select('erp_id, model_code, name, category').eq('category', 'SOFA').order('model_code').order('erp_id').range(f, t),
     ),
+    all((f, t) => sb.from('catalogue_models').select('erp_model_id, model_name').order('erp_model_id').range(f, t)),
   ])
   const priceOf = new Map(
     prices.map(p => [`${p.base_model}\u0000${p.slots_key}\u0000${p.tier}`, p.price_by_height as Record<string, unknown>]),
   )
-  const nameOf = new Map(models.map(m => [String(m.model_code).toUpperCase(), str(m.name)]))
+  const ownNames = ownNamesOf(modelRows)
+  const nameOf = new Map(models.map(m => [String(m.model_code).toUpperCase(), ownNames.get(String(m.erp_id)) ?? str(m.name)]))
 
   const pricesOf = (c: Row): Record<string, number> => {
     const raw = priceOf.get(`${c.base_model}\u0000${c.slots_key}\u0000${c.tier ?? ''}`) ?? {}

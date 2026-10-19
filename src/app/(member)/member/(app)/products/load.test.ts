@@ -145,6 +145,36 @@ describe('Product List readers', () => {
     expect(models[3]).toMatchObject({ derivedBrand: null, brand: 'RIDER', brandOverride: 'RIDER', calcCategory: 'Mattress', calcOverride: null })
   })
 
+  // 2026-10-19 (user: "sofa category same as mattress have the model name … then it can be add and edit"): the
+  // name typed on Modular is the portal's own and shows before the ERP's on every tab that names the model.
+  it('names a model by the portal’s own name first — SKU Master, Modular and Combo Pricing alike', async () => {
+    tables.erp_products = [product(0, { item_code: '5066-1S' }), product(1, { item_code: '5535-1S' }), product(2, { item_code: 'PILLOW', category: 'ACCESSORY' })]
+    tables.erp_product_models = [
+      model(0, { model_code: '5066', name: '5066' }),
+      model(1, { model_code: '5535', name: 'NOVA' }),
+      model(2, { model_code: 'PILLOW', name: 'Latex Pillow', category: 'ACCESSORY', branding: null }),
+    ]
+    tables.catalogue_models = [
+      { erp_model_id: 'model-00000', offered: true, model_name: 'ROMA' },
+      { erp_model_id: 'model-00001', offered: false, model_name: null },
+      { erp_model_id: 'model-00002', offered: true, model_name: 'Cloud Bolster' },
+    ]
+    tables.comm_brands = [{ id: 'z', code: 'ZANOTTI', name: 'Zanotti', is_active: true }]
+    const skus = await loadSkus()
+    expect(skus.map(s => [s.modelCode, s.modelName, s.modelOffered])).toEqual([
+      ['5066', 'ROMA', true], ['5535', 'NOVA', false], ['PILLOW', 'Cloud Bolster', true],
+    ])
+    const { models } = await loadModels()
+    expect(models.map(m => [m.code, m.name, m.erpName, m.ownName])).toEqual([
+      ['5066', 'ROMA', '5066', 'ROMA'], ['5535', 'NOVA', 'NOVA', null], ['PILLOW', 'Cloud Bolster', 'Latex Pillow', 'Cloud Bolster'],
+    ])
+    // A name never moves a section: the ERP's "Latex Pillow" keeps it a Pillow.
+    expect(models[2]).toMatchObject({ calcCategory: 'Pillow', gift: true })
+    tables.catalogue_combos = [{ erp_company_id: 1, id: 'a', base_model: '5066', slots_key: '[["1S"]]', modules: [['1S']], tier: 'PRICE_2',
+      label: 'Single', heights: ['24'], effective_from: '2026-01-01', created_at: '2026-01-01T00:00:00Z', erp_id: 'e', removed_at: null }]
+    expect((await loadCombos()).map(c => [c.baseModel, c.modelName])).toEqual([['5066', 'ROMA']])
+  })
+
   it('pages models and active brands and deterministically resolves duplicate model codes', async () => {
     tables.erp_product_models = Array.from({ length: 1002 }, (_, i) => model(i, { branding: i === 1001 ? 'Last brand' : null }))
     tables.catalogue_models = Array.from({ length: 1002 }, (_, i) => ({ erp_model_id: `model-${id(i)}`, offered: true }))

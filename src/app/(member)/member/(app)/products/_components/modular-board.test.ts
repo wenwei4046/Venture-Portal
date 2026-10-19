@@ -6,7 +6,7 @@ function sku(branding: string | null): CatalogueSku {
   return { erpId: `sku-${branding}`, code: 'X', description: null, category: 'MATTRESS', modelId: null, modelCode: null, modelName: null, baseModel: null, moduleCode: null, sizeCode: null, sizeLabel: null, optionLabel: 'Q', branding, brand: null, active: true, removed: false, isNew: false, price: null, grid: null, offered: false, modelOffered: false, adopted: false }
 }
 function model(code: string, category: string | null, branding: string | null, extra: Partial<CatalogueModel> = {}): CatalogueModel {
-  return { erpId: code, code, name: null, category, branding, active: true, removed: false, isNew: false, allowed: {}, configured: false, offered: false, enabled: {}, gift: false, giftOverride: null, calcCategory: 'Mattress', calcOverride: null, brand: null, brandOverride: null, derivedBrand: null, skus: [], ...extra }
+  return { erpId: code, code, name: null, erpName: null, ownName: null, category, branding, active: true, removed: false, isNew: false, allowed: {}, configured: false, offered: false, enabled: {}, gift: false, giftOverride: null, calcCategory: 'Mattress', calcOverride: null, brand: null, brandOverride: null, derivedBrand: null, skus: [], ...extra }
 }
 const brands = [
   { code: 'AKEMI', name: 'Akemi' },
