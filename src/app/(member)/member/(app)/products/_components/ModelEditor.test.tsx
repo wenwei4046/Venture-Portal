@@ -217,9 +217,10 @@ describe('Modular model workspace', () => {
 
   // 2026-10-19, the user: "sofa category same as mattress have the model name … then it can be add and edit, on here".
   describe('a sofa’s model name', () => {
-    it('is added in its window and sent tidied, once it changed', async () => {
+    it('is added in its window and sent tidied, in capitals, once it changed', async () => {
       const close = vi.fn()
       render(<ModelEditor model={model({ configured: true, code: '5066', name: '5066', erpName: '5066' })} brands={brands} options={options} onClose={close} />)
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^5066$/)
       const box = screen.getByRole('textbox', { name: 'Model name' })
       expect(box).toHaveValue('')
       expect(box).toHaveAttribute('placeholder', 'Add a name')
@@ -228,18 +229,21 @@ describe('Modular model workspace', () => {
       fireEvent.change(box, { target: { value: '  Roma   Grande ' } })
       expect(screen.getByRole('status')).toHaveTextContent('1 unsaved change')
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-      await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ erpModelId: 'model-a', modelName: 'Roma Grande' })))
+      await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ erpModelId: 'model-a', modelName: 'ROMA GRANDE' })))
       expect(close).toHaveBeenCalledOnce()
       expect(refresh).toHaveBeenCalledOnce()
     })
 
-    it('opens on the portal’s own name with the ERP’s as the hint; spaces alone are no change; a blank box clears it', async () => {
+    // The user, on 5071's card: "以名字先，然后下面再 code … 只要你一下名字，就这样子倒反"; "aaaa" reads "AAAA".
+    it('opens on the portal’s own name, its title name first; spaces or small letters alone are no change; a blank box clears it', async () => {
       render(<ModelEditor model={model({ configured: true, code: '5535', name: 'NOVA PLUS', erpName: 'NOVA', ownName: 'NOVA PLUS' })} brands={brands} options={options} onClose={vi.fn()} />)
-      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('5535 · NOVA PLUS')
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^NOVA PLUS · 5535$/)
       const box = screen.getByRole('textbox', { name: 'Model name' })
       expect(box).toHaveValue('NOVA PLUS')
       expect(box).toHaveAttribute('placeholder', 'NOVA')
       fireEvent.change(box, { target: { value: ' NOVA  PLUS ' } })
+      expect(screen.getByRole('status')).toHaveTextContent('No unsaved changes')
+      fireEvent.change(box, { target: { value: 'nova plus' } })
       expect(screen.getByRole('status')).toHaveTextContent('No unsaved changes')
       fireEvent.change(box, { target: { value: '   ' } })
       expect(screen.getByRole('status')).toHaveTextContent('1 unsaved change')
@@ -263,17 +267,36 @@ describe('Modular model workspace', () => {
       }
     })
 
-    it('shows on its card, and the board still finds it by the ERP’s name', () => {
+    it('leads its card, the code under it, and the board still finds it by the ERP’s name', () => {
       render(<ModularTab models={[
         model({ code: '5535', name: 'ROMA', erpName: 'NOVA', ownName: 'ROMA' }),
         model({ erpId: 'model-b', code: '9999', name: '9999', erpName: '9999', skus: [] }),
       ]} brands={brands} options={options} />)
-      expect(screen.getByRole('button', { name: 'Configure 5535' })).toHaveTextContent('ROMA')
+      const card = screen.getByRole('button', { name: 'Configure 5535' })
+      expect(card.querySelector('strong')).toHaveTextContent(/^ROMA$/)
+      expect(card).toHaveTextContent(/^ROMA.*5535/)
+      expect(within(card).queryByText('NOVA')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Configure 9999' }).querySelector('strong')).toHaveTextContent(/^9999$/)
       for (const query of ['roma', 'nova']) {
         fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), { target: { value: query } })
         expect(screen.getByRole('button', { name: 'Configure 5535' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Configure 9999' })).not.toBeInTheDocument()
       }
+    })
+
+    it('leads with the ERP’s name too on a sofa the ERP names; every other category keeps its code first', () => {
+      render(<ModularTab models={[
+        model({ code: '5535', name: 'NOVA', erpName: 'NOVA', ownName: null }),
+        model({ erpId: 'model-b', code: 'NINA-(K)', name: 'NINA BEDFRAME (6FT)', erpName: 'NINA BEDFRAME (6FT)', category: 'BEDFRAME', brand: null, derivedBrand: null, skus: [] }),
+      ]} brands={brands} options={options} />)
+      const sofa = screen.getByRole('button', { name: 'Configure 5535' })
+      expect(sofa.querySelector('strong')).toHaveTextContent(/^NOVA$/)
+      expect(sofa).toHaveTextContent(/^NOVA.*5535/)
+      const frame = screen.getByRole('button', { name: 'Configure NINA-(K)' })
+      expect(frame.querySelector('strong')).toHaveTextContent(/^NINA-\(K\)$/)
+      expect(frame).toHaveTextContent(/^NINA-\(K\).*NINA BEDFRAME \(6FT\)/)
+      fireEvent.click(frame)
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^NINA-\(K\) · NINA BEDFRAME \(6FT\)$/)
     })
   })
 

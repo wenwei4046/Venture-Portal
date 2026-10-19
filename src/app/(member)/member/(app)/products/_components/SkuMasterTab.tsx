@@ -3,7 +3,7 @@
 import { useMemo, useReducer, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareHeights, heightKey } from '@/lib/catalogue/keys'
-import { modelLabelOf, takesModelName } from '@/lib/catalogue/options'
+import { leadNameOf, modelLabelOf, takesModelName } from '@/lib/catalogue/options'
 import { TIERS, type PriceCell } from '@/lib/catalogue/pricing'
 import { saveSkuPrices } from '../actions'
 import type { CatalogueSku } from '../load'
@@ -206,10 +206,15 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '', colum
     { key: 'description', label: 'DESCRIPTION', className: c.strong, defaultWidth: 260, cell: s => s.description ?? '—' },
     {
       key: 'model', label: 'MODEL', defaultWidth: 120,
-      cell: s => <>
-        {s.modelCode ?? '—'}
-        {s.modelName && s.modelName !== s.modelCode ? <div className={c.sub}>{s.modelName}</div> : null}
-      </>,
+      cell: s => {
+        // A named sofa leads with its name, its code under it (2026-10-19); everything else leads with its code.
+        const lead = leadNameOf(s.category, s.modelCode, s.modelName)
+        const second = lead ? s.modelCode : s.modelName && s.modelName !== s.modelCode ? s.modelName : null
+        return <>
+          {lead ?? s.modelCode ?? '—'}
+          {second ? <div className={c.sub}>{second}</div> : null}
+        </>
+      },
     },
   ]
   if (sofaView) {
