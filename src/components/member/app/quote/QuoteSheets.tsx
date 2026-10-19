@@ -4,7 +4,7 @@ import { useState } from "react";
 import Sheet, { SheetHandle } from "../Sheet";
 import { ICON, Svg } from "../icons";
 import { rm2 } from "../format";
-import { cartMeta, sizesText, TAGS, type CartLine, type QCatalog, type QModel } from "./quote-model";
+import { cartMeta, modelMatches, TAGS, type CartLine, type QCatalog } from "./quote-model";
 import { QtyStepper } from "./QuoteCalc";
 import s from "./quote.module.css";
 
@@ -52,12 +52,6 @@ export function CartSheet({ open, cart, brandName, itemsText, onClose, onClear, 
   );
 }
 
-function matches(model: QModel, q: string): boolean {
-  if (!q) return true;
-  const hay = [model.name, model.desc, sizesText(model), ...model.modules.map(x => `${x.code} ${x.desc}`)].join(" ").toLowerCase();
-  return hay.includes(q);
-}
-
 /** *All Akemi models* — A–Z, with a search (1481–1492). */
 export function AllModelsSheet({ open, catalog, cart, query, onQuery, onClose, onModel }: {
   open: boolean;
@@ -69,7 +63,7 @@ export function AllModelsSheet({ open, catalog, cart, query, onQuery, onClose, o
   onModel: (key: string) => void;
 }) {
   const q = query.trim().toLowerCase();
-  const list = catalog.models.filter(m => matches(m, q));
+  const list = catalog.models.filter(m => modelMatches(m, q));
   return (
     <Sheet open={open} onClose={onClose} z={25} dim="a" height="82%" className={s.allPanel} label={`All ${catalog.name} models`}>
       <SheetHandle />
