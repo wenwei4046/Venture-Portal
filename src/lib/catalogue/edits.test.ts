@@ -307,6 +307,20 @@ describe('validateModelEdit', () => {
     expect(() => validateModelEdit(edit({ skuOffered: { 'mfg 1': true } }))).toThrow('A SKU tick names no SKU')
   })
 
+  // 2026-10-19: a sofa's name of the portal's own — sent only when it changed.
+  it('carries a model name only when the edit names one: tidied, and blank is none', () => {
+    expect(validateModelEdit(edit()).model).not.toHaveProperty('model_name')
+    expect(validateModelEdit(edit({ modelName: '  Roma   Grande ' })).model.model_name).toBe('Roma Grande')
+    expect(validateModelEdit(edit({ modelName: ' \t ' })).model.model_name).toBeNull()
+    expect(validateModelEdit(edit({ modelName: null })).model.model_name).toBeNull()
+    expect(validateModelEdit(edit({ modelName: 'x'.repeat(80) })).model.model_name).toBe('x'.repeat(80))
+  })
+
+  it('refuses a model name past 80 characters, or one that is not text', () => {
+    expect(() => validateModelEdit(edit({ modelName: 'x'.repeat(81) }))).toThrow('A model name is at most 80 characters')
+    expect(() => validateModelEdit(edit({ modelName: 5066 as unknown as string }))).toThrow('A model name is text')
+  })
+
   it('no enabled lists and no ticks is a valid save', () => {
     const e = edit({ enabled: undefined as unknown as Record<string, string[]>, skuOffered: undefined as unknown as Record<string, boolean> })
     const saved = validateModelEdit(e)

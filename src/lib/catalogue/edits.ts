@@ -84,6 +84,28 @@ export interface ModelEdit {
   brandCode: string | null
   /** SKU ticks: erpId → offered. Only the SKUs listed are touched. */
   skuOffered: Record<string, boolean>
+  /**
+   * A sofa's name of the portal's own (2026-10-19). Sent only when it changed —
+   * absent leaves the stored name as it is; blank or null clears it, and the
+   * ERP's own name shows again.
+   */
+  modelName?: string | null
+}
+
+/** The longest model name `catalogue_models_model_name_valid` takes. */
+export const MODEL_NAME_MAX = 80
+
+/** A typed model name as it is kept: one space between words, none around them. */
+export function tidyModelName(raw: string | null | undefined): string {
+  return String(raw ?? '').replace(/\s+/g, ' ').trim()
+}
+
+/** A model name as `catalogue_models.model_name` stores it: tidied, blank = none. */
+export function parseModelName(raw: string | null | undefined): string | null {
+  const name = tidyModelName(raw)
+  if (name === '') return null
+  if (name.length > MODEL_NAME_MAX) throw new EditError(`A model name is at most ${MODEL_NAME_MAX} characters`)
+  return name
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -93,7 +115,11 @@ const OPTION_KEYS = new Set([
 const CALC = new Set(['Mattress', 'Bed frame', 'Sofa', 'Pillow', 'Protector', 'Accessory', 'Other'])
 
 export function validateModelEdit(e: ModelEdit): {
-  model: { erp_model_id: string; offered: boolean; enabled: Record<string, string[]>; gift: boolean | null; calc_category: string | null; brand_code: string | null }
+  model: {
+    erp_model_id: string; offered: boolean; enabled: Record<string, string[]>; gift: boolean | null; calc_category: string | null; brand_code: string | null
+    /** Only when the edit carries a name: an upsert leaves a column it does not name as it was. */
+    model_name?: string | null
+  }
   skus: Array<{ erp_product_id: string; offered: boolean }>
 } {
   if (!e || typeof e.erpModelId !== 'string' || !UUID.test(e.erpModelId)) throw new EditError('No model named')
@@ -119,6 +145,7 @@ export function validateModelEdit(e: ModelEdit): {
     if (!ERP_ID.test(id)) throw new EditError('A SKU tick names no SKU')
     return { erp_product_id: id, offered: offered === true }
   })
+  if (e.modelName !== undefined && e.modelName !== null && typeof e.modelName !== 'string') throw new EditError('A model name is text')
   return {
     model: {
       erp_model_id: e.erpModelId,
@@ -127,6 +154,7 @@ export function validateModelEdit(e: ModelEdit): {
       gift: e.gift === null || e.gift === undefined ? null : e.gift === true,
       calc_category: calc,
       brand_code: brand,
+      ...(e.modelName === undefined ? {} : { model_name: parseModelName(e.modelName) }),
     },
     skus,
   }

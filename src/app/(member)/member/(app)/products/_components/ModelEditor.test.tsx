@@ -13,7 +13,7 @@ function sku(id: string, extra: Partial<CatalogueSku> = {}): CatalogueSku {
   return { erpId: id, code: `2376-${id}`, description: `SOFA 2376 ${id}`, category: 'SOFA', modelId: 'model-a', modelCode: '2376', modelName: '2376', baseModel: '2376', moduleCode: id, sizeCode: null, sizeLabel: null, optionLabel: id, branding: 'ZANOTTI', brand: 'ZANOTTI', active: true, removed: false, isNew: false, price: null, grid: null, offered: false, modelOffered: false, adopted: false, ...extra }
 }
 function model(extra: Partial<CatalogueModel> = {}): CatalogueModel {
-  return { erpId: 'model-a', code: '2376', name: 'Sofa 2376', category: 'SOFA', branding: 'ZANOTTI', active: true, removed: false, isNew: false, allowed: { sizes: [], leg_heights: ['6"'], specials: null }, configured: false, offered: false, enabled: {}, gift: false, giftOverride: null, calcCategory: 'Sofa', calcOverride: null, brand: 'ZANOTTI', brandOverride: null, derivedBrand: 'ZANOTTI', skus: [sku('1S'), sku('2S'), sku('old', { active: false }), sku('gone', { removed: true })], ...extra }
+  return { erpId: 'model-a', code: '2376', name: 'Sofa 2376', erpName: 'Sofa 2376', ownName: null, category: 'SOFA', branding: 'ZANOTTI', active: true, removed: false, isNew: false, allowed: { sizes: [], leg_heights: ['6"'], specials: null }, configured: false, offered: false, enabled: {}, gift: false, giftOverride: null, calcCategory: 'Sofa', calcOverride: null, brand: 'ZANOTTI', brandOverride: null, derivedBrand: 'ZANOTTI', skus: [sku('1S'), sku('2S'), sku('old', { active: false }), sku('gone', { removed: true })], ...extra }
 }
 function option(pool: string, value: string, extra: Partial<MaintenanceOption> = {}): MaintenanceOption {
   return { pool, value, label: value, sortOrder: 1, active: true, removed: false, isNew: false, price: null, ...extra }
@@ -213,6 +213,68 @@ describe('Modular model workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save & next/ }))
     await waitFor(() => expect(screen.getByRole('region', { name: 'Configure model 7777' })).toBeInTheDocument())
     expect(saveModelSettings).toHaveBeenLastCalledWith(expect.objectContaining({ erpModelId: 'model-b', offered: true }))
+  })
+
+  // 2026-10-19, the user: "sofa category same as mattress have the model name … then it can be add and edit, on here".
+  describe('a sofa’s model name', () => {
+    it('is added in its window and sent tidied, once it changed', async () => {
+      const close = vi.fn()
+      render(<ModelEditor model={model({ configured: true, code: '5066', name: '5066', erpName: '5066' })} brands={brands} options={options} onClose={close} />)
+      const box = screen.getByRole('textbox', { name: 'Model name' })
+      expect(box).toHaveValue('')
+      expect(box).toHaveAttribute('placeholder', 'Add a name')
+      expect(box).toHaveAttribute('maxLength', '80')
+      expect(within(screen.getByRole('group', { name: 'Calculator listing' })).getByText('MODEL NAME')).toBeInTheDocument()
+      fireEvent.change(box, { target: { value: '  Roma   Grande ' } })
+      expect(screen.getByRole('status')).toHaveTextContent('1 unsaved change')
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ erpModelId: 'model-a', modelName: 'Roma Grande' })))
+      expect(close).toHaveBeenCalledOnce()
+      expect(refresh).toHaveBeenCalledOnce()
+    })
+
+    it('opens on the portal’s own name with the ERP’s as the hint; spaces alone are no change; a blank box clears it', async () => {
+      render(<ModelEditor model={model({ configured: true, code: '5535', name: 'NOVA PLUS', erpName: 'NOVA', ownName: 'NOVA PLUS' })} brands={brands} options={options} onClose={vi.fn()} />)
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('5535 · NOVA PLUS')
+      const box = screen.getByRole('textbox', { name: 'Model name' })
+      expect(box).toHaveValue('NOVA PLUS')
+      expect(box).toHaveAttribute('placeholder', 'NOVA')
+      fireEvent.change(box, { target: { value: ' NOVA  PLUS ' } })
+      expect(screen.getByRole('status')).toHaveTextContent('No unsaved changes')
+      fireEvent.change(box, { target: { value: '   ' } })
+      expect(screen.getByRole('status')).toHaveTextContent('1 unsaved change')
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ modelName: null })))
+    })
+
+    it('is never written back when another setting is what changed', async () => {
+      render(<ModelEditor model={model({ configured: true, code: '5535', name: 'ROMA', erpName: 'NOVA', ownName: 'ROMA' })} brands={brands} options={options} onClose={vi.fn()} />)
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Offer SKU 2376-1S' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(saveModelSettings).toHaveBeenCalledOnce())
+      expect(saveModelSettings.mock.calls[0][0]).not.toHaveProperty('modelName')
+    })
+
+    it('is not asked of a mattress, a bed frame or an accessory — their model is their name', () => {
+      for (const [code, category] of [['APEX', 'MATTRESS'], ['1025', 'BEDFRAME'], ['BOLSTER', 'ACCESSORY']]) {
+        render(<ModelEditor model={model({ code, name: code, erpName: code, category, skus: [] })} brands={brands} options={options} onClose={vi.fn()} />)
+        expect(screen.queryByRole('textbox', { name: 'Model name' })).not.toBeInTheDocument()
+        cleanup()
+      }
+    })
+
+    it('shows on its card, and the board still finds it by the ERP’s name', () => {
+      render(<ModularTab models={[
+        model({ code: '5535', name: 'ROMA', erpName: 'NOVA', ownName: 'ROMA' }),
+        model({ erpId: 'model-b', code: '9999', name: '9999', erpName: '9999', skus: [] }),
+      ]} brands={brands} options={options} />)
+      expect(screen.getByRole('button', { name: 'Configure 5535' })).toHaveTextContent('ROMA')
+      for (const query of ['roma', 'nova']) {
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search models' }), { target: { value: query } })
+        expect(screen.getByRole('button', { name: 'Configure 5535' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Configure 9999' })).not.toBeInTheDocument()
+      }
+    })
   })
 
   it('keeps prices out of the option picker: no price, matrix or surcharge labels', () => {

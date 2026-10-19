@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useTransition, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
+import { MODEL_NAME_MAX, tidyModelName } from '@/lib/catalogue/edits'
 import { valueKey } from '@/lib/catalogue/keys'
-import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, needsBrandPick, optionKeysOf, RIDER, skuKeyOf, type OptionKey } from '@/lib/catalogue/options'
+import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, needsBrandPick, optionKeysOf, RIDER, skuKeyOf, takesModelName, type OptionKey } from '@/lib/catalogue/options'
 import { saveModelSettings } from '../actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import FloatingWindow from './FloatingWindow'
@@ -21,9 +22,11 @@ interface Draft {
   gift: boolean | null
   calc: string | null
   brand: string | null
+  /** The model name box as typed: '' = no name of the portal's own. */
+  name: string
 }
 
-/** How many ticks, switches and selects differ from what is saved. Ticking and unticking again is no change. */
+/** How many ticks, switches, selects and boxes differ from what is saved. Ticking and unticking again is no change. */
 export function countChanges(saved: Draft, draft: Draft, keys: readonly string[]): number {
   let n = 0
   if (saved.offered !== draft.offered) n++
@@ -39,6 +42,7 @@ export function countChanges(saved: Draft, draft: Draft, keys: readonly string[]
   if (saved.gift !== draft.gift) n++
   if (saved.calc !== draft.calc) n++
   if (saved.brand !== draft.brand) n++
+  if (tidyModelName(saved.name) !== tidyModelName(draft.name)) n++
   return n
 }
 
@@ -91,6 +95,9 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
   // the system cannot place is asked (user 2026-10-06). Anything stored for
   // the others is not read, and a save clears it.
   const picks = needsBrandPick(model.category, model.derivedBrand)
+  // A sofa's model is a number, so the portal may name it (2026-10-19); the box
+  // holds the portal's own name only — the ERP's shows as its placeholder.
+  const named = takesModelName(model.category)
   const [saved] = useState<Draft>(() => ({
     offered: model.offered,
     skuTicks: Object.fromEntries(model.skus.map(s => [s.erpId, s.offered])),
@@ -98,6 +105,7 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
     gift: model.giftOverride,
     calc: picks ? model.calcOverride : null,
     brand: picks ? model.brandOverride : null,
+    name: model.ownName ?? '',
   }))
   const [offered, setOffered] = useState(saved.offered)
   const [skuTicks, setSkuTicks] = useState(saved.skuTicks)
@@ -105,12 +113,16 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
   const [gift, setGift] = useState(saved.gift)
   const [calc, setCalc] = useState(saved.calc)
   const [brand, setBrand] = useState(saved.brand)
+  const [name, setName] = useState(saved.name)
+  const nameChanged = tidyModelName(name) !== tidyModelName(saved.name)
   const skuKey = skuKeyOf(model.category)
   const optionKeys = optionKeysOf(model.category)
-  const changes = countChanges(saved, { offered, skuTicks, enabled, gift, calc, brand }, optionKeys.map(o => o.key))
+  const changes = countChanges(saved, { offered, skuTicks, enabled, gift, calc, brand, name }, optionKeys.map(o => o.key))
   const dirty = changes > 0
   useProductDraftGuard(changes, saving)
-  const derivedCalc = calcCategoryOf(model.category, model.name ?? model.code)
+  // The section follows the ERP's own name, never one typed here.
+  const derivedCalc = calcCategoryOf(model.category, model.erpName ?? model.code)
+  const erpNamed = model.erpName && model.erpName !== model.code ? model.erpName : null
   const liveSkus = model.skus.filter(s => !s.removed && s.active)
   const missingLadder = picks && !brand
   const hasPrev = !!position && position.index > 0
@@ -179,7 +191,11 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
     setGuard(null)
     startSaving(async () => {
       try {
-        await saveModelSettings({ erpModelId: model.erpId, offered, enabled: Object.fromEntries(optionKeys.map(o => [o.key, enabled[o.key] ?? []])), gift, calcCategory: calc, brandCode: brand, skuOffered: skuTicks })
+        await saveModelSettings({
+          erpModelId: model.erpId, offered, enabled: Object.fromEntries(optionKeys.map(o => [o.key, enabled[o.key] ?? []])), gift, calcCategory: calc, brandCode: brand, skuOffered: skuTicks,
+          // Only a name that changed is sent: another window's name is never written back over.
+          ...(named && nameChanged ? { modelName: tidyModelName(name) || null } : {}),
+        })
         router.refresh()
         const last = after.kind === 'step' && after.dir === 1 && !hasNext
         onSaved?.(last ? `${model.code} saved. That was the last model in this list.` : `${model.code} saved. Calculator selections are updated.`)
@@ -237,7 +253,7 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
         <fieldset disabled={saving} style={{ display: 'contents' }}>
           <legend className="sr-only">Model settings</legend>
           <div className={c.winListing}>
-            <div className={c.calc} data-picks={picks || undefined} aria-label="Calculator listing" role="group">
+            <div className={c.calc} data-picks={picks || undefined} data-named={named || undefined} aria-label="Calculator listing" role="group">
               <div className={c.field}>
                 <span className={c.fieldLabel}>REVENUE CALCULATOR</span>
                 <button type="button" role="switch" aria-checked={offered} aria-label="Offered in the Revenue calculator" className={c.toggle} onClick={() => turnOn(!offered)}>
@@ -271,6 +287,13 @@ function EditorContent({ model, titleId, dismiss, brands, options, position, onC
                   <option value="">{defaultGift(calc ?? derivedCalc) ? 'May be a gift (default)' : 'Not a gift (default)'}</option><option value="yes">May be a gift</option><option value="no">Not a gift</option>
                 </select>
               </label>
+              {named ? (
+                <label className={c.field}>
+                  <span className={c.fieldLabel}>MODEL NAME</span>
+                  <input type="text" aria-label="Model name" className={c.fieldInput} value={name} maxLength={MODEL_NAME_MAX}
+                    placeholder={erpNamed ?? 'Add a name'} autoComplete="off" spellCheck={false} onChange={e => setName(e.target.value)} />
+                </label>
+              ) : null}
             </div>
             <p className={c.summary} data-tone={summary.tone}>{summary.text}</p>
           </div>
