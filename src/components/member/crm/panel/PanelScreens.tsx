@@ -14,13 +14,11 @@ import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { useCloseOnOutside } from "../sales/outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
-import { useBackCloses } from "../shared/back";
 import { InAppCamera } from "../shared/in-app-camera";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
   // The phone's Back closes the chat, back to where it was opened from (2026-10-15).
-  useBackCloses(!!ui.lead, () => set(u => ({ ...u, lead: null, toast: "", pMenu: false, reSheet: false, pick: "", pCmp: null, pPick: null })), "crmLead");
   // The Undo bar counts 30 seconds down, then the change stands.
   const undoOn = !!ui.undo;
   useEffect(() => {

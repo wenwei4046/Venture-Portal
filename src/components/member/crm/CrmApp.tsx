@@ -43,6 +43,8 @@ import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { paintStatusBar, topColorOf } from "@/components/pwa/status-bar";
 import { crmChatTag } from "@/lib/push/notices";
 import { setUrgencyThresholds } from "@/lib/member/crm";
+import { useNavHistory, type NavFrame } from "./shared/nav-history";
+import { CHAT_LEFT, LEAD_LEFT, navFrameOf, type NavSnap } from "./shared/nav-frame";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
@@ -236,6 +238,15 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       setPanelUi(u => ({ ...u, tab: "inbox", lead: c.id, nfOpen: false }));
     }
   }, [data, open, act]);
+
+  // The phone's Back steps back through the CRM (2026-10-20, shared/nav-history.ts): every screen — the side, its tab,
+  // a chat, a sub-page, a sheet — is a step, and Back puts the one before it back. The desktop keeps desk/nav.ts.
+  const navFrame = useMemo<NavFrame<NavSnap> | null>(() => (desk ? null : navFrameOf(ui, panelUi, hodMode, viewing, teamAs)), [desk, ui, panelUi, hodMode, viewing, teamAs]);
+  useNavHistory(navFrame, snap => {
+    setHodMode(snap.hodMode); setViewing(snap.viewing); setTeamAs(snap.teamAs);
+    setUi(u => ({ ...u, ...snap.sales, ...(u.chat !== snap.sales.chat ? CHAT_LEFT : {}) }));
+    setPanelUi(u => ({ ...u, ...snap.panel, ...(u.lead !== snap.panel.lead ? LEAD_LEFT : {}) }));
+  });
 
   const shell = (body: React.ReactNode, extra = "") => (
     // data-revenue-app: the portal's display serif stays off the CRM's headings (globals.css).
