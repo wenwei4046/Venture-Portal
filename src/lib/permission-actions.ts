@@ -27,7 +27,7 @@ export type FunctionKey =
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
   // HR › Attendance (mig 20261015030000).
   | 'attendance'
-  // IT support's desk (mig 20261021013000).
+  // IT support's desk (mig 20261021020000).
   | 'it_requests'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
@@ -114,7 +114,7 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   guest_link: ['guest_link.view', 'guest_link.edit'],
   // HR › Attendance (20261015030000).
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
-  // IT support's desk (20261021013000): read everybody's requests; write notes and set their status.
+  // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
   it_requests: ['it_requests.view', 'it_requests.edit'],
 }
 

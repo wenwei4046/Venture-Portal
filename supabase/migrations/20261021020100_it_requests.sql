@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261021013100_it_requests.sql
+-- 20261021020100_it_requests.sql
 -- IT support (2026-10-20 — the user: "i want add on a button to get submit for IT support or help"; "主要的目的呢，是在
 -- 那边所有人都可以填：上面是 title，然后 details 讲具体内容，还可以加 screenshot。你可以选 category … suggest 加 feature
 -- 还是 fix bug，或者是有什么建议 … upload image 或者传一个包"; "我们也可以帮做 annotation … 他也能看到自己 submit 的 case

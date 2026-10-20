@@ -40,7 +40,7 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   guest_link: { actions: ['view', 'edit'], scopes: ['all'] },
   // HR › Attendance (mig 20261015030000).
   attendance: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
-  // IT support's desk (mig 20261021013000).
+  // IT support's desk (mig 20261021020000).
   it_requests: { actions: ['view', 'edit'], scopes: ['all'] },
 }
 

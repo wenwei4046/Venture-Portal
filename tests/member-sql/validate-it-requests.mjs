@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261021013100 (2026-10-20 — the user: "i want add on a button to get submit for IT
+// Local PostgreSQL regression for 20261021020100 (2026-10-20 — the user: "i want add on a button to get submit for IT
 // support or help"; everybody sends a title, the details, screenshots or files, as a bug, a new feature or a suggestion;
 // "as Revenue Director 的 view … 左边这里 category 就会多一个 IT request"; "我们也可以帮做 annotation … 他也能看到自己
 // submit 的 case status。如果我们给它 fix 了，他那边就可以收到 fix 的通知"). The migration runs VERBATIM, twice, over
@@ -114,7 +114,7 @@ await db.exec(`
     ('CHEA HUAN', '${SENDER}', '${id(31)}'), ('PETER', '${DESK}', '${id(32)}'), ('OTHER ONE', '${OTHER}', NULL);
 `)
 
-const file = (await readFile(new URL('20261021013100_it_requests.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+const file = (await readFile(new URL('20261021020100_it_requests.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
 

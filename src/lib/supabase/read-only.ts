@@ -63,7 +63,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'director_hv_share_of',
   // The Revenue app's CRM chat button — one's own chats' unread (mig 20261014120000): STABLE.
   'crm_my_unread',
-  // IT support (mig 20261021013100): one's own requests, the desk's, a file's path — all STABLE.
+  // IT support (mig 20261021020100): one's own requests, the desk's, a file's path — all STABLE.
   'my_it_requests', 'it_requests_desk', 'it_request_file',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',

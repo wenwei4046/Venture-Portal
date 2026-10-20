@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261021013000_it_requests_permission.sql
+-- 20261021020000_it_requests_permission.sql
 -- IT requests join the permission matrix (2026-10-20 — the user: "i want add on a button to get submit for IT support
 -- or help" in the Revenue app's Profile › Settings, which everybody may use; "as Revenue Director 的 view，或者像更大职位
 -- log in 进去的时候，左边这里 category 就会多一个 IT request。这边的 list 就会显示出来他们 submit 上来的 request change

@@ -61,7 +61,7 @@ export const PERMISSIONS = [
   'guest_link',
   // HR › Attendance (2026-10-15, mig 20261015030000): Attendance · View opens it.
   'attendance',
-  // IT support's desk (2026-10-20, mig 20261021013000): IT requests · View opens it — a Revenue app account may hold it.
+  // IT support's desk (2026-10-20, mig 20261021020000): IT requests · View opens it — a Revenue app account may hold it.
   'it_requests',
 ] as const
 

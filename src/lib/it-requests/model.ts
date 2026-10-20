@@ -5,7 +5,7 @@
  * 它 fix 了，他那边就可以收到 fix 的通知").
  *
  * What a request is as the app reads and writes it. Pure, so every screen draws the same thing and this is tested. The
- * database decides who may do what (mig 20261021013100): anybody signed in sends one and follows their own; IT requests ·
+ * database decides who may do what (mig 20261021020100): anybody signed in sends one and follows their own; IT requests ·
  * View reads everybody's; Edit writes notes on one and sets its status, and its sender is told.
  */
 
@@ -31,7 +31,7 @@ export const STATUS_LABEL: Readonly<Record<ItStatus, string>> = { new: 'New', in
 /** A status's chip, in the app's tones: waiting, being worked on, done, put away. */
 export const STATUS_TONE: Readonly<Record<ItStatus, 'pending' | 'warn' | 'good' | 'none'>> = { new: 'pending', in_progress: 'warn', fixed: 'good', closed: 'none' }
 
-/** The database's limits (mig 20261021013100), said before anything is sent. */
+/** The database's limits (mig 20261021020100), said before anything is sent. */
 export const IT_LIMITS = { title: 120, details: 5000, note: 3000, files: 10, fileBytes: 50 * 1024 * 1024 } as const
 
 export interface ItFile {
@@ -151,7 +151,7 @@ export function noteProblem(input: { body: string; files: number; status: ItStat
   return null
 }
 
-/** The bucket's own list (mig 20261021013100): the type a file goes up as, by the browser's word or else its name. */
+/** The bucket's own list (mig 20261021020100): the type a file goes up as, by the browser's word or else its name. */
 const BY_TYPE: readonly string[] = [
   'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
   'video/mp4', 'video/quicktime', 'video/webm',

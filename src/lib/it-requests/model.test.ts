@@ -5,7 +5,7 @@ import {
 } from './model'
 
 // IT support (2026-10-20): what a request is as the app reads it, and what the app refuses before sending — the
-// database's own words and limits (mig 20261021013100, tests/member-sql/validate-it-requests.mjs).
+// database's own words and limits (mig 20261021020100, tests/member-sql/validate-it-requests.mjs).
 
 const ROW = {
   id: 'r1', ref: 'IT-0001', category: 'bug', title: 'Quote page freezes', details: 'Tap + twice', status: 'in_progress', app: 'revenue',

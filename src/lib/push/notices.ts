@@ -11,7 +11,7 @@ export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it'
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
  */
 export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today' | 'att_request'
-  // IT support (2026-10-20, mig 20261021013100): a request's status or note, to its sender; a new one or a reply, to the desk.
+  // IT support (2026-10-20, mig 20261021020100): a request's status or note, to its sender; a new one or a reply, to the desk.
   | 'it_request'
 
 export interface Notice {

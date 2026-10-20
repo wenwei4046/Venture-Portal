@@ -347,7 +347,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
   // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
   'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',
-  // IT support (mig 20261021013100): a request sent and one's own read by any active sign-in; everybody's and a note's
+  // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
   // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
