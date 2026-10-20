@@ -52,7 +52,7 @@ describe("Requests in View as (user 2026-10-06: 只能看，不能送出)", () =
   it("each way to start a request opens its form — nothing on the page is switched off", () => {
     const onNew = vi.fn();
     render(<RequestsPage rows={[]} filter="all" onFilter={() => {}} onBack={() => {}} onNew={onNew} onOpen={() => {}} />);
-    for (const [label, kind] of [["Submit claim", "claim"], ["Submit replacement", "replacement"], ["Submit waiting list", "waiting"]] as const) {
+    for (const [label, kind] of [["Submit transport claim", "claim"], ["Submit replacement", "replacement"], ["Submit waiting list", "waiting"]] as const) {
       const row = screen.getByRole("button", { name: new RegExp(label) });
       expect(row).toBeEnabled();
       fireEvent.click(row);

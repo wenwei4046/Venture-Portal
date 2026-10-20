@@ -214,7 +214,7 @@ describe("Requests offers a food claim only where HR opened it", () => {
     const { onNew, onFilter } = page(["claim", "food", "replacement", "waiting"]);
     const starts = screen.getAllByRole("button", { name: /^Submit/ }).map(b => b.textContent);
     expect(starts).toEqual([
-      "Submit claimOutstation and Airbnb stays", "Submit food claimMeals on the days you worked a fair",
+      "Submit transport claimOutstation and Airbnb stays", "Submit food claimMeals on the days you worked a fair",
       "Submit replacementReplacements, transfers and exits", "Submit waiting listJoining requests and allocation",
     ]);
     fireEvent.click(screen.getByRole("button", { name: /Submit food claim/ }));

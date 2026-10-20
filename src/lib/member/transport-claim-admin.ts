@@ -2,7 +2,7 @@
  * People › Member services › Transport claim's ⋯ — who may claim it (2026-10-20, the user: "在 save button 旁边…做
  * 一个三个点。它是要能够选择什么 title 的人可以 claim 这个 transport。它跟 food claim 一样…什么 title 都可以选").
  *
- * A transport claim is the member's *Submit claim*: Outstation by road, a plane ticket, an Airbnb stay. HR ticks the
+ * A transport claim is the member's *Submit transport claim* (*Submit claim* until 2026-10-20): Outstation by road, a plane ticket, an Airbnb stay. HR ticks the
  * titles whose holders may send one — the member's seat title in the sub-department claimed for. The database asks
  * the same when a claim is sent (`member_transport_claim_open`); `member_admin_save_transport_claim` checks the list
  * again. Seeded on 2026-10-20 with every Revenue title, so nobody lost the claim on the day.
