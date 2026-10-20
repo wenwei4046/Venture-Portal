@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { FileLink } from '@/lib/documentation/server'
+import { signatureOrNull, signatureProblem } from './signature'
 
 /**
  * One's own memos, written (2026-10-12, mig 20261012210000): opened, or
@@ -32,13 +33,20 @@ async function signedIn(): Promise<boolean> {
   return !!user?.is_active
 }
 
-/** Opened (`ack` false) or acknowledged. */
-export async function markMyMemo(id: string, ack: boolean): Promise<MemoMarkOutcome> {
+/**
+ * Opened (`ack` false) or acknowledged — acknowledged with the person's own signature (2026-10-20, mig
+ * 20261021013000: the pad's PNG, kept on the receipt with the first acknowledgement). The database refuses an
+ * Acknowledge without one; this says so first.
+ */
+export async function markMyMemo(id: string, ack: boolean, signature?: string | null): Promise<MemoMarkOutcome> {
   if (!(await signedIn())) return { ok: false, reason: 'Sign in with an active work account.' }
   if (typeof id !== 'string' || !UUID.test(id)) return { ok: false, reason: 'That memo is not there.' }
-  const { data, error } = await (await client()).rpc('my_memo_mark', { p_memo: id, p_ack: ack === true })
+  const acking = ack === true
+  const problem = acking ? signatureProblem(signature) : null
+  if (problem) return { ok: false, reason: problem }
+  const { data, error } = await (await client()).rpc('my_memo_mark', { p_memo: id, p_ack: acking, p_signature: acking ? signature : null })
   if (error) {
-    return { ok: false, reason: error.code === '42501' || error.code === 'VIEW_AS' ? error.message : 'It could not be recorded. Please try again.' }
+    return { ok: false, reason: ['42501', '22023', 'VIEW_AS'].includes(error.code ?? '') ? error.message : 'It could not be recorded. Please try again.' }
   }
   // The faces that read memos on the server: the HR app, the Revenue app.
   revalidatePath('/hr-app')
@@ -49,6 +57,14 @@ export async function markMyMemo(id: string, ack: boolean): Promise<MemoMarkOutc
     readAt: typeof r.readAt === 'string' ? r.readAt : null,
     acknowledgedAt: typeof r.acknowledgedAt === 'string' ? r.acknowledgedAt : null,
   }
+}
+
+/** One's own signature on a memo one acknowledged (2026-10-20): drawn back beside "You acknowledged this". */
+export async function myMemoSignature(id: string): Promise<string | null> {
+  if (!(await signedIn())) return null
+  if (typeof id !== 'string' || !UUID.test(id)) return null
+  const { data, error } = await (await client()).rpc('my_memo_signature', { p_memo: id })
+  return error ? null : signatureOrNull(data)
 }
 
 /**

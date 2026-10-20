@@ -298,6 +298,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [memoError, setMemoError] = useState<string | null>(null);
   const [memoRead, setMemoRead] = useState<ReadonlySet<string>>(() => new Set());
   const [memoAcked, setMemoAcked] = useState<ReadonlyMap<string, string>>(() => new Map());
+  // The signature before Acknowledge (2026-10-20 — the user: "签完之后再来点那个 Acknowledge button"): the pad's picture
+  // for the memo open, and each acknowledged memo's signature once given here or read back.
+  const [memoSig, setMemoSig] = useState<string | null>(null);
+  const [memoSigned, setMemoSigned] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const memoSigAsked = useRef<Set<string>>(new Set());
   const [pfDateOpen, setPfDateOpen] = useState(false);
   const [incPeriod, setIncPeriod] = useState<string | null>(null);
   // IT support (2026-10-20): its list's filter, the form, and the request open — a tapped notice's (`?it=<id>`) from the
@@ -1004,16 +1009,32 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     memoFromAddress.current = null;
     openMemo(memoOnScreen);
   }, [memoOnScreen, openMemo]);
+  // Another memo, or none: the pad starts clean.
+  useEffect(() => { setMemoSig(null); }, [memoPick]);
   const ackMemo = useCallback(async () => {
-    if (!memoPick || memoReadOnly) return;
+    if (!memoPick || memoReadOnly || !memoSig) return;
     setMemoBusy(true); setMemoError(null);
-    const result = fxp ? { ok: true as const, data: { acknowledgedAt: new Date().toISOString() } } : await source.memo(memoPick, true);
+    const result = fxp ? { ok: true as const, data: { acknowledgedAt: new Date().toISOString() } } : await source.memo(memoPick, true, memoSig);
     setMemoBusy(false);
     if (!result.ok) { setMemoError(result.error); return; }
     const at = result.data.acknowledgedAt ?? new Date().toISOString();
     setMemoAcked(prev => new Map(prev).set(memoPick, at));
-  }, [memoPick, memoReadOnly, fxp, source]);
+    setMemoSigned(prev => new Map(prev).set(memoPick, memoSig));
+    setMemoSig(null);
+  }, [memoPick, memoReadOnly, memoSig, fxp, source]);
   const memoPickVM = memoPick ? memoVMs.find(m => m.id === memoPick) ?? null : null;
+  // An acknowledged memo opened: its signature is read back once, to draw under "You acknowledged" (their own only —
+  // never while viewing a member).
+  const pickAcked = !!memoPickVM?.acked;
+  useEffect(() => {
+    if (!memoPick || !pickAcked || memoReadOnly || fxp || !source.memoSignature || memoSigAsked.current.has(memoPick)) return;
+    memoSigAsked.current.add(memoPick);
+    const id = memoPick;
+    void settleRead(source.memoSignature(id)).then(r => {
+      const png = r.ok ? r.data : null;
+      if (png) setMemoSigned(prev => (prev.has(id) ? prev : new Map(prev).set(id, png)));
+    });
+  }, [memoPick, pickAcked, memoReadOnly, fxp, source]);
 
   // Requests: send one, cancel one still with HR, update one HR returned.
   const openRequest = useCallback((id: string) => {
@@ -1563,7 +1584,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
                 sign={source.itSign} openFile={openItFile} onClose={() => setItPick(null)} />
             </>
           )}
-          {route.pf === "memos" && <MemoSheet open={memoPickVM !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}
+          {route.pf === "memos" && <MemoSheet open={memoPickVM !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError}
+            signature={memoSig} signed={memoPick && !memoReadOnly ? memoSigned.get(memoPick) ?? null : null} onSign={setMemoSig}
+            onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}
             onFile={memoPick && source.memoFile && !fxp ? mode => openMemoFile(memoPick, mode) : undefined} />}
           {!route.pf && shows(closed, "scheme") && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
           {!route.pf && ownPassword && <PasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} change={ownPassword} />}

@@ -221,6 +221,141 @@ try {
   const psnap = await one(`SELECT public.member_principal_snapshot(false)`)
   check([psnap.find(m => m.id === M2).attachmentName, psnap.find(m => m.id === M2).kind], ['Board.pdf', 'Memo'], 'and the Principal’s')
 
+  // ══ 2026-10-20 — Acknowledge carries the person's own signature (the user: "点进去的时候，应该要有一个 signature，
+  // 也就是他自己手绘签名的那种，签完之后再来点那个 Acknowledge button"; migs 20261021013000 + 20261021013100, each run
+  // VERBATIM twice). The Revenue app's writer, member_acknowledge_memo, as production runs it (read off pg_proc
+  // 2026-10-20 — the migration checks its body), over stand-ins for what it asks.
+  await asSystem()
+  await db.exec(`
+    CREATE TABLE hr_person_letters(id uuid PRIMARY KEY, staff_id uuid NOT NULL, memo_id uuid);
+    CREATE FUNCTION public.has_perm(p_key text) RETURNS boolean LANGUAGE sql STABLE AS
+      $$ SELECT p_key = ANY (string_to_array(current_setting('test.actions', true), ',')) $$;
+    CREATE FUNCTION public.member_staff_id() RETURNS uuid LANGUAGE sql STABLE AS
+      $$ SELECT s.id FROM public.hr_staff_costs s WHERE s.user_id = auth.uid() LIMIT 1 $$;
+    CREATE FUNCTION public.member_visible_memo(p_memo uuid, p_staff uuid) RETURNS boolean LANGUAGE sql STABLE AS
+      $$ SELECT EXISTS (SELECT 1 FROM public.member_memo_recipients r WHERE r.memo_id = p_memo AND r.staff_id = p_staff) $$;
+    CREATE FUNCTION public.member_acknowledge_memo(p_memo uuid, p_ack boolean DEFAULT false) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_staff uuid:=public.member_staff_id(); v_version integer; v_receipt public.member_memo_receipts%ROWTYPE;
+BEGIN
+ IF NOT public.has_perm('member_memos') OR NOT public.member_visible_memo(p_memo,v_staff) THEN RAISE EXCEPTION 'Memo is not addressed to this account' USING ERRCODE='42501'; END IF;
+ SELECT version INTO v_version FROM public.member_memos WHERE id=p_memo;
+ INSERT INTO public.member_memo_receipts(memo_id,user_id,version,acknowledged_at) VALUES(p_memo,auth.uid(),v_version,CASE WHEN p_ack THEN now() END)
+ ON CONFLICT(memo_id,user_id,version) DO UPDATE SET acknowledged_at=coalesce(member_memo_receipts.acknowledged_at,EXCLUDED.acknowledged_at)
+ RETURNING * INTO v_receipt;
+ RETURN jsonb_build_object('id',p_memo,'readAt',v_receipt.read_at,'acknowledgedAt',v_receipt.acknowledged_at,'version',v_version);
+END $$;
+    GRANT EXECUTE ON FUNCTION public.member_acknowledge_memo(uuid, boolean) TO authenticated;
+  `)
+  const folded = sig => one(`SELECT md5(regexp_replace(prosrc, '\\s+', ' ', 'g')) FROM pg_proc WHERE oid = $1::regprocedure`, [sig])
+  check(await folded('public.member_acknowledge_memo(uuid,boolean)'), 'eb0354d8bcbcec5fc60945fb53536a6c', 'the stand-in is production’s body, word for word')
+  check(await folded('public.my_memo_mark(uuid,boolean)'), 'e58967962ff66c2fbf6aca311fd87744', '20261012210000’s my_memo_mark is production’s')
+  check(await folded('public.hr_memo_preview(uuid)'), '00c1fbf9a72e7731fa30ab5c19b867fe', '…and its hr_memo_preview')
+
+  const signed = await readFile(new URL('20261021013000_memo_signature.sql', migrations), 'utf8')
+  const required = await readFile(new URL('20261021013100_memo_signature_required.sql', migrations), 'utf8')
+  // The signature as the pad sends it: a PNG data URL.
+  const SIG_A = `data:image/png;base64,iVBORw0KGgo${'A'.repeat(400)}`
+  const SIG_B = `data:image/png;base64,iVBORw0KGgo${'B'.repeat(400)}`
+  const receipt = async (memo, user) => {
+    await asSystem()
+    return (await q(`SELECT acknowledged_at IS NOT NULL AS acked, signature FROM member_memo_receipts WHERE memo_id = $1 AND user_id = $2`, [memo, user]))[0] ?? null
+  }
+
+  await db.exec(signed)
+  // Between the two (the app that signs not live yet): the old writers still acknowledge, as the page on the screen does.
+  const M3 = await publish('Code of conduct', [LOO, KRIS, ZACK])
+  const M4 = await publish('Fire drill', [LOO, KRIS])
+  await as(LOO_USER)
+  check(typeof (await one(`SELECT public.my_memo_mark($1, true)`, [M4])).acknowledgedAt, 'string', 'before 013100: the old my_memo_mark still acknowledges')
+  check(await receipt(M4, LOO_USER), { acked: true, signature: null }, '…with no signature, as before')
+  await db.exec(required)
+  const bodies = async () => q(`SELECT oid::regprocedure::text AS f, md5(prosrc) AS m FROM pg_proc
+    WHERE proname IN ('my_memo_mark', 'member_acknowledge_memo', 'hr_memo_preview', 'my_memo_signature', 'hr_letter_signature', 'memo_signature_ok') ORDER BY 1`)
+  const once = await bodies()
+  await db.exec(signed)
+  await db.exec(required)
+  check(await bodies(), once, 'both run again change nothing (each guard sees it is done)')
+
+  // ── Who may ───────────────────────────────────────────────────────────────
+  for (const fn of ['my_memo_mark(uuid,boolean,text)', 'member_acknowledge_memo(uuid,boolean,text)', 'my_memo_signature(uuid)', 'hr_letter_signature(uuid)']) {
+    check(await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), false, `the publishable key cannot call ${fn}`)
+    check(await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`), true, `a signed-in login can call ${fn}`)
+  }
+  check(await one(`SELECT has_function_privilege('authenticated', 'public.memo_signature_ok(text)', 'EXECUTE')`), false, 'memo_signature_ok is the writers’ alone')
+  check(await one(`SELECT has_function_privilege('authenticated', 'public.my_memo_mark(uuid,boolean)', 'EXECUTE')`), true, 'the old my_memo_mark keeps its grant')
+
+  // ── Every view's writer: no Acknowledge without a signature ───────────────
+  await as(LOO_USER)
+  await reject(`SELECT public.my_memo_mark($1, true, NULL)`, [M3], /Sign in the box/, 'Acknowledge with no signature is refused')
+  await reject(`SELECT public.my_memo_mark($1, true, $2)`, [M3, `data:image/jpeg;base64,/9j/4AAQ${'A'.repeat(400)}`], /Sign in the box/, 'a picture that is not the pad’s PNG is refused')
+  await reject(`SELECT public.my_memo_mark($1, true, $2)`, [M3, 'data:image/png;base64,iVBORw0KGgoAAAA'], /Sign in the box/, 'nor a PNG too small to hold a signature')
+  await reject(`SELECT public.my_memo_mark($1, true, $2)`, [M3, `data:image/png;base64,iVBORw0KGgo${'A'.repeat(200001)}`], /Sign in the box/, 'nor one past 200,000 characters')
+  check(await receipt(M3, LOO_USER), null, 'a refused Acknowledge writes nothing')
+  await as(LOO_USER)
+  const opened = await one(`SELECT public.my_memo_mark($1, false, NULL)`, [M3])
+  check([typeof opened.readAt, opened.acknowledgedAt], ['string', null], 'opening needs no signature')
+  check(await receipt(M3, LOO_USER), { acked: false, signature: null }, 'an opened receipt has none')
+  await as(LOO_USER)
+  const signedAck = await one(`SELECT public.my_memo_mark($1, true, $2)`, [M3, SIG_A])
+  check(typeof signedAck.acknowledgedAt, 'string', 'signed: acknowledged')
+  check(await receipt(M3, LOO_USER), { acked: true, signature: SIG_A }, 'the signature is kept on the receipt')
+  check('signature' in signedAck, false, 'and never sent back')
+  await as(LOO_USER)
+  const twice = await one(`SELECT public.my_memo_mark($1, true, $2)`, [M3, SIG_B])
+  check(twice.acknowledgedAt, signedAck.acknowledgedAt, 'a second Acknowledge keeps the first time…')
+  check((await receipt(M3, LOO_USER)).signature, SIG_A, '…and the first signature')
+  await as(LOO_USER)
+  await reject(`SELECT public.my_memo_mark($1, true, $2)`, [L1, SIG_A], /not addressed to you/, 'a memo for somebody else is still refused, signed or not')
+  await reject(`SELECT public.my_memo_mark($1, true)`, [M2], /refresh the app/, 'after 013100 the old my_memo_mark acknowledges nothing')
+  check(await receipt(M2, LOO_USER), null, '…and writes nothing')
+  await as(LOO_USER)
+  check(typeof (await one(`SELECT public.my_memo_mark($1, false)`, [M2])).readAt, 'string', 'but still marks a memo opened')
+  check(await receipt(M2, LOO_USER), { acked: false, signature: null }, '…unsigned, unacknowledged')
+  await as(LOO_USER)
+  check((await one(`SELECT public.my_memos()`)).memos.every(m => !('signature' in m)), true, 'my_memos() carries no signature (the list stays small)')
+
+  // ── The Revenue app's writer, the same rule ───────────────────────────────
+  await as(KRIS_USER, ['member_memos'])
+  await reject(`SELECT public.member_acknowledge_memo($1, true, NULL)`, [M3], /Sign in the box/, 'the Revenue app’s Acknowledge needs a signature too')
+  await reject(`SELECT public.member_acknowledge_memo($1, true)`, [M3], /refresh the app/, '…and its old two-argument one refuses to acknowledge')
+  await as(KRIS_USER, ['member_memos'])
+  check((await one(`SELECT public.member_acknowledge_memo($1, false)`, [M4])).acknowledgedAt, null, 'the old one still marks a memo read')
+  await as(KRIS_USER, ['member_memos'])
+  check(typeof (await one(`SELECT public.member_acknowledge_memo($1, true, $2)`, [M3, SIG_B])).acknowledgedAt, 'string', 'signed: acknowledged')
+  check(await receipt(M3, KRIS_USER), { acked: true, signature: SIG_B }, 'the member’s signature is on their receipt')
+  await as(KRIS_USER)
+  await reject(`SELECT public.member_acknowledge_memo($1, true, $2)`, [M4, SIG_B], /not addressed to this account/, 'without Memos (member_memos) it is refused as before')
+  await asSystem()
+  await reject(`INSERT INTO member_memo_receipts (memo_id, user_id, version, signature) VALUES ($1, $2, 1, $3)`, [M4, OFF_USER, SIG_A],
+    /signature_check/, 'the table refuses a signature on a receipt nobody acknowledged')
+
+  // ── Reading it back ───────────────────────────────────────────────────────
+  await as(LOO_USER)
+  check(await one(`SELECT public.my_memo_signature($1)`, [M3]), SIG_A, 'one’s own signature on a memo one acknowledged')
+  check(await one(`SELECT public.my_memo_signature($1)`, [M2]), null, 'none on a memo only opened')
+  await as(KRIS_USER)
+  check(await one(`SELECT public.my_memo_signature($1)`, [M3]), SIG_B, 'each login reads its own, never another’s')
+  await as(null)
+  await reject(`SELECT public.my_memo_signature($1)`, [M3], /Sign in/, 'nobody signed in reads none')
+
+  await as(KRIS_USER)
+  await reject(`SELECT public.hr_memo_preview($1)`, [M3], /Documentation · View/, 'Publish › Preview still needs Documentation · View')
+  await as(SHARED_USER, ['documentation.view'])
+  const pv3 = await one(`SELECT public.hr_memo_preview($1)`, [M3])
+  check(pv3.people.map(p => [p.name, p.signature]), [['ZACK', null], ['KRIS', SIG_B], ['LOO WEN WEI', SIG_A]],
+    'HR sees each person’s signature beside Acknowledged — none for who has not')
+
+  const LETTER = id(31)
+  const UNSIGNED = id(32)
+  await asSystem()
+  await q(`INSERT INTO hr_person_letters (id, staff_id, memo_id) VALUES ($1, $2, $3), ($4, $5, $6)`, [LETTER, KRIS, M3, UNSIGNED, KRIS, M4])
+  await as(KRIS_USER)
+  await reject(`SELECT public.hr_letter_signature($1)`, [LETTER], /Documentation · View/, 'a letter’s signature needs Documentation · View')
+  await as(SHARED_USER, ['documentation.view'])
+  const ls = await one(`SELECT public.hr_letter_signature($1)`, [LETTER])
+  check([ls.signature, typeof ls.acknowledgedAt], [SIG_B, 'string'], 'HR reads the signature on a letter its person acknowledged')
+  check(await one(`SELECT public.hr_letter_signature($1)`, [UNSIGNED]), null, 'nothing on a letter not acknowledged yet')
+
   console.log(`validate-memos: ${checks} checks passed`)
 } finally {
   await db.close()

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
 import MemoCard, { openMemoFileIn } from '@/components/memos/MemoCard'
+import { SignatureImage } from '@/components/memos/SignaturePad'
 import { previewPublished } from '@/lib/documentation/actions'
 import { openMemoFile } from '@/lib/memos/actions'
 import { memoWhen, previewSummary, receiptOf, type MemoPreview } from '@/lib/memos/model'
@@ -77,9 +78,10 @@ export default function MemoPreviewDrawer({ memoId, onClose }: { memoId: string 
               <div className={s.mpGone}>Withdrawn {memoWhen(memo.withdrawnAt)} — nobody sees it any more.</div>
             ) : memo.requiresAck ? (
               <div className={s.mpAck}>
+                <span className={s.mpSignPad} aria-hidden="true">Sign here</span>
                 <span className={s.mpAckBtn} aria-hidden="true">Acknowledge</span>
                 <span className={s.mpAckNote}>
-                  Each person taps Acknowledge once — in the portal, the HR app or the Revenue app; their name and time are recorded for HR.
+                  Each person signs and taps Acknowledge once — in the portal, the HR app or the Revenue app; their signature, name and time are recorded for HR.
                 </span>
               </div>
             ) : null}
@@ -97,6 +99,7 @@ export default function MemoPreviewDrawer({ memoId, onClose }: { memoId: string 
                   {p.department ? <span className={s.mpPersonDept}> · {p.department}</span> : null}
                 </span>
                 {r.when ? <span className={s.mpPersonWhen}>{r.when}</span> : null}
+                {p.signature ? <SignatureImage src={p.signature} alt={`${p.name}'s signature`} small className={s.mpSigned} /> : null}
                 <span className={s.status} data-tone={r.tone}>
                   <span className={s.statusDot} />
                   {r.label}

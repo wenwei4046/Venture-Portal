@@ -1085,6 +1085,11 @@
 .mdFileName { flex: 1; min-width: 0; font-size: calc(14px * var(--rv-type)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mdFileBtn { flex: none; height: 36px; min-width: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rv-rule); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 600; display: grid; place-items: center; }
 .mdFoot { flex: 0 0 auto; padding: 12px 20px 26px; border-top: 1px solid var(--rv-rule); display: flex; flex-direction: column; gap: 8px; }
+/* The signature before Acknowledge (2026-10-20, components/memos/SignaturePad): the pad on the app's own edges and type. */
+.mdSign { display: flex; flex-direction: column; gap: 8px; }
+.mdSignLabel { font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-ink); }
+.mdPad { --sig-line: var(--rv-handle); --sig-sub: var(--rv-sub); --sig-font: calc(13px * var(--rv-type)); --sig-radius: 14px; }
+.mdSigned { --sig-line: var(--rv-rule); --sig-radius: 12px; max-width: 240px; }
 .mdAckNote { text-align: center; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 
 /* ── View as (a Principal, read-only): a page that slides in over the app ── */

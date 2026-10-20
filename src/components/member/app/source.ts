@@ -8,7 +8,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberMemoSignature, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
   type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
@@ -102,7 +102,9 @@ export interface RevenueSource {
   /** A cart's margin at a price — priced on the server; no cost ever comes back. */
   quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
   /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
-  memo(id: string, ack: boolean): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  memo(id: string, ack: boolean, signature?: string | null): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  /** One's own signature on a memo one acknowledged (2026-10-20), drawn back in it — read at the open, never kept. */
+  memoSignature?(id: string): Promise<Outcome<string | null>>;
   /** A memo's file (2026-10-12): a short link made at the tap (never kept). */
   memoFile?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
   /** Who moved a request, when, and why. */
@@ -224,11 +226,12 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     insightRange: (subDepartmentId, from, until, context) =>
       go<Answer<typeof fetchMemberInsightRange>>(ask.insightRange(subDepartmentId, from, until, context)),
     quote: input => calculateMemberQuote(input),
-    async memo(id, ack) {
-      const result = await acknowledgeMemberMemo(id, ack);
+    async memo(id, ack, signature) {
+      const result = await acknowledgeMemberMemo(id, ack, signature);
       return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
     },
     memoFile: (id, mode) => openMemberMemoFile(id, mode),
+    memoSignature: id => fetchMemberMemoSignature(id),
     requestHistory: id => go<Answer<typeof fetchMemberRequestHistory>>(ask.requestHistory(id)),
     submitRequest: form => submitMemberRequest(form),
     cancelRequest: id => cancelMemberRequest(id),

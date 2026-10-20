@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
-import { openDocumentationFile } from '@/lib/documentation/actions'
+import { SignatureImage } from '@/components/memos/SignaturePad'
+import { letterSignature, openDocumentationFile } from '@/lib/documentation/actions'
 import { openDriveFile } from '@/lib/documentation/drive-actions'
 import { EMPTY_DRIVE, pathLine, type Drive } from '@/lib/documentation/drive'
 import {
@@ -117,10 +118,27 @@ export default function PreviewDrawer({
   // A spreadsheet, read from its link in the browser (null: not read yet, or it could not be).
   const [sheet, setSheet] = useState<SheetPreview | null>(null)
   const [sheetFailed, setSheetFailed] = useState(false)
+  // A letter its person acknowledged: the signature they gave (2026-10-20), read when it is opened.
+  const [signed, setSigned] = useState<{ key: string; png: string } | null>(null)
   const shown = target ? shownOf(data, target, drive) : null
   const kind = shown ? previewKind(shown.fileName, shown.contentType) : 'none'
   const key = target ? `${target.kind}:${target.id}` : ''
   const gone = shown?.gone ?? null
+  const ackedLetter = target?.kind === 'letter' ? data.letters.find(l => l.id === target.id && l.acknowledgedAt && !l.withdrawnAt) ?? null : null
+
+  useEffect(() => {
+    if (!ackedLetter) return
+    let live = true
+    const at = `letter:${ackedLetter.id}`
+    void letterSignature(ackedLetter.id).then(res => {
+      if (live && res.ok && res.signature) setSigned({ key: at, png: res.signature })
+    })
+    return () => {
+      live = false
+    }
+    // Once per letter shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ackedLetter?.id])
 
   useEffect(() => {
     if (!target) return
@@ -224,6 +242,12 @@ export default function PreviewDrawer({
                   <FactRow key={f.l} l={f.l} v={f.v} />
                 ))}
               </div>
+              {ackedLetter && signed?.key === key ? (
+                <div className={s.vwSignature}>
+                  <span className={s.vwSignatureLabel}>Signed when acknowledged</span>
+                  <SignatureImage src={signed.png} alt={`${ackedLetter.staffName}'s signature`} className={s.vwSigned} />
+                </div>
+              ) : null}
               <div className={s.vwTrailLabel}>Audit trail</div>
               {shown.events.map((e, i) => (
                 <div key={i} className={s.ev}>

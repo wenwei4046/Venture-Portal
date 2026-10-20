@@ -3,8 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BIN, HV, ROOT, deptAt, folderAt, personAt, type Drive } from '@/lib/documentation/drive'
 import type { Documentation, PersonLetter } from '@/lib/documentation/model'
+import { PNG } from '@/test/signature'
 
-const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn(), setLetterShare: vi.fn() }))
+const actions = vi.hoisted(() => ({ fileLetter: vi.fn(), withdrawLetter: vi.fn(), openDocumentationFile: vi.fn(), addLetterType: vi.fn(), setLetterShare: vi.fn(), letterSignature: vi.fn() }))
 const drive = vi.hoisted(() => ({
   addDriveFolder: vi.fn(), renameDriveFolder: vi.fn(), deleteDriveFolder: vi.fn(), saveDriveFile: vi.fn(), deleteDriveFile: vi.fn(), openDriveFile: vi.fn(),
   moveDriveFolder: vi.fn(), restoreDriveItem: vi.fn(), deleteDriveItemForever: vi.fn(), emptyDriveBin: vi.fn(),
@@ -282,6 +283,23 @@ describe('the preview', () => {
     render(<PreviewDrawer data={DATA} target={{ kind: 'letter', id: 'L2' }} onClose={vi.fn()} />)
     await waitFor(() => expect(actions.openDocumentationFile).toHaveBeenCalledWith('letter', 'L2', 'view'))
     expect(screen.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  // 2026-10-20 — a memo is acknowledged with the person's own signature: a letter they acknowledged shows it on its trail.
+  it('of a letter its person acknowledged shows the signature they gave; one not acknowledged asks for none', async () => {
+    actions.letterSignature.mockResolvedValue({ ok: true, signature: PNG, acknowledgedAt: '2026-10-20T03:00:00Z' })
+    const signedData = { ...DATA, letters: [letter({ id: 'L3', readAt: '2026-10-20T02:59:00Z', acknowledgedAt: '2026-10-20T03:00:00Z' }), ...DATA.letters] }
+    render(<PreviewDrawer data={signedData} target={{ kind: 'letter', id: 'L3' }} onClose={vi.fn()} />)
+    await waitFor(() => expect(actions.letterSignature).toHaveBeenCalledWith('L3'))
+    fireEvent.click(screen.getByRole('tab', { name: /Audit trail/ }))
+    expect(await screen.findByRole('img', { name: "Zack's signature" })).toHaveAttribute('src', PNG)
+    expect(screen.getByText('Signed when acknowledged')).toBeInTheDocument()
+    cleanup()
+    actions.letterSignature.mockClear()
+    render(<PreviewDrawer data={DATA} target={{ kind: 'letter', id: 'L2' }} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('tab', { name: /Audit trail/ }))
+    expect(actions.letterSignature).not.toHaveBeenCalled()
+    expect(screen.queryByText('Signed when acknowledged')).toBeNull()
   })
 
   it('of a Data center file opens it through its own link and names its folder', async () => {

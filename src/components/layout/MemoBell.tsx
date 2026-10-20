@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { Drawer } from '@/components/hrv/overlay'
 import MemoCard, { openMemoFileIn } from '@/components/memos/MemoCard'
-import { markMyMemo, openMemoFile } from '@/lib/memos/actions'
+import SignaturePad, { SignatureImage } from '@/components/memos/SignaturePad'
+import { markMyMemo, myMemoSignature, openMemoFile } from '@/lib/memos/actions'
 import {
   ackedLine, memoBellCount, memoDay, memoHeading, memoUnread, memoWaiting, memosInOrder, myMemosFromRow, type MyMemo,
 } from '@/lib/memos/model'
@@ -27,6 +28,11 @@ import s from './memo-bell.module.css'
  * Read from the browser (`my_memos()`, the login's own session), not through a
  * Server Action: nothing may fire one on its own after a navigation (speed.md).
  * Read again when the drawer opens and when the window comes back into view.
+ *
+ * Acknowledge is signed (2026-10-20 — the user: "签完之后再来点那个 Acknowledge
+ * button"): a memo waiting for them carries the signature pad, and Acknowledge
+ * waits for a signature; one they acknowledged shows the signature they gave,
+ * read back when it is opened.
  */
 export default function MemoBell() {
   const [memos, setMemos] = useState<MyMemo[] | null>(null)
@@ -34,6 +40,8 @@ export default function MemoBell() {
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [sig, setSig] = useState<string | null>(null)
+  const [signed, setSigned] = useState<ReadonlyMap<string, string>>(() => new Map())
 
   const read = useCallback(async () => {
     try {
@@ -65,6 +73,13 @@ export default function MemoBell() {
   function openMemo(m: MyMemo) {
     setPick(m.id)
     setError('')
+    setSig(null)
+    // One they acknowledged: the signature they gave, read back to draw under it.
+    if (m.acknowledgedAt && !signed.has(m.id)) {
+      void myMemoSignature(m.id).then(png => {
+        if (png) setSigned(prev => new Map(prev).set(m.id, png))
+      })
+    }
     if (!memoUnread(m)) return
     // Opening it is reading it — the login's receipt, in every view.
     patch(m.id, { readAt: new Date().toISOString(), acknowledgedAt: null })
@@ -72,12 +87,14 @@ export default function MemoBell() {
   }
 
   async function acknowledge(m: MyMemo) {
-    if (busy) return
+    if (busy || !sig) return
     setBusy(true)
     setError('')
-    const res = await markMyMemo(m.id, true)
+    const res = await markMyMemo(m.id, true, sig)
     setBusy(false)
     if (!res.ok) return setError(res.reason)
+    setSigned(prev => new Map(prev).set(m.id, sig))
+    setSig(null)
     patch(m.id, { readAt: res.readAt, acknowledgedAt: res.acknowledgedAt ?? new Date().toISOString() })
   }
 
@@ -122,13 +139,20 @@ export default function MemoBell() {
             <MemoCard memo={picked} onFile={picked.attachment ? mode => openFile(picked, mode) : undefined}>
               {memoWaiting(picked) ? (
                 <div className={s.ackBox}>
-                  <button type="button" className={s.ack} onClick={() => void acknowledge(picked)} disabled={busy}>
+                  <span className={s.signLabel}>Your signature</span>
+                  <SignaturePad value={sig} onChange={setSig} disabled={busy} className={s.sign} />
+                  <button type="button" className={s.ack} onClick={() => void acknowledge(picked)} disabled={busy || !sig} aria-busy={busy || undefined}>
                     {busy ? 'Recording…' : 'Acknowledge'}
                   </button>
-                  <span className={s.ackNote}>Your name and time are recorded for HR — once, for every view.</span>
+                  <span className={s.ackNote}>
+                    {sig ? 'Your signature, name and time are recorded for HR — once, for every view.' : 'Sign above to acknowledge.'}
+                  </span>
                 </div>
               ) : picked.acknowledgedAt ? (
-                <div className={s.acked}>✓ {ackedLine(picked.acknowledgedAt)}</div>
+                <div className={s.ackBox}>
+                  <div className={s.acked}>✓ {ackedLine(picked.acknowledgedAt)}</div>
+                  {signed.get(picked.id) ? <SignatureImage src={signed.get(picked.id)!} alt="Your signature" className={s.signed} /> : null}
+                </div>
               ) : null}
               {error ? <div className={s.err} role="alert">{error}</div> : null}
             </MemoCard>

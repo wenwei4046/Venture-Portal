@@ -1,0 +1,78 @@
+/* The signature pad (2026-10-20, SignaturePad.tsx): white paper with a dashed edge and a baseline, ink in the
+   signature's own colour — the same in every theme (globals.css --signature-*), since the picture is kept as drawn.
+   The face it sits in sets its type and edges through --sig-*: --sig-line (the dashed edge), --sig-sub (the hint
+   and Clear), --sig-font (the hint's size), --sig-radius. */
+.pad {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  border: 1.5px dashed var(--sig-line, rgb(var(--hairline)));
+  border-radius: var(--sig-radius, 12px);
+  background: rgb(var(--signature-paper));
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  box-sizing: border-box;
+}
+.pad[data-disabled] { opacity: 0.55; }
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  color: rgb(var(--signature-ink));
+  cursor: crosshair;
+  touch-action: none;
+}
+.pad[data-disabled] .canvas { cursor: default; }
+/* The line one signs on, a third up from the foot. */
+.line {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  bottom: 27%;
+  border-top: 1px solid var(--sig-line, rgb(var(--hairline)));
+  pointer-events: none;
+}
+.hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(27% + 8px);
+  text-align: center;
+  font-size: var(--sig-font, 13px);
+  color: var(--sig-sub, rgb(var(--muted)));
+  pointer-events: none;
+}
+.clear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--sig-line, rgb(var(--hairline)));
+  background: rgb(var(--signature-paper));
+  color: var(--sig-sub, rgb(var(--muted)));
+  font: inherit;
+  font-size: var(--sig-font, 13px);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* A signature drawn back (beside "Acknowledged", in HR's lists): the picture on its paper. */
+.signed {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 3 / 1;
+  object-fit: contain;
+  background: rgb(var(--signature-paper));
+  border: 1px solid var(--sig-line, rgb(var(--hairline)));
+  border-radius: var(--sig-radius, 10px);
+  box-sizing: border-box;
+}
+.signedSmall { max-width: 120px; border-radius: 6px; }
