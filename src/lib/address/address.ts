@@ -58,8 +58,18 @@ export function inMalaysia(a: Pick<Address, 'country'>): boolean {
   return c === '' || c.toLowerCase() === MALAYSIA.toLowerCase()
 }
 
+/** A record's six columns (hr_staff_costs, att_locations), each as it came. */
+export interface AddressRow {
+  address_line1?: unknown
+  address_line2?: unknown
+  address_postcode?: unknown
+  address_city?: unknown
+  address_state?: unknown
+  address_country?: unknown
+}
+
 /** The parts as a record keeps them — `address_line1` … — an empty one as nothing, Malaysia when the country is blank. */
-export function addressOf(row: Partial<Record<string, unknown>> | null | undefined): Address {
+export function addressOf(row: AddressRow | null | undefined): Address {
   const a: Address = {
     line1: clean(row?.address_line1),
     line2: clean(row?.address_line2),

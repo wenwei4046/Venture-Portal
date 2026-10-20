@@ -41,8 +41,7 @@ ALTER TABLE public.hr_staff_costs ADD COLUMN IF NOT EXISTS address_city text;
 ALTER TABLE public.hr_staff_costs ADD COLUMN IF NOT EXISTS address_state text;
 ALTER TABLE public.hr_staff_costs ADD COLUMN IF NOT EXISTS address_country text;
 
-GRANT SELECT (address_line1, address_line2, address_postcode, address_city, address_state, address_country)
-  ON public.hr_staff_costs TO authenticated;
+GRANT SELECT (address_line1, address_line2, address_postcode, address_city, address_state, address_country) ON public.hr_staff_costs TO authenticated;
 
 COMMENT ON COLUMN public.hr_staff_costs.address IS
   'The address on one line: its six parts put together by hr_staff_costs_compose_address (address_compose) whenever a part is written — or, for a record whose parts were never written, the old box''s own text.';

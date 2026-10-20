@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button'
 import { DescriptionList } from '@/components/ds/Data'
 import { DsSelect, Field, TextField } from '@/components/ds/Field'
 import MeAddressFields from './MeAddressFields'
+import { isEmptyAddress } from '@/lib/address/address'
 import { bankOptions, pendingBanner, recordCards, type ProfileForm } from '@/lib/me/profile'
 import type { AttRequest } from '@/lib/attendance/types'
 import type { MeRecord } from '@/lib/me/types'
@@ -92,7 +93,11 @@ export function ProfileEdit({ form, set, record, clean, busy, onCancel, onSend, 
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Label>Home address</Label>
-        <MeAddressFields value={form.address} onChange={address => set({ address })} />
+        <MeAddressFields
+          value={form.address}
+          onChange={address => set({ address })}
+          onFile={record?.address && isEmptyAddress(record.addressParts) ? record.address : null}
+        />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Label>Emergency contact</Label>

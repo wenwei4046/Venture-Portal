@@ -11,7 +11,12 @@ import { COUNTRIES } from '@/lib/address/countries'
  * state, its city and the city's postcode picked from Pos Malaysia's list in that order; the country, Malaysia unless
  * another is picked (`AddressFields`' steps, `lib/address/address.ts`).
  */
-export default function MeAddressFields({ value, onChange }: { value: Address; onChange: (next: Address) => void }) {
+export default function MeAddressFields({ value, onChange, onFile = null }: {
+  value: Address
+  onChange: (next: Address) => void
+  /** The old one-box address, while the record has no parts yet — shown above the fields to copy from. */
+  onFile?: string | null
+}) {
   const { data, failed } = useMalaysia()
   const malaysia = inMalaysia(value)
   const waiting = malaysia && !data
@@ -22,6 +27,11 @@ export default function MeAddressFields({ value, onChange }: { value: Address; o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {onFile ? (
+        <Field label="On file">
+          <div data-on-file style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--ds-ink-2)', overflowWrap: 'anywhere' }}>{onFile}</div>
+        </Field>
+      ) : null}
       <Field label="Address line 1">
         <TextField value={value.line1} onChange={v => set({ line1: v })} ariaLabel="Address line 1" />
       </Field>

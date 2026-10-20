@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { StaffRow, TitleRow } from '@/lib/staff-form'
 
 // A person's full page, edited where it stands (2026-10-14, the user: "when i
@@ -253,6 +253,50 @@ describe('Email follows the login', () => {
   it('without a login it is HR’s to edit', () => {
     openEditor()
     expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+  })
+})
+
+describe('Address — six parts, State → City → Postcode from Malaysia’s list (2026-10-20)', () => {
+  const parts = {
+    address_line1: 'No 83, Jalan Jambu 3', address_line2: 'Machang Bubok', address_postcode: '14000',
+    address_city: 'Bukit Mertajam', address_state: 'Pulau Pinang', address_country: 'Malaysia',
+  }
+  const field = (key: string) => document.getElementById(`person-address-${key}`) as HTMLInputElement | HTMLSelectElement
+  const listed = () => waitFor(() => expect(field('state')).not.toBeDisabled())
+
+  it('edited, each part is its field holding what the record keeps; the old one-box address shows until it is in parts', async () => {
+    openEditor(view(), editor(parts))
+    await listed()
+    expect(field('line1')).toHaveValue('No 83, Jalan Jambu 3')
+    expect(field('state')).toHaveValue('Pulau Pinang')
+    expect(field('city')).toHaveValue('Bukit Mertajam')
+    expect(field('postcode')).toHaveValue('14000')
+    expect(screen.queryByText('On file')).toBeNull()
+    cleanup()
+
+    openEditor(view(), editor({ address: '83 Jalan Jambu 3, 14000 BM, Penang' }))
+    expect(screen.getByText('On file')).toBeInTheDocument()
+    expect(screen.getByText('83 Jalan Jambu 3, 14000 BM, Penang')).toBeInTheDocument()
+  })
+
+  it('a new postcode is one change, and the address goes whole — its six parts, nothing else', async () => {
+    openEditor(view(), editor(parts))
+    await listed()
+    fireEvent.change(field('postcode'), { target: { value: '14020' } })
+    expect(field('postcode')).toHaveAttribute('data-dirty', 'true')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ ...parts, address_postcode: '14020' })
+  })
+
+  it('refuses in the bar, before sending, three that are not one place on the list', async () => {
+    openEditor(view(), editor({ ...parts, address_postcode: '11060' }))
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 85, Jalan Jambu 3' } })
+    await act(async () => {
+      fireEvent.submit(form())
+    })
+    await waitFor(() => expect(within(bar()).getByRole('alert')).toHaveTextContent('11060 is not a postcode of Bukit Mertajam, Pulau Pinang'))
+    expect(mocks.updateStaff).not.toHaveBeenCalled()
   })
 })
 
