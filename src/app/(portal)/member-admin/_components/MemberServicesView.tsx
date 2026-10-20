@@ -36,14 +36,15 @@ export default function MemberServicesView({
   facts,
   claimRates,
   foodClaim,
-  transportClaim,
+  transportClaim = null,
   initialRequestId,
 }: {
   data: AdminMemberData
   facts: Record<string, RequestFacts> | null
   claimRates: ClaimRatesAdmin | null
   foodClaim: FoodClaimAdmin | null
-  transportClaim: TransportClaimAdmin | null
+  /** Transport claim's ⋯ — who may claim it (2026-10-20). */
+  transportClaim?: TransportClaimAdmin | null
   initialRequestId: string | null
 }) {
   const tabs: Array<{ key: Tab; label: string }> = data.canManageRequests

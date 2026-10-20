@@ -36,7 +36,8 @@ describe('MemberServicesView', () => {
   it('heads the page and offers its tabs — Capacity, Product options and Publish memo are gone, Food claim is new', () => {
     show()
     expect(screen.getByRole('heading', { level: 1, name: 'Member services' })).toBeInTheDocument()
-    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Claim rates', 'Food claim'])
+    // Claim rates is Transport claim since 2026-10-20 (the user: "这个 claim rate 我要换成 transport claim").
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Request reviews', 'Brand weeks', 'Transport claim', 'Food claim'])
     expect(screen.getByRole('tab', { name: 'Request reviews' })).toHaveAttribute('aria-selected', 'true')
   })
 

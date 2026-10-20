@@ -1,13 +1,16 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaimRatesAdmin } from '@/lib/member/claim-rates-admin'
+import type { TransportClaimAdmin } from '@/lib/member/transport-claim-admin'
 
-// Member services › Claim rates (2026-10-10, the HR revamp): one Save at the
-// top, lit while something differs from what is stored; the regions and the
-// venues' regions under the two rate cards.
+// Member services › Transport claim (Claim rates until 2026-10-20; the HR revamp's panel since 2026-10-10): one Save
+// at the top, lit while something differs from what is stored; the regions and the venues' regions under the two rate
+// cards; right of Save, ⋯ — who may claim it, in a window with its own Save.
 
 const save = vi.hoisted(() => vi.fn())
 vi.mock('../claim-rates-actions', () => ({ saveClaimRatesAdmin: save }))
+const saveTitles = vi.hoisted(() => vi.fn())
+vi.mock('../transport-claim-actions', () => ({ saveTransportClaimAdmin: saveTitles }))
 const flash = vi.fn()
 vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m) }))
 
@@ -50,7 +53,7 @@ describe('ClaimRatesPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     })
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ base: 'KL', perSpot: 30, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: 220 }))
-    expect(flash).toHaveBeenCalledWith('Claim rates saved — new claims use them')
+    expect(flash).toHaveBeenCalledWith('Transport claim saved — new claims use it')
   })
 
   it('flies a region, adds and removes one', () => {
@@ -75,6 +78,89 @@ describe('ClaimRatesPanel', () => {
 
   it('says when the rates could not be read', () => {
     render(<ClaimRatesPanel initial={null} />)
-    expect(screen.getByRole('alert')).toHaveTextContent('Claim rates could not be read.')
+    expect(screen.getByRole('alert')).toHaveTextContent('The transport claim could not be read.')
+  })
+})
+
+// The user, 2026-10-20: "这个 claim rate 我要换成 transport claim … 在 save button 旁边…做一个三个点。它是要能够选择
+// 什么 title 的人可以 claim 这个 transport。它跟 food claim 一样".
+describe('Transport claim — who may claim it', () => {
+  const transport: TransportClaimAdmin = {
+    titleIds: ['t-leader', 't-spec'],
+    titles: [
+      { id: 't-dir', name: 'Revenue Director', level: 'Management', people: 0, active: true },
+      { id: 't-leader', name: 'Team Leader', level: 'Senior Manager', people: 5, active: true },
+      { id: 't-asst', name: 'Team Assistant', level: 'Assistant Manager', people: 9, active: true },
+      { id: 't-spec', name: 'Revenue Specialist', level: 'Executive', people: 1, active: true },
+    ],
+    updatedAt: null,
+    updatedBy: null,
+  }
+  beforeEach(() => {
+    saveTitles.mockReset().mockImplementation(async (ids: string[]) => ({ ok: true, data: { ...transport, titleIds: ids } }))
+  })
+  const more = () => screen.getByRole('button', { name: 'Who can claim transport' })
+  const win = () => screen.getByRole('dialog', { name: 'Who can claim transport' })
+
+  it('is called Transport claim, and its ⋯ stands right of Save', () => {
+    render(<ClaimRatesPanel initial={rates} transport={transport} />)
+    expect(screen.getByRole('heading', { name: 'Transport claim' })).toBeInTheDocument()
+    const saveButton = screen.getByRole('button', { name: 'Saved' })
+    expect(saveButton.compareDocumentPosition(more()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(more()).toHaveTextContent('⋯')
+    expect(more()).toHaveAttribute('title', 'Who can claim · 2 of 4 titles')
+  })
+
+  it('opens every Revenue title, the ticked ones ticked, as Food claim lists them', () => {
+    render(<ClaimRatesPanel initial={rates} transport={transport} />)
+    fireEvent.click(more())
+    const w = win()
+    expect(within(w).getAllByRole('row').slice(1).map(r => r.textContent)).toEqual([
+      'Revenue DirectorManagement0 peopleCan claim',
+      'Team LeaderSenior Manager5 people✓Can claim',
+      'Team AssistantAssistant Manager9 peopleCan claim',
+      'Revenue SpecialistExecutive1 person✓Can claim',
+    ])
+    expect(within(w).getAllByRole('checkbox').map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'true'])
+    expect(within(w).getByText('2 of 4 titles')).toBeInTheDocument()
+    expect(within(w).getByRole('button', { name: 'Saved' })).toBeDisabled()
+  })
+
+  it('saves the ticks on their own — the rates stay as they are — and says how many may claim', async () => {
+    render(<ClaimRatesPanel initial={rates} transport={transport} />)
+    fireEvent.click(more())
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Team Assistant may claim transport' }))
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Revenue Specialist may claim transport' }))
+    expect(within(win()).getByText('2 of 4 titles')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(within(win()).getByRole('button', { name: 'Save' }))
+    })
+    expect(saveTitles).toHaveBeenCalledWith(['t-asst', 't-leader'])
+    expect(save).not.toHaveBeenCalled()
+    expect(flash).toHaveBeenCalledWith('Transport claim: 2 of 4 titles can claim')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
+    fireEvent.click(more())
+    expect(within(win()).getAllByRole('checkbox').map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'true', 'false'])
+  })
+
+  it('shows a refusal in the window and keeps the ticks; Cancel drops them', async () => {
+    saveTitles.mockResolvedValue({ ok: false, error: 'HR request management access is required' })
+    render(<ClaimRatesPanel initial={rates} transport={transport} />)
+    fireEvent.click(more())
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Revenue Director may claim transport' }))
+    await act(async () => {
+      fireEvent.click(within(win()).getByRole('button', { name: 'Save' }))
+    })
+    expect(within(win()).getByRole('alert')).toHaveTextContent('HR request management access is required')
+    expect(within(win()).getByRole('checkbox', { name: 'Revenue Director may claim transport' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(win()).getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(more())
+    expect(within(win()).getByRole('checkbox', { name: 'Revenue Director may claim transport' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('has no ⋯ when the list could not be read', () => {
+    render(<ClaimRatesPanel initial={rates} transport={null} />)
+    expect(screen.queryByRole('button', { name: 'Who can claim transport' })).toBeNull()
   })
 })

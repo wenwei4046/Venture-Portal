@@ -1345,7 +1345,8 @@ The matrix is **Permissions by view and tab** (Part III). Around it:
 - **Request reviews** — the list card beside the request card: facts, the step with its note and buttons, then AUDIT HISTORY.
   - *View ↗* on a signed form (v4.102) opens a PDF or a picture in a new tab. A Word form, which a browser saves rather than shows, downloads under the name it was sent with, and the page says *Downloads name*.
 - **Brand weeks** — read only (v3.64). A column per Friday; each week is a chip in its brand's colours (solid for Sales Attending, dashed for auto-located, faint for "No fair"), with the venue under it. The foot says when the ERP last sent it.
-- **Claim rates** — Outstation / Airbnb, regions, venues. Save reads "Saved" until something differs.
+- **Transport claim** (*Claim rates* until 2026-10-20) — Outstation / Airbnb, regions, venues. Save reads "Saved" until something differs.
+  - **⋯** right of Save (34 × 32, hairline, white; its tooltip *Who can claim · 5 of 7 titles*) opens **Who can claim transport** (the kit `Window`, 620px): the count top right, then the Food claim's table — Title · Level · People (a seat on it today, any sub-department) · *Can claim* — and Cancel · Save in the foot (its own Save, the rates' untouched; a refusal in red beside them). Saved, the window closes and a toast says *Transport claim: N of M titles can claim*.
 - **Food claim** (v3.81) — *Fair only*. *Rate a day*, then the titles (Title · Level · *In Fair* · *Can claim*).
 - Publishing a memo moved to People › Documentation › Publish (v3.31).
 
