@@ -99,9 +99,15 @@ export function useMemberDocs({ active, onPage, source, staffId, fixture, readOn
 
   const open = useCallback((id: string) => {
     const doc = docs?.find(x => x.id === id);
-    if (!doc) return;
+    if (!doc || !docs) return;
     setMessage(null);
-    if (!readOnly) setDocs(list => list?.map(x => (x.id === id ? { ...x, seen: true } : x)) ?? list);
+    if (!readOnly) {
+      const seen = docs.map(x => (x.id === id ? { ...x, seen: true } : x));
+      setDocs(seen);
+      // …and so on the phone's kept list (2026-10-20 — the user: "只要我按过一次就等于 read 了 … by right 就不应该再跳出来显示
+      // 1 个 notification"): the next open shows it opened while the list is read again, not New for a moment.
+      if (!fixture) source.keep?.(ask.documents(staffId ? { staffId } : undefined), seen);
+    }
     if (fixture || !source.openDocument) return setOpening(doc.fileName || doc.name);
     const openDocument = source.openDocument;
     follow(doc.fileName || doc.name, () => openDocument(id, staffId ? { staffId } : undefined), setMessage);
@@ -109,12 +115,14 @@ export function useMemberDocs({ active, onPage, source, staffId, fixture, readOn
 
   const openPersonal = useCallback((kind: "drive" | "letter", id: string) => {
     const item = kind === "drive" ? personal?.files.find(x => x.id === id) : personal?.letters.find(x => x.id === id);
-    if (!item) return;
+    if (!item || !personal) return;
     setPersonalMessage(null);
     if (!readOnly) {
-      setPersonal(p => p && (kind === "drive"
-        ? { ...p, files: p.files.map(x => (x.id === id ? { ...x, seen: true } : x)) }
-        : { ...p, letters: p.letters.map(x => (x.id === id ? { ...x, readAt: x.readAt ?? new Date().toISOString() } : x)) }));
+      const seen = kind === "drive"
+        ? { ...personal, files: personal.files.map(x => (x.id === id ? { ...x, seen: true } : x)) }
+        : { ...personal, letters: personal.letters.map(x => (x.id === id ? { ...x, readAt: x.readAt ?? new Date().toISOString() } : x)) };
+      setPersonal(seen);
+      if (!fixture) source.keep?.(ask.personal(staffId ? { staffId } : undefined), seen);
     }
     if (fixture || !source.openPersonal) return setOpening(item.name);
     const openPersonalFile = source.openPersonal;

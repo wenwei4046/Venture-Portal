@@ -151,6 +151,12 @@ export interface RevenueSource {
    * the last answer to a read (`ask.*`), shown while it is read again.
    */
   peek?<T>(read: MemberRead): T | undefined;
+  /**
+   * Put what the screen now shows in place of the phone's kept answer to a read (2026-10-20): a file the member just
+   * opened stays opened on the next open too, instead of showing New — and Profile's count — until the list is read
+   * again. Nothing is sent.
+   */
+  keep?(read: MemberRead, value: unknown): void;
   /** Settles once the phone's answers are loaded — the app asks for nothing before, or the first screen would miss them. */
   ready?: Promise<void>;
   /** How many answers the phone kept from before this open. */
@@ -237,6 +243,7 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     openPersonal: (kind, id, context) => openMemberPersonal(kind, id, context?.staffId),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
+      keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),
       ready: memory.ready,
       kept: () => memory.kept(),
     } : {}),

@@ -90,6 +90,7 @@ function source() {
     cancelBooking: vi.fn(async () => ({ ok: true as const, data: true as const })),
     documents: vi.fn(async () => ({ ok: true as const, data: DOCS })),
     openDocument: vi.fn(async () => ({ ok: true as const, data: { url: "https://files.example/handbook.pdf", fileName: "Handbook.pdf" } })),
+    keep: vi.fn(),
   } satisfies RevenueSource;
 }
 
@@ -218,6 +219,14 @@ describe("Documentation", () => {
     await waitFor(() => expect(tab.location.href).toBe("https://files.example/handbook.pdf"));
   });
 
+  it("a file opened stays opened on the phone's kept list — the next open shows no 1 on Profile before the list is read", async () => {
+    vi.stubGlobal("open", vi.fn(() => ({ location: { href: "" }, close: vi.fn() })));
+    const live = await open("?page=account&view=docs");
+    await act(async () => fireEvent.click(await screen.findByRole("button", { name: /Price list · October 2026/ })));
+    expect(live.keep).toHaveBeenCalledTimes(1);
+    expect(live.keep).toHaveBeenCalledWith({ kind: "documents" }, [{ ...DOCS[0], seen: true }, DOCS[1]]);
+  });
+
   it("says when nothing is shared yet", async () => {
     const live = await open("?page=account&view=docs");
     live.documents.mockResolvedValue({ ok: true, data: [] });
@@ -235,5 +244,7 @@ describe("Documentation", () => {
     await act(async () => fireEvent.click(row));
     expect(live.openDocument).toHaveBeenCalledWith("d-new", { staffId: "anthony" });
     expect(row).toHaveTextContent("New");
+    // Nor on the phone: View as is read-only (the user's own rule) — the member still sees it New.
+    expect(live.keep).not.toHaveBeenCalled();
   });
 });

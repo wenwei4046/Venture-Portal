@@ -5,10 +5,10 @@ import RevenueApp from "./RevenueApp";
 import { AT } from "./shell/ViewSwitchCurtain";
 
 // The switch to the CRM on a phone (2026-10-17 — the user: "when revenue app, press switch to crm, i want is have a
-// motion"; the handoff "Revenue → CRM switch view motion", design 2c "Peach · Context"): Today's chat button and Profile's
-// My leads & appointments alike put a curtain up, the CRM goes in under it at 950ms, and it lifts only once the CRM has
-// drawn. The way out goes behind the mirror curtain (the user: "也做一个反方向的幕布") and still leads to where the CRM
-// was opened.
+// motion"; the handoff "Revenue → CRM switch view motion", design 2c "Peach · Context"): Today's chat button puts a
+// curtain up (Profile's My leads & appointments did too until it went, 2026-10-20), the CRM goes in under it at 950ms,
+// and it lifts only once the CRM has drawn. The way out goes behind the mirror curtain (the user: "也做一个反方向的幕布")
+// and still leads to where the CRM was opened — home when a tapped notice opened it.
 vi.mock("next/navigation", () => ({
   usePathname: () => "/member/preview",
   useSearchParams: () => new URLSearchParams(window.location.search),
@@ -68,10 +68,10 @@ async function open(search: string) {
   await act(async () => {});
 }
 const wait = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
-/** Into the CRM, drawn, the curtain gone. */
-async function inCrm(search = "") {
-  await open(search);
-  fireEvent.click(search ? screen.getByRole("button", { name: /My leads & appointments/ }) : screen.getByRole("button", { name: "Open CRM" }));
+/** Into the CRM from Today's chat button, drawn, the curtain gone. */
+async function inCrm() {
+  await open("");
+  fireEvent.click(screen.getByRole("button", { name: "Open CRM" }));
   await wait(AT.swap);
   fireEvent.click(screen.getByRole("button", { name: "CRM drawn" }));
   await wait(AT.uncover - AT.swap);
@@ -138,17 +138,20 @@ describe("the switch to the CRM on a phone", () => {
     expect(screen.getByRole("button", { name: "Open CRM" })).toBeInTheDocument();
   });
 
-  it("from Profile's My leads & appointments too — any way out goes behind the curtain, back to Profile", async () => {
-    await inCrm("?page=account");
+  it("opened by a tapped notice: any way out goes behind the curtain too, home to Today", async () => {
+    await open("?page=account&view=crm");
+    fireEvent.click(screen.getByRole("button", { name: "CRM drawn" }));
     fireEvent.click(screen.getByRole("button", { name: "Leave the CRM" }));
     await act(async () => {});
     // No house pressed: no ripple, the curtain alike.
     expect(anims.some(a => JSON.stringify(a.frames).includes("scale(1.6)"))).toBe(false);
     expect(curtain("Revenue")).toBeInTheDocument();
     await wait(AT.swap);
-    expect([page(), view()]).toEqual(["account", null]);
+    // Profile has led to the CRM no more since 2026-10-20: the way back is home.
+    expect([page(), view()]).toEqual([null, null]);
     await wait(AT.uncover - AT.swap);
     await act(async () => { leaving("Revenue")!.finish(); });
     expect(curtain("Revenue")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open CRM" })).toBeInTheDocument();
   });
 });
