@@ -2,6 +2,7 @@ import type { CommissionOrderRow, OverrideOrderRow, WorkbenchPerson } from "@/li
 import type { CloseSummary } from "@/lib/commission/closes";
 import type { StatementDto } from "@/lib/commission/run-payload";
 import type { MemberIncome as SnapshotIncome } from "./types";
+import type { MemberPay } from "./income-pay";
 
 /**
  * My income (2026-10-05, user: 跟着 up to date … close 的时候就是 fix): the
@@ -99,6 +100,13 @@ export interface IncomeMonth {
   payLines: IncomePayLine[];
   switches: { kpi: boolean; openBill: boolean; incentive: boolean; override: boolean; group: boolean };
   notice: string | null;
+  /**
+   * What the month pays, as HR's payroll pays it (2026-10-20): the fixed
+   * salary and the statutory figures paid out of the commission
+   * (`./income-pay`). Worked out by the server once the commission is known;
+   * null when it cannot be — a claim-form month payroll kept no row for.
+   */
+  pay: MemberPay | null;
 }
 
 export interface IncomePast {
@@ -107,6 +115,8 @@ export interface IncomePast {
   basic: number;
   commission: number;
   gross: number;
+  /** What reached the bank (2026-10-20): the payroll row's net. */
+  net: number;
   paidOn: string | null;
 }
 
@@ -173,6 +183,7 @@ export function liveIncome(person: WorkbenchPerson | null, extra: Pick<IncomeMon
     bills: rows.map(bill),
     overrides: (person?.overridingRows ?? []).map(override),
     notice: null,
+    pay: null,
   };
 }
 
@@ -245,6 +256,7 @@ export function closedIncome(close: {
     bills,
     overrides,
     notice: null,
+    pay: null,
   };
 }
 

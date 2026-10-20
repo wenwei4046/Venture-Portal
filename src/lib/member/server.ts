@@ -13,11 +13,14 @@ import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
 import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
 import { closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
+import { memberPay, salaryFromRow, salaryFromSchedule, taxModeOf, type PayrollRowFacts, type PaySalary } from "./income-pay";
 import { parseCloseSummary } from "@/lib/commission/closes";
 import { buildCommissionWorkbench, workbenchStaffIds } from "@/lib/commission/workbench";
 import type { StatementDto } from "@/lib/commission/run-payload";
 import { fetchByKeys } from "@/lib/paginate";
+import { startRead } from "@/lib/start-read";
 import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-input";
+import { previewWageWindow, scheduleStatutory, statutoryLookup } from "@/app/(portal)/revenue/_lib/pay-preview-before-run";
 import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
@@ -468,23 +471,30 @@ export async function loadMemberIncome(
     if (typeof staffId !== "string" || !staffId) throw new Error("This department is not available to your account.");
     const admin = adminClient() as unknown as SupabaseClient;
     const first = `${period}-01`;
+    // Payroll pays the month's commission from every sub-department at once, the fixed salary out of all of it:
+    // started now, beside this sub-department's own engine.
+    const elsewhere = startRead(commissionElsewhere(admin, staffId, subDepartmentId, first));
     const [cutover, closes, payroll, lines, staff, runs] = await Promise.all([
       admin.from("comm_cutovers").select("first_paid_month").eq("sub_department_id", subDepartmentId).maybeSingle(),
       admin.from("comm_salesperson_closes").select("closed_at, summary, statement, deferred_orders")
         .eq("sub_department_id", subDepartmentId).eq("period_month", first).eq("staff_id", staffId).is("reopened_at", null).maybeSingle(),
-      admin.from("hr_monthly_payroll").select("period_month, status, basic_salary, commission_amount, gross")
+      admin.from("hr_monthly_payroll").select("period_month, status, basic_salary, commission_amount, gross, net, statutory_allowance, "
+        + "non_statutory_allowance, ot_amount, deduction_amount, skbbk_amount, prorata_days_worked, prorata_days_in_month, "
+        + "epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, commission_adjustment_amount")
         .eq("staff_id", staffId).order("period_month", { ascending: false }).limit(13),
       admin.from("revenue_pay_lines").select("kind, description, amount, sort_order").eq("staff_id", staffId).eq("period_month", first).order("sort_order"),
-      admin.from("hr_staff_costs").select("basic_salary").eq("id", staffId).maybeSingle(),
+      admin.from("hr_staff_costs").select("basic_salary, hire_date, resignation_date, epf_category, socso_category, pcb_category, "
+        + "children_count, is_epf_exempt, tax_mode, withholding_rate").eq("id", staffId).maybeSingle(),
       admin.from("payroll_runs").select("period_month, paid_at").not("paid_at", "is", null).order("period_month", { ascending: false }).limit(13),
     ]);
     for (const r of [cutover, closes, payroll, lines, staff, runs]) if (r.error) throw new Error(r.error.message);
     const paidAt = new Map(((runs.data ?? []) as { period_month: string; paid_at: string }[]).map(r => [r.period_month.slice(0, 7), r.paid_at]));
-    const rows = (payroll.data ?? []) as { period_month: string; status: string; basic_salary: number | string; commission_amount: number | string | null; gross: number | string | null }[];
+    const rows = (payroll.data ?? []) as unknown as ({ period_month: string; status: string; commission_amount: number | string | null;
+      gross: number | string | null; net: number | string | null } & PayrollRowFacts)[];
     const num = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Number(v));
     const past: IncomePast[] = rows.filter(r => r.status !== "draft").map(r => ({
       period: r.period_month.slice(0, 7), status: r.status, basic: num(r.basic_salary), commission: num(r.commission_amount),
-      gross: num(r.gross), paidOn: r.status === "paid" ? paidAt.get(r.period_month.slice(0, 7)) ?? null : null,
+      gross: num(r.gross), net: num(r.net), paidOn: r.status === "paid" ? paidAt.get(r.period_month.slice(0, 7)) ?? null : null,
     }));
     const row = rows.find(r => r.period_month.slice(0, 7) === period);
     const firstPaid = ((cutover.data as { first_paid_month: string } | null)?.first_paid_month ?? null)?.slice(0, 7) ?? null;
@@ -492,18 +502,45 @@ export async function loadMemberIncome(
     const byHand = firstPaid !== null && period < firstPaid;
     const payLines: IncomePayLine[] = ((lines.data ?? []) as { kind: string; description: string | null; amount: number | string }[])
       .map(l => ({ kind: l.kind, description: l.description ?? "", amount: num(l.amount) }));
+    const record = staff.data as {
+      basic_salary: number | string | null; hire_date: string | null; resignation_date: string | null; epf_category: string;
+      socso_category: string; pcb_category: string; children_count: number; is_epf_exempt: boolean; tax_mode: string | null;
+      withholding_rate: number | string | null;
+    } | null;
     const extra = {
       period, payLines,
       // A month paid outside the portal has no salary here unless payroll kept one — never today's contract.
-      basic: row ? num(row.basic_salary) : !byHand && staff.data ? num((staff.data as { basic_salary: unknown }).basic_salary) : null,
+      basic: row ? num(row.basic_salary) : !byHand && record ? num(record.basic_salary) : null,
       payrollStatus: row?.status ?? null,
       paidOn: row?.status === "paid" ? paidAt.get(period) ?? null : null,
+    };
+    // The salary HR pays the month (2026-10-20): the payroll row as HR keeps it, any EPF / SOCSO / EIS / PCB
+    // typed over the schedule included; before the row exists, what the close will write — the record's basic,
+    // with the schedules' figures on it. Started now, beside the engine; read once the commission is known.
+    const salary: Promise<PaySalary | null> = startRead(row ? Promise.resolve(salaryFromRow(row))
+      : byHand || !record ? Promise.resolve(null)
+      : (async () => {
+        const basic = num(record.basic_salary);
+        const window = previewWageWindow(first, { ...record, basic_salary: basic, allowances: 0 });
+        const statutory = await scheduleStatutory(statutoryLookup(admin), { ...record, tax_mode: record.tax_mode ?? "pcb" }, window, first);
+        return salaryFromSchedule(basic, window, statutory);
+      })());
+    const withPay = async (month: IncomeMonth): Promise<IncomeMonth> => {
+      const [s, other] = await Promise.all([salary, elsewhere]);
+      return {
+        ...month,
+        pay: s ? memberPay({
+          commission: month.commission, elsewhere: other.amount, elsewhereFrom: other.names, payLines, salary: s,
+          taxMode: taxModeOf(record?.tax_mode), withholdingRate: record?.withholding_rate == null ? null : num(record.withholding_rate),
+        }) : null,
+      };
     };
     const empty = (state: IncomeMonth["state"], notice: string): IncomeMonth => ({
       ...extra, state, asOf: new Date().toISOString(), closedAt: null, rankLabel: null, rate: 0,
       personal: 0, kpi: 0, kpiQty: 0, openBill: 0, incentive: 0, override: 0, group: 0, director: 0,
       commission: 0, countedSales: 0, bandKey: null, brands: [],
       bills: [], overrides: [], switches: { kpi: false, openBill: false, incentive: false, override: false, group: false }, notice,
+      pay: null,
     });
 
     const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
@@ -539,16 +576,59 @@ export async function loadMemberIncome(
       for (const [id, name] of names) facts.set(`staff:${id}`, { no: "", seller: name, brand: null, orderTotal: null });
       const month = closedIncome({ closedAt: close.closed_at, summary: parseCloseSummary(close.summary, ""), statement: close.statement, deferred: close.deferred_orders ?? [] },
         facts, { ...extra, switches });
-      return { month, past, cutover: firstPaid };
+      return { month: await withPay(month), past, cutover: firstPaid };
     }
 
     // Still open (or paid by hand): the engine's figure now, exactly as Comm Cal shows it.
     const board = await liveWorkbench(admin, subDepartmentId, first, staffId);
-    if (!board) return { month: empty("none", "No bills have arrived for this month yet."), past, cutover: firstPaid };
+    if (!board) return { month: await withPay(empty("none", "No bills have arrived for this month yet.")), past, cutover: firstPaid };
     const person = board.people.find(p => p.staffId === staffId) ?? null;
     const month = liveIncome(person, { ...extra, asOf: new Date().toISOString(), switches });
-    return { month: byHand ? { ...month, state: "manual" } : month, past, cutover: firstPaid };
+    return { month: await withPay(byHand ? { ...month, state: "manual" } : month), past, cutover: firstPaid };
   });
+}
+
+/**
+ * What the member earns the same month in their OTHER sub-departments
+ * (2026-10-20). Payroll pays every sub-department's commission in one row
+ * (`comm_standing_close_total`) and takes the fixed salary out of all of it
+ * once — so My income in any one of them carves the salary out of the whole:
+ * where they are closed, the close's figure; anywhere else they sit or direct,
+ * that sub-department's engine now. Read with the service role, like the month
+ * itself, only after `member_income_context` authorised the session.
+ */
+async function commissionElsewhere(admin: SupabaseClient, staffId: string, subDepartmentId: string, first: string): Promise<{ amount: number; names: string[] }> {
+  const [y, m] = first.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const [closes, seats, directs] = await Promise.all([
+    admin.from("comm_salesperson_closes").select("sub_department_id, total_commission")
+      .eq("staff_id", staffId).eq("period_month", first).is("reopened_at", null).neq("sub_department_id", subDepartmentId),
+    admin.from("comm_hierarchy").select("comm_schemes!inner (sub_department_id, is_active, effective_to)")
+      .eq("staff_id", staffId).eq("comm_schemes.is_active", true).is("comm_schemes.effective_to", null)
+      .lte("effective_from", last).or(`effective_to.is.null,effective_to.gte.${first}`),
+    admin.from("comm_director_pay").select("comm_schemes!inner (sub_department_id, is_active, effective_to)")
+      .eq("staff_id", staffId).eq("comm_schemes.is_active", true).is("comm_schemes.effective_to", null),
+  ]);
+  for (const r of [closes, seats, directs]) if (r.error) throw new Error(r.error.message);
+  const closed = new Map<string, number>();
+  for (const c of (closes.data ?? []) as { sub_department_id: string; total_commission: number | string | null }[]) {
+    closed.set(c.sub_department_id, (closed.get(c.sub_department_id) ?? 0) + Number(c.total_commission ?? 0));
+  }
+  const schemeSubs = (rows: unknown[] | null) => (rows ?? []).map(r => (r as { comm_schemes: { sub_department_id: string } }).comm_schemes.sub_department_id);
+  const open = [...new Set([...schemeSubs(seats.data), ...schemeSubs(directs.data)])].filter(id => id !== subDepartmentId && !closed.has(id));
+  const live = await Promise.all(open.map(async id => {
+    const board = await liveWorkbench(admin, id, first, staffId);
+    return [id, board?.people.find(p => p.staffId === staffId)?.totalCommission ?? 0] as const;
+  }));
+  const earned = [...closed.entries(), ...live].filter(([, amount]) => amount !== 0);
+  if (!earned.length) return { amount: 0, names: [] };
+  const { data: subs, error } = await admin.from("comm_sub_departments").select("id, name").in("id", earned.map(([id]) => id));
+  if (error) throw new Error(error.message);
+  const name = new Map(((subs ?? []) as { id: string; name: string }[]).map(s => [s.id, s.name]));
+  return {
+    amount: Math.round(earned.reduce((a, [, amount]) => a + amount, 0) * 100) / 100,
+    names: earned.map(([id]) => name.get(id) ?? "Another department"),
+  };
 }
 
 /**

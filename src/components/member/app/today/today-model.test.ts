@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
 import type { MemberArenaSnapshot, ArenaPerson } from "@/lib/member/arena";
+import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
 import { amountParts, reachedTier, shortTier, thousands, todayModel, weekFriday, type TodayInput } from "./today-model";
 
 const score = (over: Partial<ArenaPerson> = {}): ArenaPerson => ({
@@ -72,6 +73,40 @@ describe("the income hero", () => {
     const m = todayModel({ ...base, today: "2026-10-06", incomeStatus: "failed" });
     expect(m.heroAmount).toBe("RM —");
     expect(m.heroSplit).toBe("October's commission is unavailable right now");
+  });
+
+  // 2026-10-20 — the user, of CHEA HUAN's "RM 16,746.00 · Fixed salary RM 7,000.00 + commission RM 9,746.00":
+  // "the basic is deduct from the commission … you can get it from hr code base"; HR's EPF / SOCSO / PCB count.
+  describe("the fixed salary comes out of the commission, as payroll pays it", () => {
+    const salary = salaryFromSchedule(7000, { daysWorked: 31, daysInMonth: 31 },
+      { epfEr: 840, epfEe: 770, socsoEr: 104.15, socsoEe: 29.75, eisEr: 11.9, eisEe: 11.9, pcb: 333.85 });
+    const payOf = (commission: number) => memberPay({ commission, elsewhere: 0, payLines: [], salary, taxMode: "pcb", withholdingRate: 0.02 });
+    const october = { ...base, today: "2026-10-19", salary: 7000, income: { period: "2026-10", status: "computed", total: 9746 } };
+
+    it("is what reaches the bank — net basic + balance commission — never the salary on top", () => {
+      const m = todayModel({ ...october, pay: payOf(9746) });
+      expect(m.heroLabel).toBe("October · Estimated income");
+      expect(m.heroAmount).toBe("RM 7,644.45");
+      expect(m.heroSplit).toBe("Net basic RM 5,854.50 + balance commission RM 1,789.95");
+    });
+
+    it("says when the commission does not cover the fixed salary yet, and draws the minus with the figure", () => {
+      const m = todayModel({ ...october, income: { ...october.income, total: 2000 }, pay: payOf(2000) });
+      expect(m.heroAmount).toBe("−RM 101.55");
+      expect(m.heroSplit).toBe("Net basic RM 5,854.50 + balance commission −RM 5,956.05");
+      expect(amountParts(m.heroAmount)).toEqual({ cur: "RM", num: "−101.55" });
+    });
+
+    it("no fixed salary: the commission, after whatever payroll takes", () => {
+      const none = salaryFromSchedule(0, { daysWorked: 31, daysInMonth: 31 }, { epfEr: 0, epfEe: 0, socsoEr: 0, socsoEe: 0, eisEr: 0, eisEe: 0, pcb: 0 });
+      const m = todayModel({ ...october, salary: 0, pay: memberPay({ commission: 9746, elsewhere: 0, payLines: [], salary: none, taxMode: "withholding", withholdingRate: 0.02 }) });
+      expect(m.heroAmount).toBe("RM 9,551.08");
+      expect(m.heroSplit).toBe("Commission only");
+    });
+
+    it("still hides it when asked", () => {
+      expect(todayModel({ ...october, pay: payOf(9746), hidden: true })).toMatchObject({ heroAmount: "RM ••••", heroSplit: "Amounts hidden" });
+    });
   });
 });
 
