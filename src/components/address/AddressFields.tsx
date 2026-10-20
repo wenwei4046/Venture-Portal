@@ -110,7 +110,9 @@ export default function AddressFields({
   )
 
   return (
-    <div className={s.fields} data-stacked={stacked ? 'true' : undefined} style={gap === undefined ? undefined : { gap }}>
+    // `hrv-overlay`: the HR kit's palette (--hv-*) its steps, waiting fields and On file are drawn in — brought along, so
+    // they are drawn the same in a window portaled to <body> (Finance's invoice dialogs) as on the sheet.
+    <div className={`${s.fields} hrv-overlay`} data-stacked={stacked ? 'true' : undefined} style={gap === undefined ? undefined : { gap }}>
       {onFile ? (
         <div className={s.onFile}>
           <span className={s.onFileLabel}>On file</span>
@@ -130,11 +132,11 @@ export default function AddressFields({
         <>
           <div className={s.part}>
             {label('state', 1)}
-            {pick('state', states, waiting ? (failed ? 'Could not load — reload' : 'Loading…') : 'Choose the state', v => onChange(withState(value, v)), false)}
+            {pick('state', states, waiting ? (failed ? 'Could not load — reload' : 'Loading…') : 'Choose', v => onChange(withState(value, v)), false)}
           </div>
           <div className={s.part}>
             {label('city', 2)}
-            {pick('city', cities, value.state ? 'Choose the city' : 'State first', v => onChange(withCity(value, v, data)), !value.state)}
+            {pick('city', cities, value.state ? 'Choose' : 'State first', v => onChange(withCity(value, v, data)), !value.state)}
           </div>
           <div className={s.part}>
             {label('postcode', 3)}
