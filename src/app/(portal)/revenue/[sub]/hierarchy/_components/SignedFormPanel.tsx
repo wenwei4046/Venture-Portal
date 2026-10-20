@@ -115,7 +115,10 @@ export default function SignedFormPanel({
             e.preventDefault()
             setOver(true)
           }}
-          onDragLeave={() => setOver(false)}
+          onDragLeave={e => {
+            // Crossing onto its own words is still over it.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
+          }}
           onDrop={drop}
         >
           <span className={w.signedDropTitle}>{uploading ? 'Uploading…' : 'Upload the signed form'}</span>

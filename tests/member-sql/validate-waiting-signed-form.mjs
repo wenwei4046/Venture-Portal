@@ -201,7 +201,8 @@ try {
   await as(null)
   await db.exec(MIGRATION)
   const swapped = await md5()
-  check(swapped !== 'b5f8cacefeaa4440120dc17574b2016e', true, 'the list’s body swapped')
+  // The body production answered in this migration's dry-run (2026-10-20, BEGIN … ROLLBACK on the live schema).
+  check(swapped, '75a80f3e8944f966e1e136e47db05092', 'the list’s body swapped, as on production')
   check(await q(`SELECT prosecdef, provolatile FROM pg_proc WHERE proname = 'member_sub_department_requests'`), [{ prosecdef: true, provolatile: 's' }],
     'still DEFINER and STABLE')
 
