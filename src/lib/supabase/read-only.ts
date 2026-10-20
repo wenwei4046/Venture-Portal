@@ -46,6 +46,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
   // Member services › Food claim (mig 20261013150000).
   'member_admin_food_claim',
+  'member_admin_transport_claim',
   // The replacement list's form (mig 20261011130000).
   'member_replacement_form',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.

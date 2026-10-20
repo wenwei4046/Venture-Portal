@@ -4,6 +4,7 @@ import { memberDemo } from "@/lib/member/demo";
 import type { MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberReadContext, MemberRequest } from "@/lib/member/types";
+import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { RevenueSource } from "./source";
 import RevenueApp from "./RevenueApp";
 
@@ -289,5 +290,47 @@ describe("a food claim", () => {
     expect(sheet.getByText("RM 20.00")).toBeInTheDocument();
     expect(sheet.getByText("RM 40.00")).toBeInTheDocument();
     expect(sheet.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+  });
+});
+
+// A transport claim — Outstation, a plane ticket, an Airbnb stay — for the titles HR ticked (2026-10-20, Member services ›
+// Transport claim's ⋯): in View as, the viewed person's title. Rates read before the list existed offer it, as before.
+describe("a transport claim", () => {
+  const TRANSPORT = (titles: string[], food: string[] = []): ClaimRates => ({
+    ...RATES, transport: { titles }, food: { subDepartmentId: "fair", perDay: 20, titles: food },
+  });
+  async function open(make: () => MemberData, search: string, rates: ClaimRates) {
+    window.history.replaceState({}, "", `/member${search}`);
+    const live = { ...source(make), claimRates: vi.fn(async () => ({ ok: true as const, data: rates })) };
+    render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={live} />);
+    expect(await screen.findByRole("heading", { name: "Requests" })).toBeInTheDocument();
+    await waitFor(() => expect(live.claimRates).toHaveBeenCalled());
+    await act(async () => {});
+    return live;
+  }
+
+  it("is offered to a title HR ticked, in the sub-department they claim in", async () => {
+    // Jia En: a Team Leader in Fair, a Revenue Specialist in IR.
+    await open(memberData, "?page=account&view=requests&department=ir", TRANSPORT(["Revenue Specialist"]));
+    expect(await screen.findByRole("button", { name: /Submit claim/ })).toBeInTheDocument();
+    cleanup();
+    await open(memberData, "?page=account&view=requests&department=fair", TRANSPORT(["Revenue Specialist"], ["Team Leader"]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Submit claim/ })).not.toBeInTheDocument());
+    // The food claim stays its own: ticked for a Team Leader in Fair.
+    expect(screen.getByRole("button", { name: /Submit food claim/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Submit waiting list/ })).toBeInTheDocument();
+  });
+
+  it("is not offered to anybody when HR ticked no title", async () => {
+    await open(memberData, "?page=account&view=requests&department=ir", TRANSPORT([]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Submit claim/ })).not.toBeInTheDocument());
+  });
+
+  it("in View as follows the viewed person's title", async () => {
+    await open(principalData, "?page=account&view=requests&department=fair&staff=anthony", TRANSPORT(["Team Leader"]));
+    expect(await screen.findByRole("button", { name: /Submit claim/ })).toBeInTheDocument();
+    cleanup();
+    await open(principalData, "?page=account&view=requests&department=fair&staff=yuny", TRANSPORT(["Team Leader"]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Submit claim/ })).not.toBeInTheDocument());
   });
 });

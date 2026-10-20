@@ -249,6 +249,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
   // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.
   'member_admin_food_claim', 'member_admin_save_food_claim',
+  // Transport claim's ⋯ — who may claim it (mig 20261020220000).
+  'member_admin_transport_claim', 'member_admin_save_transport_claim',
   'member_capacity_of', 'member_process_all_queues',
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).

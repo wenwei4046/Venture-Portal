@@ -88,7 +88,7 @@ import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
 import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
-import { foodOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
+import { foodOpenTo, transportOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
@@ -1130,8 +1130,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // same Create as a claim. In View as, the viewed person's title decides.
   // The design preview's form carries the refresh handoff's food sample (2026-10-14), so its Requests offer it too.
   const foodOpen = foodOpenTo(fxp ? fxp.form.rates : claimRates, membership?.id, me.title);
-  const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim" && foodOpen ? ["claim", "food"] as RequestKindVM[] : [k])),
-    [requestKinds, foodOpen]);
+  // …and a transport claim (Outstation, a plane ticket, an Airbnb stay) only for a title HR ticked (2026-10-20).
+  const transportOpen = transportOpenTo(fxp ? fxp.form.rates : claimRates, me.title);
+  const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim"
+    ? [...(transportOpen ? ["claim"] : []), ...(foodOpen ? ["food"] : [])] as RequestKindVM[]
+    : [k])), [requestKinds, foodOpen, transportOpen]);
 
   // ── pull to refresh: the end of it ──
   // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest

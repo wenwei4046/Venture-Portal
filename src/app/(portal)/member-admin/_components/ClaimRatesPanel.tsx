@@ -12,9 +12,11 @@ import {
   type ClaimRatesAdmin,
   type ClaimRatesDraft,
 } from '@/lib/member/claim-rates-admin'
+import { transportTally, type TransportClaimAdmin } from '@/lib/member/transport-claim-admin'
 import { formatIntlDate, formatMoney } from '@/lib/utils'
 import s from './member-services.module.css'
 import { Select } from '@/components/hrv/select'
+import TransportTitlesWindow from './TransportTitlesWindow'
 
 const REGION_COLS = 'minmax(0,1.6fr) 150px 140px 150px 100px'
 const VENUE_COLS = 'minmax(0,1.6fr) minmax(0,1fr)'
@@ -22,23 +24,28 @@ const day = (d: string) => formatIntlDate(new Date(`${d}T00:00:00Z`), { day: 'nu
 const savedOn = (at: string) => formatIntlDate(new Date(at), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kuala_Lumpur' }, 'en-GB')
 
 /**
- * Member services › Claim rates (2026-10-10, the HR revamp; the rules since
- * 2026-10-05/06): what a member's fair claim is worked out from — Outstation's
- * base and rate per spot, Airbnb's limits (a person a night — a limit, not a
+ * Member services › Transport claim (Claim rates until 2026-10-20 — the user: "这个 claim rate 我要换成 transport
+ * claim"; the HR revamp's panel since 2026-10-10, the rules since 2026-10-05/06): what a member's transport claim is
+ * worked out from — Outstation's base and rate per spot, Airbnb's limits (a person a night — a limit, not a
  * fixed amount, since 2026-10-12 — and its small group's),
  * the regions (spots from the base, or flown to) and every venue the ERP's
  * fairs name with its region. One Save, at the top, lit while anything
  * differs from what is stored; `member_admin_save_claim_settings` checks it
  * all again. Read with the page.
+ *
+ * Right of Save, ⋯ (2026-10-20): who may claim it — the titles ticked, in a window with its own Save
+ * (`TransportTitlesWindow`), as Food claim picks its titles.
  */
-export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin | null }) {
+export default function ClaimRatesPanel({ initial, transport: initialTransport = null }: { initial: ClaimRatesAdmin | null; transport?: TransportClaimAdmin | null }) {
   const [saved, setSaved] = useState(initial)
+  const [transport, setTransport] = useState(initialTransport)
+  const [titlesOpen, setTitlesOpen] = useState(false)
   const [draft, setDraft] = useState<ClaimRatesDraft | null>(initial ? claimRatesDraft(initial) : null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const added = useRef(0)
 
-  if (!saved || !draft) return <p className={s.alert} role="alert">Claim rates could not be read. Reload the page to try again.</p>
+  if (!saved || !draft) return <p className={s.alert} role="alert">The transport claim could not be read. Reload the page to try again.</p>
 
   const changed = claimRatesChanged(saved, draft)
   const problems = claimRatesProblems(draft)
@@ -67,9 +74,9 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
       }
       setSaved(result.data)
       setDraft(claimRatesDraft(result.data))
-      flash('Claim rates saved — new claims use them')
+      flash('Transport claim saved — new claims use it')
     } catch {
-      setError('The claim rates could not be saved. Please try again.')
+      setError('The transport claim could not be saved. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -78,10 +85,24 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
   return (
     <section className={s.crCard} aria-labelledby="cr-title">
       <div className={s.crHead}>
-        <h2 id="cr-title" className={s.crTitle}>Claim rates</h2>
-        <button type="button" className={s.crSave} disabled={!changed || saving} onClick={save}>
-          {saving ? 'Saving…' : changed ? 'Save' : 'Saved'}
-        </button>
+        <h2 id="cr-title" className={s.crTitle}>Transport claim</h2>
+        <div className={s.crHeadActions}>
+          <button type="button" className={s.crSave} disabled={!changed || saving} onClick={save}>
+            {saving ? 'Saving…' : changed ? 'Save' : 'Saved'}
+          </button>
+          {transport ? (
+            <button
+              type="button"
+              className={s.crMore}
+              aria-label="Who can claim transport"
+              title={`Who can claim · ${transportTally(transport)}`}
+              aria-haspopup="dialog"
+              onClick={() => setTitlesOpen(true)}
+            >
+              ⋯
+            </button>
+          ) : null}
+        </div>
       </div>
       {error || (changed && problems.length) ? (
         <p className={s.alert} role="alert">{error || problems[0]}</p>
@@ -249,6 +270,16 @@ export default function ClaimRatesPanel({ initial }: { initial: ClaimRatesAdmin 
         <div className={s.foot}>
           Last saved {savedOn(saved.updatedAt)}{saved.updatedBy ? ` by ${saved.updatedBy}` : ''}.
         </div>
+      ) : null}
+      {titlesOpen && transport ? (
+        <TransportTitlesWindow
+          transport={transport}
+          onClose={() => setTitlesOpen(false)}
+          onSaved={next => {
+            setTransport(next)
+            setTitlesOpen(false)
+          }}
+        />
       ) : null}
     </section>
   )
