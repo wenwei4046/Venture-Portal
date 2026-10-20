@@ -60,6 +60,19 @@ export function keptParts(row: { employee_name: string; first_name?: string | nu
   return { first: row.first_name ?? null, last: row.last_name ?? null }
 }
 
+/**
+ * Their full name as People Management lists it (2026-10-20, the user: "我要他的名字显示全名（也就是 Last Name 加 First
+ * Name）… 点进去之后才分别看到他的 First Name 跟 Last Name"): the last name, then the first — LOO WEN WEI, TEOH CHEA HUAN —
+ * except a last name that is a father's name (IZZUL BIN ISMAIL, NUR HAKIIMAH ZULAIKHA SYED NOR HAKIM), which follows the
+ * first as their IC writes it. One of the two alone is the name; neither kept, the full name on their IC.
+ */
+export function fullNameOf(row: { employee_name: string; first_name?: string | null; last_name?: string | null }): string {
+  const first = (row.first_name ?? '').trim().replace(/\s+/g, ' ')
+  const last = (row.last_name ?? '').trim().replace(/\s+/g, ' ')
+  if (!first || !last) return first || last || row.employee_name.trim().replace(/\s+/g, ' ')
+  return FATHERS.has(last.split(' ')[0].toUpperCase()) ? `${first} ${last}` : `${last} ${first}`
+}
+
 /** What an app greets them by: the first name the record keeps, else the full name's (`nameParts`). */
 export function greetingName(name: string | null | undefined, first?: string | null): string {
   return first?.trim() || nameParts(name).first || ''

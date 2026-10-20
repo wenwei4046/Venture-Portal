@@ -8,6 +8,7 @@ import { Chip, HistoryEvent, btn } from '@/components/hrv/kit'
 import { CloseButton, Window } from '@/components/hrv/overlay'
 import { Tabs } from '@/components/hrv/tabs'
 import { initialsOf } from '@/lib/people-roster'
+import { fullNameOf } from '@/lib/person-name'
 import { MASKED } from '@/lib/sensitive'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import { BASIC_FROM_COMMISSION } from '@/lib/person-record'
@@ -58,7 +59,8 @@ export default function PersonWindow({
 
   const person = data
   const wide = tab === 'permissions' && !!person?.account
-  const name = person?.staff.employee_name ?? ''
+  // Their full name, as the roster row that opened it lists it (2026-10-20); Full page shows the two apart.
+  const name = person ? fullNameOf(person.staff) : ''
 
   return (
     <Window open onClose={onClose} width={wide ? 900 : 760} label={name || 'Person'}>

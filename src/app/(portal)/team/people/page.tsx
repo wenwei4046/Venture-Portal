@@ -12,6 +12,7 @@ import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
 import type { InviteCandidate, PendingInvite } from './_components/InviteDialog'
 import PeopleManagement from './_components/PeopleManagement'
 import { pendingLogins } from '@/lib/invite'
+import { fullNameOf } from '@/lib/person-name'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -45,6 +46,9 @@ interface OpenPosition {
 interface RosterRow {
   id: string
   employee_name: string
+  /** The two the apps call them by (2026-10-17) — the roster lists them as one full name. The directory has neither. */
+  first_name?: string | null
+  last_name?: string | null
   employee_code: string | null
   designation: string | null
   user_id: string | null
@@ -93,7 +97,7 @@ export default async function PeopleManagementPage({
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -294,7 +298,9 @@ function personRow(
   const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
   return {
     id: r.id,
-    name: r.employee_name,
+    // Their full name, last name then first (2026-10-20); the full name on their IC is searched too.
+    name: fullNameOf(r),
+    icName: r.employee_name,
     code: r.employee_code ?? null,
     // title_id is authoritative; designation is the free text it was
     // backfilled from and still what the InfoTech import writes.

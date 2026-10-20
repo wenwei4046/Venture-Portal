@@ -45,6 +45,8 @@ export interface SubDeptRequest {
   submittedAt: string | null
   /** The member who sent it. */
   submittedBy: string | null
+  /** …their staff id — what the drawer's Edit starts "Submitted by" on (read since mig 20261020190000). */
+  submittedById?: string | null
   newPerson: string | null
   contact: string | null
   /** Waiting list: the preferred joining date (YYYY-MM-DD), or `anytime` — ready whenever HR calls them. */
@@ -135,6 +137,12 @@ export function addedHere(r: Pick<SubDeptRequest, 'kind' | 'events'>): boolean {
 export const FORM_UPLOADED = 'Signed form uploaded'
 
 /**
+ * The note `member_waiting_edit` puts on its step (mig 20261020190000): HR changed the applicant's details with
+ * the drawer's Edit — "Details edited · name, phone number". A step with no move, like an upload.
+ */
+export const DETAILS_EDITED = 'Details edited'
+
+/**
  * The history a person reads: one step per status it moved to. The database
  * writes a status change once from the app and, on some paths, once more from
  * its own trigger; the same move a second later is the same step. A member's
@@ -143,7 +151,8 @@ export const FORM_UPLOADED = 'Signed form uploaded'
  * nobody's step: it is the request being written. HR's "+" puts somebody on
  * the list without a member ever sending it — "Added to the waiting list".
  * A signed form HR uploads in the drawer is a step of its own too (2026-10-20),
- * its note the file's name.
+ * its note the file's name; so is HR's Edit in the drawer — "Details edited",
+ * its note what changed.
  */
 export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent & { what: string }> {
   const out: Array<RequestEvent & { what: string }> = []
@@ -152,13 +161,17 @@ export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent &
     if (e.to === 'draft') continue
     const updated = e.to === 'submitted' && !!e.note && e.note.startsWith(UPDATED)
     const uploaded = !!e.note && e.note.startsWith(`${FORM_UPLOADED} · `)
+    const edited = !!e.note && e.note.startsWith(`${DETAILS_EDITED} · `)
     const last = out[out.length - 1]
-    if (last && last.to === e.to && !updated && !uploaded) {
+    if (last && last.to === e.to && !updated && !uploaded && !edited) {
       if (!last.by && e.by) last.by = e.by
       if (!last.note && e.note) last.note = e.note
       continue
     }
-    if (uploaded) {
+    if (edited) {
+      const changed = e.note!.slice(DETAILS_EDITED.length + 3)
+      out.push({ ...e, what: DETAILS_EDITED, note: changed ? `Changed: ${changed}` : null })
+    } else if (uploaded) {
       out.push({ ...e, what: FORM_UPLOADED, note: e.note!.slice(FORM_UPLOADED.length + 3) || null })
     } else if (updated) {
       const changed = e.note!.slice(UPDATED.length).replace(/^\s*·\s*/, '')
