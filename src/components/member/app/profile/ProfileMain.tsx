@@ -17,8 +17,8 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
   // The HR revamp's second package (2026-10-11, README 18.4): the meeting rooms, booked from the phone.
   { key: "rooms", label: "Book a room", sub: "See free meeting rooms and book a slot", d: ICON.room, tone: s.toneRooms },
   { key: "docs", label: "Documentation", sub: "Handbook, price list and files from HR", d: ICON.doc, tone: s.toneDocs },
-  // The CRM (2026-10-09, prototype 2a: Profile › My leads & appointments).
-  { key: "crm", label: "My leads & appointments", sub: "Manage your leads and appointments", d: ICON.chat, tone: s.toneLeads },
+  // My leads & appointments (the CRM, 2026-10-09) is no row of Profile's since 2026-10-20 — the user: "这个我们不用留了，
+  // 帮我 delete 掉，因为左边那个基本上已经有 CRM 了": Today's chat button and the desktop sidebar's CRM row open it.
   { key: "memos", label: "Memos & notifications", sub: "Read published team updates", d: ICON.bell, tone: s.toneMemos },
 ];
 
@@ -59,8 +59,8 @@ const VIEWS: { id: ModuleId; where: string }[] = [
  * 2026-10-16).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
-export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false, views = null }: {
-  vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean; closedRows?: readonly WorkKey[];
+export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS, push = false, views = null }: {
+  vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; closedRows?: readonly WorkKey[];
   /**
    * Settings › Notifications (2026-10-11; in Settings since 2026-10-16): their own app only — the Principal's too,
    * never while the Principal views a member.
@@ -137,16 +137,13 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
         ) : null}
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
-          {/* My leads & appointments: only for an account the CRM is open to (CRM · View, 2026-10-10). */}
-          {ROWS.filter(r => (r.key !== "crm" || crm) && !closedRows.includes(r.key)).map(r => (
-            <button key={r.key} className={r.key === "crm" && vm.badges.crm ? `${s.workRow} ${s.workRowCount}` : s.workRow} onClick={() => actions.open(r.key)}>
+          {ROWS.filter(r => !closedRows.includes(r.key)).map(r => (
+            <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{r.key !== "crm" && vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
-              {/* The chats' unread sits at the row's end, before its arrow (the owner, 2026-10-14). */}
-              {r.key === "crm" && vm.badges.crm && <span className={`${s.workCount} ${s.workCountEnd}`}>{vm.badges.crm}</span>}
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           ))}
