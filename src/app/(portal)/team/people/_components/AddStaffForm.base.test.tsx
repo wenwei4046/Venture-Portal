@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AddStaffForm, { type AddStaffDepartment } from './AddStaffForm'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
@@ -6,6 +6,10 @@ import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staf
 const actions = vi.hoisted(() => ({ addStaff: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => actions)
+// Each test waits for ITS OWN submit (CI flake on #582, 2026-10-20): the submit awaits Malaysia's list before it calls
+// addStaff, so on a busy runner `toHaveBeenCalled` passed on an earlier test's call and read its empty address — and
+// the late call then landed in the next test.
+beforeEach(() => { actions.addStaff.mockClear() })
 
 const departments: AddStaffDepartment[] = [
   { id: 'revenue', name: 'Revenue Department', payroll_source: 'commission', segment_key: 'revenue' },
@@ -142,7 +146,6 @@ describe('Add Staff — the address', () => {
   })
 
   it('asks for the postcode before sending anything', async () => {
-    actions.addStaff.mockClear()
     const { department } = setup()
     fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
     fireEvent.change(department, { target: { value: 'marketing' } })
