@@ -129,15 +129,15 @@ describe('Add Staff — the address', () => {
     await listed()
     fireEvent.change(field('line1'), { target: { value: 'No 8, Jalan Mawar 2' } })
     fireEvent.change(field('state'), { target: { value: 'Johor' } })
-    fireEvent.change(field('city'), { target: { value: 'Ayer Baloi' } })
-    expect(field('postcode')).toHaveValue('82100')
+    fireEvent.change(field('city'), { target: { value: 'Rengit' } })
+    expect(field('postcode')).toHaveValue('83100')
 
     await submit()
     await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
     const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
     expect(Object.fromEntries([...sent.entries()].filter(([key]) => key.startsWith('address')))).toEqual({
-      address_line1: 'No 8, Jalan Mawar 2', address_line2: '', address_state: 'Johor', address_city: 'Ayer Baloi',
-      address_postcode: '82100', address_country: 'Malaysia',
+      address_line1: 'No 8, Jalan Mawar 2', address_line2: '', address_state: 'Johor', address_city: 'Rengit',
+      address_postcode: '83100', address_country: 'Malaysia',
     })
   })
 

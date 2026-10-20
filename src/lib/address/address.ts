@@ -3,8 +3,8 @@ import { belongTogether, citiesOf, postcodesOf, statesOf, type PostcodeData } fr
 /**
  * An address as the portal keeps it (2026-10-20 — the user: "凡是有提到 address 的东西 … 填写的 format 要区分成 address 1、
  * address 2、postcode、state、city，国家 default 是 Malaysia", and "所有关联到 address 的，都要跟着我刚才上面讲的 format 给他们去
- * 填"): two lines typed, then — in Malaysia — the state, the city and the postcode picked from Pos Malaysia's list in that
- * order (`malaysia.ts`), and the country, Malaysia unless another is picked. Abroad the three are typed: the list is
+ * 填"): two lines typed, then — in Malaysia — the state, the city and the postcode picked from the official list in that
+ * order (`malaysia.ts` — the place's own name, not its post office's), and the country, Malaysia unless another is picked. Abroad the three are typed: the list is
  * Malaysia's. The old one-box address stays on each record as the six put together (`addressText`, the database's
  * `address_compose`), for everything that still prints one line. Pure.
  */
