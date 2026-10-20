@@ -16,7 +16,7 @@ import { GET } from './route'
 const inv = (over: Record<string, unknown>) => ({
   id: 'i1', invoice_no: 'HV-INV-202610-0013', company_id: 'co-hc', period_month: '2026-10-01', billing_mode: 'hr_attribution', total_amount: '2204.00', status: 'issued',
   billable_to_type: 'subsidiary', billable_to_department_id: null, billable_to_freetext_name: null, billable_to_freetext_address: null,
-  billable_to_freetext_phone: null, billable_to_freetext_email: null, description: 'HR shared service — Oct', invoice_date: '2026-10-07', due_date: '2026-11-06',
+  billable_to_freetext_address_parts: null, billable_to_freetext_phone: null, billable_to_freetext_email: null, description: 'HR shared service — Oct', invoice_date: '2026-10-07', due_date: '2026-11-06',
   reference_no: null, category_code: '5020', settlement_voucher_id: null, ...over,
 })
 
@@ -27,6 +27,11 @@ function database() {
       inv({}),
       inv({ id: 'i2', invoice_no: 'HV-INV-202610-0014', status: 'paid', company_id: null, billable_to_type: 'dept_pool', billable_to_department_id: 'd-office', total_amount: '900.00', settlement_voucher_id: 'v-batch', billing_mode: 'venture_attribution' }),
       inv({ id: 'i3', invoice_no: 'HV-INV-202610-0015', company_id: null, billable_to_type: 'freetext', billable_to_freetext_name: 'Rygis Private Gym', billable_to_freetext_address: 'Lot 12', billable_to_freetext_email: 'hello@rygis.my' }),
+      inv({
+        id: 'i4', invoice_no: 'HV-INV-202610-0016', company_id: null, billable_to_type: 'freetext', billable_to_freetext_name: 'Rygis Private Gym',
+        billable_to_freetext_address: 'No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia', billable_to_freetext_phone: '012-345 6789',
+        billable_to_freetext_address_parts: { line1: 'No 83, Jalan Jambu 3', line2: '', postcode: '11060', city: 'Paya Terubong', state: 'Pulau Pinang', country: 'Malaysia' },
+      }),
     ],
     companies: [{ id: 'co-hc', name: 'HOUZS Century', short_code: 'HC' }],
     departments: [{ id: 'd-office', name: 'Venture (Office)' }],
@@ -80,5 +85,7 @@ describe('the invoice document’s figures', () => {
     expect(calls.some((c) => c.table === 'departments' && c.method === 'eq')).toBe(false)
     // An outside party carries how to reach it.
     expect(docs[2].bill_to).toEqual({ name: 'Rygis Private Gym', kind: 'External party', contact: ['Lot 12', 'hello@rygis.my'] })
+    // Its address in six parts (2026-10-20) prints a line each, as a letter is addressed.
+    expect(docs[3].bill_to.contact).toEqual(['No 83, Jalan Jambu 3', '11060 Paya Terubong', 'Pulau Pinang, Malaysia', '012-345 6789'])
   })
 })

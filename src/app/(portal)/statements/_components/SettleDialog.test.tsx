@@ -33,6 +33,7 @@ const row = (id: string, no: string, total: number): InvoiceRowIn => ({
   billable_to_department_id: null,
   billable_to_freetext_name: null,
   billable_to_freetext_address: null,
+  billable_to_freetext_address_parts: null,
   billable_to_freetext_phone: null,
   billable_to_freetext_email: null,
   description: null,

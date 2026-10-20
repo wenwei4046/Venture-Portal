@@ -19,9 +19,10 @@ import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry
 import { toHubInvoice, type HubCreditNoteLine, type InvoiceRowIn } from '@/app/(portal)/statements/_lib/invoice-model'
 import { InvoiceDocPdf, type InvoiceDocData, type InvoiceLineData } from '../_format/invoice-doc-pdf'
 import { officeTime } from '@/lib/office-time'
+import { EMPTY_ADDRESS, addressFromParts, addressLines } from '@/lib/address/address'
 
 const COLUMNS =
-  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, settlement_voucher_id'
+  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_address_parts, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, settlement_voucher_id'
 
 // The billing mode as the invoice has always printed it (the design's *Venture (HV) OPEX*).
 const MODE_ON_INVOICE: Record<string, string> = {
@@ -49,9 +50,12 @@ function billTo(
     return { name: departments.get(inv.billable_to_department_id) ?? '—', kind: 'Department pool', contact: [] }
   }
   const kind: Record<string, string> = { director: 'Director', dept_pool: 'Department pool', freetext: 'External party' }
+  // An address in its six parts prints as its lines (2026-10-20); one billed before them, as it was typed.
+  const lines = addressLines(addressFromParts(inv.billable_to_freetext_address_parts) ?? EMPTY_ADDRESS)
+  const address = lines.length ? lines : [inv.billable_to_freetext_address]
   const contact =
     inv.billable_to_type === 'freetext'
-      ? [inv.billable_to_freetext_address, inv.billable_to_freetext_phone, inv.billable_to_freetext_email].filter((x): x is string => !!x?.trim())
+      ? [...address, inv.billable_to_freetext_phone, inv.billable_to_freetext_email].filter((x): x is string => !!x?.trim())
       : []
   return { name: inv.billable_to_freetext_name ?? '—', kind: kind[inv.billable_to_type ?? ''] ?? '—', contact }
 }

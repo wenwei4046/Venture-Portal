@@ -35,6 +35,7 @@ import {
   type StaffAllocationCompanyRow,
 } from '../billing/actions'
 import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
+import type { Address } from '@/lib/address/address'
 
 // Invoice's hub steps, in words (2026-10-14, the Finance revamp v2 — D10). The
 // hub's drawer, its bulk bar and its credit notes call Service Billing's own
@@ -155,7 +156,10 @@ export interface HubInvoiceParty {
   companyId?: string
   deptId?: string
   name?: string
+  /** The one line — the parts put together, or the text on file of an invoice billed before them. */
   address?: string
+  /** The address in its six parts, when picked (2026-10-20). */
+  addressParts?: Address | null
   phone?: string
   email?: string
 }
@@ -177,6 +181,7 @@ const partyOf = (p: HubInvoiceParty) => ({
   departmentId: p.billKind === 'dept_pool' ? p.deptId : undefined,
   freetextName: p.billKind === 'director' || p.billKind === 'freetext' ? p.name?.trim() : undefined,
   freetextAddress: p.billKind === 'freetext' ? p.address?.trim() : undefined,
+  freetextAddressParts: p.billKind === 'freetext' ? (p.addressParts ?? null) : undefined,
   freetextPhone: p.billKind === 'freetext' ? p.phone?.trim() : undefined,
   freetextEmail: p.billKind === 'freetext' ? p.email?.trim() : undefined,
 })
@@ -192,6 +197,7 @@ export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead
     if (payload.billKind === 'director' || payload.billKind === 'freetext') fd.set('billable_to_freetext_name', payload.name?.trim() ?? '')
     if (payload.billKind === 'freetext') {
       fd.set('billable_to_freetext_address', payload.address?.trim() ?? '')
+      fd.set('billable_to_freetext_address_parts', JSON.stringify(payload.addressParts ?? null))
       fd.set('billable_to_freetext_phone', payload.phone?.trim() ?? '')
       fd.set('billable_to_freetext_email', payload.email?.trim() ?? '')
     }

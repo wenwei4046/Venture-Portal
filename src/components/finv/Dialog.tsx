@@ -227,6 +227,9 @@ export function DialogForm({
   )
 }
 
+/** A field's label and text box as classes — for a control that draws its own (the six parts of an address). */
+export const FIELD_LOOK = { label: s.fieldLabel, input: s.input }
+
 /** A field: its label over its control. */
 export function Field({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
   return (

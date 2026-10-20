@@ -96,4 +96,17 @@ describe('AddressFields', () => {
     expect(choices('state')[0]).toBe('Penang')
     expect((field('city') as HTMLSelectElement).value).toBe('BM')
   })
+
+  // 2026-10-20, Finance's invoice dialogs: portaled to <body>, outside the sheet — the steps lost their orange disc and
+  // the waiting fields their grey; a third of the dialog is too narrow for *Choose the state*.
+  it('carries its own palette, and asks for each part in a word that fits a third of a dialog', async () => {
+    render(<Host />)
+    expect(field('line1').closest('.hrv-overlay')).not.toBeNull()
+    await ready()
+    const empty = (key: keyof Address) => (field(key) as HTMLSelectElement).options[0].textContent
+    expect([empty('state'), empty('city'), empty('postcode')]).toEqual(['Choose', 'State first', 'City first'])
+    pick('state', 'Pulau Pinang')
+    pick('city', 'Bukit Mertajam')
+    expect([empty('city'), empty('postcode')]).toEqual(['Choose', 'Choose'])
+  })
 })

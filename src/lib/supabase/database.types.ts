@@ -4834,6 +4834,7 @@ export type Database = {
           base_amount: number | null
           billable_to_department_id: string | null
           billable_to_freetext_address: string | null
+          billable_to_freetext_address_parts: Json | null
           billable_to_freetext_email: string | null
           billable_to_freetext_name: string | null
           billable_to_freetext_phone: string | null
@@ -4862,6 +4863,7 @@ export type Database = {
           base_amount?: number | null
           billable_to_department_id?: string | null
           billable_to_freetext_address?: string | null
+          billable_to_freetext_address_parts?: Json | null
           billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
           billable_to_freetext_phone?: string | null
@@ -4890,6 +4892,7 @@ export type Database = {
           base_amount?: number | null
           billable_to_department_id?: string | null
           billable_to_freetext_address?: string | null
+          billable_to_freetext_address_parts?: Json | null
           billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
           billable_to_freetext_phone?: string | null

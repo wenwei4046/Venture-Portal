@@ -28,6 +28,7 @@ export default function AddressFields({
   selectClassName = '',
   labelClassName = '',
   selectBare = false,
+  selectRound,
   gap,
   stacked = false,
 }: {
@@ -46,6 +47,8 @@ export default function AddressFields({
   selectClassName?: string
   /** Draw the selects in the host's classes alone (Add person's own fields are `<Select bare>`). */
   selectBare?: boolean
+  /** The soft dropdown's radius where the host's own selects differ (Finance's dialogs: 12). */
+  selectRound?: 10 | 12
   /** The host's own label classes, instead of the kit's small capitals. */
   labelClassName?: string
   /** The space between the fields, in px, where the host's own grid differs (12). */
@@ -89,6 +92,7 @@ export default function AddressFields({
   const pick = (key: 'state' | 'city' | 'postcode', list: string[], empty: string, onPick: (v: string) => void, off: boolean) => (
     <Select
       bare={selectBare}
+      round={selectRound}
       id={id(key)}
       className={`${selectClass} ${mono(key)}`}
       value={value[key]}
@@ -106,7 +110,9 @@ export default function AddressFields({
   )
 
   return (
-    <div className={s.fields} data-stacked={stacked ? 'true' : undefined} style={gap === undefined ? undefined : { gap }}>
+    // `hrv-overlay`: the HR kit's palette (--hv-*) its steps, waiting fields and On file are drawn in — brought along, so
+    // they are drawn the same in a window portaled to <body> (Finance's invoice dialogs) as on the sheet.
+    <div className={`${s.fields} hrv-overlay`} data-stacked={stacked ? 'true' : undefined} style={gap === undefined ? undefined : { gap }}>
       {onFile ? (
         <div className={s.onFile}>
           <span className={s.onFileLabel}>On file</span>
@@ -126,11 +132,11 @@ export default function AddressFields({
         <>
           <div className={s.part}>
             {label('state', 1)}
-            {pick('state', states, waiting ? (failed ? 'Could not load — reload' : 'Loading…') : 'Choose the state', v => onChange(withState(value, v)), false)}
+            {pick('state', states, waiting ? (failed ? 'Could not load — reload' : 'Loading…') : 'Choose', v => onChange(withState(value, v)), false)}
           </div>
           <div className={s.part}>
             {label('city', 2)}
-            {pick('city', cities, value.state ? 'Choose the city' : 'State first', v => onChange(withCity(value, v, data)), !value.state)}
+            {pick('city', cities, value.state ? 'Choose' : 'State first', v => onChange(withCity(value, v, data)), !value.state)}
           </div>
           <div className={s.part}>
             {label('postcode', 3)}
@@ -158,6 +164,7 @@ export default function AddressFields({
         {label('country')}
         <Select
           bare={selectBare}
+          round={selectRound}
           id={id('country')}
           className={selectClass}
           value={value.country || MALAYSIA}

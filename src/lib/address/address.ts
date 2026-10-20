@@ -11,7 +11,7 @@ import { belongTogether, citiesOf, postcodesOf, statesOf, type PostcodeData } fr
 
 export const MALAYSIA = 'Malaysia'
 
-export interface Address {
+export type Address = {
   line1: string
   line2: string
   postcode: string
@@ -89,6 +89,23 @@ export const ADDRESS_JSON_KEYS: Readonly<Record<keyof Address, string>> = {
   city: 'addressCity',
   state: 'addressState',
   country: 'addressCountry',
+}
+
+/**
+ * An address held whole — `{ line1, line2, postcode, city, state, country }`, as an invoice keeps its typed bill-to's
+ * (`billable_to_freetext_address_parts`) — read as `addressOf` reads a record; null for anything else.
+ */
+export function addressFromParts(v: unknown): Address | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const o = v as Record<string, unknown>
+  return addressOf({
+    address_line1: o.line1,
+    address_line2: o.line2,
+    address_postcode: o.postcode,
+    address_city: o.city,
+    address_state: o.state,
+    address_country: o.country,
+  })
 }
 
 /** The six as a database function hands them over, each as it came. */

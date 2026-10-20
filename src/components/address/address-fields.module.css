@@ -1,6 +1,7 @@
 /* An address's fields (2026-10-20): the two lines across, then State · City · Postcode side by side in the order they
    are picked (a step number on each), then the country. One to a row where it is narrow. Colours are the HR kit's
-   --hv-* (on .sheet-theme); a host's own field classes draw the boxes over these. */
+   --hv-* — the root carries them (`hrv-overlay`), so a window portaled to <body> has them too; a host's own field
+   classes draw the boxes over these. */
 
 .fields {
   display: grid;
