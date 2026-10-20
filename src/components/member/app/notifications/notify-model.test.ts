@@ -70,3 +70,20 @@ describe("a settled month's commission", () => {
     expect(pay(null)?.sub).toBe("Goes to payroll.");
   });
 });
+
+// IT support (2026-10-20, mig 20261021020100): a status IT set or its note — or, for the desk, a new request or a reply.
+describe("an IT request's news", () => {
+  const fixed = {
+    id: "n9", kind: "it" as const, title: "IT-0007 · Fixed", body: "The Quote freezes on step 2 — “Fixed in today's update.”",
+    refKind: "it_request" as const, refId: "r1", at: "2026-10-05T07:00:00Z", read: false,
+  };
+
+  it("comes under UPDATES and opens the request in IT support — the bell's number, not a to-do", () => {
+    const { items, count } = notifications({ ...base, requests: [], memos: [], notices: [fixed] });
+    expect(items.map(n => [n.id, n.kind, n.tab, n.unread, n.title, n.sub, n.link, n.go])).toEqual([
+      ["nt-n9", "it", "updates", true, "IT-0007 · Fixed", "The Quote freezes on step 2 — “Fixed in today's update.”", "Open IT support", { to: "it", requestId: "r1" }],
+    ]);
+    expect(count).toBe(0);
+    expect(notifGroups(items, "all", null).map(g => [g.title, g.items.length])).toEqual([["UPDATES", 1]]);
+  });
+});

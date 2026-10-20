@@ -27,6 +27,8 @@ export type FunctionKey =
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
   // HR › Attendance (mig 20261015030000).
   | 'attendance'
+  // IT support's desk (mig 20261021020000).
+  | 'it_requests'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -112,6 +114,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   guest_link: ['guest_link.view', 'guest_link.edit'],
   // HR › Attendance (20261015030000).
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
+  // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
+  it_requests: ['it_requests.view', 'it_requests.edit'],
 }
 
 /**
@@ -174,6 +178,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hr_costing.edit': 'all',
   'hr_costing.export': 'all',
   'hr_costing.view': 'all',
+  // IT support's desk (2026-10-20): the Revenue app's IT requests — read, and notes and statuses.
+  'it_requests.edit': 'all',
+  'it_requests.view': 'all',
   // Hiring (round 2, 2026-10-11).
   'hiring.approve': 'all',
   'hiring.create': 'all',

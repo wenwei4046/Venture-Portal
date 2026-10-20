@@ -38,6 +38,7 @@ const SOMEWHERE_ELSE: Readonly<Record<string, string>> = {
   'rev.leads': 'the CRM in the Revenue app — its own cell, CRM · View',
   'rev.crm_team': 'the CRM’s Control panel — CRM · View at All',
   'rev.product_list': '/member/products — the product_list key',
+  'rev.it_requests': 'the Revenue app’s IT requests (Profile › IT support › All, the sidebar’s row) — its own cells, IT requests · View / Edit',
   'pri.switch_views': 'the view switcher in the top bar',
 }
 
@@ -47,6 +48,8 @@ const OPEN_IN_THE_APP: Readonly<Record<string, string>> = {
   products: 'the Product List — rev.product_list, by its key',
   memos: 'Memos & notifications — every member reads and acknowledges HR’s memos (the user, 2026-10-11)',
   crm: 'My leads & appointments — the CRM’s own tabs (rev.leads, rev.crm_team), by their cells',
+  it: 'IT support — anybody may ask IT for help and follow their own requests (the user, 2026-10-20: "所有人都可以填")',
+  itdesk: 'IT requests — everybody’s, rev.it_requests, by its own cells',
 }
 
 describe('every tab of every view is in People › Permissions', () => {
@@ -158,6 +161,8 @@ describe('every tab of every view is in People › Permissions', () => {
       // 2026-10-11: the rest of Profile (Memos & notifications stays open to all).
       'Profile · My honours', 'Profile · My brand weeks', 'Profile · Commission scheme',
       'Profile · My leads & appointments', 'CRM · Team', 'Product List',
+      // 2026-10-20: IT support's desk.
+      'IT requests',
     ])
   })
 })

@@ -31,13 +31,17 @@ export const tabCellRows = (): string[] =>
  */
 export function seededRows(table: 'permission_page_tabs' | 'permission_tab_cells'): { file: string; rows: string[] } | null {
   let found: { file: string; rows: string[] } | null = null
+  const rowsOf = (values: string) => [...values.matchAll(/\(([^)]*)\)/g)].map(m => [...m[1].matchAll(/'([^']*)'/g)].map(v => v[1]).join(' '))
   for (const f of migrationFiles()) {
     const sql = sqlOf(f)
     const insert = new RegExp(`INSERT INTO public\\.${table} \\([^)]*\\) VALUES([\\s\\S]*?);`).exec(sql)
-    if (insert) {
-      if (!sql.includes(`DELETE FROM public.${table};`)) throw new Error(`${f} seeds ${table} without emptying it first`)
-      const rows = [...insert[1].matchAll(/\(([^)]*)\)/g)].map(m => [...m[1].matchAll(/'([^']*)'/g)].map(v => v[1]).join(' '))
-      found = { file: f, rows: rows.sort() }
+    if (insert && sql.includes(`DELETE FROM public.${table};`)) {
+      found = { file: f, rows: rowsOf(insert[1]).sort() }
+    } else if (insert) {
+      // Rows added BY NAME over the last whole seed (2026-10-20, IT requests' tab): production's registry holds rows main
+      // does not (the Leads tabs), so a new tab's rows go in `… ON CONFLICT DO NOTHING` instead of a whole reseed.
+      if (!/ON CONFLICT DO NOTHING\s*$/.test(insert[1]) || !found) throw new Error(`${f} seeds ${table} without emptying it first`)
+      found = { file: f, rows: [...new Set([...found.rows, ...rowsOf(insert[1].replace(/ON CONFLICT DO NOTHING\s*$/, ''))])].sort() }
     }
     if (!found) continue
     for (const m of sql.matchAll(new RegExp(`DELETE FROM public\\.${table}\\s+WHERE tab_id IN \\(([^)]*)\\);`, 'g'))) {

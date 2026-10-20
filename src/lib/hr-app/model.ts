@@ -439,6 +439,8 @@ export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string
   if (n.refKind === 'hiring_request') return { tag: 'HIRE', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   if (n.refKind === 'booking') return { tag: 'ROOM', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
   if (n.refKind === 'memo') return { ...MEMO_TAG }
+  // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
+  if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
   return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
 }
 

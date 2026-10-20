@@ -124,8 +124,9 @@ describe('moving the templates onto tabs loses nothing', () => {
 })
 
 it('counts a view the way the rail does', () => {
-  // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme).
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 16 })
+  // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme); seventeen
+  // since 2026-10-20 (IT requests — the desk of IT support).
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 17 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {

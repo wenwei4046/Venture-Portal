@@ -42,6 +42,11 @@ export interface ProfileMainActions {
    * own request): beside Change password, on the same terms.
    */
   changeEmail?: () => void;
+  /**
+   * IT support (2026-10-20 — the user, circling Settings: "i want add on a button to get submit for IT support or help"):
+   * the account's own — never while viewing a member, never on the demo.
+   */
+  itSupport?: () => void;
 }
 
 const NO_ROWS: readonly WorkKey[] = [];
@@ -154,6 +159,11 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
         <section className={s.settings} aria-label="Settings">
           <h2 className={s.h2}>Settings</h2>
           {push ? <PushRow /> : null}
+          {actions.itSupport ? (
+            <button className={s.hideBtn} onClick={actions.itSupport}>
+              IT support<Svg d={ICON.help} size={20} sw={1.7} />
+            </button>
+          ) : null}
           {actions.toggleHide ? (
             <button className={s.hideBtn} onClick={actions.toggleHide}>
               {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />

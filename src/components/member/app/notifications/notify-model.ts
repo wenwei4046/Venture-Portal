@@ -5,13 +5,15 @@ import { ICON } from "../icons";
 
 /** The bell: built from what already exists — memos, requests and the settled month. */
 export type NotifTab = "all" | "requests" | "memos" | "results" | "updates";
-export type NotifKind = "memo" | "res" | "pay" | "req" | "room" | "hire";
+export type NotifKind = "memo" | "res" | "pay" | "req" | "room" | "hire" | "it";
 export type NotifGo =
   | { to: "memo"; memoId: string }
   | { to: "requests"; requestId?: string; kind?: RequestKind }
   | { to: "income" }
   | { to: "arena" }
   | { to: "rooms" }
+  // IT support (2026-10-20): a request's status or IT's note — or, for the desk, a new one or a reply.
+  | { to: "it"; requestId: string }
   | { to: "none" };
 
 export interface NotifItem {
@@ -143,6 +145,13 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
     });
   }
   for (const n of input.notices ?? []) {
+    if (n.refKind === "it_request") {
+      items.push({
+        id: `nt-${n.id}`, kind: "it", tab: "updates", icon: ICON.help, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
+        unread: !n.read, big: null, link: "Open IT support", done: null, go: { to: "it", requestId: n.refId },
+      });
+      continue;
+    }
     const room = n.refKind === "booking";
     items.push({
       id: `nt-${n.id}`, kind: room ? "room" : "hire", tab: "updates", icon: room ? ICON.calendar : ICON.queue, time: ago(n.at, input.now),
@@ -159,7 +168,7 @@ export function notifGroups(items: NotifItem[], tab: NotifTab, settledMonth: str
   const need = visible.filter(n => n.open);
   const res = visible.filter(n => n.kind === "res" || n.kind === "pay");
   const upd = visible.filter(n => n.kind === "req" && !n.open);
-  const news = visible.filter(n => n.kind === "room" || n.kind === "hire");
+  const news = visible.filter(n => n.kind === "room" || n.kind === "hire" || n.kind === "it");
   const rest = visible.filter(n => !need.includes(n) && !res.includes(n) && !upd.includes(n) && !news.includes(n));
   const groups: [string, NotifItem[]][] = [
     ["NEEDS YOU", need],
