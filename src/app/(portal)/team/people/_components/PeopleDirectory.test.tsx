@@ -94,7 +94,27 @@ describe('the roster', () => {
     show()
     fireEvent.contextMenu(rowOf('Ryan Tan'))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Invite user' }))
-    expect(flash).toHaveBeenCalledWith('Inviting needs Logins & invites · Create')
+    expect(flash).toHaveBeenCalledWith('Inviting needs HR view › Permissions · Create')
+  })
+
+  // HR invites since 2026-10-20 — but a full-access title only from whoever manages permissions.
+  it('greys Invite user for a full-access title and says why, never opening the window', () => {
+    const onInvite = vi.fn()
+    const held = 'CHIEF EXECUTIVE OFFICER is a full-access title (Ultimate full access): only whoever manages permissions gives it a login.'
+    render(
+      <PeopleDirectory
+        people={people.map(p => (p.id === 'l' ? { ...p, inviteHeld: held } : p))}
+        unattachedAccounts={[]}
+        canSeeActivity={false}
+        onInvite={onInvite}
+      />,
+    )
+    fireEvent.contextMenu(rowOf('LOO WEN WEI'))
+    const item = within(screen.getByRole('menu', { name: 'LOO WEN WEI' })).getByRole('menuitem', { name: 'Invite user' })
+    expect(item).toHaveAttribute('data-quiet', 'true')
+    fireEvent.click(item)
+    expect(flash).toHaveBeenCalledWith(held)
+    expect(onInvite).not.toHaveBeenCalled()
   })
 
   it('a click elsewhere or Escape puts the menu away', () => {

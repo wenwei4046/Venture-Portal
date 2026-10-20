@@ -176,7 +176,9 @@ held. What each cell opens:
   Director Pool  Edit = the calculator
   Team & roster  Create = add people (by hand or InfoTech) · Edit = change a person,
                  the reporting line · Manage = titles and the ladder
-  Logins         Create = invite · Manage = templates, a person's cells, deleting a title
+  Logins         Create = invite (HR view › Permissions · Create; a full-access title —
+                 a Principal-kind template, or one with Manage — needs Manage too,
+                 2026-10-20) · Manage = templates, a person's cells, deleting a title
   My Billing     Create (Dept) = the department's invoices and requests
   Claims         Create (Own) = raise a claim · Approve = approve, reject, mark paid
   Reconciliation Create = upload a statement, a journal voucher · Edit = match,

@@ -66,6 +66,8 @@ export interface PermissionTab {
   page?: string
   /** Its page opens with its own View cell, not a module key (the CRM's Control panel: CRM · View at All) — never "not open yet". */
   cellGated?: boolean
+  /** What a box does where it is not plain from the tab's name — the box's tooltip (Permissions · Create = Invite user, 2026-10-20). */
+  hints?: Readonly<Partial<Record<TabAction, string>>>
 }
 
 type Opens = PermissionTab['opens']
@@ -121,7 +123,11 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('hr', 'rules', 'Rules', ['revenue'], { ...REVENUE, edit: ['revenue.edit', 'revenue.manage'] }),
   tab('hr', 'people', 'People Management', ['team', 'team_directory'], { view: ['team.view'], create: ['team.create'], edit: ['team.edit'] }),
   // Logins and who may do what — never implied by People Management (an editor of people is not a granter of rights).
-  tab('hr', 'permissions', 'Permissions', ['team'], { view: ['accounts.view'], create: ['accounts.create'], edit: ['accounts.manage'] }),
+  // Its Create is People's Invite user — HR's too since 2026-10-20 (a full-access title stays with its Edit).
+  {
+    ...tab('hr', 'permissions', 'Permissions', ['team'], { view: ['accounts.view'], create: ['accounts.create'], edit: ['accounts.manage'] }),
+    hints: { create: 'Invite user — give somebody on the roster a login', edit: 'Change what a title or a person may do' },
+  },
   // Titles and the ladder are managed on Hierarchy.
   tab('hr', 'hierarchy', 'Hierarchy', ['team', 'team_directory'], { view: ['team.view'], edit: ['team.edit', 'team.manage'] }),
   tab('hr', 'member_services', 'Member Services', ['member_requests_manage', 'member_memos_manage'], { view: ['member.view'], edit: ['member.manage'] }),

@@ -47,6 +47,8 @@ export interface PersonRow {
   lastSeenAt: string | null
   /** Sent an invite link not used yet (2026-10-16) — read only for whoever may invite. */
   invitePending?: boolean
+  /** Why this reader may not give them a login: a full-access title, for whoever does not manage permissions (2026-10-20). */
+  inviteHeld?: string
   /** Fields whose absence breaks payroll or the import, computed server-side. */
   missing: string[]
 }
@@ -138,7 +140,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
     if (!p.active) return flash(`${p.name} is not active`)
     // An invite link never used is invited again (2026-10-16); any other login is theirs already.
     if (p.accountEmail && !p.invitePending) return flash(`${p.name} already has a login`)
-    if (!onInvite) return flash('Inviting needs Logins & invites · Create')
+    if (!onInvite) return flash('Inviting needs HR view › Permissions · Create')
+    if (p.inviteHeld) return flash(p.inviteHeld)
     onInvite(p.id)
   }
 
@@ -303,7 +306,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               type="button"
                               role="menuitem"
                               className={s.menuItem}
-                              data-quiet={!p.active || (p.accountEmail && !p.invitePending) || !onInvite ? 'true' : undefined}
+                              data-quiet={!p.active || (p.accountEmail && !p.invitePending) || !onInvite || p.inviteHeld ? 'true' : undefined}
                               onClick={() => inviteFrom(p)}
                             >
                               {p.invitePending ? 'Invite again' : 'Invite user'}
