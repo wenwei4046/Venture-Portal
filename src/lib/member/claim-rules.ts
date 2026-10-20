@@ -64,6 +64,14 @@ export interface ClaimRates {
   fairs: Record<string, ClaimFair>;
   /** The food claim HR set (2026-10-13); absent from a read older than it. */
   food?: FoodClaimRates;
+  /** Who may send a transport claim — Outstation, a plane ticket, an Airbnb stay (2026-10-20); absent from a read older than it. */
+  transport?: TransportClaimRates;
+}
+
+/** The transport claim's titles as HR ticked them (Member services › Transport claim's ⋯). */
+export interface TransportClaimRates {
+  /** The names of the titles whose holders may send one. */
+  titles: string[];
 }
 
 /** The food claim as HR set it: Fair's, a rate a day, and the titles that may claim it. */
@@ -210,6 +218,20 @@ export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
   return cap === null ? 0 : Math.min(invoice, cap);
 }
 
+// ── Who may send a transport claim (2026-10-20) ──
+
+/**
+ * May this member send a transport claim — Outstation, a plane ticket, an Airbnb stay: their title is one HR ticked
+ * (the user: "选择什么 title 的人可以 claim 这个 transport"). Rates not read yet, or read from before the list existed,
+ * say yes — what Requests showed before; the database asks again when it is sent (`member_transport_claim_open`).
+ */
+export function transportOpenTo(rates: Pick<ClaimRates, "transport"> | null | undefined, title: string | null | undefined): boolean {
+  const transport = rates?.transport;
+  if (!transport) return true;
+  const mine = (title ?? "").trim().toLowerCase();
+  return !!mine && transport.titles.some(t => t.trim().toLowerCase() === mine);
+}
+
 // ── The food claim (2026-10-13) ──
 
 /**
@@ -337,6 +359,7 @@ export function readClaimRates(raw: unknown): ClaimRates {
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
   const regions = Array.isArray(o.regions) ? o.regions : [];
+  const transport = readTransport(o.transport);
   const fairs: Record<string, ClaimFair> = {};
   for (const f of Array.isArray(o.fairs) ? o.fairs : []) {
     const x = f && typeof f === "object" ? (f as Record<string, unknown>) : null;
@@ -358,7 +381,14 @@ export function readClaimRates(raw: unknown): ClaimRates {
     }),
     fairs,
     food: readFood(o.food, money),
+    ...(transport ? { transport } : {}),
   };
+}
+
+function readTransport(raw: unknown): TransportClaimRates | null {
+  const t = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  if (!t || !Array.isArray(t.titles)) return null;
+  return { titles: t.titles.filter((x): x is string => typeof x === "string" && x.trim() !== "") };
 }
 
 function readFood(raw: unknown, money: (v: unknown) => number | null): FoodClaimRates {

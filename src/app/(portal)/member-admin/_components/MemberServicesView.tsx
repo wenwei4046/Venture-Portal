@@ -7,6 +7,7 @@ import { Tabs } from '@/components/hrv/tabs'
 import type { AdminMemberData } from '@/app/(member)/member/actions'
 import type { ClaimRatesAdmin } from '@/lib/member/claim-rates-admin'
 import type { FoodClaimAdmin } from '@/lib/member/food-claim-admin'
+import type { TransportClaimAdmin } from '@/lib/member/transport-claim-admin'
 import type { RequestFacts } from '@/lib/member/member-services'
 import RequestReviews from './RequestReviews'
 import BrandWeeksPanel from './BrandWeeksPanel'
@@ -17,7 +18,7 @@ type Tab = 'requests' | 'weeks' | 'claims' | 'food'
 
 /**
  * People › Member services (2026-10-10, the HR revamp handoff, variant A):
- * Request reviews · Brand weeks · Claim rates · Food claim (2026-10-13: Fair's
+ * Request reviews · Brand weeks · Transport claim (Claim rates until 2026-10-20) · Food claim (2026-10-13: Fair's
  * rate a day and the titles that may claim it). The headcount limit went to
  * Revenue › Rules › Capacity (PR2), Product options — only a pointer to the
  * Product List's Modular since 2026-09-24 — went with this redraw, and
@@ -35,16 +36,18 @@ export default function MemberServicesView({
   facts,
   claimRates,
   foodClaim,
+  transportClaim,
   initialRequestId,
 }: {
   data: AdminMemberData
   facts: Record<string, RequestFacts> | null
   claimRates: ClaimRatesAdmin | null
   foodClaim: FoodClaimAdmin | null
+  transportClaim: TransportClaimAdmin | null
   initialRequestId: string | null
 }) {
   const tabs: Array<{ key: Tab; label: string }> = data.canManageRequests
-    ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Claim rates' },
+    ? [{ key: 'requests', label: 'Request reviews' }, { key: 'weeks', label: 'Brand weeks' }, { key: 'claims', label: 'Transport claim' },
         { key: 'food', label: 'Food claim' }]
     : []
   // HR's sidebar opens each tab as its own row (2026-10-15, the Attendance handoff): `?tab=` picks it on arrival.
@@ -91,7 +94,7 @@ export default function MemberServicesView({
       ) : null}
       {allowed('claims') && show('claims') ? (
         <div hidden={tab !== 'claims'}>
-          <ClaimRatesPanel initial={claimRates} />
+          <ClaimRatesPanel initial={claimRates} transport={transportClaim} />
         </div>
       ) : null}
       {allowed('food') && show('food') ? (

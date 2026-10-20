@@ -7,7 +7,7 @@
 //   II.   ATTENDANCE         Today · Records · Requests · Leave balances · Month close · Settings · Readiness
 //   III.  HR & PAYROLL       HR Costing · Payroll · Allocation · Payment
 //   IV.   REVENUE            Comm Cal · Sales chart · Members · Waiting list · Replacement list · Rules ·
-//                            Requests · Brand weeks · Claim rates · Food claim
+//                            Requests · Brand weeks · Transport claim · Food claim
 //   V.    PEOPLE MANAGEMENT  People · Permissions · Org chart · People & roles · Levels
 //   VI.   DOCUMENTATION      Documents · Data center · Letters · Publish
 //   VII.  ADMIN              Room schedule · Rooms · Guest Link · Audit Log · Change password
@@ -177,7 +177,7 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
         // Member Services dissolved into Revenue (the handoff): its four tabs, "Request reviews" → Requests.
         { key: 'memReq', label: 'Requests', icon: 'approve', href: mem('requests'), match: memOn('requests'), visible: seesMemberServices },
         { key: 'memWeeks', label: 'Brand weeks', icon: 'calendar', href: mem('weeks'), match: memOn('weeks'), visible: seesMemberServices },
-        { key: 'memClaims', label: 'Claim rates', icon: 'receipt', href: mem('claims'), match: memOn('claims'), visible: seesMemberServices },
+        { key: 'memClaims', label: 'Transport claim', icon: 'receipt', href: mem('claims'), match: memOn('claims'), visible: seesMemberServices },
         { key: 'memFood', label: 'Food claim', icon: 'receipt', href: mem('food'), match: memOn('food'), visible: seesMemberServices },
       ],
     },

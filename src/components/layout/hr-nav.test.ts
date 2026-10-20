@@ -17,7 +17,7 @@ describe("HR's sidebar", () => {
       [null, null, ['Overview']],
       ['I.', 'Attendance', ['Today', 'Records', 'Requests', 'Leave balances', 'Month close', 'Settings', 'Readiness']],
       ['II.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Allocation', 'Payment']],
-      ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Claim rates', 'Food claim']],
+      ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Transport claim', 'Food claim']],
       ['IV.', 'People Management', ['People', 'Permissions', 'Org chart', 'People & roles', 'Levels']],
       ['V.', 'Admin', ['Audit Log']],
       ['VI.', 'Directors', ['Director Salary', 'Director Pool']],
@@ -56,14 +56,14 @@ describe("HR's sidebar", () => {
       ['Replacement list', '/revenue/ir/hierarchy?tab=replacement'],
       ['Requests', '/member-admin'],
       ['Brand weeks', '/member-admin?tab=weeks'],
-      ['Claim rates', '/member-admin?tab=claims'],
+      ['Transport claim', '/member-admin?tab=claims'],
       ['Food claim', '/member-admin?tab=food'],
     ])
   })
 
   it('has no Revenue rows while there is no sub-department, but Member Services’ rows stay', () => {
     const rev = visibleHrNav(hrNavSections(null), hr).find(s => s.label === 'Revenue')!
-    expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Claim rates', 'Food claim'])
+    expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Transport claim', 'Food claim'])
   })
 
   it.each([
