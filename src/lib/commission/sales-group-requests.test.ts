@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ADDED_NOTE,
+  DETAILS_EDITED,
   FORM_UPLOADED,
   addedHere,
   arrangementOf,
@@ -188,6 +189,21 @@ describe('historyOf', () => {
       ['Added to the waiting list', 'LI SEAN', null],
       ['Signed form uploaded', 'LI SEAN', 'Joan Quek application.pdf'],
       ['Signed form uploaded', 'HR', 'Joan clearer.png'],
+    ])
+  })
+
+  // 2026-10-20 (the user: "要能够按 Edit … 让 HR 可以去改资料"): HR's Edit in the drawer — a step with no move, which the
+  // database notes "Details edited · name, phone number".
+  it('reads HR’s edit in the drawer as its own step, with what changed', () => {
+    const steps = historyOf([
+      { to: 'waiting', at: '2026-10-20T04:41:25Z', note: ADDED_NOTE, by: 'LI SEAN' },
+      { to: 'waiting', at: '2026-10-20T07:00:00Z', note: `${DETAILS_EDITED} · name, phone number`, by: 'LI SEAN' },
+      { to: 'waiting', at: '2026-10-20T08:00:00Z', note: `${DETAILS_EDITED} · submitted by`, by: 'HR' },
+    ])
+    expect(steps.map(s => [s.what, s.by, s.note])).toEqual([
+      ['Added to the waiting list', 'LI SEAN', null],
+      ['Details edited', 'LI SEAN', 'Changed: name, phone number'],
+      ['Details edited', 'HR', 'Changed: submitted by'],
     ])
   })
 

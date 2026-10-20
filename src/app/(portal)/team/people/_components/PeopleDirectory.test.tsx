@@ -107,3 +107,57 @@ describe('the roster', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 })
+
+// 2026-10-20 — the user: "People Management 这边要多加一个 filter：这个 filter 是 drop down 来的，可以选 department，
+// 用 department 来做 filter"; and "在 People Management page，我要他的名字显示全名（也就是 Last Name 加 First Name）".
+describe('the department filter and the full name', () => {
+  const roster: PersonRow[] = [
+    row({ id: 'c', name: 'Teoh CHEA HUAN', icName: 'CHEA HUAN', code: 'HV009', department: 'Revenue Department' }),
+    row({ id: 'k', name: 'KRIS', icName: 'KRIS', code: 'HV006', department: 'Revenue Department' }),
+    row({ id: 'g', name: 'GONE', department: 'Revenue Department', active: false }),
+    row({ id: 'l', name: 'LOO WEN WEI', icName: 'LOO WEN WEI', code: 'HV001', department: 'Director' }),
+    row({ id: 'n', name: 'NOBODY', department: null }),
+  ]
+  const draw = () => render(<PeopleDirectory people={roster} unattachedAccounts={[]} canSeeActivity={false} />)
+  const pick = (dept: string) => fireEvent.change(screen.getByRole('combobox', { name: 'Department' }), { target: { value: dept } })
+
+  it('lists the full name, last name first, and finds them by the name on their IC too', () => {
+    draw()
+    expect(rowOf('Teoh CHEA HUAN')).toHaveTextContent('HV009')
+    expect(rowOf('Teoh CHEA HUAN')).toHaveTextContent('TC')
+    fireEvent.change(screen.getByLabelText('Search people'), { target: { value: 'chea huan' } })
+    expect(screen.getByText('Teoh CHEA HUAN')).toBeInTheDocument()
+    expect(screen.queryByText('KRIS')).toBeNull()
+  })
+
+  it('offers every department with its count, then shows the one picked — its pills counting it', () => {
+    draw()
+    const select = screen.getByRole('combobox', { name: 'Department' }) as HTMLSelectElement
+    expect([...select.options].map(o => o.textContent)).toEqual(['All departments', 'Director · 1', 'Revenue Department · 2', '— No department · 1'])
+    pick('Revenue Department')
+    expect(screen.getByText('Teoh CHEA HUAN')).toBeInTheDocument()
+    expect(screen.getByText('KRIS')).toBeInTheDocument()
+    expect(screen.queryByText('LOO WEN WEI')).toBeNull()
+    expect(screen.queryByText('NOBODY')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Director\s*1 person/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /^Active/ })).toHaveTextContent('2')
+    expect(screen.getByRole('button', { name: /^Inactive/ })).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: /^All/ })).toHaveTextContent('3')
+    // The five cards stay over the whole roster.
+    expect(within(screen.getByRole('region', { name: 'The roster' })).getByRole('group', { name: 'Active staff' })).toHaveTextContent('4')
+    fireEvent.click(screen.getByRole('button', { name: /^Inactive/ }))
+    expect(screen.getByText('GONE')).toBeInTheDocument()
+    expect(screen.queryByText('KRIS')).toBeNull()
+  })
+
+  it('shows the people in no department on their own, and everybody again on All departments', () => {
+    draw()
+    pick('— No department')
+    expect(screen.getByText('NOBODY')).toBeInTheDocument()
+    expect(screen.queryByText('KRIS')).toBeNull()
+    pick('')
+    expect(screen.getByText('NOBODY')).toBeInTheDocument()
+    expect(screen.getByText('KRIS')).toBeInTheDocument()
+    expect(screen.getByText('LOO WEN WEI')).toBeInTheDocument()
+  })
+})

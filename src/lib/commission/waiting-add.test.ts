@@ -13,7 +13,12 @@ import {
   waitingAddDetail,
   waitingAddInputFrom,
   waitingAddRefusal,
+  waitingEditChanges,
+  waitingEditChangesFrom,
+  waitingEditPayload,
+  waitingEditRefusal,
   type WaitingAddInput,
+  type WaitingEditDraft,
 } from './waiting-add'
 import type { WaitingForm } from './waiting-form'
 
@@ -208,5 +213,86 @@ describe('Submitted by', () => {
       { group: 'Fair', people: [{ id: 'adrian', name: 'ADRIAN', title: null }, { id: 'both', name: 'BOTH', title: null }, { id: 'stanley', name: 'STANLEY', title: 'Team Leader' }] },
       { group: 'IR', people: [{ id: 'alvin', name: 'ALVIN', title: 'Specialist' }] },
     ])
+  })
+})
+
+describe('Submitted by — the whole department (2026-10-20)', () => {
+  it('ends with everybody else in the department, under its name — a Revenue Director placed nowhere too', () => {
+    const groups = submitterGroups(
+      [
+        { name: 'IR', people: [{ staffId: 'alvin', name: 'ALVIN', titleName: 'Revenue Specialist' }] },
+        { name: 'Fair', people: [{ staffId: 'stanley', name: 'STANLEY', titleName: 'Team Leader' }] },
+      ],
+      'Fair',
+      {
+        name: 'Revenue Department',
+        people: [
+          { staffId: 'stanley', name: 'STANLEY', titleName: 'Team Leader' },
+          { staffId: 'peter', name: 'PETER', titleName: 'Revenue Director' },
+          { staffId: 'kris', name: 'KRIS', titleName: 'Revenue Director' },
+          { staffId: 'alvin', name: 'ALVIN', titleName: 'Revenue Specialist' },
+        ],
+      },
+    )
+    expect(groups).toEqual([
+      { group: 'Fair', people: [{ id: 'stanley', name: 'STANLEY', title: 'Team Leader' }] },
+      { group: 'IR', people: [{ id: 'alvin', name: 'ALVIN', title: 'Revenue Specialist' }] },
+      {
+        group: 'Revenue Department',
+        people: [
+          { id: 'kris', name: 'KRIS', title: 'Revenue Director' },
+          { id: 'peter', name: 'PETER', title: 'Revenue Director' },
+        ],
+      },
+    ])
+  })
+
+  it('draws no department group when everybody in it is placed already, or the roster could not be read', () => {
+    const fair = [{ name: 'Fair', people: [{ staffId: 'stanley', name: 'STANLEY' }] }]
+    expect(submitterGroups(fair, 'Fair', { name: 'Revenue Department', people: [{ staffId: 'stanley', name: 'STANLEY' }] })).toEqual([
+      { group: 'Fair', people: [{ id: 'stanley', name: 'STANLEY', title: null }] },
+    ])
+    expect(submitterGroups(fair, 'Fair', null)).toEqual(submitterGroups(fair, 'Fair'))
+  })
+})
+
+describe('Edit, in the applicant’s drawer (2026-10-20)', () => {
+  const was: WaitingEditDraft = { name: 'JOAN QUEK XIAO', contact: '018-776-0020', start: 'anytime', submittedBy: STAFF }
+  const KRIS = '7b6f1f0e-2a8d-4b1a-9a52-5c8a1e2b3c4d'
+
+  it('sends only what changed — a name or phone compared trimmed', () => {
+    expect(waitingEditChanges(was, { ...was })).toEqual({})
+    expect(waitingEditChanges(was, { ...was, name: '  JOAN QUEK XIAO ', contact: ' 018-776-0020' })).toEqual({})
+    expect(waitingEditChanges(was, { ...was, contact: ' 018-776-0021 ', submittedBy: KRIS })).toEqual({ contact: '018-776-0021', submittedBy: KRIS })
+    expect(waitingEditChanges(was, { ...was, start: '2026-12-01' })).toEqual({ start: '2026-12-01' })
+  })
+
+  it('refuses nothing changed, a blank field by its words, a long one, a day the calendar has not', () => {
+    expect(waitingEditRefusal({})).toBe('Nothing has changed.')
+    expect(waitingEditRefusal({ name: '', contact: ' ' })).toBe('Fill in new member name, mobile number.')
+    expect(waitingEditRefusal({ name: 'x'.repeat(161) })).toBe('Keep the name under 160 characters.')
+    expect(waitingEditRefusal({ contact: '0'.repeat(61) })).toBe('Keep the phone number under 60 characters.')
+    expect(waitingEditRefusal({ start: '2026-02-30' })).toBe('Pick the joining date.')
+    expect(waitingEditRefusal({ start: '' })).toBe('Pick the joining date.')
+    expect(waitingEditRefusal({ submittedBy: 'KRIS' })).toBe('Reload the page and try again.')
+    expect(waitingEditRefusal({ start: 'anytime', submittedBy: KRIS, name: 'JOAN QUEK' })).toBeNull()
+  })
+
+  it('reads on the server only the four fields, as strings', () => {
+    expect(waitingEditChangesFrom({ name: ' JOAN ', note: 'x', staff_id: KRIS })).toEqual({ name: 'JOAN' })
+    expect(waitingEditChangesFrom({ contact: 12 })).toBeNull()
+    expect(waitingEditChangesFrom(['name'])).toBeNull()
+    expect(waitingEditChangesFrom(null)).toBeNull()
+    expect(waitingEditChangesFrom({})).toEqual({})
+  })
+
+  it('hands the database the request’s own words for each', () => {
+    expect(waitingEditPayload({ name: 'JOAN', contact: '011', start: 'anytime', submittedBy: KRIS })).toEqual({
+      newPerson: 'JOAN',
+      contact: '011',
+      start: 'anytime',
+      staffId: KRIS,
+    })
+    expect(waitingEditPayload({ start: '2026-12-01' })).toEqual({ start: '2026-12-01' })
   })
 })
