@@ -77,6 +77,18 @@ describe('AddressFields', () => {
     expect(field('country')).not.toHaveAttribute('data-dirty')
   })
 
+  it('draws in the host form’s own classes — Add person’s labels, fields and bare selects', async () => {
+    render(
+      <AddressFields value={CHEA} onChange={() => {}} idPrefix="t" inputClassName="host-input" selectClassName="host-select" selectBare labelClassName="host-label" gap={16} />,
+    )
+    await ready()
+    expect(field('line1')).toHaveClass('host-input')
+    expect(field('state')).toHaveClass('host-select')
+    expect(document.querySelector('label[for="t-line1"]')).toHaveClass('host-label')
+    expect(document.querySelector('label[for="t-state"]')?.textContent).toBe('1State')
+    expect((field('line1').closest('[data-stacked], div[style]') as HTMLElement | null)?.style.gap).toBe('16px')
+  })
+
   it('keeps a value on file that the list has not, so nothing is lost on opening', async () => {
     render(<Host start={{ ...CHEA, state: 'Penang', city: 'BM', postcode: '14000' }} />)
     await ready()

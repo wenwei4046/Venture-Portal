@@ -285,7 +285,14 @@ describe('Address — six parts, State → City → Postcode from Malaysia’s l
     fireEvent.change(field('postcode'), { target: { value: '14020' } })
     expect(field('postcode')).toHaveAttribute('data-dirty', 'true')
     expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
-    expect(await save()).toEqual({ ...parts, address_postcode: '14020' })
+    mocks.updateStaff.mockResolvedValue({ ok: true })
+    await act(async () => {
+      fireEvent.submit(form())
+    })
+    // The address is checked against Malaysia's list first (its own chunk, read as the save starts).
+    await waitFor(() => expect(mocks.updateStaff).toHaveBeenCalledTimes(1))
+    const [, data] = mocks.updateStaff.mock.calls[0] as [string, FormData]
+    expect(Object.fromEntries(data.entries())).toEqual({ ...parts, address_postcode: '14020' })
   })
 
   it('refuses in the bar, before sending, three that are not one place on the list', async () => {

@@ -27,6 +27,8 @@ export default function AddressFields({
   inputClassName = '',
   selectClassName = '',
   labelClassName = '',
+  selectBare = false,
+  gap,
   stacked = false,
 }: {
   value: Address
@@ -38,9 +40,16 @@ export default function AddressFields({
   disabled?: boolean
   /** The old one-box address, while the record has no parts yet — shown above the fields to copy from. */
   onFile?: string | null
+  /** The host form's own text-field classes, drawn INSTEAD of the kit's box (Add person's fields). */
   inputClassName?: string
+  /** The host's own select classes, over the soft dropdown's box — or, with `selectBare`, instead of it. */
   selectClassName?: string
+  /** Draw the selects in the host's classes alone (Add person's own fields are `<Select bare>`). */
+  selectBare?: boolean
+  /** The host's own label classes, instead of the kit's small capitals. */
   labelClassName?: string
+  /** The space between the fields, in px, where the host's own grid differs (12). */
+  gap?: number
   /** One field to a row (a phone, a narrow window). */
   stacked?: boolean
 }) {
@@ -51,9 +60,12 @@ export default function AddressFields({
   const set = (patch: Partial<Address>) => onChange({ ...value, ...patch })
   const dirty = (key: keyof Address) => (was && value[key].trim() !== was[key].trim() ? 'true' : undefined)
   const id = (key: keyof Address) => `${idPrefix}-${key}`
+  // A postcode reads in figures once there is one — the hint before it stays in words.
+  const mono = (key: keyof Address) => (key === 'postcode' && value.postcode ? s.mono : '')
+  const selectClass = `${s.field} ${selectBare ? '' : s.select} ${selectClassName}`
 
   const label = (key: keyof Address, step?: number) => (
-    <label htmlFor={id(key)} className={`${s.label} ${labelClassName}`}>
+    <label htmlFor={id(key)} className={labelClassName || s.label}>
       {step ? (
         <span className={s.step} aria-hidden="true">
           {step}
@@ -65,7 +77,7 @@ export default function AddressFields({
   const text = (key: 'line1' | 'line2' | 'state' | 'city' | 'postcode', autoComplete: string, max: number) => (
     <input
       id={id(key)}
-      className={`${s.input} ${key === 'postcode' ? s.mono : ''} ${inputClassName}`}
+      className={`${s.field} ${inputClassName || s.input} ${mono(key)}`}
       value={value[key]}
       onChange={e => set({ [key]: e.target.value })}
       maxLength={max}
@@ -76,8 +88,9 @@ export default function AddressFields({
   )
   const pick = (key: 'state' | 'city' | 'postcode', list: string[], empty: string, onPick: (v: string) => void, off: boolean) => (
     <Select
+      bare={selectBare}
       id={id(key)}
-      className={`${s.select} ${key === 'postcode' ? s.mono : ''} ${selectClassName}`}
+      className={`${selectClass} ${mono(key)}`}
       value={value[key]}
       onChange={e => onPick(e.target.value)}
       disabled={disabled || waiting || off}
@@ -93,7 +106,7 @@ export default function AddressFields({
   )
 
   return (
-    <div className={s.fields} data-stacked={stacked ? 'true' : undefined}>
+    <div className={s.fields} data-stacked={stacked ? 'true' : undefined} style={gap === undefined ? undefined : { gap }}>
       {onFile ? (
         <div className={s.onFile}>
           <span className={s.onFileLabel}>On file</span>
@@ -117,11 +130,11 @@ export default function AddressFields({
           </div>
           <div className={s.part}>
             {label('city', 2)}
-            {pick('city', cities, value.state ? 'Choose the city' : 'Choose the state first', v => onChange(withCity(value, v, data)), !value.state)}
+            {pick('city', cities, value.state ? 'Choose the city' : 'State first', v => onChange(withCity(value, v, data)), !value.state)}
           </div>
           <div className={s.part}>
             {label('postcode', 3)}
-            {pick('postcode', postcodes, value.city ? 'Choose the postcode' : 'Choose the city first', v => set({ postcode: v }), !value.city)}
+            {pick('postcode', postcodes, value.city ? 'Choose' : 'City first', v => set({ postcode: v }), !value.city)}
           </div>
         </>
       ) : (
@@ -144,8 +157,9 @@ export default function AddressFields({
       <div className={s.part}>
         {label('country')}
         <Select
+          bare={selectBare}
           id={id('country')}
-          className={`${s.select} ${selectClassName}`}
+          className={selectClass}
           value={value.country || MALAYSIA}
           onChange={e => onChange(withCountry(value, e.target.value))}
           disabled={disabled}

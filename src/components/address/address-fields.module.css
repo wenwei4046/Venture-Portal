@@ -19,7 +19,6 @@
 .label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   margin: 0;
   font-size: 11px;
   font-weight: 500;
@@ -39,6 +38,9 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0;
+  margin-right: 6px;
+  /* In a host's own block label (Add person's), level with its words. */
+  vertical-align: 1px;
 }
 
 .input,
@@ -59,13 +61,13 @@
   outline: none;
 }
 .input:focus-visible { border-color: rgb(var(--hv-accent)); }
-.input:disabled,
-.select:disabled { background: rgb(var(--hv-disabled)); color: rgb(var(--hv-faint)); cursor: not-allowed; }
-.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-variant-numeric: tabular-nums; }
+/* Over a host's own field face too (a person's page draws its selects in Inter). */
+.field.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-variant-numeric: tabular-nums; }
 
-/* A changed part: the peach of a changed field, as on a person's page. */
-.input[data-dirty='true'],
-.select[data-dirty='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
+/* Every field, the kit's box or the host's: waiting for the one before it, and changed — the peach of a changed
+   field, as on a person's page. */
+.field:disabled { background: rgb(var(--hv-disabled)); color: rgb(var(--hv-faint)); cursor: not-allowed; }
+.field[data-dirty='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
 
 /* The old one-box address, while the record has no parts yet. */
 .onFile {

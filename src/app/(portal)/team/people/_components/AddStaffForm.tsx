@@ -566,7 +566,17 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
         </div>
         <div className="sm:col-span-2">
           {/* The address in six parts, State → City → Postcode picked from Malaysia's list (2026-10-20); the form carries them hidden. */}
-          <AddressFields value={address} onChange={setAddress} idPrefix="staff-address" inputClassName={textInput} />
+          <AddressFields
+            value={address}
+            onChange={setAddress}
+            idPrefix="staff-address"
+            inputClassName={textInput}
+            selectClassName={textInput}
+            selectBare
+            // Its own labels' words; the space under them is the fields' own 6px.
+            labelClassName="block text-sm font-medium"
+            gap={16}
+          />
           {addressFormEntries(address).map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
           ))}
