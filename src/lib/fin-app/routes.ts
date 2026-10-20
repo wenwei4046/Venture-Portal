@@ -93,6 +93,7 @@ export function appHref(key: string, opts: { approvalsTab?: boolean } = {}): str
   const hub = HUB_OF_ROW[key]
   if (hub) return HUB_HREF[hub]
   if (key === 'overview') return '/fin-app'
+  if (key === 'it-support') return '/fin-app/it-support'
   if (key === 'approvals' && opts.approvalsTab) return APPROVALS_TAB_HREF
   return `/fin-app/page/${encodeURIComponent(key)}`
 }
@@ -120,6 +121,6 @@ export function tabOf(pathname: string): AppTab {
   if (pathname.startsWith('/fin-app/daily')) return 'daily'
   if (pathname.startsWith('/fin-app/fund')) return 'fund'
   if (pathname.startsWith('/fin-app/report')) return 'report'
-  if (pathname.startsWith('/fin-app/profile')) return 'profile'
+  if (pathname.startsWith('/fin-app/profile') || pathname === '/fin-app/it-support') return 'profile'
   return 'home'
 }

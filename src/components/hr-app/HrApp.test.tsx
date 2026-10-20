@@ -4,6 +4,13 @@ import type { ReactNode } from 'react'
 import type { AttConfig, AttLedger, AttMonth, AttRequest, AttStep } from '@/lib/attendance/types'
 import type { HrAppData } from '@/lib/hr-app/model'
 
+const itSupport = vi.hoisted(() => ({ render: vi.fn() }))
+vi.mock('@/components/it-support/ItSupport', () => ({
+  default: (props: { app: string; initialId?: string; readOnly?: boolean }) => {
+    itSupport.render(props)
+    return <div data-testid="it-support" data-app={props.app} data-request={props.initialId ?? ''} />
+  },
+}))
 vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.fn() }))
 // Me (components/me) reads from the browser: drawn here as its layer only, with the rows the app hands it.
 vi.mock('@/components/me/useMe', () => ({ useMe: () => ({ s: { today: null, todayAt: 0 } }), useClock: () => 0 }))
@@ -413,6 +420,62 @@ describe('the avatar: Me, with the old More’s rows', () => {
     await waitFor(() => expect(screen.getByText(/Password changed\./)).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
+  })
+})
+
+describe('IT support stays in the HR app', () => {
+  it('opens from Me’s Profile and returns to HR without loading Revenue', async () => {
+    window.history.pushState(null, '', '/hr-app')
+    render(<HrApp data={{ ...data, personalLogin: true }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Me' }))
+    fireEvent.click(within(screen.getByTestId('me')).getByText('IT support'))
+    expect(await screen.findByTestId('it-support')).toHaveAttribute('data-app', 'hr')
+    expect(screen.getByRole('heading', { name: 'IT support' })).toBeInTheDocument()
+    expect(screen.queryByTestId('me')).toBeNull()
+    expect(window.location.pathname).toBe('/hr-app')
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.queryByTestId('it-support')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'HR app' })).toBeInTheDocument()
+  })
+
+  it('a shared login can open IT support from Account without a People profile', () => {
+    render(<HrApp data={{ ...data, personalLogin: false, meId: null }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Account' })).getByRole('button', { name: 'IT support' }))
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-app', 'hr')
+    expect(screen.queryByRole('dialog', { name: 'Account' })).toBeNull()
+    expect(screen.queryByTestId('me')).toBeNull()
+  })
+
+  it('a bell notice opens the request in HR’s own IT page', () => {
+    window.history.pushState(null, '', '/hr-app')
+    const notices = {
+      unread: 1,
+      items: [{ id: 'n-it', kind: 'it' as const, title: 'IT-0001 · Fixed', body: 'Upload issue',
+        refKind: 'it_request' as const, refId: 'it-1', at: '2026-10-20T15:00:00Z', read: false }],
+    }
+    render(<HrApp data={{ ...data, notices }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    fireEvent.click(screen.getByText('IT-0001 · Fixed'))
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-request', 'it-1')
+    expect(window.location.pathname).toBe('/hr-app')
+  })
+
+  it('a tapped IT push opens its request and consumes the address', () => {
+    window.history.pushState(null, '', '/hr-app?open=it:it-1')
+    render(<HrApp data={data} actions={actions} />)
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-request', 'it-1')
+    expect(window.location.pathname).toBe('/hr-app')
+    expect(window.location.search).toBe('')
+  })
+
+  it('View as hides the entrance and does not mount private IT reads from a push URL', () => {
+    window.history.pushState(null, '', '/hr-app?open=it:it-1')
+    render(<HrApp data={{ ...data, personalLogin: true, viewingAs: 'Nurul Huda' }} actions={actions} />)
+    expect(screen.queryByText('IT support')).toBeNull()
+    expect(screen.queryByTestId('it-support')).toBeNull()
+    expect(itSupport.render).not.toHaveBeenCalled()
+    expect(screen.getByRole('navigation', { name: 'HR app' })).toBeInTheDocument()
   })
 })
 

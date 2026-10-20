@@ -196,12 +196,16 @@ export type PageRoute = keyof typeof PAGE_TABS
  * own approval pages, opened by whoever it involves; the old addresses that
  * only send on to a page that asks for itself; and Admin › Change password,
  * every personal login's own (2026-10-12 — it asks for that itself), and its
- * neighbour Admin › My documents (2026-10-14, the same).
+ * neighbour Admin › My documents (2026-10-14, the same). IT support belongs
+ * to every active account: sending and following one's own asks no module cell.
+ * The separate IT requests desk asks the account's IT requests · View itself.
  */
 export const OPEN_PAGES: ReadonlySet<string> = new Set([
   '/dashboard',
   '/admin/documents',
   '/admin/password',
+  '/it-support',
+  '/it-requests',
   '/approvals/[id]',
   '/approvals/payroll-run/[id]',
   '/billing',

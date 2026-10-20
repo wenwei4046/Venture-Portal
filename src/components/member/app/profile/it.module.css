@@ -6,7 +6,7 @@
 .files { display: flex; flex-direction: column; gap: 8px; }
 .fileRow {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 32px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
@@ -42,6 +42,7 @@
   display: grid;
   place-items: center;
 }
+.fileActions { display: flex; align-items: center; gap: 6px; }
 .attach {
   align-self: flex-start;
   height: 38px;
@@ -79,6 +80,10 @@
   font-weight: 650;
 }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.picture { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.picture .thumb { width: 100%; }
+.mark { border: 1px solid var(--rv-line); border-radius: 8px; padding: 7px 9px; background: var(--rv-white); color: var(--rv-accent); font-size: calc(12px * var(--rv-type)); font-weight: 600; }
+.mark:disabled { opacity: .5; }
 .docs { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .docRow {
   width: 100%;

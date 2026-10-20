@@ -95,7 +95,7 @@ describe('every tab of every view is in People › Permissions', () => {
       ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }, { principal: true }).flatMap(section => section.items),
       ...finAccountMenu({ principal: true }).flatMap(group => group.items).filter(item => item.href !== undefined),
     ].filter(item => !finance.has(item.key))
-    expect(items.map(i => i.key).sort()).toEqual(['access', 'opex', 'settings'])
+    expect(items.map(i => i.key).sort()).toEqual(['access', 'it-requests', 'opex', 'settings'])
     const bad = items.flatMap(item => {
       const href = item.href as string
       const route = known(href)

@@ -15,6 +15,7 @@ import { useRequestEmail, type RequestEmailActions } from '@/components/account/
 import { MIN_PASSWORD_LENGTH } from '@/lib/account/password'
 import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { MeOverlay } from '@/components/me/MeOverlay'
+import ItSupport from '@/components/it-support/ItSupport'
 import { useMe, useClock } from '@/components/me/useMe'
 import { ListCard, ListItem, Label } from '@/components/me/kit'
 import { todayCard } from '@/lib/me/today'
@@ -108,6 +109,7 @@ type Page =
   | { k: 'notices' }
   | { k: 'memos' }
   | { k: 'memo'; id: string }
+  | { k: 'it'; id?: string }
   | { k: 'mydocs' }
   | { k: 'mydocsFolder'; id: string }
 
@@ -256,12 +258,20 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
     else push({ k: 'desk', id: GEN_META[key].label, icon: GEN_META[key].icon })
   }
 
+  // IT support belongs to the signed-in account, including shared logins; it stays inside HR's app.
+  const openIt = (id?: string) => {
+    if (d.viewingAs) return
+    setSheet(null)
+    setMeOpen(false)
+    setTab('home')
+    setStack([{ k: 'it', id }])
+  }
+
   // ── Notifications: a notice opens what it is about, or its list when it has left it ──
   const openRef = (kind: NoticeRef, id: string) => {
     setSheet(null)
-    // IT support lives in the Revenue app (2026-10-20): the request opens there.
     if (kind === 'it_request') {
-      window.location.assign(`/member?page=account&view=it&it=${encodeURIComponent(id)}`)
+      openIt(id)
       return
     }
     if (kind === 'hiring_request') {
@@ -298,7 +308,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       }
       return
     }
-    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : 'booking', target.id)
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -456,10 +466,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
                   : top.k === 'hire' ? [hr?.id ?? '', hr ? positionLabel(hr) : '']
                     : top.k === 'talent' ? ['Talent Bank', tt?.name ?? '']
                       : top.k === 'notices' ? ['HR', 'Notifications']
-                        : top.k === 'memos' ? ['For you', 'Memos']
-                          : top.k === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
-                            : top.k === 'mydocs' ? ['For you', 'My documents']
-                              : ['My documents', mf?.name ?? '']
+                        : top.k === 'it' ? ['Account', 'IT support']
+                          : top.k === 'memos' ? ['For you', 'Memos']
+                            : top.k === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
+                              : top.k === 'mydocs' ? ['For you', 'My documents']
+                                : ['My documents', mf?.name ?? '']
 
   // ── Me's Profile carries the old More's rows (the user, 2026-10-17: "keep all … inside Me › Profile") ──
   const leaveMe = (then: () => void) => { setMeOpen(false); setTimeout(then, 280) }
@@ -469,6 +480,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       go={(what) => leaveMe(() => {
         if (what === 'memos') { setTab('home'); setStack([{ k: 'memos' }]) }
         else if (what === 'mydocs') { setTab('home'); setStack([{ k: 'mydocs' }]) }
+        else if (what === 'it') openIt()
         else openSheet({ k: what })
       })} />
   )
@@ -564,6 +576,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
             saveNotes={() => { if (d.may.talentEdit && talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, 'Notes saved') }} />
         ) : null}
         {top?.k === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
+        {top?.k === 'it' && !d.viewingAs ? <ItSupport key={top.id ?? 'mine'} app="hr" initialId={top.id} /> : null}
         {top?.k === 'memos' ? <MemosScreen memos={memos} open={id => push({ k: 'memo', id })} /> : null}
         {top?.k === 'memo' ? (
           <MemoScreen m={mm} openFile={id => openInTab(() => actions.memoFile(id, 'view'), flash)}
@@ -638,7 +651,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
 
       <SheetLayer d={d} sheet={sheet} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr} busy={busy} arm={arm} setArm={setArm}
         close={closeSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
-        openGuide={() => setPopUpGuide(true)} flash={flash} />
+        openGuide={() => setPopUpGuide(true)} openIt={() => openIt()} flash={flash} />
       {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
       <Toast msg={toast} />
       {mine ? <MeOverlay me={me} open={meOpen} onClose={() => { setMeOpen(false); setMeStart(null) }} backLabel="HR" startRequest={meStart} accountRows={accountRows} /> : null}
@@ -667,7 +680,7 @@ function AccountRows({ d, memos, pushNow, busy, togglePush, openGuide, hasEmail,
   openGuide: () => void
   hasEmail: boolean
   switchView: (v: HrAppView) => void
-  go: (what: 'memos' | 'mydocs' | 'password' | 'email') => void
+  go: (what: 'memos' | 'mydocs' | 'password' | 'email' | 'it') => void
 }) {
   const waiting = memos.filter(memoWaiting).length
   const pushOff = busy || pushNow === null || pushNow === 'unsupported' || pushNow === 'denied' || pushNow === 'install'
@@ -684,8 +697,9 @@ function AccountRows({ d, memos, pushNow, busy, togglePush, openGuide, hasEmail,
           </span>}
           onClick={pushOff ? undefined : togglePush} />
         {pushNow === 'on' && popUpNeedsTurningOn() ? <ListItem leading={<Tile bg="rgb(255 240 228)" fg="rgb(189 74 25)">▣</Tile>} title="Make them pop up" subtitle="Pop on screen, once per phone" onClick={openGuide} /> : null}
-        <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">⚿</Tile>} title="Change password" subtitle="The current one, then a new one twice" onClick={() => go('password')} divider={hasEmail} />
-        {hasEmail ? <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">@</Tile>} title={EMAIL_WORDS.title} subtitle="HR approves the new one" onClick={() => go('email')} divider={false} /> : null}
+        <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">⚿</Tile>} title="Change password" subtitle="The current one, then a new one twice" onClick={() => go('password')} divider={hasEmail || !d.viewingAs} />
+        {hasEmail ? <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">@</Tile>} title={EMAIL_WORDS.title} subtitle="HR approves the new one" onClick={() => go('email')} divider={!d.viewingAs} /> : null}
+        {!d.viewingAs ? <ListItem leading={<Tile bg="var(--ds-surface-2)" fg="var(--ds-ink-2)">?</Tile>} title="IT support" subtitle="Send a request and follow its status" onClick={() => go('it')} divider={false} /> : null}
       </ListCard>
       {d.views ? (
         <div role="group" aria-label="Switch view" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
@@ -726,6 +740,7 @@ function SheetLayer(p: {
   pushNow: PushState | null
   togglePush: () => void
   openGuide: () => void
+  openIt: () => void
   flash: (m: string) => void
 }) {
   const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, day, pushNow, togglePush, flash } = p
@@ -972,6 +987,7 @@ function SheetLayer(p: {
         <SheetFacts items={[['This phone', pushNow ? PUSH_WORDS[pushNow] : '…']]} />
         {!d.viewingAs ? <button type="button" className={`${s.sheetBtn}`} disabled={pushOff} onClick={togglePush}>{pushNow === 'on' ? 'Turn notifications off' : 'Turn notifications on'}</button> : null}
         {pushNow === 'on' && popUpNeedsTurningOn() ? <button type="button" className={s.sheetBtn} onClick={() => { close(); p.openGuide() }}>Make them pop up</button> : null}
+        {!d.viewingAs ? <button type="button" className={s.sheetBtn} onClick={p.openIt}>IT support</button> : null}
         {d.views ? HR_APP_VIEWS.filter(([v]) => v !== d.views?.current).map(([v, name, where]) => (
           <button key={v} type="button" className={s.sheetBtn} onClick={() => actions.switchView(v)}>{name} · {where}</button>
         )) : null}

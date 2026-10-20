@@ -43,8 +43,7 @@ export interface ProfileMainActions {
    */
   changeEmail?: () => void;
   /**
-   * IT support (2026-10-20 — the user, circling Settings: "i want add on a button to get submit for IT support or help"):
-   * the account's own — never while viewing a member, never on the demo.
+   * IT support: the account's own, at the top of Your workspace so it is easy to find.
    */
   itSupport?: () => void;
 }
@@ -64,8 +63,10 @@ const VIEWS: { id: ModuleId; where: string }[] = [
  * 2026-10-16).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
-export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS, push = false, views = null }: {
+export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS, push = false, views = null, itReadOnly = false }: {
   vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; closedRows?: readonly WorkKey[];
+  /** Show where employees find support while viewing them, without opening or submitting their private requests. */
+  itReadOnly?: boolean;
   /**
    * Settings › Notifications (2026-10-11; in Settings since 2026-10-16): their own app only — the Principal's too,
    * never while the Principal views a member.
@@ -142,6 +143,16 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
         ) : null}
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
+          {actions.itSupport || itReadOnly ? (
+            <button className={s.workRow} onClick={actions.itSupport} disabled={itReadOnly} aria-label="IT support">
+              <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.help} size={22} sw={1.8} /></span>
+              <span className={s.workText}>
+                <span className={s.workLabel}>IT support</span>
+                <span className={s.workSub}>{itReadOnly ? "Exit View as to send your own request" : "Send a request and track its status"}</span>
+              </span>
+              <Svg d={itReadOnly ? ICON.lock : ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+            </button>
+          ) : null}
           {ROWS.filter(r => !closedRows.includes(r.key)).map(r => (
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
@@ -159,11 +170,6 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
         <section className={s.settings} aria-label="Settings">
           <h2 className={s.h2}>Settings</h2>
           {push ? <PushRow /> : null}
-          {actions.itSupport ? (
-            <button className={s.hideBtn} onClick={actions.itSupport}>
-              IT support<Svg d={ICON.help} size={20} sw={1.7} />
-            </button>
-          ) : null}
           {actions.toggleHide ? (
             <button className={s.hideBtn} onClick={actions.toggleHide}>
               {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />

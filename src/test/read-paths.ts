@@ -350,6 +350,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
   // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
+  // An exact request, including older than either list (mig 20261021030000): active sender or IT requests · View.
+  'it_request_get',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',

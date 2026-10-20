@@ -43,6 +43,7 @@ export default async function FinAppProfile() {
       push={!user.viewingAs}
       // Me (2026-10-17): one's own punch, leave and payslips — a login a People record can name, never while viewing as a person.
       me={personal && !user.viewingAs}
+      itSupport={!user.viewingAs}
     />
   )
 }

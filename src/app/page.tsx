@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getUser } from '@/lib/auth'
-import { isPhone, startPlace } from '@/lib/one-app'
+import { isPhone, startPlace, itSupportPlace } from '@/lib/one-app'
 import { openTarget } from '@/lib/push/notices'
 
 // The one app's start (lib/one-app.ts): HR's view on a phone opens the HR app, Finance's the Finance app; the portal
@@ -10,5 +10,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const user = await getUser()
   const raw = (await searchParams).open
   const target = openTarget(typeof raw === 'string' ? raw : null)
+  if (target?.k === 'it') redirect(itSupportPlace(user, isPhone((await headers()).get('user-agent')), target.id))
   redirect(startPlace(user, isPhone((await headers()).get('user-agent')), target?.k === 'me' ? target.id : null))
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ItNoteInput } from "@/app/(member)/member/it-actions";
+import ImageAnnotator from "@/components/it-requests/ImageAnnotator";
 import {
   CATEGORY_LABEL, IT_LIMITS, IT_STATUSES, STATUS_LABEL, STATUS_TONE, fileSize, fileTag, isImage, itWhen, noteProblem,
   type ItFile, type ItRequest, type ItStatus,
@@ -69,6 +70,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   useEffect(() => { setStatus(r.status); }, [r.status]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [annotating, setAnnotating] = useState<ItFile | null>(null);
   const files = useItUploads(upload);
   const { discard } = files;
   const closed = useRef(false);
@@ -129,7 +131,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
       {own.length > 0 && (
         <div>
           <p className={t.label}>SCREENSHOTS AND FILES</p>
-          <Files files={own} urls={urls} openFile={openFile} />
+          <Files files={own} urls={urls} openFile={openFile} annotate={writes && !busy && !files.full ? setAnnotating : undefined} />
         </div>
       )}
       {r.notes.length > 0 && (
@@ -148,7 +150,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
                     <div className={t.noteStatus}>Marked <span className={`${s.status} ${TONE[STATUS_TONE[n.statusTo]]}`}>{STATUS_LABEL[n.statusTo]}</span></div>
                   )}
                   {n.body && <p className={t.noteBody}>{n.body}</p>}
-                  {theirs.length > 0 && <Files files={theirs} urls={urls} openFile={openFile} />}
+                  {theirs.length > 0 && <Files files={theirs} urls={urls} openFile={openFile} annotate={writes && !busy && !files.full ? setAnnotating : undefined} />}
                 </div>
               );
             })}
@@ -156,11 +158,11 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
         </div>
       )}
       {writes && (
-        <div className={t.composer} onPaste={files.paste}>
+        <div className={t.composer} onPaste={busy ? undefined : files.paste}>
           <p className={t.label}>{r.mine && !canEdit ? "REPLY" : "WRITE ON IT"}</p>
           <textarea rows={3} className={`${s.input} ${s.textarea}`} value={body} onChange={e => setBody(e.target.value)} maxLength={IT_LIMITS.note}
             placeholder={r.mine ? "Anything to add — still happening, another screenshot…" : "A note for the sender — what was found, what was done"} aria-label="Your note" />
-          <ItFileList items={files.items} full={files.full} onAdd={files.add} onRemove={files.remove} label="Attach" />
+          <ItFileList items={files.items} full={files.full} disabled={busy} onAdd={files.add} onRemove={files.remove} label="Attach" />
           {setsStatus && (
             <div className={s.field} role="group" aria-label="Status">
               <span className={s.fieldLabel}>Status</span>
@@ -179,12 +181,14 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
         </div>
       )}
       <button className={s.done} onClick={onClose}>Done</button>
+      {annotating && urls[annotating.id] && <ImageAnnotator src={urls[annotating.id]} fileName={annotating.name} theme="revenue"
+        onClose={() => setAnnotating(null)} onSave={file => { files.add([file]); setAnnotating(null); }} />}
     </>
   );
 }
 
 /** A request's (or a note's) files: the pictures as previews, the rest as rows. */
-function Files({ files, urls, openFile }: { files: ItFile[]; urls: Record<string, string>; openFile?: (id: string, mode: "view" | "download") => void }) {
+function Files({ files, urls, openFile, annotate }: { files: ItFile[]; urls: Record<string, string>; openFile?: (id: string, mode: "view" | "download") => void; annotate?: (file: ItFile) => void }) {
   const pics = files.filter(f => isImage(f.contentType));
   const docs = files.filter(f => !isImage(f.contentType));
   return (
@@ -192,10 +196,13 @@ function Files({ files, urls, openFile }: { files: ItFile[]; urls: Record<string
       {pics.length > 0 && (
         <div className={t.thumbs}>
           {pics.map(f => (
-            <button key={f.id} type="button" className={t.thumb} onClick={() => openFile?.(f.id, "view")} aria-label={`Open ${f.name}`}>
+            <div key={f.id} className={t.picture}>
+            <button type="button" className={t.thumb} onClick={() => openFile?.(f.id, "view")} aria-label={`Open ${f.name}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- a short signed link, never a page asset */}
               {urls[f.id] ? <img src={urls[f.id]} alt={f.name} /> : fileTag(f.name, f.contentType)}
             </button>
+            {annotate && urls[f.id] && <button type="button" className={t.mark} onClick={() => annotate(f)} aria-label={`Annotate ${f.name}`}>Annotate</button>}
+            </div>
           ))}
         </div>
       )}

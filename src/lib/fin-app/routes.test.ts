@@ -18,6 +18,7 @@ describe('the Finance app’s addresses', () => {
     expect(appHref('pnl-month')).toBe('/fin-app/report/pnl')
     expect(appHref('overview')).toBe('/fin-app')
     expect(appHref('daily-bank')).toBe('/fin-app/page/daily-bank')
+    expect(appHref('it-support')).toBe('/fin-app/it-support')
     expect(appHref('dp-revenue_department')).toBe('/fin-app/page/dp-revenue_department')
     expect(hubOfRow('ledger')).toBeNull()
   })
@@ -47,6 +48,7 @@ describe('the Finance app’s addresses', () => {
     expect(tabOf('/fin-app/fund/out')).toBe('fund')
     expect(tabOf('/fin-app/report/bs')).toBe('report')
     expect(tabOf('/fin-app/profile')).toBe('profile')
+    expect(tabOf('/fin-app/it-support')).toBe('profile')
     expect(tabOf('/fin-app/page/daily-bank')).toBe('home')
   })
 

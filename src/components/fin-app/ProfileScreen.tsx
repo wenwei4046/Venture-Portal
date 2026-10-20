@@ -53,6 +53,7 @@ export default function ProfileScreen({
   view = 'finance',
   push = false,
   me = false,
+  itSupport = false,
 }: {
   name: string
   email: string
@@ -67,6 +68,8 @@ export default function ProfileScreen({
   push?: boolean
   /** Me's card on top (2026-10-17): a login of one's own, not while viewing as a person. */
   me?: boolean
+  /** Every signed-in account's own requests, including shared logins; hidden while viewing as a person. */
+  itSupport?: boolean
 }) {
   const [win, setWin] = useState<'password' | 'email' | 'signout' | null>(null)
   const [switching, startSwitch] = useTransition()
@@ -78,6 +81,7 @@ export default function ProfileScreen({
     })
   }
   const initial = (name.trim()[0] ?? 'F').toUpperCase()
+  const hasAccount = personal || itSupport
 
   return (
     <>
@@ -97,36 +101,51 @@ export default function ProfileScreen({
         {/* Me (2026-10-17): today's punch, and the way into one's own attendance, leave, payslips and record. */}
         {me ? <MeCard backLabel="Profile" /> : null}
 
-        {personal ? (
+        {hasAccount ? (
           <>
             <div className={s.menuHead}>
               <span className={s.roman}>I.</span>
               <span className={s.caps}>Account</span>
             </div>
             <div className={s.menu}>
-              <button type="button" className={s.menuRow} onClick={() => setWin('password')}>
-                <span className={`${s.menuIcon} ${s.walnut}`}>
-                  <HrIcon name="lock" size={16} />
-                </span>
-                <span className={s.menuText}>
-                  <span className={s.menuLabel}>Change password</span>
-                </span>
-                <span className={s.menuChev} aria-hidden="true">
-                  ›
-                </span>
-              </button>
-              <button type="button" className={s.menuRow} onClick={() => setWin('email')}>
-                <span className={`${s.menuIcon} ${s.walnut}`}>
-                  <HrIcon name="mail" size={16} />
-                </span>
-                <span className={s.menuText}>
-                  <span className={s.menuLabel}>{EMAIL_WORDS.title}</span>
-                  {email ? <span className={s.menuSub}>{email}</span> : null}
-                </span>
-                <span className={s.menuChev} aria-hidden="true">
-                  ›
-                </span>
-              </button>
+              {personal ? (
+                <>
+                  <button type="button" className={s.menuRow} onClick={() => setWin('password')}>
+                    <span className={`${s.menuIcon} ${s.walnut}`}>
+                      <HrIcon name="lock" size={16} />
+                    </span>
+                    <span className={s.menuText}>
+                      <span className={s.menuLabel}>Change password</span>
+                    </span>
+                    <span className={s.menuChev} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                  <button type="button" className={s.menuRow} onClick={() => setWin('email')}>
+                    <span className={`${s.menuIcon} ${s.walnut}`}>
+                      <HrIcon name="mail" size={16} />
+                    </span>
+                    <span className={s.menuText}>
+                      <span className={s.menuLabel}>{EMAIL_WORDS.title}</span>
+                      {email ? <span className={s.menuSub}>{email}</span> : null}
+                    </span>
+                    <span className={s.menuChev} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                </>
+              ) : null}
+              {itSupport ? (
+                <Link href="/fin-app/it-support" className={s.menuRow} onClick={pushIntent}>
+                  <span className={`${s.menuIcon} ${s.walnut}`}>
+                    <HrIcon name="buoy" size={16} />
+                  </span>
+                  <span className={s.menuText}>
+                    <span className={s.menuLabel}>IT support</span>
+                  </span>
+                  <span className={s.menuChev} aria-hidden="true">›</span>
+                </Link>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -134,7 +153,7 @@ export default function ProfileScreen({
         {admin.length > 0 ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{ROMAN[personal ? 1 : 0]}</span>
+              <span className={s.roman}>{ROMAN[hasAccount ? 1 : 0]}</span>
               <span className={s.caps}>Admin</span>
             </div>
             <div className={s.menu}>
@@ -159,7 +178,7 @@ export default function ProfileScreen({
         {canSwitch ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{ROMAN[(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
+              <span className={s.roman}>{ROMAN[(hasAccount ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
               <span className={s.caps}>Switch view</span>
             </div>
             <div className={s.menu} aria-label="Switch view">
@@ -187,7 +206,7 @@ export default function ProfileScreen({
         ) : null}
 
         {/* This phone's notifications (2026-10-17): the last section, drawn only where the phone can show them. */}
-        {push ? <PushRow roman={ROMAN[(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0) + (canSwitch ? 1 : 0)]} /> : null}
+        {push ? <PushRow roman={ROMAN[(hasAccount ? 1 : 0) + (admin.length > 0 ? 1 : 0) + (canSwitch ? 1 : 0)]} /> : null}
 
         <div className={s.signOutWrap}>
           <button type="button" className={s.signOut} onClick={() => setWin('signout')}>

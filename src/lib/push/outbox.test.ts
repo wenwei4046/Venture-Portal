@@ -108,6 +108,9 @@ describe('a notice', () => {
     // A memo names its page as well (2026-10-17): the app's first drawing is Profile › Memos with the memo, not Today.
     expect(noticeUrl({ refKind: 'memo', refId: 'm 1' }, 'revenue')).toBe('/member?page=account&view=memos&memo=m%201')
     expect(noticeUrl({ refKind: 'memo', refId: 'm1' }, 'hr')).toBe('/hr-app?open=memo:m1')
+    expect(noticeUrl({ refKind: 'it_request', refId: 'it 1' }, 'hr')).toBe('/?open=it:it%201')
+    expect(noticeUrl({ refKind: 'it_request', refId: 'it1' }, 'revenue')).toBe('/member?page=account&view=it&it=it1')
+    expect(openTarget('it:it1')).toEqual({ k: 'it', id: 'it1' })
     // Today › Remind all (2026-10-15): the app's front page, either app.
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')

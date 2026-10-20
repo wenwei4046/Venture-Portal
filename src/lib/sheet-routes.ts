@@ -65,6 +65,8 @@ export const SHEET_ROUTE_PREFIXES = [
   // Admin (2026-10-11, the HR revamp's second package): Meeting Rooms — every
   // view books a room — and the Guest Link.
   '/admin',
+  '/it-support',
+  '/it-requests',
 ] as const
 
 function under(pathname: string, prefix: string): boolean {

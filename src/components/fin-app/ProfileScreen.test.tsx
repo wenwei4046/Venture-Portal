@@ -76,4 +76,18 @@ describe('the Finance app’s Profile', () => {
     expect(screen.getByText('principal@venture.my · Finance view')).toBeInTheDocument()
     expect(screen.getByTestId('sign-out')).toHaveTextContent('the Finance view')
   })
+
+  it('opens IT support from a shared account and numbers all following sections after Account', () => {
+    draw({ personal: false, itSupport: true, canSwitch: true, push: true })
+    expect(screen.getByRole('link', { name: 'IT support' })).toHaveAttribute('href', '/fin-app/it-support')
+    expect(screen.queryByRole('button', { name: 'Change password' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Request to change email' })).toBeNull()
+    const heads = [...document.querySelectorAll('[class*="menuHead"]')].map(h => h.textContent)
+    expect(heads).toEqual(['I.Account', 'II.Admin', 'III.Switch view', 'IV.This phone'])
+  })
+
+  it('keeps IT support out while viewing as a person', () => {
+    draw({ itSupport: false })
+    expect(screen.queryByRole('link', { name: 'IT support' })).toBeNull()
+  })
 })
