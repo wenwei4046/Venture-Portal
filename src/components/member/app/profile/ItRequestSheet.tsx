@@ -180,7 +180,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
           </div>
         </div>
       )}
-      <button className={s.done} onClick={onClose}>Done</button>
+      <button className={`${s.done} ${t.requestDone}`} onClick={onClose}>Done</button>
       {annotating && urls[annotating.id] && <ImageAnnotator src={urls[annotating.id]} fileName={annotating.name} theme="revenue"
         onClose={() => setAnnotating(null)} onSave={file => { files.add([file]); setAnnotating(null); }} />}
     </>

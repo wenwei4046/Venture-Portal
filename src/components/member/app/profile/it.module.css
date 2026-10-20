@@ -125,3 +125,6 @@
   font-weight: 600;
 }
 .send:disabled { opacity: .55; }
+
+/* Keep Done full-width and comfortably tall even when a long thread fills the scrolling sheet. */
+.requestDone { width: 100%; flex: 0 0 48px; min-height: 48px; }
