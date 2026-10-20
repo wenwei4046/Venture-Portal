@@ -12,6 +12,8 @@ import { canDo } from '@/lib/permission-actions'
 import {
   MIN_PASSWORD_LENGTH,
   emailRefusal,
+  fullAccessHeld,
+  fullAccessTemplate,
   isInviteMode,
   validateInvite,
   welcomeLink,
@@ -34,7 +36,8 @@ interface Invitee {
   user_id: string | null
   status: string | null
   department_id: string
-  template: { name: string; base_role: string }
+  title: string
+  template: { name: string; base_role: string; fullAccess: boolean }
 }
 
 /**
@@ -51,6 +54,12 @@ interface Invitee {
  *                     (`sync_user_role`) when their title or template moves.
  *   hr_staff_costs    the person, who already exists — the drawer only lists
  *                     active people with no login, and nobody new is made here.
+ *
+ * The last two are ONE call since 2026-10-20, `account_attach_login`, under
+ * the caller's session: whoever holds Permissions · Create — HR, not only
+ * whoever manages permissions (the user: HR "supposed to be 是要能够 invite
+ * user 的"). A full-access title (`fullAccessTemplate`) is still given a login
+ * only by whoever manages permissions — refused here first, in the database too.
  *
  * Then, optionally, the cells changed for this person alone
  * (`permission_user_cells_set`), which only whoever manages permissions may.
@@ -73,7 +82,7 @@ interface Invitee {
  * message reaches production's browser only as a digest.
  */
 export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
-  // Minting a login is the Principal's, not HR's: an account is access.
+  // Permissions · Create — HR's too since 2026-10-20; a full-access title stays with whoever manages permissions.
   const actor = await requireActionOn('/team/people', 'accounts', 'create')
   // A login is minted with the service role, around the read-only session: refused while viewing as somebody (2026-10-11).
   if (await viewingAsSomebody()) return { ok: false, reason: READ_ONLY_MESSAGE }
@@ -97,6 +106,9 @@ export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
   const person = await readInvitee(supabase, input.staffId)
   if ('reason' in person) return person
   if (person.user_id) return { ok: false, reason: `${person.employee_name} already has a login.` }
+  if (person.template.fullAccess && !canDo(actor, 'accounts', 'manage')) {
+    return { ok: false, reason: fullAccessHeld(person.title, person.template.name) }
+  }
 
   let userId: string
   let handover: { emailed: true } | { emailed: false; link: string; why: string } | null = null
@@ -121,22 +133,15 @@ export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
     return { ok: false, reason }
   }
 
-  // The caller's client, not the service role: the same RLS everything else
-  // obeys governs these writes, and the history records who made them.
-  const { error: userError } = await supabase.from('users').insert({
-    id: userId,
-    email: input.email,
-    name: person.employee_name,
-    role: person.template.base_role,
-    department_id: person.department_id,
+  // The caller's session, not the service role: the portal user and the person's login in one transaction,
+  // asked Permissions · Create again (and a full-access title of whoever manages permissions), and the
+  // history records who made them.
+  const { error: attachError } = await supabase.rpc('account_attach_login', {
+    p_staff: person.id,
+    p_login: userId,
+    p_email: input.email,
   })
-  if (userError) return rollBack(`Could not create the portal user: ${userError.message}`)
-
-  const { error: linkError } = await supabase
-    .from('hr_staff_costs')
-    .update({ user_id: userId, email: input.email })
-    .eq('id', person.id)
-  if (linkError) return rollBack(`Could not attach the login to ${person.employee_name}: ${linkError.message}`)
+  if (attachError) return rollBack(`Could not give ${person.employee_name} the login: ${attachError.message}`)
 
   if (input.cells.length > 0) {
     const { error: cellsError } = await supabase.rpc('permission_user_cells_set', {
@@ -160,7 +165,7 @@ export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
  * again.
  */
 export async function reinviteUser(raw: { staffId?: string | null; mode?: string | null; password?: string | null }): Promise<InviteResult> {
-  await requireActionOn('/team/people', 'accounts', 'create')
+  const actor = await requireActionOn('/team/people', 'accounts', 'create')
   if (await viewingAsSomebody()) return { ok: false, reason: READ_ONLY_MESSAGE }
 
   const staffId = (raw.staffId ?? '').trim()
@@ -175,6 +180,10 @@ export async function reinviteUser(raw: { staffId?: string | null; mode?: string
   const person = await readInvitee(supabase, staffId)
   if ('reason' in person) return person
   if (!person.user_id) return { ok: false, reason: `${person.employee_name} has no login yet — invite them instead.` }
+  // A full-access login nobody has opened yet: a new link or a password from HR would make it HR's (2026-10-20).
+  if (person.template.fullAccess && !canDo(actor, 'accounts', 'manage')) {
+    return { ok: false, reason: fullAccessHeld(person.title, person.template.name) }
+  }
 
   const { data: found, error: findError } = await adminClient().auth.admin.getUserById(person.user_id)
   if (findError || !found?.user?.email) return { ok: false, reason: 'Could not read their login. Try again.' }
@@ -205,15 +214,18 @@ export async function reinviteUser(raw: { staffId?: string | null; mode?: string
 async function readInvitee(supabase: SupabaseClient, staffId: string): Promise<Invitee | Refusal> {
   const { data: personRow, error: personError } = await supabase
     .from('hr_staff_costs')
-    .select('id, employee_name, user_id, status, department_id, titles (name, template_id, permission_templates (name, base_role))')
+    .select(
+      'id, employee_name, user_id, status, department_id, titles (name, template_id, permission_templates (name, base_role, permission_template_grants (function_key, action)))',
+    )
     .eq('id', staffId)
     .maybeSingle()
   if (personError) return { ok: false, reason: 'Could not read their People record. Try again.' }
+  type TemplateRow = { name: string; base_role: string; permission_template_grants?: Array<{ function_key: string; action: string }> | null }
   const person = personRow as {
     id: string; employee_name: string; user_id: string | null; status: string | null; department_id: string
     titles: {
       name: string; template_id: string | null
-      permission_templates: { name: string; base_role: string } | Array<{ name: string; base_role: string }> | null
+      permission_templates: TemplateRow | TemplateRow[] | null
     } | null
   } | null
   if (!person) return { ok: false, reason: 'That person is no longer on the roster.' }
@@ -230,13 +242,15 @@ async function readInvitee(supabase: SupabaseClient, staffId: string): Promise<I
       reason: `${person.titles.name} has no permission template yet. Choose one under People Management → Permissions, then invite.`,
     }
   }
+  const managesPermissions = (template.permission_template_grants ?? []).some(g => g.function_key === 'accounts' && g.action === 'manage')
   return {
     id: person.id,
     employee_name: person.employee_name,
     user_id: person.user_id,
     status: person.status,
     department_id: person.department_id,
-    template,
+    title: person.titles.name,
+    template: { name: template.name, base_role: template.base_role, fullAccess: fullAccessTemplate(template.base_role, managesPermissions) },
   }
 }
 

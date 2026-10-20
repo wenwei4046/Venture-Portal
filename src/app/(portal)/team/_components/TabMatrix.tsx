@@ -141,6 +141,7 @@ export default function TabMatrix({
                       role="checkbox"
                       aria-checked={on}
                       aria-label={`${t.label} · ${TAB_ACTION_LABEL[a]}`}
+                      title={exists ? t.hints?.[a] : undefined}
                       disabled={!canEdit || !exists}
                       className={`${s.box} ${on ? s.boxOn : ''} ${exists ? '' : s.boxNone}`}
                       onClick={() => onToggle(t.id, a)}

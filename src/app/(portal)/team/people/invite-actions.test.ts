@@ -93,11 +93,10 @@ describe('inviting somebody on the roster', () => {
     })
     expect(mocks.inviteUserByEmail).not.toHaveBeenCalled()
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
-    expect(db.writes).toEqual([
-      { table: 'users', row: { id: 'new-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
-      { table: 'hr_staff_costs', row: { user_id: 'new-user', email: 'siew@houzs.com' }, id: ONG },
-    ])
-    expect(db.rpc).not.toHaveBeenCalled()
+    // The portal user and the person's login are ONE call under the caller's session (2026-10-20).
+    expect(db.rpc).toHaveBeenCalledTimes(1)
+    expect(db.rpc).toHaveBeenCalledWith('account_attach_login', { p_staff: ONG, p_login: 'new-user', p_email: 'siew@houzs.com' })
+    expect(db.writes).toEqual([])
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/team', 'layout')
   })
 
@@ -176,10 +175,8 @@ describe('inviting by link', () => {
     expect(mocks.inviteUserByEmail).toHaveBeenCalledWith('siew@houzs.com', { data: { name: 'ONG SIEW LAN' } })
     expect(mocks.createUser).not.toHaveBeenCalled()
     expect(mocks.generateLink).not.toHaveBeenCalled()
-    expect(db.writes).toEqual([
-      { table: 'users', row: { id: 'invited-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
-      { table: 'hr_staff_costs', row: { user_id: 'invited-user', email: 'siew@houzs.com' }, id: ONG },
-    ])
+    expect(db.rpc).toHaveBeenCalledWith('account_attach_login', { p_staff: ONG, p_login: 'invited-user', p_email: 'siew@houzs.com' })
+    expect(db.writes).toEqual([])
   })
 
   it('when Supabase will not email the address, makes the same login with no email and hands back our own link', async () => {
@@ -190,7 +187,7 @@ describe('inviting by link', () => {
       why: expect.stringContaining('until an email service is connected'),
     })
     expect(mocks.generateLink).toHaveBeenCalledWith({ type: 'invite', email: 'siew@houzs.com', options: { data: { name: 'ONG SIEW LAN' } } })
-    expect(db.writes.map(w => w.row.id ?? w.row.user_id)).toEqual(['linked-user', 'linked-user'])
+    expect(db.rpc).toHaveBeenCalledWith('account_attach_login', { p_staff: ONG, p_login: 'linked-user', p_email: 'siew@houzs.com' })
   })
 
   it('refuses an address that already signs in, and makes no link for it', async () => {
@@ -201,7 +198,7 @@ describe('inviting by link', () => {
   })
 
   it('deletes the invited login again when the portal user cannot be made', async () => {
-    db.state.insertError = { message: 'denied' }
+    db.state.rpcError = { message: 'denied' }
     expect(await byLink()).toEqual({ ok: false, reason: expect.stringContaining('denied') })
     expect(mocks.deleteUser).toHaveBeenCalledWith('invited-user')
   })
@@ -261,5 +258,68 @@ describe('inviting again', () => {
     mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
     await expect(reinviteUser({ staffId: ONG, mode: 'link' })).rejects.toThrow('NEXT_REDIRECT')
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.any(String), 'accounts', 'create')
+  })
+})
+
+// HR invites (2026-10-20 — the user: HR "supposed to be 是要能够 invite user 的"): Permissions · Create is enough,
+// but a full-access title — a Principal-kind template, or one that ticks Manage permissions — is given a login only
+// by whoever manages permissions: the inviter types the email and may set the password, so it would be theirs.
+describe('inviting as HR — Permissions · Create, not Manage permissions', () => {
+  let db: ReturnType<typeof database>
+  const HR = { id: 'li-sean', permissions: ['team', 'team_invite'], actions: { 'accounts.view': 'all', 'accounts.create': 'all' } }
+  const PRINCIPAL = { id: 'principal', permissions: ['team_invite', 'permissions_manage'], actions: { 'accounts.view': 'all', 'accounts.create': 'all', 'accounts.manage': 'all' } }
+  const onTemplate = (template: Row) => { (db.tables.hr_staff_costs[0].titles as Row).permission_templates = template }
+  beforeEach(() => {
+    vi.clearAllMocks()
+    db = database()
+    mocks.requirePermission.mockResolvedValue(HR)
+    mocks.createClient.mockResolvedValue(db)
+    mocks.createUser.mockResolvedValue({ data: { user: { id: 'new-user' } }, error: null })
+    mocks.inviteUserByEmail.mockResolvedValue({ data: { user: { id: 'invited-user' } }, error: null })
+    mocks.getUserById.mockResolvedValue({
+      data: { user: { id: 'pending-user', email: 'siew@houzs.com', invited_at: '2026-10-20T01:00:00Z', email_confirmed_at: null } }, error: null,
+    })
+  })
+
+  it('gives somebody on an everyday title a login, by link or by password', async () => {
+    expect(await invite({ mode: 'link', password: undefined })).toMatchObject({ ok: true, mode: 'link', emailed: true })
+    expect(db.rpc).toHaveBeenCalledWith('account_attach_login', { p_staff: ONG, p_login: 'invited-user', p_email: 'siew@houzs.com' })
+    expect(await invite()).toMatchObject({ ok: true, mode: 'password' })
+  })
+
+  it.each([
+    ['a Principal-kind template', { name: 'Ultimate full access', base_role: 'principal', permission_template_grants: [] }],
+    ['a template that manages permissions', { name: 'People lead', base_role: 'staff', permission_template_grants: [{ function_key: 'accounts', action: 'manage' }] }],
+  ])('refuses a full-access title — %s — before any login exists', async (_label, template) => {
+    onTemplate(template)
+    expect(await invite()).toEqual({
+      ok: false,
+      reason: `SENIOR ACCOUNT EXECUTIVE is a full-access title (${template.name}): only whoever manages permissions gives it a login.`,
+    })
+    expect(mocks.createUser).not.toHaveBeenCalled()
+    expect(mocks.inviteUserByEmail).not.toHaveBeenCalled()
+    expect(db.rpc).not.toHaveBeenCalled()
+  })
+
+  it('whoever manages permissions gives a full-access title its login, as before', async () => {
+    mocks.requirePermission.mockResolvedValue(PRINCIPAL)
+    onTemplate({ name: 'Ultimate full access', base_role: 'principal', permission_template_grants: [{ function_key: 'accounts', action: 'manage' }] })
+    expect(await invite()).toMatchObject({ ok: true, mode: 'password' })
+    expect(db.rpc).toHaveBeenCalledWith('account_attach_login', { p_staff: ONG, p_login: 'new-user', p_email: 'siew@houzs.com' })
+  })
+
+  it('does not invite a full-access login again — a new link or a password from HR would make it HR’s', async () => {
+    db.tables.hr_staff_costs[0].user_id = 'pending-user'
+    onTemplate({ name: 'Ultimate full access', base_role: 'principal', permission_template_grants: [] })
+    for (const mode of ['link', 'password'] as const) {
+      expect(await reinviteUser({ staffId: ONG, mode, password: 'Hv-abcdefg' })).toEqual({
+        ok: false, reason: expect.stringContaining('only whoever manages permissions gives it a login'),
+      })
+    }
+    expect(mocks.inviteUserByEmail).not.toHaveBeenCalled()
+    expect(mocks.updateUserById).not.toHaveBeenCalled()
+    // An everyday title's pending login is HR's to invite again.
+    onTemplate({ name: 'Finance · Maker', base_role: 'finance', permission_template_grants: [] })
+    expect(await reinviteUser({ staffId: ONG, mode: 'link' })).toMatchObject({ ok: true, mode: 'link' })
   })
 })
