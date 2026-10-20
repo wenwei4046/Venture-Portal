@@ -5,12 +5,14 @@ import type { PushApp } from './config'
  * `app_notifications`): what it is about, and where a tap on it opens — in
  * the app the phone turned notifications on in.
  */
-export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo'
+export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it'
 /**
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
  */
 export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today' | 'att_request'
+  // IT support (2026-10-20, mig 20261021013100): a request's status or note, to its sender; a new one or a reply, to the desk.
+  | 'it_request'
 
 export interface Notice {
   id: string
@@ -28,8 +30,8 @@ export interface Notices {
   items: Notice[]
 }
 
-const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo']
+const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request']
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -71,6 +73,9 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   // opens for them (app/page.tsx carries `open=me:` to the HR app, the Finance app's Profile or the portal). The
   // Revenue app has no Me: its front page. Never in a bell.
   if (n.refKind === 'att_request') return app === 'hr' ? `/?open=me:${id}` : '/member'
+  // An IT request (2026-10-20) lives in the Revenue app, whichever app the phone signed up in: Profile › IT support on it
+  // (the desk's own list when it is not theirs).
+  if (n.refKind === 'it_request') return `/member?page=account&view=it&it=${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`

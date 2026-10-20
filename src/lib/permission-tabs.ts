@@ -228,6 +228,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // The Director and the CEO run the CRM for the whole team (PR #253); its Control panel opens with CRM · View at All.
   { ...tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'), cellGated: true },
   tab('rev', 'product_list', 'Product List', ['product_list'], { view: ['product_list.view'], edit: ['product_list.edit'] }, 'all'),
+  // IT support's desk (2026-10-20, mig 20261021013000): everybody's IT requests — read them; write notes, set their status.
+  // Sending one and following one's own need no box (open to all, as Memos).
+  tab('rev', 'it_requests', 'IT requests', ['it_requests'], { view: ['it_requests.view'], edit: ['it_requests.edit'] }, 'all'),
 ]
 
 export const TAB_BY_ID: ReadonlyMap<string, PermissionTab> = new Map(PERMISSION_TABS.map(t => [t.id, t]))

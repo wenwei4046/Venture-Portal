@@ -249,6 +249,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   // ── Notifications: a notice opens what it is about, or its list when it has left it ──
   const openRef = (kind: NoticeRef, id: string) => {
     setSheet(null)
+    // IT support lives in the Revenue app (2026-10-20): the request opens there.
+    if (kind === 'it_request') {
+      window.location.assign(`/member?page=account&view=it&it=${encodeURIComponent(id)}`)
+      return
+    }
     if (kind === 'hiring_request') {
       setTab('home')
       setStack(d.hires.some(h => h.id === id) ? [{ k: 'gen', id: 'hire' }, { k: 'hire', id }] : [{ k: 'gen', id: 'hire' }])

@@ -25,6 +25,7 @@ import { fetchMemberRooms } from "./rooms-actions";
 import { fetchMemberDocuments, fetchMemberPersonal } from "./docs-actions";
 import { fetchMemberCrmUnread } from "./chat-badge-actions";
 import { fetchMemberNotices } from "./bell-actions";
+import { fetchItDesk, fetchMyItRequests } from "./it-actions";
 
 /** One of the Revenue app's reads, named by the action it calls. */
 export type MemberRead =
@@ -49,7 +50,10 @@ export type MemberRead =
   | { kind: "documents"; staffId?: string }
   | { kind: "crmUnread" }
   | { kind: "notices" }
-  | { kind: "personal"; staffId?: string };
+  | { kind: "personal"; staffId?: string }
+  // IT support (2026-10-20): one's own requests, and the desk's.
+  | { kind: "itMine" }
+  | { kind: "itDesk" };
 
 /** A read's answer, or the message of what it threw — the client rejects that read alone. */
 export type MemberReadSlot = { value: unknown } | { thrown: string };
@@ -97,6 +101,8 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "crmUnread": return fetchMemberCrmUnread();
     case "notices": return fetchMemberNotices();
     case "personal": return fetchMemberPersonal(read.staffId);
+    case "itMine": return fetchMyItRequests();
+    case "itDesk": return fetchItDesk();
     default: return Promise.reject(new Error("Unknown read."));
   }
 }

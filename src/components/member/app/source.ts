@@ -19,6 +19,8 @@ import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-ac
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, openMemberPersonal, type fetchMemberDocuments, type fetchMemberPersonal } from "@/app/(member)/member/docs-actions";
+import { noteItRequest, openItFile, signItFiles, submitItRequest, type ItNoteInput, type ItSubmitInput, type fetchItDesk, type fetchMyItRequests } from "@/app/(member)/member/it-actions";
+import type { ItRequest } from "@/lib/it-requests/model";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
@@ -76,6 +78,8 @@ export const ask = {
   crmUnread: (): MemberRead => ({ kind: "crmUnread" }),
   notices: (): MemberRead => ({ kind: "notices" }),
   personal: (context?: { staffId: string }): MemberRead => (context ? { kind: "personal", staffId: context.staffId } : { kind: "personal" }),
+  itMine: (): MemberRead => ({ kind: "itMine" }),
+  itDesk: (): MemberRead => ({ kind: "itDesk" }),
 };
 
 /**
@@ -146,6 +150,18 @@ export interface RevenueSource {
   personal?(context?: { staffId: string }): Promise<Outcome<Personal>>;
   /** One of Personal: a file of theirs, or a letter — its short link made at the tap. */
   openPersonal?(kind: "drive" | "letter", id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
+  /** IT support (2026-10-20): one's own requests — read fresh each time, never kept on the phone. */
+  itMine?(): Promise<Outcome<ItRequest[]>>;
+  /** …everybody's, for IT requests · View. */
+  itDesk?(): Promise<Outcome<ItRequest[]>>;
+  /** Send one (its files already in the bucket). */
+  itSubmit?(input: ItSubmitInput): Promise<Outcome<ItRequest>>;
+  /** A reply, IT's note, a status. */
+  itNote?(input: ItNoteInput): Promise<Outcome<ItRequest>>;
+  /** Short links to some of a request's files (its pictures' previews). */
+  itSign?(ids: string[]): Promise<Outcome<Record<string, string>>>;
+  /** One file's short link, made at the tap. */
+  itOpen?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -241,6 +257,13 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     notices: () => read<Answer<typeof fetchMemberNotices>>(ask.notices()),
     personal: context => go<Answer<typeof fetchMemberPersonal>>(ask.personal(context)),
     openPersonal: (kind, id, context) => openMemberPersonal(kind, id, context?.staffId),
+    // IT support (2026-10-20): read fresh, never kept — a status IT set an hour ago must not wait for a pull.
+    itMine: () => read<Answer<typeof fetchMyItRequests>>(ask.itMine()),
+    itDesk: () => read<Answer<typeof fetchItDesk>>(ask.itDesk()),
+    itSubmit: input => submitItRequest(input),
+    itNote: input => noteItRequest(input),
+    itSign: ids => signItFiles(ids),
+    itOpen: (id, mode) => openItFile(id, mode),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),
