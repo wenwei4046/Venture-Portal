@@ -710,7 +710,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
               return null;
             })}
             <SignedFormBox title="Replacement form" needs={needsForm} flagged={tried && needsForm} signedName={signedName} fetching={fetching}
-              note="Download the form, print it in black and white, fill it in and have it signed, then upload a photo or scan."
+              note="Download the form, print it in black and white, fill it in and have it signed, then upload a photo or scan — or the filled-in Word file."
               label="Signed replacement form" onDownload={() => void downloadForm()} onFile={file => { setSigned(file); setError(null); }} />
             <p className={s.formNote}>Transfers need the receiving department to confirm. Member and payroll records change after approval.</p>
           </>
@@ -733,7 +733,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
               );
             })}
             <SignedFormBox title="Application form" needs={needsForm} flagged={tried && needsForm} signedName={signedName} fetching={fetching}
-              note="Download the form, print it in black and white, have the applicant fill it in and sign, then upload a photo or scan."
+              note="Download the form, print it in black and white, have the applicant fill it in and sign, then upload a photo or scan — or the filled-in Word file."
               label="Signed application form" onDownload={() => void downloadForm()} onFile={file => { setSigned(file); setError(null); }} />
             <div className={s.field}>
               <span className={s.fieldLabel}>Your signature</span>
@@ -901,6 +901,16 @@ function FormQuestion({ f, err, value, choices, onValue, maxLength, anyTime = fa
 }
 
 /**
+ * What the signed form may be: a photo or scan (JPG, PNG, PDF) — and, since
+ * 2026-10-20 ("need as well"), the filled-in Word file (.docx, or an old .doc).
+ * Types and extensions both, so a phone's picker offers Word documents too.
+ */
+const SIGNED_FORM_TYPES = [
+  "image/jpeg", "image/png", "application/pdf",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".doc", ".docx",
+].join(",");
+
+/**
  * The form to print and sign: Download form (HR's upload, or the black-and-
  * white one built from the questions), Upload signed form → Replace file, and
  * "✓ name" — "(optional)" unless HR's form requires it.
@@ -929,7 +939,7 @@ function SignedFormBox({ title, note, label, needs, flagged, signedName, fetchin
           <Svg d={UPLOAD} size={15} sw={1.8} />{signedName ? "Replace file" : "Upload signed form"}
         </button>
       </div>
-      <input ref={ref} type="file" accept="image/jpeg,image/png,application/pdf" hidden aria-label={label}
+      <input ref={ref} type="file" accept={SIGNED_FORM_TYPES} hidden aria-label={label}
         onChange={e => { const file = e.target.files?.[0]; if (file) onFile(file); }} />
       {signedName && <span className={s.appFormFile}>✓ {signedName}</span>}
     </div>

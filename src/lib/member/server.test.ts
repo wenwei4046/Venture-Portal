@@ -370,6 +370,15 @@ describe('a member sends a request', () => {
     expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
   })
 
+  // 2026-10-20: a signed form may be a Word file now — an invoice may not.
+  it('an invoice stays a JPG, PNG or PDF — never a Word file', async () => {
+    const docx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, ...Array.from('word/document.xml', c => c.charCodeAt(0))])
+    const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '456.70' })
+    data.set('invoice', new File([docx], 'flight.docx'))
+    expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The invoice must be a valid JPG, PNG or PDF file.' })
+    mocks.rpc.mockReset()
+  })
+
   it('refuses a plane ticket without a price it can read', async () => {
     expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '45.678' })))
       .toEqual({ ok: false, error: 'Enter the plane ticket\'s price, as its invoice shows.' })
@@ -485,10 +494,47 @@ describe('a member sends a request', () => {
       expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
     })
 
-    it('refuses a signed form that is not a JPG, PNG or PDF', async () => {
+    it('refuses a signed form that is not a PDF, Word, JPG or PNG', async () => {
       const data = waitingForm()
       data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
-      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed application form must be a valid JPG, PNG or PDF file.' })
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed application form must be a PDF, Word, JPG or PNG file.' })
+      mocks.rpc.mockReset()
+    })
+
+    // 2026-10-20, the user, once HR's own uploads took Word: "need as well".
+    it('takes the filled-in Word file too — kept and attested as Word, whatever the phone called it', async () => {
+      const docx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 20, 0, ...Array.from('word/document.xml', c => c.charCodeAt(0)), 0, 0])
+      const data = waitingForm()
+      data.set('signedForm', new File([docx], 'Amelia application.docx', { type: '' }))
+      expect((await submitMemberRequest(data)).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+      expect(prepared.p_detail).toMatchObject({ signedFormName: 'Amelia application.docx' })
+      const [path, , options] = upload.mock.calls[0] as unknown as [string, Uint8Array, { contentType: string }]
+      expect(path).toMatch(/\.docx$/)
+      expect(options.contentType).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+        mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', content_sha256: prepared.p_detail.signedFormHash,
+      }))
+      expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    })
+
+    it('an old .doc too; never one holding macros', async () => {
+      const utf16 = (s: string) => Array.from(s).flatMap(c => [c.charCodeAt(0), 0])
+      const ole = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+      const doc = waitingForm()
+      doc.set('signedForm', new File([new Uint8Array([...ole, ...utf16('WordDocument')])], 'Amelia.doc', { type: 'application/msword' }))
+      expect((await submitMemberRequest(doc)).ok).toBe(true)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ mime_type: 'application/msword' }))
+
+      mocks.rpc.mockClear()
+      upload.mockClear()
+      const macros = waitingForm()
+      macros.set('signedForm', new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, ...Array.from('word/document.xml word/vbaProject.bin', c => c.charCodeAt(0))])], 'Amelia.docm'))
+      expect(await submitMemberRequest(macros)).toEqual({
+        ok: false,
+        error: 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.',
+      })
+      expect(upload).not.toHaveBeenCalled()
       mocks.rpc.mockReset()
     })
 
@@ -544,11 +590,19 @@ describe('a member sends a request', () => {
       expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
     })
 
-    it('refuses a signed form that is not a JPG, PNG or PDF, in the replacement’s words', async () => {
+    it('refuses a signed form that is not a PDF, Word, JPG or PNG, in the replacement’s words', async () => {
       const data = replacementForm()
       data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
-      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed replacement form must be a valid JPG, PNG or PDF file.' })
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed replacement form must be a PDF, Word, JPG or PNG file.' })
       mocks.rpc.mockReset()
+    })
+
+    it('takes a Word file as the signed replacement form too', async () => {
+      const docx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, ...Array.from('word/document.xml', c => c.charCodeAt(0))])
+      const data = replacementForm()
+      data.set('signedForm', new File([docx], 'handover.docx'))
+      expect((await submitMemberRequest(data)).ok).toBe(true)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }))
     })
 
     it('an update keeps the signed form it was sent with', async () => {
