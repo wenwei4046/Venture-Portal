@@ -199,24 +199,30 @@ export function letterFile(bytes: Uint8Array, declared: string): { ok: true; kin
 // ─── "Submitted by" ─────────────────────────────────────────────────────────
 
 export interface SubmitterGroup {
-  /** The sub-department ("Fair"). */
+  /** The sub-department ("Fair"), or the department for whoever is placed in none. */
   group: string
   people: Array<{ id: string; name: string; title: string | null }>
 }
 
+type Submitter = { staffId: string; name: string; titleName?: string | null }
+
 /**
  * Who may have brought them in: the Revenue team as the page charts it — this sub-department first,
- * then its siblings — each person once (where they come first), by name. The database asks the same
- * (an active placement in a sub-department of the department).
+ * then its siblings — each person once (where they come first), by name; then (2026-10-20, the user:
+ * "它应该要能选到 Revenue department 的全部人，不管什么 title") everybody else active in the department, under
+ * its name — the Revenue Directors, who hold no placement, and anybody in a sub-department the chart
+ * does not draw. The database asks the same: active, and in the department or placed in one of its
+ * sub-departments.
  */
 export function submitterGroups(
-  departments: ReadonlyArray<{ name: string; people: ReadonlyArray<{ staffId: string; name: string; titleName?: string | null }> }>,
+  departments: ReadonlyArray<{ name: string; people: ReadonlyArray<Submitter> }>,
   current: string,
+  department: { name: string; people: ReadonlyArray<Submitter> } | null = null,
 ): SubmitterGroup[] {
   const ordered = [...departments].sort((a, b) => Number(b.name === current) - Number(a.name === current))
   const seen = new Set<string>()
   const groups: SubmitterGroup[] = []
-  for (const d of ordered) {
+  for (const d of department ? [...ordered, department] : ordered) {
     const people = d.people
       .filter(p => !seen.has(p.staffId))
       .map(p => ({ id: p.staffId, name: p.name, title: p.titleName ?? null }))
@@ -225,4 +231,77 @@ export function submitterGroups(
     if (people.length) groups.push({ group: d.name, people })
   }
   return groups
+}
+
+// ─── Edit, in the applicant's drawer ────────────────────────────────────────
+
+/**
+ * What the drawer's Edit changes (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"):
+ * the applicant's name and phone, the joining date and who brought them in. The department is the list's
+ * own and stays.
+ */
+export interface WaitingEditDraft {
+  name: string
+  contact: string
+  /** YYYY-MM-DD, or `anytime` (`ANY_TIME`). */
+  start: string
+  /** The Revenue-team member who brought them in: their staff id. */
+  submittedBy: string
+}
+
+/** Only what changed — a shared login on two computers never writes back what nobody touched. */
+export type WaitingEditChanges = Partial<WaitingEditDraft>
+
+/** The fields' words, in the drawer's order. */
+const EDIT_WORDS: Readonly<Record<keyof WaitingEditDraft, string>> = {
+  name: 'New member name',
+  contact: 'Mobile number',
+  start: 'Joining date',
+  submittedBy: 'Submitted by',
+}
+
+/** The fields the draft changed against the applicant as the drawer drew them (a name or phone compared trimmed). */
+export function waitingEditChanges(was: WaitingEditDraft, now: WaitingEditDraft): WaitingEditChanges {
+  const out: WaitingEditChanges = {}
+  if (now.name.trim() !== was.name.trim()) out.name = now.name.trim()
+  if (now.contact.trim() !== was.contact.trim()) out.contact = now.contact.trim()
+  if (now.start !== was.start) out.start = now.start
+  if (now.submittedBy !== was.submittedBy) out.submittedBy = now.submittedBy
+  return out
+}
+
+/** What stops a save, in words, in the drawer's order — or null. The database asks the same again. */
+export function waitingEditRefusal(changes: WaitingEditChanges): string | null {
+  const keys = Object.keys(changes) as Array<keyof WaitingEditDraft>
+  if (keys.length === 0) return 'Nothing has changed.'
+  const blank = keys.filter(k => k !== 'start' && !(changes[k] ?? '').trim())
+  if (blank.length) return fillIn(blank.map(k => ({ label: EDIT_WORDS[k] })))
+  if (changes.name !== undefined && changes.name.length > 160) return 'Keep the name under 160 characters.'
+  if (changes.contact !== undefined && changes.contact.length > 60) return 'Keep the phone number under 60 characters.'
+  if (changes.start !== undefined && !isJoiningDate(changes.start)) return 'Pick the joining date.'
+  if (changes.submittedBy !== undefined && !UUID.test(changes.submittedBy)) return 'Reload the page and try again.'
+  return null
+}
+
+/** What the browser sent, read on the server: only the four fields, only as strings. Null = not a change at all. */
+export function waitingEditChangesFrom(raw: unknown): WaitingEditChanges | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const out: WaitingEditChanges = {}
+  for (const key of Object.keys(EDIT_WORDS) as Array<keyof WaitingEditDraft>) {
+    if (!(key in o)) continue
+    if (typeof o[key] !== 'string') return null
+    out[key] = (o[key] as string).trim()
+  }
+  return out
+}
+
+/** The changes as `member_waiting_edit` takes them: the request's own words for each field. */
+export function waitingEditPayload(changes: WaitingEditChanges): Record<string, string> {
+  return {
+    ...(changes.name !== undefined ? { newPerson: changes.name } : {}),
+    ...(changes.contact !== undefined ? { contact: changes.contact } : {}),
+    ...(changes.start !== undefined ? { start: changes.start } : {}),
+    ...(changes.submittedBy !== undefined ? { staffId: changes.submittedBy } : {}),
+  }
 }

@@ -15,7 +15,7 @@ import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
 import { loadSwitcherData, type SwitcherData } from '../../_lib/switcher'
 import type { OrgDepartment, OrgPerson, OrgRank } from './_components/OrgChart'
 import type { OrgDirector } from './_components/org-chart-types'
-import { loadTeam } from '../../_components/config/load'
+import { loadDepartmentPeople, loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
 import { subsInReach } from '@/lib/sub-department-reach'
@@ -80,7 +80,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   // waiting list's form and the places left (Transfer waits while it is full)
   // with them.
   const seesRequests = can(user, 'member_requests_manage')
-  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, replacementForm, capacity] = await Promise.all([
+  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, replacementForm, capacity, departmentPeople] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -101,6 +101,8 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     seesRequests ? loadWaitingForm() : Promise.resolve(null),
     seesRequests ? loadReplacementForm() : Promise.resolve(null),
     seesRequests ? loadSubDepartmentCapacity(subDept.id) : Promise.resolve(null),
+    // "Submitted by" offers the whole department (2026-10-20), not only who the chart draws.
+    seesRequests ? loadDepartmentPeople(subDept.departmentId) : Promise.resolve(null),
   ])
 
   return (
@@ -118,6 +120,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       waitingForm={waitingForm}
       replacementForm={replacementForm}
       capacity={capacity?.ok ? capacity.data : null}
+      departmentPeople={departmentPeople}
       canTransfer={canDo(user, 'team', 'create')}
       canAddToWaiting={seesRequests && canDo(user, 'member', 'manage')}
       head={head}

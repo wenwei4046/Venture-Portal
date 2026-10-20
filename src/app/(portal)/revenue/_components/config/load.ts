@@ -60,6 +60,27 @@ const loadCommissionRoster = cache(async () => {
     .order('employee_name')
 })
 
+/**
+ * Everybody active in one commission department, under its name — the waiting list's "Submitted by"
+ * (2026-10-20, the user: "它应该要能选到 Revenue department 的全部人，不管什么 title"): the Revenue Directors,
+ * who hold no placement, as much as the members. The chart's own roster read, so no query of its own.
+ * Null when the department is not one the roster reads.
+ */
+export async function loadDepartmentPeople(
+  departmentId: string,
+): Promise<{ name: string; people: Array<{ staffId: string; name: string; titleName: string | null }> } | null> {
+  const { data } = await loadCommissionRoster()
+  type Named = { name: string }
+  const one = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null))
+  const staff = rows<{ id: string; employee_name: string; department_id: string | null; titles: Named | Named[] | null; departments: Named | Named[] | null }>(data)
+    .filter(s => s.department_id === departmentId)
+  if (staff.length === 0) return null
+  return {
+    name: one(staff[0].departments)?.name ?? 'Department',
+    people: staff.map(s => ({ staffId: s.id, name: s.employee_name, titleName: one(s.titles)?.name ?? null })),
+  }
+}
+
 /** The company ladder: the Team table reads it top down (user, 2026-09-05). */
 const loadTitleLevels = cache(async () => {
   const supabase = await untyped()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NO_DEPT, initialsOf, rosterCounts, rosterGroups, rosterMatches, type RosterPerson } from './people-roster'
+import { NO_DEPT, initialsOf, rosterCounts, rosterDepartments, rosterGroups, rosterMatches, type RosterPerson } from './people-roster'
 
 // People Management's roster (2026-10-10, the HR revamp): the five cards, the
 // search and the employment filter, the department bands.
@@ -50,5 +50,45 @@ describe('the roster', () => {
     expect(initialsOf('miao miao')).toBe('MM')
     expect(initialsOf(' ZACK ')).toBe('Z')
     expect(initialsOf('')).toBe('')
+  })
+})
+
+// 2026-10-20 — the user: "People Management 这边要多加一个 filter：这个 filter 是 drop down 来的，可以选 department"; and the
+// roster lists the full name (last, then first), the IC's name still found by the search.
+describe('the department filter and the full name', () => {
+  const people = [
+    person({ name: 'Teoh CHEA HUAN', icName: 'CHEA HUAN', department: 'Revenue Department' }),
+    person({ name: 'KRIS', icName: 'KRIS', department: 'Revenue Department' }),
+    person({ name: 'LOO WEN WEI', icName: 'LOO WEN WEI', department: 'Director' }),
+    person({ name: 'GONE', department: 'Director', active: false }),
+    person({ name: 'NOBODY', department: null }),
+  ]
+  const shown = (q: string, dept: string, status: 'active' | 'inactive' | 'all' = 'active') =>
+    people.filter(p => rosterMatches(p, q, status, dept)).map(p => p.name)
+
+  it('shows one department, every one when none is picked, and the people in none by their own choice', () => {
+    expect(shown('', 'Revenue Department')).toEqual(['Teoh CHEA HUAN', 'KRIS'])
+    expect(shown('', 'Director', 'all')).toEqual(['LOO WEN WEI', 'GONE'])
+    expect(shown('', NO_DEPT)).toEqual(['NOBODY'])
+    expect(shown('', '')).toEqual(['Teoh CHEA HUAN', 'KRIS', 'LOO WEN WEI', 'NOBODY'])
+  })
+
+  it('searches inside the department, by the name listed or the one on their IC', () => {
+    expect(shown('teoh', 'Revenue Department')).toEqual(['Teoh CHEA HUAN'])
+    expect(shown('chea  huan', '')).toEqual(['Teoh CHEA HUAN'])
+    expect(shown('teoh', 'Director')).toEqual([])
+  })
+
+  it('offers every department A→Z with its count, none last', () => {
+    expect(rosterDepartments(people)).toEqual([
+      { dept: 'Director', count: 2 },
+      { dept: 'Revenue Department', count: 2 },
+      { dept: NO_DEPT, count: 1 },
+    ])
+    expect(rosterDepartments(people.filter(p => p.active))).toEqual([
+      { dept: 'Director', count: 1 },
+      { dept: 'Revenue Department', count: 2 },
+      { dept: NO_DEPT, count: 1 },
+    ])
   })
 })

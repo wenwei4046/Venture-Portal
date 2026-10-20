@@ -157,6 +157,29 @@
 .fail { margin-right: auto; padding: 8px 14px; }
 .transfer { padding: 8px 18px; }
 
+/* Edit (2026-10-20, the user: "要能够按 Edit … 让 HR 可以去改资料"): the head's button beside the ×, and the
+   fields "+" asks in the drawer's body — a changed one peach, as on a person's page. */
+.drawerHead { display: flex; align-items: flex-start; gap: 12px; }
+.drawerHeadText { flex: 1; min-width: 0; }
+.editButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.editButton svg { width: 13px; height: 13px; }
+.editFields { display: flex; flex-direction: column; gap: 14px; }
+.editFields input[data-dirty='true'],
+.editFields select[data-dirty='true'] {
+  border-color: rgb(var(--hv-accent));
+  background-color: rgb(var(--hv-peach));
+}
+.editFixed { font-size: 13.5px; color: rgb(var(--hv-ink)); }
+.editFoot { margin-right: auto; align-self: center; font-size: 12.5px; color: rgb(var(--hv-brown)); }
+
 /* Its signed form (2026-10-20, the user: "view for the letter they submit, then can be upload as well"): the
    file as a framed row — its icon, its name over when and who, View, Replace — or, with none, a dashed drop. */
 .signed {

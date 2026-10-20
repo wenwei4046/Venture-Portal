@@ -9,7 +9,10 @@ export type RosterStatus = 'active' | 'inactive' | 'all'
 
 /** What a roster row carries that this needs. */
 export interface RosterPerson {
+  /** Their full name as the roster lists it — last name, then first (`fullNameOf`, 2026-10-20). */
   name: string
+  /** The full name on their IC, when it reads otherwise — the search finds them by it too. */
+  icName?: string | null
   code: string | null
   title: string | null
   department: string | null
@@ -37,13 +40,30 @@ export function rosterCounts(people: readonly RosterPerson[]) {
   }
 }
 
-/** Search (name, code, title, department or email) and the employment filter. */
-export function rosterMatches(p: RosterPerson, query: string, status: RosterStatus): boolean {
+/**
+ * Search (name — as listed or as on their IC — code, title, department or email), the employment filter and
+ * the department filter (2026-10-20, the user: "要多加一个 filter … 可以选 department"): '' is every department,
+ * `NO_DEPT` the people in none.
+ */
+export function rosterMatches(p: RosterPerson, query: string, status: RosterStatus, dept = ''): boolean {
   if (status === 'active' && !p.active) return false
   if (status === 'inactive' && p.active) return false
-  const q = query.trim().toLowerCase()
+  if (dept && (p.department ?? NO_DEPT) !== dept) return false
+  const q = query.trim().toLowerCase().replace(/\s+/g, ' ')
   if (!q) return true
-  return [p.name, p.code, p.title, p.department, p.accountEmail].some(v => (v ?? '').toLowerCase().includes(q))
+  return [p.name, p.icName, p.code, p.title, p.department, p.accountEmail].some(v => (v ?? '').toLowerCase().replace(/\s+/g, ' ').includes(q))
+}
+
+/** The department filter's choices: every department on the roster A→Z, none last, each with how many it holds. */
+export function rosterDepartments(people: readonly RosterPerson[]): Array<{ dept: string; count: number }> {
+  const counts = new Map<string, number>()
+  for (const p of people) {
+    const dept = p.department ?? NO_DEPT
+    counts.set(dept, (counts.get(dept) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => (a === NO_DEPT ? 1 : b === NO_DEPT ? -1 : a.localeCompare(b)))
+    .map(([dept, count]) => ({ dept, count }))
 }
 
 /**

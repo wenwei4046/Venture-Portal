@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CHINESE_SURNAMES, CHINESE_SYLLABLE, FATHERS_NAME_STARTS, greetingName, keptParts, nameParts } from './person-name'
+import { CHINESE_SURNAMES, CHINESE_SYLLABLE, FATHERS_NAME_STARTS, fullNameOf, greetingName, keptParts, nameParts } from './person-name'
 
 // The first name is the person's own, the last their surname (2026-10-17 — the user: "full name = loo wen wei, wen wei
 // ( first name ) , loo ( last name )"). The roster is written every way — surname first, an English name in front, an
@@ -76,5 +76,31 @@ describe('the greeting’s name', () => {
     expect(greetingName('GOH JOEY', 'Joey')).toBe('Joey')
     expect(greetingName('Principal')).toBe('Principal')
     expect(greetingName('LOO WEN WEI', '  ')).toBe('WEN WEI')
+  })
+})
+
+// People Management lists the full name (2026-10-20 — the user: "我要他的名字显示全名（也就是 Last Name 加 First Name）…
+// 点进去之后才分别看到他的 First Name 跟 Last Name"). Production's own rows, as HR keeps them.
+describe('the full name People Management lists', () => {
+  it('is the last name, then the first', () => {
+    expect(fullNameOf({ employee_name: 'CHEA HUAN', first_name: 'CHEA HUAN', last_name: 'Teoh' })).toBe('Teoh CHEA HUAN')
+    expect(fullNameOf({ employee_name: 'LOO WEN WEI', first_name: 'WEN WEI', last_name: 'LOO' })).toBe('LOO WEN WEI')
+    expect(fullNameOf({ employee_name: 'ANTHONY', first_name: 'ANTHONY', last_name: 'Lee Hong Chang' })).toBe('Lee Hong Chang ANTHONY')
+    expect(fullNameOf({ employee_name: 'RACHAEL LIM SHEUE LYNN', first_name: 'RACHAEL', last_name: 'LIM SHEUE LYNN' })).toBe('LIM SHEUE LYNN RACHAEL')
+  })
+
+  it('keeps a father’s name after the first, as the IC writes it', () => {
+    expect(fullNameOf({ employee_name: 'IZZUL BIN ISMAIL', first_name: 'IZZUL', last_name: 'BIN ISMAIL' })).toBe('IZZUL BIN ISMAIL')
+    expect(fullNameOf({ employee_name: 'x', first_name: 'SITI RAFIDAH', last_name: 'BINTI FADLULLAH TEY' })).toBe('SITI RAFIDAH BINTI FADLULLAH TEY')
+    expect(fullNameOf({ employee_name: 'x', first_name: 'NUR HAKIIMAH ZULAIKHA', last_name: 'SYED NOR HAKIM' })).toBe('NUR HAKIIMAH ZULAIKHA SYED NOR HAKIM')
+    expect(fullNameOf({ employee_name: 'x', first_name: 'KUMAR', last_name: 'a/l raj' })).toBe('KUMAR a/l raj')
+  })
+
+  it('is the one kept alone, else the full name on their IC', () => {
+    expect(fullNameOf({ employee_name: 'KRIS', first_name: 'KRIS', last_name: null })).toBe('KRIS')
+    expect(fullNameOf({ employee_name: 'MEI TING', first_name: '  ', last_name: 'LIM' })).toBe('LIM')
+    expect(fullNameOf({ employee_name: ' ESTHER  CHONG ', first_name: null, last_name: null })).toBe('ESTHER CHONG')
+    expect(fullNameOf({ employee_name: 'PETER' })).toBe('PETER')
+    expect(fullNameOf({ employee_name: 'x', first_name: ' CHEA  HUAN ', last_name: ' Teoh ' })).toBe('Teoh CHEA HUAN')
   })
 })

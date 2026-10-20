@@ -11,6 +11,9 @@ import {
   waitingAddDetail,
   waitingAddInputFrom,
   waitingAddRefusal,
+  waitingEditChangesFrom,
+  waitingEditPayload,
+  waitingEditRefusal,
 } from '@/lib/commission/waiting-add'
 import {
   FORM_KINDS,
@@ -50,6 +53,9 @@ import { loadMemberForm } from './_lib/waiting-form'
  * An applicant's signed form, in their drawer (2026-10-20): View and Download
  * (`viewSignedForm`, `signedFormDownload` — the key, as the list is read) and
  * Upload (`uploadSignedForm` — Member services · Edit and the key, as "+").
+ *
+ * The drawer's Edit (2026-10-20): `editWaitingApplicant` — the same gate as
+ * "+", only the fields that changed.
  *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
@@ -426,6 +432,27 @@ export async function uploadSignedForm(formData: FormData): Promise<SignedFormOu
       by: typeof kept.by === 'string' ? kept.by : null,
     },
   }
+}
+
+/**
+ * Edit, in an applicant's drawer (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"): their
+ * name, mobile number, joining date and who brought them in — only the fields the drawer changed (the logins are
+ * shared: a save never writes back what nobody touched). `member_waiting_edit` (mig 20261020210000) asks "+"'s
+ * two doors again, refuses somebody no longer on the list, a phone number already on it and a submitter from
+ * outside the department, and writes the step "Details edited · …" in the history.
+ */
+export async function editWaitingApplicant(requestId: string, raw: unknown): Promise<WaitingOutcome> {
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'member', 'manage')
+  if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
+  if (typeof requestId !== 'string' || !UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
+  const changes = waitingEditChangesFrom(raw)
+  if (!changes) return { ok: false, reason: 'Reload the page and try again.' }
+  const refused = waitingEditRefusal(changes)
+  if (refused) return { ok: false, reason: refused }
+  const { error } = await (await client()).rpc('member_waiting_edit', { p_request: requestId, p_changes: waitingEditPayload(changes) })
+  if (error) return { ok: false, reason: refusal(error, 'Their details could not be saved. Please try again.') }
+  revalidateWaiting()
+  return { ok: true }
 }
 
 /** Fail: they didn't come when called — off the waiting list, and the next moves up. */

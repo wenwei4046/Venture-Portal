@@ -26,6 +26,7 @@ const actions = vi.hoisted(() => ({
   uploadSignedForm: vi.fn(),
   viewSignedForm: vi.fn(),
   signedFormDownload: vi.fn(),
+  editWaitingApplicant: vi.fn(),
 }))
 vi.mock('../../../waiting-actions', () => actions)
 const convertToHtml = vi.hoisted(() => vi.fn())
@@ -348,6 +349,142 @@ describe('"+" — straight onto the list', () => {
 // 2026-10-20, the user, on JOAN QUEK XIAO's drawer: "i want here can be view for the letter they submit, then can
 // be upload as well, the file". The drawer holds the applicant's signed form: View, and Upload / Replace for
 // Member services · Edit.
+// 2026-10-20 — the user, circling the space beside the drawer's ×: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的";
+// and "submitted by … 应该要能选到 Revenue department 的全部人，不管什么 title".
+describe('Edit, in an applicant’s drawer', () => {
+  const SHAWN = '61b4c495-6b7d-442d-a391-31fe4cbe2d6a'
+  const KRIS = '7b6f1f0e-2a8d-4b1a-9a52-5c8a1e2b3c4d'
+  const submitters = [
+    { group: 'Fair', people: [{ id: SHAWN, name: 'SHAWN', title: 'Team Leader' }] },
+    { group: 'Revenue Department', people: [{ id: KRIS, name: 'KRIS', title: 'Revenue Director' }] },
+  ]
+  const joan = (over: Partial<SubDeptRequest> = {}) =>
+    req({
+      id: 'joan', requestNo: 'RQ-2610-002', newPerson: 'JOAN QUEK XIAO', contact: '018-776-0020', submittedBy: 'SHAWN', submittedById: SHAWN,
+      start: 'anytime', acceptedAt: '2026-10-20T04:41:25Z',
+      events: [{ to: 'waiting', at: '2026-10-20T04:41:25Z', note: 'Added on Sales Groups', by: 'LI SEAN' }],
+      ...over,
+    })
+  const open = (canAdd = true, row = joan()) => {
+    const view = show({ rows: [row], canAdd, submitters })
+    fireEvent.click(screen.getAllByRole('row')[1])
+    return { view, drawer: screen.getByRole('dialog') }
+  }
+  const save = (drawer: HTMLElement) => within(drawer).getByRole('button', { name: 'Save changes' })
+
+  it('is offered beside the × to whoever may use "+", and to nobody else', () => {
+    const { drawer } = open(false)
+    expect(within(drawer).queryByRole('button', { name: /Edit/ })).toBeNull()
+    cleanup()
+    const second = open(true).drawer
+    expect(within(second).getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+  })
+
+  it('opens the fields "+" asks, as the applicant is — Save waits for a change', () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    expect((within(drawer).getByLabelText('New member name') as HTMLInputElement).value).toBe('JOAN QUEK XIAO')
+    expect((within(drawer).getByLabelText('Mobile number') as HTMLInputElement).value).toBe('018-776-0020')
+    expect(within(drawer).getByLabelText('Joining date')).toBeDisabled()
+    expect(within(drawer).getByRole('checkbox', { name: 'Any time ready' })).toBeChecked()
+    expect((within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement).value).toBe(SHAWN)
+    expect(drawer).toHaveTextContent('Revenue · Fair')
+    expect(save(drawer)).toBeDisabled()
+    expect(drawer).toHaveTextContent('No changes yet')
+    expect(within(drawer).queryByRole('button', { name: 'Transfer' })).toBeNull()
+  })
+
+  it('offers the whole department for Submitted by — a Revenue Director too', () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    const by = within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement
+    expect([...by.querySelectorAll('optgroup')].map(g => g.label)).toEqual(['Fair', 'Revenue Department'])
+    expect([...by.options].map(o => o.textContent)).toEqual(['SHAWN · Team Leader', 'KRIS · Revenue Director'])
+  })
+
+  it('sends only what changed, says Saving… and closes once the fresh rows are in', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: true })
+    const { view, drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('Mobile number'), { target: { value: ' 018-776-0021 ' } })
+    fireEvent.change(within(drawer).getByRole('combobox', { name: /Submitted by/ }), { target: { value: KRIS } })
+    expect(within(drawer).getByLabelText('Mobile number').getAttribute('data-dirty')).toBe('true')
+    expect(within(drawer).getByLabelText('New member name').getAttribute('data-dirty')).toBeNull()
+    expect(drawer).toHaveTextContent('2 changes')
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).toHaveBeenCalledExactlyOnceWith('joan', { contact: '018-776-0021', submittedBy: KRIS })
+    expect(flash).toHaveBeenCalledWith('JOAN QUEK XIAO — details saved')
+    expect(within(drawer).getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    view.rerender(
+      <WaitingList
+        rows={[joan({ contact: '018-776-0021', submittedBy: 'KRIS', submittedById: KRIS })]}
+        subDeptName="Fair"
+        subSlug="fair"
+        form={{ ok: true, form: V1 }}
+        capacity={ROOM}
+        canTransfer
+        subOptions={['Fair', 'IR']}
+        canAdd
+        submitters={submitters}
+      />,
+    )
+    const fresh = screen.getByRole('dialog')
+    expect(within(fresh).queryByLabelText('Mobile number')).toBeNull()
+    expect(fresh).toHaveTextContent('018-776-0021')
+    expect(fresh).toHaveTextContent('KRIS')
+    expect(within(fresh).getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+  })
+
+  it('sends a day for Any time ready unticked, and back to Any time ready ticked', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: true })
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.click(within(drawer).getByRole('checkbox', { name: 'Any time ready' }))
+    expect(within(drawer).getByLabelText('Joining date')).not.toBeDisabled()
+    fireEvent.change(within(drawer).getByLabelText('Joining date'), { target: { value: '2026-12-01' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).toHaveBeenCalledExactlyOnceWith('joan', { start: '2026-12-01' })
+  })
+
+  it('keeps the edit open with the refusal in words, and Cancel puts the facts back', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: false, reason: 'This phone number is already on the waiting list, or waiting for review in Member services' })
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('Mobile number'), { target: { value: '019-464-6349' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('already on the waiting list')
+    expect((within(drawer).getByLabelText('Mobile number') as HTMLInputElement).value).toBe('019-464-6349')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Cancel' }))
+    expect(within(drawer).queryByLabelText('Mobile number')).toBeNull()
+    expect(drawer).toHaveTextContent('018-776-0020')
+  })
+
+  it('refuses a blank name before anything is sent', async () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('New member name'), { target: { value: '  ' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).not.toHaveBeenCalled()
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('Fill in new member name.')
+  })
+
+  it('keeps a submitter no longer in the department among the choices, by name', () => {
+    const { drawer } = open(true, joan({ submittedBy: 'GONE', submittedById: '11111111-2222-4333-8444-555555555555' }))
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    const by = within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement
+    expect(by.value).toBe('11111111-2222-4333-8444-555555555555')
+    expect(by.options[0].textContent).toBe('GONE')
+  })
+})
+
 describe('an applicant’s signed form', () => {
   const joan = (over: Partial<SubDeptRequest> = {}) =>
     req({
