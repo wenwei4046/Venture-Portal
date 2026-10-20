@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MemberMemo, MemberRequest } from "@/lib/member/types";
+import type { MemberIncome, MemberMemo, MemberRequest } from "@/lib/member/types";
 import { notifGroups, notifications } from "./notify-model";
 
 const request = (id: string, kind: MemberRequest["kind"], status: string): MemberRequest => ({
@@ -54,5 +54,19 @@ describe("what the database told them (2026-10-11, mig 20261011180000)", () => {
   it("a meeting is left out when Book a room is closed to them", () => {
     const { items } = notifications({ ...base, requests: [], memos: [], notices, opens: go => go.to !== "rooms" });
     expect(items.map(n => n.id)).toEqual(["nt-n2"]);
+  });
+});
+
+// 2026-10-20: a Revenue fixed salary is paid out of the commission — the settled month's news says so.
+describe("a settled month's commission", () => {
+  const settled: MemberIncome = {
+    schemeId: "s", period: "2026-09", status: "locked", personal: 16850.9, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0,
+    total: 16850.9, sales: 300000, groupSales: 0, deferred: 0, rank: "Rank B", rate: 0.06, kpis: [], brands: [],
+  };
+  it("pays the fixed salary from it, never beside it", () => {
+    const pay = (salary: number | null) => notifications({ ...base, requests: [], memos: [], settled, salary }).items.find(n => n.kind === "pay");
+    expect(pay(7000)).toMatchObject({ title: "September commission RM 16,850.90", sub: "Your fixed salary of RM 7,000.00 is paid from it." });
+    expect(pay(0)?.sub).toBe("Goes to payroll.");
+    expect(pay(null)?.sub).toBe("Goes to payroll.");
   });
 });

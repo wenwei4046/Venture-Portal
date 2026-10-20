@@ -137,7 +137,8 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
     items.push({
       id: `pay-${settled.period}`, kind: "pay", tab: "results", icon: ICON.nCash, time: "",
       title: `${month} commission ${rm2(settled.total)}`,
-      sub: input.salary !== null ? `Goes to payroll with your fixed salary of ${rm2(input.salary)}.` : "Goes to payroll with your fixed salary.",
+      // A Revenue fixed salary is paid out of the commission (2026-10-20), never beside it.
+      sub: input.salary ? `Your fixed salary of ${rm2(input.salary)} is paid from it.` : "Goes to payroll.",
       open: false, unread: !input.readAll, big: null, link: "Open My income", done: null, go: { to: "income" },
     });
   }

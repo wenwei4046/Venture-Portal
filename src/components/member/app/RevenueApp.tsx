@@ -724,13 +724,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     return { rank: standings.find(s => s.id === selfId)?.position ?? null, leader: standings.find(s => s.position === 1)?.name ?? null };
   }, [arenaToday, kpiRule, selfId]);
 
+  const todayPay = todayIncome?.month?.pay ?? null;
   const model = useMemo(() => todayModel({
-    today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden: hidden || incomeShut,
+    today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, pay: todayPay, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     team: director ? membership?.name : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
     metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
-  }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
+  }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
     now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, director]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──

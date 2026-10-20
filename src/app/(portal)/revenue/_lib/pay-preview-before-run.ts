@@ -86,6 +86,72 @@ export function previewWageWindow(
   return { daysInMonth, daysWorked, statutoryWages, basicForPcb: round2(num(staff.basic_salary) * daysWorked / daysInMonth) }
 }
 
+export type StatutoryLookup = (name: string, args: Record<string, unknown>) => Promise<unknown>
+
+/**
+ * The statutory schedule RPCs, read once per identical call: many
+ * full-commission team members share a zero wage, and salaried people often
+ * share the same band.
+ */
+export function statutoryLookup(supabase: SupabaseClient): StatutoryLookup {
+  const lookups = new Map<string, Promise<unknown>>()
+  return (name, args) => {
+    const key = JSON.stringify([name, args])
+    if (!lookups.has(key)) {
+      lookups.set(key, (async () => {
+        const { data, error } = await supabase.rpc(name, args)
+        if (error) throw new Error(`Could not read ${name}: ${error.message}`)
+        return data
+      })())
+    }
+    return lookups.get(key)!
+  }
+}
+
+/** One person's EPF / SOCSO / EIS, both shares, and PCB, as the schedules give them. */
+export interface ScheduleStatutory {
+  epfEr: number
+  epfEe: number
+  socsoEr: number
+  socsoEe: number
+  eisEr: number
+  eisEe: number
+  pcb: number
+}
+
+/**
+ * The schedules' contributions on a person's statutory wage for the month,
+ * and the PCB on their basic after employee EPF — the lookups
+ * `compute_hr_monthly_payroll` makes, dated the month as revenue_pay_preview
+ * dates them. No wage, no contribution and no call.
+ */
+export async function scheduleStatutory(
+  lookup: StatutoryLookup,
+  person: Pick<StaffRow, 'epf_category' | 'socso_category' | 'pcb_category' | 'children_count' | 'is_epf_exempt' | 'tax_mode'>,
+  window: { statutoryWages: number; basicForPcb: number },
+  period: string,
+): Promise<ScheduleStatutory> {
+  async function contribution(name: string, args: Record<string, unknown>): Promise<Contribution> {
+    const result = await lookup(name, args)
+    return (Array.isArray(result) ? result[0] : result) as Contribution ?? zero
+  }
+  const args = { p_wages: window.statutoryWages, p_period: period }
+  const [epf, socso, eis] = await Promise.all([
+    window.statutoryWages > 0 && !person.is_epf_exempt
+      ? contribution('lookup_epf', { ...args, p_part: person.epf_category }) : zero,
+    window.statutoryWages > 0 ? contribution('lookup_socso', { ...args, p_category: person.socso_category }) : zero,
+    window.statutoryWages > 0 ? contribution('lookup_eis', args) : zero,
+  ])
+  const pcb = person.tax_mode === 'pcb' ? num(await lookup('lookup_pcb', {
+    p_income: Math.max(window.basicForPcb - num(epf.employee), 0),
+    p_category: person.pcb_category, p_children: person.children_count, p_period: period,
+  }) as Num) : 0
+  return {
+    epfEr: num(epf.employer), epfEe: num(epf.employee), socsoEr: num(socso.employer), socsoEe: num(socso.employee),
+    eisEr: num(eis.employer), eisEe: num(eis.employee), pcb,
+  }
+}
+
 /**
  * The existing pay RPC starts from saved statements. Before the first run,
  * read the effective team and supply its exact same salary inputs using the
@@ -130,40 +196,13 @@ export async function loadPayBeforeRun(
   const elsewhereByPerson = new Map<string, number>()
   for (const row of elsewhere) elsewhereByPerson.set(row.staff_id, (elsewhereByPerson.get(row.staff_id) ?? 0) + num(row.total_commission))
 
-  // Many full-commission team members share a zero wage, and salaried people
-  // often share the same band. Reuse identical read-only statutory lookups.
-  const lookups = new Map<string, Promise<unknown>>()
-  function lookup(name: string, args: Record<string, unknown>): Promise<unknown> {
-    const key = JSON.stringify([name, args])
-    if (!lookups.has(key)) {
-      lookups.set(key, (async () => {
-        const { data, error } = await supabase.rpc(name, args)
-        if (error) throw new Error(`Could not read ${name}: ${error.message}`)
-        return data
-      })())
-    }
-    return lookups.get(key)!
-  }
-  async function contribution(name: string, args: Record<string, unknown>): Promise<Contribution> {
-    const result = await lookup(name, args)
-    return (Array.isArray(result) ? result[0] : result) as Contribution ?? zero
-  }
+  const lookup = statutoryLookup(supabase)
 
   const preview = await Promise.all(staff.map(async person => {
     const pay = payrollByPerson.get(person.id)
     const salary = payrollSalary(person, pay)
     const window = previewWageWindow(period, { ...person, basic_salary: salary.basic, allowances: salary.statutoryAllowance }, pay)
-    const args = { p_wages: window.statutoryWages, p_period: period }
-    const [epf, socso, eis] = await Promise.all([
-      window.statutoryWages > 0 && !person.is_epf_exempt
-        ? contribution('lookup_epf', { ...args, p_part: person.epf_category }) : zero,
-      window.statutoryWages > 0 ? contribution('lookup_socso', { ...args, p_category: person.socso_category }) : zero,
-      window.statutoryWages > 0 ? contribution('lookup_eis', args) : zero,
-    ])
-    const pcb = person.tax_mode === 'pcb' ? num(await lookup('lookup_pcb', {
-      p_income: Math.max(window.basicForPcb - num(epf.employee), 0),
-      p_category: person.pcb_category, p_children: person.children_count, p_period: period,
-    }) as Num) : 0
+    const statutory = await scheduleStatutory(lookup, person, window, period)
     return {
       staff_id: person.id, employee_name: person.employee_name, employee_code: person.employee_code,
       designation: person.designation, employment_type: person.employment_type,
@@ -172,8 +211,8 @@ export async function loadPayBeforeRun(
       deduction_amount: num(pay?.deduction_amount), skbbk_amount: num(pay?.skbbk_amount), unpaid_leave_days: num(pay?.unpaid_leave_days),
       days_worked: window.daysWorked, days_in_month: window.daysInMonth,
       tax_mode: person.tax_mode, withholding_rate: num(person.withholding_rate), statutory_wages: round2(window.statutoryWages),
-      epf_er: num(epf.employer), epf_ee: num(epf.employee), socso_er: num(socso.employer), socso_ee: num(socso.employee),
-      eis_er: num(eis.employer), eis_ee: num(eis.employee), pcb,
+      epf_er: statutory.epfEr, epf_ee: statutory.epfEe, socso_er: statutory.socsoEr, socso_ee: statutory.socsoEe,
+      eis_er: statutory.eisEr, eis_ee: statutory.eisEe, pcb: statutory.pcb,
       commission_here: 0, commission_elsewhere: elsewhereByPerson.get(person.id) ?? 0,
       payroll_exists: Boolean(pay), payroll_status: pay?.status ?? null, payroll_source: pay?.source ?? null,
       payroll_commission: pay?.commission_amount ?? null, payroll_adjustment: num(pay?.commission_adjustment_amount),
