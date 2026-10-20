@@ -23,7 +23,7 @@ import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-inpu
 import { previewWageWindow, scheduleStatutory, statutoryLookup } from "@/app/(portal)/revenue/_lib/pay-preview-before-run";
 import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
-import { WORD_DOC, WORD_DOCX, WORD_MACROS_REFUSAL, letterKind } from "@/lib/commission/waiting-add";
+import { SIGNED_FORM_KINDS, WORD_DOC, WORD_DOCX, WORD_MACROS_REFUSAL, letterKind } from "@/lib/commission/waiting-add";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import { ANY_TIME, isAnyTime } from "./waiting-start";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
@@ -1064,7 +1064,7 @@ async function verifiedUpload(form: FormData, fieldName: string, noun: string, w
   if (word) {
     const kind = letterKind(bytes, file.type);
     if (kind === "macros") throw new Error(WORD_MACROS_REFUSAL);
-    if (!kind) throw new Error(`The ${noun} must be a PDF, Word, JPG or PNG file.`);
+    if (!kind) throw new Error(`The ${noun} must be ${SIGNED_FORM_KINDS}.`);
     return { bytes, mime: kind.mime, extension: kind.extension, name: file.name.slice(0, 200) };
   }
   let mime = "",

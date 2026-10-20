@@ -494,10 +494,10 @@ describe('a member sends a request', () => {
       expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
     })
 
-    it('refuses a signed form that is not a PDF, Word, JPG or PNG', async () => {
+    it('refuses a signed form that is not a PDF, Word, PNG or JPG', async () => {
       const data = waitingForm()
       data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
-      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed application form must be a PDF, Word, JPG or PNG file.' })
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed application form must be a PDF, Word, PNG or JPG file.' })
       mocks.rpc.mockReset()
     })
 
@@ -590,10 +590,10 @@ describe('a member sends a request', () => {
       expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
     })
 
-    it('refuses a signed form that is not a PDF, Word, JPG or PNG, in the replacement’s words', async () => {
+    it('refuses a signed form that is not a PDF, Word, PNG or JPG, in the replacement’s words', async () => {
       const data = replacementForm()
       data.set('signedForm', new File(['GIF89a'], 'form.gif', { type: 'image/gif' }))
-      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed replacement form must be a PDF, Word, JPG or PNG file.' })
+      expect(await submitMemberRequest(data)).toEqual({ ok: false, error: 'The signed replacement form must be a PDF, Word, PNG or JPG file.' })
       mocks.rpc.mockReset()
     })
 
