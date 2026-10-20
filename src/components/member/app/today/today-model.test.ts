@@ -77,24 +77,52 @@ describe("the income hero", () => {
 
   // 2026-10-20 — the user, of CHEA HUAN's "RM 16,746.00 · Fixed salary RM 7,000.00 + commission RM 9,746.00":
   // "the basic is deduct from the commission … you can get it from hr code base"; HR's EPF / SOCSO / PCB count.
+  // Then, of "RM 8,063.49 · Net basic RM 5,854.50 + balance commission RM 2,208.99": "i want his show gross
+  // basic, not net" — asked, the user chose the hero RM 9,208.99 (basic + balance) over keeping RM 8,063.49.
   describe("the fixed salary comes out of the commission, as payroll pays it", () => {
     const salary = salaryFromSchedule(7000, { daysWorked: 31, daysInMonth: 31 },
       { epfEr: 840, epfEe: 770, socsoEr: 104.15, socsoEe: 29.75, eisEr: 11.9, eisEe: 11.9, pcb: 333.85 });
     const payOf = (commission: number) => memberPay({ commission, elsewhere: 0, payLines: [], salary, taxMode: "pcb", withholdingRate: 0.02 });
     const october = { ...base, today: "2026-10-19", salary: 7000, income: { period: "2026-10", status: "computed", total: 9746 } };
 
-    it("is what reaches the bank — net basic + balance commission — never the salary on top", () => {
+    it("names the basic as it stands, never net — the hero is basic + balance commission, never the salary on top", () => {
       const m = todayModel({ ...october, pay: payOf(9746) });
       expect(m.heroLabel).toBe("October · Estimated income");
-      expect(m.heroAmount).toBe("RM 7,644.45");
-      expect(m.heroSplit).toBe("Net basic RM 5,854.50 + balance commission RM 1,789.95");
+      expect(m.heroAmount).toBe("RM 8,789.95");
+      expect(m.heroSplit).toBe("Basic RM 7,000.00 + balance commission RM 1,789.95");
     });
 
-    it("says when the commission does not cover the fixed salary yet, and draws the minus with the figure", () => {
+    it("is HR's gross — the commission less the employer's EPF / SOCSO / EIS; the member's own and the PCB are not off it", () => {
+      const pay = payOf(9746);
+      expect(pay.employer).toBe(956.05);
+      expect(todayModel({ ...october, pay }).heroAmount).toBe("RM 8,789.95"); // 9,746 − 956.05
+      expect(pay.net).toBe(7644.45); // My income's Total: 8,789.95 − 770 − 29.75 − 11.90 − 333.85
+      // A PCB HR types moves what reaches the bank, not the basic + balance.
+      const typed = memberPay({ commission: 9746, elsewhere: 0, payLines: [], salary: { ...salary, pcb: 930 }, taxMode: "pcb", withholdingRate: 0.02 });
+      expect(todayModel({ ...october, pay: typed }).heroAmount).toBe("RM 8,789.95");
+    });
+
+    it("a commission that does not cover the fixed salary yet reads its real negative in the balance", () => {
       const m = todayModel({ ...october, income: { ...october.income, total: 2000 }, pay: payOf(2000) });
-      expect(m.heroAmount).toBe("−RM 101.55");
-      expect(m.heroSplit).toBe("Net basic RM 5,854.50 + balance commission −RM 5,956.05");
-      expect(amountParts(m.heroAmount)).toEqual({ cur: "RM", num: "−101.55" });
+      expect(m.heroAmount).toBe("RM 1,043.95");
+      expect(m.heroSplit).toBe("Basic RM 7,000.00 + balance commission −RM 5,956.05");
+    });
+
+    it("draws the minus with the figure when the commission does not even cover the employer's EPF / SOCSO / EIS", () => {
+      const m = todayModel({ ...october, income: { ...october.income, total: 500 }, pay: payOf(500) });
+      expect(m.heroAmount).toBe("−RM 456.05");
+      expect(m.heroSplit).toBe("Basic RM 7,000.00 + balance commission −RM 7,456.05");
+      expect(amountParts(m.heroAmount)).toEqual({ cur: "RM", num: "−456.05" });
+    });
+
+    it("a basic for part of the month is the part paid", () => {
+      const joined = salaryFromSchedule(7000, { daysWorked: 10, daysInMonth: 31 },
+        { epfEr: 0, epfEe: 0, socsoEr: 0, socsoEe: 0, eisEr: 0, eisEe: 0, pcb: 0 });
+      const pay = memberPay({ commission: 9746, elsewhere: 0, payLines: [], salary: joined, taxMode: "pcb", withholdingRate: 0.02 });
+      const m = todayModel({ ...october, pay });
+      // 7,000 × 0.322581 (10 ÷ 31 to six decimals, as the trigger keeps it)
+      expect(m.heroSplit).toBe("Basic RM 2,258.07 + balance commission RM 7,487.93");
+      expect(m.heroAmount).toBe("RM 9,746.00");
     });
 
     it("no fixed salary: the commission, after whatever payroll takes", () => {

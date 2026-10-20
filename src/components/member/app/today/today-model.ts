@@ -29,8 +29,9 @@ export interface TodayInput {
   /**
    * What the month pays, as HR's payroll pays it (2026-10-20): the fixed
    * salary is paid OUT OF the commission, with every EPF / SOCSO / EIS and the
-   * PCB — HR's figures (`lib/member/income-pay.ts`). The hero is what reaches
-   * the bank: net basic + balance commission. Absent (the demo): the salary
+   * PCB — HR's figures (`lib/member/income-pay.ts`). The hero is the basic as
+   * it stands + the balance commission, the member's own EPF / SOCSO / EIS and
+   * PCB not yet off (My income takes them off). Absent (the demo): the salary
    * and the commission as they are.
    */
   pay?: MemberPay | null;
@@ -279,6 +280,14 @@ export function amountParts(amount: string): { cur: string; num: string } {
 const rmSigned = (n: number) => (n < 0 ? `−${rm2(-n)}` : rm2(n));
 
 /**
+ * The hero's figure (2026-10-20, the user: "i want his show gross basic, not
+ * net"): the basic as it stands + the balance commission — HR's gross, the
+ * member's own EPF / SOCSO / EIS and PCB not yet off. Without a fixed salary,
+ * what payroll pays.
+ */
+const heroPay = (pay: MemberPay) => (pay.fixed > 0 ? Math.round((pay.fixed + pay.balance) * 100) / 100 : pay.net);
+
+/**
  * The income card as the eye hides it — and as My income closed keeps it
  * (2026-10-11). The preview's figures are written out, not worked out, so it
  * hides them through this too.
@@ -295,20 +304,21 @@ export function todayModel(input: TodayInput, championRank: number | null = null
   const month = income ? monthName(income.period) : monthName(input.today.slice(0, 7));
   const dept = input.department;
   const pending = input.incomeStatus;
-  // HR's pay (2026-10-20): the fixed salary comes out of the commission, never on top of it.
+  // HR's pay (2026-10-20): the fixed salary comes out of the commission, never on top of it — and is
+  // named as it stands, not net of the member's own deductions.
   const pay = commission === null ? null : input.pay ?? null;
   return {
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
     heroAmount: input.hidden ? HIDDEN_AMOUNT : pending ? "RM —" : dept ? rm2(commission ?? 0)
-      : pay ? rmSigned(pay.net) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+      : pay ? rmSigned(heroPay(pay)) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroLoading: !input.hidden && pending === "loading",
     heroSplit: input.hidden ? HIDDEN_SPLIT
       : pending === "loading" ? `Working out ${month}'s commission…`
       : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
-      : pay ? (pay.fixed > 0 ? `Net basic ${rmSigned(pay.netBasic)} + balance commission ${rmSigned(pay.balance)}` : "Commission only")
+      : pay ? (pay.fixed > 0 ? `Basic ${rm2(pay.fixed)} + balance commission ${rmSigned(pay.balance)}` : "Commission only")
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
     metrics: input.metricsLoading && !input.insight ? LOADING_METRICS
