@@ -20,6 +20,22 @@ export interface RequestEvent {
   by: string | null
 }
 
+/**
+ * An applicant's signed application form (2026-10-20, the user: "view for the letter they submit, then can be
+ * upload as well"): the file a member sent with Submit waiting list, or HR attached with "+" or in the drawer —
+ * the one the request names now (mig 20261020130000).
+ */
+export interface SignedForm {
+  /** As its sender's file was named. */
+  name: string
+  /** application/pdf · image/png · image/jpeg. */
+  type: string
+  /** When it was uploaded. */
+  at: string
+  /** Who uploaded it: a staff name, or their login's role ("HR"). */
+  by: string | null
+}
+
 export interface SubDeptRequest {
   id: string
   requestNo: string | null
@@ -47,6 +63,8 @@ export interface SubDeptRequest {
   target: string | null
   /** When HR accepted the applicant onto the waiting list. */
   acceptedAt: string | null
+  /** Waiting list: the signed form on file, or null (none yet, or read before mig 20261020130000). */
+  signedForm?: SignedForm | null
   events: RequestEvent[]
 }
 
@@ -111,6 +129,12 @@ export function addedHere(r: Pick<SubDeptRequest, 'kind' | 'events'>): boolean {
 }
 
 /**
+ * The note `member_waiting_attach_form` puts on its step (mig 20261020130000): HR uploaded the signed form in the
+ * applicant's drawer — "Signed form uploaded · <file>". A step with no move: the status stays as it was.
+ */
+export const FORM_UPLOADED = 'Signed form uploaded'
+
+/**
  * The history a person reads: one step per status it moved to. The database
  * writes a status change once from the app and, on some paths, once more from
  * its own trigger; the same move a second later is the same step. A member's
@@ -118,6 +142,8 @@ export function addedHere(r: Pick<SubDeptRequest, 'kind' | 'events'>): boolean {
  * (the handoff: "Changed: phone number, preferred start date"). A draft is
  * nobody's step: it is the request being written. HR's "+" puts somebody on
  * the list without a member ever sending it — "Added to the waiting list".
+ * A signed form HR uploads in the drawer is a step of its own too (2026-10-20),
+ * its note the file's name.
  */
 export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent & { what: string }> {
   const out: Array<RequestEvent & { what: string }> = []
@@ -125,13 +151,16 @@ export function historyOf(events: readonly RequestEvent[]): Array<RequestEvent &
   for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at) || order(a) - order(b))) {
     if (e.to === 'draft') continue
     const updated = e.to === 'submitted' && !!e.note && e.note.startsWith(UPDATED)
+    const uploaded = !!e.note && e.note.startsWith(`${FORM_UPLOADED} · `)
     const last = out[out.length - 1]
-    if (last && last.to === e.to && !updated) {
+    if (last && last.to === e.to && !updated && !uploaded) {
       if (!last.by && e.by) last.by = e.by
       if (!last.note && e.note) last.note = e.note
       continue
     }
-    if (updated) {
+    if (uploaded) {
+      out.push({ ...e, what: FORM_UPLOADED, note: e.note!.slice(FORM_UPLOADED.length + 3) || null })
+    } else if (updated) {
       const changed = e.note!.slice(UPDATED.length).replace(/^\s*·\s*/, '')
       out.push({ ...e, what: UPDATED, note: changed ? `Changed: ${changed}` : null })
     } else if (e.to === 'waiting' && e.note === ADDED_NOTE) {

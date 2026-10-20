@@ -8,7 +8,7 @@ import { Drawer } from '@/components/hrv/overlay'
 import { Chevron } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { revenuePath } from '@/lib/revenue'
-import { addedHere, dayLabel, historyOf, joiningDayLabel, shortDay, waitingList, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
+import { addedHere, dayLabel, historyOf, joiningDayLabel, shortDay, waitingList, type SignedForm, type SubDeptRequest } from '@/lib/commission/sales-group-requests'
 import { isAnyTime } from '@/lib/member/waiting-start'
 import type { WaitingForm } from '@/lib/commission/waiting-form'
 import type { SubmitterGroup } from '@/lib/commission/waiting-add'
@@ -16,6 +16,7 @@ import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
 import { failWaitingApplicant } from '../../../waiting-actions'
 import MemberFormTools from './MemberFormTools'
 import AddToWaitingList from './AddToWaitingList'
+import SignedFormPanel from './SignedFormPanel'
 import s from './sales-groups.module.css'
 import w from './waiting.module.css'
 
@@ -30,6 +31,10 @@ import w from './waiting.module.css'
 // "+" (2026-10-11, the user) first in the row puts somebody straight onto the
 // list — at the end, as if accepted today. Such a row was never sent by a
 // member: its drawer says who added it instead of who signed.
+//
+// The drawer holds the applicant's SIGNED FORM (2026-10-20, the user: "view
+// for the letter they submit, then can be upload as well"): View, and — for
+// Member services · Edit, as "+" — Upload, or Replace (`SignedFormPanel`).
 
 const COLS = '56px minmax(0,1.5fr) minmax(0,1fr) 140px 140px 28px'
 
@@ -60,13 +65,22 @@ export default function WaitingList({
   subDepartmentId?: string
   /** "Submitted by": the Revenue team, this sub-department first. */
   submitters?: SubmitterGroup[]
-  /** Member services · Edit: "+" is drawn. */
+  /** Member services · Edit: "+" is drawn, and a signed form is uploaded in the drawer. */
   canAdd?: boolean
 }) {
   const router = useRouter()
   const list = waitingList(rows)
   const [openId, setOpenId] = useState<string | null>(null)
   const open = list.find(r => r.id === openId) ?? null
+
+  // A signed form uploaded here shows at once, until the page's next answer (which names it) catches up.
+  const [seenRows, setSeenRows] = useState(rows)
+  const [uploaded, setUploaded] = useState<Record<string, SignedForm>>({})
+  if (seenRows !== rows) {
+    setSeenRows(rows)
+    setUploaded({})
+  }
+  const signedForm = open ? (uploaded[open.id] ?? open.signedForm ?? null) : null
 
   const [confirmFail, setConfirmFail] = useState(false)
   const [failing, setFailing] = useState(false)
@@ -213,6 +227,15 @@ export default function WaitingList({
                       { l: 'Accepted', v: open.acceptedAt ? `${dayLabel(open.acceptedAt)} · Member services` : '—' },
                     ]
               }
+            />
+            <SecLabel style={{ margin: '22px 0 10px' }}>Signed form</SecLabel>
+            <SignedFormPanel
+              key={open.id}
+              requestId={open.id}
+              applicant={open.newPerson ?? 'The applicant'}
+              form={signedForm}
+              canUpload={canAdd}
+              onUploaded={form => setUploaded(all => ({ ...all, [open.id]: form }))}
             />
             <SecLabel style={{ margin: '22px 0 10px' }}>Action history</SecLabel>
             <div>

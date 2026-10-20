@@ -3,7 +3,14 @@
 import { useCallback, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { TEMPLATE_ACCEPT, templateRefusal, type MemberFormKind, type WaitingForm } from '@/lib/commission/waiting-form'
-import { removeFormTemplate, uploadReplacementFormTemplate, uploadWaitingFormTemplate } from '../../../waiting-actions'
+import {
+  removeFormTemplate,
+  replacementFormTemplateLink,
+  uploadReplacementFormTemplate,
+  uploadWaitingFormTemplate,
+  viewFormTemplate,
+  waitingFormTemplateLink,
+} from '../../../waiting-actions'
 import type { MenuAnchor } from './ContextMenuPanel'
 import FormFileIcon from './FormFileIcon'
 import FormFileMenu from './FormFileMenu'
@@ -18,14 +25,16 @@ import w from './waiting.module.css'
 // chip has a right-click menu (2026-10-14): View and Remove — and since
 // 2026-10-15 the chip is the file's icon, its name in the tooltip.
 
-const WORDS: Readonly<Record<MemberFormKind, { title: string; uploaded: (name: string) => string }>> = {
+const WORDS: Readonly<Record<MemberFormKind, { title: string; uploaded: (name: string) => string; list: string }>> = {
   waiting: {
     title: 'Upload the application form Revenue members download',
     uploaded: name => `Form uploaded — the waiting-list application is now ${name}`,
+    list: 'Waiting list',
   },
   replacement: {
     title: 'Upload the replacement form Revenue members download',
     uploaded: name => `Replacement form uploaded — Revenue members now download ${name}`,
+    list: 'Replacement list',
   },
 }
 
@@ -189,7 +198,15 @@ export default function MemberFormTools({
           onKeyClose={focusChip}
         />
       ) : null}
-      {viewing ? <FormFileViewer kind={kind} name={viewing} onClose={() => setViewing(null)} /> : null}
+      {viewing ? (
+        <FormFileViewer
+          kicker={`${WORDS[kind].list} · Uploaded form`}
+          name={viewing}
+          open={() => viewFormTemplate(kind)}
+          download={() => (kind === 'replacement' ? replacementFormTemplateLink() : waitingFormTemplateLink())}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
     </>
   )
 }

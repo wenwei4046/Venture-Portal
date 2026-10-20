@@ -307,13 +307,19 @@ export function templateObjectPath(name: string, id: string): string {
  */
 export type TemplateView = 'pdf' | 'image' | 'word' | 'html' | 'none'
 
-export function templateView(name: string): TemplateView {
+/**
+ * An applicant's signed form (2026-10-20) is named as its sender's file was, which may say nothing of its kind;
+ * the bucket kept its type — a PDF, PNG or JPEG.
+ */
+const TYPE_KIND: Readonly<Record<string, 'pdf' | 'image'>> = { 'application/pdf': 'pdf', 'image/png': 'image', 'image/jpeg': 'image' }
+
+export function templateView(name: string, type?: string | null): TemplateView {
   const ext = name.toLowerCase().split('.').pop() ?? ''
   if (ext === 'pdf') return 'pdf'
   if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'image'
   if (ext === 'docx') return 'word'
   if (ext === 'html') return 'html'
-  return 'none'
+  return (type && TYPE_KIND[type]) || 'none'
 }
 
 /**
@@ -323,13 +329,13 @@ export function templateView(name: string): TemplateView {
  */
 export type TemplateIcon = 'word' | 'pdf' | 'image' | 'html' | 'file'
 
-export function templateIcon(name: string): TemplateIcon {
+export function templateIcon(name: string, type?: string | null): TemplateIcon {
   const ext = name.toLowerCase().split('.').pop() ?? ''
   if (ext === 'doc' || ext === 'docx') return 'word'
   if (ext === 'pdf') return 'pdf'
   if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'image'
   if (ext === 'html') return 'html'
-  return 'file'
+  return (type && TYPE_KIND[type]) || 'file'
 }
 
 /** A Word file as mammoth reads it (its words, tables and pictures) on a white page, for the frame's `srcDoc`. */
