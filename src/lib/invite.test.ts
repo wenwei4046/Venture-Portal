@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailRefusal,
+  fullAccessHeld,
+  fullAccessTemplate,
   generatePassword,
   inviteBlocker,
   isTokenHash,
@@ -112,5 +114,23 @@ describe('the invite link (2026-10-16)', () => {
     expect([...pendingLogins([{ user_id: 'a', pending: true }, { user_id: 'b', pending: false }, { pending: true }, null])]).toEqual(['a'])
     expect(pendingLogins(null).size).toBe(0)
     expect(pendingLogins({ user_id: 'a', pending: true }).size).toBe(0)
+  })
+})
+
+// HR invites since 2026-10-20 — a full-access title only from whoever manages permissions (account_attach_login says the same).
+describe('a full-access title (2026-10-20)', () => {
+  it('is the Principal’s kind, or a template that manages permissions', () => {
+    expect(fullAccessTemplate('principal', false)).toBe(true)
+    expect(fullAccessTemplate('staff', true)).toBe(true)
+    expect(fullAccessTemplate('hr', false)).toBe(false)
+    expect(fullAccessTemplate('revenue_member', false)).toBe(false)
+    expect(fullAccessTemplate(null, false)).toBe(false)
+  })
+
+  it('says why in the database’s own words', () => {
+    expect(fullAccessHeld('DIRECTOR', 'Ultimate full access')).toBe(
+      'DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions gives it a login.',
+    )
+    expect(fullAccessHeld(null, 'Full access')).toMatch(/^Their title is a full-access title/)
   })
 })

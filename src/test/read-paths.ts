@@ -206,6 +206,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
 export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // People › Invite user (mig 20261016170000): which logins have an invite link not used yet — auth.users, Logins & invites · View.
   'account_invite_states',
+  // …and the login itself (mig 20261020190000): the portal user, put on the person — Permissions · Create.
+  'account_attach_login',
   'adjust_revenue_payroll_commission', 'amend_fund_source', 'amend_fund_source_from', 'amend_issued_invoice', 'amend_loan',
   'amend_loan_from', 'amend_loan_repayment', 'amend_loan_repayment_date', 'amend_voucher_date', 'approve_dept_payment_expense',
   'approve_payroll_run', 'approve_single_voucher', 'approve_voucher_batch', 'approve_voucher_batch_partial', 'audit_changes', 'audit_overview',

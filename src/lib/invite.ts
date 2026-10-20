@@ -81,6 +81,22 @@ export function generatePassword(random: () => number = Math.random): string {
   return out
 }
 
+/**
+ * A FULL-ACCESS title's template (2026-10-20): the Principal's kind, or one that ticks Manage permissions — a
+ * login on it can do everything, or give itself anything. Since HR may invite (Permissions · Create), such a
+ * title is given a login only by whoever manages permissions: the inviter types the email and may set the
+ * password, so the login would be the inviter's own (a side agent's note the user passed on).
+ * `account_attach_login` refuses the same in the database.
+ */
+export function fullAccessTemplate(baseRole: string | null | undefined, managesPermissions: boolean): boolean {
+  return baseRole === 'principal' || managesPermissions
+}
+
+/** Why an inviter who does not manage permissions cannot give this title a login — the database's words. */
+export function fullAccessHeld(title: string | null | undefined, template: string): string {
+  return `${title || 'Their title'} is a full-access title (${template}): only whoever manages permissions gives it a login.`
+}
+
 export function validateInvite(raw: RawInvite): ValidInvite {
   const staffId = (raw.staffId ?? '').trim()
   if (!staffId || !UUID.test(staffId)) throw new Error('Pick somebody from the roster')
