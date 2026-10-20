@@ -200,8 +200,9 @@ export function DeskAside({ active, count, notifOpen, me, products, it, modules,
   /** The Product List row under its group label — only for an account holding `product_list`. */
   products?: { group: string; onOpen: () => void } | null;
   /**
-   * IT requests (2026-10-20 — the user: "as Revenue Director 的 view，或者像更大职位 log in 进去的时候，左边这里 category 就会
-   * 多一个 IT request"): everybody's, for IT requests · View — under the Product List's group label, its New ones counted.
+   * IT requests (2026-10-20 — the user: "log in 进去的时候，左边这里 category 就会多一个 IT request" … "just principal or
+   * ulitmate full access"): everybody's, for IT requests · View — under the Product List's group label, its New ones
+   * counted.
    */
   it?: { group: string; count: number; on: boolean; onOpen: () => void } | null;
   /** The module switcher — a Principal's, who can open the other modules. */

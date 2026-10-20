@@ -1,6 +1,7 @@
 // Local PostgreSQL regression for 20261021020100 (2026-10-20 — the user: "i want add on a button to get submit for IT
 // support or help"; everybody sends a title, the details, screenshots or files, as a bug, a new feature or a suggestion;
-// "as Revenue Director 的 view … 左边这里 category 就会多一个 IT request"; "我们也可以帮做 annotation … 他也能看到自己
+// everybody's in a list for the Principal and Ultimate full access ("change to just principal or ulitmate full access
+// permission user log in can view"); "我们也可以帮做 annotation … 他也能看到自己
 // submit 的 case status。如果我们给它 fix 了，他那边就可以收到 fix 的通知"). The migration runs VERBATIM, twice, over
 // stand-ins for the sign-in, the people, the permission check, the storage schema and the notices (production's
 // notify_people and notify_topic bodies). No live I/O.
@@ -21,7 +22,7 @@ const refuses = async (sql, params, pattern, what) => {
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
 
 const SENDER = id(1) // CHEA HUAN, a Team Leader — no cell: sends and follows their own
-const DESK = id(2) // PETER, the Revenue Director — IT requests · View and Edit
+const DESK = id(2) // ANTHONY, the CEO (Ultimate full access) — IT requests · View and Edit
 const VIEWER = id(3) // IT requests · View only
 const OTHER = id(4) // a colleague with no cell
 const GONE = id(5) // switched off
@@ -107,11 +108,11 @@ await db.exec(`
 `)
 await db.exec(`
   INSERT INTO public.users (id, name, email, is_active) VALUES
-    ('${SENDER}', 'Chea Huan login', 'chea@x.my', true), ('${DESK}', 'Peter login', 'peter@x.my', true),
+    ('${SENDER}', 'Chea Huan login', 'chea@x.my', true), ('${DESK}', 'Anthony login', 'anthony@x.my', true),
     ('${VIEWER}', NULL, 'viewer@x.my', true), ('${OTHER}', 'Other', 'other@x.my', true), ('${GONE}', 'Gone', 'gone@x.my', false);
-  INSERT INTO public.titles (id, name) VALUES ('${id(31)}', 'Team Leader'), ('${id(32)}', 'Revenue Director');
+  INSERT INTO public.titles (id, name) VALUES ('${id(31)}', 'Team Leader'), ('${id(32)}', 'CHIEF EXECUTIVE OFFICER');
   INSERT INTO public.hr_staff_costs (employee_name, user_id, title_id) VALUES
-    ('CHEA HUAN', '${SENDER}', '${id(31)}'), ('PETER', '${DESK}', '${id(32)}'), ('OTHER ONE', '${OTHER}', NULL);
+    ('CHEA HUAN', '${SENDER}', '${id(31)}'), ('ANTHONY', '${DESK}', '${id(32)}'), ('OTHER ONE', '${OTHER}', NULL);
 `)
 
 const file = (await readFile(new URL('20261021020100_it_requests.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
@@ -218,8 +219,8 @@ await clearNotices()
 await as(DESK, EDIT, 'authenticated')
 await refuses(`SELECT public.it_request_note($1, 'x', '[]', 'done')`, [r1.id], /Pick a status/, 'a status of the four')
 const r3 = await note(r1.id, 'Looking at it.', [], 'in_progress')
-check([r3.status, r3.statusByName], ['in_progress', 'PETER'], 'in progress, by whom')
-check(r3.notes.at(-1), { ...r3.notes.at(-1), side: 'it', authorName: 'PETER', body: 'Looking at it.', statusFrom: 'new', statusTo: 'in_progress', mine: true }, 'the note says so')
+check([r3.status, r3.statusByName], ['in_progress', 'ANTHONY'], 'in progress, by whom')
+check(r3.notes.at(-1), { ...r3.notes.at(-1), side: 'it', authorName: 'ANTHONY', body: 'Looking at it.', statusFrom: 'new', statusTo: 'in_progress', mine: true }, 'the note says so')
 check((await notices(SENDER)).map(n => [n.kind, n.title, n.body, n.ref_kind, n.ref_id]),
   [['it', 'IT-0001 · In progress', 'Quote page freezes — “Looking at it.”', 'it_request', r1.id]], 'the sender is told')
 await clearNotices()
@@ -273,7 +274,7 @@ check((await notices(VIEWER)).map(n => n.title), ['New IT request · New feature
 await clearNotices()
 await as(DESK, EDIT, 'authenticated')
 check((await note(own.id, 'More detail: by month.')).notes.at(-1).side, 'sender', 'on their own request they write as its sender')
-check((await notices(VIEWER)).map(n => n.title), ['IT-0002 · PETER replied'], 'the desk hears of it')
+check((await notices(VIEWER)).map(n => n.title), ['IT-0002 · ANTHONY replied'], 'the desk hears of it')
 await clearNotices()
 
 // ── Twenty a day each ──────────────────────────────────────────────────────────

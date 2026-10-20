@@ -13,7 +13,8 @@ const FILTERS: { id: ItFilter; label: string }[] = [
 /**
  * IT support (2026-10-20 — the user: "i want add on a button to get submit for IT support or help" … "他也能看到自己
  * submit 的 case status"): Send a request, then everything one sent and where it stands. For the desk (IT requests ·
- * View — "as Revenue Director 的 view，或者像更大职位"), *Mine* and *All* — everybody's, each with who sent it; *All* is
+ * View — the Principal and Ultimate full access, "just principal or ulitmate full access"), *Mine* and *All* —
+ * everybody's, each with who sent it; *All* is
  * also the desktop sidebar's IT requests. A row opens the request, its files and its thread.
  */
 export default function ItPage({ mode, mine, desk, deskOn, newCount, error, filter, readOnly, onFilter, onMode, onBack, onNew, onOpen }: {

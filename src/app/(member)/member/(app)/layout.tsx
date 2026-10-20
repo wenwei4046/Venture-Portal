@@ -42,7 +42,8 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
     isPrincipalAccount(user) && !user.viewingAs ? loadMyMemos() : Promise.resolve(null)]);
   const crm = canDo(account, "crm", "view", "own");
   // IT requests (2026-10-20): the ACCOUNT's IT requests · View — everybody's requests and the sidebar's row, the Principal's
-  // under PRINCIPAL, a Revenue Director's under MANAGEMENT (the Product List's labels); Edit writes notes and statuses.
+  // and Ultimate full access's under PRINCIPAL, anybody raised on it alone under MANAGEMENT (the Product List's labels);
+  // Edit writes notes and statuses.
   const itDesk = canDo(account, "it_requests", "view")
     ? { group: isPrincipalAccount(user) ? "PRINCIPAL" : "MANAGEMENT", edit: canDo(account, "it_requests", "edit") }
     : null;

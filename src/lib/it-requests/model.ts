@@ -1,8 +1,8 @@
 /**
  * IT support (2026-10-20 — the user: "i want add on a button to get submit for IT support or help"; everybody sends a
- * title, the details and screenshots or files, as a bug, a new feature or a suggestion; "as Revenue Director 的 view …
- * 左边这里 category 就会多一个 IT request"; "我们也可以帮做 annotation … 他也能看到自己 submit 的 case status。如果我们给
- * 它 fix 了，他那边就可以收到 fix 的通知").
+ * title, the details and screenshots or files, as a bug, a new feature or a suggestion; "左边这里 category 就会多一个 IT
+ * request" — for "just principal or ulitmate full access" (a screenshot can carry the sender's pay); "我们也可以帮做
+ * annotation … 他也能看到自己 submit 的 case status。如果我们给它 fix 了，他那边就可以收到 fix 的通知").
  *
  * What a request is as the app reads and writes it. Pure, so every screen draws the same thing and this is tested. The
  * database decides who may do what (mig 20261021020100): anybody signed in sends one and follows their own; IT requests ·

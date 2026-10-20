@@ -1,9 +1,11 @@
 -- ============================================================================
 -- 20261021020000_it_requests_permission.sql
 -- IT requests join the permission matrix (2026-10-20 — the user: "i want add on a button to get submit for IT support
--- or help" in the Revenue app's Profile › Settings, which everybody may use; "as Revenue Director 的 view，或者像更大职位
--- log in 进去的时候，左边这里 category 就会多一个 IT request。这边的 list 就会显示出来他们 submit 上来的 request change
--- 以及带上来的 file"). The module itself — its tables, bucket and functions — is the next migration.
+-- or help" in the Revenue app's Profile › Settings, which everybody may use, and a list on the left of what they send,
+-- "这边的 list 就会显示出来他们 submit 上来的 request change 以及带上来的 file" — asked first for "Revenue Director 的
+-- view，或者像更大职位"; then, told a seller's screenshot of Today or My income shows their pay to whoever reads the list:
+-- "change to just principal or ulitmate full access permission user log in can view"). The module itself — its tables,
+-- bucket and functions — is the next migration.
 -- ============================================================================
 --
 -- 1. The function `it_requests` (Admin): View = read everybody's requests and their files; Edit = write a note on one
@@ -12,9 +14,10 @@
 --    yours.
 -- 2. The key `it_requests`, scope none: no table's row policy opens for it — the module's tables are read and written
 --    only through its own functions, which ask has_any_action. Opened by IT requests · View.
--- 3. Who holds it: the shared Principal login (role default), the two full-access templates (Ultimate, Full) and the
---    Revenue Director template — the user's "Revenue Director … 或者像更大职位". The Revenue Director's ticks are stored
---    (a template saved on tabs closes every box its ticks leave out), so they gain the new tab's two boxes too.
+-- 3. Who holds it: the shared Principal login (role default) and the Ultimate full access template (the CEO, the CFO,
+--    the Directors and their assistants) — the user's "just principal or ulitmate full access". Not the Revenue
+--    Director: their title does not tick Salary, and a screenshot sent to IT carries the sender's pay. Any other
+--    template or person is a tick away in Permissions.
 -- 4. A Revenue app account may hold the key: `current_permissions()`'s member-app list, production's body with that one
 --    statement swapped (pg_temp.swap_check, as 20261014100000 did for the Product List).
 -- 5. The tab `rev.it_requests` ("IT requests", the Revenue app, reach all) in the database's copy of the registry —
@@ -75,20 +78,20 @@ ON CONFLICT (role, permission_key) DO NOTHING;
 INSERT INTO public.permission_template_grants (template_id, function_key, action, scope)
 SELECT t.id, 'it_requests', a, 'all'
   FROM public.permission_templates t, unnest(ARRAY['view', 'edit']) a
- WHERE t.key IN ('ultimate', 'full', 'revenue_director')
+ WHERE t.key = 'ultimate'
 ON CONFLICT (template_id, function_key, action) DO NOTHING;
 
 -- A template whose ticks are stored keeps the new tab open only when it is ticked.
 INSERT INTO public.permission_template_tabs (template_id, tab_id, action)
 SELECT t.id, 'rev.it_requests', a
   FROM public.permission_templates t, unnest(ARRAY['view', 'edit']) a
- WHERE t.key IN ('ultimate', 'full', 'revenue_director')
+ WHERE t.key = 'ultimate'
    AND EXISTS (SELECT 1 FROM public.permission_template_tabs x WHERE x.template_id = t.id)
 ON CONFLICT (template_id, tab_id, action) DO NOTHING;
 
--- An editor left open on any of them saves over nothing it did not see.
+-- An editor left open on it saves over nothing it did not see.
 UPDATE public.permission_templates SET version = version + 1, updated_at = now()
- WHERE key IN ('ultimate', 'full', 'revenue_director');
+ WHERE key = 'ultimate';
 
 -- ── 4. A Revenue app account may hold it ────────────────────────────────────
 
