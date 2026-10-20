@@ -408,7 +408,8 @@ try {
   const WORD = await read('20261020160000_waiting_list_signed_form_word.sql')
   await db.exec(WORD)
   const wordMd5s = [await fnMd5('member_waiting_attach_form'), await fnMd5('member_waiting_add_form')]
-  check([wordMd5s[0] !== '7cd93f56644e6abd0cafbaafd298ad29', wordMd5s[1] !== 'a27df82bc3fba68202c7e26bca3b7623'], [true, true], 'both writers swapped')
+  // The bodies production answered in this migration's dry-run (2026-10-20, BEGIN … ROLLBACK on the live schema).
+  check(wordMd5s, ['738f62c8f1f91d23b5af3d3ca48c9265', '83f222d0888ab8460215c314cc9b5499'], 'both writers swapped, as on production')
   check(await one(`SELECT allowed_mime_types FROM storage.buckets WHERE id = 'member-invoices'`),
     ['image/jpeg', 'image/png', 'application/pdf', DOCX, DOC], 'the bucket takes the two Word types too')
   check(await one(`SELECT file_size_limit FROM storage.buckets WHERE id = 'member-invoices'`), 3145728, 'and keeps its 3 MB')
