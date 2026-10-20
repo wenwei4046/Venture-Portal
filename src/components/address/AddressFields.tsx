@@ -28,6 +28,7 @@ export default function AddressFields({
   selectClassName = '',
   labelClassName = '',
   selectBare = false,
+  selectRound,
   gap,
   stacked = false,
 }: {
@@ -46,6 +47,8 @@ export default function AddressFields({
   selectClassName?: string
   /** Draw the selects in the host's classes alone (Add person's own fields are `<Select bare>`). */
   selectBare?: boolean
+  /** The soft dropdown's radius where the host's own selects differ (Finance's dialogs: 12). */
+  selectRound?: 10 | 12
   /** The host's own label classes, instead of the kit's small capitals. */
   labelClassName?: string
   /** The space between the fields, in px, where the host's own grid differs (12). */
@@ -89,6 +92,7 @@ export default function AddressFields({
   const pick = (key: 'state' | 'city' | 'postcode', list: string[], empty: string, onPick: (v: string) => void, off: boolean) => (
     <Select
       bare={selectBare}
+      round={selectRound}
       id={id(key)}
       className={`${selectClass} ${mono(key)}`}
       value={value[key]}
@@ -158,6 +162,7 @@ export default function AddressFields({
         {label('country')}
         <Select
           bare={selectBare}
+          round={selectRound}
           id={id('country')}
           className={selectClass}
           value={value.country || MALAYSIA}

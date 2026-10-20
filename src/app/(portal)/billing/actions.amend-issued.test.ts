@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
+vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@/lib/period-lock', () => ({ assertPeriodOpen: mocks.assertPeriodOpen }))
@@ -128,6 +129,7 @@ describe('updateIssuedInvoiceFull', () => {
       billable_to_department_id: null,
       billable_to_freetext_name: 'Rygis Private Gym',
       billable_to_freetext_address: '12 Jalan Gym',
+      billable_to_freetext_address_parts: null,
       billable_to_freetext_phone: null,
       billable_to_freetext_email: null,
     })
@@ -170,6 +172,26 @@ describe('updateIssuedInvoiceFull', () => {
       ['5019', 1500],
       ['5011', 1000], // Service Revenue — Subs, the fallback for a project invoice
     ])
+  })
+
+  // 2026-10-20: a typed party's address in its six parts, State → City → Postcode from Malaysia's list.
+  const PENANG = { line1: ' No 83,  Jalan Jambu 3 ', line2: '', postcode: '11060', city: 'Paya Terubong', state: 'Pulau Pinang', country: 'Malaysia' }
+
+  it('puts the one line together from the parts it was sent, and keeps the parts whole', async () => {
+    const db = database()
+    await updateIssuedInvoiceFull({ ...payload, freetextAddress: 'whatever the browser sent', freetextAddressParts: PENANG })
+    const args = (db.rpc.mock.calls[0] as unknown as [string, { p_header: Record<string, unknown> }])[1]
+    expect(args.p_header.billable_to_freetext_address).toBe('No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia')
+    expect(args.p_header.billable_to_freetext_address_parts).toEqual({ ...PENANG, line1: 'No 83, Jalan Jambu 3' })
+  })
+
+  it('refuses parts that are not one place on the list, before the database is asked', async () => {
+    const db = database()
+    await expect(updateIssuedInvoiceFull({ ...payload, freetextAddressParts: { ...PENANG, postcode: '14000' } })).rejects.toThrow(
+      '14000 is not a postcode of Paya Terubong, Pulau Pinang',
+    )
+    await expect(updateIssuedInvoiceFull({ ...payload, freetextAddressParts: { ...PENANG, city: '', postcode: '' } })).rejects.toThrow('Pick the city, postcode.')
+    expect(db.rpc).not.toHaveBeenCalled()
   })
 
   it('refuses a draft — that is edited normally', async () => {

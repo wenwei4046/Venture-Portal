@@ -16,11 +16,14 @@ import {
   PartyFields,
   PeriodSelect,
   companyLabel,
+  contactAddressOut,
   useHrFigures,
   type DialogCompany,
   type DialogDepartment,
   type PartyContact,
 } from './InvoiceFormParts'
+import { EMPTY_ADDRESS, addressFromParts, addressRefusal, isEmptyAddress } from '@/lib/address/address'
+import { loadMalaysia } from '@/lib/address/malaysia'
 
 // Multi-line invoice (2026-10-14, the Finance revamp v2 — D10, the prototype's
 // `inv-form` with its lines): Bill to, Description, Category, Billing mode,
@@ -109,10 +112,16 @@ export default function InvoiceLinesDialog({
 
   const [billTo, setBillTo] = useState(init ? billToOf(init) : '')
   const [name, setName] = useState(init?.billable_to_freetext_name ?? '')
-  const [contact, setContact] = useState<PartyContact>({
-    address: init?.billable_to_freetext_address ?? '',
-    phone: init?.billable_to_freetext_phone ?? '',
-    email: init?.billable_to_freetext_email ?? '',
+  // The address in its six parts (2026-10-20); an invoice billed before them keeps its one-box text, on file.
+  const [contact, setContact] = useState<PartyContact>(() => {
+    const kept = addressFromParts(init?.billable_to_freetext_address_parts)
+    const parts = kept && !isEmptyAddress(kept) ? kept : null
+    return {
+      address: parts ?? EMPTY_ADDRESS,
+      addressOnFile: parts ? null : (init?.billable_to_freetext_address ?? null),
+      phone: init?.billable_to_freetext_phone ?? '',
+      email: init?.billable_to_freetext_email ?? '',
+    }
   })
   const [desc, setDesc] = useState(init?.description ?? '')
   const [mode, setMode] = useState(init?.billing_mode ?? 'marketing_project')
@@ -208,12 +217,20 @@ export default function InvoiceLinesDialog({
     if (!ok || busy || !bill.kind) return
     setBusy(true)
     setError(null)
+    // A typed party's address is checked against Malaysia's list here first (the server asks again).
+    const refused =
+      bill.kind === 'freetext' && !isEmptyAddress(contact.address) ? addressRefusal(contact.address, await loadMalaysia()) : null
+    if (refused) {
+      setError(refused)
+      setBusy(false)
+      return
+    }
     const payload = {
       billKind: bill.kind,
       companyId: bill.kind === 'subsidiary' ? bill.companyId : undefined,
       deptId: bill.kind === 'dept_pool' ? bill.deptId : undefined,
       name: bill.kind === 'director' || bill.kind === 'freetext' ? name.trim() : undefined,
-      ...(bill.kind === 'freetext' ? contact : {}),
+      ...(bill.kind === 'freetext' ? { ...contactAddressOut(contact), phone: contact.phone, email: contact.email } : {}),
       mode,
       period: month,
       invoiceDate,

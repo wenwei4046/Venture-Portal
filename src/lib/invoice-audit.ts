@@ -34,7 +34,7 @@ const PAID = new Set(['paid', 'paid_via_netting'])
 const QUIET = new Set(['updated_at', 'version', 'created_by', 'base_amount', 'settlement_voucher_id'])
 /** Who it bills — one line however many of them moved. */
 const PARTY = new Set(['billable_to_type', 'company_id', 'billable_to_department_id', 'billable_to_freetext_name'])
-const CONTACT = new Set(['billable_to_freetext_address', 'billable_to_freetext_phone', 'billable_to_freetext_email'])
+const CONTACT = new Set(['billable_to_freetext_address', 'billable_to_freetext_address_parts', 'billable_to_freetext_phone', 'billable_to_freetext_email'])
 
 function statusLine(before: unknown, after: unknown): string {
   const to = String(after ?? '')

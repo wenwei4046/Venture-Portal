@@ -143,6 +143,7 @@ describe('the invoice dialogs', () => {
       billable_to_type: 'freetext',
       billable_to_freetext_name: 'Rygis Private Gym',
       billable_to_freetext_address: '12 Jalan Ipoh',
+      billable_to_freetext_address_parts: 'null',
       billable_to_freetext_phone: '012',
       billable_to_freetext_email: 'a@b.my',
       billing_mode: 'venture_attribution',
@@ -154,6 +155,20 @@ describe('the invoice dialogs', () => {
       description: 'Office rental — Sep',
       reference_no: 'PO-881',
     })
+  })
+
+  it('a typed party’s address picked in six parts goes with its line, whole (2026-10-20)', async () => {
+    const parts = { line1: 'No 83, Jalan Jambu 3', line2: '', postcode: '11060', city: 'Paya Terubong', state: 'Pulau Pinang', country: 'Malaysia' }
+    const address = 'No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia'
+    mocks.createManualInvoice.mockResolvedValue({ invoice_no: 'HV-INV-202609-0064' })
+    await hubCreateInvoice({ billKind: 'freetext', name: 'Rygis Private Gym', address, addressParts: parts, ...head, category: '9091', amount: 10 })
+    const fd = sent(mocks.createManualInvoice)
+    expect(fd.billable_to_freetext_address).toBe(address)
+    expect(JSON.parse(String(fd.billable_to_freetext_address_parts))).toEqual(parts)
+
+    mocks.createMultiLineInvoice.mockResolvedValue({ id: 'i9', invoice_no: 'HV-INV-202609-0065' })
+    await hubCreateLinesInvoice({ billKind: 'freetext', name: 'Rygis Private Gym', address, addressParts: parts, ...head, lines: [{ description: 'Gym', amount: 10, categoryCode: '' }] })
+    expect(mocks.createMultiLineInvoice).toHaveBeenCalledWith(expect.objectContaining({ freetextAddress: address, freetextAddressParts: parts }))
   })
 
   it('a company is billed by its id only', async () => {

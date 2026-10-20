@@ -22,15 +22,19 @@ import { hubCreateInvoice, hubCreateLinesInvoice, type HubInvoiceParty } from '.
 import {
   BillToSelect,
   CategorySelect,
+  EMPTY_CONTACT,
   ModeSelect,
   PartyFields,
   PeriodSelect,
   companyLabel,
+  contactAddressOut,
   useHrFigures,
   type DialogCompany,
   type DialogDepartment,
   type PartyContact,
 } from './InvoiceFormParts'
+import { addressRefusal, isEmptyAddress } from '@/lib/address/address'
+import { loadMalaysia } from '@/lib/address/malaysia'
 
 // Create invoice (2026-10-14, the Finance revamp v2 — D10, the prototype's
 // `inv-form`): Bill to, Description, Category, Billing mode, Amount RM,
@@ -93,7 +97,7 @@ export default function CreateInvoiceDialog({
 
   const [billTo, setBillTo] = useState('')
   const [name, setName] = useState('')
-  const [contact, setContact] = useState<PartyContact>({ address: '', phone: '', email: '' })
+  const [contact, setContact] = useState<PartyContact>(EMPTY_CONTACT)
   const [desc, setDesc] = useState('')
   const [category, setCategory] = useState('')
   const [mode, setMode] = useState('hr_attribution')
@@ -253,7 +257,7 @@ export default function CreateInvoiceDialog({
     companyId: t.companyId,
     deptId: t.deptId,
     name: t.name,
-    ...(t.billKind === 'freetext' ? contact : {}),
+    ...(t.billKind === 'freetext' ? { ...contactAddressOut(contact), phone: contact.phone, email: contact.email } : {}),
   })
 
   const save = async () => {
@@ -261,6 +265,14 @@ export default function CreateInvoiceDialog({
     if (!ok || busy) return
     setBusy(true)
     setError(null)
+    // A typed party's address is checked against Malaysia's list here first (the server asks again).
+    const refused =
+      bill.kind === 'freetext' && !several && !isEmptyAddress(contact.address) ? addressRefusal(contact.address, await loadMalaysia()) : null
+    if (refused) {
+      setError(refused)
+      setBusy(false)
+      return
+    }
     const targets: InvoiceTarget[] = several
       ? filledRows.map((r) => {
           const co = companies.find((c) => c.id === r.companyId)

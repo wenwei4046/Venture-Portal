@@ -1,4 +1,15 @@
-import { ADDRESS_COLUMNS, ADDRESS_JSON_KEYS, ADDRESS_KEYS, cleanAddress, isEmptyAddress, type Address } from './address'
+import {
+  ADDRESS_COLUMNS,
+  ADDRESS_JSON_KEYS,
+  ADDRESS_KEYS,
+  addressFromParts,
+  addressRefusal,
+  addressText,
+  cleanAddress,
+  isEmptyAddress,
+  type Address,
+} from './address'
+import type { PostcodeData } from './malaysia'
 
 /**
  * An address as a form carries it and a record keeps it (2026-10-20): the six parts under their columns' names —
@@ -59,4 +70,22 @@ export function addressPatch(a: Address): Record<string, string | null> {
 export function addressJsonOf(a: Address): Record<string, string | null> {
   const patch = addressPatch(a)
   return Object.fromEntries(ADDRESS_KEYS.map(key => [ADDRESS_JSON_KEYS[key], patch[ADDRESS_COLUMNS[key]]]))
+}
+
+/**
+ * A typed party's address as a form sends it — an invoice's bill-to (2026-10-20): its six parts when they were picked,
+ * the one line then put together from them (`addressText`) and never taken as sent; else the one-box text it had (an
+ * invoice billed before the parts keeps its words); null for none. Parts that are not one place on Malaysia's list
+ * throw the refusal in words.
+ */
+export function partyAddress(text: unknown, parts: unknown, data: PostcodeData): { line: string | null; parts: Address | null } {
+  const picked = addressFromParts(parts)
+  if (picked && !isEmptyAddress(picked)) {
+    const refused = addressRefusal(picked, data)
+    if (refused) throw new Error(refused)
+    const clean = cleanAddress(picked)
+    return { line: addressText(clean), parts: clean }
+  }
+  const typed = typeof text === 'string' ? text.trim() : ''
+  return { line: typed || null, parts: null }
 }

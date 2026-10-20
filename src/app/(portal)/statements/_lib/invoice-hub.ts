@@ -33,7 +33,7 @@ type Client = Awaited<ReturnType<typeof createClient>>
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 const INVOICE_COLUMNS =
-  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at'
+  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_address_parts, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at'
 
 /** A movement that left the pool. The Venture Pool's types are `*_in` / `*_out` (profit_in, expense_out, fund_in,
  *  fund_out, loan_repayment_in); the list read only expense_out, loan_out and saving_out as out, so a loan

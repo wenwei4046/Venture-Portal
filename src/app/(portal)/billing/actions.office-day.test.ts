@@ -11,6 +11,7 @@ import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), redirect: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
+vi.mock('server-only', () => ({}))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 

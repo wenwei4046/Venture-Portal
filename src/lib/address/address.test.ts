@@ -3,6 +3,7 @@ import file from './malaysia-postcodes.json'
 import {
   EMPTY_ADDRESS,
   addressFromJson,
+  addressFromParts,
   addressLines,
   addressOf,
   addressRefusal,
@@ -16,7 +17,7 @@ import {
   withState,
   type Address,
 } from './address'
-import { addressFormEntries, addressFromChanges, addressFromForm, addressJsonOf, addressPatch } from './address-form'
+import { addressFormEntries, addressFromChanges, addressFromForm, addressJsonOf, addressPatch, partyAddress } from './address-form'
 import { belongTogether, citiesOf, placesOfPostcode, postcodesOf, statesOf, type PostcodeData } from './malaysia'
 
 // An address in six parts (2026-10-20 — the user: "填写的 format 要区分成 address 1、address 2、postcode、state、city，国家
@@ -195,5 +196,33 @@ describe('on a form and on a record', () => {
     // No address at all goes as every key null, and reads back as none.
     expect(Object.values(addressJsonOf(EMPTY_ADDRESS))).toEqual([null, null, null, null, null, null])
     expect(addressFromJson(null)).toEqual(EMPTY_ADDRESS)
+  })
+})
+
+// An invoice's typed bill-to (2026-10-20): the address held whole, as `billable_to_freetext_address_parts`.
+describe('held whole — an invoice’s bill-to', () => {
+  it('reads an object of the six as a record’s parts; anything else as none', () => {
+    expect(addressFromParts({ ...CHEA, line1: ' No 83,  Jalan Jambu 3 ', country: '' })).toEqual(CHEA)
+    for (const v of [null, undefined, 'No 83', ['No 83'], 7]) expect(addressFromParts(v)).toBeNull()
+  })
+
+  it('puts the one line together from the parts, never taking the line as sent', () => {
+    expect(partyAddress('anything at all', { ...CHEA, line2: '' }, DATA)).toEqual({
+      line: 'No 83, Jalan Jambu 3, 14000 Bukit Mertajam, Pulau Pinang, Malaysia',
+      parts: { ...CHEA, line2: '' },
+    })
+  })
+
+  it('keeps the words of an invoice billed before the parts; none as none', () => {
+    expect(partyAddress(' 12 Jalan Ipoh, KL ', null, DATA)).toEqual({ line: '12 Jalan Ipoh, KL', parts: null })
+    expect(partyAddress('12 Jalan Ipoh, KL', EMPTY_ADDRESS, DATA)).toEqual({ line: '12 Jalan Ipoh, KL', parts: null })
+    expect(partyAddress('  ', null, DATA)).toEqual({ line: null, parts: null })
+    expect(partyAddress(undefined, undefined, DATA)).toEqual({ line: null, parts: null })
+  })
+
+  it('throws the refusal in words for parts that are not one place on the list', () => {
+    expect(() => partyAddress('', { ...CHEA, postcode: '11060' }, DATA)).toThrow('11060 is not a postcode of Bukit Mertajam, Pulau Pinang')
+    expect(() => partyAddress('', { ...CHEA, city: '', postcode: '' }, DATA)).toThrow('Pick the city, postcode.')
+    expect(() => partyAddress('', { ...CHEA, line1: '' }, DATA)).toThrow('Fill in address line 1.')
   })
 })

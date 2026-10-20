@@ -31,6 +31,19 @@ import {
   type BilledRow,
 } from '@/lib/payroll-billing-delta'
 import type { User } from '@/types'
+import type { Address } from '@/lib/address/address'
+import { partyAddress } from '@/lib/address/address-form'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
+
+/** The six parts of a typed party's address as a form sent them (JSON), or null. */
+const partsSent = (v: FormDataEntryValue | null): unknown => {
+  if (typeof v !== 'string' || !v) return null
+  try {
+    return JSON.parse(v)
+  } catch {
+    return null
+  }
+}
 
 // Payer-side inter-billing splits BY NATURE (user 2026-07-24): the paying
 // dept's expense JE debits what the charge actually was — rent share → 9094,
@@ -198,6 +211,12 @@ export async function createManualInvoice(formData: FormData): Promise<{ invoice
   if (billableToType === 'freetext' && !billableFreetext) {
     throw new Error('Billable party name is required')
   }
+  // A typed party's address in its six parts — State → City → Postcode one place on Malaysia's list (2026-10-20) —
+  // checked before a number is minted; its one line put together from them.
+  const freetextAddress =
+    billableToType === 'freetext'
+      ? partyAddress(formData.get('billable_to_freetext_address'), partsSent(formData.get('billable_to_freetext_address_parts')), MALAYSIA_DATA)
+      : { line: null, parts: null }
   if (!rawPeriod) throw new Error('Period is required')
   await assertBillingModeSupported(supabase, rawMode)
   const billingMode = rawMode as CreateInvoiceMode
@@ -237,7 +256,8 @@ export async function createManualInvoice(formData: FormData): Promise<{ invoice
     billable_to_department_id: billableToType === 'dept_pool' ? billableDeptId : null,
     billable_to_freetext_name:
       billableToType === 'director' || billableToType === 'freetext' ? billableFreetext : null,
-    billable_to_freetext_address: contact('billable_to_freetext_address'),
+    billable_to_freetext_address: freetextAddress.line,
+    billable_to_freetext_address_parts: freetextAddress.parts,
     billable_to_freetext_phone: contact('billable_to_freetext_phone'),
     billable_to_freetext_email: contact('billable_to_freetext_email'),
   })
@@ -278,7 +298,7 @@ export async function copyInvoice(formData: FormData): Promise<{ id: string; no:
 
   const { data: src, error: srcErr } = await supabase
     .from('invoices')
-    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, category_code, base_amount, total_amount, description, reference_no')
+    .select('billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_address_parts, billable_to_freetext_phone, billable_to_freetext_email, category_code, base_amount, total_amount, description, reference_no')
     .eq('id', sourceId)
     .single()
   if (srcErr || !src) throw new Error('Source invoice not found')
@@ -312,6 +332,7 @@ export async function copyInvoice(formData: FormData): Promise<{ id: string; no:
       billable_to_department_id: src.billable_to_department_id,
       billable_to_freetext_name: src.billable_to_freetext_name,
       billable_to_freetext_address: src.billable_to_freetext_address,
+      billable_to_freetext_address_parts: src.billable_to_freetext_address_parts,
       billable_to_freetext_phone: src.billable_to_freetext_phone,
       billable_to_freetext_email: src.billable_to_freetext_email,
     })
@@ -359,6 +380,7 @@ export async function createMultiLineInvoice(
     departmentId?: string
     freetextName?: string
     freetextAddress?: string
+    freetextAddressParts?: Address | null
     freetextPhone?: string
     freetextEmail?: string
     lines: InvoiceLineInput[]
@@ -383,6 +405,12 @@ export async function createMultiLineInvoice(
   if (payload.billableType === 'freetext' && !payload.freetextName?.trim()) {
     throw new Error('Billable party name is required')
   }
+  // A typed party's address in its six parts — State → City → Postcode one place on Malaysia's list (2026-10-20) —
+  // its one line put together from them.
+  const freetextAddress =
+    payload.billableType === 'freetext'
+      ? partyAddress(payload.freetextAddress, payload.freetextAddressParts, MALAYSIA_DATA)
+      : { line: null, parts: null }
   if (!payload.period) throw new Error('Period is required')
   if (!payload.lines || payload.lines.length === 0) {
     throw new Error('At least one line item is required')
@@ -440,8 +468,8 @@ export async function createMultiLineInvoice(
         payload.billableType === 'director' || payload.billableType === 'freetext'
           ? payload.freetextName?.trim() ?? null
           : null,
-      billable_to_freetext_address:
-        payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+      billable_to_freetext_address: freetextAddress.line,
+      billable_to_freetext_address_parts: freetextAddress.parts,
       billable_to_freetext_phone:
         payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
       billable_to_freetext_email:
@@ -1124,6 +1152,7 @@ export async function updateDraftInvoiceFull(payload: {
   departmentId?: string
   freetextName?: string
   freetextAddress?: string
+  freetextAddressParts?: Address | null
   freetextPhone?: string
   freetextEmail?: string
   lines: InvoiceLineInput[]
@@ -1144,6 +1173,12 @@ export async function updateDraftInvoiceFull(payload: {
   ) {
     throw new Error('Billable party name is required')
   }
+  // A typed party's address in its six parts — State → City → Postcode one place on Malaysia's list (2026-10-20) —
+  // its one line put together from them.
+  const freetextAddress =
+    payload.billableType === 'freetext'
+      ? partyAddress(payload.freetextAddress, payload.freetextAddressParts, MALAYSIA_DATA)
+      : { line: null, parts: null }
   if (!payload.period) throw new Error('Period is required')
   if (!payload.lines || payload.lines.length === 0) {
     throw new Error('At least one line item is required')
@@ -1197,8 +1232,8 @@ export async function updateDraftInvoiceFull(payload: {
         payload.billableType === 'director' || payload.billableType === 'freetext'
           ? payload.freetextName?.trim() ?? null
           : null,
-      billable_to_freetext_address:
-        payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+      billable_to_freetext_address: freetextAddress.line,
+      billable_to_freetext_address_parts: freetextAddress.parts,
       billable_to_freetext_phone:
         payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
       billable_to_freetext_email:
@@ -1254,6 +1289,7 @@ export async function updateIssuedInvoiceFull(payload: {
   departmentId?: string
   freetextName?: string
   freetextAddress?: string
+  freetextAddressParts?: Address | null
   freetextPhone?: string
   freetextEmail?: string
   lines: InvoiceLineInput[]
@@ -1283,6 +1319,12 @@ export async function updateIssuedInvoiceFull(payload: {
   ) {
     throw new Error('Billable party name is required')
   }
+  // A typed party's address in its six parts — State → City → Postcode one place on Malaysia's list (2026-10-20) —
+  // its one line put together from them.
+  const freetextAddress =
+    payload.billableType === 'freetext'
+      ? partyAddress(payload.freetextAddress, payload.freetextAddressParts, MALAYSIA_DATA)
+      : { line: null, parts: null }
   if (!payload.period) throw new Error('Period is required')
   if (!payload.lines || payload.lines.length === 0) {
     throw new Error('At least one line item is required')
@@ -1340,7 +1382,8 @@ export async function updateIssuedInvoiceFull(payload: {
     company_id: payload.billableType === 'subsidiary' ? (payload.companyId ?? null) : null,
     billable_to_department_id: null,
     billable_to_freetext_name: isParty ? (payload.freetextName?.trim() ?? null) : null,
-    billable_to_freetext_address: payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+    billable_to_freetext_address: freetextAddress.line,
+    billable_to_freetext_address_parts: freetextAddress.parts,
     billable_to_freetext_phone: payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
     billable_to_freetext_email: payload.billableType === 'freetext' ? payload.freetextEmail?.trim() || null : null,
   }

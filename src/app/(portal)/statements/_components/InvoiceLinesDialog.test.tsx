@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { InvoiceEditInitial } from '../_lib/invoice-model'
 
 // Multi-line invoice and Edit (2026-10-14, the Finance revamp v2 — D10's
@@ -55,6 +55,11 @@ const dialog = () => screen.getByRole('dialog')
 const set = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const hint = () => within(dialog()).getAllByText((_, el) => el?.tagName === 'P').map((p) => p.textContent)
 const press = (name: string) => fireEvent.click(within(dialog()).getByRole('button', { name }))
+// A typed party's address, in its six parts (2026-10-20): line 1 typed, then State → City → Postcode from the list.
+const part = (key: 'line1' | 'state' | 'city' | 'postcode', value: string) =>
+  fireEvent.change(document.getElementById(`il-address-${key}`) as HTMLElement, { target: { value } })
+const listReady = () => waitFor(() => expect(document.getElementById('il-address-state')).not.toBeDisabled())
+const PENANG = { line1: 'No 83, Jalan Jambu 3', line2: '', postcode: '11060', city: 'Paya Terubong', state: 'Pulau Pinang', country: 'Malaysia' }
 
 const INITIAL: InvoiceEditInitial = {
   total_amount: 63440,
@@ -69,6 +74,7 @@ const INITIAL: InvoiceEditInitial = {
   billable_to_department_id: null,
   billable_to_freetext_name: null,
   billable_to_freetext_address: null,
+  billable_to_freetext_address_parts: null,
   billable_to_freetext_phone: null,
   billable_to_freetext_email: null,
   period_month: '2026-10-01',
@@ -102,7 +108,10 @@ describe('Multi-line invoice', () => {
     const { onDone, onClose } = draw()
     set('Bill to', 'freetext')
     set('Name', 'Rygis Private Gym')
-    set('Address', '12 Jalan Ipoh, KL')
+    await listReady()
+    part('line1', 'No 83, Jalan Jambu 3')
+    part('state', 'Pulau Pinang')
+    part('city', 'Paya Terubong')
     set('Description', 'Marketing service — Sep')
     set('Category', '5018')
     set('Line 1 description', 'Ads management')
@@ -112,13 +121,15 @@ describe('Multi-line invoice', () => {
     expect(hint()).toContain('Each line’s description is needed before you can save.')
     set('Line 2 description', 'Video shooting')
     press('Save draft')
-    await flush()
+    // The save reads the list first, to check the address.
+    await waitFor(() => expect(mocks.createLines).toHaveBeenCalled())
     expect(mocks.createLines).toHaveBeenCalledWith({
       billKind: 'freetext',
       companyId: undefined,
       deptId: undefined,
       name: 'Rygis Private Gym',
-      address: '12 Jalan Ipoh, KL',
+      address: 'No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia',
+      addressParts: PENANG,
       phone: '',
       email: '',
       mode: 'marketing_project',
@@ -234,6 +245,40 @@ describe('Edit', () => {
     expect(screen.getByLabelText('Line 1 amount')).toHaveValue('780.25')
     expect(screen.getByLabelText('Category')).toHaveValue('5018')
     expect(screen.queryByLabelText('Line 2 amount')).toBeNull()
+  })
+
+  // 2026-10-20: the address in its six parts.
+  const typed: InvoiceEditInitial = {
+    ...INITIAL,
+    billable_to_type: 'freetext',
+    company_id: null,
+    billable_to_freetext_name: 'Rygis Private Gym',
+    billable_to_freetext_address: '12 Jalan Ipoh, KL',
+  }
+
+  it('billed before the parts: its one-box address shows On file, and goes back as it was until the parts are picked', async () => {
+    draw({ ...issued, status: 'draft', no: null, initial: typed })
+    expect(within(dialog()).getByText('On file')).toBeInTheDocument()
+    expect(within(dialog()).getByText('12 Jalan Ipoh, KL')).toBeInTheDocument()
+    expect(document.getElementById('il-address-line1')).toHaveValue('')
+    press('Save changes')
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ billKind: 'freetext', address: '12 Jalan Ipoh, KL', addressParts: null }))
+  })
+
+  it('billed with the parts: each in its field, sent back whole', async () => {
+    draw({ ...issued, status: 'draft', no: null, initial: { ...typed, billable_to_freetext_address: 'No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia', billable_to_freetext_address_parts: PENANG } })
+    expect(within(dialog()).queryByText('On file')).toBeNull()
+    await listReady()
+    expect(document.getElementById('il-address-line1')).toHaveValue('No 83, Jalan Jambu 3')
+    expect(document.getElementById('il-address-state')).toHaveValue('Pulau Pinang')
+    expect(document.getElementById('il-address-city')).toHaveValue('Paya Terubong')
+    expect(document.getElementById('il-address-postcode')).toHaveValue('11060')
+    part('state', 'Johor')
+    press('Save changes')
+    // A new state starts its city and postcode again: refused, in words, and nothing is sent.
+    await waitFor(() => expect(hint()).toContain('Pick the city, postcode.'))
+    expect(mocks.update).not.toHaveBeenCalled()
   })
 
   it('a due date left out stays out — the field says so', () => {

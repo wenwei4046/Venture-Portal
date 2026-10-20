@@ -52,6 +52,8 @@ export interface InvoiceEditInitial {
   billable_to_department_id: string | null
   billable_to_freetext_name: string | null
   billable_to_freetext_address: string | null
+  /** The address in its six parts (2026-10-20) — `addressFromParts` reads it; null for an invoice billed before them. */
+  billable_to_freetext_address_parts: unknown
   billable_to_freetext_phone: string | null
   billable_to_freetext_email: string | null
   period_month: string | null
@@ -216,6 +218,8 @@ export interface InvoiceRowIn {
   billable_to_department_id: string | null
   billable_to_freetext_name: string | null
   billable_to_freetext_address: string | null
+  /** The address in its six parts (2026-10-20) — `addressFromParts` reads it; null for an invoice billed before them. */
+  billable_to_freetext_address_parts: unknown
   billable_to_freetext_phone: string | null
   billable_to_freetext_email: string | null
   description: string | null
@@ -342,6 +346,7 @@ export function toHubInvoice(inv: InvoiceRowIn, ctx: InvoiceContext, other = fal
       billable_to_department_id: inv.billable_to_department_id,
       billable_to_freetext_name: inv.billable_to_freetext_name,
       billable_to_freetext_address: inv.billable_to_freetext_address,
+      billable_to_freetext_address_parts: inv.billable_to_freetext_address_parts ?? null,
       billable_to_freetext_phone: inv.billable_to_freetext_phone,
       billable_to_freetext_email: inv.billable_to_freetext_email,
       period_month: inv.period_month,
