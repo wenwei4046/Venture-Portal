@@ -30,7 +30,7 @@ export type SubmitOutcome = { ok: true; code: string } | { ok: false; error: str
 export type FormLink = () => Promise<{ ok: true; data: { url: string; name: string } | null } | { ok: false; error: string }>;
 
 const TEXT: Record<RequestKindVM, [string, string, string, string]> = {
-  claim: ["Submit claim", "Outstation or Airbnb stay for a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
+  claim: ["Submit transport claim", "Outstation or Airbnb stay for a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
   food: ["Submit food claim", "Meals on the days you worked a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
   replacement: ["Submit replacement", "Replace, transfer or release a team member", "Review & submit", "HR reviews it, and the receiving department confirms if it is a transfer."],
   waiting: ["Submit waiting list", "Bring a new member into the team", "Review & submit", "HR matches the request to an open place by eligibility and start date."],
