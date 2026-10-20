@@ -10,6 +10,8 @@ paths:
 
 # Revenue tab — the Revenue app (`/member`)
 
+**QUOTE ACCESSORIES SEARCH (2026-10-20 — the user, on the phone):** *Accessories only* has no global Size picker. It lists the catalogue's one-size and fitted SKUs directly, retaining each fitted item's size subtitle and independent quantity. Both this list and a mattress's *Accessories* section search by name across the full available list; searching or clearing keeps quantities, and a search shows all matches. A mattress's accessories still follow its size. Standalone picks keep the existing cart IDs and remembered accessory names, so they merge with matching mattress accessories and preserve history. Tests: `quote/ProductSheet.test.tsx`, `quote/quote-model.test.ts`.
+
 Today, Insight, Quote, Arena, Profile; requests and claims (and HR's side of them, People › Member services); My income, honours, brand weeks; how the app reads and refreshes — `src/app/(member)/member/`, `src/components/member/`, `src/lib/member/`. The Product List page inside the app is `product-list.md`, the CRM is `crm.md`, installing the app is `../portal-wide/pwa.md`.
 
 Read this before changing anything it covers, and again in every full scan of such a change (a review, QA, an E2E audit) — CLAUDE.md › Rules by tab. New decisions are added here, dated, never to CLAUDE.md. Until 2026-10-10 this was the Architecture tree's comment on `(member)/member/` in CLAUDE.md, moved word for word.

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { bedframeKey, tierLabel } from "@/lib/member/catalog";
 import type { FrameChoices } from "@/lib/member/build";
 import type { BedframeBuild, OptionCharge } from "@/lib/member/types";
@@ -7,7 +8,7 @@ import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  SIZES, accAt, accOrder, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
+  SIZES, accAt, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
   type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 import s from "./quote.module.css";
@@ -17,6 +18,7 @@ const PENCIL = "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z";
 const PLUS = "M12 5v14M5 12h14";
 const CLOSE = "m6 6 12 12M6 18 18 6";
 const X = "M6 6l12 12M18 6 6 18";
+const SEARCH = "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3";
 /** The accessories a sheet lists before *Show all*. */
 const ACC_FIRST = 5;
 
@@ -104,16 +106,8 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
             </>
           )}
           {sheet.mode === "acc" && (
-            <>
-              {catalog.accs.some(x => Object.keys(x.sizes).length > 0) && (
-                <div>
-                  <p className={s.secLabel}>Size</p>
-                  <SizeChips sizes={SIZES.map(z => z.key)} has={() => true} value={sheet.size} onPick={size => a.patch({ size })} />
-                </div>
-              )}
-              <AccSection title="Accessories" catalog={catalog} memory={memory} picked={sheet.acc} size={sheet.size} all={sheet.accAll}
-                onAll={() => a.patch({ accAll: !sheet.accAll })} onSet={acc => a.patch({ acc })} />
-            </>
+            <AccSection title="Accessories" catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}
+              onAll={() => a.patch({ accAll: !sheet.accAll })} onSet={acc => a.patch({ acc })} />
           )}
         </div>
         <div className={s.psFoot}>
@@ -402,34 +396,52 @@ function AccSection({ title, catalog, memory, picked, size, all, onAll, onSet }:
   catalog: QCatalog;
   memory: QuoteMemory;
   picked: Record<string, number>;
-  size: SizeKey;
+  size?: SizeKey;
   all: boolean;
   onAll: () => void;
   onSet: (acc: Record<string, number>) => void;
 }) {
-  const rows = accOrder(catalog, memory, picked).map(acc => ({ acc, at: accAt(acc, size) })).filter(r => r.at);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  // Standalone accessories have independent SKU quantities; mattress accessories follow its size.
+  const grouped = size ? picked : Object.fromEntries(catalog.accs.map(acc => [
+    acc.key, accVariants(acc).reduce((sum, at) => sum + (picked[at.productId] ?? 0), 0),
+  ]));
+  const rows = accOrder(catalog, memory, grouped).flatMap(acc => {
+    const fitted = size ? accAt(acc, size) : null;
+    const variants = size ? (fitted ? [fitted] : []) : accVariants(acc);
+    return variants.map(at => ({ acc, at, key: size ? acc.key : at.productId }));
+  }).sort((a, b) => Number((picked[b.key] ?? 0) > 0) - Number((picked[a.key] ?? 0) > 0));
   if (!rows.length) return null;
-  const shown = all ? rows : rows.slice(0, Math.max(ACC_FIRST, rows.filter(r => (picked[r.acc.key] ?? 0) > 0).length));
+  const shown = q ? rows.filter(({ acc }) => acc.name.toLowerCase().includes(q))
+    : all ? rows : rows.slice(0, Math.max(ACC_FIRST, rows.filter(r => (picked[r.key] ?? 0) > 0).length));
   return (
     <div>
       <div className={s.rowHead}><p className={s.rowHeadTitle}>{title}</p><span className={s.rowHeadCap}>Optional</span></div>
-      {shown.map(({ acc, at }) => {
-        const n = picked[acc.key] ?? 0;
+      <div className={`${s.search} ${s.accSearch}`}>
+        <Svg d={SEARCH} size={18} sw={1.8} stroke="var(--rv-sub)" />
+        <input className={s.searchInput} type="search" aria-label="Search accessories" placeholder="Search accessories by name"
+          value={query} onChange={e => setQuery(e.target.value)} />
+        {query && <button className={s.accSearchClear} aria-label="Clear accessory search" onClick={() => setQuery("")}><Svg d={X} size={16} sw={2} /></button>}
+      </div>
+      {!shown.length && <p className={s.noMatch} role="status">No accessories match your search.</p>}
+      {shown.map(({ acc, at, key }) => {
+        const n = picked[key] ?? 0;
         return (
-          <div key={acc.key} className={s.accRow}>
+          <div key={key} className={s.accRow} role="group" aria-label={[acc.name, at.size ? sizeLabel(at.size) : ""].filter(Boolean).join(" · ")}>
             <div className={s.accText}>
               <span className={s.accName}>{acc.name}</span>
-              <span className={s.accSize}>{at?.size ? sizeLabel(at.size) : ""}</span>
+              {at.size && <span className={s.accSize}>{sizeLabel(at.size)}</span>}
             </div>
             <div className={`${s.accStep} ${n ? s.accStepOn : ""}`}>
-              <button className={s.accBtn} aria-label="Remove one" onClick={() => n && onSet({ ...picked, [acc.key]: n - 1 })}>−</button>
+              <button className={s.accBtn} aria-label="Remove one" onClick={() => n && onSet({ ...picked, [key]: n - 1 })}>−</button>
               <span className={s.accQty}>{n}</span>
-              <button className={s.accBtn} aria-label="Add one" onClick={() => onSet({ ...picked, [acc.key]: n + 1 })}>+</button>
+              <button className={s.accBtn} aria-label="Add one" onClick={() => onSet({ ...picked, [key]: n + 1 })}>+</button>
             </div>
           </div>
         );
       })}
-      {rows.length > shown.length || all ? (
+      {!q && (rows.length > shown.length || all) ? (
         <button className={s.more} onClick={onAll}>
           {all ? "Show fewer" : `Show all ${rows.length} accessories`}
           <Svg d={ICON.chevronDown} size={18} sw={2} className={`${s.dropChev} ${all ? s.dropChevOpen : ""}`} />
