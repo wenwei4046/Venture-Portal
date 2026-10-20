@@ -120,10 +120,12 @@ export function taxModeOf(value: string | null | undefined): TaxMode {
 }
 
 export interface MemberPay {
-  /** The month's commission as payroll holds it: this sub-department's, every other one's standing close, HR's adjustment. */
+  /** The month's commission as payroll holds it: this sub-department's, the member's other ones', HR's adjustment. */
   commission: number;
-  /** Other sub-departments' commission already closed for the month — payroll adds them in. */
+  /** The member's commission in their other sub-departments this month — payroll pays it in the same row. */
   elsewhere: number;
+  /** Those sub-departments, by name. */
+  elsewhereFrom: string[];
   /** HR's adjustment to the commission, on the payroll row. */
   adjustment: number;
   /** The fixed salary for the days employed. */
@@ -151,8 +153,9 @@ export interface MemberPay {
 export interface MemberPayInput {
   /** This sub-department's commission for the month — live, or its close. */
   commission: number;
-  /** Every other sub-department's standing close for the month. */
+  /** The member's other sub-departments' commission for the month: a standing close's, else their engine's now. */
   elsewhere: number;
+  elsewhereFrom?: readonly string[];
   /** The month's pay lines (Special claim / Allowance / Incentive add; Deduction takes off). */
   payLines: readonly { kind: string; amount: number }[];
   salary: PaySalary;
@@ -191,6 +194,7 @@ export function memberPay(input: MemberPayInput): MemberPay {
   return {
     commission,
     elsewhere: round2(input.elsewhere),
+    elsewhereFrom: [...(input.elsewhereFrom ?? [])],
     adjustment: round2(s.commissionAdjustment),
     fixed: round2(s.basicSalary * pay.ratio),
     allowance: round2(pay.proratedStatutoryAllowance + s.nonStatutoryAllowance),

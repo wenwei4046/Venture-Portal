@@ -90,6 +90,30 @@ describe("incomeVM — the fixed salary is paid out of the commission, as payrol
     expect(vm.paidAs?.[1]).toMatchObject({ label: "Balance commission", amt: "−RM 5,956.05", neg: true });
   });
 
+  // CHEA HUAN sits in Fair and IR: payroll pays both in one row and takes the salary out once.
+  it("in another sub-department, carves the salary out of the whole month — never twice", () => {
+    const ir = month({ ...october, personal: 0, commission: 0, countedSales: 0, bills: [],
+      pay: memberPay({ commission: 0, elsewhere: 9746, elsewhereFrom: ["Fair"], payLines: [], salary, taxMode: "pcb", withholdingRate: 0.02 }) });
+    const vm = incomeVM(data(ir), false);
+    expect(vm.rows.slice(0, 2).map(r => [r.label, r.sub, r.amt])).toEqual([
+      ["Personal sales commission", "RM 0 counted sales", "RM 0.00"],
+      ["Fair commission", "In the same payroll", "RM 9,746.00"],
+    ]);
+    expect(vm.total).toBe("RM 7,644.45");
+  });
+
+  it("a sub-department with no bills yet still shows where the pay comes from", () => {
+    const none = month({ ...october, state: "none", personal: 0, commission: 0, countedSales: 0, bills: [], notice: "No bills have arrived for this month yet.",
+      pay: memberPay({ commission: 0, elsewhere: 9746, elsewhereFrom: ["Fair"], payLines: [], salary, taxMode: "pcb", withholdingRate: 0.02 }) });
+    const vm = incomeVM(data(none), false);
+    expect(vm.notice).toBeNull();
+    expect(vm.heroNote).toBe("No bills have arrived for this month yet.");
+    expect(vm.rows.map(r => r.label)).toContain("Fair commission");
+    expect(vm.total).toBe("RM 7,644.45");
+    // Without the pay it says so instead, as before.
+    expect(incomeVM(data({ ...none, pay: null }), false).notice).toBe("No bills have arrived for this month yet.");
+  });
+
   it("no fixed salary: nothing to split, nothing taken off", () => {
     const none = salaryFromSchedule(0, { daysWorked: 31, daysInMonth: 31 }, { epfEr: 0, epfEe: 0, socsoEr: 0, socsoEe: 0, eisEr: 0, eisEe: 0, pcb: 0 });
     const vm = incomeVM(data(month({ pay: memberPay({ commission: 7974.2, elsewhere: 0, payLines: [], salary: none, taxMode: "pcb", withholdingRate: 0.02 }) })), false);

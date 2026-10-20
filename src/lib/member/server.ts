@@ -471,7 +471,10 @@ export async function loadMemberIncome(
     if (typeof staffId !== "string" || !staffId) throw new Error("This department is not available to your account.");
     const admin = adminClient() as unknown as SupabaseClient;
     const first = `${period}-01`;
-    const [cutover, closes, payroll, lines, staff, runs, otherCloses] = await Promise.all([
+    // Payroll pays the month's commission from every sub-department at once, the fixed salary out of all of it:
+    // started now, beside this sub-department's own engine.
+    const elsewhere = startRead(commissionElsewhere(admin, staffId, subDepartmentId, first));
+    const [cutover, closes, payroll, lines, staff, runs] = await Promise.all([
       admin.from("comm_cutovers").select("first_paid_month").eq("sub_department_id", subDepartmentId).maybeSingle(),
       admin.from("comm_salesperson_closes").select("closed_at, summary, statement, deferred_orders")
         .eq("sub_department_id", subDepartmentId).eq("period_month", first).eq("staff_id", staffId).is("reopened_at", null).maybeSingle(),
@@ -483,11 +486,8 @@ export async function loadMemberIncome(
       admin.from("hr_staff_costs").select("basic_salary, hire_date, resignation_date, epf_category, socso_category, pcb_category, "
         + "children_count, is_epf_exempt, tax_mode, withholding_rate").eq("id", staffId).maybeSingle(),
       admin.from("payroll_runs").select("period_month, paid_at").not("paid_at", "is", null).order("period_month", { ascending: false }).limit(13),
-      // Payroll pays the month's commission from every sub-department at once (`comm_standing_close_total`).
-      admin.from("comm_salesperson_closes").select("total_commission")
-        .eq("staff_id", staffId).eq("period_month", first).is("reopened_at", null).neq("sub_department_id", subDepartmentId),
     ]);
-    for (const r of [cutover, closes, payroll, lines, staff, runs, otherCloses]) if (r.error) throw new Error(r.error.message);
+    for (const r of [cutover, closes, payroll, lines, staff, runs]) if (r.error) throw new Error(r.error.message);
     const paidAt = new Map(((runs.data ?? []) as { period_month: string; paid_at: string }[]).map(r => [r.period_month.slice(0, 7), r.paid_at]));
     const rows = (payroll.data ?? []) as unknown as ({ period_month: string; status: string; commission_amount: number | string | null;
       gross: number | string | null; net: number | string | null } & PayrollRowFacts)[];
@@ -525,13 +525,12 @@ export async function loadMemberIncome(
         const statutory = await scheduleStatutory(statutoryLookup(admin), { ...record, tax_mode: record.tax_mode ?? "pcb" }, window, first);
         return salaryFromSchedule(basic, window, statutory);
       })());
-    const elsewhere = ((otherCloses.data ?? []) as { total_commission: number | string | null }[]).reduce((a, c) => a + num(c.total_commission), 0);
     const withPay = async (month: IncomeMonth): Promise<IncomeMonth> => {
-      const s = await salary;
+      const [s, other] = await Promise.all([salary, elsewhere]);
       return {
         ...month,
         pay: s ? memberPay({
-          commission: month.commission, elsewhere, payLines, salary: s,
+          commission: month.commission, elsewhere: other.amount, elsewhereFrom: other.names, payLines, salary: s,
           taxMode: taxModeOf(record?.tax_mode), withholdingRate: record?.withholding_rate == null ? null : num(record.withholding_rate),
         }) : null,
       };
@@ -587,6 +586,49 @@ export async function loadMemberIncome(
     const month = liveIncome(person, { ...extra, asOf: new Date().toISOString(), switches });
     return { month: await withPay(byHand ? { ...month, state: "manual" } : month), past, cutover: firstPaid };
   });
+}
+
+/**
+ * What the member earns the same month in their OTHER sub-departments
+ * (2026-10-20). Payroll pays every sub-department's commission in one row
+ * (`comm_standing_close_total`) and takes the fixed salary out of all of it
+ * once — so My income in any one of them carves the salary out of the whole:
+ * where they are closed, the close's figure; anywhere else they sit or direct,
+ * that sub-department's engine now. Read with the service role, like the month
+ * itself, only after `member_income_context` authorised the session.
+ */
+async function commissionElsewhere(admin: SupabaseClient, staffId: string, subDepartmentId: string, first: string): Promise<{ amount: number; names: string[] }> {
+  const [y, m] = first.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const [closes, seats, directs] = await Promise.all([
+    admin.from("comm_salesperson_closes").select("sub_department_id, total_commission")
+      .eq("staff_id", staffId).eq("period_month", first).is("reopened_at", null).neq("sub_department_id", subDepartmentId),
+    admin.from("comm_hierarchy").select("comm_schemes!inner (sub_department_id, is_active, effective_to)")
+      .eq("staff_id", staffId).eq("comm_schemes.is_active", true).is("comm_schemes.effective_to", null)
+      .lte("effective_from", last).or(`effective_to.is.null,effective_to.gte.${first}`),
+    admin.from("comm_director_pay").select("comm_schemes!inner (sub_department_id, is_active, effective_to)")
+      .eq("staff_id", staffId).eq("comm_schemes.is_active", true).is("comm_schemes.effective_to", null),
+  ]);
+  for (const r of [closes, seats, directs]) if (r.error) throw new Error(r.error.message);
+  const closed = new Map<string, number>();
+  for (const c of (closes.data ?? []) as { sub_department_id: string; total_commission: number | string | null }[]) {
+    closed.set(c.sub_department_id, (closed.get(c.sub_department_id) ?? 0) + Number(c.total_commission ?? 0));
+  }
+  const schemeSubs = (rows: unknown[] | null) => (rows ?? []).map(r => (r as { comm_schemes: { sub_department_id: string } }).comm_schemes.sub_department_id);
+  const open = [...new Set([...schemeSubs(seats.data), ...schemeSubs(directs.data)])].filter(id => id !== subDepartmentId && !closed.has(id));
+  const live = await Promise.all(open.map(async id => {
+    const board = await liveWorkbench(admin, id, first, staffId);
+    return [id, board?.people.find(p => p.staffId === staffId)?.totalCommission ?? 0] as const;
+  }));
+  const earned = [...closed.entries(), ...live].filter(([, amount]) => amount !== 0);
+  if (!earned.length) return { amount: 0, names: [] };
+  const { data: subs, error } = await admin.from("comm_sub_departments").select("id, name").in("id", earned.map(([id]) => id));
+  if (error) throw new Error(error.message);
+  const name = new Map(((subs ?? []) as { id: string; name: string }[]).map(s => [s.id, s.name]));
+  return {
+    amount: Math.round(earned.reduce((a, [, amount]) => a + amount, 0) * 100) / 100,
+    names: earned.map(([id]) => name.get(id) ?? "Another department"),
+  };
 }
 
 /**

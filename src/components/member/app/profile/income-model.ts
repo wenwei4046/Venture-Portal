@@ -65,7 +65,10 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
   if (m.switches.incentive || m.incentive !== 0) rows.push({ label: "Margin incentive", sub: incentiveSub(m), amt: money(m.incentive) });
   if (m.switches.group || m.group !== 0) rows.push({ label: "Group incentive", sub: "Your team's group reward", amt: money(m.group) });
   if (m.director !== 0) rows.push({ label: "Director pay", sub: "Fixed amount and incentive", amt: money(m.director) });
-  if (pay && pay.elsewhere !== 0) rows.push({ label: "Other departments", sub: "Their commission, closed", amt: money(pay.elsewhere) });
+  // The member's other sub-departments: payroll pays their commission in the same row, the salary out of all of it.
+  if (pay && pay.elsewhere !== 0) rows.push(pay.elsewhereFrom.length === 1
+    ? { label: `${pay.elsewhereFrom[0]} commission`, sub: "In the same payroll", amt: signed(pay.elsewhere), neg: pay.elsewhere < 0 }
+    : { label: "Other departments", sub: pay.elsewhereFrom.join(" · ") || "In the same payroll", amt: signed(pay.elsewhere), neg: pay.elsewhere < 0 });
   if (pay && pay.adjustment !== 0) rows.push({ label: "Payroll adjustment", sub: "Set by HR", amt: signed(pay.adjustment), neg: pay.adjustment < 0 });
   for (const l of m.payLines) {
     const v = l.kind === "deduction" ? -Math.abs(l.amount) : l.amount;
@@ -115,7 +118,9 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
         : null,
     past,
     hasOrders: m.bills.length > 0 || m.overrides.length > 0,
-    notice: m.state === "none" ? m.notice : null,
+    // With the pay worked out there is still a breakdown to show — the salary and what it costs, another
+    // sub-department's commission — and the hero's note says no bills have arrived here.
+    notice: m.state === "none" && !pay ? m.notice : null,
   };
 }
 
