@@ -71,6 +71,23 @@ describe("Sheet › peek (a row of the page beside it)", () => {
     expect(isOpen()).toBe(false);
   });
 
+  it("drawing or clicking a portalled screenshot editor keeps its parent peek open", () => {
+    const onClose = vi.fn();
+    const onTool = vi.fn();
+    render(<><Bills onClose={onClose} /><div data-image-annotator><button onClick={onTool}>Circle tool</button></div></>);
+    fireEvent.click(screen.getByText("HC-SO-2610-042"));
+    const tool = screen.getByText("Circle tool");
+    fireEvent.click(tool);
+    fireEvent.pointerDown(tool, { clientX: 100, clientY: 100 });
+    fireEvent.click(tool, { clientX: 100, clientY: 100 });
+    expect(onTool).toHaveBeenCalledTimes(2);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(isOpen()).toBe(true);
+    fireEvent.pointerDown(screen.getByText("Waiting for deposit"));
+    fireEvent.click(screen.getByText("Waiting for deposit"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("selecting text out of the panel, or dragging across the page, is not a click outside", () => {
     const onClose = vi.fn();
     render(<Bills onClose={onClose} />);
@@ -173,5 +190,13 @@ describe("Sheet › pulled down", () => {
     render(<Pulled onClose={onClose} />);
     drag(screen.getByLabelText("Notes"), SWIPE_CLOSE_PX + 60);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("an embedded screenshot editor keeps its own touch without pulling the host sheet", () => {
+    const onClose = vi.fn();
+    render(<Sheet open onClose={onClose} z={22} label="IT request"><div data-image-annotator><canvas aria-label="Mark screenshot" /></div></Sheet>);
+    drag(screen.getByLabelText("Mark screenshot"), SWIPE_CLOSE_PX + 60);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(panel().style.transform).toBe("");
   });
 });

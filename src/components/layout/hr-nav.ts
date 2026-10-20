@@ -222,6 +222,7 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
         // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
         { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
+        { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', match: p => under(p, '/it-support'), visible: viewer => !viewer.viewingAs },
       ],
     },
     {

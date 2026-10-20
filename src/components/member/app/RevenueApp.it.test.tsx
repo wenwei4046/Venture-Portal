@@ -79,8 +79,10 @@ async function open(search: string, options: { data?: () => MemberData; itDesk?:
 const rows = () => screen.getAllByRole("button", { name: /IT-00\d\d/ });
 
 describe("IT support", () => {
-  it("is in Profile › Settings, and opens what one sent — one's own, never everybody's", async () => {
+  it("is first in Profile › Your workspace, and opens only what one sent", async () => {
     const live = await open("?page=account");
+    const workspace = screen.getByRole("heading", { name: "Your workspace" }).closest("section")!;
+    expect(within(workspace).getAllByRole("button")[0]).toHaveAccessibleName("IT support");
     fireEvent.click(screen.getByRole("button", { name: "IT support" }));
     expect(await screen.findByRole("heading", { name: "IT support" })).toBeInTheDocument();
     await waitFor(() => expect(rows().map(r => r.textContent)).toEqual([expect.stringContaining("The Quote freezes on step 2")]));
@@ -110,11 +112,26 @@ describe("IT support", () => {
     expect(window.location.search).toBe("?page=account&view=it");
   });
 
-  it("is not offered while the Principal views a member", async () => {
+  it("shows where support belongs in View as, but cannot open another person's private requests", async () => {
     const live = await open("?page=account&staff=anthony", { data: principalData });
     expect(screen.getByRole("button", { name: /Documentation/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "IT support" })).toBeNull();
+    expect(screen.getByRole("button", { name: "IT support" })).toBeDisabled();
+    expect(screen.getByText("Exit View as to send your own request")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "IT support" }));
     expect(live.itMine).not.toHaveBeenCalled();
+  });
+
+  it.each(["it", "itdesk"])("does not read the real account's private requests through a View as %s deep link", async view => {
+    const live = await open(`?page=account&view=${view}&staff=anthony&it=r1`, {
+      data: principalData, itDesk: { group: "PRINCIPAL", edit: true },
+    });
+    expect(screen.getByText("Exit View as to read and send your own requests.")).toBeInTheDocument();
+    expect(screen.queryByText("The Quote freezes on step 2")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^IT requests/ })).toBeNull();
+    expect(live.itMine).not.toHaveBeenCalled();
+    expect(live.itDesk).not.toHaveBeenCalled();
+    expect(live.itSign).not.toHaveBeenCalled();
   });
 });
 

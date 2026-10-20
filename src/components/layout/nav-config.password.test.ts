@@ -4,7 +4,7 @@ import { buildNavEntries, emptyNavData, isGroup, navLabelByPath, type NavEntry, 
 import { activeHrNavKey, hrNavSections, visibleHrNav } from './hr-nav'
 
 // Change password (2026-10-12 — the user: in their profile "or admin category"; "just for that
-// personal acc"): the last link of Admin in both sidebars (and so in the phone's More sheet), for a
+// personal acc"): an Admin link in both sidebars (and so in the phone's More sheet), for a
 // login a People record names — never a shared one, never while viewing the portal as somebody.
 
 type Leaf = { href: string; label: string; section?: string }
@@ -56,15 +56,15 @@ describe('My documents beside it', () => {
 })
 
 describe('Change password in HR’s sidebar', () => {
-  it('ends Admin for a personal login, and lights there', () => {
+  it('sits in Admin before IT support for a personal login, and lights there', () => {
     const admin = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true }).find(s => s.label === 'Admin')
-    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'Change password'])
-    expect(admin?.items.at(-1)).toMatchObject({ href: '/admin/password', icon: 'lock' })
+    expect(admin?.items.map(i => i.label)).toEqual(['Audit Log', 'Change password', 'IT support'])
+    expect(admin?.items.find(i => i.key === 'password')).toMatchObject({ href: '/admin/password', icon: 'lock' })
     expect(activeHrNavKey(hrNavSections('fair'), '/admin/password')).toBe('password')
   })
 
   it('is not there for hr@ (shared), nor while viewing as somebody', () => {
-    expect(visibleHrNav(hrNavSections('fair'), hr).find(s => s.label === 'Admin')?.items.map(i => i.label)).toEqual(['Audit Log'])
+    expect(visibleHrNav(hrNavSections('fair'), hr).find(s => s.label === 'Admin')?.items.map(i => i.label)).toEqual(['Audit Log', 'IT support'])
     const viewing = visibleHrNav(hrNavSections('fair'), { ...hr, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })
     expect(viewing.find(s => s.label === 'Admin')?.items.map(i => i.label)).toEqual(['Audit Log'])
   })

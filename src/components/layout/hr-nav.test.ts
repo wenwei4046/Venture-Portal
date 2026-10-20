@@ -19,13 +19,20 @@ describe("HR's sidebar", () => {
       ['II.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Allocation', 'Payment']],
       ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Transport claim', 'Food claim']],
       ['IV.', 'People Management', ['People', 'Permissions', 'Org chart', 'People & roles', 'Levels']],
-      ['V.', 'Admin', ['Audit Log']],
+      ['V.', 'Admin', ['Audit Log', 'IT support']],
       ['VI.', 'Directors', ['Director Salary', 'Director Pool']],
     ])
   })
 
   it('keeps the handoff’s eight sections: Hiring, Attendance, HR & Payroll, Revenue, People Management, Documentation, Admin, Directors', () => {
     expect(hrNavSections('fair').map(s => s.label)).toEqual([null, 'Hiring', 'Attendance', 'HR & Payroll', 'Revenue', 'People Management', 'Documentation', 'Admin', 'Directors'])
+  })
+
+  it('opens own IT support without a module permission, except while viewing as somebody', () => {
+    const own = { ...hr, permissions: [], actions: {}, tabs: [] }
+    const items = (viewer: NavViewer) => visibleHrNav(hrNavSections(null), viewer).flatMap(s => s.items)
+    expect(items(own).find(i => i.key === 'it-support')?.href).toBe('/it-support')
+    expect(items({ ...own, viewingAs: { id: 'other', name: 'Other' } }).map(i => i.key)).not.toContain('it-support')
   })
 
   it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {
@@ -95,6 +102,7 @@ describe("HR's sidebar", () => {
     ['/admin/rooms', 'tab=rooms', 'roomRooms'],
     ['/admin/rooms', '', 'roomSched'],
     ['/audit-log/access', '', 'audit'],
+    ['/it-support', '', 'it-support'],
     ['/claims', '', null],
     ['/revenue/department', '', null],
   ])('%s?%s lights %s', (path, search, key) => {

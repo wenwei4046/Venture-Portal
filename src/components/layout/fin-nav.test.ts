@@ -110,18 +110,22 @@ describe("Finance's sidebar", () => {
 })
 
 describe("Finance's account menu", () => {
-  it('opens Account (a login of one’s own) and Admin for Carrie', () => {
+  it('opens Account and Admin for Carrie', () => {
     const groups = visibleAccountMenu(finAccountMenu(), carrie)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
       // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves.
-      ['Account', ['Change password']],
+      ['Account', ['Change password', 'IT support']],
       ['Admin', ['Audit Log', 'Meeting Rooms']],
     ])
   })
 
-  it('keeps Account away from a shared login (finance@) — Admin only, Departments with the chart', () => {
+  it('lets a shared login ask IT for help, with no password control', () => {
     const groups = visibleAccountMenu(finAccountMenu(), finance)
-    expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([['Admin', ['Audit Log', 'Departments', 'Meeting Rooms']]])
+    expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
+      ['Account', ['IT support']],
+      ['Admin', ['Audit Log', 'Departments', 'Meeting Rooms']],
+    ])
+    expect(groups[0].items[0].href).toBe('/it-support')
   })
 
   it('keeps Account away while viewing as somebody', () => {
@@ -133,6 +137,7 @@ describe("Finance's account menu", () => {
     expect(accountMenuActive(finAccountMenu(), '/settings', new URLSearchParams('tab=departments'))).toBe('depts')
     expect(accountMenuActive(finAccountMenu(), '/audit-log/access', null)).toBe('audit')
     expect(accountMenuActive(finAccountMenu(), '/payments', null)).toBeNull()
+    expect(accountMenuActive(finAccountMenu(), '/it-support', null)).toBe('it-support')
   })
 })
 
@@ -160,17 +165,29 @@ describe("the Principal's own view", () => {
   it('puts Access log and Settings in Admin, in the user’s order', () => {
     const groups = visibleAccountMenu(finAccountMenu({ principal: true }), own)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
+      ['Account', ['IT support']],
       ['Admin', ['Audit Log', 'Access log', 'Departments', 'Meeting Rooms', 'Settings']],
     ])
-    const settings = groups[0].items.find((i) => i.key === 'settings')!
+    const settings = groups.find(g => g.title === 'Admin')!.items.find((i) => i.key === 'settings')!
     expect(settings.href).toBe('/settings')
   })
 
   it('adds nothing to Finance’s own view — finance@ and the Principal’s Finance lens', () => {
     expect(finNavSections(data).flatMap((s) => s.items).map((i) => i.key)).not.toContain('opex')
+    expect(finNavSections(data).flatMap((s) => s.items).map((i) => i.key)).not.toContain('it-requests')
     expect(finAccountMenu().flatMap((g) => g.items).map((i) => i.key)).not.toContain('settings')
     const lens = lensNav({ ...principal, role: 'finance', actualRole: 'principal', tabs } as never) as NavViewer
     expect(visibleAccountMenu(finAccountMenu({ principal: true }), lens).flatMap((g) => g.items.map((i) => i.label))).not.toContain('Settings')
+  })
+
+  it('gives the Principal one IT requests desk only when its account may view it, never during view-as', () => {
+    const sections = finNavSections(data, { principal: true })
+    const keys = (viewer: NavViewer) => visibleHrNav(sections, viewer).flatMap(section => section.items.map(item => item.key))
+    const allowed = { ...own, permissions: [...own.permissions, 'it_requests' as const], actions: { ...own.actions, 'it_requests.view': 'all' as const } }
+    expect(keys(allowed)).toContain('it-requests')
+    expect(keys(own)).not.toContain('it-requests')
+    expect(keys({ ...allowed, viewingAs: { id: 'other', name: 'Other' } })).not.toContain('it-requests')
+    expect(activeHrNavKey(sections, '/it-requests')).toBe('it-requests')
   })
 
   it('lights the closest row: Access log on its page, Departments on its tab, Settings on the others', () => {

@@ -872,13 +872,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // View) from the open — the sidebar counts the New ones. A Principal viewing a member reads and writes nothing more
   // (View as is read-only); viewing nobody, IT support is theirs.
   const onIt = route.screen === "account" && (route.pf === "it" || route.pf === "itdesk");
-  const itDeskOn = !!itDesk && !data.demo;
   const itReadOnly = readOnlyView && !!viewed;
-  const it = useItRequests({ source, mineOn: memoryReady && onIt && !data.demo, deskOn: memoryReady && itDeskOn, gen });
-  const itPickVM = itPick ? it.find(itPick) : null;
+  const itDeskOn = !!itDesk && !data.demo && !itReadOnly;
+  const it = useItRequests({ source, mineOn: memoryReady && onIt && !data.demo && !itReadOnly, deskOn: memoryReady && itDeskOn, selectedId: itReadOnly ? null : itPick, gen });
+  const itPickVM = itPick && !itReadOnly ? it.find(itPick) : null;
   // A file of a request: a short link asked for at the tap, opened in a tab readied in the same tap.
   const openItFile = useCallback((id: string, mode: "view" | "download") => {
-    if (!source.itOpen) return;
+    if (!source.itOpen || itReadOnly) return;
     const win = mode === "view" ? window.open("", "_blank") : null;
     if (win) win.opener = null;
     void settleRead(source.itOpen(id, mode)).then(res => {
@@ -887,7 +887,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         else window.location.assign(res.data.url);
       } else win?.close();
     });
-  }, [source]);
+  }, [source, itReadOnly]);
   // A tapped notice's `it=` (lib/push/notices noticeUrl) is the first drawing's; the address then keeps only the page.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -1450,14 +1450,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
     } else if (pf === "it" || pf === "itdesk") {
       const all = pf === "itdesk" && itDeskOn;
-      page = <ItPage mode={all ? "all" : "mine"} mine={it.mine} desk={it.desk} deskOn={itDeskOn} newCount={it.newCount}
-        error={all ? it.deskError : it.mineError} filter={itFilter} readOnly={itReadOnly} onFilter={setItFilter}
+      page = <ItPage mode={all ? "all" : "mine"} mine={itReadOnly ? [] : it.mine} desk={itReadOnly ? [] : it.desk} deskOn={itDeskOn} newCount={itReadOnly ? 0 : it.newCount}
+        error={itReadOnly ? "Exit View as to read and send your own requests." : all ? it.deskError : it.mineError} filter={itFilter} readOnly={itReadOnly} onFilter={setItFilter}
         onMode={m => { setItFilter("all"); goScreen("account", { pf: m === "all" ? "itdesk" : "it" }); }} onBack={back}
         onNew={() => setItFormOpen(true)} onOpen={setItPick} />;
     } else if (pf === "brandWeeks") {
       page = <BrandWeeksPage months={bwMonths} viewing={!!context} onBack={back} />;
     } else {
-      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} closedRows={closedRows} push={!data.demo && !viewed} actions={{
+      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} closedRows={closedRows} push={!data.demo && !viewed} itReadOnly={!data.demo && !fixture && !!viewed} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,
@@ -1579,7 +1579,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           )}
           {(route.pf === "it" || route.pf === "itdesk") && (
             <>
-              <ItRequestForm open={itFormOpen} readOnly={itReadOnly} onSubmit={it.submit} onClose={() => setItFormOpen(false)} />
+              <ItRequestForm open={itFormOpen && !itReadOnly} readOnly={itReadOnly} onSubmit={it.submit} onClose={() => setItFormOpen(false)} />
               <ItRequestSheet open={itPickVM !== null} request={itPickVM} canEdit={!!itDesk?.edit} readOnly={itReadOnly} onNote={it.note}
                 sign={source.itSign} openFile={openItFile} onClose={() => setItPick(null)} />
             </>

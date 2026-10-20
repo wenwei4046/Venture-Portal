@@ -118,6 +118,8 @@ await db.exec(`
 const file = (await readFile(new URL('20261021020100_it_requests.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
+// The new exact reader is additive and deliberately refuses an existing function of the same signature.
+await db.exec(await readFile(new URL('20261021030000_it_request_get.sql', migrations), 'utf8'))
 
 // ── The notices' kinds and the desk's topic: widened, nothing dropped ──────────
 const def = name => one(`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = $1`, [name])
@@ -131,7 +133,7 @@ check([...(await def('app_notifications_kind_check')).matchAll(/'([^']+)'/g)].le
 check(await one(`SELECT count(*)::int FROM storage.buckets WHERE id = 'it-requests' AND NOT public AND file_size_limit = 52428800`), 1, 'the bucket: private, 50 MB a file')
 
 // ── Who may call what ──────────────────────────────────────────────────────────
-for (const fn of ['it_request_submit(text,text,text,jsonb,text,text)', 'my_it_requests()', 'it_requests_desk()', 'it_request_file(uuid)',
+for (const fn of ['it_request_submit(text,text,text,jsonb,text,text)', 'my_it_requests()', 'it_requests_desk()', 'it_request_file(uuid)', 'it_request_get(uuid)',
   'it_request_note(uuid,text,jsonb,text)', 'it_desk_listen()', 'it_request_object_readable(text)', 'it_request_object_removable(text)']) {
   check(await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), false, `the publishable key cannot call ${fn}`)
   check(await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`), true, `a sign-in may call ${fn}`)
@@ -200,6 +202,33 @@ await refuses(`SELECT public.it_requests_desk()`, [], /not open to your account/
 await as(VIEWER, ['it_requests.view'], 'authenticated')
 const desk1 = await one(`SELECT public.it_requests_desk()`)
 check(desk1.map(r => [r.ref, r.mine, r.senderName]), [['IT-0001', false, 'CHEA HUAN']], 'View reads everybody’s')
+
+// An exact detail read does not leak whether another person's request exists.
+const detail = rid => one(`SELECT public.it_request_get($1)`, [rid])
+const hiddenDetail = async rid => {
+  let failure
+  try { await detail(rid) } catch (error) { failure = { code: error.code, message: error.message } }
+  return failure
+}
+await as(SENDER, [], 'authenticated')
+check(await detail(r1.id), r1, 'exact detail: the sender reads their request, files and thread')
+await as(OTHER, [], 'authenticated')
+const hidden = { code: '42501', message: 'This IT request was not found.' }
+check(await hiddenDetail(r1.id), hidden, 'exact detail: another sender cannot read it')
+check(await hiddenDetail(id(999)), hidden, 'exact detail: an absent request reveals nothing different')
+check(await hiddenDetail(null), hidden, 'exact detail: a null ID reveals nothing different')
+await as(DESK, ['it_requests.edit'], 'authenticated')
+check(await hiddenDetail(r1.id), hidden, 'exact detail: Edit alone grants no read')
+await as(VIEWER, ['it_requests.view'], 'authenticated')
+check((await detail(r1.id)).mine, false, 'exact detail: View reads another sender’s request')
+check(await hiddenDetail(id(999)), hidden, 'exact detail: the desk receives the same missing-request answer')
+for (const user of [null, GONE, id(999)]) {
+  await as(user, EDIT, 'authenticated')
+  check(await hiddenDetail(r1.id), { code: '42501', message: 'Sign in with an active account.' }, 'exact detail needs an active portal login, even with desk cells')
+}
+await asSystem()
+check(await one(`SELECT provolatile = 's' AND prosecdef AND proconfig @> ARRAY['search_path=public'] FROM pg_proc WHERE oid = 'public.it_request_get(uuid)'::regprocedure`),
+  true, 'the exact reader is STABLE and fixes its search path')
 
 // ── The thread: replies, notes, statuses ───────────────────────────────────────
 await as(OTHER, [], 'authenticated')
@@ -283,5 +312,19 @@ for (let i = 0; i < 20; i++) await submit('suggestion', `Idea ${i + 1}`)
 await refuses(`SELECT public.it_request_submit('suggestion', 'one more', '', '[]', 'revenue', '')`, [], /20 requests in a day/, 'the twenty-first waits for tomorrow')
 await asSystem()
 check(await one(`SELECT max(ref) FROM public.it_requests`), 'IT-0022', 'refs run on')
+
+// ── Old notification details survive the personal and desk list caps ──────────
+await q(`INSERT INTO public.it_requests (ref, category, title, sent_by, sender_name, app, created_at)
+  SELECT 'QA-CAP-' || n, 'bug', 'Newer request ' || n, $1, 'CHEA HUAN', 'hr',
+         clock_timestamp() + interval '1 day' + n * interval '1 second'
+    FROM generate_series(1, 301) n`, [SENDER])
+await as(SENDER, [], 'authenticated')
+const cappedMine = await one(`SELECT public.my_it_requests()`)
+check([cappedMine.length, cappedMine.some(r => r.id === r1.id)], [100, false], 'the old request is outside the 100 personal rows')
+check([(await detail(r1.id)).ref, (await detail(r1.id)).notes.length], ['IT-0001', 5], 'the owner still opens the old notification with its complete thread')
+await as(DESK, EDIT, 'authenticated')
+const cappedDesk = await one(`SELECT public.it_requests_desk()`)
+check([cappedDesk.length, cappedDesk.some(r => r.id === r1.id)], [300, false], 'the old request is outside the 300 desk rows')
+check([(await detail(r1.id)).ref, (await detail(r1.id)).files.length], ['IT-0001', 2], 'the desk still opens the old notification with its files')
 
 console.log(`validate-it-requests: ${checks} checks passed`)

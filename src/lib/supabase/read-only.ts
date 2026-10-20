@@ -67,6 +67,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'crm_my_unread',
   // IT support (mig 20261021020100): one's own requests, the desk's, a file's path — all STABLE.
   'my_it_requests', 'it_requests_desk', 'it_request_file',
+  // Exact notification detail, including older than either list (mig 20261021030000): STABLE, reading only.
+  'it_request_get',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',

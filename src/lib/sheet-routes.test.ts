@@ -39,6 +39,8 @@ describe('isSheetRoute', () => {
       '/team/roles',
       '/team/permissions',
       '/member-admin',
+      '/it-support',
+      '/it-requests',
     ]) {
       expect(isSheetRoute(path), path).toBe(true)
     }

@@ -64,3 +64,17 @@ export function startPlace(user: (PermissionHolder & { role: string }) | null | 
   if (phone && opensFinApp(user)) return me ? `/fin-app/profile${me}` : '/fin-app'
   return `/dashboard${me}`
 }
+
+/** The desktop view in which a request was written; context only, never permission. */
+export function itSupportApp(user: ShellViewer): 'hr' | 'finance' | 'portal' {
+  return user?.role === 'hr' ? 'hr' : user?.role === 'finance' ? 'finance' : 'portal'
+}
+
+/** A support notice opens its request in the current face of the one app, including Finance's 'hr' push subscription. */
+export function itSupportPlace(user: (PermissionHolder & { role: string }) | null | undefined, phone: boolean, request: string): string {
+  const id = encodeURIComponent(request)
+  if (user?.role === 'revenue_member') return `/member?page=account&view=it&it=${id}`
+  if (phone && opensHrAppOnPhone(user)) return `/hr-app?open=it:${id}`
+  if (phone && opensFinApp(user)) return `/fin-app/it-support?it=${id}`
+  return `/it-support?it=${id}`
+}

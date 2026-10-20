@@ -13,6 +13,12 @@ vi.mock("@/lib/it-requests/upload", () => ({
   uploadItFile: vi.fn(async () => ({ ok: false, reason: "no bucket in this test" })),
   removeItUpload: bucket.remove,
 }));
+vi.mock("@/components/it-requests/ImageAnnotator", () => ({
+  default: ({ onSave, onClose }: { onSave: (file: File) => void; onClose: () => void }) => <div role="dialog" aria-label="Annotate screenshot">
+    <button onClick={() => onSave(new File(["marked"], "shot-marked.png", { type: "image/png" }))}>Save marked copy</button>
+    <button onClick={onClose}>Cancel annotation</button>
+  </div>,
+}));
 
 class NoResize { observe() {} unobserve() {} disconnect() {} }
 beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); bucket.remove.mockClear(); });
@@ -33,6 +39,33 @@ const note = (over: Partial<ItNote>): ItNote => ({
 const takes = () => vi.fn(async (f: File) => ({ ok: true as const, file: { path: `u1/k-${f.name}/${f.name}`, name: f.name, contentType: f.type, size: f.size } }));
 const attach = (...files: File[]) => fireEvent.change(screen.getByTestId("it-files"), { target: { files } });
 const png = (name = "shot.png") => new File(["picture"], name, { type: "image/png" });
+
+describe("screenshot annotation in the Revenue thread", () => {
+  it("attaches a marked copy to the draft without changing the original or sending until asked", async () => {
+    const upload = takes();
+    const onNote = vi.fn(async () => ({ ok: true as const, data: request() }));
+    const sign = vi.fn(async () => ({ ok: true as const, data: { f1: "https://example.invalid/signed-shot" } }));
+    render(<ItRequestSheet open request={request({ mine: false, files: [file({})] })} canEdit readOnly={false}
+      onNote={onNote} onClose={vi.fn()} sign={sign} upload={upload} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Annotate shot.png" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save marked copy" }));
+    await waitFor(() => expect(upload).toHaveBeenCalledOnce());
+    expect(onNote).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Open shot.png" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(onNote).toHaveBeenCalledWith(expect.objectContaining({
+      files: [expect.objectContaining({ name: "shot-marked.png" })],
+    })));
+    expect(bucket.remove).not.toHaveBeenCalled();
+  });
+
+  it("offers no annotation when viewing a request read-only", async () => {
+    render(<ItRequestSheet open request={request({ files: [file({})] })} canEdit={false} readOnly
+      onNote={vi.fn()} onClose={vi.fn()} sign={async () => ({ ok: true, data: { f1: "https://example.invalid/shot" } })} />);
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: /Annotate/ })).toBeNull();
+  });
+});
 
 describe("IT support's page", () => {
   const page = (over: Partial<Parameters<typeof ItPage>[0]> = {}) => {
@@ -191,6 +224,9 @@ describe("Send to IT", () => {
     await screen.findByText("1 KB");
     send();
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    fireEvent.paste(screen.getByRole("textbox", { name: "Details" }), { clipboardData: { files: [png("late.png")] } });
+    expect(f.upload).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("it-files")).toBeDisabled();
     f.view.rerender(<ItRequestForm {...f} open={false} />);
     expect(bucket.remove).not.toHaveBeenCalled();
     await act(async () => { finish(saved ? { ok: true, data: request() } : { ok: false, error: "Could not send." }); });
@@ -310,6 +346,9 @@ describe("A request, read", () => {
     await screen.findByText("1 KB");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    fireEvent.paste(screen.getByRole("textbox", { name: "Your note" }), { clipboardData: { files: [png("late.png")] } });
+    expect(p.upload).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("it-files")).toBeDisabled();
     p.view.unmount();
     expect(bucket.remove).not.toHaveBeenCalled();
     await act(async () => { finish(saved ? { ok: true, data: request() } : { ok: false, error: "Could not save." }); });

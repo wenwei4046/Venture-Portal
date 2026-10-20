@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone, startPlace } from './one-app'
+import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone, startPlace, itSupportPlace, itSupportApp } from './one-app'
 
 // ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是 portal app").
 
@@ -67,6 +67,24 @@ describe('the start (`/`)', () => {
     expect(startPlace(fin, false, 'r1')).toBe('/dashboard?open=me:r1')
     // The Revenue app has no Me.
     expect(startPlace(rev, true, 'r1')).toBe('/member')
+  })
+})
+
+describe('a tapped IT support notification', () => {
+  it('labels desktop requests by the view that submitted them', () => {
+    expect(itSupportApp({ role: 'hr' })).toBe('hr')
+    expect(itSupportApp({ role: 'finance' })).toBe('finance')
+    expect(itSupportApp({ role: 'principal' })).toBe('portal')
+  })
+  it('keeps the request in HR, Finance or Revenue on a phone and uses the portal on desktop', () => {
+    const hr = { role: 'hr', permissions: ['documentation'] }
+    const finance = { role: 'finance', permissions: ['treasury'] }
+    expect(itSupportPlace(hr, true, 'r 1')).toBe('/hr-app?open=it:r%201')
+    expect(itSupportPlace(finance, true, 'r1')).toBe('/fin-app/it-support?it=r1')
+    expect(itSupportPlace({ role: 'principal', permissions: ['view_switch'] }, true, 'r1')).toBe('/fin-app/it-support?it=r1')
+    expect(itSupportPlace(hr, false, 'r1')).toBe('/it-support?it=r1')
+    expect(itSupportPlace(finance, false, 'r1')).toBe('/it-support?it=r1')
+    expect(itSupportPlace({ role: 'revenue_member', permissions: [] }, true, 'r1')).toBe('/member?page=account&view=it&it=r1')
   })
 })
 

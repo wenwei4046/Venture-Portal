@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from "react";
 import { IT_ACCEPT, IT_LIMITS, fileSize, fileTag, isImage, itFileRefusal, type ItUpload } from "@/lib/it-requests/model";
 import { removeItUpload, uploadItFile, type Uploaded } from "@/lib/it-requests/upload";
+import ImageAnnotator from "@/components/it-requests/ImageAnnotator";
 import { ICON, Svg } from "../icons";
 import t from "./it.module.css";
 
@@ -107,6 +108,7 @@ export function ItFileList({ items, full, disabled, onAdd, onRemove, label = "Ad
   label?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [annotating, setAnnotating] = useState<ItAttachment | null>(null);
   return (
     <div className={t.files}>
       {items.map(x => (
@@ -121,9 +123,13 @@ export function ItFileList({ items, full, disabled, onAdd, onRemove, label = "Ad
               {x.state === "up" ? "Uploading…" : x.state === "err" ? x.error : fileSize(x.size)}
             </span>
           </span>
-          <button type="button" className={t.fileX} onClick={() => onRemove(x.key)} aria-label={`Remove ${x.name}`}>
+          <span className={t.fileActions}>
+          {x.preview && <button type="button" className={t.mark} disabled={disabled || full || x.state !== "ok"}
+            onClick={() => setAnnotating(x)} aria-label={`Annotate ${x.name}`}>Annotate</button>}
+          <button type="button" className={t.fileX} disabled={disabled} onClick={() => onRemove(x.key)} aria-label={`Remove ${x.name}`}>
             <Svg d="M6 6l12 12M18 6 6 18" size={16} sw={2} />
           </button>
+          </span>
         </div>
       ))}
       {!full && (
@@ -132,7 +138,9 @@ export function ItFileList({ items, full, disabled, onAdd, onRemove, label = "Ad
         </button>
       )}
       <input ref={input} type="file" multiple accept={IT_ACCEPT} hidden data-testid="it-files"
-        onChange={e => { onAdd([...(e.target.files ?? [])]); e.target.value = ""; }} />
+        disabled={disabled} onChange={e => { if (!disabled) onAdd([...(e.target.files ?? [])]); e.target.value = ""; }} />
+      {annotating?.preview && <ImageAnnotator src={annotating.preview} fileName={annotating.name} theme="revenue"
+        onClose={() => setAnnotating(null)} onSave={file => { onAdd([file]); setAnnotating(null); }} />}
     </div>
   );
 }

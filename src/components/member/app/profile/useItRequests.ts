@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ItNoteInput, ItSubmitInput } from "@/app/(member)/member/it-actions";
 import type { ItRequest } from "@/lib/it-requests/model";
 import { settleRead, type RevenueSource } from "../source";
@@ -19,7 +19,7 @@ export interface ItFixture {
  * on the phone: a status IT set a moment ago shows the next time the page opens. A request sent or written on replaces
  * itself in both lists at once.
  */
-export function useItRequests({ source, mineOn, deskOn, gen, fixture }: {
+export function useItRequests({ source, mineOn, deskOn, gen, fixture, selectedId }: {
   source: RevenueSource;
   /** IT support (or the desk) is on screen. */
   mineOn: boolean;
@@ -28,6 +28,8 @@ export function useItRequests({ source, mineOn, deskOn, gen, fixture }: {
   /** Pull to refresh: every read runs again. */
   gen: number;
   fixture?: ItFixture;
+  /** The open request, also fetched directly so an old notification works beyond either list's limit. */
+  selectedId?: string | null;
 }): {
   mine: ItRequest[] | null;
   desk: ItRequest[] | null;
@@ -43,6 +45,8 @@ export function useItRequests({ source, mineOn, deskOn, gen, fixture }: {
   const [desk, setDesk] = useState<ItRequest[] | null>(fixture?.desk ?? null);
   const [mineError, setMineError] = useState<string | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ source: RevenueSource; request: ItRequest } | null>(null);
+  const written = useRef(new Map<string, number>());
 
   useEffect(() => {
     if (!mineOn || fixture || !source.itMine) return;
@@ -65,12 +69,35 @@ export function useItRequests({ source, mineOn, deskOn, gen, fixture }: {
     // Read again whenever IT support opens too: the desk's list is its "All".
   }, [deskOn, mineOn, gen, fixture, source]);
 
+  useEffect(() => {
+    if ((!mineOn && !deskOn) || !selectedId || fixture || !source.itGet) {
+      setSelected(null);
+      return;
+    }
+    setSelected(current => current?.source === source && current.request.id === selectedId ? current : null);
+    let live = true;
+    const version = written.current.get(selectedId) ?? 0;
+    void settleRead(source.itGet(selectedId)).then(res => {
+      // A closed/changed request, View as, or a reply sent during this read must not receive its old answer.
+      if (!live || version !== (written.current.get(selectedId) ?? 0)) return;
+      const request = res.ok ? res.data : null;
+      setSelected(request?.id === selectedId && (request.mine || deskOn) ? { source, request } : null);
+      if (!res.ok) {
+        if (mineOn) setMineError(res.error);
+        else setDeskError(res.error);
+      }
+    });
+    return () => { live = false; };
+  }, [source, mineOn, deskOn, selectedId, gen, fixture]);
+
   /** A request as it now stands, in place in whichever list holds it — at the top of one's own when it is new. */
   const put = useCallback((r: ItRequest, fresh: boolean) => {
+    written.current.set(r.id, (written.current.get(r.id) ?? 0) + 1);
     const swap = (list: ItRequest[] | null) => (list ? (list.some(x => x.id === r.id) ? list.map(x => (x.id === r.id ? r : x)) : fresh ? [r, ...list] : list) : list);
     if (r.mine) setMine(list => swap(list) ?? (fresh ? [r] : list));
     setDesk(list => swap(list));
-  }, []);
+    setSelected(current => current?.source === source && current.request.id === r.id ? { source, request: r } : current);
+  }, [source]);
 
   const submit = useCallback(async (input: ItSubmitInput): Promise<Outcome<ItRequest>> => {
     if (fixture || !source.itSubmit) return { ok: false, error: "Preview data only." };
@@ -86,7 +113,11 @@ export function useItRequests({ source, mineOn, deskOn, gen, fixture }: {
     return res;
   }, [fixture, source, put]);
 
-  const find = useCallback((id: string) => mine?.find(r => r.id === id) ?? desk?.find(r => r.id === id) ?? null, [mine, desk]);
+  const find = useCallback((id: string) => {
+    if (!mineOn && !deskOn) return null;
+    if (id === selectedId && selected?.source === source && selected.request.id === id && (selected.request.mine || deskOn)) return selected.request;
+    return mine?.find(r => r.id === id) ?? (deskOn ? desk?.find(r => r.id === id) : null) ?? null;
+  }, [mineOn, deskOn, selectedId, selected, source, mine, desk]);
   const newCount = useMemo(() => desk?.filter(r => r.status === "new").length ?? 0, [desk]);
   return { mine, desk, mineError, deskError, newCount, find, submit, note };
 }

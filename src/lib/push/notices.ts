@@ -73,9 +73,9 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   // opens for them (app/page.tsx carries `open=me:` to the HR app, the Finance app's Profile or the portal). The
   // Revenue app has no Me: its front page. Never in a bell.
   if (n.refKind === 'att_request') return app === 'hr' ? `/?open=me:${id}` : '/member'
-  // An IT request (2026-10-20) lives in the Revenue app, whichever app the phone signed up in: Profile › IT support on it
-  // (the desk's own list when it is not theirs).
-  if (n.refKind === 'it_request') return `/member?page=account&view=it&it=${id}`
+  // HR, Finance and the portal share the 'hr' push subscription identity. The one-app start keeps the tapped
+  // request in the caller's own surface; Revenue continues to open its existing Profile flow.
+  if (n.refKind === 'it_request') return app === 'revenue' ? `/member?page=account&view=it&it=${id}` : `/?open=it:${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`
@@ -131,11 +131,11 @@ export function crmPushFromRow(v: unknown): CrmPush | null {
   }
 }
 
-export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me'; id: string }
+export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it'; id: string }
 
 /** What the HR app's `?open=` names: a hire, a booking, a member request, a memo — or one's own request in Me (`me:`). */
 export function openTarget(raw: string | null | undefined): OpenTarget | null {
-  const m = /^(hire|booking|req|memo|me):(.{1,80})$/.exec(raw ?? '')
+  const m = /^(hire|booking|req|memo|me|it):(.{1,80})$/.exec(raw ?? '')
   return m ? { k: m[1] as OpenTarget['k'], id: m[2] } : null
 }
 

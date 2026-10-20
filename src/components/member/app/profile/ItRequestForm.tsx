@@ -122,7 +122,7 @@ function FormBody({ readOnly, onSubmit, onClose, upload }: {
   return (
     <>
       {head}
-      <div className={s.rfScroll} onPaste={readOnly ? undefined : files.paste}>
+      <div className={s.rfScroll} onPaste={readOnly || busy ? undefined : files.paste}>
         <div className={s.field} role="group" aria-label="What is it?">
           <span className={s.fieldLabel}>What is it?</span>
           <div className={s.pills}>
@@ -143,7 +143,7 @@ function FormBody({ readOnly, onSubmit, onClose, upload }: {
             onChange={e => setDetails(e.target.value)} maxLength={IT_LIMITS.details} />
         </label>
         <div className={s.field}><span className={s.fieldLabel}>Screenshots and files</span>
-          <ItFileList items={files.items} full={files.full} disabled={readOnly} onAdd={files.add} onRemove={files.remove} />
+          <ItFileList items={files.items} full={files.full} disabled={readOnly || busy} onAdd={files.add} onRemove={files.remove} />
           <span className={t.hint}>Pictures, videos, PDF, Office, zip — up to 10, 50 MB each.</span>
         </div>
         {error && <p className={s.formError} role="alert">{error}</p>}

@@ -19,7 +19,7 @@ import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-ac
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, openMemberPersonal, type fetchMemberDocuments, type fetchMemberPersonal } from "@/app/(member)/member/docs-actions";
-import { noteItRequest, openItFile, signItFiles, submitItRequest, type ItNoteInput, type ItSubmitInput, type fetchItDesk, type fetchMyItRequests } from "@/app/(member)/member/it-actions";
+import { fetchItRequest, noteItRequest, openItFile, signItFiles, submitItRequest, type ItNoteInput, type ItSubmitInput, type fetchItDesk, type fetchMyItRequests } from "@/app/(member)/member/it-actions";
 import type { ItRequest } from "@/lib/it-requests/model";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
@@ -156,6 +156,8 @@ export interface RevenueSource {
   itMine?(): Promise<Outcome<ItRequest[]>>;
   /** …everybody's, for IT requests · View. */
   itDesk?(): Promise<Outcome<ItRequest[]>>;
+  /** A tapped notice's request, including one older than the list's limit. Never kept on the phone. */
+  itGet?(id: string): Promise<Outcome<ItRequest | null>>;
   /** Send one (its files already in the bucket). */
   itSubmit?(input: ItSubmitInput): Promise<Outcome<ItRequest>>;
   /** A reply, IT's note, a status. */
@@ -263,6 +265,7 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     // IT support (2026-10-20): read fresh, never kept — a status IT set an hour ago must not wait for a pull.
     itMine: () => read<Answer<typeof fetchMyItRequests>>(ask.itMine()),
     itDesk: () => read<Answer<typeof fetchItDesk>>(ask.itDesk()),
+    itGet: id => fetchItRequest(id),
     itSubmit: input => submitItRequest(input),
     itNote: input => noteItRequest(input),
     itSign: ids => signItFiles(ids),

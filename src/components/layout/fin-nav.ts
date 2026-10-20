@@ -24,6 +24,7 @@
 // Admin. HR's pages are not here — HR's view is one switch away.
 
 import { opensPath } from '@/lib/page-tabs'
+import { canDo } from '@/lib/permission-actions'
 import { statementDepts, statementPath } from '@/lib/dept-statements'
 import {
   canAccessAuditLog,
@@ -145,6 +146,11 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
         ...(opts.principal ? [link('opex', 'OPEX', 'people', '/opex', canAccessOpex)] : []),
       ],
     },
+    ...(opts.principal ? [{
+      label: 'IT support',
+      tone: 'slate',
+      items: [link('it-requests', 'IT requests', 'buoy', '/it-requests', viewer => !viewer.viewingAs && canDo(viewer, 'it_requests', 'view'))],
+    } satisfies HrNavSection] : []),
   ]
 }
 
@@ -165,7 +171,7 @@ export interface AccountMenuGroup {
 }
 
 /**
- * The footer's menu (the design's D13): Account — a login of one's own only, as Change password —, then Admin.
+ * The footer's menu (the design's D13): Account — password for a personal login, IT support for every account —, then Admin.
  * The Principal's own view adds Access log and Settings to Admin (2026-10-17, the user's pick: "Audit Log ·
  * Access log · Departments · Meeting Rooms · Settings") — Settings opens on Treasury, its strip reaching the rest.
  * No Edit profile (2026-10-17 — the user: one's record is changed through Me › Profile, which HR approves).
@@ -176,6 +182,7 @@ export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
       title: 'Account',
       items: [
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
+        { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', visible: viewer => !viewer.viewingAs },
       ],
     },
     {
