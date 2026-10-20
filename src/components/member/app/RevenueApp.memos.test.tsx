@@ -2,6 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
 import type { MemberData, MemberMemo } from "@/lib/member/types";
+import { PNG, padPicture, sign } from "@/test/signature";
 import type { RevenueSource } from "./source";
 import RevenueApp from "./RevenueApp";
 
@@ -56,7 +57,7 @@ function source(make: () => MemberData) {
   } satisfies RevenueSource;
 }
 
-beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
+beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); padPicture(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 async function open(search: string, make: () => MemberData) {
@@ -128,10 +129,24 @@ describe("the Principal's own memos", () => {
     expect(screen.queryAllByText("Offer letter")).toHaveLength(0);
     screen.getAllByText("Director memo")[0].closest("button")!.click();
     await act(async () => {});
+    sign(screen.getByLabelText("Sign here"));
     screen.getByRole("button", { name: "Acknowledge" }).click();
     await act(async () => {});
-    expect(ack).toHaveBeenCalledWith("m-mine", true);
+    expect(ack).toHaveBeenCalledWith("m-mine", true, PNG);
     expect(screen.getByText(/You acknowledged this memo/)).toBeInTheDocument();
+  });
+
+  it("viewing a member: no pad, nothing to acknowledge", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=memos&staff=anthony");
+    const memoSignature = vi.fn(async () => ({ ok: true as const, data: PNG }));
+    render(<RevenueApp initialData={principalData()} initialSearch="?page=account&view=memos&staff=anthony" today="2026-10-05"
+      source={{ ...source(principalData), memoSignature }} />);
+    await act(async () => {});
+    (await screen.findAllByText("Offer letter"))[0].closest("button")!.click();
+    await act(async () => {});
+    expect(screen.queryByLabelText("Sign here")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
+    expect(memoSignature).not.toHaveBeenCalled();
   });
 
   it("viewing a member: theirs, read-only, as before", async () => {
@@ -142,5 +157,66 @@ describe("the Principal's own memos", () => {
     await act(async () => {});
     expect(screen.getAllByText("Offer letter").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Director memo")).toHaveLength(0);
+  });
+});
+
+// 2026-10-20 — the user: "点进去的时候，应该要有一个 signature，也就是他自己手绘签名的那种，签完之后再来点那个 Acknowledge
+// button". A memo waiting for the member carries a signature pad; Acknowledge waits for a signature and sends it; one
+// they acknowledged shows the signature they gave, read back once when it is opened.
+describe("a memo is acknowledged with the member's own signature", () => {
+  const own = (): MemberData => ({ ...memberDemo(), demo: false, requests: [], incomes: [], memos: [memo("m-sign", "House rules", [])] });
+
+  it("Acknowledge waits for a signature, then sends it — and the memo shows it", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=memos");
+    const ack = vi.fn(async (_id: string, isAck: boolean) => ({ ok: true as const, data: { acknowledgedAt: isAck ? "2026-10-20T10:01:00Z" : null } }));
+    render(<RevenueApp initialData={own()} initialSearch="?page=account&view=memos" today="2026-10-20" source={{ ...source(own), memo: ack }} />);
+    await act(async () => {});
+    (await screen.findAllByText("House rules"))[0].closest("button")!.click();
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: "Acknowledge" })).toBeDisabled();
+    expect(screen.getByText("Sign above to acknowledge.")).toBeInTheDocument();
+    screen.getByRole("button", { name: "Acknowledge" }).click();
+    await act(async () => {});
+    expect(ack).not.toHaveBeenCalledWith("m-sign", true, expect.anything());
+    sign(screen.getByLabelText("Sign here"));
+    expect(screen.getByRole("button", { name: "Acknowledge" })).toBeEnabled();
+    expect(screen.getByText("Your signature, name and time are recorded for HR.")).toBeInTheDocument();
+    screen.getByRole("button", { name: "Acknowledge" }).click();
+    await act(async () => {});
+    expect(ack).toHaveBeenCalledWith("m-sign", true, PNG);
+    expect(screen.getByText(/You acknowledged this memo/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Your signature" })).toHaveAttribute("src", PNG);
+    expect(screen.queryByLabelText("Sign here")).toBeNull();
+  });
+
+  it("a refusal keeps the signature, says why, and sends nothing more", async () => {
+    window.history.replaceState({}, "", "/member?page=account&view=memos");
+    const ack = vi.fn(async (_id: string, isAck: boolean) => (isAck
+      ? { ok: false as const, error: "Sign in the box before you acknowledge." }
+      : { ok: true as const, data: { acknowledgedAt: null } }));
+    render(<RevenueApp initialData={own()} initialSearch="?page=account&view=memos" today="2026-10-20" source={{ ...source(own), memo: ack }} />);
+    await act(async () => {});
+    (await screen.findAllByText("House rules"))[0].closest("button")!.click();
+    await act(async () => {});
+    sign(screen.getByLabelText("Sign here"));
+    screen.getByRole("button", { name: "Acknowledge" }).click();
+    await act(async () => {});
+    expect(screen.getByText("Sign in the box before you acknowledge.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acknowledge" })).toBeEnabled();
+    expect(screen.queryByText(/You acknowledged this memo/)).toBeNull();
+  });
+
+  it("an acknowledged memo, opened, reads its signature back once", async () => {
+    const acked = (): MemberData => ({ ...own(), memos: [{ ...memo("m-done", "Old rules", []), readAt: "2026-10-19T02:00:00Z", acknowledgedAt: "2026-10-19T02:05:00Z" }] });
+    window.history.replaceState({}, "", "/member?page=account&view=memos");
+    const memoSignature = vi.fn(async () => ({ ok: true as const, data: PNG }));
+    render(<RevenueApp initialData={acked()} initialSearch="?page=account&view=memos" today="2026-10-20" source={{ ...source(acked), memoSignature }} />);
+    await act(async () => {});
+    (await screen.findAllByText("Old rules"))[0].closest("button")!.click();
+    await act(async () => {});
+    expect(memoSignature).toHaveBeenCalledWith("m-done");
+    expect(screen.getByRole("img", { name: "Your signature" })).toHaveAttribute("src", PNG);
+    expect(screen.queryByLabelText("Sign here")).toBeNull();
+    expect(memoSignature).toHaveBeenCalledTimes(1);
   });
 });

@@ -130,7 +130,7 @@ const ROW_SHEETS: [string, (onClose: () => void) => ReactNode][] = [
   ["My honours › a finish", onClose => <HonourSheet open place={null} vm={null} periodLabel="" onClose={onClose} />],
   ["Team & capacity › a person", onClose => <PersonSheet open vm={null} onClose={onClose} />],
   ["Requests › a request", onClose => <RequestSheet open vm={null} busy={false} error={null} onCancel={() => {}} onUpdate={() => {}} onClose={onClose} />],
-  ["Memos › a memo", onClose => <MemoSheet open memo={null} busy={false} readOnly={false} error={null} onAck={() => {}} onClose={onClose} />],
+  ["Memos › a memo", onClose => <MemoSheet open memo={null} busy={false} readOnly={false} error={null} signature={null} onSign={() => {}} onAck={() => {}} onClose={onClose} />],
 ];
 
 describe.each(ROW_SHEETS)("%s is a peek", (_, sheet) => {

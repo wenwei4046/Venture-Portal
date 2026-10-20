@@ -12,6 +12,7 @@ vi.mock('@/components/me/MeOverlay', () => ({
     (open ? <div data-testid="me" data-back={backLabel} data-start={startRequest ?? ''}>{accountRows}</div> : null),
 }))
 
+import { PNG, padPicture, sign } from '@/test/signature'
 import HrApp, { type HrAppActions } from './HrApp'
 
 // The HR app — HR Mobile (2026-10-17, the handoff `design_handoff_hr_mobile`): four tabs, sub screens, the generic
@@ -314,11 +315,13 @@ describe('memos (2026-10-12)', () => {
     publishedAt: '2026-10-12T09:44:13Z', version: 1, requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' }, readAt: null, acknowledgedAt: null,
   }
   const marks = () => {
-    const mark = vi.fn(async (_id: string, ack: boolean) => ({ ok: true as const, acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null }))
-    return { mark, acts: { ...actions, memoMark: mark, memoFile: vi.fn(async () => ({ ok: false as const, reason: 'Withdrawn.' })) } }
+    const mark = vi.fn(async (_id: string, ack: boolean, _signature?: string | null) => ({ ok: true as const, acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null }))
+    const memoSignature = vi.fn(async () => PNG)
+    return { mark, memoSignature, acts: { ...actions, memoMark: mark, memoSignature, memoFile: vi.fn(async () => ({ ok: false as const, reason: 'Withdrawn.' })) } }
   }
 
-  it('Home heads with one to acknowledge; opening reads it; Acknowledge records it once', async () => {
+  it('Home heads with one to acknowledge; opening reads it; Acknowledge waits for a signature and records it once', async () => {
+    padPicture()
     const { mark, acts } = marks()
     render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
     expect(screen.getByText('Waiting for you')).toBeInTheDocument()
@@ -326,9 +329,32 @@ describe('memos (2026-10-12)', () => {
     expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
     expect(screen.getByText('They start Monday.')).toBeInTheDocument()
     await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', false))
+    // 2026-10-20 — the user: "签完之后再来点那个 Acknowledge button".
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeDisabled()
+    sign(screen.getByLabelText('Sign here'))
+    expect(screen.getByText('Your signature, name and time are recorded for HR.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
-    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', true))
+    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', true, PNG))
     expect(await screen.findByText(/You acknowledged this ·/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
+    expect(screen.queryByLabelText('Sign here')).toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('one acknowledged before shows the signature it was given, read back once; viewing as somebody, none', async () => {
+    const { memoSignature, acts } = marks()
+    const done = { ...memo, readAt: '2026-10-12T10:00:00Z', acknowledgedAt: '2026-10-12T10:01:00Z' }
+    window.history.pushState(null, '', '/hr-app?open=memo:m1')
+    const { unmount } = render(<HrApp data={{ ...data, memos: [done], personalLogin: true }} actions={acts} />)
+    expect(await screen.findByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
+    expect(memoSignature).toHaveBeenCalledWith('m1')
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    unmount()
+    memoSignature.mockClear()
+    window.history.pushState(null, '', '/hr-app?open=memo:m1')
+    render(<HrApp data={{ ...data, memos: [memo], personalLogin: true, viewingAs: 'KRIS' }} actions={acts} />)
+    expect(screen.queryByLabelText('Sign here')).toBeNull()
+    expect(memoSignature).not.toHaveBeenCalled()
   })
 
   it('a tapped push opens it (?open=memo:…); one taken back since opens the list', () => {

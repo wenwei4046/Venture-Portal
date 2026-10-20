@@ -12,6 +12,7 @@ import {
 } from '@/lib/hr-app/model'
 import type { Notice } from '@/lib/push/notices'
 import { ackedLine, memoDay, memoFileExt, memoParas, memoUnread, memoWaiting, memoWhen, type MyMemo } from '@/lib/memos/model'
+import SignaturePad, { SignatureImage } from '@/components/memos/SignaturePad'
 import { letterState as myLetterState, personalIn, personalPath, personalUnseen, type MyDocuments } from '@/lib/documentation/personal'
 import { docDay } from '@/lib/documentation/model'
 import { Avatar, Card, Chip, Empty, Facts, Flow, Icon, MONO, Pills, Primary, Row, SectHead, Tiles, toneOf, type Tone } from './kit'
@@ -572,7 +573,17 @@ export function MemosScreen({ memos, open }: { memos: MyMemo[]; open: (id: strin
   )
 }
 
-export function MemoScreen({ m, openFile }: { m: MyMemo | null; openFile: (id: string) => void }) {
+/**
+ * One memo, read in full. Since 2026-10-20 (the user: "签完之后再来点那个 Acknowledge button") one waiting for them
+ * carries the signature pad (`signing`) above the bar's Acknowledge, which waits for it; one they acknowledged shows the
+ * signature they gave (`signature`).
+ */
+export function MemoScreen({ m, openFile, signing = null, signature = null }: {
+  m: MyMemo | null
+  openFile: (id: string) => void
+  signing?: { value: string | null; onChange: (png: string | null) => void; busy: boolean } | null
+  signature?: string | null
+}) {
   if (!m) return <div className={s.sub}><Card><Empty>This memo was taken back.</Empty></Card></div>
   const waiting = memoWaiting(m)
   return (
@@ -591,7 +602,15 @@ export function MemoScreen({ m, openFile }: { m: MyMemo | null; openFile: (id: s
             right={<span className={s.stageBtn} style={{ background: 'var(--hr2-pill-on)', color: 'rgb(var(--tone-clay-deep))' }}>View</span>} onClick={() => openFile(m.id)} />
         </Card>
       ) : null}
+      {signing ? (
+        <div className={s.memoSign}>
+          <div className={s.memoSignLabel}>Your signature</div>
+          <SignaturePad value={signing.value} onChange={signing.onChange} disabled={signing.busy} className={s.memoPad} />
+          <div className={s.meta}>{signing.value ? 'Your signature, name and time are recorded for HR.' : 'Sign above, then tap Acknowledge.'}</div>
+        </div>
+      ) : null}
       {m.acknowledgedAt ? <div className={s.meta}>✓ {ackedLine(m.acknowledgedAt)}</div> : null}
+      {m.acknowledgedAt && signature ? <SignatureImage src={signature} alt="Your signature" className={s.memoSigned} /> : null}
     </div>
   )
 }

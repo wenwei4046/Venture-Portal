@@ -10,7 +10,7 @@ import {
 import type { HrAppData } from '@/lib/hr-app/model'
 import { readNotices, removePushSubscription, reportPushTrouble, savePushSubscription } from '@/lib/push/actions'
 import { changeMyPassword, loadMyEmailChange, requestEmailChange, withdrawEmailChange } from '@/lib/account/actions'
-import { markMyMemo, openMemoFile } from '@/lib/memos/actions'
+import { markMyMemo, myMemoSignature, openMemoFile } from '@/lib/memos/actions'
 import { openMyDoc } from '@/lib/documentation/my-docs-actions'
 import HrApp, { type HrAppActions } from './HrApp'
 
@@ -48,6 +48,8 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     requestEmail: { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange },
     // Their own memos (2026-10-12): the login's receipt, the same one the portal's bell and the Revenue app write.
     memoMark: markMyMemo,
+    // …the signature an acknowledged memo of theirs was given (2026-10-20).
+    memoSignature: myMemoSignature,
     memoFile: openMemoFile,
     // Their own documents (2026-10-14): the login's own, read and opened under its own session.
     myDocLink: (kind, id) => openMyDoc(kind, id),

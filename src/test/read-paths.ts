@@ -353,6 +353,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
+  // A memo acknowledged with a signature (mig 20261021013000): one's own signature on a memo one acknowledged (a
+  // sign-in, their own receipt); a Data center letter's, to Documentation · View.
+  'my_memo_signature', 'hr_letter_signature',
   // Sub-departments per person (mig 20261016180000): the caller's own reach; a person's, to whoever reads their
   // boxes; their ticks, by whoever manages permissions.
   'my_sub_department_reach', 'person_sub_department_reach', 'permission_user_reach_set',

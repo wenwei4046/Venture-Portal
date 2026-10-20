@@ -13,6 +13,7 @@
  */
 
 import { officeTime } from '@/lib/office-time'
+import { signatureOrNull } from './signature'
 
 export interface MemoFile {
   name: string
@@ -154,6 +155,8 @@ export interface PreviewPerson {
   hasLogin: boolean
   readAt: string | null
   acknowledgedAt: string | null
+  /** The signature they acknowledged with (2026-10-20) — null for an older acknowledgement, or none yet. */
+  signature: string | null
 }
 
 export interface MemoPreview {
@@ -192,6 +195,7 @@ export function memoPreviewFromRow(raw: unknown): MemoPreview | null {
         hasLogin: y.hasLogin === true,
         readAt: strOrNull(y.readAt),
         acknowledgedAt: strOrNull(y.acknowledgedAt),
+        signature: signatureOrNull(y.signature),
       }
     }).filter(p => p.staffId),
   }

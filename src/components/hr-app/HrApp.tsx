@@ -79,8 +79,13 @@ export interface HrAppActions {
   changePassword: ChangePassword
   /** Request to change email (2026-10-16) — a personal login only. Absent: the row is not drawn. */
   requestEmail?: RequestEmailActions
-  /** Their own memo (2026-10-12): opened, or acknowledged — the LOGIN's receipt, in every view at once. */
-  memoMark(id: string, ack: boolean): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
+  /**
+   * Their own memo (2026-10-12): opened, or acknowledged — the LOGIN's receipt, in every view at once. Acknowledged
+   * with their own signature (2026-10-20): the pad's PNG, refused without one.
+   */
+  memoMark(id: string, ack: boolean, signature?: string | null): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
+  /** The signature an acknowledged memo of theirs was given (2026-10-20) — drawn under it; null when there is none. */
+  memoSignature?(id: string): Promise<string | null>
   memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** One of their own documents (2026-10-14): a short link made at the press. */
   myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
@@ -187,6 +192,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   // Their own memos (2026-10-12): what was opened or acknowledged here shows at once, before the app reads again.
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   const [acked, setAcked] = useState<ReadonlyMap<string, string>>(() => new Map())
+  // The signature before Acknowledge (2026-10-20): the pad's picture for the memo open, and each acknowledged memo's
+  // signature once given here or read back.
+  const [memoSig, setMemoSig] = useState<string | null>(null)
+  const [memoSigned, setMemoSigned] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const memoSigAsked = useRef<Set<string>>(new Set())
   const memos = useMemo<MyMemo[]>(() => memosInOrder((d.memos ?? []).map(m => ({
     ...m,
     readAt: m.readAt ?? (opened.has(m.id) || acked.has(m.id) ? m.publishedAt : null),
@@ -326,6 +336,20 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
     // Once per memo opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memoOpen])
+  // Another memo, or none: the pad starts clean. One they acknowledged: its signature read back once, to draw under it.
+  const memoShown = mm?.id ?? null
+  useEffect(() => { setMemoSig(null) }, [memoShown])
+  const memoSignedAt = mm && mm.acknowledgedAt && !d.viewingAs ? mm.id : null
+  useEffect(() => {
+    if (!memoSignedAt || !actions.memoSignature || memoSigAsked.current.has(memoSignedAt)) return
+    memoSigAsked.current.add(memoSignedAt)
+    const id = memoSignedAt
+    void actions.memoSignature(id).then(png => {
+      if (png) setMemoSigned(prev => (prev.has(id) ? prev : new Map(prev).set(id, png)))
+    })
+    // Once per acknowledged memo opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoSignedAt])
 
   // ── An attendance request decided (HR's step, or the upline's on their behalf) ──
   const arView = ar && att ? requestView(ar, att.config, att.ledger, att.requests) : null
@@ -541,7 +565,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         ) : null}
         {top?.k === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
         {top?.k === 'memos' ? <MemosScreen memos={memos} open={id => push({ k: 'memo', id })} /> : null}
-        {top?.k === 'memo' ? <MemoScreen m={mm} openFile={id => openInTab(() => actions.memoFile(id, 'view'), flash)} /> : null}
+        {top?.k === 'memo' ? (
+          <MemoScreen m={mm} openFile={id => openInTab(() => actions.memoFile(id, 'view'), flash)}
+            signing={mm && memoWaiting(mm) && !d.viewingAs ? { value: memoSig, onChange: setMemoSig, busy } : null}
+            signature={mm && !d.viewingAs ? memoSigned.get(mm.id) ?? null : null} />
+        ) : null}
         {top?.k === 'mydocs' || top?.k === 'mydocsFolder' ? (
           <MyDocsScreen docs={d.myDocs ?? null} folder={top.k === 'mydocsFolder' ? top.id : null} tab={top.k === 'mydocsFolder' ? 'personal' : mdTab} setTab={setMdTab}
             openFolder={id => push({ k: 'mydocsFolder', id })} open={(kind, id) => openInTab(() => actions.myDocLink(kind, id), flash, actions.refresh)} />
@@ -576,11 +604,19 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       ) : null}
       {top?.k === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
         <div className={s.actBar}>
-          <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy} onClick={() => run(async () => {
-            const r = await actions.memoMark(mm.id, true)
-            if (r.ok) setAcked(prev => new Map(prev).set(mm.id, r.acknowledgedAt ?? new Date().toISOString()))
-            return r.ok ? { ok: true } : r
-          }, undefined, 'Acknowledged')}>{busy ? 'Recording…' : 'Acknowledge'}</button>
+          <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || !memoSig} onClick={() => {
+            const signature = memoSig
+            if (!signature) return
+            run(async () => {
+              const r = await actions.memoMark(mm.id, true, signature)
+              if (r.ok) {
+                setAcked(prev => new Map(prev).set(mm.id, r.acknowledgedAt ?? new Date().toISOString()))
+                setMemoSigned(prev => new Map(prev).set(mm.id, signature))
+                setMemoSig(null)
+              }
+              return r.ok ? { ok: true } : r
+            }, undefined, 'Acknowledged')
+          }}>{busy ? 'Recording…' : 'Acknowledge'}</button>
         </div>
       ) : null}
 

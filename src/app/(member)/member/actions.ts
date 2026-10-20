@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { pushSoon } from "@/lib/push/outbox";
 import { getMemberUser } from "@/lib/auth";
 import { isPrincipalAccount } from "@/lib/view-as";
-import { markMyMemo, openMemoFile } from "@/lib/memos/actions";
+import { markMyMemo, myMemoSignature, openMemoFile } from "@/lib/memos/actions";
 import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
@@ -118,19 +118,25 @@ export async function fetchMemberReplacementFormLink() {
 export async function fetchMemberWaitingQueue(context?: Pick<MemberReadContext, "staffId">) {
   return loadMemberWaitingQueue(context);
 }
-export async function acknowledgeMemberMemo(id: string, ack: boolean) {
+/** Read, or acknowledged with the member's own signature (2026-10-20 — the pad's PNG; none, and it is refused). */
+export async function acknowledgeMemberMemo(id: string, ack: boolean, signature?: string | null) {
   // The Principal's own memos (2026-10-12): their People record is not a Revenue member's, so their receipt goes
   // through the login's own function — the very row the portal's bell and the HR app write.
   const user = await getMemberUser();
   if (user && isPrincipalAccount(user)) {
-    const own = await markMyMemo(id, ack);
+    const own = await markMyMemo(id, ack, signature);
     return own.ok
       ? { ok: true as const, data: { id, readAt: own.readAt, acknowledgedAt: own.acknowledgedAt, version: 1 } }
       : { ok: false as const, error: own.reason };
   }
-  const result = await acknowledge(id, ack);
+  const result = await acknowledge(id, ack, signature);
   if (result.ok) revalidatePath("/member");
   return result;
+}
+/** One's own signature on a memo one acknowledged (2026-10-20): drawn back in the memo, beside "You acknowledged". */
+export async function fetchMemberMemoSignature(id: string) {
+  const signature = await myMemoSignature(id);
+  return { ok: true as const, data: signature };
 }
 /** A memo's file (2026-10-12): a short link made at the tap — to its person, or to the Principal viewing them. */
 export async function openMemberMemoFile(id: string, mode: "view" | "download") {

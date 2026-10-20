@@ -1,5 +1,6 @@
 "use client";
 
+import SignaturePad, { SignatureImage } from "@/components/memos/SignaturePad";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { PageHead } from "./IncomePages";
@@ -59,14 +60,21 @@ export default function MemosPage({ memos, tab, onTab, onBack, onOpen }: {
 /**
  * One memo, read in full; acknowledging records the member's name and time for HR (lines 1680–1697). The file sent
  * with it (2026-10-12 — the user: Kris "在打开 memo 时是看不到附件的") is a row under the body: its tile, its name, View
- * and Download, each a short link made at the tap.
+ * and Download, each a short link made at the tap. Since 2026-10-20 (the user: "签完之后再来点那个 Acknowledge button")
+ * a memo waiting for them carries a signature pad under the body, and Acknowledge waits for a signature; one they
+ * acknowledged shows the signature they gave.
  */
-export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose, onFile }: {
+export function MemoSheet({ open, memo, busy, readOnly, error, signature, signed = null, onSign, onAck, onClose, onFile }: {
   open: boolean;
   memo: MemoVM | null;
   busy: boolean;
   readOnly: boolean;
   error: string | null;
+  /** The pad's picture while they sign (2026-10-20): Acknowledge sends it, and waits for it. */
+  signature: string | null;
+  /** The signature an acknowledged memo was given — drawn under "You acknowledged"; null while not read (or none). */
+  signed?: string | null;
+  onSign: (png: string | null) => void;
   onAck: () => void;
   onClose: () => void;
   /** Open the memo's file — absent where nothing can be read (the design preview). */
@@ -100,14 +108,21 @@ export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose, o
                 )}
               </div>
             )}
+            {needs && !readOnly && (
+              <div className={s.mdSign}>
+                <span className={s.mdSignLabel}>Your signature</span>
+                <SignaturePad value={signature} onChange={onSign} disabled={busy} className={s.mdPad} />
+              </div>
+            )}
             {memo.acked && <div className={s.mdAcked}><Svg d={ICON.tick} size={18} sw={2.4} />{memo.ackedText}</div>}
+            {memo.acked && signed && <SignatureImage src={signed} alt="Your signature" className={s.mdSigned} />}
             {error && <p className={s.formError}>{error}</p>}
           </div>
           <div className={s.mdFoot}>
             {needs && !readOnly ? (
               <>
-                <button className={s.primary} onClick={onAck} disabled={busy}>{busy ? "Recording…" : "Acknowledge"}</button>
-                <span className={s.mdAckNote}>Your name and time are recorded for HR.</span>
+                <button className={s.primary} onClick={onAck} disabled={busy || !signature}>{busy ? "Recording…" : "Acknowledge"}</button>
+                <span className={s.mdAckNote}>{signature ? "Your signature, name and time are recorded for HR." : "Sign above to acknowledge."}</span>
               </>
             ) : (
               <button className={s.done} onClick={onClose}>Done</button>

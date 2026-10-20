@@ -64,6 +64,11 @@
   --walnut: 90 62 43;
   --scrim: 90 62 43;
 
+  /* A hand-drawn signature (2026-10-20, components/memos/SignaturePad): dark ink on white paper in EVERY theme —
+     the picture is kept as drawn and read back by somebody else, in their own theme, so neither ever inverts. */
+  --signature-ink: 43 31 23;
+  --signature-paper: 255 255 255;
+
   /* Band — walnut lifted a step, for the one dark object that REPEATS: the
      department divider in a grouped table. Full walnut is right for a hero
      card you meet once on a page; six of them down a roster is a lot of ink,

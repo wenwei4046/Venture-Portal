@@ -29,6 +29,7 @@ import { ANY_TIME, isAnyTime } from "./waiting-start";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
 import { SEND_REFUSED, appClosed, requestPageOf } from "./app-pages";
 import { readFoodWeeks, type FoodWeekPick } from "./claim-rules";
+import { signatureProblem } from "@/lib/memos/signature";
 import type { MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
@@ -1559,15 +1560,24 @@ export async function loadPrincipalMemoReceipts(staffId: string): Promise<Member
   });
 }
 
+/**
+ * Read (`ack` false) or acknowledged — acknowledged with the member's own signature (2026-10-20, mig 20261021013000:
+ * the pad's PNG, kept on the receipt with the first acknowledgement; the database refuses an Acknowledge without one).
+ */
 export async function acknowledgeMemberMemo(
   id: string,
   ack: boolean,
+  signature?: string | null,
 ): Promise<MemberOutcome<MemoReceipt>> {
   return outcome(async () => {
     const client = await session("member_memos");
+    const acking = ack === true;
+    const problem = acking ? signatureProblem(signature) : null;
+    if (problem) throw new Error(problem);
     return rpc<MemoReceipt>(client, "member_acknowledge_memo", {
       p_memo: uuid(id, "Memo"),
-      p_ack: ack === true,
+      p_ack: acking,
+      p_signature: acking ? signature : null,
     });
   });
 }

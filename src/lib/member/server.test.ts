@@ -993,3 +993,30 @@ describe('a send whose page’s Create was unticked', () => {
     expect((await calculateMemberQuote(quote)).ok).toBe(true)
   })
 })
+
+// 2026-10-20 — the user: "点进去的时候，应该要有一个 signature … 签完之后再来点那个 Acknowledge button". A member's Acknowledge
+// carries the pad's PNG; without one it is refused before the database is asked (which refuses it too, mig 20261021013000).
+describe('a member acknowledges a memo with their own signature', () => {
+  const memoId = '10000000-0000-4000-8000-000000000009'
+  const PNG = `data:image/png;base64,iVBORw0KGgo${'A'.repeat(400)}`
+  beforeEach(() => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_memos'] }))
+    mocks.rpc.mockResolvedValue({ data: { id: memoId, readAt: 'x', acknowledgedAt: 'y', version: 1 }, error: null })
+  })
+
+  it('without a signature: refused, and the database is not asked', async () => {
+    expect(await acknowledgeMemberMemo(memoId, true)).toEqual({ ok: false, error: 'Sign in the box before you acknowledge.' })
+    expect(await acknowledgeMemberMemo(memoId, true, 'data:image/jpeg;base64,/9j/4AAQ')).toMatchObject({ ok: false })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it('signed: the signature goes with it', async () => {
+    expect((await acknowledgeMemberMemo(memoId, true, PNG)).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_acknowledge_memo', { p_memo: memoId, p_ack: true, p_signature: PNG })
+  })
+
+  it('read: no signature asked, none sent', async () => {
+    expect((await acknowledgeMemberMemo(memoId, false)).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_acknowledge_memo', { p_memo: memoId, p_ack: false, p_signature: null })
+  })
+})

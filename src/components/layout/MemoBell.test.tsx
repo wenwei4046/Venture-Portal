@@ -6,10 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // receipt, the same in every view.
 
 const db = vi.hoisted(() => ({ rpc: vi.fn() }))
-const memoActions = vi.hoisted(() => ({ markMyMemo: vi.fn(), openMemoFile: vi.fn() }))
+const memoActions = vi.hoisted(() => ({ markMyMemo: vi.fn(), openMemoFile: vi.fn(), myMemoSignature: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => db }))
 vi.mock('@/lib/memos/actions', () => memoActions)
 
+import { PNG, padPicture, sign } from '@/test/signature'
 import MemoBell from './MemoBell'
 
 const row = (over: Record<string, unknown>) => ({
@@ -22,6 +23,9 @@ beforeEach(() => {
   db.rpc.mockReset()
   memoActions.markMyMemo.mockReset()
   memoActions.openMemoFile.mockReset()
+  memoActions.myMemoSignature.mockReset()
+  memoActions.myMemoSignature.mockResolvedValue(PNG)
+  padPicture()
   db.rpc.mockResolvedValue({
     data: {
       staffId: 'loo',
@@ -36,7 +40,10 @@ beforeEach(() => {
     ok: true, readAt: '2026-10-12T10:00:00Z', acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null,
   }))
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('MemoBell', () => {
   it('reads the login’s own memos and counts what is new or waiting', async () => {
@@ -63,16 +70,31 @@ describe('MemoBell', () => {
     expect(memoActions.markMyMemo).toHaveBeenCalledWith('m1', false)
   })
 
-  it('Acknowledge records it once — then it says when', async () => {
+  it('Acknowledge waits for a signature, records it once with it — then says when and shows it', async () => {
     render(<MemoBell />)
     fireEvent.click(await screen.findByRole('button', { name: 'Memos, 1 new' }))
     const drawer = await screen.findByRole('dialog')
     fireEvent.click(within(drawer).getByText('House rules').closest('button')!)
+    expect(within(drawer).getByRole('button', { name: 'Acknowledge' })).toBeDisabled()
+    expect(within(drawer).getByText('Sign above to acknowledge.')).toBeInTheDocument()
+    sign(within(drawer).getByLabelText('Sign here'))
+    expect(within(drawer).getByText(/Your signature, name and time are recorded for HR/)).toBeInTheDocument()
     fireEvent.click(within(drawer).getByRole('button', { name: 'Acknowledge' }))
-    await waitFor(() => expect(memoActions.markMyMemo).toHaveBeenCalledWith('m1', true))
+    await waitFor(() => expect(memoActions.markMyMemo).toHaveBeenCalledWith('m1', true, PNG))
     expect(await within(drawer).findByText(/You acknowledged this ·/)).toBeInTheDocument()
+    expect(within(drawer).getByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
     expect(within(drawer).queryByRole('button', { name: 'Acknowledge' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Memos' })).toBeInTheDocument()
+  })
+
+  it('a memo acknowledged before shows the signature it was given, read back when opened', async () => {
+    render(<MemoBell />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Memos, 1 new' }))
+    const drawer = await screen.findByRole('dialog')
+    fireEvent.click(within(drawer).getByText('Old notice').closest('button')!)
+    expect(memoActions.myMemoSignature).toHaveBeenCalledWith('old')
+    expect(await within(drawer).findByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
+    expect(within(drawer).queryByLabelText('Sign here')).toBeNull()
   })
 
   it('a refusal is said in words', async () => {
@@ -82,6 +104,7 @@ describe('MemoBell', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Memos, 1 new' }))
     const drawer = await screen.findByRole('dialog')
     fireEvent.click(within(drawer).getByText('House rules').closest('button')!)
+    sign(within(drawer).getByLabelText('Sign here'))
     fireEvent.click(within(drawer).getByRole('button', { name: 'Acknowledge' }))
     expect(await within(drawer).findByRole('alert')).toHaveTextContent('Read-only while viewing as somebody')
   })
