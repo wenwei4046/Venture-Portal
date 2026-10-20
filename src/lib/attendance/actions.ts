@@ -11,6 +11,8 @@ import { ATT_BUCKET, previewOf, type FileLink, type RemindOutcome } from './file
 import { attendanceFacts, otHoursOf } from './payroll'
 import { sendToPayroll, type PayrollSend } from './payroll-write'
 import { loadBoard, loadMonth, loadRequests } from './server'
+import { addressFromJson, addressRefusal } from '@/lib/address/address'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 
 /**
  * HR › Attendance's writes (2026-10-15). Each stands behind the Attendance
@@ -213,8 +215,11 @@ export async function reopenMonth(month: string, reason: string) {
 
 export type SettingKind = 'schedule' | 'location' | 'holiday' | 'assignment' | 'leave' | 'ot' | 'policy' | 'route'
 
-export async function saveSetting(kind: SettingKind, id: string | null, row: Record<string, unknown>) {
+export async function saveSetting(kind: SettingKind, id: string | null, row: Record<string, unknown>): Promise<AttOutcome<{ id: string; label: string }>> {
   await requireActionOn('/attendance/settings', 'attendance', 'edit')
+  // A location's address is six parts, State → City → Postcode one place on Malaysia's list (2026-10-20).
+  const refused = kind === 'location' ? addressRefusal(addressFromJson(row), MALAYSIA_DATA) : null
+  if (refused) return { ok: false, reason: refused }
   return call<{ id: string; label: string }>('att_save_setting', { p_kind: kind, p_id: id, p_row: row }, 'The setting could not be saved.')
 }
 

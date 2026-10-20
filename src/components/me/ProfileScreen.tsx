@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import { Button } from '@/components/ds/Button'
 import { DescriptionList } from '@/components/ds/Data'
 import { DsSelect, Field, TextField } from '@/components/ds/Field'
-import MeAddressFields from './MeAddressFields'
+import DsAddressFields from '@/components/address/DsAddressFields'
 import { isEmptyAddress } from '@/lib/address/address'
 import { bankOptions, pendingBanner, recordCards, type ProfileForm } from '@/lib/me/profile'
 import type { AttRequest } from '@/lib/attendance/types'
@@ -93,7 +93,7 @@ export function ProfileEdit({ form, set, record, clean, busy, onCancel, onSend, 
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Label>Home address</Label>
-        <MeAddressFields
+        <DsAddressFields
           value={form.address}
           onChange={address => set({ address })}
           onFile={record?.address && isEmptyAddress(record.addressParts) ? record.address : null}

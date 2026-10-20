@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import file from './malaysia-postcodes.json'
 import {
   EMPTY_ADDRESS,
+  addressFromJson,
   addressLines,
   addressOf,
   addressRefusal,
@@ -15,7 +16,7 @@ import {
   withState,
   type Address,
 } from './address'
-import { addressFormEntries, addressFromChanges, addressFromForm, addressPatch } from './address-form'
+import { addressFormEntries, addressFromChanges, addressFromForm, addressJsonOf, addressPatch } from './address-form'
 import { belongTogether, citiesOf, placesOfPostcode, postcodesOf, statesOf, type PostcodeData } from './malaysia'
 
 // An address in six parts (2026-10-20 — the user: "填写的 format 要区分成 address 1、address 2、postcode、state、city，国家
@@ -182,5 +183,17 @@ describe('on a form and on a record', () => {
     expect(addressFromChanges(changes)).toEqual(CHEA)
     expect(addressFromChanges([{ key: 'contact_number', to: '012' }])).toBeNull()
     expect(addressFromChanges('nope')).toBeNull()
+  })
+
+  it('crosses to a database function and back by its keys — addressLine1 … (my_record, att_config, att_save_setting)', () => {
+    const sent = addressJsonOf({ ...CHEA, line2: ' ' })
+    expect(sent).toEqual({
+      addressLine1: 'No 83, Jalan Jambu 3', addressLine2: null, addressPostcode: '14000', addressCity: 'Bukit Mertajam',
+      addressState: 'Pulau Pinang', addressCountry: 'Malaysia',
+    })
+    expect(addressFromJson(sent)).toEqual({ ...CHEA, line2: '' })
+    // No address at all goes as every key null, and reads back as none.
+    expect(Object.values(addressJsonOf(EMPTY_ADDRESS))).toEqual([null, null, null, null, null, null])
+    expect(addressFromJson(null)).toEqual(EMPTY_ADDRESS)
   })
 })
