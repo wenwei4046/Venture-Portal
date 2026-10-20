@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261020200000 (Member services › Transport claim, 2026-10-20 — the user: Claim
+// Local PostgreSQL regression for 20261020220000 (Member services › Transport claim, 2026-10-20 — the user: Claim
 // rates becomes Transport claim, and a ⋯ beside Save picks "什么 title 的人可以 claim 这个 transport … 跟 food claim
 // 一样"). HR ticks the titles whose holders may send a transport claim (Outstation, a plane ticket, an Airbnb stay):
 // seeded with every Revenue title on the day; `member_admin_transport_claim` / `member_admin_save_transport_claim`
@@ -137,7 +137,7 @@ try {
   await q(`INSERT INTO member_claim_rates(id, rate_per_spot, food_title_ids) VALUES (true, 25, ARRAY[$1]::uuid[])`, [T_SPECIALIST])
 
   // ── The migration, verbatim — twice ────────────────────────────────────────────────────────────
-  const sql = (await readFile(new URL('20261020200000_transport_claim_titles.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const sql = (await readFile(new URL('20261020220000_transport_claim_titles.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(sql)
   const after = { detail: await md5('member_claim_detail_for'), settings: await md5('member_claim_settings'), prepare: await md5('member_prepare_request') }
   const seeded = (await q('SELECT transport_title_ids AS ids FROM member_claim_rates WHERE id'))[0].ids.sort()
