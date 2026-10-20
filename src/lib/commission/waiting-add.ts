@@ -185,10 +185,13 @@ export function letterKind(bytes: Uint8Array, declared: string): LetterKind | 'm
   return null
 }
 
+/** Why a Word file holding macros is refused — HR's uploads and the member app's say it alike. */
+export const WORD_MACROS_REFUSAL = 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.'
+
 /** The file as the signed form — its kind, or why it cannot be one, in words. */
 export function letterFile(bytes: Uint8Array, declared: string): { ok: true; kind: LetterKind } | { ok: false; reason: string } {
   const kind = letterKind(bytes, declared)
-  if (kind === 'macros') return { ok: false, reason: 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.' }
+  if (kind === 'macros') return { ok: false, reason: WORD_MACROS_REFUSAL }
   if (!kind) return { ok: false, reason: `The signed form must be ${SIGNED_FORM_KINDS}.` }
   return { ok: true, kind }
 }
