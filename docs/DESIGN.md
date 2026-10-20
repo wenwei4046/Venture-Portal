@@ -1287,6 +1287,7 @@ The dense kit for lists of short strings, never money. It now serves the payroll
 `team/people/_components/` (measurements in `people.module.css`) — HR's kit end to end.
 - **The head:** *Invite user · Import InfoTech · + Add person*, compact tabs, five cards, then search with counted pills.
 - **The grid** — a band per department ("· N incomplete" in amber), then rows of: tile (an orange rim when they can sign in), name, title + L-level, rank chip, code, status, Last seen. Right-click opens the row menu.
+  - *Invite user* in it is faint — a click only toasts why — for somebody with a login, somebody inactive, a reader who may not invite, and (2026-10-20) a full-access title for a reader who does not manage permissions: *DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions gives it a login.* Such a person is not offered in the window's *Person* list either, and every other door (their window, their page, `?invite=`) toasts the same.
 - **The person window** (760px; 900 on a login's Permissions) — Details and History tabs, "missing" in amber, then *Esc closes.* · Full page.
 - **Invite user** (466px; v4.62) — the kit's small tabs *Send invite link* | *Set password* (the link first), Email, and on *Set password* the password: dots until the eye inside its box is pressed, Regenerate beside it; then Role and *Send invite link* / *Create login*.
   - **When Supabase does not email the link** the window stays: why, in the amber note, then *Invite link · {email}* in a read-only box with *Copy link* (*Copied*), and *Done*.
@@ -1334,6 +1335,7 @@ The matrix is **Permissions by view and tab** (Part III). Around it:
 - **The title tables** (`ledger-table tight`): Title · Department · People · Their own boxes · Template. The select moves the title at once.
 - ***Show history*:** When · Who · What changed.
 - **Invite user** (`InviteDialog`): email, an invite link or a password (v4.62), and the title's template as the role — nothing to choose. A per-person cell is set later, in their window.
+  - **Who may invite** (2026-10-20): HR view › *Permissions* · **Create** — its box's tooltip says *Invite user* (Edit's, *Change what a title or a person may do*). A full-access title stays with Edit.
 - **Hierarchy › Roles** (`PeopleRoles`): a band per title, with its template link, over the people holding it.
 - **Masked fields** follow **A hidden value** (Part II).
 
