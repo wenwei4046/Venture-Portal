@@ -1341,6 +1341,7 @@ The matrix is **Permissions by view and tab** (Part III). Around it:
 
 `member-admin/_components/`
 - **Request reviews** — the list card beside the request card: facts, the step with its note and buttons, then AUDIT HISTORY.
+  - *View ↗* on a signed form (v4.102) opens a PDF or a picture in a new tab. A Word form, which a browser saves rather than shows, downloads under the name it was sent with, and the page says *Downloads name*.
 - **Brand weeks** — read only (v3.64). A column per Friday; each week is a chip in its brand's colours (solid for Sales Attending, dashed for auto-located, faint for "No fair"), with the venue under it. The foot says when the ERP last sent it.
 - **Claim rates** — Outstation / Airbnb, regions, venues. Save reads "Saved" until something differs.
 - **Food claim** (v3.81) — *Fair only*. *Rate a day*, then the titles (Title · Level · *In Fair* · *Can claim*).
@@ -1624,6 +1625,7 @@ The Revenue app's `profile/RequestForm`.
 - The questions come in the form's order, with "(optional)" when not required; a refused send marks *Required* in red.
 - **Application form:** Download and Upload. Upload turns green once a file is chosen and is red while it is required and missing. Then the signature pad with Clear.
 - The done screen adds *Signed form attached · name*.
+- **A Word letter** (v4.102) — *Upload signed form* takes the filled-in Word file (a .docx, or an old .doc) beside a photo, scan or PDF, 3 MB. Both notes end *… then upload a photo or scan — or the filled-in Word file.* A Word file holding macros is refused in words. A claim's invoice stays a JPG, PNG or PDF.
 - **Submit replacement** draws the same way (v3.43), under "Replacement form".
 
 ### Waiting list & replacements (v3.28, 2026-10-10)
@@ -1662,6 +1664,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.102** · 2026-10-20 · Revenue app › Submit waiting list / Submit replacement: the signed form may be the filled-in Word file (the user: "need as well") — a .docx or an old .doc beside a photo, scan or PDF; the notes end *… or the filled-in Word file.*; one holding macros is refused; a claim's invoice stays JPG, PNG or PDF. Member services' *View ↗* downloads a Word form under its own name (*Downloads name*) → Submit waiting list, Member services (#570)
 - **v4.101** · 2026-10-20 · Sales Groups › Waiting list: an applicant's signed form may be a Word file (the user: "want word file as well") — the drawer and "+" take a .docx or an old .doc beside a PDF, PNG or JPG (*PDF, Word, PNG or JPG …*); Word's W; *View* reads a .docx, an old .doc is Download only; one holding macros is refused → Waiting list flow (#568)
 - **v4.100** · 2026-10-20 · Sales Groups › Waiting list: an applicant's drawer holds their signed form (the user: "view for the letter they submit, then can be upload as well, the file") — a *SIGNED FORM* section between the facts and the history: the file's icon, its name, *date · who*, *View* (the uploaded form's 640px viewer) and *Replace*; with none, a dashed *Upload the signed form* (PDF, PNG or JPG · 3 MB; a file may be dropped on it); its upload is a step in the history → Waiting list flow (#566)
 - **v4.99** · 2026-10-20 · The Revenue app's income is what payroll pays (the user: "the basic is deduct from the commission … you can get it from hr code base"): the fixed salary comes out of the commission with every EPF / SOCSO / EIS and the PCB — HR's figures, a typed one included — so Today's hero is *Net basic RM x + balance commission RM y*, never *Fixed salary + commission*; My income lists the deductions under the commission, adds *Paid as* (Net basic · Balance commission), and Past months show what reached the bank → The Revenue app — built to the prototype
