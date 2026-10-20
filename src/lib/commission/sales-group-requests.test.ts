@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ADDED_NOTE,
+  FORM_UPLOADED,
   addedHere,
   arrangementOf,
   dayLabel,
@@ -173,5 +174,39 @@ describe('historyOf', () => {
       ['Updated by the member', 'Changed: phone number, preferred start date'],
       ['Updated by the member', null],
     ])
+  })
+
+  // 2026-10-20 (the user: "view for the letter they submit, then can be upload as well"): HR uploads the signed
+  // form in the applicant's drawer — a step with no move, which the database notes "Signed form uploaded · <file>".
+  it('reads a signed form HR uploaded as its own step, the file its note — once more for a replacement', () => {
+    const steps = historyOf([
+      { to: 'waiting', at: '2026-10-20T04:41:25Z', note: ADDED_NOTE, by: 'LI SEAN' },
+      { to: 'waiting', at: '2026-10-20T06:00:00Z', note: `${FORM_UPLOADED} · Joan Quek application.pdf`, by: 'LI SEAN' },
+      { to: 'waiting', at: '2026-10-21T01:00:00Z', note: `${FORM_UPLOADED} · Joan clearer.png`, by: 'HR' },
+    ])
+    expect(steps.map(s => [s.what, s.by, s.note])).toEqual([
+      ['Added to the waiting list', 'LI SEAN', null],
+      ['Signed form uploaded', 'LI SEAN', 'Joan Quek application.pdf'],
+      ['Signed form uploaded', 'HR', 'Joan clearer.png'],
+    ])
+  })
+
+  it('folds a note that only begins with the words into the step, as any other', () => {
+    const steps = historyOf([
+      { to: 'waiting', at: '2026-10-10T02:00:00Z', note: null, by: 'HR' },
+      { to: 'waiting', at: '2026-10-10T02:00:01Z', note: 'Signed form uploaded late by the member', by: 'HR' },
+    ])
+    expect(steps.map(s => [s.what, s.note])).toEqual([['Accepted onto the waiting list', 'Signed form uploaded late by the member']])
+  })
+
+  it('keeps the applicant accepted when they were and "Added by" the one who added them', () => {
+    const r = req({
+      events: [
+        { to: 'waiting', at: '2026-10-20T04:41:25Z', note: ADDED_NOTE, by: 'LI SEAN' },
+        { to: 'waiting', at: '2026-10-20T06:00:00Z', note: `${FORM_UPLOADED} · Joan.pdf`, by: 'OTHER HR' },
+      ],
+    })
+    expect(addedHere(r)).toBe(true)
+    expect(r.events.find(e => e.to === 'waiting')?.by).toBe('LI SEAN')
   })
 })
