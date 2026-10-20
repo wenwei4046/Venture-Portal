@@ -271,6 +271,24 @@ describe('"+" — straight onto the list', () => {
     expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-006")
   })
 
+  // 2026-10-20, the user: "want word file as well".
+  it('takes a Word file as the signed form too', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-007' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    expect(win).toHaveTextContent('PDF, Word, PNG or JPG, 3 MB or smaller.')
+    const input = within(win).getByLabelText('Attach the signed form')
+    expect(input.getAttribute('accept')).toContain('.docx')
+    fill(win)
+    const letter = new File(['PK'], 'Daniel letter.docx', { type: '' })
+    fireEvent.change(input, { target: { files: [letter] } })
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(sent().get('signedForm')).toBe(letter)
+  })
+
   // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
   it('takes Any time ready instead of a day — the date then left empty', async () => {
     actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-007' })
@@ -366,6 +384,38 @@ describe('an applicant’s signed form', () => {
     expect(viewer.querySelector('iframe')).toHaveAttribute('src', 'data:application/pdf;base64,JVBERi0xLjQK')
   })
 
+  // 2026-10-20, the user: "want word file as well".
+  it('shows a Word letter as Word, and View reads it here in a frame where nothing runs', async () => {
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan.docx?token=t', name: 'Joan letter.docx', type: DOCX })
+    const fetched = vi.fn(async () => new Response(new Uint8Array([80, 75, 3, 4, 1, 2])))
+    vi.stubGlobal('fetch', fetched)
+    convertToHtml.mockResolvedValue({ value: '<p>WAITING LIST APPLICATION — JOAN QUEK XIAO</p>', messages: [] })
+    const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan letter.docx', type: DOCX } }))
+    expect(drawer.querySelector('[data-kind="word"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    const viewer = screen.getByRole('dialog', { name: 'Joan letter.docx' })
+    await waitFor(() => expect(viewer.querySelector('iframe')).not.toBeNull())
+    expect(fetched).toHaveBeenCalledWith('https://files.test/sign/joan.docx?token=t', expect.anything())
+    const frame = viewer.querySelector('iframe')!
+    expect(frame).toHaveAttribute('sandbox', '')
+    expect(frame.getAttribute('srcdoc')).toContain('WAITING LIST APPLICATION — JOAN QUEK XIAO')
+  })
+
+  it('an old .doc is Download only', async () => {
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan.doc?token=t', name: 'Joan letter.doc', type: 'application/msword' })
+    const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan letter.doc', type: 'application/msword' } }))
+    expect(drawer.querySelector('[data-kind="word"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    const viewer = screen.getByRole('dialog', { name: 'Joan letter.doc' })
+    expect(viewer).toHaveTextContent('No preview for .doc files.Download it to open.')
+    expect(within(viewer).getByRole('button', { name: 'Download' })).toBeInTheDocument()
+  })
+
   it('draws a picture whose name says nothing of its kind, by the type the bucket kept', async () => {
     actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan?token=t', name: 'Joan', type: 'image/jpeg' })
     const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan', type: 'image/jpeg' } }))
@@ -394,7 +444,8 @@ describe('an applicant’s signed form', () => {
     actions.uploadSignedForm.mockResolvedValue({ ok: true, form: ON_FILE })
     const drawer = open()
     expect(drawer).toHaveTextContent('Upload the signed form')
-    expect(drawer).toHaveTextContent('PDF, PNG or JPG · 3 MB or smaller')
+    expect(drawer).toHaveTextContent('PDF, Word, PNG or JPG · 3 MB or smaller')
+    expect(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form").getAttribute('accept')).toBe('.pdf,.png,.jpg,.jpeg,.doc,.docx')
     const file = pdf()
     await act(async () => {
       fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [file] } })

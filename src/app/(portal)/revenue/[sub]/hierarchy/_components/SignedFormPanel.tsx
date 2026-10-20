@@ -16,7 +16,8 @@ import w from './waiting.module.css'
  * Submit waiting list, or HR attached — its icon, its name, when and by whom. *View* opens it in the 640px viewer
  * the uploaded form's View uses; *Replace* uploads another in its place. With none on file, the dashed *Upload
  * the signed form* (a file can be dropped on it too). Uploading is Member services · Edit's, as "+" is; the
- * file is what every signed form is: a PDF, PNG or JPG of 3 MB or less.
+ * file is what "+" takes: a PDF, PNG or JPG, or a Word file (2026-10-20, the user: "want word file as well"),
+ * of 3 MB or less. A Word .docx is read in the viewer; an old .doc is Download only.
  */
 export default function SignedFormPanel({
   requestId,
@@ -122,7 +123,7 @@ export default function SignedFormPanel({
           onDrop={drop}
         >
           <span className={w.signedDropTitle}>{uploading ? 'Uploading…' : 'Upload the signed form'}</span>
-          <span className={w.signedDropHint}>PDF, PNG or JPG · 3 MB or smaller</span>
+          <span className={w.signedDropHint}>PDF, Word, PNG or JPG · 3 MB or smaller</span>
           {input}
         </label>
       ) : (
