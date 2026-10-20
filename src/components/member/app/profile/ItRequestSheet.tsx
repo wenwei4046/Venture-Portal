@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ItNoteInput } from "@/app/(member)/member/it-actions";
 import {
   CATEGORY_LABEL, IT_LIMITS, IT_STATUSES, STATUS_LABEL, STATUS_TONE, fileSize, fileTag, isImage, itWhen, noteProblem,
@@ -38,7 +38,7 @@ export default function ItRequestSheet({ open, request, canEdit, readOnly, onNot
   return (
     <Sheet open={open} onClose={onClose} z={22} maxHeight="88%" scroll peek className={s.sheetBody} label={request?.title ?? "IT request"}>
       <SheetHandle />
-      {request && <Body key={request.id} request={request} canEdit={canEdit} readOnly={readOnly} onNote={onNote} sign={sign} openFile={openFile} onClose={onClose} upload={upload} />}
+      {open && request && <Body key={request.id} request={request} canEdit={canEdit} readOnly={readOnly} onNote={onNote} sign={sign} openFile={openFile} onClose={onClose} upload={upload} />}
     </Sheet>
   );
 }
@@ -70,10 +70,22 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const files = useItUploads(upload);
+  const { discard } = files;
+  const closed = useRef(false);
+  const sending = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      // A send may still be filing these uploads. Its answer decides which ones can be removed.
+      if (!sending.current) discard();
+    };
+  }, [discard]);
   const writes = !readOnly && (r.mine || canEdit);
   const setsStatus = canEdit && !readOnly;
 
   const send = async () => {
+    if (sending.current) return;
     setError(null);
     const next = setsStatus && status !== r.status ? status : null;
     const problem = noteProblem({ body, files: files.items.length, status: next, current: r.status });
@@ -81,11 +93,20 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
     if (files.busy) return setError("Wait for the files to finish uploading.");
     if (files.failed) return setError("Take off the files that could not be uploaded, or add them again.");
     setBusy(true);
-    const res = await onNote({ id: r.id, body, files: files.uploads, status: next, current: r.status });
-    setBusy(false);
-    if (!res.ok) return setError(res.error);
-    setBody("");
-    files.clear();
+    sending.current = true;
+    try {
+      const res = await onNote({ id: r.id, body, files: files.uploads, status: next, current: r.status });
+      if (!res.ok) {
+        if (!closed.current) setError(res.error);
+        return;
+      }
+      files.clear();
+      if (!closed.current) setBody("");
+    } finally {
+      sending.current = false;
+      if (closed.current) discard();
+      else setBusy(false);
+    }
   };
 
   const own = r.files.filter(f => f.noteId === null);

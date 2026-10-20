@@ -59,22 +59,39 @@ function FormBody({ readOnly, onSubmit, onClose, upload }: {
   const files = useItUploads(upload);
   const { discard } = files;
   // Closed (or swiped away) before it was sent: what went up comes out again.
-  const done = useRef(false);
-  useEffect(() => () => { if (!done.current) discard(); }, [discard]);
+  const closed = useRef(false);
+  const sending = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      // An in-flight send must finish filing its uploads before cleanup can remove any.
+      if (!sending.current) discard();
+    };
+  }, [discard]);
 
   const send = async () => {
+    if (sending.current) return;
     setError(null);
     const problem = !category ? "Pick what it is: a bug, a new feature or a suggestion." : submitProblem({ category, title, details, files: files.items.length });
     if (problem) return setError(problem);
     if (files.busy) return setError("Wait for the files to finish uploading.");
     if (files.failed) return setError("Take off the files that could not be uploaded, or add them again.");
     setBusy(true);
-    const res = await onSubmit({ category: category!, title, details, files: files.uploads, device: thisDevice() });
-    setBusy(false);
-    if (!res.ok) return setError(res.error);
-    done.current = true;
-    files.clear();
-    setSent(res.data);
+    sending.current = true;
+    try {
+      const res = await onSubmit({ category: category!, title, details, files: files.uploads, device: thisDevice() });
+      if (!res.ok) {
+        if (!closed.current) setError(res.error);
+        return;
+      }
+      files.clear();
+      if (!closed.current) setSent(res.data);
+    } finally {
+      sending.current = false;
+      if (closed.current) discard();
+      else setBusy(false);
+    }
   };
 
   const head = (

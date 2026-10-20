@@ -180,6 +180,24 @@ describe("Send to IT", () => {
     expect(f.onSubmit).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])("closing while a request sends waits for its result (saved: %s)", async saved => {
+    type Result = Awaited<ReturnType<Parameters<typeof ItRequestForm>[0]["onSubmit"]>>;
+    let finish!: (value: Result) => void;
+    const onSubmit = vi.fn(() => new Promise<Result>(resolve => { finish = resolve; }));
+    const f = form({ onSubmit });
+    fireEvent.click(screen.getByRole("button", { name: "Fix a bug" }));
+    fill("The Quote freezes");
+    attach(png());
+    await screen.findByText("1 KB");
+    send();
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    f.view.rerender(<ItRequestForm {...f} open={false} />);
+    expect(bucket.remove).not.toHaveBeenCalled();
+    await act(async () => { finish(saved ? { ok: true, data: request() } : { ok: false, error: "Could not send." }); });
+    if (saved) expect(bucket.remove).not.toHaveBeenCalled();
+    else expect(bucket.remove).toHaveBeenCalledExactlyOnceWith("u1/k-shot.png/shot.png");
+  });
+
   it("fills in and sends nothing in View as", () => {
     form({ readOnly: true });
     expect(screen.getByRole("button", { name: "Read-only while viewing as" })).toBeDisabled();
@@ -195,8 +213,8 @@ describe("A request, read", () => {
       sign: vi.fn(async (ids: string[]) => ({ ok: true as const, data: Object.fromEntries(ids.map(id => [id, `https://files.example/${id}.png`])) })),
       upload: takes(), ...over,
     };
-    render(<ItRequestSheet {...props} />);
-    return props;
+    const view = render(<ItRequestSheet {...props} />);
+    return { ...props, view };
   };
 
   it("shows its sender what was sent, its pictures and files, and IT's notes — and the reply goes to IT", async () => {
@@ -250,6 +268,53 @@ describe("A request, read", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Your note" }), { target: { value: "Hello" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That request is not yours to write on.");
+  });
+
+  it("closing an unsent reply removes its uploads", async () => {
+    const p = sheet(request());
+    attach(png());
+    await screen.findByText("1 KB");
+    p.view.rerender(<ItRequestSheet {...p} open={false} />);
+    expect(bucket.remove).toHaveBeenCalledExactlyOnceWith("u1/k-shot.png/shot.png");
+    expect(p.onNote).not.toHaveBeenCalled();
+  });
+
+  it("closing while a reply's file uploads removes it when it arrives", async () => {
+    type Uploaded = Awaited<ReturnType<ReturnType<typeof takes>>>;
+    let finish!: (value: Uploaded) => void;
+    const upload = vi.fn(() => new Promise<Uploaded>(resolve => { finish = resolve; }));
+    const p = sheet(request(), { upload });
+    attach(png());
+    expect(screen.getByText("Uploading…")).toBeInTheDocument();
+    p.view.unmount();
+    await act(async () => { finish(await takes()(png())); });
+    expect(bucket.remove).toHaveBeenCalledExactlyOnceWith("u1/k-shot.png/shot.png");
+  });
+
+  it("a sent reply keeps its files when the request closes", async () => {
+    const p = sheet(request());
+    attach(png());
+    await screen.findByText("1 KB");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.queryByText("shot.png")).toBeNull());
+    p.view.unmount();
+    expect(bucket.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("closing while a reply sends waits for its result (saved: %s)", async saved => {
+    type Result = Awaited<ReturnType<Parameters<typeof ItRequestSheet>[0]["onNote"]>>;
+    let finish!: (value: Result) => void;
+    const onNote = vi.fn(() => new Promise<Result>(resolve => { finish = resolve; }));
+    const p = sheet(request(), { onNote });
+    attach(png());
+    await screen.findByText("1 KB");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+    p.view.unmount();
+    expect(bucket.remove).not.toHaveBeenCalled();
+    await act(async () => { finish(saved ? { ok: true, data: request() } : { ok: false, error: "Could not save." }); });
+    if (saved) expect(bucket.remove).not.toHaveBeenCalled();
+    else expect(bucket.remove).toHaveBeenCalledExactlyOnceWith("u1/k-shot.png/shot.png");
   });
 
   it("reads and writes nothing in View as", async () => {
