@@ -359,6 +359,16 @@ export function accAt(acc: QAcc, size: SizeKey | null): { productId: string; siz
   return null;
 }
 
+/** Every SKU that can be bought separately, with fitted sizes in bed-size order. */
+export function accVariants(acc: QAcc): { productId: string; size: SizeKey | null }[] {
+  const variants: { productId: string; size: SizeKey | null }[] = acc.any ? [{ productId: acc.any, size: null }] : [];
+  for (const size of ["S", "SS", "Q", "K", "SK"] as const) {
+    const productId = acc.sizes[size];
+    if (productId) variants.push({ productId, size });
+  }
+  return variants;
+}
+
 // ── the sheet ─────────────────────────────────────────────────────────────
 
 export interface BfPick {
@@ -385,7 +395,8 @@ export type SheetState =
       leg: string | null; specials: string[];
     }
   | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
-  | { mode: "acc"; size: SizeKey; acc: Record<string, number>; accAll: boolean };
+  /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
+  | { mode: "acc"; acc: Record<string, number>; accAll: boolean };
 
 /** The first bed frame that comes in a size, A–Z; empty when none does. */
 export function firstFrame(catalog: QCatalog, size: SizeKey): string {
@@ -440,11 +451,13 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
   }
   if (sh.mode === "model" || sh.mode === "acc") {
     for (const acc of catalog.accs) {
-      const n = (sh.acc[acc.key] ?? 0) * sets;
-      if (!n) continue;
-      const at = accAt(acc, sh.size);
-      if (!at) continue;
-      push(out, { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty: n, productId: at.productId });
+      const variants = sh.mode === "acc" ? accVariants(acc) : [accAt(acc, sh.size)];
+      for (const at of variants) {
+        if (!at) continue;
+        const n = (sh.acc[sh.mode === "acc" ? at.productId : acc.key] ?? 0) * sets;
+        if (!n) continue;
+        push(out, { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty: n, productId: at.productId });
+      }
     }
   }
   return out;
@@ -550,7 +563,8 @@ const sameFrame = (a: RecentFrame, b: RecentFrame) =>
   a.size === b.size && a.frame === b.frame && a.kpi.join() === b.kpi.join() && bedframeKey(a.build) === bedframeKey(b.build);
 
 /** What adding a sheet teaches the memory (the prototype's `addSheet`). */
-export function remember(memory: QuoteMemory, sh: SheetState, brand: string): QuoteMemory {
+export function remember(memory: QuoteMemory, sh: SheetState, catalog: QCatalog): QuoteMemory {
+  const brand = catalog.brand;
   const next: QuoteMemory = { sets: { ...memory.sets }, layouts: { ...memory.layouts }, frames: memory.frames, accs: { ...memory.accs } };
   const sets = next.sets[brand] ?? [];
   if (sh.mode === "sofa") {
@@ -569,7 +583,9 @@ export function remember(memory: QuoteMemory, sh: SheetState, brand: string): Qu
     next.frames = [f, ...memory.frames.filter(r => !sameFrame(r, f))].slice(0, 3);
   }
   if (sh.mode === "model" || sh.mode === "acc") {
-    const used = Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k);
+    const used = sh.mode === "acc"
+      ? catalog.accs.filter(acc => accVariants(acc).some(at => (sh.acc[at.productId] ?? 0) > 0)).map(acc => acc.key)
+      : Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k);
     if (used.length) next.accs[brand] = [...used, ...(memory.accs[brand] ?? []).filter(k => !used.includes(k))].slice(0, 12);
   }
   return next;
