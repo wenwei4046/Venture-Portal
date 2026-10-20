@@ -23,7 +23,7 @@ import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-inpu
 import { previewWageWindow, scheduleStatutory, statutoryLookup } from "@/app/(portal)/revenue/_lib/pay-preview-before-run";
 import { monthFinishes, type HonourBoard } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
-import { WORD_MACROS_REFUSAL, letterKind } from "@/lib/commission/waiting-add";
+import { WORD_DOC, WORD_DOCX, WORD_MACROS_REFUSAL, letterKind } from "@/lib/commission/waiting-add";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
 import { ANY_TIME, isAnyTime } from "./waiting-start";
 import { queuesFrom, type WaitingQueue } from "./waiting-queue";
@@ -1608,7 +1608,7 @@ export async function adminMemberAction(
         throw new Error(`No accessible ${what} was found.`);
       const result = await client
         .from("member_request_attachments")
-        .select("object_path")
+        .select("object_path, mime_type")
         .eq("request_id", requestId)
         .eq("content_sha256", request.data.detail[key])
         .order("created_at", { ascending: false })
@@ -1616,11 +1616,16 @@ export async function adminMemberAction(
         .maybeSingle();
       if (result.error || !result.data)
         throw new Error(`No accessible ${what} was found.`);
-      const signed = await client.storage
-        .from("member-invoices")
-        .createSignedUrl(result.data.object_path, 120);
+      // A browser opens a PDF or a picture where it is, but saves a Word file
+      // (2026-10-20, once members could send one): it is handed over under
+      // the name it was sent with, not the bucket's, and `download` says so.
+      const name = String(request.data.detail.signedFormName ?? "").trim();
+      const saved = command.action === "signed_form" && !!name && [WORD_DOCX, WORD_DOC].includes(result.data.mime_type);
+      const signed = saved
+        ? await client.storage.from("member-invoices").createSignedUrl(result.data.object_path, 120, { download: name })
+        : await client.storage.from("member-invoices").createSignedUrl(result.data.object_path, 120);
       if (signed.error) throw new Error(signed.error.message);
-      return { url: signed.data.signedUrl, expiresIn: 120 };
+      return { url: signed.data.signedUrl, expiresIn: 120, ...(saved ? { download: name } : {}) };
     }
     if (command.action === "publish_memo") {
       const departments = command.departments;

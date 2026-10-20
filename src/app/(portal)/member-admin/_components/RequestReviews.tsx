@@ -108,8 +108,10 @@ export default function RequestReviews({
       const result = await adminMemberAction(act.input)
       if (!result.ok) return { ok: false, reason: result.error }
       if (act.input.action === 'invoice' || act.input.action === 'signed_form') {
-        const url = (result.data as { url?: string } | null)?.url
-        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        const link = result.data as { url?: string; download?: string } | null
+        if (link?.url) window.open(link.url, '_blank', 'noopener,noreferrer')
+        // A Word form is saved, not shown (2026-10-20): said as the viewer's Download says it.
+        if (link?.url && link.download) flash(`Downloads ${link.download}`)
         return null
       }
       return { ok: true, done: act.done }

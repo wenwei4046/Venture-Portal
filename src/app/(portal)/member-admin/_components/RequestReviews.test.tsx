@@ -229,4 +229,36 @@ describe('RequestReviews', () => {
     expect(within(detail()).getByRole('alert')).toHaveTextContent('This action requires an open request and an explanation')
     expect(flash).not.toHaveBeenCalled()
   })
+
+  // A member may send a Word file as the signed form (2026-10-20, the user: "need as well"): a browser saves one
+  // instead of showing it, so View ↗ says it is downloading, under the name it was sent with.
+  describe('View ↗ on the signed form', () => {
+    const signed = (name: string) => ({ ...base.requests[0], detail: { ...base.requests[0].detail, signedFormName: name, signedFormHash: 'a'.repeat(64) } })
+    let open: ReturnType<typeof vi.spyOn>
+    beforeEach(() => {
+      open = vi.spyOn(window, 'open').mockReturnValue(null)
+    })
+    afterEach(() => open.mockRestore())
+
+    it('opens a PDF where it is, saying nothing', async () => {
+      action.mockResolvedValue({ ok: true, data: { url: 'https://files.example/form.pdf?token=1', expiresIn: 120 } })
+      show({ requests: [signed('Siti form.pdf')] })
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'View ↗' }))
+      })
+      expect(action).toHaveBeenCalledWith({ action: 'signed_form', requestId: 'wait' })
+      expect(open).toHaveBeenCalledWith('https://files.example/form.pdf?token=1', '_blank', 'noopener,noreferrer')
+      expect(flash).not.toHaveBeenCalled()
+    })
+
+    it('says a Word file is downloading, under its own name', async () => {
+      action.mockResolvedValue({ ok: true, data: { url: 'https://files.example/x.docx?token=1&download=Siti%20form.docx', expiresIn: 120, download: 'Siti form.docx' } })
+      show({ requests: [signed('Siti form.docx')] })
+      await act(async () => {
+        fireEvent.click(within(detail()).getByRole('button', { name: 'View ↗' }))
+      })
+      expect(open).toHaveBeenCalledWith('https://files.example/x.docx?token=1&download=Siti%20form.docx', '_blank', 'noopener,noreferrer')
+      expect(flash).toHaveBeenCalledWith('Downloads Siti form.docx')
+    })
+  })
 })

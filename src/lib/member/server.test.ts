@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, adminMemberAction, calculateMemberQuote, cancelMemberRequest, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -705,6 +705,54 @@ describe('the waiting-list form the Revenue app draws', () => {
     expect((await loadMemberWaitingForm()).ok).toBe(false)
     expect((await loadMemberWaitingFormLink()).ok).toBe(false)
     expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// Member services' View ↗ (2026-10-20, once a member could send a Word file — the user: "need as well"): a
+// browser shows a PDF or a picture where it is but saves a Word file, so a Word form's link hands it over under
+// the name it was sent with, not the bucket's random one, and says so.
+describe('Member services opens a signed form', () => {
+  const requestId = '10000000-0000-4000-8000-000000000040'
+  const path = `${userId}/${requestId}/0d6f.docx`
+  const createSignedUrl = vi.fn(async () => ({ data: { signedUrl: 'https://files.example/0d6f?token=1' }, error: null }))
+  function onFile(mime: string, detail: Record<string, unknown> = { signedFormName: 'Siti form.docx', signedFormHash: 'a'.repeat(64) }) {
+    const answers: Record<string, unknown> = {
+      member_requests: { detail },
+      member_request_attachments: { object_path: path, mime_type: mime },
+    }
+    const from = (table: string) => {
+      const chain: Record<string, unknown> = {}
+      for (const step of ['select', 'eq', 'order', 'limit']) chain[step] = () => chain
+      chain.maybeSingle = async () => ({ data: answers[table] ?? null, error: null })
+      return chain
+    }
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from, storage: { from: () => ({ createSignedUrl }) } })
+  }
+  beforeEach(() => createSignedUrl.mockClear())
+
+  it.each([
+    ['a .docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['an old .doc', 'application/msword'],
+  ])('hands %s over under its own name', async (_, mime) => {
+    onFile(mime)
+    expect(await adminMemberAction({ action: 'signed_form', requestId })).toEqual({
+      ok: true, data: { url: 'https://files.example/0d6f?token=1', expiresIn: 120, download: 'Siti form.docx' },
+    })
+    expect(createSignedUrl).toHaveBeenCalledWith(path, 120, { download: 'Siti form.docx' })
+  })
+
+  it('opens a PDF or a picture where it is, as before', async () => {
+    for (const mime of ['application/pdf', 'image/jpeg', 'image/png']) {
+      onFile(mime, { signedFormName: 'Siti form.pdf', signedFormHash: 'a'.repeat(64) })
+      expect(await adminMemberAction({ action: 'signed_form', requestId })).toEqual({ ok: true, data: { url: 'https://files.example/0d6f?token=1', expiresIn: 120 } })
+    }
+    expect(createSignedUrl.mock.calls).toEqual([[path, 120], [path, 120], [path, 120]])
+  })
+
+  it('a claim’s invoice is never handed over as a download — the rule is the signed form’s', async () => {
+    onFile('application/vnd.openxmlformats-officedocument.wordprocessingml.document', { invoiceHash: 'b'.repeat(64), signedFormName: 'Siti form.docx' })
+    expect(await adminMemberAction({ action: 'invoice', requestId })).toEqual({ ok: true, data: { url: 'https://files.example/0d6f?token=1', expiresIn: 120 } })
+    expect(createSignedUrl).toHaveBeenCalledWith(path, 120)
   })
 })
 
