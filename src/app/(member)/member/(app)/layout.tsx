@@ -41,11 +41,16 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
     isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices(), loginIsPersonal(),
     isPrincipalAccount(user) && !user.viewingAs ? loadMyMemos() : Promise.resolve(null)]);
   const crm = canDo(account, "crm", "view", "own");
+  // IT requests (2026-10-20): the ACCOUNT's IT requests · View — everybody's requests and the sidebar's row, the Principal's
+  // under PRINCIPAL, a Revenue Director's under MANAGEMENT (the Product List's labels); Edit writes notes and statuses.
+  const itDesk = canDo(account, "it_requests", "view")
+    ? { group: isPrincipalAccount(user) ? "PRINCIPAL" : "MANAGEMENT", edit: canDo(account, "it_requests", "edit") }
+    : null;
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
   // The display face (2026-10-14): Inter Tight's variable on a wrapper that draws no box, so the
   // app and its loading frame read it and the portal never downloads the font.
   return <div className={interTight.variable} style={{ display: "contents" }}>
-    <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
+    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} closed={appClosed(user.closed)} notices={notices}
       changePassword={password ? changeMyPassword : undefined}
       requestEmail={password ? { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange } : undefined}
       own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>

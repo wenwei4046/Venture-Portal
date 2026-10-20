@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  deviceLabel, fileSize, fileTag, isImage, itContentType, itFileRefusal, itObjectPath, itRequestFromRow, itRequestsFromRow,
+  deviceLabel, fileSize, fileTag, isImage, itDay, itWhen, itContentType, itFileRefusal, itObjectPath, itRequestFromRow, itRequestsFromRow,
   noteProblem, submitProblem,
 } from './model'
 
@@ -80,6 +80,14 @@ describe('files', () => {
     expect([fileTag('shot.png', null), fileTag('x', 'application/pdf'), fileSize(900), fileSize(3.4 * 1024 * 1024), fileSize(null)])
       .toEqual(['PNG', 'PDF', '1 KB', '3.4 MB', ''])
     expect([isImage('image/png'), isImage('image/heic'), isImage('application/pdf')]).toEqual([true, false, false])
+  })
+})
+
+describe('when', () => {
+  it('reads a moment on the office’s calendar (UTC+8), not the machine’s', () => {
+    expect(itDay('2026-10-20T17:30:00Z')).toBe('21 Oct')
+    expect(itWhen('2026-10-20T06:32:00Z')).toBe('20 Oct · 14:32')
+    expect(itDay('')).toBe('')
   })
 })
 

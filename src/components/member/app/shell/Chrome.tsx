@@ -187,7 +187,7 @@ function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: M
 }
 
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, products, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, it, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
   /** Screens their ticks close: not listed (2026-10-11). */
   hidden?: readonly Screen[];
@@ -199,6 +199,11 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, crm
   me?: Me;
   /** The Product List row under its group label — only for an account holding `product_list`. */
   products?: { group: string; onOpen: () => void } | null;
+  /**
+   * IT requests (2026-10-20 — the user: "as Revenue Director 的 view，或者像更大职位 log in 进去的时候，左边这里 category 就会
+   * 多一个 IT request"): everybody's, for IT requests · View — under the Product List's group label, its New ones counted.
+   */
+  it?: { group: string; count: number; on: boolean; onOpen: () => void } | null;
   /** The module switcher — a Principal's, who can open the other modules. */
   modules?: { current: ModuleId; onPick: (id: ModuleId) => void } | null;
   /** The CRM, a row under Arena with its unread messages — for an account the CRM is open to (the owner, 2026-10-16). */
@@ -243,6 +248,15 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, crm
           <span className={s.asideGroup}>{products.group}</span>
           <button className={`${s.asideNav} ${productsOn ? s.asideNavOn : ""}`} onClick={products.onOpen} aria-current={productsOn ? "page" : undefined}>
             <Svg d={ICON.cube} size={20} sw={1.8} />Product List
+          </button>
+        </>
+      )}
+      {it && (
+        <>
+          {products?.group === it.group ? null : <span className={s.asideGroup}>{it.group}</span>}
+          <button className={`${s.asideNav} ${s.asideNotif} ${it.on ? s.asideNavOn : ""}`} onClick={it.onOpen} aria-current={it.on ? "page" : undefined}>
+            <Svg d={ICON.help} size={20} sw={1.8} /><span className={s.asideNotifLabel}>IT requests</span>
+            {it.count > 0 && <span className={s.asideCount}>{badgeCount(it.count)}</span>}
           </button>
         </>
       )}

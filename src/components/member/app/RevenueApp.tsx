@@ -83,6 +83,10 @@ import RoomsPage, { RoomBookSheet, RoomViewSheet } from "./profile/RoomsPage";
 import { useMemberRooms } from "./profile/useMemberRooms";
 import DocsPage from "./profile/DocsPage";
 import { useMemberDocs } from "./profile/useMemberDocs";
+import ItPage, { type ItFilter } from "./profile/ItPage";
+import ItRequestForm from "./profile/ItRequestForm";
+import ItRequestSheet from "./profile/ItRequestSheet";
+import { useItRequests } from "./profile/useItRequests";
 import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edit";
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
@@ -137,6 +141,11 @@ export interface RevenueAppProps {
    * nobody, Profile › Memos and the bell are these; acknowledging one is the login's receipt, as in the portal.
    */
   own?: { memos: MemberData["memos"] };
+  /**
+   * IT requests (2026-10-20): the ACCOUNT holds IT requests · View — everybody's requests, the sidebar's row under
+   * `group` (PRINCIPAL, else MANAGEMENT); `edit` = notes and statuses. Absent: IT support is one's own only.
+   */
+  itDesk?: { group: string; edit: boolean } | null;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -204,7 +213,7 @@ const NO_NOTICES: Notices = { unread: 0, items: [] };
 /** The CRM's way back to the app — its house, a button the CRM draws itself (crm/sales/SalesInbox, crm/panel). */
 const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue app"]';
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -291,9 +300,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [memoAcked, setMemoAcked] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [pfDateOpen, setPfDateOpen] = useState(false);
   const [incPeriod, setIncPeriod] = useState<string | null>(null);
+  // IT support (2026-10-20): its list's filter, the form, and the request open — a tapped notice's (`?it=<id>`) from the
+  // app's first drawing, as a memo's.
+  const [itFilter, setItFilter] = useState<ItFilter>("all");
+  const [itFormOpen, setItFormOpen] = useState(false);
+  const [itPick, setItPick] = useState<string | null>(() => new URLSearchParams(startSearch).get("it"));
   const closeProfileSheets = useCallback(() => {
     setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null); setPfDateOpen(false);
-    setSchemeOpen(false); setPwOpen(false);
+    setSchemeOpen(false); setPwOpen(false); setItFormOpen(false); setItPick(null);
   }, []);
 
   useEffect(() => {
@@ -475,7 +489,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
-    opens: go => go.to === "memo" || go.to === "none" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
     notices: principal ? [] : shownNotices,
   }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices]);
   const unseenNotices = unseen.length;
@@ -704,6 +718,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     // A settled month's news opens on that month: the app itself opens on the current one.
     else if (n.go.to === "income") { setIncPeriod(settled?.period ?? null); goScreen("account", { pf: "income" }); }
     else if (n.go.to === "rooms") goScreen("account", { pf: "rooms" });
+    // An IT request (2026-10-20): IT support, the request open.
+    else if (n.go.to === "it") { goScreen("account", { pf: "it" }); setItPick(n.go.requestId); }
     else if (n.go.to === "none") return;
     else openBoard("sales", settled?.period ?? null);
   };
@@ -847,6 +863,33 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     onPage: route.screen === "account" && route.pf === "docs",
     source, staffId: principal && viewed ? viewed.id : undefined, fixture: fixture?.docs, readOnly: readOnlyView,
   });
+  // IT support (2026-10-20): the ACCOUNT's own requests while its page is open; the desk's everybody's (IT requests ·
+  // View) from the open — the sidebar counts the New ones. A Principal viewing a member reads and writes nothing more
+  // (View as is read-only); viewing nobody, IT support is theirs.
+  const onIt = route.screen === "account" && (route.pf === "it" || route.pf === "itdesk");
+  const itDeskOn = !!itDesk && !data.demo;
+  const itReadOnly = readOnlyView && !!viewed;
+  const it = useItRequests({ source, mineOn: memoryReady && onIt && !data.demo, deskOn: memoryReady && itDeskOn, gen });
+  const itPickVM = itPick ? it.find(itPick) : null;
+  // A file of a request: a short link asked for at the tap, opened in a tab readied in the same tap.
+  const openItFile = useCallback((id: string, mode: "view" | "download") => {
+    if (!source.itOpen) return;
+    const win = mode === "view" ? window.open("", "_blank") : null;
+    if (win) win.opener = null;
+    void settleRead(source.itOpen(id, mode)).then(res => {
+      if (res.ok) {
+        if (win) win.location.href = res.data.url;
+        else window.location.assign(res.data.url);
+      } else win?.close();
+    });
+  }, [source]);
+  // A tapped notice's `it=` (lib/push/notices noticeUrl) is the first drawing's; the address then keeps only the page.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("it")) return;
+    q.delete("it");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${q}`);
+  }, []);
   const nameOf = useCallback((staffId: string) => {
     for (const m of data.memberships) { const p = m.people.find(x => x.id === staffId); if (p) return p.name; }
     return null;
@@ -1208,7 +1251,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPickVM !== null || pfDateOpen || schemeOpen || pwOpen || emailOpen);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPickVM !== null || pfDateOpen || schemeOpen || pwOpen || emailOpen || itFormOpen || itPickVM !== null);
   // Change password: the login is a person's own (the layout hands the action only then), and it is their own Profile —
   // not a member viewed, not the demo.
   const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
@@ -1331,7 +1374,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== "rooms" && pf !== null;
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== "rooms" && pf !== "it" && pf !== "itdesk" && pf !== null;
     if (pick) {
       page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "docs" ? "Documentation" : pf === "track" ? "Waiting list & replacements" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
@@ -1384,6 +1427,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
+    } else if (pf === "it" || pf === "itdesk") {
+      const all = pf === "itdesk" && itDeskOn;
+      page = <ItPage mode={all ? "all" : "mine"} mine={it.mine} desk={it.desk} deskOn={itDeskOn} newCount={it.newCount}
+        error={all ? it.deskError : it.mineError} filter={itFilter} readOnly={itReadOnly} onFilter={setItFilter}
+        onMode={m => { setItFilter("all"); goScreen("account", { pf: m === "all" ? "itdesk" : "it" }); }} onBack={back}
+        onNew={() => setItFormOpen(true)} onOpen={setItPick} />;
     } else if (pf === "brandWeeks") {
       page = <BrandWeeksPage months={bwMonths} viewing={!!context} onBack={back} />;
     } else {
@@ -1396,6 +1445,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
         changePassword: ownPassword ? () => setPwOpen(true) : undefined,
         changeEmail: ownEmail ? () => setEmailOpen(true) : undefined,
+        itSupport: !viewed && !data.demo && !fixture ? () => goScreen("account", { pf: "it" }) : undefined,
       }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
     }
   } else {
@@ -1410,6 +1460,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => openSheet("brand")}
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
+        it={itDesk && itDeskOn ? { group: itDesk.group, count: it.newCount, on: route.screen === "account" && route.pf === "itdesk", onOpen: () => goScreen("account", { pf: "itdesk" }) } : null}
         modules={principal ? { current: "revenue", onPick: pickModule } : null}
         crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
@@ -1503,6 +1554,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             <>
               <RoomBookSheet {...rooms.book} />
               <RoomViewSheet {...rooms.view} />
+            </>
+          )}
+          {(route.pf === "it" || route.pf === "itdesk") && (
+            <>
+              <ItRequestForm open={itFormOpen} readOnly={itReadOnly} onSubmit={it.submit} onClose={() => setItFormOpen(false)} />
+              <ItRequestSheet open={itPickVM !== null} request={itPickVM} canEdit={!!itDesk?.edit} readOnly={itReadOnly} onNote={it.note}
+                sign={source.itSign} openFile={openItFile} onClose={() => setItPick(null)} />
             </>
           )}
           {route.pf === "memos" && <MemoSheet open={memoPickVM !== null} memo={memoPickVM} busy={memoBusy} readOnly={memoReadOnly} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)}

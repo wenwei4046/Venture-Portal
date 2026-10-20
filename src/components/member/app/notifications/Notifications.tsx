@@ -5,10 +5,10 @@ import type { NotifGroup, NotifItem, NotifTab } from "./notify-model";
 import s from "./notifications.module.css";
 
 const TABS: [NotifTab, string][] = [["all", "All"], ["requests", "Requests"], ["memos", "Memos"], ["results", "Results"]];
-const KIND_LABEL: Record<NotifItem["kind"], string> = { memo: "Memo", res: "Results", pay: "Commission", req: "Your request", room: "Meeting", hire: "Manpower request" };
+const KIND_LABEL: Record<NotifItem["kind"], string> = { memo: "Memo", res: "Results", pay: "Commission", req: "Your request", room: "Meeting", hire: "Manpower request", it: "IT support" };
 // A meeting in the rooms' slate, a manpower request in the walnut of Requests (2026-10-11).
-const ICON_TONE = { memo: s.k_memo, res: s.k_res, pay: s.k_pay, req: s.k_req, room: s.k_room, hire: s.k_hire } as const;
-const KIND_TONE = { memo: s.kk_memo, res: s.kk_res, pay: s.kk_pay, req: s.kk_req, room: s.kk_room, hire: s.kk_hire } as const;
+const ICON_TONE = { memo: s.k_memo, res: s.k_res, pay: s.k_pay, req: s.k_req, room: s.k_room, hire: s.k_hire, it: s.k_room } as const;
+const KIND_TONE = { memo: s.kk_memo, res: s.kk_res, pay: s.kk_pay, req: s.kk_req, room: s.kk_room, hire: s.kk_hire, it: s.kk_room } as const;
 const DONE_TONE = { green: s.t_green, amber: s.t_amber, red: s.t_red, sub: s.t_sub } as const;
 
 /** The bell's page: what needs you first, then the settled month, then request updates. */

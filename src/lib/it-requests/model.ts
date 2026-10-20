@@ -9,6 +9,8 @@
  * View reads everybody's; Edit writes notes on one and sets its status, and its sender is told.
  */
 
+import { officeDay } from '@/lib/office-time'
+
 export type ItCategory = 'bug' | 'feature' | 'suggestion'
 export type ItStatus = 'new' | 'in_progress' | 'fixed' | 'closed'
 export type ItSide = 'it' | 'sender'
@@ -199,6 +201,11 @@ export function itObjectPath(uid: string, name: string, key: string): string {
 
 export const isImage = (contentType: string | null) => !!contentType && contentType.startsWith('image/') && contentType !== 'image/heic' && contentType !== 'image/heif'
 export const isVideo = (contentType: string | null) => !!contentType && contentType.startsWith('video/')
+
+/** A moment on the office's calendar: 20 Oct (a request sent at 01:00 is the office's day, not UTC's). */
+export const itDay = (iso: string): string => (iso ? officeDay(iso).format('D MMM') : '')
+/** …and its time: 20 Oct · 14:32. */
+export const itWhen = (iso: string): string => (iso ? officeDay(iso).format('D MMM · HH:mm') : '')
 
 /** 950 KB, 3.4 MB. */
 export function fileSize(bytes: number | null): string {

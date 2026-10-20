@@ -22,6 +22,7 @@ vi.mock("@/app/(member)/member/batch-actions", () => ({ readMemberBatch: vi.fn()
 vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
+vi.mock("@/app/(member)/member/it-actions", () => ({}));
 
 const { useCrmUnread, LIVE_SETTLE_MS } = await import("./useCrmUnread");
 
