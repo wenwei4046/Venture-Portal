@@ -4395,6 +4395,12 @@ export type Database = {
       hr_staff_costs: {
         Row: {
           address: string | null
+          address_city: string | null
+          address_country: string | null
+          address_line1: string | null
+          address_line2: string | null
+          address_postcode: string | null
+          address_state: string | null
           allowances: number
           bank_account_no: string | null
           bank_name_2: string | null
@@ -4441,6 +4447,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postcode?: string | null
+          address_state?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name_2?: string | null
@@ -4487,6 +4499,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postcode?: string | null
+          address_state?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name_2?: string | null

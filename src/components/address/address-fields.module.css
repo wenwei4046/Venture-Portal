@@ -1,0 +1,82 @@
+/* An address's fields (2026-10-20): the two lines across, then State · City · Postcode side by side in the order they
+   are picked (a step number on each), then the country. One to a row where it is narrow. Colours are the HR kit's
+   --hv-* (on .sheet-theme); a host's own field classes draw the boxes over these. */
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 12px;
+  min-width: 0;
+}
+.fields[data-stacked='true'] { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+}
+
+.wide { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.part { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+/* The order they are picked in: an orange surface, black figure (orange is never lettering on the sheet). */
+.step {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgb(var(--hv-accent));
+  color: rgb(var(--hv-ink));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.input,
+.select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: rgb(var(--hv-ink));
+}
+.input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  background: rgb(255 255 255);
+  outline: none;
+}
+.input:focus-visible { border-color: rgb(var(--hv-accent)); }
+.input:disabled,
+.select:disabled { background: rgb(var(--hv-disabled)); color: rgb(var(--hv-faint)); cursor: not-allowed; }
+.mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-variant-numeric: tabular-nums; }
+
+/* A changed part: the peach of a changed field, as on a person's page. */
+.input[data-dirty='true'],
+.select[data-dirty='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
+
+/* The old one-box address, while the record has no parts yet. */
+.onFile {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px dashed rgb(var(--hv-frame));
+  border-radius: 8px;
+  background: rgb(var(--hv-panel-2));
+}
+.onFileLabel { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--hv-brown)); }
+.onFileText { font-size: 13px; color: rgb(var(--hv-body-2)); white-space: pre-line; overflow-wrap: anywhere; }

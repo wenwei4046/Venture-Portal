@@ -8,6 +8,7 @@ import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
 import { keptParts } from '@/lib/person-name'
+import { addressLines, addressOf } from '@/lib/address/address'
 import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -152,7 +153,8 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     resignationDate: staff.resignation_date ? formatDate(staff.resignation_date) : null,
     nric: priv.nric,
     infotechCode: staff.infotech_code,
-    contact: { phone: staff.contact_number, email: account?.email ?? staff.email, address: staff.address },
+    // The address a line each from its six parts (2026-10-20); an older record without them, its one box.
+    contact: { phone: staff.contact_number, email: account?.email ?? staff.email, address: addressLines(addressOf(row)).join('\n') || staff.address },
     emergency: {
       name: staff.emergency_contact_name,
       relationship: staff.emergency_contact_relationship,

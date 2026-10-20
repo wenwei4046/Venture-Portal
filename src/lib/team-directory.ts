@@ -33,6 +33,9 @@ export function readsStaffTable(viewer: PermissionHolder): boolean {
 export interface DirectoryRow {
   id: string
   employee_name: string
+  /** What the apps call them (2026-10-17) — read by the directory since mig 20261020230000. */
+  first_name?: string | null
+  last_name?: string | null
   employee_code: string | null
   designation: string | null
   status: string
@@ -54,6 +57,13 @@ export interface DirectoryRow {
   contact_number: string | null
   email: string | null
   address: string | null
+  /** The address in its six parts (2026-10-20, mig 20261020230000) — `address` is them put together. */
+  address_line1?: string | null
+  address_line2?: string | null
+  address_postcode?: string | null
+  address_city?: string | null
+  address_state?: string | null
+  address_country?: string | null
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
   emergency_contact_relationship: string | null

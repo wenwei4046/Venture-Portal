@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/server'
 import { pushSoon } from '@/lib/push/outbox'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
 import { viewingAsSomebody } from '@/lib/view-as-person'
+import { addressRefusal } from '@/lib/address/address'
+import { addressFromChanges } from '@/lib/address/address-form'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 
 /**
  * Me's writes (2026-10-17): one's own punch, one's own requests, one's own photo, and an upline's decision on what
@@ -96,6 +99,10 @@ export async function meSendRequest(r: RequestInput): Promise<MeAct<{ id: string
   if (!['leave', 'ot', 'correction', 'manpower', 'profile'].includes(r.kind)) return { ok: false, reason: 'Unknown request kind.' }
   if ((r.from && !DATE.test(r.from)) || (r.to && !DATE.test(r.to))) return { ok: false, reason: 'The dates could not be read.' }
   const detail = r.detail && typeof r.detail === 'object' && !Array.isArray(r.detail) ? r.detail : {}
+  // A home address changed is all six parts, checked against Malaysia's postcode list before HR ever sees it (2026-10-20).
+  const address = r.kind === 'profile' ? addressFromChanges(detail.changes) : null
+  const refused = address ? addressRefusal(address, MALAYSIA_DATA) : null
+  if (refused) return { ok: false, reason: refused }
   return call('att_create_request', {
     p_staff: r.staffId, p_kind: r.kind, p_leave_code: r.leaveCode ?? null, p_from: r.from ?? null, p_to: r.to ?? r.from ?? null,
     p_days: typeof r.days === 'number' ? r.days : null, p_hours: typeof r.hours === 'number' ? r.hours : null,
