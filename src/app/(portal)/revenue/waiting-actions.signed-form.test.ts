@@ -85,6 +85,32 @@ describe('Upload', () => {
     expect(mocks.refresh).toHaveBeenCalledWith('/revenue', 'layout')
   })
 
+  // 2026-10-20, the user: "want word file as well".
+  it('takes a Word file too — a .docx kept as Word, whatever the browser called it', async () => {
+    const docx = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 20, 0, ...Array.from('word/document.xml', c => c.charCodeAt(0)), 0, 0])
+    await uploadSignedForm(sent(new File([docx], 'Joan Quek letter.docx', { type: '' })))
+    const [path, , options] = mocks.upload.mock.calls[0]
+    expect(path).toMatch(new RegExp(`^${HR}/${JOAN}/[0-9a-f-]{36}\\.docx$`))
+    expect(options).toEqual({ contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', upsert: false })
+    expect(mocks.rpc.mock.calls[0][1]).toMatchObject({ p_path: path, p_name: 'Joan Quek letter.docx', p_hash: sha(docx) })
+  })
+
+  it('an old .doc too; never one holding macros', async () => {
+    const utf16 = (s: string) => Array.from(s).flatMap(c => [c.charCodeAt(0), 0])
+    const OLE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+    await uploadSignedForm(sent(new File([new Uint8Array([...OLE, ...utf16('WordDocument')])], 'Joan.doc', { type: 'application/msword' })))
+    expect(mocks.upload.mock.calls[0][0]).toMatch(/\.doc$/)
+    expect(mocks.upload.mock.calls[0][2].contentType).toBe('application/msword')
+
+    mocks.upload.mockClear()
+    const docm = new Uint8Array([0x50, 0x4b, 0x03, 0x04, ...Array.from('word/document.xml word/vbaProject.bin', c => c.charCodeAt(0))])
+    expect(await uploadSignedForm(sent(new File([docm], 'Joan.docm')))).toEqual({
+      ok: false,
+      reason: 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.',
+    })
+    expect(mocks.upload).not.toHaveBeenCalled()
+  })
+
   it('names the kind by the bytes, not the name: a picture is kept as a PNG', async () => {
     await uploadSignedForm(sent(new File([PNG], 'Joan', { type: '' })))
     const [path, , options] = mocks.upload.mock.calls[0]
@@ -97,7 +123,7 @@ describe('Upload', () => {
     const html = new TextEncoder().encode('<html><body>Joan</body></html>')
     expect(await uploadSignedForm(sent(new File([html], 'Joan.pdf', { type: 'application/pdf' })))).toEqual({
       ok: false,
-      reason: 'The signed form must be a PDF, PNG or JPG file.',
+      reason: 'The signed form must be a PDF, Word, PNG or JPG file.',
     })
     expect(await uploadSignedForm(sent(new File([], 'Joan.pdf')))).toEqual({ ok: false, reason: 'That file is empty — attach the signed form again.' })
     const big = new Uint8Array(3 * 1024 * 1024 + 1)

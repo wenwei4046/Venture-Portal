@@ -159,6 +159,22 @@ describe('View — how HR’s file is drawn', () => {
     expect(templateIcon('form')).toBe('file')
   })
 
+  // An applicant's signed form (2026-10-20): the type the bucket kept — found in its bytes — decides, Word too.
+  it('draws an applicant’s signed form by the type the bucket kept, whatever its name says', () => {
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    expect(templateView('Joan letter', DOCX)).toBe('word')
+    expect(templateView('Joan letter.pdf', DOCX)).toBe('word')
+    expect(templateView('Joan letter.docx', 'application/msword')).toBe('none')
+    expect(templateView('scan', 'image/jpeg')).toBe('image')
+    expect(templateView('scan.docx', 'application/pdf')).toBe('pdf')
+    expect(templateIcon('Joan letter', DOCX)).toBe('word')
+    expect(templateIcon('Joan letter.pdf', 'application/msword')).toBe('word')
+    expect(templateIcon('scan.docx', 'image/png')).toBe('image')
+    // An unknown type leaves it to the name.
+    expect(templateView('Form.pdf', 'text/plain')).toBe('pdf')
+    expect(templateIcon('Form.pdf', null)).toBe('pdf')
+  })
+
   it('puts a Word file’s words on a white page, its title escaped', () => {
     const page = wordPage('<p>REVENUE TEAM WAITING LIST FORM</p><table><tr><td>Name</td></tr></table>', 'A & B <form>.docx')
     expect(page).toMatch(/^<!doctype html>/)

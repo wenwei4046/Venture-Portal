@@ -5,7 +5,13 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { signedFormKind, signedFormRefusal, waitingAddDetail, waitingAddInputFrom, waitingAddRefusal } from '@/lib/commission/waiting-add'
+import {
+  letterFile,
+  signedFormRefusal,
+  waitingAddDetail,
+  waitingAddInputFrom,
+  waitingAddRefusal,
+} from '@/lib/commission/waiting-add'
 import {
   FORM_KINDS,
   cleanedFields,
@@ -252,7 +258,8 @@ export type WaitingAddOutcome = { ok: true; requestNo: string | null } | { ok: f
  *
  * `formData`: `input` (the window's fields as JSON) and, when attached,
  * `signedForm`. A signed form is looked at byte by byte (the member app's
- * rule) and goes where a member's does: the add keeps the request a draft,
+ * rule, and a Word file too since 2026-10-20 — `letterFile`) and goes where a
+ * member's does: the add keeps the request a draft,
  * the file is uploaded into the adder's own folder of it under this session
  * (the bucket's own policy), and `member_waiting_add_form` finds it there,
  * attests it and puts the request on the list. Each press is its own add.
@@ -282,8 +289,10 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
     const tooBig = signedFormRefusal(file)
     if (tooBig) return { ok: false, reason: tooBig }
     const bytes = new Uint8Array(await file.arrayBuffer())
-    const kind = signedFormKind(bytes, file.type)
-    if (!kind) return { ok: false, reason: 'The signed form must be a PDF, PNG or JPG file.' }
+    // A Word file too since 2026-10-20 (`letterFile`); `member_waiting_add_form` takes it (mig 20261020160000).
+    const read = letterFile(bytes, file.type)
+    if (!read.ok) return read
+    const kind = read.kind
     signed = { name: file.name.trim() || `Signed form.${kind.extension}`, hash: createHash('sha256').update(bytes).digest('hex'), bytes, ...kind }
   }
 
@@ -368,8 +377,9 @@ export type SignedFormOutcome = { ok: true; form: SignedForm } | { ok: false; re
 /**
  * Upload, in an applicant's drawer (2026-10-20, the user: "i want here can be view for the letter they submit,
  * then can be upload as well, the file"): the signed form for somebody already on the list — added with "+" and
- * no form, or a better copy of a member's (it replaces the one on file; that one stays, attested). The member
- * app's rule and "+"'s: a PDF, PNG or JPG of 3 MB or less, looked at byte by byte. The file goes into the
+ * no form, or a better copy of a member's (it replaces the one on file; that one stays, attested). "+"'s rule: a
+ * PDF, PNG or JPG — or, since 2026-10-20 ("want word file as well"), a Word .docx / .doc without macros — of 3 MB
+ * or less, looked at byte by byte (`letterFile`). The file goes into the
  * uploader's own folder of the request under this session (`member_invoice_waiting_form_insert`), then
  * `member_waiting_attach_form` (mig 20261020130000) finds it, attests it and makes it the request's signed form;
  * refused, the file is removed again (`member_invoice_unattested_manager_delete`).
@@ -386,8 +396,9 @@ export async function uploadSignedForm(formData: FormData): Promise<SignedFormOu
   const refused = signedFormRefusal(file)
   if (refused) return { ok: false, reason: refused }
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const kind = signedFormKind(bytes, file.type)
-  if (!kind) return { ok: false, reason: 'The signed form must be a PDF, PNG or JPG file.' }
+  const read = letterFile(bytes, file.type)
+  if (!read.ok) return read
+  const kind = read.kind
   const name = (file.name.trim() || `Signed form.${kind.extension}`).slice(0, 200)
 
   const supabase = await client()

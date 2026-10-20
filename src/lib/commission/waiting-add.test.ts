@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY_ADD,
+  SIGNED_FORM_ACCEPT,
+  WORD_DOC,
+  WORD_DOCX,
   isDay,
+  letterFile,
+  letterKind,
   signedFormKind,
   signedFormRefusal,
   submitterGroups,
@@ -134,6 +139,58 @@ describe('the signed application form', () => {
     expect(signedFormRefusal({ size: 3 * 1024 * 1024 })).toBeNull()
     expect(signedFormRefusal({ size: 3 * 1024 * 1024 + 1 })).toBe('The signed form must be 3 MB or smaller.')
     expect(signedFormRefusal({ size: 0 })).toMatch(/empty/)
+  })
+})
+
+// 2026-10-20, the user: "want word file as well" — HR's uploads ("+" and the waiting drawer) take a Word file too.
+describe('the signed form HR attaches — a Word file too', () => {
+  const ascii = (s: string) => Array.from(s, c => c.charCodeAt(0))
+  const utf16 = (s: string) => Array.from(s).flatMap(c => [c.charCodeAt(0), 0])
+  const file = (...parts: number[][]) => new Uint8Array(parts.flat())
+  const ZIP = [0x50, 0x4b, 0x03, 0x04, 20, 0, 6, 0]
+  const OLE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]
+  const docx = file(ZIP, ascii('[Content_Types].xml'), [1, 2, 3], ascii('word/document.xml'), [9, 9])
+  const doc = file(OLE, [0, 0, 0], utf16('Root Entry'), [0, 0], utf16('WordDocument'), [0, 0], utf16('1Table'))
+
+  it('knows a .docx by the ZIP holding word/document.xml, and an old .doc by its WordDocument stream', () => {
+    expect(letterKind(docx, '')).toEqual({ mime: WORD_DOCX, extension: 'docx' })
+    expect(letterKind(doc, '')).toEqual({ mime: WORD_DOC, extension: 'doc' })
+    // Browsers leave Word's type blank, or say what they please: the bytes decide.
+    expect(letterKind(docx, 'application/octet-stream')).toEqual({ mime: WORD_DOCX, extension: 'docx' })
+    expect(letterKind(doc, 'application/msword')).toEqual({ mime: WORD_DOC, extension: 'doc' })
+  })
+
+  it('takes what the member app takes, as it takes it', () => {
+    expect(letterKind(file([37, 80, 68, 70, 45, 0]), 'application/pdf')).toEqual({ mime: 'application/pdf', extension: 'pdf' })
+    expect(letterKind(file([137, 80, 78, 71, 13, 10, 26, 10, 0]), '')).toEqual({ mime: 'image/png', extension: 'png' })
+    expect(letterKind(file([37, 80, 68, 70, 45, 0]), 'image/png')).toBeNull()
+  })
+
+  it('is not any ZIP or OLE file: a spreadsheet, a slide deck, a plain archive', () => {
+    expect(letterKind(file(ZIP, ascii('xl/workbook.xml')), '')).toBeNull()
+    expect(letterKind(file(ZIP, ascii('ppt/presentation.xml')), '')).toBeNull()
+    expect(letterKind(file(ZIP, ascii('photos/ic.jpg')), '')).toBeNull()
+    expect(letterKind(file(OLE, utf16('Workbook')), '')).toBeNull()
+    expect(letterKind(file(ascii('word/document.xml')), '')).toBeNull()
+    expect(letterKind(file(ascii('<html><body>a letter</body></html>')), 'application/msword')).toBeNull()
+  })
+
+  it('refuses a Word file holding macros', () => {
+    expect(letterKind(file(ZIP, ascii('word/document.xml'), ascii('word/vbaProject.bin')), '')).toBe('macros')
+    expect(letterKind(file(OLE, utf16('WordDocument'), [0, 0], utf16('Macros'), [0, 0], utf16('_VBA_PROJECT')), '')).toBe('macros')
+  })
+
+  it('says why in words', () => {
+    expect(letterFile(docx, '')).toEqual({ ok: true, kind: { mime: WORD_DOCX, extension: 'docx' } })
+    expect(letterFile(file(ZIP, ascii('xl/workbook.xml')), '')).toEqual({ ok: false, reason: 'The signed form must be a PDF, Word, PNG or JPG file.' })
+    expect(letterFile(file(ZIP, ascii('word/document.xml'), ascii('word/vbaProject.bin')), '')).toEqual({
+      ok: false,
+      reason: 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.',
+    })
+  })
+
+  it('offers Word in the file picker', () => {
+    expect(SIGNED_FORM_ACCEPT.split(',')).toEqual(['.pdf', '.png', '.jpg', '.jpeg', '.doc', '.docx'])
   })
 })
 

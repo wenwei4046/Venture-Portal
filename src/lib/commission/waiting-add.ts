@@ -109,9 +109,18 @@ export function waitingAddDetail(
 
 // ─── The signed application form ────────────────────────────────────────────
 
-/** The member app's rule (`verifiedUpload`): a PDF, PNG or JPG of 3 MB or less. */
-export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg'
+/**
+ * What HR attaches as an applicant's signed form — with "+" and in the waiting drawer: the member app's PDF, PNG
+ * or JPG (`verifiedUpload`), and since 2026-10-20 a Word file too (the user: "want word file as well"), each of
+ * 3 MB or less. The member app itself still takes a PDF, PNG or JPG only.
+ */
+export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx'
 export const SIGNED_FORM_MAX_BYTES = 3 * 1024 * 1024
+export const SIGNED_FORM_KINDS = 'a PDF, Word, PNG or JPG file'
+
+/** Word's own types, as the bucket keeps them (mig 20261020160000). */
+export const WORD_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+export const WORD_DOC = 'application/msword'
 
 /** What the window can tell before sending: the size. The bytes are checked on the server. */
 export function signedFormRefusal(file: { size: number }): string | null {
@@ -135,6 +144,53 @@ export function signedFormKind(bytes: Uint8Array, declared: string): { mime: str
         : null
   if (!kind || (declared && declared !== kind.mime)) return null
   return kind
+}
+
+export type LetterKind = { mime: string; extension: 'png' | 'jpg' | 'pdf' | 'docx' | 'doc' }
+
+/** `needle` somewhere in `bytes`. */
+function holds(bytes: Uint8Array, needle: readonly number[]): boolean {
+  const first = needle[0]
+  for (let i = bytes.indexOf(first); i !== -1 && i <= bytes.length - needle.length; i = bytes.indexOf(first, i + 1)) {
+    let j = 1
+    while (j < needle.length && bytes[i + j] === needle[j]) j++
+    if (j === needle.length) return true
+  }
+  return false
+}
+const ascii = (s: string) => Array.from(s, c => c.charCodeAt(0))
+/** A name as an OLE file's directory writes it: UTF-16, little end first. */
+const utf16 = (s: string) => Array.from(s).flatMap(c => [c.charCodeAt(0), 0])
+
+const ZIP = [0x50, 0x4b, 0x03, 0x04]
+const OLE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+
+/**
+ * An applicant's signed form as HR attaches it, looked at byte by byte, whatever its name says: what the member
+ * app takes (`signedFormKind`, its declared type agreeing), or a Word file — a .docx (a ZIP holding
+ * `word/document.xml`) or an old .doc (an OLE file holding a `WordDocument` stream). Browsers often leave Word's
+ * type blank, so Word is known by its bytes alone. A Word file holding macros (`vbaProject.bin`, `_VBA_PROJECT`)
+ * is `'macros'`: HR opens these files on their own computers. Null = none of them.
+ */
+export function letterKind(bytes: Uint8Array, declared: string): LetterKind | 'macros' | null {
+  const kind = signedFormKind(bytes, declared)
+  if (kind) return kind
+  const starts = (sig: readonly number[]) => bytes.length >= sig.length && sig.every((b, i) => bytes[i] === b)
+  if (starts(ZIP) && holds(bytes, ascii('word/document.xml'))) {
+    return holds(bytes, ascii('vbaProject.bin')) ? 'macros' : { mime: WORD_DOCX, extension: 'docx' }
+  }
+  if (starts(OLE) && holds(bytes, utf16('WordDocument'))) {
+    return holds(bytes, utf16('_VBA_PROJECT')) ? 'macros' : { mime: WORD_DOC, extension: 'doc' }
+  }
+  return null
+}
+
+/** The file as the signed form — its kind, or why it cannot be one, in words. */
+export function letterFile(bytes: Uint8Array, declared: string): { ok: true; kind: LetterKind } | { ok: false; reason: string } {
+  const kind = letterKind(bytes, declared)
+  if (kind === 'macros') return { ok: false, reason: 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.' }
+  if (!kind) return { ok: false, reason: `The signed form must be ${SIGNED_FORM_KINDS}.` }
+  return { ok: true, kind }
 }
 
 // ─── "Submitted by" ─────────────────────────────────────────────────────────

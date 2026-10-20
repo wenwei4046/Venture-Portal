@@ -9,7 +9,9 @@
 // caller put in their own folder of that request, really there, of the kinds the bucket keeps; the same file twice
 // is refused, another one replaces it and the first stays attested; its step in the history; the bucket lets a
 // manager put a file into their own folder of a request on the list — nobody else's, no other request — and clean
-// up a file no attachment names, never an attested one. No live I/O.
+// up a file no attachment names, never an attested one. Then 20261020160000 (the user: "want word file as well"):
+// the drawer and "+"'s finish (20261011230000, production's body) take a Word .docx / .doc too, each named by its
+// own type, and the bucket and the attestations take the two Word types. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -107,6 +109,8 @@ try {
       note text,
       created_at timestamptz NOT NULL DEFAULT now(),
       submitted_at timestamptz,
+      reviewed_by uuid REFERENCES users(id),
+      reviewed_at timestamptz,
       request_no text
     );
     CREATE TABLE member_request_events(id bigserial PRIMARY KEY, request_id uuid NOT NULL REFERENCES member_requests(id),
@@ -143,6 +147,8 @@ try {
     -- Supabase Storage's objects, its folder helper, and the bucket's policies as production has them.
     CREATE SCHEMA storage;
     CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL, metadata jsonb);
+    CREATE TABLE storage.buckets(id text PRIMARY KEY, file_size_limit bigint, allowed_mime_types text[]);
+    INSERT INTO storage.buckets VALUES ('member-invoices', 3145728, ARRAY['image/jpeg', 'image/png', 'application/pdf']);
     CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS
       $$ SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
     ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -363,12 +369,94 @@ try {
     'the member reads the forms of their own request, HR’s copy too, and nobody else’s')
   await as(null)
 
-  // ── Twice is once; a changed body is refused ──
+  // ── Twice is once ──
   await db.exec(MIGRATION)
   check(await md5(), swapped, 'a second run changes nothing')
   check(await one(`SELECT count(*)::int FROM pg_policies WHERE schemaname = 'storage' AND policyname LIKE 'member_invoice_%'`), 7, 'seven policies, none twice')
+
+  // ── A Word file too (20261020160000; 2026-10-20, the user: "want word file as well") — both of HR's writers:
+  // the drawer's (above) and "+"'s finish (20261011230000, production's body). ──
+  const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  const DOC = 'application/msword'
+  const HASH_C = 'e'.repeat(64)
+  const HASH_D = 'f'.repeat(64)
+  const fnMd5 = name => one(`SELECT md5(prosrc) FROM pg_proc WHERE proname = $1`, [name])
+  await as(null)
+  await db.exec(await read('20261011230000_member_waiting_add.sql'))
+  check(await fnMd5('member_waiting_add_form'), 'a27df82bc3fba68202c7e26bca3b7623', '"+"’s finish is production’s body')
+  check(await fnMd5('member_waiting_attach_form'), '7cd93f56644e6abd0cafbaafd298ad29', 'the drawer’s upload is production’s body')
+  // A "+" add with a Word form, waiting as a draft for its file.
+  const PLUS = id(50)
+  await q(`INSERT INTO member_requests(id, created_by, staff_id, sub_department_id, kind, status, detail)
+           VALUES ($1, $2, $3, $4, 'waiting', 'draft', $5::jsonb)`,
+    [PLUS, HR, SHAWN, FAIR, JSON.stringify({ newPerson: 'PLUS', contact: '011-7', addedBy: 'hr', signedFormName: 'Plus letter.docx', signedFormHash: HASH_D })])
+  const word = (user, request, ext, mime, size = 4000) => {
+    const path = objectPath(user, request, ext)
+    return q(`INSERT INTO storage.objects(bucket_id, name, metadata) VALUES ('member-invoices', $1, $2::jsonb)`,
+      [path, JSON.stringify({ size, mimetype: mime })]).then(() => path)
+  }
+  const tanDocx = await word(HR, TAN, 'docx', DOCX)
+  const plusDocx = await word(HR, PLUS, 'docx', DOCX)
+  await as(HR)
+  // Before: neither writer, nor the attestations, take one.
+  await reject(ATTACH, [TAN, tanDocx, 'Tan letter.docx', HASH_C], /Attach the signed form again/, 'before: the drawer refuses a .docx')
+  await reject(`SELECT public.member_waiting_add_form($1, $2)`, [PLUS, plusDocx], /Attach the signed application form again/, 'before: "+" refuses one')
+  await as(null)
+  await reject(`INSERT INTO member_request_attachments(request_id, uploaded_by, object_path, mime_type, size_bytes, content_sha256)
+                VALUES ($1, $2, 'x/y.doc', $3, 10, $4)`, [TAN, HR, DOC, HASH_C], /check constraint/, 'before: no Word attestation')
+
+  const WORD = await read('20261020160000_waiting_list_signed_form_word.sql')
+  await db.exec(WORD)
+  const wordMd5s = [await fnMd5('member_waiting_attach_form'), await fnMd5('member_waiting_add_form')]
+  check([wordMd5s[0] !== '7cd93f56644e6abd0cafbaafd298ad29', wordMd5s[1] !== 'a27df82bc3fba68202c7e26bca3b7623'], [true, true], 'both writers swapped')
+  check(await one(`SELECT allowed_mime_types FROM storage.buckets WHERE id = 'member-invoices'`),
+    ['image/jpeg', 'image/png', 'application/pdf', DOCX, DOC], 'the bucket takes the two Word types too')
+  check(await one(`SELECT file_size_limit FROM storage.buckets WHERE id = 'member-invoices'`), 3145728, 'and keeps its 3 MB')
+
+  // The drawer: a .docx, an old .doc — each with its own type.
+  await as(HR)
+  const tan = await attach(TAN, tanDocx, 'Tan letter.docx', HASH_C)
+  check([tan.name, tan.type], ['Tan letter.docx', DOCX], 'a .docx is attached')
+  await as(null)
+  const leeDoc = await word(HR, LEE, 'doc', DOC)
+  await as(HR)
+  check((await attach(LEE, leeDoc, 'Lee letter.doc', HASH_C)).type, DOC, 'an old .doc too')
+  rows = await list()
+  check([rows[TAN].signedForm.type, rows[LEE].signedForm.name], [DOCX, 'Lee letter.doc'], 'the list names them with their types')
+  // The extension is the type's — a Word file under another name, or another file under Word's, is refused.
+  await as(null)
+  const lyingDocx = await word(HR, TAN, 'docx', 'application/pdf')
+  const lyingPdf = await word(HR, TAN, 'pdf', DOCX)
+  const lyingDoc = await word(HR, TAN, 'doc', DOCX)
+  const macros = await word(HR, TAN, 'docx', 'application/vnd.ms-word.document.macroEnabled.12')
+  await as(HR)
+  for (const [path, what] of [[lyingDocx, 'a PDF named .docx'], [lyingPdf, 'a .docx named .pdf'], [lyingDoc, 'a .docx named .doc'], [macros, 'a Word file with macros']]) {
+    await reject(ATTACH, [TAN, path, 'x', 'a'.repeat(63) + '1'], /Attach the signed form again/, what)
+  }
+  await reject(ATTACH, [TAN, `${HR}/${TAN}/0b5f6a1e-4c1d-4f3a-9a77-000000000999.docm`, 'x.docm', 'a'.repeat(63) + '2'], /Attach the signed form again/, 'a .docm path')
+  // A PDF, PNG and JPG still go as they did.
+  await as(null)
+  const stillPdf = await word(HR, TAN, 'pdf', 'application/pdf')
+  await as(HR)
+  check((await attach(TAN, stillPdf, 'Tan scan.pdf', 'a'.repeat(63) + '3')).type, 'application/pdf', 'a PDF still goes')
+
+  // "+": its draft finishes with the .docx.
+  const plus = await one(`SELECT public.member_waiting_add_form($1, $2)`, [PLUS, plusDocx])
+  check(plus.status, 'waiting', '"+" with a Word form goes on the list')
+  check(await q(`SELECT mime_type, content_sha256 FROM member_request_attachments WHERE request_id = $1`, [PLUS]),
+    [{ mime_type: DOCX, content_sha256: HASH_D }], 'attested as Word')
+  await as(null)
+  await reject(`INSERT INTO member_request_attachments(request_id, uploaded_by, object_path, mime_type, size_bytes, content_sha256)
+                VALUES ($1, $2, 'x/z.html', 'text/html', 10, $3)`, [TAN, HR, HASH_C], /check constraint/, 'the attestations still take nothing else')
+  await db.exec(WORD)
+  check([await fnMd5('member_waiting_attach_form'), await fnMd5('member_waiting_add_form')], wordMd5s, 'the Word migration twice is once')
+
+  // ── A body changed since is refused ──
   await db.exec(`CREATE OR REPLACE FUNCTION public.member_sub_department_requests(p_sub uuid) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$ BEGIN RETURN '[]'::jsonb; END $$`)
   await assert.rejects(() => db.exec(MIGRATION), /not once — production changed since this migration was written/, 'a body changed since is refused')
+  checks++
+  await db.exec(`CREATE OR REPLACE FUNCTION public.member_waiting_add_form(p_request uuid, p_path text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN '{}'::jsonb; END $$`)
+  await assert.rejects(() => db.exec(WORD), /not once — production changed since this migration was written/, 'the Word migration over a changed "+" is refused')
   checks++
 
   console.log(`validate-waiting-signed-form: ${checks} checks passed`)

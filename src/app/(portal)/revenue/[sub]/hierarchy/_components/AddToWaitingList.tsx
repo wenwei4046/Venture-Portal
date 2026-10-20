@@ -218,7 +218,7 @@ function AddWindow({
               </button>
             ) : null}
           </div>
-          <span className={w.addHint}>PDF, PNG or JPG, 3 MB or smaller.</span>
+          <span className={w.addHint}>PDF, Word, PNG or JPG, 3 MB or smaller.</span>
         </div>
 
         {error ? (
