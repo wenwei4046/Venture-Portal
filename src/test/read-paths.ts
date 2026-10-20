@@ -257,7 +257,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_waiting_add', 'member_waiting_add_form',
   // …and an applicant's signed form uploaded in their drawer (mig 20261020130000): the same two.
   'member_waiting_attach_form',
-  // …and the drawer's Edit (mig 20261020190000): the same two.
+  // …and the drawer's Edit (mig 20261020210000): the same two.
   'member_waiting_edit',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',

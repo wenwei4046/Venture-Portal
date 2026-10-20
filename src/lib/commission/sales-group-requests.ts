@@ -45,7 +45,7 @@ export interface SubDeptRequest {
   submittedAt: string | null
   /** The member who sent it. */
   submittedBy: string | null
-  /** …their staff id — what the drawer's Edit starts "Submitted by" on (read since mig 20261020190000). */
+  /** …their staff id — what the drawer's Edit starts "Submitted by" on (read since mig 20261020210000). */
   submittedById?: string | null
   newPerson: string | null
   contact: string | null
@@ -137,7 +137,7 @@ export function addedHere(r: Pick<SubDeptRequest, 'kind' | 'events'>): boolean {
 export const FORM_UPLOADED = 'Signed form uploaded'
 
 /**
- * The note `member_waiting_edit` puts on its step (mig 20261020190000): HR changed the applicant's details with
+ * The note `member_waiting_edit` puts on its step (mig 20261020210000): HR changed the applicant's details with
  * the drawer's Edit — "Details edited · name, phone number". A step with no move, like an upload.
  */
 export const DETAILS_EDITED = 'Details edited'

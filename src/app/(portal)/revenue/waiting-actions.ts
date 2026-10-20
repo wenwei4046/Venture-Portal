@@ -437,7 +437,7 @@ export async function uploadSignedForm(formData: FormData): Promise<SignedFormOu
 /**
  * Edit, in an applicant's drawer (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"): their
  * name, mobile number, joining date and who brought them in — only the fields the drawer changed (the logins are
- * shared: a save never writes back what nobody touched). `member_waiting_edit` (mig 20261020190000) asks "+"'s
+ * shared: a save never writes back what nobody touched). `member_waiting_edit` (mig 20261020210000) asks "+"'s
  * two doors again, refuses somebody no longer on the list, a phone number already on it and a submitter from
  * outside the department, and writes the step "Details edited · …" in the history.
  */

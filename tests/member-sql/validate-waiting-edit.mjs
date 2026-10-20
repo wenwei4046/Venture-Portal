@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261020190000 (2026-10-20, the user, on Sales Groups › Waiting list: "要能够按
+// Local PostgreSQL regression for 20261020210000 (2026-10-20, the user, on Sales Groups › Waiting list: "要能够按
 // Edit：这个 Edit 本身是让 HR 可以去改资料的", and "'submitted by' 选不到 Revenue 的人。它应该要能选到 Revenue department
 // 的全部人，不管什么 title"). The migration runs VERBATIM over production's own member_waiting_add and
 // member_sub_department_requests (waiting-edit-production.sql, each md5-checked first), stand-ins for the tables
@@ -176,7 +176,7 @@ try {
   check('submittedById' in (await list())[JOAN], false, 'before: the list named no staff id')
 
   // ── The migration, verbatim — twice is once ──
-  const MIGRATION = await text(new URL('20261020190000_waiting_list_edit_any_revenue_submitter.sql', migrations))
+  const MIGRATION = await text(new URL('20261020210000_waiting_list_edit_any_revenue_submitter.sql', migrations))
   await as(null)
   await db.exec(MIGRATION)
   const swapped = [await md5('member_waiting_add'), await md5('member_sub_department_requests'), await md5('member_waiting_edit')]

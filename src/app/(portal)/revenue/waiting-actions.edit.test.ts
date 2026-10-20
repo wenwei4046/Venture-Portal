@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The applicant's drawer on Sales Groups › Waiting list, edited (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让
 // HR 可以去改资料的"): the gate "+" asks, only the fields the drawer changed, each in the request's own words for
-// member_waiting_edit. The database's half is mig 20261020190000 (tests/member-sql/validate-waiting-edit.mjs).
+// member_waiting_edit. The database's half is mig 20261020210000 (tests/member-sql/validate-waiting-edit.mjs).
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), action: vi.fn(), createClient: vi.fn(), rpc: vi.fn(), refresh: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requireAuth: mocks.auth, requireActionOn: mocks.action }))

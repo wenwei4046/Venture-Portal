@@ -1,6 +1,6 @@
 -- Production's own text, read with pg_get_functiondef on 2026-10-20, of member_waiting_add (HR's "+") and
 -- member_sub_department_requests (Sales Groups' waiting and replacement lists). Loaded by validate-waiting-edit.mjs,
--- which checks each md5 before 20261020190000_waiting_list_edit_any_revenue_submitter swaps one statement into each.
+-- which checks each md5 before 20261020210000_waiting_list_edit_any_revenue_submitter swaps one statement into each.
 
 -- member_sub_department_requests(uuid) md5(prosrc) 75a80f3e8944f966e1e136e47db05092
 CREATE OR REPLACE FUNCTION public.member_sub_department_requests(p_sub uuid)

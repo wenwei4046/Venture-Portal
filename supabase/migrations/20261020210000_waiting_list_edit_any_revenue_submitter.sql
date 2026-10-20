@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261020190000_waiting_list_edit_any_revenue_submitter.sql
+-- 20261020210000_waiting_list_edit_any_revenue_submitter.sql
 -- Sales Groups › Waiting list: Edit in the applicant's drawer, and "Submitted by" is anybody in the Revenue
 -- department (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"; "Waiting list 那边 …
 -- 'submitted by' 选不到 Revenue 的人。它应该要能选到 Revenue department 的全部人，不管什么 title").
