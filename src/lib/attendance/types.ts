@@ -53,7 +53,16 @@ export interface AttSchedule {
 export interface AttLocation {
   id: string
   name: string
+  /** The six parts put together on one line (the database's `address_compose`), or the old one-box text. */
   address: string
+  /** The address in its six parts (2026-10-20, mig 20261020233000) — `addressFromJson` reads them. */
+  addressLine1?: string | null
+  addressLine2?: string | null
+  addressPostcode?: string | null
+  addressCity?: string | null
+  addressState?: string | null
+  addressCountry?: string | null
+  /** Whose public holidays cover its people — Settings › Holidays' states (`HOLIDAY_STATES`), not the address's. */
   state: string
   radius: number
   lat: number | null

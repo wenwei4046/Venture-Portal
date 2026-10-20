@@ -1,17 +1,17 @@
 'use client'
 
 import { DsSelect, Field, TextField } from '@/components/ds/Field'
-import { useMalaysia } from '@/components/address/use-malaysia'
 import { MALAYSIA, choicesFor, inMalaysia, withCity, withCountry, withState, type Address } from '@/lib/address/address'
 import { COUNTRIES } from '@/lib/address/countries'
+import { useMalaysia } from './use-malaysia'
 
 /**
- * Me › Edit profile's home address (2026-10-20 — the user: "所有关联到 address 的，都要跟着我刚才上面讲的 format 给他们去填";
- * "go with state, city, postcode"): the portal's address in the app's own fields — two lines typed; in Malaysia the
- * state, its city and the city's postcode picked from the official list in that order; the country, Malaysia unless
- * another is picked (`AddressFields`' steps, `lib/address/address.ts`).
+ * An address in the design system's own fields (2026-10-20 — the user: "所有关联到 address 的，都要跟着我刚才上面讲的 format
+ * 给他们去填"; "go with state, city, postcode") — Me › Edit profile's home address, an Attendance location's: two lines
+ * typed; in Malaysia the state, its city and the city's postcode picked from the official list in that order; the
+ * country, Malaysia unless another is picked (`AddressFields`' steps, on the HR kit's fields; `lib/address/address.ts`).
  */
-export default function MeAddressFields({ value, onChange, onFile = null }: {
+export default function DsAddressFields({ value, onChange, onFile = null }: {
   value: Address
   onChange: (next: Address) => void
   /** The old one-box address, while the record has no parts yet — shown above the fields to copy from. */

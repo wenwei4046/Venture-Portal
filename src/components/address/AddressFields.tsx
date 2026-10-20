@@ -15,7 +15,7 @@ import s from './address-fields.module.css'
  *
  * Controlled: the host keeps the value, and `was` — the address as it was drawn — turns a changed part peach. The
  * host's own field and label classes can draw it, so it looks like the page it is on. The Me app's own is
- * `MeAddressFields` (its design-system fields), the same steps.
+ * `DsAddressFields` (the design system's fields: Me, Attendance's locations), the same steps.
  */
 export default function AddressFields({
   value,

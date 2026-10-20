@@ -1,5 +1,5 @@
 import type { AttLedger, AttLeaveType, AttMonth, AttOtRate, AttPolicy, AttRequest } from '@/lib/attendance/types'
-import { addressOf } from '@/lib/address/address'
+import { addressFromJson } from '@/lib/address/address'
 import type { MeData, MeOrg, MePayslip, MeRecord, MeTeam, MeToday, OrgStatus } from './types'
 
 /**
@@ -163,14 +163,7 @@ export function meRecordOf(raw: unknown): MeRecord | null {
     phone: strOrNull(d.phone),
     email: strOrNull(d.email),
     address: strOrNull(d.address),
-    addressParts: addressOf({
-      address_line1: d.addressLine1,
-      address_line2: d.addressLine2,
-      address_postcode: d.addressPostcode,
-      address_city: d.addressCity,
-      address_state: d.addressState,
-      address_country: d.addressCountry,
-    }),
+    addressParts: addressFromJson(d),
     ecName: strOrNull(d.ecName),
     ecPhone: strOrNull(d.ecPhone),
     ecRel: strOrNull(d.ecRel),

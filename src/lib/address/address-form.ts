@@ -1,4 +1,4 @@
-import { ADDRESS_COLUMNS, ADDRESS_KEYS, cleanAddress, isEmptyAddress, type Address } from './address'
+import { ADDRESS_COLUMNS, ADDRESS_JSON_KEYS, ADDRESS_KEYS, cleanAddress, isEmptyAddress, type Address } from './address'
 
 /**
  * An address as a form carries it and a record keeps it (2026-10-20): the six parts under their columns' names —
@@ -53,4 +53,10 @@ export function addressPatch(a: Address): Record<string, string | null> {
   const x = cleanAddress(a)
   for (const key of ADDRESS_KEYS) out[ADDRESS_COLUMNS[key]] = x[key] || null
   return out
+}
+
+/** The same parts under the keys a database function takes them by (`addressLine1` …, att_save_setting). */
+export function addressJsonOf(a: Address): Record<string, string | null> {
+  const patch = addressPatch(a)
+  return Object.fromEntries(ADDRESS_KEYS.map(key => [ADDRESS_JSON_KEYS[key], patch[ADDRESS_COLUMNS[key]]]))
 }

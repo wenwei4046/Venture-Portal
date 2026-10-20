@@ -81,6 +81,38 @@ export function addressOf(row: AddressRow | null | undefined): Address {
   return { ...a, country: a.country || MALAYSIA }
 }
 
+/** Each part's key where a database function hands it over or takes it (my_record, att_config, att_save_setting). */
+export const ADDRESS_JSON_KEYS: Readonly<Record<keyof Address, string>> = {
+  line1: 'addressLine1',
+  line2: 'addressLine2',
+  postcode: 'addressPostcode',
+  city: 'addressCity',
+  state: 'addressState',
+  country: 'addressCountry',
+}
+
+/** The six as a database function hands them over, each as it came. */
+export interface AddressJson {
+  addressLine1?: unknown
+  addressLine2?: unknown
+  addressPostcode?: unknown
+  addressCity?: unknown
+  addressState?: unknown
+  addressCountry?: unknown
+}
+
+/** The parts as a database function hands them over — `addressLine1` … — read as `addressOf` reads a record. */
+export function addressFromJson(row: AddressJson | null | undefined): Address {
+  return addressOf({
+    address_line1: row?.addressLine1,
+    address_line2: row?.addressLine2,
+    address_postcode: row?.addressPostcode,
+    address_city: row?.addressCity,
+    address_state: row?.addressState,
+    address_country: row?.addressCountry,
+  })
+}
+
 /** The parts trimmed, a blank country Malaysia — what is saved and compared. */
 export function cleanAddress(a: Address): Address {
   const out: Address = {
