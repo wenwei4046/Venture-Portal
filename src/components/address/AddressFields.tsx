@@ -9,7 +9,7 @@ import s from './address-fields.module.css'
 /**
  * An address, filled in the portal's one way (2026-10-20 — the user: "填写的 format 要区分成 address 1、address 2、postcode、
  * state、city，国家 default 是 Malaysia"; "不是填的，应该都是选的"; "go with state, city, postcode"): two lines typed, then
- * in Malaysia the state, its city and the city's postcode, each picked from Pos Malaysia's list in that order (a long
+ * in Malaysia the state, its city and the city's postcode, each picked from the official list in that order (a long
  * list searches as you type — the soft dropdown), and the country, Malaysia unless another is picked. Abroad the
  * three are typed. A city with one postcode picks it at once.
  *

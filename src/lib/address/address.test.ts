@@ -27,14 +27,15 @@ const at = (over: Partial<Address> = {}): Address => ({ ...EMPTY_ADDRESS, ...ove
 const CHEA = at({ line1: 'No 83, Jalan Jambu 3', line2: 'Machang Bubok', postcode: '14000', city: 'Bukit Mertajam', state: 'Pulau Pinang' })
 
 describe('Malaysia’s postcode list', () => {
-  it('holds the sixteen states, the federal territories last, as Pos Malaysia names their cities', () => {
+  it('holds the sixteen states, the federal territories last — the government’s list, filled in from Pos Malaysia’s', () => {
     expect(statesOf(DATA)).toEqual([
       'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak',
       'Selangor', 'Terengganu', 'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya',
     ])
     const cities = DATA.reduce((n, [, c]) => n + c.length, 0)
     const postcodes = new Set(DATA.flatMap(([, c]) => c.flatMap(([, p]) => p)))
-    expect([cities, postcodes.size]).toEqual([444, 2929])
+    // data.gov.my's 2,930 postcodes and the 285 only Pos Malaysia's list holds (scripts/build-malaysia-postcodes.mjs).
+    expect([cities, postcodes.size]).toEqual([411, 3215])
     expect([...postcodes].every(p => /^\d{5}$/.test(p))).toBe(true)
   })
 
@@ -45,15 +46,27 @@ describe('Malaysia’s postcode list', () => {
     expect(postcodesOf(DATA, 'Pulau Pinang', 'Ipoh')).toEqual([])
   })
 
-  it('places a postcode — where Pos Malaysia says, not where people say (11060 is Pulau Pinang, not Ayer Itam)', () => {
-    expect(placesOfPostcode(DATA, '11060')).toEqual([{ state: 'Pulau Pinang', city: 'Pulau Pinang' }])
-    expect(placesOfPostcode(DATA, '86400')).toEqual([{ state: 'Johor', city: 'Batu Pahat' }, { state: 'Johor', city: 'Parit Raja' }])
+  it('places a postcode under the place’s own name, not its post office’s (the user: “Standard Malaysia 的那个地址”)', () => {
+    // Pos Malaysia's list put 11060 under its post office, Pulau Pinang; the government's under Paya Terubong.
+    expect(placesOfPostcode(DATA, '11060')).toEqual([{ state: 'Pulau Pinang', city: 'Paya Terubong' }])
+    expect(placesOfPostcode(DATA, '11500')).toEqual([{ state: 'Pulau Pinang', city: 'Air Itam' }])
+    expect(placesOfPostcode(DATA, '08010')).toEqual([{ state: 'Kedah', city: 'Kuala Ketil' }])
+    // One postcode, two places.
+    expect(placesOfPostcode(DATA, '40160')).toEqual([{ state: 'Selangor', city: 'Shah Alam' }, { state: 'Selangor', city: 'Sungai Buloh' }])
     expect(placesOfPostcode(DATA, '00000')).toEqual([])
+  })
+
+  it('keeps every postcode only Pos Malaysia’s list holds, under its town as the government spells it', () => {
+    expect(placesOfPostcode(DATA, '81960')).toEqual([{ state: 'Johor', city: 'Bandar Penawar' }])
+    expect(citiesOf(DATA, 'Pahang')).toContain('Bandar Tun Razak')
+    expect(citiesOf(DATA, 'Pahang')).not.toContain('Bandar Tun Abdul Razak')
+    expect(citiesOf(DATA, 'Perak')).not.toContain('Kampung Gajah')
   })
 
   it('knows when the three are one place', () => {
     expect(belongTogether(DATA, { state: 'Pulau Pinang', city: 'Bukit Mertajam', postcode: '14000' })).toBe(true)
-    expect(belongTogether(DATA, { state: 'Pulau Pinang', city: 'Ayer Itam', postcode: '11060' })).toBe(false)
+    expect(belongTogether(DATA, { state: 'Pulau Pinang', city: 'Paya Terubong', postcode: '11060' })).toBe(true)
+    expect(belongTogether(DATA, { state: 'Pulau Pinang', city: 'Air Itam', postcode: '11060' })).toBe(false)
     // A city name two states share is the state's own.
     expect(belongTogether(DATA, { state: 'Perlis', city: 'Simpang Ampat', postcode: '14100' })).toBe(false)
     expect(belongTogether(DATA, { state: 'Pulau Pinang', city: 'Simpang Ampat', postcode: '14100' })).toBe(true)
@@ -100,8 +113,8 @@ describe('picking, state then city then postcode', () => {
   })
 
   it('picks the postcode at once for a city that has only one', () => {
-    expect(withCity(at({ state: 'Johor' }), 'Ayer Baloi', DATA).postcode).toBe('82100')
-    expect(withCity(at({ state: 'Johor' }), 'Ayer Baloi', null).postcode).toBe('')
+    expect(withCity(at({ state: 'Johor' }), 'Rengit', DATA).postcode).toBe('83100')
+    expect(withCity(at({ state: 'Johor' }), 'Rengit', null).postcode).toBe('')
   })
 
   it('starts the three again when the country moves across Malaysia’s border, not otherwise', () => {
@@ -116,7 +129,9 @@ describe('picking, state then city then postcode', () => {
     expect(c.states).toHaveLength(16)
     expect(c.cities).toContain('Bukit Mertajam')
     expect(c.postcodes).toEqual(['14000', '14007', '14009', '14020'])
-    expect(choicesFor(at({ state: 'Pulau Pinang', city: 'Ayer Itam', postcode: '11060' }), DATA).postcodes).toEqual(['11060', '11500'])
+    expect(choicesFor(at({ state: 'Pulau Pinang', city: 'Air Itam', postcode: '11060' }), DATA).postcodes).toEqual(['11060', '11500'])
+    // A city on file from the old list (Pos Malaysia's Ayer Itam) stays a choice.
+    expect(choicesFor(at({ state: 'Pulau Pinang', city: 'Ayer Itam' }), DATA).cities[0]).toBe('Ayer Itam')
     expect(choicesFor(at({ state: 'Penang' }), DATA).states[0]).toBe('Penang')
     expect(choicesFor(CHEA, null)).toEqual({ states: ['Pulau Pinang'], cities: ['Bukit Mertajam'], postcodes: ['14000'] })
     expect(choicesFor(EMPTY_ADDRESS, DATA).cities).toEqual([])

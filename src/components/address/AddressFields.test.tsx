@@ -5,7 +5,7 @@ import AddressFields from './AddressFields'
 import { EMPTY_ADDRESS, type Address } from '@/lib/address/address'
 
 // An address filled in the portal's one way (2026-10-20 — the user: "不是填的，应该都是选的"; "go with state, city,
-// postcode"): State, then City, then Postcode, each from Pos Malaysia's list; typed only abroad.
+// postcode"): State, then City, then Postcode, each from the official list; typed only abroad.
 
 function Host({ start = EMPTY_ADDRESS, was, onFile }: { start?: Address; was?: Address; onFile?: string | null }) {
   const [value, setValue] = useState(start)
@@ -51,8 +51,8 @@ describe('AddressFields', () => {
     await ready()
     pick('state', 'Johor')
     expect(valueNow()).toMatchObject({ state: 'Johor', city: '', postcode: '' })
-    pick('city', 'Ayer Baloi')
-    expect(valueNow()).toMatchObject({ state: 'Johor', city: 'Ayer Baloi', postcode: '82100' })
+    pick('city', 'Rengit')
+    expect(valueNow()).toMatchObject({ state: 'Johor', city: 'Rengit', postcode: '83100' })
   })
 
   it('types the state, city and postcode abroad — and clears the three Malaysia’s list gave', async () => {

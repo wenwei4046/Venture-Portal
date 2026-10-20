@@ -377,8 +377,8 @@ describe('Me › Hierarchy and My team', () => {
 describe('Me › Profile', () => {
   it('sends only the fields that changed; a new account number only when one is typed', () => {
     const saved = formOf({ id: 'ann', name: '', code: null, title: null, department: null, hireDate: null, upline: null, phone: '012-345 6789', email: 'a@x.my',
-      address: '1 Jalan Mawar, 82100 Ayer Baloi, Johor, Malaysia',
-      addressParts: { line1: '1 Jalan Mawar', line2: '', postcode: '82100', city: 'Ayer Baloi', state: 'Johor', country: 'Malaysia' },
+      address: '1 Jalan Mawar, 82100 Pontian, Johor, Malaysia',
+      addressParts: { line1: '1 Jalan Mawar', line2: '', postcode: '82100', city: 'Pontian', state: 'Johor', country: 'Malaysia' },
       ecName: 'Ong', ecPhone: '016', ecRel: 'Father', bank: 'Maybank', accountLast4: '3376', nric: null, photo: null })
     expect(changedFields(saved, saved)).toEqual([])
     expect(changedFields({ ...saved, phone: '013-111 2222', acct: '8007 2213 9041' }, saved)).toEqual([

@@ -8,7 +8,7 @@ import { COUNTRIES } from '@/lib/address/countries'
 /**
  * Me › Edit profile's home address (2026-10-20 — the user: "所有关联到 address 的，都要跟着我刚才上面讲的 format 给他们去填";
  * "go with state, city, postcode"): the portal's address in the app's own fields — two lines typed; in Malaysia the
- * state, its city and the city's postcode picked from Pos Malaysia's list in that order; the country, Malaysia unless
+ * state, its city and the city's postcode picked from the official list in that order; the country, Malaysia unless
  * another is picked (`AddressFields`' steps, `lib/address/address.ts`).
  */
 export default function MeAddressFields({ value, onChange, onFile = null }: {
