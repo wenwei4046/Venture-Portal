@@ -23,6 +23,8 @@ vi.mock('@/lib/private-fields', () => ({ readStaffPrivate }))
 // Reports to travels by the charts' own writer (2026-10-16), which is server-only.
 const { moveReportingLine } = vi.hoisted(() => ({ moveReportingLine: vi.fn() }))
 vi.mock('@/lib/hierarchy-writes', () => ({ moveReportingLine }))
+// Malaysia's postcode list, which the address is checked against (2026-10-20), is server-only.
+vi.mock('server-only', () => ({}))
 import { addStaff, updateStaff } from './actions'
 import { LOGIN_EMAIL_LOCKED } from '@/lib/person-record'
 
@@ -133,9 +135,54 @@ describe('a person is saved from their own page (2026-10-14, edited where it sta
     form.set('email', 'new@example.com')
     await updateStaff('staff', form)
     const fields = update.mock.calls[0][0]
-    for (const key of ['employee_name', 'hire_date', 'resignation_date', 'employee_code', 'contact_number', 'address', 'title_id', 'employment_type', 'basic_salary']) {
+    for (const key of ['employee_name', 'hire_date', 'resignation_date', 'employee_code', 'contact_number', 'address', 'title_id', 'employment_type', 'basic_salary',
+      'address_line1', 'address_line2', 'address_postcode', 'address_city', 'address_state', 'address_country']) {
       expect(fields, key).not.toHaveProperty(key)
     }
+  })
+
+  // The address in six parts (2026-10-20): written whole, State → City → Postcode as one place on Malaysia's list;
+  // the one-line `address` is the database's to put together, never written here.
+  const addressForm = (parts: Record<string, string>) => {
+    const form = new FormData()
+    const all = { address_line1: '', address_line2: '', address_postcode: '', address_city: '', address_state: '', address_country: 'Malaysia', ...parts }
+    for (const [key, value] of Object.entries(all)) form.set(key, value)
+    return form
+  }
+
+  it('writes an address as its six parts, trimmed, a blank one NULL', async () => {
+    const form = addressForm({ address_line1: ' No 83, Jalan Jambu 3 ', address_state: 'Pulau Pinang', address_city: 'Bukit Mertajam', address_postcode: '14000' })
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    const fields = update.mock.calls[0][0]
+    expect(fields).toMatchObject({
+      address_line1: 'No 83, Jalan Jambu 3', address_line2: null, address_state: 'Pulau Pinang',
+      address_city: 'Bukit Mertajam', address_postcode: '14000', address_country: 'Malaysia',
+    })
+    expect(fields).not.toHaveProperty('address')
+  })
+
+  it('refuses, in words, a postcode that is not the city’s — and writes nothing', async () => {
+    const form = addressForm({ address_line1: 'No 1', address_state: 'Pulau Pinang', address_city: 'Bukit Mertajam', address_postcode: '11060' })
+    await expect(updateStaff('staff', form)).resolves.toEqual({
+      ok: false, reason: '11060 is not a postcode of Bukit Mertajam, Pulau Pinang — pick them from the list.',
+    })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('clears an address as every part NULL', async () => {
+    await expect(updateStaff('staff', addressForm({}))).resolves.toEqual({ ok: true })
+    expect(update.mock.calls[0][0]).toMatchObject({
+      address_line1: null, address_line2: null, address_postcode: null, address_city: null, address_state: null, address_country: null,
+    })
+  })
+
+  it('files a new person’s address in its parts — abroad the three typed', async () => {
+    const form = staffForm()
+    for (const [key, value] of addressForm({ address_line1: '1 Raffles Place', address_city: 'Singapore', address_postcode: '048616', address_country: 'Singapore' })) form.set(key, value as string)
+    await addStaff(form)
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      address_line1: '1 Raffles Place', address_city: 'Singapore', address_postcode: '048616', address_state: null, address_country: 'Singapore',
+    })
   })
 
   it('refuses a blank name', async () => {

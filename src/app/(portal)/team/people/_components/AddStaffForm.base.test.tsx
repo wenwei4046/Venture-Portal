@@ -114,3 +114,45 @@ describe('Add Staff — the sub-department and the reporting line', () => {
     expect(upline.value).toBe('')
   })
 })
+
+// The address in six parts (2026-10-20): State → City → Postcode picked from Malaysia's list, the form carrying the
+// six by their columns' names; three that are not one place are refused before anything is sent.
+describe('Add Staff — the address', () => {
+  const field = (key: string) => document.getElementById(`staff-address-${key}`) as HTMLInputElement | HTMLSelectElement
+  const listed = () => waitFor(() => expect(field('state')).not.toBeDisabled())
+  const submit = () => act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+
+  it('files the six parts picked in turn', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 8, Jalan Mawar 2' } })
+    fireEvent.change(field('state'), { target: { value: 'Johor' } })
+    fireEvent.change(field('city'), { target: { value: 'Ayer Baloi' } })
+    expect(field('postcode')).toHaveValue('82100')
+
+    await submit()
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(Object.fromEntries([...sent.entries()].filter(([key]) => key.startsWith('address')))).toEqual({
+      address_line1: 'No 8, Jalan Mawar 2', address_line2: '', address_state: 'Johor', address_city: 'Ayer Baloi',
+      address_postcode: '82100', address_country: 'Malaysia',
+    })
+  })
+
+  it('asks for the postcode before sending anything', async () => {
+    actions.addStaff.mockClear()
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 83, Jalan Jambu 3' } })
+    fireEvent.change(field('state'), { target: { value: 'Pulau Pinang' } })
+    fireEvent.change(field('city'), { target: { value: 'Bukit Mertajam' } })
+
+    await submit()
+    expect(await screen.findByText('Pick the postcode.')).toBeInTheDocument()
+    expect(actions.addStaff).not.toHaveBeenCalled()
+  })
+})

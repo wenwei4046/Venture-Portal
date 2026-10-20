@@ -27,6 +27,13 @@ export const PROFILE_LABELS: Readonly<Record<string, string>> = {
   contact_number: 'Mobile',
   email: 'Personal email',
   address: 'Home address',
+  // The home address in its six parts (2026-10-20).
+  address_line1: 'Address line 1',
+  address_line2: 'Address line 2',
+  address_postcode: 'Postcode',
+  address_city: 'City',
+  address_state: 'State',
+  address_country: 'Country',
   emergency_contact_name: 'Emergency contact',
   emergency_contact_relationship: 'Relationship',
   emergency_contact_phone: 'Emergency mobile',

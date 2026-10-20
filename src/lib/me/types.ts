@@ -14,6 +14,7 @@ import type {
   ClockMode,
   ScheduleDay,
 } from '@/lib/attendance/types'
+import type { Address } from '@/lib/address/address'
 
 /**
  * "Me" — a person's own attendance, leave, payslips, record and line (2026-10-17, the Claude Design handoff
@@ -134,7 +135,10 @@ export interface MeRecord {
   upline: string | null
   phone: string | null
   email: string | null
+  /** The one line the record keeps — its six parts put together, or an older record's own box. */
   address: string | null
+  /** The address in its six parts (2026-10-20; `my_record` since mig 20261020230000) — what Edit profile changes. */
+  addressParts: Address
   ecName: string | null
   ecPhone: string | null
   ecRel: string | null

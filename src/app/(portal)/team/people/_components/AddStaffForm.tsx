@@ -16,6 +16,10 @@ import {
 } from '@/lib/staff-form'
 import { BANK_NAMES } from '@/lib/banks'
 import { Select } from '@/components/hrv/select'
+import AddressFields from '@/components/address/AddressFields'
+import { EMPTY_ADDRESS, addressRefusal, type Address } from '@/lib/address/address'
+import { addressFormEntries } from '@/lib/address/address-form'
+import { loadMalaysia } from '@/lib/address/malaysia'
 
 export interface AddStaffDepartment {
   id: string
@@ -104,6 +108,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
   const [fullCommission, setFullCommission] = useState(false)
   const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
+  const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
 
   const department = departments.find(d => d.id === departmentId) ?? null
   const isCommissionDept = department?.payroll_source === 'commission'
@@ -191,6 +196,12 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
     setError(null)
     startTransition(async () => {
       try {
+        // Checked against Malaysia's list here first, so the refusal reads at once (the server asks again).
+        const refused = addressRefusal(address, await loadMalaysia())
+        if (refused) {
+          setError(refused)
+          return
+        }
         await addStaff(formData)
         router.push('/team/people')
         router.refresh()
@@ -554,16 +565,21 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
           />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="staff-address" className={labelBase}>
-            Address
-          </label>
-          <textarea
-            id="staff-address"
-            name="address"
-            rows={2}
-            placeholder="Street, city, postcode"
-            className={`${textInput} resize-y`}
+          {/* The address in six parts, State → City → Postcode picked from Malaysia's list (2026-10-20); the form carries them hidden. */}
+          <AddressFields
+            value={address}
+            onChange={setAddress}
+            idPrefix="staff-address"
+            inputClassName={textInput}
+            selectClassName={textInput}
+            selectBare
+            // Its own labels' words; the space under them is the fields' own 6px.
+            labelClassName="block text-sm font-medium"
+            gap={16}
           />
+          {addressFormEntries(address).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
         </div>
       </div>
 

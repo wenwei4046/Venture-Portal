@@ -376,11 +376,25 @@ describe('Me › Hierarchy and My team', () => {
 
 describe('Me › Profile', () => {
   it('sends only the fields that changed; a new account number only when one is typed', () => {
-    const saved = formOf({ id: 'ann', name: '', code: null, title: null, department: null, hireDate: null, upline: null, phone: '012-345 6789', email: 'a@x.my', address: '1 Jalan',
+    const saved = formOf({ id: 'ann', name: '', code: null, title: null, department: null, hireDate: null, upline: null, phone: '012-345 6789', email: 'a@x.my',
+      address: '1 Jalan Mawar, 82100 Ayer Baloi, Johor, Malaysia',
+      addressParts: { line1: '1 Jalan Mawar', line2: '', postcode: '82100', city: 'Ayer Baloi', state: 'Johor', country: 'Malaysia' },
       ecName: 'Ong', ecPhone: '016', ecRel: 'Father', bank: 'Maybank', accountLast4: '3376', nric: null, photo: null })
     expect(changedFields(saved, saved)).toEqual([])
     expect(changedFields({ ...saved, phone: '013-111 2222', acct: '8007 2213 9041' }, saved)).toEqual([
       { key: 'contact_number', to: '013-111 2222' }, { key: 'bank_account_no', to: '8007 2213 9041' }])
+  })
+
+  it('sends a changed home address whole — its six parts, after the email (2026-10-20)', () => {
+    const saved = formOf(null)
+    expect(saved.address).toEqual({ line1: '', line2: '', postcode: '', city: '', state: '', country: 'Malaysia' })
+    const address = { line1: ' No 83, Jalan Jambu 3 ', line2: '', postcode: '14000', city: 'Bukit Mertajam', state: 'Pulau Pinang', country: 'Malaysia' }
+    expect(changedFields({ ...saved, email: 'a@x.my', address }, saved)).toEqual([
+      { key: 'email', to: 'a@x.my' },
+      { key: 'address_line1', to: 'No 83, Jalan Jambu 3' }, { key: 'address_line2', to: '' }, { key: 'address_state', to: 'Pulau Pinang' },
+      { key: 'address_city', to: 'Bukit Mertajam' }, { key: 'address_postcode', to: '14000' }, { key: 'address_country', to: 'Malaysia' }])
+    // Spaces alone are no change.
+    expect(changedFields({ ...saved, address: { ...saved.address, line1: '  ' } }, saved)).toEqual([])
   })
 })
 
