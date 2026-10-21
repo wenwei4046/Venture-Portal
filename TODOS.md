@@ -22,7 +22,25 @@ it is not on (`reactCompiler` unset).
 
 GitHub's Dependabot alerts are off on the repo (`vulnerability-alerts`
 answers 404), so nothing names a published hole in a dependency — `next`
-included. The user, asked the same day: not now.
+included. The user, asked the same day: not now. Until then, `npm audit
+--omit=dev` is the check (only what the site runs; 2026-10-21 after the
+fixes: 0 critical — what is left is listed in the items below and mammoth's
+CLI-only argparse / sprintf-js, never reached by the browser-side previews).
+
+## Owed — pdf2json 3.2 (2026-10-21)
+
+`pdf2json` is pinned at exactly 3.1.5 (`src/lib/pdf2json-version.test.ts`):
+3.2 changed the coordinates it reports without a major version — on our own
+PDFs the topmost line read y=874.89 where 3.1.5 reads 33.01, while the page
+Height stayed in the old units. Until it moves, its bundled
+`@xmldom/xmldom` 0.9.6 stays (npm audit: high), reachable only through a
+bank statement PDF a signed-in Finance user uploads to Reconciliation.
+- Moving it: re-derive `lib/bank-recon-pdf.ts` (rows grouped by y within a
+  fixed tolerance, columns by x), the PDF layout tests (`lib/export/pdf.test.ts`,
+  the invoice / voucher / credit note document tests) and the worker smoke
+  (`tools/smoke-worker-pdf.mjs`) on 3.2's coordinates — and check real HLB
+  statements, which the bank-recon tests (synthetic items) never parse.
+- Or read statements with `pdfjs-dist`, already a dependency.
 
 ## Owed — sub-departments per person (2026-10-16)
 
