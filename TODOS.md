@@ -26,6 +26,14 @@ included. The user, asked the same day: not now. Until then, `npm audit
 --omit=dev` is the check (only what the site runs; 2026-10-21 after the
 fixes: 0 critical — what is left is listed in the items below and mammoth's
 CLI-only argparse / sprintf-js, never reached by the browser-side previews).
+- **xlsx comes from SheetJS's CDN** (#604) and npm audit still checks it: it
+  matches by name and version, wherever the tarball came from — checked the
+  same day, a CDN-installed 0.20.1 is reported (GHSA-5pgg-2g8v-p4x9, high),
+  0.20.3 is not. What npm cannot do is move it: `npm audit fix` and
+  `npm update` never pick a newer CDN release. When an advisory names it, find
+  the fixed release at cdn.sheetjs.com and change the URL in package.json
+  (`src/lib/xlsx-version.test.ts` keeps it on the CDN). The same answer
+  without npm: `gh api "/advisories?ecosystem=npm&affects=xlsx@0.20.3"`.
 
 ## Owed — pdf2json 3.2 (2026-10-21)
 
