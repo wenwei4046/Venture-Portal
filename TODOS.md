@@ -42,6 +42,23 @@ bank statement PDF a signed-in Finance user uploads to Reconciliation.
   statements, which the bank-recon tests (synthetic items) never parse.
 - Or read statements with `pdfjs-dist`, already a dependency.
 
+## Found — dates that follow the server's locale and time zone (2026-10-21)
+
+Both seen while checking xlsx 0.20.3 (neither comes from it; production is
+right today only because Vercel runs in UTC with a US locale):
+- **Fund Summary's Excel prints a maturity date the US way**:
+  `reports/fund-summary/export/_format/xlsx.ts:37` writes
+  `new Date(…).toLocaleDateString()` with no locale, so production's file reads
+  `6/15/2030` for 15 June (`15/06/2030` on a Malaysian PC). The portal's own
+  format (DESIGN.md › Date format) would say `15 Jun 2030`.
+- **Reconciliation reads an Excel statement's dates by the server's clock**:
+  with `cellDates: true` xlsx builds each date at the server's local midnight
+  and `lib/bank-recon.ts › parseDate` takes its UTC parts — right on a UTC
+  server, a day early on a UTC+8 one (1 Oct read as 30 Sep, xlsx 0.18.5 and
+  0.20.3 alike). Only a server run in Malaysian time is hit (local dev); reading
+  the serials with `cellDates: false`, as the InfoTech and ERP imports do,
+  would end it.
+
 ## Owed — sub-departments per person (2026-10-16)
 
 The owner: permission ticked "按 sub-department" on the CRM and the Revenue
