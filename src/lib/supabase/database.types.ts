@@ -6417,6 +6417,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          journal_entry_id: string | null
           loan_id: string
           notes: string | null
           payment_date: string
@@ -6428,6 +6429,7 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          journal_entry_id?: string | null
           loan_id: string
           notes?: string | null
           payment_date: string
@@ -6439,6 +6441,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          journal_entry_id?: string | null
           loan_id?: string
           notes?: string | null
           payment_date?: string
@@ -6451,6 +6454,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repayments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
           {
