@@ -127,7 +127,8 @@ export function moduleSum(pieces: ReadonlyArray<ComboPiece & { n: number }>, tie
   let total = 0
   for (const p of pieces) {
     const cell = p.grid?.find(c => heightKey(c.height) === want && c.tier === tier)
-    if (!cell || typeof cell.price !== 'number') return null
+    // A 0 is no price (2026-10-21), as the costing reads it: "Not sold", never a set at RM 0.
+    if (!cell || typeof cell.price !== 'number' || !(cell.price > 0)) return null
     total += cell.price * p.n
   }
   return Math.round(total * 100) / 100

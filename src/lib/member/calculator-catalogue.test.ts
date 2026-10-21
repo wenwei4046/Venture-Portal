@@ -189,6 +189,15 @@ describe("sofa combos — exactly the set, at the portal's price", () => {
     expect(alone.error).toMatch(/cost is pending/);
   });
 
+  // 2026-10-21 (user: 0 = 还没定价): a module whose cell at the seat is 0 is not costed at RM 0 — the Quote refuses the
+  // seat, as it refuses one the grid does not carry (member_catalogue no longer offers it either).
+  it("never costs a module at a cell priced 0", () => {
+    const zero = { ...module_("z", "1A(LHF)", 0, "35"), costGrid: [{ height: "35", tier: "PRICE_2", cost: 0 }], options: [{ height: "35", tier: "PRICE_2" }] };
+    const r = calculateQuote(quote([one("z")], { height: "35", tier: "PRICE_2" }), [zero], bands, undefined, pricing());
+    expect(r.valid).toBe(false);
+    expect(r.error).toMatch(/seat height is not available/);
+  });
+
   it("is no combo at a seat height the portal did not price it at", () => {
     const at24 = { ...lShape, priceByHeight: { "24": 2000 } };
     const r = calculateQuote(quote([one("a"), one("b")], sofa), products, bands, undefined, pricing({ combos: [at24] }));

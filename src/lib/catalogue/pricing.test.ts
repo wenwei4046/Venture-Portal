@@ -136,6 +136,23 @@ describe('gridPrice — catalogue_grid_price', () => {
   it('an empty grid knows nothing', () => {
     expect(gridPrice([], '30', 'PRICE_2')).toBeNull()
   })
+
+  // 2026-10-21: 8069-1A(LHF) prices seat 28 at RM 750 and every other seat at 0 — a Recost would have costed its
+  // seat-35 lines at RM 0 (a margin near 100%). The user: "0 = 还没定价". Migration 20261021230200 is the SQL twin.
+  it('a cell priced 0 is no price — the fallback goes on, and with none the height is unpriced', () => {
+    const soffioLike: PriceCell[] = [
+      { height: '28', tier: 'PRICE_1', price: 750 },
+      { height: '35', tier: 'PRICE_1', price: 0 },
+    ]
+    expect(gridPrice(soffioLike, '35', 'PRICE_2')).toBeNull()
+    expect(gridPrice(soffioLike, '28', 'PRICE_2')).toBe(750)
+    const zeroAtOwnTier: PriceCell[] = [
+      { height: '35', tier: 'PRICE_1', price: 0 },
+      { height: '35', tier: 'PRICE_3', price: 900 },
+    ]
+    expect(gridPrice(zeroAtOwnTier, '35', 'PRICE_1')).toBe(900)
+    expect(unitPrice({ price: null, grid: soffioLike }, '35', 'PRICE_2')).toEqual({ price: null, how: 'no_height' })
+  })
 })
 
 describe('unitPrice — catalogue_unit_price', () => {
