@@ -67,7 +67,7 @@ export default function ShareOrderSheet({ open, orderId, ownerName, readOnly, lo
   const shown = query.trim() ? team.filter(m => m.name.toLowerCase().includes(query.trim().toLowerCase())) : team;
 
   return (
-    <Sheet open={open} onClose={onClose} z={23} maxHeight="92%" scroll className={p.sheetBody} label="Share order">
+    <Sheet open={open} onClose={onClose} z={23} maxHeight="92%" scroll className={`${p.sheetBody} ${t.body}`} label="Share order">
       <SheetHandle />
       <div>
         <h2 className={t.title}>Share order</h2>

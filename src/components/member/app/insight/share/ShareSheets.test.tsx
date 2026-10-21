@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import t from "./share.module.css";
 import { shareRequestFromRow, type ShareContext, type ShareRequest } from "@/lib/member/share-requests";
 import { OrderSheet } from "../InsightSheets";
 import type { OrderSheetVM } from "../insight-model";
@@ -164,5 +167,27 @@ describe("a share request", () => {
   it("says why it is not there", () => {
     render(<ShareRequestSheet open request={null} error="That share request is not there any more." staffId={ANTHONY} readOnly={false} onAnswer={vi.fn()} onWithdraw={vi.fn()} onClose={() => {}} />);
     expect(screen.getByText("That share request is not there any more.")).toBeTruthy();
+  });
+});
+
+// Seen on production (2026-10-21, the first real share): in a sheet long enough to scroll, *Send to ANTHONY* and *Cancel*
+// were squeezed thin, and the bill sheet's SHARED row ran past the right edge.
+describe("the share sheets keep their shape", () => {
+  const css = readFileSync(resolve(process.cwd(), "src/components/member/app/insight/share/share.module.css"), "utf8");
+
+  it("let nothing in a scrolling share sheet shrink", async () => {
+    render(<ShareOrderSheet open orderId={ORDER} ownerName="LUCAS" readOnly={false} load={async () => ({ ok: true, data: context() })}
+      onSend={vi.fn()} onOpenRequest={vi.fn()} onClose={() => {}} />);
+    expect(screen.getByRole("dialog", { name: "Share order" }).classList.contains(t.body)).toBe(true);
+    cleanup();
+    render(<ShareRequestSheet open request={request()} staffId={ANTHONY} readOnly={false} onAnswer={vi.fn()} onWithdraw={vi.fn()} onClose={() => {}} />);
+    expect(screen.getByRole("dialog", { name: "Share request HC-SO-2610-004" }).classList.contains(t.body)).toBe(true);
+    expect(css).toMatch(/\.body > \* \{ flex-shrink: 0; \}/);
+  });
+
+  it("keep the SHARED row inside the sheet's width", () => {
+    const row = /\.shareRow \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(row).toContain("box-sizing: border-box;");
+    expect(row).toContain("flex-shrink: 0;");
   });
 });

@@ -56,7 +56,7 @@ export default function ShareRequestSheet({ open, request, error, staffId, readO
   };
 
   return (
-    <Sheet open={open} onClose={onClose} z={24} maxHeight="88%" scroll className={p.sheetBody} label={vm ? `Share request ${vm.orderNo}` : "Share request"}>
+    <Sheet open={open} onClose={onClose} z={24} maxHeight="88%" scroll className={`${p.sheetBody} ${t.body}`} label={vm ? `Share request ${vm.orderNo}` : "Share request"}>
       <SheetHandle />
       {!vm && <p className={p.rdError}>{error ?? "Loading…"}</p>}
       {vm && (
