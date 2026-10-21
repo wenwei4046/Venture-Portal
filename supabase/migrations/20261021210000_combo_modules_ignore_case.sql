@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261021190000_combo_modules_ignore_case.sql
+-- 20261021210000_combo_modules_ignore_case.sql
 -- A combo's modules match whatever their case (2026-10-21 — the user, on a SOFFIO quote at 19.8%: "if the sofa
 -- compartment that got match with the combo, it should use the combo costing to calculate"; the salesperson: "but i set
 -- at combo price dy").

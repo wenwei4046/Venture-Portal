@@ -145,7 +145,7 @@ describe('matchComboSlots — catalogue_match_slots', () => {
   // 2026-10-21: the ERP keeps the SOFFIO console as 8030-Console and a retired
   // 8030-CONSOLE; a set made on CONSOLE never met the Console the Quote sells,
   // and a 1A(LHF) + 1A(RHF) + Console quote read 19.8% instead of its set's 31.9%.
-  it('codes compare ignoring case, on either side (migration 20261021190000)', () => {
+  it('codes compare ignoring case, on either side (migration 20261021210000)', () => {
     expect(matchComboSlots(['1A(LHF)', '1A(RHF)', 'Console'], [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']])).toEqual([0, 1, 2])
     expect(matchComboSlots(['CONSOLE', '1a(rhf)'], [['1A(RHF)'], ['Console']])).toEqual([0, 1])
     expect(matchComboSlots(['console'], [['CONSOLE']])).toEqual([0])
