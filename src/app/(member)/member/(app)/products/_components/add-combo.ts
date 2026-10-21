@@ -73,15 +73,24 @@ function dearerGrid(a: PriceCell[] | null, b: PriceCell[] | null): PriceCell[] |
  * and, right after a module whose other side the model also has, one more for
  * the pair: a piece that may be either side (2026-10-08), as the ERP's combos
  * write "1A(R)(LHF) or 1A(R)(RHF)".
+ *
+ * A module spelled two ways is one card (2026-10-21): the ERP keeps the SOFFIO
+ * console as 8030-Console and a retired 8030-CONSOLE, and the two cards let a
+ * set be made on the one no quote sells. The card takes the live SKU's spelling.
  */
 export function comboPieces(skus: readonly CatalogueSku[], model: string): ComboPiece[] {
-  const seen = new Set<string>()
-  const singles: ComboPiece[] = []
+  const live = (s: CatalogueSku) => s.active && !s.removed
+  const byModule = new Map<string, { sku: CatalogueSku; module: string }>()
   for (const s of skus) {
-    if ((s.baseModel ?? s.modelCode ?? '').trim() !== model || !s.moduleCode || seen.has(s.moduleCode)) continue
-    seen.add(s.moduleCode)
-    singles.push({ key: s.moduleCode, module: s.moduleCode, code: s.code, modules: [s.moduleCode], grid: s.grid })
+    if ((s.baseModel ?? s.modelCode ?? '').trim() !== model || !s.moduleCode) continue
+    const key = s.moduleCode.trim().toUpperCase()
+    const held = byModule.get(key)
+    // Replacing a value keeps the card where the module first showed.
+    if (!held || (!live(held.sku) && live(s))) byModule.set(key, { sku: s, module: s.moduleCode })
   }
+  const singles: ComboPiece[] = [...byModule.values()].map(({ sku, module }) => (
+    { key: module, module, code: sku.code, modules: [module], grid: sku.grid }
+  ))
   const out: ComboPiece[] = []
   const paired = new Set<string>()
   for (const p of singles) {
@@ -124,9 +133,9 @@ export function moduleSum(pieces: ReadonlyArray<ComboPiece & { n: number }>, tie
   return Math.round(total * 100) / 100
 }
 
-/** A combo's slots as a multiset, order-free: two combos with the same are the same compartments. */
+/** A combo's slots as a multiset, order- and case-free: two combos with the same are the same compartments. */
 function slotSignature(slots: readonly (readonly string[])[]): string {
-  return slots.map(s => [...s].map(code => code.trim()).sort().join('|')).sort().join('+')
+  return slots.map(s => [...s].map(code => code.trim().toUpperCase()).sort().join('|')).sort().join('+')
 }
 
 export function sameCompartments(combo: Pick<ComboRow, 'slots'>, modules: readonly (readonly string[])[]): boolean {

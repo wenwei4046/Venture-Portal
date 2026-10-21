@@ -138,9 +138,21 @@ describe('matchComboSlots — catalogue_match_slots', () => {
     expect(matchComboSlots(['2A', '1A', 'X'], ['1A', '2A'])).toEqual([0, 1])
   })
 
-  it('built codes are trimmed; codes are case-sensitive', () => {
+  it('built codes are trimmed', () => {
     expect(matchComboSlots([' 1A '], [['1A']])).toEqual([0])
-    expect(matchComboSlots(['console'], [['CONSOLE']])).toBeNull()
+  })
+
+  // 2026-10-21: the ERP keeps the SOFFIO console as 8030-Console and a retired
+  // 8030-CONSOLE; a set made on CONSOLE never met the Console the Quote sells,
+  // and a 1A(LHF) + 1A(RHF) + Console quote read 19.8% instead of its set's 31.9%.
+  it('codes compare ignoring case, on either side (migration 20261021220000)', () => {
+    expect(matchComboSlots(['1A(LHF)', '1A(RHF)', 'Console'], [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']])).toEqual([0, 1, 2])
+    expect(matchComboSlots(['CONSOLE', '1a(rhf)'], [['1A(RHF)'], ['Console']])).toEqual([0, 1])
+    expect(matchComboSlots(['console'], [['CONSOLE']])).toEqual([0])
+  })
+
+  it('ignoring case never lets one module fill a slot of another code', () => {
+    expect(matchComboSlots(['1A(LHF)', 'Console', 'Console'], [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']])).toBeNull()
   })
 
   it.each<[unknown]>([[[]], ['2+L'], [[null]], [null]])('slots %j can never be covered → null', slots => {
@@ -275,6 +287,17 @@ describe('pickCombo — the pick inside catalogue_apply_combos', () => {
     expect(pickCombo(build({ baseModel: ' soffio ' }), [combo({ baseModel: 'SOFFIO' })])?.price).toBe(3200)
   })
 
+  it('so do the modules: a 1A(LHF) + 1A(RHF) + Console build is the CONSOLE set (2026-10-21)', () => {
+    const soffio = combo({ erpId: 'portal:13d48e86', modules: [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']], tier: 'PRICE_1',
+      label: '1A(LHF) + 1A(RHF) + CONSOLE', priceByHeight: { '24': 1744, '35': 2140, '25"': 0 } })
+    const pair = combo({ erpId: 'portal:aad8c7ba', modules: [['1A(LHF)'], ['1A(RHF)']], tier: 'PRICE_1',
+      label: '1A(LHF) + 1A(RHF)', priceByHeight: { '35': 1720 } })
+    const hit = pickCombo(build({ modules: ['1A(LHF)', '1A(RHF)', 'Console'], height: '35', tier: 'PRICE_1' }), [soffio, pair])
+    expect(hit?.combo.label).toBe('1A(LHF) + 1A(RHF) + CONSOLE')
+    expect(hit?.price).toBe(2140)
+    expect(hit?.matched).toEqual([0, 1, 2])
+  })
+
   it('another base model never matches', () => {
     expect(pickCombo(build({ baseModel: '8031' }), [combo()])).toBeNull()
   })
@@ -384,5 +407,10 @@ describe('combosCollide — could one bill match both? (2026-10-08)', () => {
     expect(combosCollide([['1A(R)(LHF)'], ['1NA']], [['1A(R)(RHF)'], ['1NA']])).toBe(false)
     expect(combosCollide([['3S'], ['2S']], [['3S'], ['2S'], ['1S']])).toBe(false)
     expect(combosCollide([], [])).toBe(false)
+  })
+
+  it('a set spelled in another case is the same set — catalogue_combos_collide (2026-10-21)', () => {
+    expect(combosCollide([['1A(LHF)'], ['1A(RHF)'], ['Console']], [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']])).toBe(true)
+    expect(combosCollide([['1a(r)(lhf)', '1A(R)(RHF)'], ['1NA']], [['1A(R)(LHF)'], ['1na']])).toBe(true)
   })
 })
