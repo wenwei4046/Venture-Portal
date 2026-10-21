@@ -1,6 +1,7 @@
 import type { MemberBand, MemberIncome, MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
 import type { MemberPay } from "@/lib/member/income-pay";
 import type { MemberOrderBook } from "@/lib/member/order-book";
+import type { ShareRequest } from "@/lib/member/share-requests";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
@@ -67,15 +68,19 @@ export interface TodayInput {
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
   requestCode: (request: MemberRequest) => string;
+  /** Share order (2026-10-21): bills shared with them, waiting for their answer. */
+  shares?: readonly ShareRequest[];
 }
 
 export type TodoTone = "memo" | "request" | "weeks";
 /** `brandWeeks` / `weeks`: the prototype's "Save … brand weeks" (its fixtures); the live app has had nothing to save since 2026-10-12. */
-export type TodoTarget = "memos" | "requests" | "brandWeeks";
+export type TodoTarget = "memos" | "requests" | "brandWeeks" | "share";
 export interface TodayTodo {
   key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget;
   /** A request's kind: where it is followed up depends on it (app-access.ts `requestPage`). */
   requestKind?: MemberRequest["kind"];
+  /** Share order (2026-10-21): the share request to answer. */
+  shareId?: string;
 }
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
@@ -212,6 +217,10 @@ function todos(input: TodayInput): TodayTodo[] {
   for (const request of input.requests.filter(r => r.status === "needs_info")) {
     out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests", requestKind: request.kind,
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
+  }
+  for (const share of input.shares ?? []) {
+    out.push({ key: `sh-${share.id}`, tone: "request", icon: ICON.share, target: "share", shareId: share.id,
+      title: `Accept ${share.orderNo}?`, sub: `${share.owner.name} shared it with you` });
   }
   return out;
 }

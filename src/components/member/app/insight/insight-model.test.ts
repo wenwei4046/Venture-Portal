@@ -17,7 +17,7 @@ const order = (o: Partial<MemberBookOrder> & Pick<MemberBookOrder, "id">): Membe
   number: `HC-SO-2609-${o.id}`, ref: null, customer: "Mdm Lee", date: "2026-09-12", sourceMonth: "2026-09", recognitionMonth: "2026-09",
   brand: "AKEMI", booth: "AKEMI", venue: "IOI CITY MALL", fairStart: "2026-09-11", fairEnd: "2026-09-13", organiser: "MEGAHOME",
   week: "2026-09-11", revenue: 1000, margin: 40, kpiQty: 0, cleared: true, carried: false, manual: false, total: 1000, paid: 1000,
-  depositNeeded: 300, lines: [{ name: "AKEMI MATT (Q)", code: "AK-Q", qty: 1, amount: 1000, goods: true, kpiQty: 0 }], ...o,
+  depositNeeded: 300, lines: [{ name: "AKEMI MATT (Q)", code: "AK-Q", qty: 1, amount: 1000, goods: true, kpiQty: 0 }], own: true, share: null, ...o,
 });
 const book = (orders: MemberBookOrder[]): MemberOrderBook => ({
   from: "2026-09", through: "2026-09", asOf: "2026-10-04T00:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders,

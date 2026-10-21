@@ -142,12 +142,13 @@ export function holdersLine(holders: readonly ShareHolder[]): string {
 export interface DraftPart { id: string; name: string; percent: number }
 
 /**
- * The parts the form starts at when `count` colleagues are picked: the bill split evenly between them and the owner, in
- * whole percent, the owner taking what is left over — one colleague 50 / 50, two 33 + 33 / 34.
+ * The parts the form starts at when `count` colleagues are picked: what the owner holds split evenly between them and the
+ * owner, in whole percent, the owner taking what is left over — one colleague 50 / 50, two 33 + 33 / 34. Anybody already
+ * holding a part who is not in the form keeps it (`othersPercent`).
  */
-export function evenPercents(count: number): number[] {
+export function evenPercents(count: number, othersPercent = 0): number[] {
   if (count <= 0) return [];
-  const each = Math.floor(100 / (count + 1));
+  const each = Math.max(1, Math.floor((100 - othersPercent) / (count + 1)));
   return Array.from({ length: count }, () => each);
 }
 
@@ -203,6 +204,18 @@ export function stepLabel(step: ShareStep): string {
     sent: "Share request sent", accepted: "Accepted", declined: "Declined", cancelled: "Withdrawn",
     approved: "Approved by HR", rejected: "Rejected by HR",
   }[step];
+}
+
+/**
+ * Who would hold the bill once HR approves a request: the colleagues it names at their parts, anybody holding a part now
+ * whom it does not name at theirs, and the owner the rest — the owner first.
+ */
+export function proposedHolders(r: Pick<ShareRequest, "owner" | "parts" | "holders">): ShareHolder[] {
+  const named = new Set(r.parts.map(p => p.id));
+  const others = r.holders.filter(h => !h.owner && h.id !== r.owner.id && !named.has(h.id));
+  const given = [...r.parts.map(p => ({ id: p.id, name: p.name, pct: p.pct, owner: false })), ...others];
+  const kept = Math.round((1 - given.reduce((a, h) => a + h.pct, 0)) * 10_000) / 10_000;
+  return [{ id: r.owner.id, name: r.owner.name, pct: kept, owner: true }, ...given];
 }
 
 /** The request still open on a bill (partner or hr), if any. */

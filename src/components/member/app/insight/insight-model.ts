@@ -2,6 +2,7 @@ import type { MemberBand, MemberDownlineRow, MemberScore, MemberTarget } from "@
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { arenaMonthFridays } from "@/lib/member/arena";
+import { holdersLine, pctLabel } from "@/lib/member/share-requests";
 import { dayRange, initials, monthName, rm, shortDay } from "../format";
 import { barPos, brandLadder, pctText, rowFor, TONES, type Ladder, type LadderRow, type Tone } from "./ladder";
 import type { InsightPeriod } from "./period";
@@ -435,6 +436,13 @@ export interface OrderSheetVM {
   tier: string;
   kpi: string;
   lines: { name: string; qty: string; amt: string; kpi: number; isKpi: boolean }[];
+  /** The reader's own bill — the ERP's salesperson on it — so theirs to share (2026-10-21). The preview's has none. */
+  own?: boolean;
+  /**
+   * A shared bill: every holder's part ("LUCAS 50% · ANTHONY 50%"), and the reader's — whose bill it is when it is
+   * somebody else's, and what of it counts in their sales.
+   */
+  share?: { line: string; sub: string } | null;
 }
 
 export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM | null {
@@ -457,6 +465,11 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     tier: o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
     kpi: kpiOn(input) ? String(o.kpiQty) : "—",
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),
+    own: o.own,
+    share: o.share ? {
+      line: holdersLine(o.share.holders),
+      sub: `${o.own ? "Your" : `${o.share.holders.find(h => h.owner)?.name ?? "Another salesperson"}’s bill · your`} part ${pctLabel(o.share.part)} · ${rm(o.revenue)} in your sales`,
+    } : null,
   };
 }
 
