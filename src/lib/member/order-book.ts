@@ -56,6 +56,34 @@ export interface MemberBookOrder {
   paid: number;
   depositNeeded: number | null;
   lines: MemberOrderLine[];
+  /**
+   * The bill is the reader's own — the salesperson the ERP put on it (2026-10-21). A bill somebody shared with them is
+   * theirs in part only: never theirs to share. True when the answer predates it.
+   */
+  own: boolean;
+  /**
+   * Who holds a shared bill (2026-10-21, `sales_order_shares`): the reader's part and every holder's, the owner first.
+   * Null when nobody shares it. `revenue` and the lines' `kpiQty` are already the reader's part; `total` is the bill's.
+   */
+  share: MemberBookShare | null;
+}
+
+export interface MemberBookShare {
+  /** The reader's part, 0.5 = half. */
+  part: number;
+  holders: { id: string; name: string; pct: number; owner: boolean }[];
+}
+
+function readShare(value: unknown): MemberBookShare | null {
+  if (!isObject(value) || !Array.isArray(value.holders)) return null;
+  const part = num(value.part);
+  const holders = value.holders.flatMap(h => {
+    if (!isObject(h)) return [];
+    const id = text(h.id);
+    const pct = num(h.pct);
+    return id && pct !== null ? [{ id, name: text(h.name) ?? "", pct, owner: h.owner === true }] : [];
+  });
+  return part !== null && holders.length > 1 ? { part, holders } : null;
 }
 
 export interface MemberOrderBook {
@@ -138,6 +166,8 @@ function readOrder(value: unknown): MemberBookOrder | null {
     total, paid,
     depositNeeded: num(value.depositNeeded),
     lines,
+    own: value.own !== false,
+    share: readShare(value.share),
   };
 }
 
