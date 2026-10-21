@@ -8,7 +8,11 @@
  *   * A combo is ordered SLOTS, each an OR-set of module codes. A build MATCHES
  *     when every slot is covered by a DISTINCT built module whose code is in
  *     that slot's set. The build may carry more modules than the combo has
- *     slots; the extras keep their own price. Order is irrelevant.
+ *     slots; the extras keep their own price. Order is irrelevant. Codes
+ *     compare trimmed and ignoring case — the portal's rule, not the ERP's
+ *     (2026-10-21): its SKU master holds the SOFFIO console as 8030-Console
+ *     and a retired 8030-CONSOLE, and a set made on CONSOLE never met the
+ *     Console a quote or a bill carries.
  *   * The combo ALWAYS wins — there is no "only if it is cheaper" guard (the
  *     Chairman removed it 2026-05-30).
  *   * Same base model only; one tier and one seat height across the set; the
@@ -76,15 +80,16 @@ export function comboSlotsKey(raw: unknown): string {
  * each trying modules in build order. Where the OR-sets overlap it can move an
  * earlier slot to another module to free one for a later slot, so WHICH
  * modules the combo consumes — and so which stay extras at their own price —
- * is the ERP's choice exactly. The SQL twin is `catalogue_match_slots`.
+ * is the ERP's choice exactly. Codes compare ignoring case (2026-10-21: a slot
+ * of `CONSOLE` takes the `Console` module). The SQL twin is `catalogue_match_slots`.
  */
 export function matchComboSlots(built: readonly string[], rawSlots: unknown): number[] | null {
   const slots = normaliseComboModules(rawSlots)
-  const mods = built.map(m => m.trim())
+  const mods = built.map(m => m.trim().toUpperCase())
   if (slots.length === 0 || mods.length < slots.length) return null
 
   const canTake = slots.map(slot => {
-    const set = new Set(slot)
+    const set = new Set(slot.map(code => code.toUpperCase()))
     return mods.map((_m, i) => i).filter(i => mods[i] !== '' && set.has(mods[i]))
   })
   if (canTake.some(c => c.length === 0)) return null
@@ -186,13 +191,15 @@ export function pickCombo(
 /**
  * Could ONE build match both combos exactly? The same number of pieces, paired
  * so each pair shares a module — "1A(R) (LHF or RHF) + 1NA" and
- * "1A(R)(LHF) + 1NA" collide, "3+2" and "3+2+1" do not. The SQL twin,
- * `catalogue_combos_collide`, is the same matching run on the slots
+ * "1A(R)(LHF) + 1NA" collide, "3+2" and "3+2+1" do not. Case is ignored, as
+ * the matching ignores it, so "… + CONSOLE" and "… + Console" collide. The SQL
+ * twin, `catalogue_combos_collide`, is the same matching run on the slots
  * themselves; Add combo refuses a set that collides with one the model has.
  */
 export function combosCollide(a: unknown, b: unknown): boolean {
-  const sa = normaliseComboModules(a)
-  const sb = normaliseComboModules(b)
+  const upper = (slot: string[]) => slot.map(code => code.toUpperCase())
+  const sa = normaliseComboModules(a).map(upper)
+  const sb = normaliseComboModules(b).map(upper)
   if (sa.length === 0 || sa.length !== sb.length) return false
   const codes = sb.map((_slot, j) => `b${j}`)
   const adjacency = sa.map(slot => sb.flatMap((other, j) => (other.some(m => slot.includes(m)) ? [codes[j]] : [])))
