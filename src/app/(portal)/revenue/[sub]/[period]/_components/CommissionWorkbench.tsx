@@ -55,9 +55,11 @@ const TABS: [Tab, string][] = [
   // The month's two review panels, above the cards until 2026-09-30 (user:
   // 把这两个 move 去 … 让它们形成两个 tab). Drawn only when the page hands them over.
   ['changes', 'Drops & upsells'], ['claims', 'Double claims'],
+  // The salespeople's share requests (2026-10-21 — the user: "在 Double claims 旁边加一个 Requests").
+  ['requests', 'Requests'],
 ]
 /** The tabs that are the page's panels rather than cuts of the workbench's own board. */
-const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
+const REVIEW_TABS: readonly Tab[] = ['changes', 'claims', 'requests']
 type Column = 'status' | 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 // Status (2026-10-12): why a row from another month is on this month's ledger
 // — Top up deposit, Late key-in, Upsell, Drop sales (`row-origin.ts`). First,
@@ -178,9 +180,11 @@ interface Props {
    * *Drops & upsells* — what the ERP changed on settled bills, and bills of
    * another month's fair — and *Double claims*, each group with the reasons
    * it was flagged and its bills' history. They sat stacked above the month's
-   * cards until then. A tab whose panel is absent is not drawn.
+   * cards until then. A tab whose panel is absent is not drawn. *Requests*
+   * (2026-10-21): the salespeople's share requests, its count those waiting
+   * for HR's approval.
    */
-  reviews?: { changes?: ReviewTab; claims?: ReviewTab }
+  reviews?: { changes?: ReviewTab; claims?: ReviewTab; requests?: ReviewTab }
 }
 
 /** What the month page hands over for closing salespeople. */
@@ -211,7 +215,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // ledger lands on that ledger — it used to land on the list of people.
   const searchParams = useSearchParams()
   const here = useMemo(() => readWorkbenchLocation(searchParams), [searchParams])
-  const reviewOf = (key: Tab): ReviewTab | undefined => key === 'changes' ? reviews?.changes : key === 'claims' ? reviews?.claims : undefined
+  const reviewOf = (key: Tab): ReviewTab | undefined =>
+    key === 'changes' ? reviews?.changes : key === 'claims' ? reviews?.claims : key === 'requests' ? reviews?.requests : undefined
   const drawn = (key: Tab) => !REVIEW_TABS.includes(key) || reviewOf(key) !== undefined
   // A link to a review tab this page does not draw opens on the month's first view.
   const tab: Tab = drawn(here.tab) ? here.tab : 'sales'
@@ -440,6 +445,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     exhibition: exhibitions.length,
     changes: reviews?.changes?.count ?? 0,
     claims: reviews?.claims?.count ?? 0,
+    requests: reviews?.requests?.count ?? 0,
   }
   // A review tab's count is what waits on somebody: it stands out while it is not zero.
   const waiting = (key: Tab) => (reviewOf(key)?.count ?? 0) > 0
@@ -1145,6 +1151,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {/* The page's own panels, server-built (2026-09-30). */}
     {tab === 'changes' && reviews?.changes?.panel}
     {tab === 'claims' && reviews?.claims?.panel}
+    {tab === 'requests' && reviews?.requests?.panel}
     </div>
 
     {billMenu.menu && <BillContextMenu

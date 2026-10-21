@@ -98,5 +98,14 @@ describe("Insight › KPI, brand, the order sheet", () => {
     const vm = orderSheet(input(), "4")!;
     expect(vm).toMatchObject({ status: "Deposit due RM 140", statusTone: "warn", amt: "RM 800", margin: "41.0%", tier: "Incentive Tier 1", kpi: "—" });
     expect(Object.keys(vm.lines[0])).toEqual(["name", "qty", "amt", "kpi", "isKpi"]);
+    expect(vm).toMatchObject({ own: true, share: null });
+  });
+  it("says who holds a shared bill, and — somebody else's — whose it is and what of it counts for the reader (2026-10-21)", () => {
+    const holders = [{ id: "lucas", name: "LUCAS", pct: 0.5, owner: true }, { id: "anthony", name: "ANTHONY", pct: 0.5, owner: false }];
+    const mine = order({ id: "7", total: 4300, revenue: 2150, share: { part: 0.5, holders } });
+    const theirs = order({ id: "8", total: 4300, revenue: 2150, own: false, share: { part: 0.5, holders } });
+    const shared = input({ book: book([mine, theirs]) });
+    expect(orderSheet(shared, "7")).toMatchObject({ amt: "RM 4,300", own: true, share: { line: "LUCAS 50% · ANTHONY 50%", sub: "Your part 50% · RM 2,150 in your sales" } });
+    expect(orderSheet(shared, "8")).toMatchObject({ own: false, share: { line: "LUCAS 50% · ANTHONY 50%", sub: "LUCAS’s bill · your part 50% · RM 2,150 in your sales" } });
   });
 });

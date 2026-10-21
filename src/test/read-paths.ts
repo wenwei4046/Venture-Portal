@@ -352,6 +352,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
   // An exact request, including older than either list (mig 20261021030000): active sender or IT requests · View.
   'it_request_get',
+  // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
+  // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
+  // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
+  'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
+  'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
