@@ -30,10 +30,19 @@ beforeEach(() => {
 })
 
 describe('share order on the member side', () => {
-  it('sends the parts as the database takes them, under the caller’s own session', async () => {
-    const res = await sendShareRequest({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.50004 }], note: '  together  ' })
+  it('sends the colleague’s half as the database takes it, under the caller’s own session', async () => {
+    const res = await sendShareRequest({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.5 }], note: '  together  ' })
     expect(res).toMatchObject({ ok: true, data: { id: REQUEST, status: 'partner' } })
     expect(mocks.rpc).toHaveBeenCalledWith('member_share_order_send', { p_order: ORDER, p_parts: [{ staffId: ANTHONY, pct: 0.5 }], p_note: 'together' })
+  })
+
+  // 2026-10-21 — the user: "only can share one pax, then percentage for them request is fix with 50% 50%".
+  it('sends one colleague at half, nothing else', async () => {
+    expect(await sendShareRequest({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.5 }, { staffId: REQUEST, pct: 0.5 }], note: '' }))
+      .toEqual({ ok: false, error: 'Share a bill with one colleague — the two of you hold half each.' })
+    expect(await sendShareRequest({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.3 }], note: '' }))
+      .toEqual({ ok: false, error: 'A shared bill is half each — 50% for you, 50% for your colleague.' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it('refuses a send whose Requests page’s Create box is unticked, before asking the database', async () => {
@@ -82,7 +91,7 @@ describe('share order on the member side', () => {
   it('checks the shape of what the phone sent', async () => {
     expect(await sendShareRequest({ orderId: 'nope', parts: [], note: '' })).toEqual({ ok: false, error: 'That bill is not there.' })
     expect(await sendShareRequest({ orderId: ORDER, parts: [], note: '' })).toEqual({ ok: false, error: 'Pick who to share it with.' })
-    expect(await sendShareRequest({ orderId: ORDER, parts: [{ staffId: 'x', pct: 0.5 }], note: '' })).toEqual({ ok: false, error: 'Give each colleague a part of the bill.' })
+    expect(await sendShareRequest({ orderId: ORDER, parts: [{ staffId: 'x', pct: 0.5 }], note: '' })).toEqual({ ok: false, error: 'Pick who to share it with.' })
     expect(await sendShareRequest({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.5 }], note: 'x'.repeat(501) })).toEqual({ ok: false, error: 'Keep the note to 500 characters.' })
     expect(await loadShareContext('nope')).toEqual({ ok: false, error: 'That bill is not there.' })
     expect(mocks.rpc).not.toHaveBeenCalled()

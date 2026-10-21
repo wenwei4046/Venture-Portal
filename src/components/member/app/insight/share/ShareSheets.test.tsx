@@ -76,30 +76,32 @@ describe("the bill's ⋯", () => {
 });
 
 describe("Share order", () => {
-  it("splits evenly with whoever is picked, and sends each part as a fraction", async () => {
+  // 2026-10-21 — the user: "only can share one pax, then percentage for them request is fix with 50% 50%".
+  it("shares with the one colleague picked — half each — and sends their half", async () => {
     const load = vi.fn(async () => ({ ok: true as const, data: context() }));
     const onSend = vi.fn(async () => ({ ok: true as const, data: request() }));
     const onOpenRequest = vi.fn();
     render(<ShareOrderSheet open orderId={ORDER} ownerName="LUCAS" readOnly={false} load={load} onSend={onSend} onOpenRequest={onOpenRequest} onClose={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /^ANTHONY/ }));
-    const split = screen.getByText("SPLIT").parentElement!;
-    expect(split).toHaveTextContent("LUCAS (you)RM 2,150.0050%");
-    expect(split).toHaveTextContent("ANTHONYRM 2,150.00−50%+");
-    fireEvent.click(screen.getByRole("button", { name: /^BEN/ }));
-    expect(split).toHaveTextContent("LUCAS (you)RM 1,462.0034%");
-    fireEvent.click(screen.getByRole("button", { name: /^BEN/ }));
-    fireEvent.click(screen.getByRole("button", { name: "More for ANTHONY" }));
-    expect(split).toHaveTextContent("LUCAS (you)RM 1,935.0045%");
+    const split = (await screen.findByText("SPLIT · HALF EACH")).parentElement!;
+    expect(split).toHaveTextContent("LUCAS (you)RM 2,150.0050%Your colleagueRM 2,150.0050%");
+    expect((screen.getByRole("button", { name: "Pick who sold it with you" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: /^ANTHONY/ }));
+    expect(split).toHaveTextContent("LUCAS (you)RM 2,150.0050%ANTHONYRM 2,150.0050%");
+    fireEvent.click(screen.getByRole("radio", { name: /^BEN/ }));
+    expect(screen.getByRole("radio", { name: /^BEN/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: /^ANTHONY/ }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByRole("button", { name: /More for|Less for/ })).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /^ANTHONY/ }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Closed it together" } });
     fireEvent.click(screen.getByRole("button", { name: "Send to ANTHONY" }));
-    await waitFor(() => expect(onSend).toHaveBeenCalledWith({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.55 }], note: "Closed it together" }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith({ orderId: ORDER, parts: [{ staffId: ANTHONY, pct: 0.5 }], note: "Closed it together" }));
     expect(onOpenRequest).toHaveBeenCalledWith(expect.objectContaining({ id: "r1" }));
   });
 
   it("names who cannot take a part, and why", async () => {
     render(<ShareOrderSheet open orderId={ORDER} ownerName="LUCAS" readOnly={false} load={async () => ({ ok: true, data: context() })}
       onSend={vi.fn()} onOpenRequest={vi.fn()} onClose={() => {}} />);
-    const teng = await screen.findByRole("button", { name: /TENG YIK/ });
+    const teng = await screen.findByRole("radio", { name: /TENG YIK/ });
     expect((teng as HTMLButtonElement).disabled).toBe(true);
     expect(teng).toHaveTextContent("No Revenue app login yet");
   });
@@ -115,7 +117,7 @@ describe("Share order", () => {
   it("View as shows the form and sends nothing", async () => {
     render(<ShareOrderSheet open orderId={ORDER} ownerName="LUCAS" readOnly load={async () => ({ ok: true, data: context() })}
       onSend={vi.fn()} onOpenRequest={vi.fn()} onClose={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /^ANTHONY/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /^ANTHONY/ }));
     expect((screen.getByRole("button", { name: "Read-only while viewing as" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -123,7 +125,7 @@ describe("Share order", () => {
     render(<ShareOrderSheet open orderId={ORDER} ownerName="LUCAS" readOnly={false} load={async () => ({ ok: true, data: context() })}
       onSend={async () => ({ ok: false, error: "ANTHONY’s Oct 2026 is closed on Comm Cal, so they cannot take a part of this bill now." })}
       onOpenRequest={vi.fn()} onClose={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /^ANTHONY/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /^ANTHONY/ }));
     fireEvent.click(screen.getByRole("button", { name: "Send to ANTHONY" }));
     expect(await screen.findByText("ANTHONY’s Oct 2026 is closed on Comm Cal, so they cannot take a part of this bill now.")).toBeTruthy();
   });

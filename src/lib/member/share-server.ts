@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { appClosed } from "./app-pages";
 import { principalReadContext } from "./read-access";
-import { shareContextFromRow, shareRequestFromRow, shareRequestsFromRow, type ShareContext, type ShareRequest, type ShareSendInput } from "./share-requests";
+import { SHARE_PART, shareContextFromRow, shareRequestFromRow, shareRequestsFromRow, type ShareContext, type ShareRequest, type ShareSendInput } from "./share-requests";
 import type { MemberOutcome } from "./server";
 import type { MemberReadContext } from "./types";
 
@@ -73,24 +73,25 @@ export async function loadShareRequests(context?: MemberReadContext): Promise<Me
   }
 }
 
-/** Send a share request: it goes to the colleagues named first, and to HR once every one of them accepted. */
+/**
+ * Send a share request: it goes to the colleague named first, and to HR once they accepted. One colleague, half each
+ * (2026-10-21 — the user: "only can share one pax … fix with 50% 50%"; the database refuses anything else too).
+ */
 export async function sendShareRequest(input: ShareSendInput): Promise<MemberOutcome<ShareRequest>> {
   try {
     const orderId = input?.orderId;
     if (!isId(orderId)) return { ok: false, error: "That bill is not there." };
     const raw = Array.isArray(input.parts) ? input.parts : [];
     if (raw.length === 0) return { ok: false, error: "Pick who to share it with." };
-    if (raw.length > 5) return { ok: false, error: "Share a bill with up to 5 people at a time." };
-    const parts = raw.map(p => ({ staffId: p?.staffId, pct: p?.pct }));
-    if (parts.some(p => !isId(p.staffId) || typeof p.pct !== "number" || !Number.isFinite(p.pct))) {
-      return { ok: false, error: "Give each colleague a part of the bill." };
-    }
+    if (raw.length > 1) return { ok: false, error: "Share a bill with one colleague — the two of you hold half each." };
+    const staffId = raw[0]?.staffId;
+    if (!isId(staffId)) return { ok: false, error: "Pick who to share it with." };
+    if (raw[0]?.pct !== SHARE_PART) return { ok: false, error: "A shared bill is half each — 50% for you, 50% for your colleague." };
     const note = typeof input.note === "string" ? input.note.trim() : "";
     if (note.length > 500) return { ok: false, error: "Keep the note to 500 characters." };
     const db = await writer(true);
     const { data, error } = await db.rpc("member_share_order_send", {
-      p_order: orderId, p_parts: parts.map(p => ({ staffId: p.staffId, pct: Math.round((p.pct as number) * 10_000) / 10_000 })),
-      p_note: note || null,
+      p_order: orderId, p_parts: [{ staffId, pct: SHARE_PART }], p_note: note || null,
     });
     if (error) return { ok: false, error: words(error, "The share request could not be sent. Please try again.") };
     const read = shareRequestFromRow(data);

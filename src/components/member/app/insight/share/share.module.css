@@ -1,5 +1,5 @@
 /* Share order (2026-10-21 — not in the prototype): what the order sheet and Profile's request sheets do not draw already —
-   the bill's ⋯ menu, its share line, the colleagues to pick and each one's part. Every size × --rv-type, colours through
+   the bill's ⋯ menu, its share line, the colleague to pick — one, half each (2026-10-21). Every size × --rv-type, colours through
    the app's tokens only. */
 
 /* The bill's ⋯: beside its deposit chip, and the menu it opens under it. */
@@ -90,21 +90,6 @@
 .partAmt { grid-column: 1; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); font-variant-numeric: tabular-nums; }
 .partPct { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 6px; }
 .pct { min-width: 54px; text-align: center; font-size: calc(16px * var(--rv-type)); font-weight: 750; font-variant-numeric: tabular-nums; }
-.step {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--rv-handle);
-  background: var(--rv-white);
-  color: var(--rv-ink);
-  font-size: calc(18px * var(--rv-type));
-  font-weight: 600;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-}
-.step:disabled { opacity: .4; }
-
 .search {
   width: 100%;
   min-width: 0;
@@ -140,7 +125,7 @@
 .tick {
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: 50%;
   border: 1.5px solid var(--rv-handle);
   background: var(--rv-white);
   color: var(--rv-white);
@@ -151,7 +136,6 @@
 .memberText { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .memberName { font-size: calc(14.5px * var(--rv-type)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberSub { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.memberHolds { font-size: calc(12px * var(--rv-type)); font-weight: 650; color: var(--rv-brown); white-space: nowrap; }
 .none { margin: 0; padding: 14px; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 
 /* A request's colleagues and their answers. */

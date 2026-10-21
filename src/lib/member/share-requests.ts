@@ -3,12 +3,13 @@
  * order allocation 分在不同的 sales 之间"; the colleague named accepts first, then HR approves on Comm Cal › Requests, and
  * the bill's commission and its sales value are split between them).
  *
- * The rule is the database's (mig 20261021150100): one open request a bill, sent by the salesperson the bill is on, naming
- * one to five colleagues of its sub-department and each one's part — the owner keeps the rest, and always some. It moves
- * partner (each colleague asked) → hr (everybody accepted) → approved (written into `sales_order_shares`, as Comm Cal's own
- * Share this bill writes it) or rejected; a colleague may decline, the owner may withdraw it before HR decides. Every step
- * is on its trail. This file reads what the functions answer and says it in words — the Revenue app's sheets and Comm Cal's
- * Requests tab share it.
+ * The rule is the database's (migs 20261021150100, 20261021170000): one open request a bill, sent by the salesperson the
+ * bill is on, naming ONE colleague of its sub-department — half each — on a bill nobody shares yet. It moves partner (the
+ * colleague asked) → hr (accepted) → approved (written into `sales_order_shares`, as Comm Cal's own Share this bill writes
+ * it) or rejected; the colleague may decline, the owner may withdraw it before HR decides. Every step is on its trail. This
+ * file reads what the functions answer and says it in words — the Revenue app's sheets and Comm Cal's Requests tab share
+ * it. (The JSON still carries a list of parts: the first version named up to five, and HR's Approve writes whatever a
+ * request names.)
  */
 
 export type ShareStatus = "partner" | "hr" | "approved" | "rejected" | "declined" | "cancelled";
@@ -138,44 +139,22 @@ export function holdersLine(holders: readonly ShareHolder[]): string {
   return [...holders].sort((a, b) => Number(b.owner) - Number(a.owner)).map(h => `${h.name} ${pctLabel(h.pct)}`).join(" · ");
 }
 
-/** A colleague in the form, and their part in whole percent. */
-export interface DraftPart { id: string; name: string; percent: number }
-
 /**
- * The parts the form starts at when `count` colleagues are picked: what the owner holds split evenly between them and the
- * owner, in whole percent, the owner taking what is left over — one colleague 50 / 50, two 33 + 33 / 34. Anybody already
- * holding a part who is not in the form keeps it (`othersPercent`).
+ * A share is ONE colleague, and the bill is half each (2026-10-21 — the user: "only can share one pax, then percentage for
+ * them request is fix with 50% 50%"; mig 20261021170000). The database refuses anything else.
  */
-export function evenPercents(count: number, othersPercent = 0): number[] {
-  if (count <= 0) return [];
-  const each = Math.max(1, Math.floor((100 - othersPercent) / (count + 1)));
-  return Array.from({ length: count }, () => each);
-}
+export const SHARE_PART = 0.5;
 
-/** What the owner keeps, in percent, once the colleagues hold theirs (and anybody not in the form keeps theirs). */
-export function ownerKeepsPercent(parts: readonly DraftPart[], othersPercent = 0): number {
-  return Math.round((100 - othersPercent - parts.reduce((a, p) => a + p.percent, 0)) * 100) / 100;
-}
-
-/** Why the form cannot be sent as it stands, or null. The database asks the same again. */
-export function draftProblem(parts: readonly DraftPart[], othersPercent = 0): string | null {
-  if (parts.length === 0) return "Pick who sold it with you.";
-  if (parts.length > 5) return "Share a bill with up to 5 people at a time.";
-  if (parts.some(p => !(Number.isFinite(p.percent) && p.percent >= 1 && p.percent <= 99))) return "Give each colleague between 1% and 99%.";
-  if (ownerKeepsPercent(parts, othersPercent) < 1) return "That leaves you nothing — you always keep a part of your own bill.";
-  return null;
-}
-
-/** What the phone sends: the bill, each colleague's part as a fraction of it (0.5 = half), and a note. */
+/** What the phone sends: the bill, the colleague's part as a fraction of it (always `SHARE_PART`), and a note. */
 export interface ShareSendInput {
   orderId: string;
   parts: { staffId: string; pct: number }[];
   note: string;
 }
 
-/** What the form sends: each colleague's part as a fraction. */
-export function draftPayload(parts: readonly DraftPart[]): { staffId: string; pct: number }[] {
-  return parts.map(p => ({ staffId: p.id, pct: Math.round(p.percent * 100) / 10_000 }));
+/** What the form sends for the colleague picked: their half. */
+export function draftPayload(pick: { id: string }): { staffId: string; pct: number }[] {
+  return [{ staffId: pick.id, pct: SHARE_PART }];
 }
 
 export type ShareTone = "warn" | "good" | "bad" | "none";
