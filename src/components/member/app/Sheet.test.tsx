@@ -10,6 +10,7 @@ import { HonourSheet } from "./profile/HonoursPage";
 import { PersonSheet } from "./profile/TeamPage";
 import { RequestSheet } from "./profile/RequestsPage";
 import { MemoSheet } from "./profile/MemosPage";
+import SignaturePad from "@/components/memos/SignaturePad";
 
 afterEach(cleanup);
 
@@ -198,5 +199,19 @@ describe("Sheet › pulled down", () => {
     drag(screen.getByLabelText("Mark screenshot"), SWIPE_CLOSE_PX + 60);
     expect(onClose).not.toHaveBeenCalled();
     expect(panel().style.transform).toBe("");
+  });
+
+  // 2026-10-21 — the user, signing a memo on an Android phone: a stroke drawn downwards dragged the memo sheet with it.
+  it("a memo's signature pad keeps its own touch: a stroke never drags the sheet", () => {
+    const onClose = vi.fn();
+    render(<Sheet open onClose={onClose} z={22} label="Memo"><SignaturePad value={null} onChange={() => {}} /></Sheet>);
+    const pad = screen.getByLabelText("Sign here");
+    fireEvent.touchStart(pad, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(document, { touches: [{ clientY: 140 }] });
+    expect(panel().style.transform).toBe("");
+    fireEvent.touchEnd(document, { touches: [] });
+    drag(pad, SWIPE_CLOSE_PX + 60);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(isOpen()).toBe(true);
   });
 });

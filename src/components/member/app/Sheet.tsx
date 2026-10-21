@@ -126,8 +126,9 @@ export default function Sheet({ open, onClose, z, dim = "a", height, maxHeight, 
     const onStart = (e: TouchEvent) => {
       const target = e.target as Element | null;
       if (!target || e.touches.length !== 1 || panel.getBoundingClientRect().left > 0 || scrolledAbove(target, panel)) return;
-      // A field or a picker inside the sheet keeps its own touch.
-      if (target.closest("input, textarea, select, audio, video, [data-image-annotator]")) return;
+      // A field, a picker or a drawing surface inside the sheet keeps its own touch — a signature drawn downwards dragged
+      // the memo sheet with it (2026-10-21).
+      if (target.closest("input, textarea, select, audio, video, [data-image-annotator], [data-signature-pad]")) return;
       y0 = e.touches[0].clientY; dy = 0; live = false; active = true;
       document.addEventListener("touchmove", onMove, { passive: false });
       document.addEventListener("touchend", onEnd);

@@ -118,8 +118,10 @@ export default function SignaturePad({ value, onChange, disabled = false, label 
     onChange(null)
   }
 
+  // `data-signature-pad`: a stroke is the pad's own — a sheet that closes when pulled down leaves a touch that starts
+  // here alone (the Revenue app's Sheet; 2026-10-21, a stroke drawn downwards dragged the memo sheet with it).
   return (
-    <div className={`${s.pad} ${className ?? ''}`} data-disabled={disabled ? '' : undefined} data-signed={value ? '' : undefined}>
+    <div className={`${s.pad} ${className ?? ''}`} data-signature-pad="" data-disabled={disabled ? '' : undefined} data-signed={value ? '' : undefined}>
       <span className={s.line} aria-hidden="true" />
       {!touched ? <span className={s.hint} aria-hidden="true">{label}</span> : null}
       <canvas
