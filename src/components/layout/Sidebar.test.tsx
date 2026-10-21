@@ -80,7 +80,7 @@ describe('Sidebar', () => {
       vi.advanceTimersByTime(RAIL_SETTLE_MS)
     })
 
-    expect(prefetch.mock.calls).toEqual([['/fund-in']])
+    expect(prefetch.mock.calls).toEqual([['/fund-in', { kind: 'full' }]])
   })
 
   it('warms nothing the pointer only passes over', () => {
