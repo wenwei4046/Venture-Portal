@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261021210000 (2026-10-21 — a SOFFIO quote of 1A(LHF) + 1A(RHF) + Console read 19.8%:
+// Local PostgreSQL regression for 20261021220000 (2026-10-21 — a SOFFIO quote of 1A(LHF) + 1A(RHF) + Console read 19.8%:
 // the three modules at their own prices, though the Product List prices the set "1A(LHF) + 1A(RHF) + CONSOLE" at RM 2,140;
 // the user: "if the sofa compartment that got match with the combo, it should use the combo costing to calculate").
 // The ERP keeps that console as 8030-Console and a retired 8030-CONSOLE; the set was made on CONSOLE and the slot matcher
@@ -108,7 +108,7 @@ check(await collides([['1A(LHF)'], ['1A(RHF)'], ['Console']], JSON.parse(SOFFIO)
 const before = await unchanged()
 
 // ── The migration, twice ────────────────────────────────────────────────────
-const file = await migration('20261021210000_combo_modules_ignore_case')
+const file = await migration('20261021220000_combo_modules_ignore_case')
 await db.exec(file)
 check([await bodyMd5(MATCH), await bodyMd5(COLLIDE)], [LANDED.match, LANDED.collide], 'what landed is the md5 the file names')
 await db.exec(file)
