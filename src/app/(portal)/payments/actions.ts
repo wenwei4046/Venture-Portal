@@ -1743,8 +1743,9 @@ export async function voidPaidReceipt(formData: FormData) {
 // already debited the bank, posted GL, and (for pooled payments) debited a pool.
 // This fully REVERSES it so a wrong payment (e.g. amount keyed wrong) can be
 // undone and re-entered correctly. Steps mirror the receipt reversal: add the
-// bank back, reverse each GL entry, reverse the pool rows, delete auto-synced
-// fund-source repayments, un-settle any linked invoice, mark voided.
+// bank back, reverse each GL entry, reverse the pool rows, un-settle any linked
+// invoice, mark voided — then remove the fund-source repayments approval synced
+// from it (reopening the source they closed).
 //
 // Voucher types that have their OWN dedicated unwind are BLOCKED here with a
 // pointer to the right flow — reversing them generically would leave their
@@ -1863,16 +1864,7 @@ export async function reversePaidPayment(formData: FormData) {
   } as never)
   if (poolRevErr) throw new Error(`Reverse ${v.voucher_no}: pool reversal failed: ${poolRevErr.message}`)
 
-  // 4) Delete auto-synced fund-source repayment rows (HV-repays-a-fund-source vouchers)
-  if (v.fund_source_id) {
-    const { error: fsrErr } = await supabase
-      .from('fund_source_repayments')
-      .delete()
-      .eq('payment_voucher_id', id)
-    if (fsrErr) throw new Error(`Reverse ${v.voucher_no}: fund-source repayment cleanup failed: ${fsrErr.message}`)
-  }
-
-  // 5) Un-settle any invoice this payment closed (billing_payment)
+  // 4) Un-settle any invoice this payment closed (billing_payment)
   const { data: linked } = await supabase
     .from('invoices')
     .select('id')
@@ -1892,13 +1884,26 @@ export async function reversePaidPayment(formData: FormData) {
     if (unsettleErr) throw new Error(`Reverse ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
   }
 
-  // 6) Mark the voucher voided (race-guarded on still-paid)
+  // 5) Mark the voucher voided (race-guarded on still-paid)
   const { error: updErr } = await supabase
     .from('payment_vouchers')
     .update({ status: 'voided' })
     .eq('id', id)
     .eq('status', 'paid')
   if (updErr) throw new Error(`Failed to void voucher: ${updErr.message}`)
+
+  // 6) Remove the fund-source repayment rows approval synced from this voucher
+  //    (HV repaying a fund source), reopening the source they had closed —
+  //    reverse_voucher_fund_source_repayments (mig 20261021230000), which takes
+  //    only a voided voucher. Never a .delete() here: fund_source_repayments
+  //    refuses every session's DELETE (fsr_no_delete USING (false)) without an
+  //    error, so the rows stayed and the source still read repaid (2026-10-21).
+  if (v.fund_source_id) {
+    const { error: fsrErr } = await supabase.rpc('reverse_voucher_fund_source_repayments', { p_voucher_id: id })
+    if (fsrErr) {
+      throw new Error(`Reverse ${v.voucher_no}: the voucher is voided, but removing its fund-source repayments failed: ${fsrErr.message}`)
+    }
+  }
 
   // Reset any dangling approval / payroll funding request via SECURITY DEFINER
   // RPC (mig 20260722100000) — a reversed funding PV otherwise leaves its

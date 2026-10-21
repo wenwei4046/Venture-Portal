@@ -8244,6 +8244,10 @@ export type Database = {
         Args: { p_period: string; p_user_id: string }
         Returns: number
       }
+      reverse_voucher_fund_source_repayments: {
+        Args: { p_voucher_id: string }
+        Returns: number
+      }
       reverse_voucher_pool_rows: {
         Args: { p_voucher_no: string }
         Returns: number
