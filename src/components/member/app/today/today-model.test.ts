@@ -3,6 +3,7 @@ import type { MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member
 import type { MemberArenaSnapshot, ArenaPerson } from "@/lib/member/arena";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
 import { amountParts, reachedTier, shortTier, thousands, todayModel, weekFriday, type TodayInput } from "./today-model";
+import { shareRequestFromRow } from "@/lib/member/share-requests";
 
 const score = (over: Partial<ArenaPerson> = {}): ArenaPerson => ({
   id: "p", name: "P", self: false, sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, brands: {}, ...over,
@@ -183,6 +184,19 @@ describe("Needs your action", () => {
     expect(m.todo.map(t => [t.title, t.sub])).toEqual([
       ["Acknowledge 2 memos", "October brand weeks are open · Deposit rule reminder"],
       ["Replacement needs info", "RQ-2609-004 · HR returned it"],
+    ]);
+  });
+
+  it("asks them to answer a bill a colleague shared with them (2026-10-21) — the request opens over Today", () => {
+    const shared = shareRequestFromRow({
+      id: "s1", status: "partner", orderId: "o1", orderNo: "HC-SO-2610-004", periodMonth: "2026-10", subDepartmentId: "sub",
+      owner: { id: "lucas", name: "LUCAS" }, note: "", createdAt: "2026-10-03T01:00:00Z", updatedAt: "2026-10-03T01:00:00Z",
+      decidedAt: null, decidedByName: null, decisionNote: null, mine: "partner", bill: null,
+      parts: [{ id: "me", name: "ANTHONY", pct: 0.5, answer: "pending", answeredAt: null, note: null }], holders: [], events: [],
+    })!;
+    const m = todayModel({ ...base, shares: [shared] });
+    expect(m.todo.map(t => [t.title, t.sub, t.target, t.shareId])).toEqual([
+      ["Accept HC-SO-2610-004?", "LUCAS shared it with you", "share", "s1"],
     ]);
   });
 });

@@ -42,6 +42,10 @@ describe('readWorkbenchLocation', () => {
     expect(at('view=claims').tab).toBe('claims')
     expect(workbenchSearch('', { ...HOME, tab: 'claims' })).toBe('?view=claims')
     expect(parseWorkbenchReturn('/revenue/fair/2026-09-01?view=claims', 'fair')).toMatchObject({ tab: 'claims', href: '/revenue/fair/2026-09-01?view=claims' })
+    // Requests (2026-10-21): the salespeople's share requests, beside Double claims — a bill opened from it comes back to it.
+    expect(at('view=requests').tab).toBe('requests')
+    expect(workbenchSearch('', { ...HOME, tab: 'requests' })).toBe('?view=requests')
+    expect(parseWorkbenchReturn('/revenue/fair/2026-10-01?view=requests', 'fair')).toMatchObject({ tab: 'requests' })
   })
 
   it('falls back to the defaults for values it does not know', () => {

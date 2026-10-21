@@ -27,6 +27,10 @@ import BillsPage, { type BillsStatus } from "./insight/BillsPage";
 import KpiPage from "./insight/KpiPage";
 import BrandPage from "./insight/BrandPage";
 import { DateSheet, OrderSheet, TiersSheet } from "./insight/InsightSheets";
+import ShareOrderSheet from "./insight/share/ShareOrderSheet";
+import ShareRequestSheet from "./insight/share/ShareRequestSheet";
+import { useShareRequests } from "./insight/share/useShareRequests";
+import { shareStatus, type ShareSendInput } from "@/lib/member/share-requests";
 import ArenaHub from "./arena/ArenaHub";
 import ArenaBoard from "./arena/ArenaBoard";
 import ArenaRecord from "./arena/ArenaRecord";
@@ -485,6 +489,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     onSnapshot: bellSnapshot });
   // A memo's notice (2026-10-12) is not listed twice: the memo itself is the bell's item, and opening it reads its notice.
   const appNotices = useMemo(() => liveNotices.items.filter(n => n.refKind !== "memo"), [liveNotices.items]);
+  // ── Share order (2026-10-21): the share requests the member sent and was sent, read again when a share notice comes in ──
+  // View as reads the viewed member's, and sends nothing. A tapped notice's (`?share=<id>`) opens over the first drawing.
+  const shareSignal = useMemo(() => liveNotices.items.filter(n => n.refKind === "share_request").map(n => n.id).join(","), [liveNotices.items]);
+  const shareStaff = viewed?.id ?? data.profile.id;
+  const shares = useShareRequests({ source, on: live && !data.demo && !fixture && readable, context, staffId: shareStaff, gen, signal: shareSignal });
+  const [sharePick, setSharePick] = useState<string | null>(() => new URLSearchParams(startSearch).get("share"));
+  const [shareOrder, setShareOrder] = useState<string | null>(null);
   // The bell's dot counts what the database told them since they last opened it; opening it reads those, and they stay
   // marked new in the list until it opens again. One coming in after that counts again.
   const [seenNew, setSeenNew] = useState<ReadonlySet<string>>(() => new Set());
@@ -494,9 +505,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
-    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || go.to === "share" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
     notices: principal ? [] : shownNotices,
-  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices]);
+    shares: shares.waiting, staffId: shareStaff,
+  }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices, shares.waiting, shareStaff]);
   const unseenNotices = unseen.length;
   const seeNotices = useCallback(() => {
     if (!unseen.length) return;
@@ -586,6 +598,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     setNfOpen(false);
     setDateOpen(false);
     setSoPick(null);
+    setShareOrder(null);
+    setSharePick(null);
     setTiersOpen(false);
     setFairsOpen(false);
     setChampOpen(false);
@@ -714,6 +728,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const todo = (t: TodayTodo) => {
     if (t.target === "memos") goScreen("account", { pf: "memos" });
     else if (t.target === "requests") goScreen("account", { pf: requestPage(closed, t.requestKind ?? "claim") ?? "requests" });
+    // A bill shared with them (2026-10-21): its request, open over Today.
+    else if (t.target === "share") setSharePick(t.shareId ?? null);
     else goScreen("account", { pf: "brandWeeks" });
   };
   const openNotifItem = (n: NotifItem) => {
@@ -725,6 +741,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     else if (n.go.to === "rooms") goScreen("account", { pf: "rooms" });
     // An IT request (2026-10-20): IT support, the request open.
     else if (n.go.to === "it") { goScreen("account", { pf: "it" }); setItPick(n.go.requestId); }
+    // A share request (2026-10-21): its sheet, over whatever page is open.
+    else if (n.go.to === "share") setSharePick(n.go.requestId);
     else if (n.go.to === "none") return;
     else openBoard("sales", settled?.period ?? null);
   };
@@ -754,9 +772,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     team: director ? membership?.name : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
-    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo,
+    metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo, shares: shares.waiting,
   }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
-    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, director]);
+    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, director, shares.waiting]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -802,6 +820,31 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (fixture?.insight) return fixture.insight.orders[soPick] ?? null;
     return orderSheet(insightInput, soPick);
   }, [fixture, soPick, insightInput]);
+  // Share order (2026-10-21): the bill's open request, the share sheet's reads and writes — each answer replaces the
+  // request in the list at once.
+  const soRequest = soPick ? shares.onBill(soPick) : null;
+  const sharePickVM = sharePick ? shares.find(sharePick) : null;
+  const sharePut = shares.put;
+  const loadShare = useCallback((orderId: string) => (source.shareContext
+    ? settleRead(source.shareContext(orderId, context)) : Promise.resolve({ ok: false as const, error: "Preview data only." })), [source, context]);
+  const sendShare = useCallback(async (input: ShareSendInput) => {
+    if (!source.shareSend) return { ok: false as const, error: "Preview data only." };
+    const res = await settleRead(source.shareSend(input));
+    if (res.ok) sharePut(res.data);
+    return res;
+  }, [source, sharePut]);
+  const answerShare = useCallback(async (id: string, accept: boolean, note: string | null) => {
+    if (!source.shareAnswer) return { ok: false as const, error: "Preview data only." };
+    const res = await settleRead(source.shareAnswer(id, accept, note));
+    if (res.ok) sharePut(res.data);
+    return res;
+  }, [source, sharePut]);
+  const withdrawShare = useCallback(async (id: string) => {
+    if (!source.shareCancel) return { ok: false as const, error: "Preview data only." };
+    const res = await settleRead(source.shareCancel(id));
+    if (res.ok) sharePut(res.data);
+    return res;
+  }, [source, sharePut]);
   const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
   const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
 
@@ -1277,7 +1320,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // not a member viewed, not the demo.
   const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
   const ownEmail = requestEmail && !viewed && !data.demo && !fixture ? requestEmail : null;
-  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
+  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel
+    || shareOrder !== null || sharePick !== null;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
   // Nor in the CRM (`onCrm`), which reads itself every 5 s and scrolls inside its own lists: a pull listener there (a non-passive
@@ -1533,7 +1577,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             onKind={kind => { setInsKind(kind); setInsFrom(null); setBillWeek(null); }}
             onPick={o => { setInsFrom(o.period.from); setBillWeek(null); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
           {route.ins === "brand" && <TiersSheet open={tiersOpen} vm={insBrandVM} onClose={() => setTiersOpen(false)} />}
-          {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)} />}
+          {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)}
+            canShare={!fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
+            request={soRequest ? { id: soRequest.id, status: shareStatus(soRequest).text } : null}
+            // The share sheets take the bill sheet's place: it is a peek, and a tap in a sheet above it would close it anyway.
+            onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }} />}
         </>
       )}
       {route.screen === "arena" && route.arena === "board" && boardVM && (
@@ -1594,6 +1642,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         </>
       )}
       {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}
+      <ShareOrderSheet open={shareOrder !== null} orderId={shareOrder} ownerName={me.name} readOnly={readOnlyView} load={loadShare}
+        onSend={sendShare} onOpenRequest={r => { shares.put(r); setShareOrder(null); setSharePick(r.id); }} onClose={() => setShareOrder(null)} />
+      <ShareRequestSheet open={sharePick !== null} request={sharePickVM} staffId={shareStaff} readOnly={readOnlyView}
+        error={sharePick && !sharePickVM ? shares.error ?? (shares.list ? "That share request is not there any more." : null) : null}
+        onAnswer={answerShare} onWithdraw={withdrawShare} onClose={() => setSharePick(null)} />
     </div>
   );
 

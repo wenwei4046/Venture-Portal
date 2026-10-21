@@ -5,7 +5,7 @@ import type { PushApp } from './config'
  * `app_notifications`): what it is about, and where a tap on it opens — in
  * the app the phone turned notifications on in.
  */
-export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it'
+export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it' | 'share'
 /**
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
@@ -13,6 +13,8 @@ export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it'
 export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo' | 'crm_contact' | 'crm_invite' | 'att_today' | 'att_request'
   // IT support (2026-10-20, mig 20261021020100): a request's status or note, to its sender; a new one or a reply, to the desk.
   | 'it_request'
+  // Share order (2026-10-21, mig 20261021150100): a bill shared with them, an answer to theirs, HR's decision — Revenue members.
+  | 'share_request'
 
 export interface Notice {
   id: string
@@ -30,8 +32,8 @@ export interface Notices {
   items: Notice[]
 }
 
-const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request']
+const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request']
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -76,6 +78,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   // HR, Finance and the portal share the 'hr' push subscription identity. The one-app start keeps the tapped
   // request in the caller's own surface; Revenue continues to open its existing Profile flow.
   if (n.refKind === 'it_request') return app === 'revenue' ? `/member?page=account&view=it&it=${id}` : `/?open=it:${id}`
+  // A share request (2026-10-21) is the Revenue app's whichever app the phone signed up in: the request, open over Today.
+  if (n.refKind === 'share_request') return `/member?share=${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`

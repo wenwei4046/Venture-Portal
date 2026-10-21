@@ -111,6 +111,9 @@ describe('a notice', () => {
     expect(noticeUrl({ refKind: 'it_request', refId: 'it 1' }, 'hr')).toBe('/?open=it:it%201')
     expect(noticeUrl({ refKind: 'it_request', refId: 'it1' }, 'revenue')).toBe('/member?page=account&view=it&it=it1')
     expect(openTarget('it:it1')).toEqual({ k: 'it', id: 'it1' })
+    // A share request (2026-10-21): the Revenue app's, whichever app the phone signed up in — the request over Today.
+    expect(noticeUrl({ refKind: 'share_request', refId: 's 1' }, 'revenue')).toBe('/member?share=s%201')
+    expect(noticeUrl({ refKind: 'share_request', refId: 's1' }, 'hr')).toBe('/member?share=s1')
     // Today › Remind all (2026-10-15): the app's front page, either app.
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')

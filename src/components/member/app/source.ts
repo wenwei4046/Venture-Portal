@@ -21,6 +21,8 @@ import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, openMemberPersonal, type fetchMemberDocuments, type fetchMemberPersonal } from "@/app/(member)/member/docs-actions";
 import { fetchItRequest, noteItRequest, openItFile, signItFiles, submitItRequest, type ItNoteInput, type ItSubmitInput, type fetchItDesk, type fetchMyItRequests } from "@/app/(member)/member/it-actions";
 import type { ItRequest } from "@/lib/it-requests/model";
+import { answerShareRequest, cancelShareRequest, fetchShareContext, sendShareRequest, type fetchShareRequests } from "@/app/(member)/member/share-actions";
+import type { ShareContext, ShareRequest, ShareSendInput } from "@/lib/member/share-requests";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
@@ -80,6 +82,7 @@ export const ask = {
   personal: (context?: { staffId: string }): MemberRead => (context ? { kind: "personal", staffId: context.staffId } : { kind: "personal" }),
   itMine: (): MemberRead => ({ kind: "itMine" }),
   itDesk: (): MemberRead => ({ kind: "itDesk" }),
+  shareRequests: (context?: MemberReadContext): MemberRead => ({ kind: "shareRequests", context }),
 };
 
 /**
@@ -166,6 +169,19 @@ export interface RevenueSource {
   itSign?(ids: string[]): Promise<Outcome<Record<string, string>>>;
   /** One file's short link, made at the tap. */
   itOpen?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
+  /**
+   * Share order (2026-10-21): the share requests one sent and was sent (View as: the viewed member's) — read fresh, never
+   * kept on the phone: a colleague's answer must not wait for a pull.
+   */
+  shareRequests?(context?: MemberReadContext): Promise<Outcome<ShareRequest[]>>;
+  /** A bill's share sheet: whom it may go to, who holds it, its open request — or why it cannot be shared now. */
+  shareContext?(orderId: string, context?: MemberReadContext): Promise<Outcome<ShareContext>>;
+  /** Send a share request to the colleagues named. */
+  shareSend?(input: ShareSendInput): Promise<Outcome<ShareRequest>>;
+  /** A colleague named accepts their part, or declines it. */
+  shareAnswer?(id: string, accept: boolean, note: string | null): Promise<Outcome<ShareRequest>>;
+  /** The salesperson withdraws their request before HR decides. */
+  shareCancel?(id: string): Promise<Outcome<ShareRequest>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
@@ -270,6 +286,12 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     itNote: input => noteItRequest(input),
     itSign: ids => signItFiles(ids),
     itOpen: (id, mode) => openItFile(id, mode),
+    // Share order (2026-10-21): read fresh, never kept, as IT's.
+    shareRequests: context => read<Answer<typeof fetchShareRequests>>(ask.shareRequests(context)),
+    shareContext: (orderId, context) => fetchShareContext(orderId, context),
+    shareSend: input => sendShareRequest(input),
+    shareAnswer: (id, accept, note) => answerShareRequest(id, accept, note),
+    shareCancel: id => cancelShareRequest(id),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),

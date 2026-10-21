@@ -35,6 +35,20 @@ describe("readOrderBook", () => {
     expect(readOrderBook(broken)).toBeNull();
     expect(readOrderBook({ ...raw(), from: "Sep" })).toBeNull();
   });
+  // Shared bills in the Revenue app (2026-10-21, mig 20261021150000): a bill somebody shared with the reader is not
+  // theirs to share, and says who holds it.
+  it("reads whose bill it is and who holds a shared one — an answer from before both is the reader's own, unshared", () => {
+    expect(readOrderBook(raw())!.orders[0]).toMatchObject({ own: true, share: null });
+    const shared = raw();
+    Object.assign(shared.orders[0], {
+      own: false,
+      share: { part: 0.5, holders: [{ id: "lucas", name: "LUCAS", pct: 0.5, owner: true }, { id: "me", name: "ANTHONY", pct: 0.5, owner: false }] },
+    });
+    expect(readOrderBook(shared)!.orders[0]).toMatchObject({
+      own: false,
+      share: { part: 0.5, holders: [{ id: "lucas", name: "LUCAS", pct: 0.5, owner: true }, { id: "me", name: "ANTHONY", pct: 0.5, owner: false }] },
+    });
+  });
 });
 
 describe("readInsightRange", () => {

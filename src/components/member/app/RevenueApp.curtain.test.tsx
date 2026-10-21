@@ -18,6 +18,7 @@ vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/it-actions", () => ({}));
+vi.mock("@/app/(member)/member/share-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 // The CRM draws when the test says so: "CRM drawn" stands for its kept copy or its first read landing. Its house is the
