@@ -79,10 +79,14 @@ async function open(search: string, options: { data?: () => MemberData; itDesk?:
 const rows = () => screen.getAllByRole("button", { name: /IT-00\d\d/ });
 
 describe("IT support", () => {
-  it("is first in Profile › Your workspace, and opens only what one sent", async () => {
+  it("sits right under Memos & notifications in Profile › Your workspace, and opens only what one sent", async () => {
     const live = await open("?page=account");
     const workspace = screen.getByRole("heading", { name: "Your workspace" }).closest("section")!;
-    expect(within(workspace).getAllByRole("button")[0]).toHaveAccessibleName("IT support");
+    const names = within(workspace).getAllByRole("button").map(b => b.getAttribute("aria-label") ?? b.textContent ?? "");
+    const memos = names.findIndex(n => n.startsWith("Memos & notifications"));
+    expect(memos).toBeGreaterThan(0);
+    expect(names[memos + 1]).toBe("IT support");
+    expect(names[0]).not.toBe("IT support");
     fireEvent.click(screen.getByRole("button", { name: "IT support" }));
     expect(await screen.findByRole("heading", { name: "IT support" })).toBeInTheDocument();
     await waitFor(() => expect(rows().map(r => r.textContent)).toEqual([expect.stringContaining("The Quote freezes on step 2")]));
@@ -117,6 +121,9 @@ describe("IT support", () => {
     expect(screen.getByRole("button", { name: /Documentation/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "IT support" })).toBeDisabled();
     expect(screen.getByText("Exit View as to send your own request")).toBeInTheDocument();
+    const workspace = screen.getByRole("heading", { name: "Your workspace" }).closest("section")!;
+    const names = within(workspace).getAllByRole("button").map(b => b.getAttribute("aria-label") ?? b.textContent ?? "");
+    expect(names[names.findIndex(n => n.startsWith("Memos & notifications")) + 1]).toBe("IT support");
     fireEvent.click(screen.getByRole("button", { name: "IT support" }));
     expect(live.itMine).not.toHaveBeenCalled();
   });
