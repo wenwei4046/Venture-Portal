@@ -14,6 +14,16 @@
 // reference_type='payroll_accrual' for idempotency. If a segment's JV already
 // exists with a DIFFERENT total, we refuse and tell Finance to reverse the old
 // one first — never silently double-book or overwrite.
+//
+// 2026-10-21 (user: 这些扣款你就 accrual salary 少进就行 → 那accrual 分开底薪和佣金记 →
+// 对，跟8月一样分开记 → 自动 accrual 也改成这样): what lies between gross and
+// net beyond the statutory, PCB, withholding and SKBBK — pay-line deductions
+// (drop sales, a recovery) — lowers the salary booked; before, it left the JV
+// out of balance and the batch never posted (Revenue Sep'26 batch #3,
+// RM 4,677.73). A commission team's pay (payroll rows from Comm Cal) splits as
+// August's hand-posted accrual did: its salaried people's basic on 9030, the
+// claims on 9090 Travelling / 9098 Hostel & Accommodation / 9084 Staff
+// Allowance (food), the rest on 9093 Commission & Allowances.
 
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -35,6 +45,22 @@ export interface AccrualSums {
   eisBoth: number
   pcb: number
   withholdingTax?: number
+  /** Gross less net, the employee's statutory, PCB, withholding and SKBBK:
+   *  the pay-line deductions, which lower the salary booked. */
+  deductions?: number
+  /** A commission team's pay apart (Revenue Department). */
+  commission?: CommissionSplit
+}
+
+/** A commission team's part of a segment: its salary (gross less the
+ *  non-statutory allowance and deductions), its salaried people's basic and
+ *  its claims by kind. */
+export interface CommissionSplit {
+  salary: number
+  basic: number
+  travelling: number
+  accommodation: number
+  food: number
 }
 
 /** Build the JV lines in Finance's manual order, skipping zero lines. */
@@ -46,7 +72,23 @@ export function buildAccrualLines(s: AccrualSums, monthLabel: string): JournalLi
   const cr = (accountCode: string, amount: number, label: string) => {
     if (r2(amount) > 0) lines.push({ accountCode, credit: r2(amount), description: `${label} - ${monthLabel}` })
   }
-  dr('9030', s.basicEtc, 'Basic Salary')
+  const deductions = s.deductions ?? 0
+  const netOf = deductions > 0 ? ` (net of RM ${deductions.toFixed(2)} deductions)` : ''
+  const salary = r2(s.basicEtc - deductions)
+  const c = s.commission
+  if (c) {
+    dr('9030', salary - c.salary + c.basic, 'Basic Salary')
+    // The company's EPF/SOCSO/EIS come out of a commission earner's
+    // commission, so the rest can fall below nothing: then it is a credit.
+    const rest = r2(c.salary - c.basic - c.travelling - c.accommodation - c.food)
+    dr('9093', rest, `Commission & Allowances${netOf}`)
+    cr('9093', -rest, `Commission & Allowances${netOf}`)
+    dr('9090', c.travelling, 'Travelling')
+    dr('9098', c.accommodation, 'Hostel & Accommodation')
+    dr('9084', c.food, 'Food Claims')
+  } else {
+    dr('9030', salary, `Basic Salary${netOf}`)
+  }
   dr('9084', s.nonStatAllowance, 'Allowance')
   dr('9081', s.epfEr, 'EPF Employer')
   dr('9082', s.socsoEr, 'SOCSO Employer')
@@ -61,8 +103,18 @@ export function buildAccrualLines(s: AccrualSums, monthLabel: string): JournalLi
   return lines
 }
 
+/** The JV's total: its debits, as journal_entries.total_amount keeps them. */
 export function accrualTotal(s: AccrualSums): number {
-  return r2(s.basicEtc + s.nonStatAllowance + s.epfEr + s.socsoEr + s.eisEr)
+  return r2(buildAccrualLines(s, '').reduce((sum, l) => sum + (l.debit ?? 0), 0))
+}
+
+/** The sums with their deductions: gross less net, the employee's
+ *  statutory, PCB, withholding and SKBBK (never below nothing). */
+function withDeductions(s: AccrualSums): AccrualSums {
+  const gross = s.basicEtc + s.nonStatAllowance
+  const employee = (s.epfBoth - s.epfEr) + (s.socsoBoth - s.socsoEr) + (s.eisBoth - s.eisEr)
+  const deductions = r2(gross - s.net - employee - s.pcb - (s.withholdingTax ?? 0) - s.skbbk)
+  return { ...s, deductions: deductions > 0.005 ? deductions : 0 }
 }
 
 interface PayrollRowLike {
@@ -100,7 +152,7 @@ export function sumPayrollRows(rows: PayrollRowLike[]): AccrualSums {
     acc.pcb = r2(acc.pcb + Number(p.pcb))
     acc.withholdingTax = r2((acc.withholdingTax ?? 0) + Number(p.withholding_tax ?? 0))
   }
-  return acc
+  return withDeductions(acc)
 }
 
 // IT wired 2026-09-03 (user "接上"): before this, IT staff rows mapped to no
@@ -150,10 +202,21 @@ interface BatchSegmentSums {
   skbbk: number | string
 }
 
-/** One segment of a batch's lines → the accrual JV's figures. */
-export function batchAccrualSums(s: BatchSegmentSums): AccrualSums {
+/** A segment's commission team, as payroll_batch_commission_split reads it. */
+interface BatchCommissionSplit {
+  segment: string
+  salary: number | string
+  basic: number | string
+  travelling: number | string
+  accommodation: number | string
+  food: number | string
+}
+
+/** One segment of a batch's lines → the accrual JV's figures; with its
+ *  commission team apart when it has one. */
+export function batchAccrualSums(s: BatchSegmentSums, split?: BatchCommissionSplit): AccrualSums {
   const n = (v: number | string) => r2(Number(v ?? 0))
-  return {
+  const sums = withDeductions({
     basicEtc: r2(n(s.gross) - n(s.non_statutory_allowance)),
     nonStatAllowance: n(s.non_statutory_allowance),
     epfEr: n(s.epf_er),
@@ -166,6 +229,17 @@ export function batchAccrualSums(s: BatchSegmentSums): AccrualSums {
     eisBoth: r2(n(s.eis_er) + n(s.eis_ee)),
     pcb: n(s.pcb),
     withholdingTax: n(s.withholding_tax),
+  })
+  if (!split || Math.abs(n(split.salary)) <= 0.005) return sums
+  return {
+    ...sums,
+    commission: {
+      salary: n(split.salary),
+      basic: n(split.basic),
+      travelling: n(split.travelling),
+      accommodation: n(split.accommodation),
+      food: n(split.food),
+    },
   }
 }
 
@@ -185,15 +259,21 @@ export async function postPayrollBatchAccrualJVs(
   const monthEnd = dayjs(period).endOf('month').format('YYYY-MM-DD')
   const monthLabel = dayjs(period).format("MMM[']YY")
 
-  const [sumsRes, existingRes, batchRes] = await Promise.all([
+  const [sumsRes, existingRes, batchRes, splitRes] = await Promise.all([
     supabase.rpc('payroll_batch_accrual_sums', { p_batch_id: opts.batchId }),
     supabase.rpc('get_payroll_accrual_totals_for', { p_reference_id: opts.batchId }),
     supabase.from('payroll_batches').select('batch_no').eq('id', opts.batchId).single(),
+    // A commission team's basic and claims (2026-10-21): through the DEFINER
+    // RPC, as the sums are — the batch's lines and the pay lines it reads are
+    // not every caller's to select.
+    supabase.rpc('payroll_batch_commission_split' as never, { p_batch_id: opts.batchId } as never),
   ])
   if (sumsRes.error) throw new Error(`Failed to read the batch: ${sumsRes.error.message}`)
   if (existingRes.error) throw new Error(`Failed to check existing accrual JVs: ${existingRes.error.message}`)
   if (batchRes.error) throw new Error(`Failed to read the batch: ${batchRes.error.message}`)
+  if (splitRes.error) throw new Error(`Failed to read the batch's commission split: ${splitRes.error.message}`)
   const batchNo = (batchRes.data as { batch_no: number }).batch_no
+  const splitBySegment = new Map(((splitRes.data ?? []) as BatchCommissionSplit[]).map(r => [r.segment, r]))
 
   const existing = new Map<string, number>(
     ((existingRes.data ?? []) as Array<{ segment: string | null; total_amount: number | null }>).map(e => [
@@ -205,7 +285,7 @@ export async function postPayrollBatchAccrualJVs(
   const result: AccrualPostResult = { posted: [], skipped: [] }
   for (const row of (sumsRes.data ?? []) as BatchSegmentSums[]) {
     const segment = row.segment
-    const sums = batchAccrualSums(row)
+    const sums = batchAccrualSums(row, splitBySegment.get(segment))
     const total = accrualTotal(sums)
     if (total <= 0.005) continue
     const prior = existing.get(segment)

@@ -1,5 +1,31 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-21 y (DATA FIX + SHIPPED) — Revenue Department's payroll accrual
+
+User: "帮我检查为什么revenue team 的payroll 没有扣" → "这些扣款你就accrual salary 少进就行" →
+"那accrual 分开底薪和佣金记" → "对，跟8月一样分开记" → "自动 accrual 也改成这样".
+
+- Why September had the team's collect-back revenue and no cost: HR's batch #3 (Revenue Department,
+  27 people, 15 Oct, RM 261,253.69) carried RM 4,677.73 of pay-line deductions (drop sales on 7
+  payslips; PETER RM 4,000 with no description — the user is asking HR); `buildAccrualLines` had
+  no line for them, so the JV was that much out of balance and never posted.
+- Posted by hand: JE-202609-0945 (30 Sep, payroll_accrual, reference = batch #3, segment
+  revenue_department, RM 256,575.96): Dr 9030 basic 51,000 (the 7 salaried people) / 9093
+  commission & allowances 187,798.61 (net of the deductions) / 9090 Travelling 4,760.27 / 9098
+  Hostel & Accommodation 3,469.83 / 9084 food claims 2,672 / 9081-9083 employer 6,875.25; Cr
+  4070-4074 incl. WHT 1,613.11.
+- The auto accrual (lib/payroll-accrual): a batch's deductions (gross − net − employee statutory −
+  PCB − WHT − SKBBK) lower the salary line; a commission team's part (new DEFINER RPC
+  `payroll_batch_commission_split`, mig 20261021210000: commission lines' salary, first-submission
+  basic, special_claim pay lines by kind while they still add up to what the batch carried) books
+  basic 9030 / claims 9090·9098·9084 / the rest 9093 (a credit when below nothing — the company's
+  EPF/SOCSO/EIS come out of commission). `accrualTotal` = the JV's debits, so Retry accruals skips
+  batch #3. Departments without commission post as before.
+- Open (the user's / HR's): PETER's RM 4,000; the team's Sep net pay RM 235,589.80 has no payment
+  vouchers (Alliance in the books RM 260,512.65); KRIS / PETER PCB RM 3,643.80 and WHT RM 1,613.11
+  unpaid; EPF on basic only; SHAWN / ANTHONY / LAWRENCE / WEI HOW without WHT; KRIS / PETER
+  reopened 19 Oct.
+
 ## CHECKPOINT 2026-10-21 y (SHIPPED) — a loan repayment knows its journal entry
 
 User (after x flagged it): Void on the second of two identical repayments reversed the FIRST one's entry → shown

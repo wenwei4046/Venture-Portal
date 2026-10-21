@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { batchAccrualSums, buildAccrualLines, sumPayrollRows, accrualTotal, segmentLabel, type AccrualSums } from './payroll-accrual'
+import { recordingSupabase } from '@/test/recording-supabase'
+import { batchAccrualSums, buildAccrualLines, sumPayrollRows, accrualTotal, segmentLabel, postPayrollBatchAccrualJVs, type AccrualSums } from './payroll-accrual'
+import type { JournalLine } from './journal'
+
+const debitOn = (lines: JournalLine[], code: string) => Math.round(lines.filter(l => l.accountCode === code).reduce((s, l) => s + (l.debit ?? 0), 0) * 100) / 100
+const totals = (lines: JournalLine[]) => ({
+  dr: Math.round(lines.reduce((s, l) => s + (l.debit ?? 0), 0) * 100) / 100,
+  cr: Math.round(lines.reduce((s, l) => s + (l.credit ?? 0), 0) * 100) / 100,
+})
 
 // HOUZS Venture's director share puts Venture Office's part in segment
 // 'corporate' (mig 20261013233000); the E2E of 2026-10-13 posted it as
@@ -108,5 +116,100 @@ describe('batchAccrualSums (unified Payroll, one batch)', () => {
     })
     expect(sums).toMatchObject({ basicEtc: 14400, epfEr: 1872, epfBoth: 3456, net: 11000 })
     expect(accrualTotal(sums)).toBe(16272)
+  })
+})
+
+// 2026-10-21 (user: 这些扣款你就 accrual salary 少进就行 → 那accrual 分开底薪和佣金记 →
+// 对，跟8月一样分开记 → 自动 accrual 也改成这样): Revenue Department's Sep'26
+// batch #3 carried RM 4,677.73 of pay-line deductions (drop sales, PETER's
+// 4,000), its JV came out that much out of balance and never posted. The
+// deductions now lower the salary; a commission team's pay splits the way
+// JE-202609-0945 was posted by hand.
+const revenueSep = {
+  segment: 'revenue_department', gross: '254378.44', non_statutory_allowance: '0.00', epf_er: '6180.00', epf_ee: '5610.00',
+  socso_er: '623.95', socso_ee: '178.25', eis_er: '71.30', eis_ee: '71.30', pcb: '6433.80', withholding_tax: '1613.11',
+  net: '235589.80', skbbk: '204.45',
+}
+const revenueSepSplit = { segment: 'revenue_department', salary: '249700.71', basic: '51000.00', travelling: '4760.27', accommodation: '3469.83', food: '2672.00' }
+
+describe('a batch with pay-line deductions (Revenue Sep\'26)', () => {
+  it('books the salary net of them, so the JV balances', () => {
+    const sums = batchAccrualSums(revenueSep)
+    expect(sums.deductions).toBe(4677.73)
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(debitOn(lines, '9030')).toBe(249700.71)
+    expect(totals(lines)).toEqual({ dr: 256575.96, cr: 256575.96 })
+    expect(accrualTotal(sums)).toBe(256575.96)
+  })
+
+  it('splits a commission team as August: basic 9030, commission 9093, claims to Travelling, Hostel and Staff Allowance', () => {
+    const sums = batchAccrualSums(revenueSep, revenueSepSplit)
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(['9030', '9093', '9090', '9098', '9084'].map(code => debitOn(lines, code))).toEqual([51000, 187798.61, 4760.27, 3469.83, 2672])
+    expect(totals(lines)).toEqual({ dr: 256575.96, cr: 256575.96 })
+    expect(accrualTotal(sums)).toBe(256575.96)
+  })
+
+  it('takes a commission part below nothing off 9093 as a credit', () => {
+    // PEI FEN alone: commission 2,748.10 carries her basic 2,500 and the
+    // company's 372.75; with her 524 of food the rest of it is −124.65.
+    const sums = batchAccrualSums(
+      { segment: 'revenue_department', gross: 2899.35, non_statutory_allowance: 0, epf_er: 325, epf_ee: 275, socso_er: 42.85, socso_ee: 12.25, eis_er: 4.9, eis_ee: 4.9, pcb: 0, withholding_tax: 0, net: 2607.2, skbbk: 0 },
+      { segment: 'revenue_department', salary: 2899.35, basic: 2500, travelling: 0, accommodation: 0, food: 524 },
+    )
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(lines.find(l => l.accountCode === '9093')?.credit).toBe(124.65)
+    expect(totals(lines)).toEqual({ dr: 3396.75, cr: 3396.75 })
+  })
+
+  it('leaves a department without commission as it was', () => {
+    const sums = batchAccrualSums({ ...revenueSep, segment: 'finance', gross: 1500, non_statutory_allowance: 0, epf_er: 195, epf_ee: 165, socso_er: 26.2, socso_ee: 7.5, eis_er: 3, eis_ee: 3, pcb: 77.05, withholding_tax: 0, net: 1247.45, skbbk: 0 })
+    expect(sums.deductions).toBe(0)
+    expect(buildAccrualLines(sums, "Sep'26").map(l => l.accountCode)).toEqual(['9030', '9081', '9082', '9083', '4070', '4071', '4072', '4073', '4074'])
+  })
+})
+
+describe('sumPayrollRows with a deduction (the run approval)', () => {
+  it('books the salary net of it', () => {
+    // STANLEY's Sep'26 row: RM 117.80 of drop sales between gross and net.
+    const sums = sumPayrollRows([{
+      gross: 17294.94, non_statutory_allowance: 0, epf_er: 840, epf_ee: 770, socso_er: 104.15, socso_ee: 29.75,
+      eis_er: 11.9, eis_ee: 11.9, pcb: 930, withholding_tax: 0, net: 15435.49, skbbk_amount: 0,
+    }])
+    expect(sums.deductions).toBe(117.8)
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(debitOn(lines, '9030')).toBe(17177.14)
+    expect(totals(lines).dr).toBe(totals(lines).cr)
+  })
+})
+
+describe('posting a batch\'s accrual', () => {
+  function database(existing: Array<{ segment: string; total_amount: number }> = []) {
+    return recordingSupabase(
+      call => (call.table === 'payroll_batches' ? { data: { batch_no: 3 } } : {}),
+      fn =>
+        fn === 'payroll_batch_accrual_sums' ? { data: [revenueSep] }
+        : fn === 'payroll_batch_commission_split' ? { data: [revenueSepSplit] }
+        : fn === 'get_payroll_accrual_totals_for' ? { data: existing }
+        : fn === 'post_journal_entry_as_caller' ? { data: 'je-new' }
+        : {},
+    )
+  }
+
+  it('posts a commission team\'s batch split and net of its deductions', async () => {
+    const db = database()
+    const result = await postPayrollBatchAccrualJVs(db.client as never, { periodMonth: '2026-09-01', batchId: 'batch-3', userId: 'hr-manager' })
+    expect(result.posted).toEqual(['revenue_department'])
+    const post = db.rpcs.find(r => r.fn === 'post_journal_entry_as_caller')?.args as { p_description: string; p_segment: string; p_transaction_date: string; p_lines: Array<{ account_code: string; debit: number | null }> }
+    expect(post).toMatchObject({ p_description: "Revenue Department Salary - Sep'26 · batch #3", p_segment: 'revenue_department', p_transaction_date: '2026-09-30' })
+    const debit = (code: string) => post.p_lines.filter(l => l.account_code === code).reduce((s, l) => s + (l.debit ?? 0), 0)
+    expect(['9030', '9093', '9090', '9098', '9084'].map(debit)).toEqual([51000, 187798.61, 4760.27, 3469.83, 2672])
+  })
+
+  it('leaves alone a batch already accrued at that total (JE-202609-0945, posted by hand)', async () => {
+    const db = database([{ segment: 'revenue_department', total_amount: 256575.96 }])
+    const result = await postPayrollBatchAccrualJVs(db.client as never, { periodMonth: '2026-09-01', batchId: 'batch-3', userId: 'hr-manager' })
+    expect(result).toEqual({ posted: [], skipped: ['revenue_department'] })
+    expect(db.rpcs.some(r => r.fn === 'post_journal_entry_as_caller')).toBe(false)
   })
 })

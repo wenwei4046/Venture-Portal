@@ -368,7 +368,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'my_sub_department_reach', 'person_sub_department_reach', 'permission_user_reach_set',
   // A person's own Salary / NRIC / Bank (mig 20261016210000): by whoever manages permissions.
   'permission_user_sensitive_set',
-  'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
+  'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_batch_commission_split', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',
   'permission_history', 'permission_template_create', 'permission_template_save', 'permission_title_set_template',
