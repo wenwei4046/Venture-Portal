@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
   },
+  // Next 16 (2026-10-21) type-checks the build with the TypeScript CLI, which reads every file the tsconfig names —
+  // the tests too, whose errors Next 15's own check skipped (`*.test.*`, `*.spec.*`, `__tests__`, `__mocks__`).
+  // tsconfig.build.json is tsconfig.json less exactly those, so the build checks what it checked before; the editor
+  // still reads tsconfig.json.
+  typescript: {
+    tsconfigPath: 'tsconfig.build.json',
+  },
   experimental: {
     // Voucher attachments (transfer slips / invoices / scanned PDFs) are sent
     // through the Server Action body. The default cap is 1 MB — a scanned PDF
