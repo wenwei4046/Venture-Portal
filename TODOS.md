@@ -6,6 +6,28 @@ history (`git log -p -- TODOS.md`).
 
 ---
 
+## Owed — upgrade to Next.js 16 (2026-10-21)
+
+Next 15 (released 2024-10-21) left the Next.js team's two-year support window
+on 2026-10-21 (nextjs.org/support-policy): a security hole found in it from now
+on may not be patched. The production site on Vercel runs it (15.5.25), and the
+portal holds salary, NRIC and bank accounts, so this matters for more than CI.
+- **Nothing warns any more.** OpenNext refused to build the worker on 15 that
+  day, which turned every branch's worker job red; the user chose to keep the
+  check running with `--dangerouslyUseUnsupportedNextVersion` on `build:worker`
+  (#595, TESTING.md › Cloudflare worker verification). That was the only alarm;
+  now it is a warning line in the worker job's log. GitHub's Dependabot alerts
+  are off on the repo (2026-10-21: `vulnerability-alerts` answers 404) —
+  switched on, they would at least name a published hole in `next@15`.
+- **The upgrade is its own task**, planned and reviewed, not done in passing:
+  `next`, `eslint-config-next` (both `^15`), the worker build
+  (`@opennextjs/cloudflare`) and the yoga WASM patch, re-verified by the CI
+  jobs and a prod walk-through. Known in Next 16: `next lint` is gone (the
+  `lint` script and the pre-push `npx next lint --quiet`), `middleware.ts`
+  becomes `proxy.ts` (ours sits at the repo root, unloaded — CLAUDE.md ›
+  Architecture). Afterwards, drop the flag and
+  `src/lib/worker-build-script.test.ts`.
+
 ## Owed — sub-departments per person (2026-10-16)
 
 The owner: permission ticked "按 sub-department" on the CRM and the Revenue
