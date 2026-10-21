@@ -2,7 +2,7 @@
  * Warming a page before it is clicked (2026-09-26).
  *
  * A sidebar link the pointer RESTS on is about to be clicked, so the page is
- * rendered now — a full prefetch, `router.prefetch(href)` — and the click that
+ * rendered now — a full prefetch, `router.prefetch(href, { kind: FULL })` — and the click that
  * follows lands on a page that is already there: no skeleton, no wait. This is
  * the Houzs ERP's hover prefetch (its lib/prefetch-routes.ts), except the ERP
  * only warms code and fetches data after the click; here the server renders the
@@ -20,14 +20,15 @@
  *     record that somebody viewed the staff directory when they only moved the
  *     mouse over it. AUDITED_ROUTES lists them; `nav-warm.test.ts` fails when a
  *     page calls log_data_access and is not on it.
- * What is warmed is reused for `experimental.staleTimes.static` (30 s,
+ * What is warmed is reused for `experimental.staleTimes.static` (five minutes,
  * next.config.ts) and thrown away by any Server Action that revalidates.
  */
 
+import { PrefetchKind } from 'next/dist/client/components/router-reducer/router-reducer-types'
 import { markWarmed } from './route-freshen'
 
 interface Prefetcher {
-  prefetch: (href: string) => void
+  prefetch: (href: string, options?: { kind: PrefetchKind }) => void
 }
 
 /** How long the pointer must rest on a link before it counts as intent. */
@@ -81,9 +82,12 @@ export function canWarm(href: string, currentHref: string): boolean {
 export function warmRoute(router: Prefetcher, href: string): void {
   if (typeof window === 'undefined' || !canWarm(href, window.location.href)) return
   try {
-    // router.prefetch defaults to a FULL prefetch in the App Router — the page
-    // itself, not just its loading boundary.
-    router.prefetch(href)
+    // FULL: the page itself, data included, not just its loading boundary. Next
+    // 15's router.prefetch(href) did that by default; Next 16's defaults to AUTO,
+    // which for a page with no PPR fetches the loading boundary alone, so the
+    // click still waited for the server (2026-10-21, hover then click: Next 15
+    // 0.24–0.30 s and no request; Next 16 without FULL 0.49–0.75 s and one).
+    router.prefetch(href, { kind: PrefetchKind.FULL })
     // How old the warmed page is, for the refresh behind a click on it (lib/route-freshen.ts).
     markWarmed(new URL(href, window.location.href).pathname, performance.now())
   } catch {

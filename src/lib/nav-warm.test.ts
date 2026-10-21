@@ -85,6 +85,8 @@ describe('canWarm', () => {
   })
 })
 
+const FULL = { kind: 'full' }
+
 describe('warmOnIntent', () => {
   const prefetch = vi.fn()
   const router = { prefetch }
@@ -105,7 +107,7 @@ describe('warmOnIntent', () => {
     vi.advanceTimersByTime(INTENT_MS - 1)
     expect(prefetch).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
-    expect(prefetch).toHaveBeenCalledWith('/fund-in')
+    expect(prefetch).toHaveBeenCalledWith('/fund-in', FULL)
   })
 
   it('warms nothing when the pointer moves on first', () => {
@@ -123,7 +125,7 @@ describe('warmOnIntent', () => {
     vi.advanceTimersByTime(40)
     warmOnIntent(router, '/repayment-schedule')
     vi.advanceTimersByTime(INTENT_MS)
-    expect(prefetch.mock.calls).toEqual([['/repayment-schedule']])
+    expect(prefetch.mock.calls).toEqual([['/repayment-schedule', FULL]])
   })
 
   it('waits for a rail that is still sliding open', () => {
@@ -133,13 +135,21 @@ describe('warmOnIntent', () => {
     vi.advanceTimersByTime(INTENT_MS)
     expect(prefetch).not.toHaveBeenCalled()
     vi.advanceTimersByTime(RAIL_SETTLE_MS - INTENT_MS)
-    expect(prefetch).toHaveBeenCalledWith('/fund-in')
+    expect(prefetch).toHaveBeenCalledWith('/fund-in', FULL)
   })
 
   it('never warms an audited page, however long the pointer rests', () => {
     warmOnIntent(router, '/team/people')
     vi.advanceTimersByTime(INTENT_MS * 10)
     expect(prefetch).not.toHaveBeenCalled()
+  })
+
+  // Next 16 (2026-10-21): router.prefetch(href) defaults to AUTO, which for a page with no PPR fetches only its
+  // loading boundary — the warmed click still waited for the server. The warm asks for the page, data included.
+  it('asks for a FULL prefetch, not the AUTO that Next 16 defaults to', () => {
+    warmRoute(router, '/fund-in')
+    expect(prefetch).toHaveBeenCalledTimes(1)
+    expect(prefetch.mock.calls[0][1]).toEqual({ kind: 'full' })
   })
 
   it('swallows a prefetch that throws', () => {
@@ -194,7 +204,7 @@ describe('the pages somebody opens most are warmed while the portal sits idle (2
       expect(router.prefetch).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
       expect(router.prefetch).toHaveBeenCalledTimes(1)
-      expect(router.prefetch).toHaveBeenLastCalledWith('/payments')
+      expect(router.prefetch).toHaveBeenLastCalledWith('/payments', FULL)
       vi.advanceTimersByTime(IDLE_WARM_GAP_MS)
       expect(router.prefetch).toHaveBeenCalledTimes(2)
       cancel()
