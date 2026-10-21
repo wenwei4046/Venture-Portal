@@ -1,5 +1,21 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-21 x (DATA FIX) — The Cont LO#4: a duplicate repayment removed
+
+User: "可以帮我检查这个repayment 对吗？" → "我不可能还两次" → "第二笔错了".
+
+The Cont's 60k loan (17fb3ef4, EMI 4% × 6, start May 2026) had TWO RM 12,400 repayment sets dated
+2026-10-02: Finance Manager's on 2 Oct (JE-202610-0009 interest → 5027 / 0010 principal → 3053) and
+one ONG MEI SHUANG keyed on 21 Oct, note "Loan repayment 06" (JE-202610-1049 interest → 3063
+Interest in Suspense / 1050 → 3053), which flipped the loan to fully_repaid. The second set was
+removed DIRECTLY (user rule: 直接更改，不是开 JE 补) in one guarded block: its 2 repayments rows,
+JE-1049/1050 + their 4 lines (no reversal JE — entry numbers 1049/1050 are a gap), its Venture
+Pool loan_repayment_in 10,000, Hong Leong's cached balance −12,400 (cache = GL 67,082.72 after),
+loan back to active (principal paid 50,000, outstanding 10,000 — instalment 6, due 2 Oct, open).
+NOT done through the page's Reverse: `void_loan_repayment` finds the JE by loan + amount + date +
+type and takes the OLDEST match, so with two identical sets it reverses the right one (flagged as
+a separate task).
+
 ## CHECKPOINT 2026-10-12 w (SHIPPED) — the repayment start is a date
 
 User: "这个repayment setting 到我set 了10月不会更新？" → (Carres' card said 7 Oct, its schedule
