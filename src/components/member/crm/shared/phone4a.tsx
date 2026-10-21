@@ -231,21 +231,21 @@ export function Phone4aCalLists({ v }: { v: {
 /** T03 · an ad on Assignment: its channel, name and headline, the leads, the split bar in team colours, Edit split / Set up. */
 export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: boolean; leads: number; setUp: boolean; held?: boolean; heldTxt?: string; bar: { w: string; c: string; op?: number }[]; edit: () => void } }) {
   return (
-    <div onClick={a.edit} style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "16px", borderRadius: "16px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        <span style={{ display: "flex", paddingTop: "3px", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={18} /></span>
+    <div onClick={a.edit} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 14px", borderRadius: "14px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+        <span style={{ display: "flex", paddingTop: "2px", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={16} /></span>
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span style={{ fontSize: fs(17), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-          {a.head && <span style={{ fontSize: fs(14), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.head}</span>}
+          <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+          {a.head && <span style={{ fontSize: fs(12.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.head}</span>}
         </span>
-        <span style={{ flex: "none", fontSize: fs(15), color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", paddingTop: "4px" }}>{a.leads} leads</span>
+        <span style={{ flex: "none", fontSize: fs(13), color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", paddingTop: "2px" }}>{a.leads} leads</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingLeft: "0" }}>
-        <span style={{ flex: 1, display: "flex", gap: "2px", height: "8px", borderRadius: "4px", overflow: "hidden", background: "var(--crm-track)" }}>
+        <span style={{ flex: 1, display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden", background: "var(--crm-track)" }}>
           {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
         </span>
         {a.held && <span style={{ flex: "none", padding: "3px 8px", borderRadius: "10px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(11), fontWeight: 600 }}>{a.heldTxt}</span>}
-        <span style={{ flex: "none", height: "34px", padding: "0 14px", borderRadius: "17px", display: "grid", placeItems: "center", fontSize: fs(14), fontWeight: 500,
+        <span style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", display: "grid", placeItems: "center", fontSize: fs(12.5), fontWeight: 500,
           ...(a.setUp ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }}>{a.setUp ? "Set up" : "Edit split"}</span>
       </div>
     </div>
