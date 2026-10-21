@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  draftPayload, draftProblem, evenPercents, holdersLine, listNames, openRequestOn, ownerKeepsPercent, pctLabel, proposedHolders,
+  SHARE_PART, draftPayload, holdersLine, listNames, openRequestOn, pctLabel, proposedHolders,
   shareContextFromRow, shareRequestFromRow, shareRequestsFromRow, shareStatus, stepLabel, waitingOn, type ShareRequest,
 } from './share-requests'
 
@@ -99,29 +99,10 @@ describe('the split in words', () => {
 })
 
 describe('the form', () => {
-  it('starts on an even split — the owner keeps what is left over', () => {
-    expect(evenPercents(1)).toEqual([50])
-    expect(evenPercents(2)).toEqual([33, 33])
-    expect(ownerKeepsPercent([{ id: ANTHONY, name: 'ANTHONY', percent: 33 }, { id: BEN, name: 'BEN', percent: 33 }])).toBe(34)
-  })
-
-  it('splits only what the owner holds when somebody already holds a part', () => {
-    expect(evenPercents(1, 20)).toEqual([40])
-    expect(ownerKeepsPercent([{ id: ANTHONY, name: 'ANTHONY', percent: 40 }], 20)).toBe(40)
-  })
-
-  it('says why it cannot be sent', () => {
-    expect(draftProblem([])).toBe('Pick who sold it with you.')
-    expect(draftProblem([{ id: ANTHONY, name: 'ANTHONY', percent: 0 }])).toBe('Give each colleague between 1% and 99%.')
-    expect(draftProblem([{ id: ANTHONY, name: 'ANTHONY', percent: 60 }, { id: BEN, name: 'BEN', percent: 40 }]))
-      .toBe('That leaves you nothing — you always keep a part of your own bill.')
-    expect(draftProblem(Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, percent: 5 })))).toBe('Share a bill with up to 5 people at a time.')
-    expect(draftProblem([{ id: ANTHONY, name: 'ANTHONY', percent: 50 }])).toBeNull()
-  })
-
-  it('sends each part as a fraction of the bill', () => {
-    expect(draftPayload([{ id: ANTHONY, name: 'ANTHONY', percent: 50 }, { id: BEN, name: 'BEN', percent: 12.5 }]))
-      .toEqual([{ staffId: ANTHONY, pct: 0.5 }, { staffId: BEN, pct: 0.125 }])
+  // 2026-10-21 — the user: "only can share one pax, then percentage for them request is fix with 50% 50%".
+  it('sends the one colleague picked, at half the bill', () => {
+    expect(SHARE_PART).toBe(0.5)
+    expect(draftPayload({ id: ANTHONY })).toEqual([{ staffId: ANTHONY, pct: 0.5 }])
   })
 })
 

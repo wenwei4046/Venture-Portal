@@ -1,8 +1,9 @@
-// Local PostgreSQL regression for 20261021150000 + 20261021150100 (2026-10-21 — the user: a ⋯ menu on My sales orders'
-// sheet sends a "share order" request; the colleague named accepts first; then HR approves on Comm Cal › Requests, and the
-// bill's commission AND sales value are split — "这会直接影响到他们的 sales target … Leader 那边的排行榜全部也是同步").
+// Local PostgreSQL regression for 20261021150000 + 20261021150100 + 20261021170000 (2026-10-21 — the user: a ⋯ menu on My
+// sales orders' sheet sends a "share order" request; the colleague named accepts first; then HR approves on Comm Cal ›
+// Requests, and the bill's commission AND sales value are split — "这会直接影响到他们的 sales target … Leader 那边的排行榜全部也
+// 是同步"; then: "only can share one pax, then percentage for them request is fix with 50% 50%").
 // Production's own bodies (tests/member-sql/share-bills-production.sql, md5-checked) are loaded over stand-ins for the
-// tables they read; both migrations then run VERBATIM, twice. No live I/O.
+// tables they read; the three migrations then run VERBATIM, twice. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -248,14 +249,18 @@ check(before[B.ONE], { [S.LUCAS]: [4200, 4200, 2, 52.38] }, 'before: the bill is
 // ── The migrations, twice ──
 const fileA = (await readFile(new URL('20261021150000_shared_bills_in_the_revenue_app.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 const fileB = (await readFile(new URL('20261021150100_share_order_requests.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+// One colleague, half each (2026-10-21, the same day): two of the functions above, one statement swapped at a time.
+const fileC = (await readFile(new URL('20261021170000_share_order_one_colleague_half.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+const BODIES = `SELECT proname, md5(prosrc) AS md5 FROM pg_proc WHERE proname IN ('member_order_facts', 'member_order_book_for_staff',
+  'member_kpi_for_staff', 'member_arena_booth_history_for_staff', 'member_share_order_send', 'share_request_blocked') ORDER BY proname, md5`
 await db.exec(fileA)
 await db.exec(fileB)
-const md5After = await q(`SELECT proname, md5(prosrc) AS md5 FROM pg_proc WHERE proname IN ('member_order_facts', 'member_order_book_for_staff',
-  'member_kpi_for_staff', 'member_arena_booth_history_for_staff') ORDER BY proname`)
+await db.exec(fileC)
+const md5After = await q(BODIES)
 await db.exec(fileA)
 await db.exec(fileB)
-check(await q(`SELECT proname, md5(prosrc) AS md5 FROM pg_proc WHERE proname IN ('member_order_facts', 'member_order_book_for_staff',
-  'member_kpi_for_staff', 'member_arena_booth_history_for_staff') ORDER BY proname`), md5After, 'the second run changes nothing')
+await db.exec(fileC)
+check(await q(BODIES), md5After, 'the second run changes nothing')
 // The bodies production runs after the migration (its dry run on 2026-10-21 answered the same md5s).
 const SWAPPED = {
   member_arena_booth_history_for_staff: '275bdf919dd38cb0930d923cbfe06516',
@@ -306,18 +311,18 @@ await member(U.LUCAS)
 await refuses(`SELECT public.member_share_order_send($1, '[]'::jsonb, '')`, [B.ONE], /Pick who to share it with/, 'somebody to share with')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: 'x', pct: 0.5 }])], /Pick who/, 'a real person')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.LUCAS, pct: 0.5 }])], /your bill already/, 'never the owner')
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }, { staffId: S.ANTHONY, pct: 0.2 }])],
-  /there twice/, 'each person once')
+// One colleague, half each (mig 20261021170000 — the user: "only can share one pax … fix with 50% 50%").
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }, { staffId: S.ANTHONY, pct: 0.5 }])],
+  /one colleague — the two of you hold half each/, 'one person, once')
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }, { staffId: S.BEN, pct: 0.5 }])],
+  /one colleague/, 'never two colleagues')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: '0.5' }])], /Give each colleague a part/, 'a part is a number')
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 1 }])], /more than 0% and less than 100%/, 'never the whole bill')
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0 }])], /more than 0% and less than 100%/, 'never nothing')
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.6 }, { staffId: S.BEN, pct: 0.4 }])],
-  /leaves you nothing/, 'the owner always keeps a part')
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.3 }])], /half each — 50% for you, 50% for your colleague/, 'never another part')
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 1 }])], /half each/, 'never the whole bill')
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0 }])], /half each/, 'never nothing')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.CAROL, pct: 0.5 }])], /CAROL has no Revenue app login/, 'a colleague who can accept')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.DAVE, pct: 0.5 }])], /DAVE’s Oct 2026 is closed/, 'never somebody closed')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.HEAD, pct: 0.5 }])], /HEAD is not in this bill’s sub-department’s team/, 'never a department head')
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify(Array.from({ length: 6 }, () => ({ staffId: S.ANTHONY, pct: 0.1 })))],
-  /up to 5 people/, 'five at most')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.THEIRS, JSON.stringify([{ staffId: S.BEN, pct: 0.5 }])], /Only the salesperson on the bill/, 'only the owner sends')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.PAID, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }])], /Sep 2026 is in payroll/, 'never a paid month')
 await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.OUT, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }])], /does not count/, 'never a bill that does not count')
@@ -427,41 +432,37 @@ check(num((await one(`SELECT public.member_kpi_for_staff($1, $2, $3)`, [S.LUCAS,
 const booth = (await one(`SELECT public.member_arena_booth_history_for_staff($1, $2)`, [FAIR, FAIR_SCHEME])).events
 check(booth.flatMap(e => e.people.map(p => [p.name, num(p.sales), p.orders])), [['ANTHONY', 2100, 1], ['LUCAS', 2100, 1]], 'each holder’s part on the booth board')
 
-// ── Several colleagues, a decline, and sending again ──
+// ── A decline, and sending again to somebody else ──
 await clearNotices()
 await member(U.LUCAS)
-const r2 = await send(B.TWO, [{ staffId: S.ANTHONY, pct: 0.3333 }, { staffId: S.BEN, pct: 0.3333 }])
-check(r2.parts.map(p => [p.name, num(p.pct)]), [['ANTHONY', 0.3333], ['BEN', 0.3333]], 'a third each')
-check((await notices(U.ANTHONY))[0].body, 'LUCAS wants to share HC-SO-2610-010 with you: your part 33.33% of RM 1,000.00 · MID VALLEY. Accept or decline in the Revenue app.', 'each colleague is told their own part')
+const r2 = await send(B.TWO, [{ staffId: S.ANTHONY, pct: 0.5 }])
+check((await notices(U.ANTHONY))[0].body, 'LUCAS wants to share HC-SO-2610-010 with you: your part 50% of RM 1,000.00 · MID VALLEY. Accept or decline in the Revenue app.', 'the colleague is told their half')
 await clearNotices()
 await member(U.ANTHONY)
-check((await answer(r2.id, true)).status, 'partner', 'one of two accepted: still waiting')
-check(await notices(U.LUCAS), [{ kind: 'share', title: 'HC-SO-2610-010 · ANTHONY accepted', body: 'Still waiting for BEN.', ref_kind: 'share_request', ref_id: r2.id }], 'LUCAS hears who is left')
-await clearNotices()
-await member(U.BEN)
 const declined = await answer(r2.id, false, ' Not my customer ')
-check([declined.status, declined.parts.map(p => p.answer)], ['declined', ['accepted', 'declined']], 'BEN declines: the request is over')
-for (const user of [U.LUCAS, U.ANTHONY]) check(await notices(user), [{ kind: 'share', title: 'HC-SO-2610-010 · share declined', ref_kind: 'share_request', ref_id: r2.id,
-  body: 'BEN declined sharing HC-SO-2610-010. “Not my customer”' }], 'the owner and whoever accepted are told')
+check([declined.status, declined.parts.map(p => p.answer)], ['declined', ['declined']], 'ANTHONY declines: the request is over')
+check(await notices(U.LUCAS), [{ kind: 'share', title: 'HC-SO-2610-010 · share declined', ref_kind: 'share_request', ref_id: r2.id,
+  body: 'ANTHONY declined sharing HC-SO-2610-010. “Not my customer”' }], 'the owner is told, with the note')
 await hr()
 await refuses(`SELECT public.revenue_share_request_decide($1, true, NULL)`, [r2.id], /declined it, so there is nothing to approve/, 'nothing to approve')
 await member(U.LUCAS)
-const r3 = await send(B.TWO, [{ staffId: S.ANTHONY, pct: 0.3333 }, { staffId: S.BEN, pct: 0.3333 }])
-await member(U.ANTHONY); await answer(r3.id, true)
+const r3 = await send(B.TWO, [{ staffId: S.BEN, pct: 0.5 }])
 await member(U.BEN); await answer(r3.id, true)
-await hr(); await decide(r3.id, true, 'Fair day 2 — three at the table')
-const thirds = (await facts())[B.TWO]
-check(thirds, { [S.LUCAS]: [333.4, 333.4, 0, 50], [S.ANTHONY]: [333.3, 333.3, 0, 50], [S.BEN]: [333.3, 333.3, 0, 50] },
-  'a third each to the sen; the owner takes the remainder, so the parts add back to the bill')
+await hr(); await decide(r3.id, true, 'Fair day 2 — BEN closed it with LUCAS')
+check((await facts())[B.TWO], { [S.LUCAS]: [500, 500, 0, 50], [S.BEN]: [500, 500, 0, 50] }, 'half each: BEN, not ANTHONY who declined')
 
-// ── Changing who holds a shared bill: a shrinking part is written first ──
+// ── A bill somebody shares already is HR's to change, on Comm Cal ──
 await member(U.LUCAS)
-await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.ANTHONY, pct: 0.5 }])], /already hold those parts/, 'nothing to change')
-const r4 = await send(B.ONE, [{ staffId: S.ANTHONY, pct: 0.2 }, { staffId: S.BEN, pct: 0.6 }])
-await member(U.ANTHONY); await answer(r4.id, true)
-await member(U.BEN); await answer(r4.id, true)
-await hr(); await decide(r4.id, true)
-check(await shares(B.ONE), [[S.ANTHONY, '0.2000'], [S.BEN, '0.6000']], 'ANTHONY 50% → 20% before BEN takes 60% (the other way round leaves LUCAS nothing for a moment, and the table refuses)')
+check((await one(`SELECT public.member_share_order_context($1, NULL)`, [B.ONE])).blocked, 'HC-SO-2610-004 is shared already — HR changes who shares it on Comm Cal.',
+  'the sheet says so')
+await refuses(`SELECT public.member_share_order_send($1, $2::jsonb, '')`, [B.ONE, JSON.stringify([{ staffId: S.BEN, pct: 0.5 }])], /is shared already/, 'and the send refuses')
+
+// Comm Cal's *Share this bill* still splits any way HR likes, and every member read follows: a third each, to the sen.
+await asSystem()
+await q(`INSERT INTO public.sales_order_shares (order_id, staff_id, share_pct) VALUES ($1, $2, 0.3333), ($1, $3, 0.3333)`, [B.SIX, S.ANTHONY, S.BEN])
+check((await facts())[B.SIX], { [S.LUCAS]: [666.8, 666.8, 0, 50], [S.ANTHONY]: [666.6, 666.6, 0, 50], [S.BEN]: [666.6, 666.6, 0, 50] },
+  'a third each to the sen; the owner takes the remainder, so the parts add back to the bill')
+await q(`DELETE FROM public.sales_order_shares WHERE order_id = $1`, [B.SIX])
 
 // ── Withdrawn; rejected; moved before HR decided ──
 await clearNotices()
@@ -501,14 +502,14 @@ check((await decide(r7.id, false, 'Moved to ANTHONY')).status, 'rejected', '…i
 await member(U.LUCAS)
 const mine = await one(`SELECT public.member_share_requests(NULL, NULL)`)
 check(mine.every(r => r.mine === 'owner'), true, 'LUCAS: every request his own')
-check(mine.length, 7, 'all seven he sent')
+check(mine.length, 6, 'all six he sent')
 await as(U.PRINCIPAL, { principal: true })
-check((await one(`SELECT public.member_share_requests($1, $2)`, [S.BEN, FAIR])).map(r => r.mine).sort(), ['partner', 'partner', 'partner', 'partner', 'partner', 'partner'],
+check((await one(`SELECT public.member_share_requests($1, $2)`, [S.BEN, FAIR])).map(r => r.mine).sort(), ['partner', 'partner', 'partner', 'partner'],
   'View as reads BEN’s, as BEN reads them')
 await as(U.ANTHONY, { perms: ['member_portal'] })
 await refuses(`SELECT public.member_share_requests($1, $2)`, [S.BEN, FAIR], /Principal/, 'a member reads only their own')
 
 await asSystem()
-check(await one(`SELECT count(*)::int FROM public.sales_order_share_request_events`), 22, 'every step is on the trail')
+check(await one(`SELECT count(*)::int FROM public.sales_order_share_request_events`), 16, 'every step is on the trail')
 
-console.log(`PASS: ${checks} share-request SQL checks. Production's bodies verbatim; both migrations verbatim, twice. No live database connection.`)
+console.log(`PASS: ${checks} share-request SQL checks. Production's bodies verbatim; the three migrations verbatim, twice. No live database connection.`)
