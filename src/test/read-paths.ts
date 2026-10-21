@@ -181,7 +181,6 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   // Transfer from the waiting list (mig 20261010150000): the roster row as the caller; the request through two DEFINER functions.
   member_transfer_waiting: ['hr_staff_costs', 'titles'],
   next_account_code: ['chart_of_accounts'],
-  recost_sales_order_lines: ['catalogue_combo_prices', 'catalogue_live_combos', 'catalogue_option_prices', 'catalogue_skus', 'comm_order_releases', 'comm_runs', 'erp_fabrics', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_dismiss_double_claim: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders', 'users'],
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders', 'users'],
@@ -230,6 +229,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
   // Product List · View, the cost setting Product List · Edit, both running as their owner.
   'revenue_costing_gaps', 'catalogue_save_cost_setting',
+  // Recost a month from the Product List (mig 20261021240000): Revenue · Edit and the Orders page's box — as the
+  // caller, every line's costing asked the permission helpers again (Fair · October, 1,282 lines: 56 s).
+  'recost_sales_order_lines',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',
