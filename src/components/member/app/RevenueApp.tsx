@@ -1580,7 +1580,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)}
             canShare={!fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
             request={soRequest ? { id: soRequest.id, status: shareStatus(soRequest).text } : null}
-            onShare={() => setShareOrder(soPick)} onRequest={setSharePick} />}
+            // The share sheets take the bill sheet's place: it is a peek, and a tap in a sheet above it would close it anyway.
+            onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }} />}
         </>
       )}
       {route.screen === "arena" && route.arena === "board" && boardVM && (
