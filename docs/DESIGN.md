@@ -732,7 +732,7 @@ A salary, NRIC or account number whose tick is not the viewer's reads `•••
 1. Find the page in Part III and the closest reference above. Copy the structure.
 2. Use the Part I tokens and the kit; reach for `--ds-*` when you build something new.
 3. A genuinely new component or pattern gets its spec here (Part I › Components or the page's Part III section) in the same PR, plus a line in Part IV.
-4. Before committing: `npx next lint --quiet`, the tests (the design guards: `no-page-descriptions`, `soft-select-coverage`, `route-boundaries`, `safe-area`, `design-system-tokens`), and a look at the page at 1280 and 1440 wide and at a phone width.
+4. Before committing: `npm run lint -- --quiet` (`next lint` is gone since Next 16), the tests (the design guards: `no-page-descriptions`, `soft-select-coverage`, `route-boundaries`, `safe-area`, `design-system-tokens`), and a look at the page at 1280 and 1440 wide and at a phone width.
 
 **Review checklist**
 - Tokens only, no hex.
@@ -1694,6 +1694,7 @@ On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data 
 
 ## Part IV — Version index
 
+- **v4.117** · 2026-10-21 · The portal moves to Next.js 16: the checklist's lint step is `npm run lint -- --quiet` (`next lint` is gone); no screen changes → What to do when you add a feature or amend a page
 - **v4.116** · 2026-10-21 · Revenue app › Profile › Your workspace: **IT support** moves from the top to right under *Memos & notifications*, above *Install the app* (the user: "move the it support to below memo & notifications"); View as's disabled row moves with it → The Revenue app — IT support
 - **v4.115** · 2026-10-21 · IT support in HR and Finance desktop/app; Principal desktop IT requests gathers every source; Revenue's entry moves first in Your workspace and is visible but disabled in View as; screenshots gain Circle, Arrow, Pen and Text annotations saved as a separate draft attachment → IT support — every department and screenshot markup
 - **v4.114** · 2026-10-20 · Revenue app › Profile › Settings › **IT support** (the user: "i want add on a button to get submit for IT support or help" … "如果我们给它 fix 了，他那边就可以收到 fix 的通知"): *Send a request* — a bug, a new feature or a suggestion, a title, the details, screenshots and files (up the moment they are added; ten, 50 MB each) — and one's own requests with their status; a request's sheet holds its facts, files and thread — IT's notes, the status IT set, the sender's reply — and the bell tells the sender. Everybody's (*All*, and the computer's sidebar **IT requests**) is the Principal's and Ultimate full access's only ("just principal or ulitmate full access") → The Revenue app — IT support (#590)

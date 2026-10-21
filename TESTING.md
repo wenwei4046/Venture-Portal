@@ -83,8 +83,11 @@ the slowest job, ~5 min):
    run the same command locally to reproduce it.
 2. **SQL checks** — `tests/member-sql` and `tests/revenue-payroll-sql`, each its
    own package (PGlite), so this job never installs the app.
-3. **Next.js build check** — `npm run build` (a 4 GB heap; it outgrew Node's 2 GB),
-   reusing `.next/cache` from earlier runs.
+3. **Next.js build check** — `npm run lint -- --quiet` (ESLint on `src/`; an error
+   fails the job, a warning does not), then `npm run build` (a 4 GB heap; it
+   outgrew Node's 2 GB), reusing `.next/cache` from earlier runs. Since Next 16
+   (2026-10-21) `next build` no longer lints and `next lint` is gone; the lint step
+   keeps what the build used to refuse. Before a push: `npm run lint -- --quiet`.
 4. **Cloudflare worker build + PDF smoke** — see below.
 
 A PR that changes only docs (`**/*.md`, `docs/`, `.design/`) runs none of them
@@ -155,13 +158,11 @@ npm run verify:worker   # build + bundle assertions + render a real PDF in worke
 
 Three layers, and the third is the one that cannot be faked:
 
-1. `opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion` — the
-   flag since 2026-10-21: OpenNext refuses to build a Next.js major more than two
-   years after its release (Next 15: 2024-10-21), exiting 1 before it builds
-   anything, so from that day every branch's worker job failed. Production runs
-   on Vercel, which does not ask, so the flag changes nothing that ships — it
-   only keeps this check running. Drop it once the app is on Next 16
-   (`src/lib/worker-build-script.test.ts`).
+1. `opennextjs-cloudflare build`. OpenNext refuses to build a Next.js major more
+   than two years after its release: Next 15 (2024-10-21) was refused from
+   2026-10-21 until the app moved to Next 16 the same day (#595 had bridged it with
+   `--dangerouslyUseUnsupportedNextVersion`). Next 16 came out on 2025-10-22, so
+   this job starts failing on 2027-10-22 unless the app is on a newer major by then.
 2. `tools/assert-open-next-wasm.mjs` — reads the built bundle and proves the fix
    is present in the right shape.
 3. `tools/smoke-worker-pdf.mjs` — starts the built worker in workerd, requests a

@@ -100,6 +100,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-next-build-${{ hashFiles('package-lock.json') }}-
 
+      # Next 16 (2026-10-21): `next build` no longer runs ESLint and `next lint`
+      # is gone. The build used to fail on an ESLint error; this keeps that —
+      # errors fail the job, warnings do not (as before).
+      - name: Lint
+        run: npm run lint -- --quiet
+
       - name: Next.js build check
         run: npm run build
         env:
