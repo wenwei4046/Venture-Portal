@@ -66,12 +66,13 @@ function tierRank(t: string): number {
  * The cell for a build: exact (height, tier), else PRICE_2 at that height —
  * the ERP's legacy default tier — else the lowest tier at that height. Null
  * when the grid does not know the height: another height's price is never
- * borrowed.
+ * borrowed. A cell priced 0 is no price (user 2026-10-21: 0 = 还没定价), as a
+ * blank is — the twin of `catalogue_grid_price` since 20261021230200.
  */
 export function gridPrice(grid: readonly PriceCell[], height: string | null, tier: string | null): number | null {
   const want = heightKey(height)
   if (want === null) return null
-  const atHeight = grid.filter(c => heightKey(c.height) === want)
+  const atHeight = grid.filter(c => heightKey(c.height) === want && c.price > 0)
   if (atHeight.length === 0) return null
   const wantTier = tier ?? 'PRICE_2'
   const ranked = [...atHeight].sort(
