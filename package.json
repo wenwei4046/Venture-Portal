@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build:worker": "opennextjs-cloudflare build && node tools/assert-open-next-wasm.mjs",
+    "build:worker": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion && node tools/assert-open-next-wasm.mjs",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
     "deploy": "npm run verify:worker && opennextjs-cloudflare deploy",
     "build": "next build",

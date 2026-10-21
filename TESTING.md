@@ -155,7 +155,13 @@ npm run verify:worker   # build + bundle assertions + render a real PDF in worke
 
 Three layers, and the third is the one that cannot be faked:
 
-1. `opennextjs-cloudflare build`
+1. `opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion` — the
+   flag since 2026-10-21: OpenNext refuses to build a Next.js major more than two
+   years after its release (Next 15: 2024-10-21), exiting 1 before it builds
+   anything, so from that day every branch's worker job failed. Production runs
+   on Vercel, which does not ask, so the flag changes nothing that ships — it
+   only keeps this check running. Drop it once the app is on Next 16
+   (`src/lib/worker-build-script.test.ts`).
 2. `tools/assert-open-next-wasm.mjs` — reads the built bundle and proves the fix
    is present in the right shape.
 3. `tools/smoke-worker-pdf.mjs` — starts the built worker in workerd, requests a
