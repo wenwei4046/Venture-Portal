@@ -135,6 +135,7 @@ repayments (
     payment_type    enum ('principal','interest','penalty','netting') NOT NULL
     payment_date    date NOT NULL
     reference_id    uuid                            -- netting 关联的 statement line
+    journal_entry_id uuid FK → journal_entries UNIQUE -- the entry recordRepayment posted for it; Void / the amends follow it (mig 20261021200000). NULL: no entry of its own (an import, a voucher's repayment)
     notes           text
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()

@@ -1,5 +1,42 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-21 y (SHIPPED) — a loan repayment knows its journal entry
+
+User (after x flagged it): Void on the second of two identical repayments reversed the FIRST one's entry → shown
+The Cont's 2 Oct pair as the example → "选 A" (link each repayment to its own entry; B was: refuse twins) →
+"可以，上线吧".
+
+- Root cause: `void_loan_repayment` matched a repayment's JE by loan + amount + date + type prefix, `ORDER BY
+  created_at LIMIT 1` — a repayment row had no link to its JE (`repayments.reference_id` is NULL on all 153). The
+  amount / date amends used the same match with STRICT (refused two, but took a lone match even if another's).
+- Mig `20261021200000_repayment_journal_entry_link.sql`: `repayments.journal_entry_id` (FK journal_entries, unique
+  partial index `repayments_journal_entry_id_key`); `audit_tables.ignore_columns` += journal_entry_id (repayments) so
+  the backfill adds no audit-log lines on loan pages; helper `loan_repayment_journal_entry(uuid)` (INVOKER,
+  service_role only); one statement swapped in void_loan_repayment / amend_loan_repayment / amend_loan_repayment_date
+  (production md5 cda958da… / 8d5f89e5… / b67c36e4… → 2a7cbe6d… / d5a79c9a… / 6b69c3bb…); backfill — 63 of 153 (the
+  other 90 have no entry of their own: 88 [LO#] imports, OR-202606-0032 interest, [BI#32] contra).
+- `recordRepayment` (fund-out/actions.ts): bank + accounts resolved, entry posted FIRST, then the row with
+  `journal_entry_id`, then Venture Pool + bump_bank_balance (a refused account / entry now writes nothing).
+  database.types.ts: repayments.journal_entry_id. Rule: finance-view.md › A LOAN REPAYMENT KNOWS ITS JOURNAL ENTRY.
+- Tests: `tests/member-sql/validate-loan-repayment-link.mjs` (50 checks: production's bodies md5-checked from
+  `loan-repayment-production.sql`, the bug reproduced on them, then the migration verbatim — unlinked twins refused,
+  linked twins void / amend their own entry and bank, backfill, second run, privileges, unique / FK);
+  `src/app/(portal)/fund-out/actions.repayment-link.test.ts` (4).
+- Verified in a CI-like tree (LF `git archive` of HEAD + these files, fresh `npm ci`): eslint 0 errors (1 old
+  warning, unused `resolveInterestSuspenseLeaf`); vitest green — the full run's 11 failed files were 5 s timeouts
+  under local load, re-run at 60 s all 204 pass; the PGlite suite exits 0. tsc errors only in old unrelated test
+  files. This checkout cannot verify alone: its node_modules is still Next 15.5 (package.json says 16.4.2 since
+  #596 — run `npm ci`), and the guard tests also scan the 258 gitignored `* - Copy.*` files.
+- Fund IN checked: no JE guessing (`fund_source_repayments.payment_voucher_id`). Found apart: `reversePaidPayment`
+  step 4 deletes fund_source_repayments through the RLS client and `fsr_no_delete USING (false)` silently blocks it —
+  a reversed fund-source repayment voucher would leave its rows (none reversed yet). Proposed as its own session.
+- Production, before the merge: dry-run (BEGIN … ROLLBACK) said the 3 md5s, 63 of 153 linked, 0 audit rows, every
+  link resolving, no unlinked row with an entry; then applied with the file's LF text in one transaction, recorded
+  in schema_migrations as `20261021200000` (created_by `claude-repayment-link`), `NOTIFY pgrst`. The Cont's 2 Oct
+  pair is linked to JE-202610-0009 (5027) / 0010 (3053). The DB had to go first: the app writes the new column.
+- After the deploy: run the migration's backfill statement once more (idempotent) — it links what the old app
+  recorded in between (until then the fallback finds those).
+
 ## CHECKPOINT 2026-10-21 x (DATA FIX) — The Cont LO#4: a duplicate repayment removed
 
 User: "可以帮我检查这个repayment 对吗？" → "我不可能还两次" → "第二笔错了".
