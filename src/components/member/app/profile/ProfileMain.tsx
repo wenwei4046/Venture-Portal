@@ -43,7 +43,7 @@ export interface ProfileMainActions {
    */
   changeEmail?: () => void;
   /**
-   * IT support: the account's own, at the top of Your workspace so it is easy to find.
+   * IT support: the account's own, in Your workspace right under Memos & notifications.
    */
   itSupport?: () => void;
 }
@@ -143,16 +143,6 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
         ) : null}
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
-          {actions.itSupport || itReadOnly ? (
-            <button className={s.workRow} onClick={actions.itSupport} disabled={itReadOnly} aria-label="IT support">
-              <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.help} size={22} sw={1.8} /></span>
-              <span className={s.workText}>
-                <span className={s.workLabel}>IT support</span>
-                <span className={s.workSub}>{itReadOnly ? "Exit View as to send your own request" : "Send a request and track its status"}</span>
-              </span>
-              <Svg d={itReadOnly ? ICON.lock : ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
-            </button>
-          ) : null}
           {ROWS.filter(r => !closedRows.includes(r.key)).map(r => (
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
@@ -163,6 +153,18 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           ))}
+          {/* Under Memos & notifications (2026-10-21 — the user, an arrow at Memos: "move the it support to below memo &
+              notifications"); Memos has no box, so it is always the row above. */}
+          {actions.itSupport || itReadOnly ? (
+            <button className={s.workRow} onClick={actions.itSupport} disabled={itReadOnly} aria-label="IT support">
+              <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.help} size={22} sw={1.8} /></span>
+              <span className={s.workText}>
+                <span className={s.workLabel}>IT support</span>
+                <span className={s.workSub}>{itReadOnly ? "Exit View as to send your own request" : "Send a request and track its status"}</span>
+              </span>
+              <Svg d={itReadOnly ? ICON.lock : ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+            </button>
+          ) : null}
           <InstallRow />
         </section>
         {/* Settings (2026-10-16 — the user, Privacy, Account and Sign out circled: "combine to one, name (settings),
