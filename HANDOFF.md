@@ -34,8 +34,9 @@ The Cont's 2 Oct pair as the example → "选 A" (link each repayment to its own
   link resolving, no unlinked row with an entry; then applied with the file's LF text in one transaction, recorded
   in schema_migrations as `20261021200000` (created_by `claude-repayment-link`), `NOTIFY pgrst`. The Cont's 2 Oct
   pair is linked to JE-202610-0009 (5027) / 0010 (3053). The DB had to go first: the app writes the new column.
-- After the deploy: run the migration's backfill statement once more (idempotent) — it links what the old app
-  recorded in between (until then the fallback finds those).
+- Merged as #607 (squash 7584048, 12:50 UTC — the repo does not allow GitHub auto-merge; unit ×2, build and
+  worker were green, the SQL job still running, its suite green locally); Vercel production deployed. The backfill
+  re-run after the deploy linked 0 — nothing was recorded in between (newest repayment 7 Oct): 63 of 153 linked.
 
 ## CHECKPOINT 2026-10-21 x (DATA FIX) — The Cont LO#4: a duplicate repayment removed
 
