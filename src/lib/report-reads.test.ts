@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { afterAll, beforeAll, describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { applyGlRefs, buildCashFlow, fetchAllJournalLines, fetchGlRefs, type GlLine } from './gl-reports'
 import type { AccountType } from './coa'
 import { classifyRows, fetchIncomeStatement, fetchLedgers, fetchTrialBalance, type RawPvSourceRow } from './cfo-reports'
 import { fetchInterBillingCashFlow } from './inter-billing-cash-flow'
 import { fetchInterBillingElimination } from './consolidation'
+import { primeDeptRegistry } from './dept-registry'
 import { fetchDeptOutstanding } from './dept-receipt-payment'
 import { fetchRnpInvoiceEvents } from './monthly-rnp'
 
@@ -542,6 +543,7 @@ describe('fetchInterBillingCashFlow — reads before the bank codes are known', 
       'dept_pools',
       'dept_pools',
       'dept_pools',
+      'journal_entries',
       'payment_vouchers',
       'rpc:bridge_mirror_slices',
       'rpc:bridge_ref_flags',
@@ -556,6 +558,64 @@ describe('fetchInterBillingCashFlow — reads before the bank codes are known', 
       ['3000', 500, 0, 'corporate'],
       ['IB-XFER', 0, 500, 'corporate'],
     ])
+  })
+})
+
+describe('fetchInterBillingCashFlow — Revenue’s payroll to HR by account (2026-10-22, "可以，只改 Revenue")', () => {
+  beforeAll(() =>
+    primeDeptRegistry([{ id: 'rev', name: 'Revenue Department', segmentKey: 'revenue_department', poolGlCode: null, billingModeKey: 'revenue_department_attribution', isInternal: false }]),
+  )
+  afterAll(() => primeDeptRegistry([]))
+
+  const custody = (no: string, amount: number) => ({ amount, created_at: '2026-10-15T09:44:18Z', description: `PV ${no}: payroll fund → custody pool`, transaction_type: 'np_in', departments: { name: 'HR' } })
+  const tables: Record<string, Row[]> = {
+    dept_pools: [
+      { amount: 261253.69, created_at: '2026-10-15T09:44:18Z', description: 'PV HV-PV-202610-0541: Payroll bank transfer — Sep 2026', transaction_type: 'expense_out', departments: { name: 'Revenue Department' } },
+      custody('HV-PV-202610-0541', 261253.69),
+      { amount: 30000, created_at: '2026-10-15T09:40:00Z', description: 'PV HV-PV-202610-0540: Payroll bank transfer — Sep 2026 (Marketing)', transaction_type: 'expense_out', departments: { name: 'Marketing' } },
+      custody('HV-PV-202610-0540', 30000),
+    ],
+    payment_vouchers: [],
+    journal_entries: [
+      {
+        id: 'je-rev-sep',
+        transaction_date: '2026-09-30',
+        reference_type: 'payroll_accrual',
+        segment: 'revenue_department',
+        is_reversed: false,
+        journal_lines: [
+          { account_code: '9030', debit: 51000 },
+          { account_code: '9093', debit: 187798.61 },
+          { account_code: '9090', debit: 4760.27 },
+          { account_code: '9098', debit: 3469.83 },
+          { account_code: '9084', debit: 2672 },
+          { account_code: '9081', debit: 6180 },
+          { account_code: '9082', debit: 623.95 },
+          { account_code: '9083', debit: 71.3 },
+          { account_code: '4070', debit: null },
+        ],
+      },
+      { id: 'je-mkt-sep', transaction_date: '2026-09-30', reference_type: 'payroll_accrual', segment: 'marketing', is_reversed: false, journal_lines: [{ account_code: '9030', debit: 30000 }] },
+    ],
+  }
+  const rpc = { bridge_ref_flags: { voided: [], payroll_refs: [] }, bridge_mirror_slices: [] }
+
+  it('splits Revenue’s round as its month’s accrual does; every other department keeps its one Accrual - Salary line', async () => {
+    const { lines } = await fetchInterBillingCashFlow(pocketPostgrest(tables, { rpc }).client, new Set(['3000']))
+    const debits = (seg: string) => lines.filter((l) => l.segment === seg && l.debit > 0).map((l) => [l.account_code, l.debit])
+    expect(debits('revenue_department')).toEqual([
+      ['9030', 51000],
+      ['9081', 6180],
+      ['9082', 623.95],
+      ['9083', 71.3],
+      ['9084', 2672],
+      ['9090', 4760.27],
+      ['9093', 192476.34],
+      ['9098', 3469.83],
+    ])
+    const cashOut = lines.filter((l) => l.segment === 'revenue_department').reduce((s, l) => s + l.credit, 0)
+    expect(Math.round(cashOut * 100) / 100).toBe(261253.69)
+    expect(debits('marketing')).toEqual([['4070', 30000]])
   })
 })
 
