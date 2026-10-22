@@ -9,6 +9,7 @@ import { askModel } from './ai-model'
 import { fetchMetaAds } from './ads-server'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
+import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
 
 /**
@@ -89,6 +90,18 @@ export async function markLeadLost(contactId: string, reason: string) {
 export async function reopenLead(contactId: string) {
   await requireActionOn('/leads/list', 'leads', 'edit')
   return call<null>('lead_reopen', { p_contact: contactId }, 'It was not reopened.')
+}
+
+/** General info's Save: every category and card as the page holds them (a card left out is deleted). */
+export async function saveInfo(cats: Array<Pick<InfoCat, 'id' | 'label'>>, cards: InfoCard[]) {
+  await requireActionOn('/leads/info', 'leads', 'manage')
+  return call<LeadInfo>('lead_save_info', { p_data: { cats, cards } }, 'General info was not saved.')
+}
+
+/** Business hours' Save: the week and the special dates. */
+export async function saveHours(week: BusinessHours['week'], specials: BusinessHours['specials']) {
+  await requireActionOn('/leads/hours', 'leads', 'manage')
+  return call<null>('lead_save_hours', { p_week: week, p_specials: specials }, 'The hours were not saved.')
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────

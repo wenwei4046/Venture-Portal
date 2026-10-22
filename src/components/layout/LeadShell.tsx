@@ -24,13 +24,15 @@ import s from './LeadShell.module.css'
  * theme (`[data-lead-view]`, globals.css) and its two faces hang on the root. The Inbox draws straight on the paper
  * (`bare`); Lead View's other pages keep the white sheet until their own step of the redesign.
  */
+const BARE = new Set(['/leads', '/leads/list', '/leads/info', '/leads/hours'])
+
 export default function LeadShell({ user, initialCollapsed, children }: { user: User; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname() ?? ''
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const sections = useMemo(() => visibleLeadNav(leadNavSections(), user), [user])
-  // The pages the redesign has drawn on the paper (step 1 the Inbox, step 2 Leads); the rest keep the sheet.
-  const bare = pathname === '/leads' || pathname === '/leads/list'
+  // The pages the redesign has drawn on the paper (step 1 the Inbox, 2 Leads, 3 General info and Business hours); the rest keep the sheet.
+  const bare = BARE.has(pathname)
   const clock = officeClock()
 
   const hrefs = useMemo(() => sections.flatMap(sec => sec.items.flatMap(i => (i.href ? [i.href] : []))), [sections])

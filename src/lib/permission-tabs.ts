@@ -246,6 +246,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // AI Agent and its Data Center (mig 20261016330000): the soul and the cards it may quote, set up as Settings is.
   tab('lead', 'ai', 'AI Agent', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   tab('lead', 'knowledge', 'Data Center', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // General info and Business hours (redesign v2 step 3, mig 20261022230000): set up as Settings is (Manage, with its Edit).
+  tab('lead', 'info', 'General info', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'hours', 'Business hours', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
   tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]

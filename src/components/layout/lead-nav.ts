@@ -6,7 +6,7 @@
 //   FILES    General info · Data Center · AI corrections
 //   ADMIN    Business hours · Audit log · Settings
 //
-// A row whose page is not built yet (`href: null`) is drawn greyed, "Not built yet" — the redesign builds them
+// A row whose page is not built yet (`href: null`) is drawn greyed, *Soon* — the redesign builds them
 // step by step (`.claude/rules/leads/lead-view.md` › REDESIGN V2). Reply templates are today's Automations page.
 // Every built row asks its page's tab, as every view sidebar does (opensPath).
 
@@ -60,7 +60,7 @@ export function leadNavSections(): LeadNavSection[] {
     {
       label: 'Files',
       items: [
-        soon('leads-info', 'General info', 'bookOpen'),
+        link('leads-info', 'General info', 'bookOpen', '/leads/info'),
         link('leads-knowledge', 'Data Center', 'library', '/leads/knowledge'),
         soon('leads-corrections', 'AI corrections', 'history'),
       ],
@@ -68,7 +68,7 @@ export function leadNavSections(): LeadNavSection[] {
     {
       label: 'Admin',
       items: [
-        soon('leads-hours', 'Business hours', 'clock'),
+        link('leads-hours', 'Business hours', 'clock', '/leads/hours'),
         soon('leads-audit', 'Audit log', 'scroll'),
         link('leads-settings', 'Settings', 'settings', '/leads/settings'),
       ],

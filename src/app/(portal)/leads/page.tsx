@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { loadInbox, loadLeadConfig, loadPersonas, loadThread } from '@/lib/leads/server'
+import { loadInbox, loadInfo, loadLeadConfig, loadPersonas, loadThread } from '@/lib/leads/server'
 import InboxView from './_components/InboxView'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   await requirePage('/leads')
   const user = await requirePermission('leads')
   const { c, q } = await searchParams
-  const [config, inbox, personas] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas()])
+  const [config, inbox, personas, info] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo()])
   if (!config.ok || !inbox.ok) {
     return (
       <HvPage>
@@ -33,6 +33,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       csName={user.name || 'Customer Service'}
       // An API key for the AI Agent (never its value) — without one the composer says so.
       aiConnected={!!process.env.ANTHROPIC_API_KEY}
+      // General info for the composer's menu (null before its migration).
+      info={info.ok ? info.data : null}
       // Brands whose AI agent is a copilot: their conversations offer an AI draft (none while its tables are not there).
       aiBrands={personas.ok ? personas.data.filter(p => p.mode === 'copilot').map(p => p.brandId) : []}
     />

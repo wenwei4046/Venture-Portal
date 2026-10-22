@@ -499,4 +499,61 @@ await q(`select public.lead_set_stage($1, 'came', null)`, [aisyah])
 check((await stageCard(aisyah)).shown, 'came', 'still works behind its guard')
 check((await q('select prosrc from pg_proc where proname = $1', ['lead_set_outcome']))[0].prosrc.includes("PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);"), true, 'the outcome asks the Inbox')
 
+// ── General info and Business bh (mig 20261022230000; the registry rows are production's, left out here) ──
+const infoSql = (await readFile(new URL('../../supabase/migrations/20261022230000_lead_info_hours.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(infoSql.slice(0, infoSql.indexOf('-- ── The two tabs')))
+await db.exec((await readFile(new URL('../../supabase/migrations/20261022230100_lead_info_hours_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+await as(CS_USER, ALL)
+let info = (await q('select public.lead_info() i'))[0].i
+check(info.cats.map(c => [c.label, c.kind, c.custom]), [['Showrooms', 'showroom', false], ['Payment methods', 'topic', false], ['Delivery', 'topic', false], ['Warranty and returns', 'topic', false]], 'the four categories')
+check(info.cards, [], 'no card yet')
+const shop = info.cats[0].id
+const saveInfo = async data => (await q('select public.lead_save_info($1::jsonb) i', [JSON.stringify(data)]))[0].i
+const kl = { catId: shop, brandId: b2990, name: 'KL showroom', code: '', status: 'on', validFrom: '', validUntil: '', note: '',
+  fields: [{ key: 'address', label: 'Address', value: 'Jalan Klang Lama' }, { key: 'evil', label: 'Hours', value: '10am – 10pm' }], uses: ['AI Agent · 2990s', 'AI Agent · 2990s'] }
+await refuses(`select public.lead_save_info($1::jsonb)`, [JSON.stringify({ cats: info.cats, cards: [{ ...kl, catId: 'new-1' }] })], /category that is not there/, 'a card in an unknown category')
+info = await saveInfo({ cats: [...(await q('select public.lead_info() i'))[0].i.cats, { id: 'new-1', label: 'Promotion' }],
+  cards: [kl, { ...kl, catId: 'new-1', brandId: null, name: 'Instalment', code: 'Instal Plan', fields: [{ label: 'Plan', value: '0% 12 months' }] }] })
+check(info.cats.map(c => c.label).at(-1), 'Promotion', 'a category added')
+check(info.cards.map(c => [c.code, c.name, c.brandId === null, c.uses.length, c.updatedByName]), [['kl-showroom', 'KL showroom', false, 1, 'Mei Ling'], ['instal-plan', 'Instalment', true, 1, 'Mei Ling']], 'codes from the name or tidied; every brand; uses once')
+check(info.cards[0].fields.map(f => f.key), ['address', null], 'only a showroom key is kept')
+check(info.cards[1].catId, info.cats.at(-1).id, 'the new category’s cards point at it')
+await refuses(`select public.lead_save_info($1::jsonb)`, [JSON.stringify({ cats: info.cats, cards: [...info.cards, { ...kl, code: 'kl-showroom' }] })], /Two cards use the code/, 'codes are unique')
+await refuses(`select public.lead_save_info($1::jsonb)`, [JSON.stringify({ cats: info.cats, cards: [{ ...info.cards[0], validFrom: '2026-11-09', validUntil: '2026-11-08' }] })], /ends before it starts/, 'a backwards range')
+// Swapping codes in one save, then deleting the custom category takes its card along.
+const [c1, c2] = info.cards
+info = await saveInfo({ cats: info.cats, cards: [{ ...c1, code: 'instal-plan' }, { ...c2, code: 'kl-showroom' }] })
+check(info.cards.map(c => c.code), ['instal-plan', 'kl-showroom'], 'two codes swapped')
+info = await saveInfo({ cats: info.cats.filter(c => !c.custom), cards: info.cards.filter(c => info.cats.some(k => k.id === c.catId && !k.custom)) })
+check([info.cats.length, info.cards.length], [4, 1], 'a custom category left out goes with its cards')
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_save_info($1::jsonb)`, [JSON.stringify({ cats: info.cats, cards: [] })], /Lead View · Manage/, 'General info needs Manage')
+await refuses(`select public.lead_save_hours('[]'::jsonb, '[]'::jsonb)`, [], /Lead View · Manage/, 'bh need Manage')
+await as(CS_USER, ALL)
+let bh = (await q('select public.lead_business_hours() h'))[0].h
+check(bh.week.map(d => d.on), [true, true, true, true, true, false, false], 'Monday to Friday by default')
+const wk = bh.week.map(d => ({ ...d, from: '10:00', to: '22:00' }))
+await refuses(`select public.lead_save_hours($1::jsonb, '[]'::jsonb)`, [JSON.stringify(wk.map((d, i) => i === 0 ? { ...d, from: '10:15' } : d))], /half hour/, 'a quarter hour')
+await refuses(`select public.lead_save_hours($1::jsonb, '[]'::jsonb)`, [JSON.stringify(wk.map((d, i) => i === 0 ? { ...d, to: '09:00' } : d))], /closes after it opens/, 'closing before opening')
+await refuses(`select public.lead_save_hours($1::jsonb, '[]'::jsonb)`, [JSON.stringify(wk.slice(1))], /right shape/, 'six days')
+await q(`select public.lead_save_hours($1::jsonb, $2::jsonb)`, [JSON.stringify(wk), JSON.stringify([
+  { name: 'Deepavali', from: '2026-11-08', to: '2026-11-08', mode: 'closed', open: '10:00', close: '18:00' },
+  { name: 'Leave', from: '2026-11-02', to: '2026-11-04', mode: 'custom', open: '12:00', close: '18:00' }])])
+bh = (await q('select public.lead_business_hours() h'))[0].h
+check([bh.specials.map(s => s.name), bh.updatedByName], [['Leave', 'Deepavali'], 'Mei Ling'], 'special dates kept in order')
+const isOpen = async at => (await q('select public.lead_hours_open($1::timestamptz) o', [at]))[0].o
+check(await isOpen('2026-10-19T03:00:00Z'), true, 'Monday 11:00 open')
+check(await isOpen('2026-10-19T14:30:00Z'), false, 'Monday 22:30 closed')
+check(await isOpen('2026-10-24T03:00:00Z'), false, 'Saturday closed')
+check(await isOpen('2026-11-08T03:00:00Z'), false, 'Deepavali closed (a Sunday anyway)')
+check(await isOpen('2026-11-03T02:00:00Z'), false, 'leave: 10:00 before its 12:00')
+check(await isOpen('2026-11-03T05:00:00Z'), true, 'leave: 13:00 open')
+for (const [fn, page] of [['lead_save_info', '/leads/info'], ['lead_save_hours', '/leads/hours']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['${page}'], ARRAY['leads.manage']);`), true, `${fn} asks ${page}`)
+}
+const lockedInfo = await q(`select count(*)::int n from information_schema.role_table_grants
+  where table_name in ('lead_info_cats','lead_info_cards','lead_business_hours') and grantee in ('anon','authenticated')`)
+check(lockedInfo[0].n, 0, 'no grants on the new tables')
+
 console.log(`validate-leads: ${checks} checks passed`)

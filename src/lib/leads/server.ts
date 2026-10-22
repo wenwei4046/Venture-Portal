@@ -5,6 +5,7 @@ import type { KnowledgeCard, Persona } from './ai'
 import type { LeadAd } from './ads'
 import type { Campaign } from './campaign'
 import type { LeadFlow } from './flow'
+import type { BusinessHours, LeadInfo } from './info'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -61,6 +62,16 @@ export async function loadLeads(from: string | null, to: string | null, today: s
   const tomorrow = new Date(Date.parse(today + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10)
   const old = await rpc<LeadContact[]>('lead_list', { p_from: from ?? back, p_to: to ?? tomorrow }, 'The leads')
   return old.ok ? { ok: true, data: { contacts: old.data, stagesReady: false } } : old
+}
+
+/** General info: its categories and every card (mig 20261022230000). */
+export function loadInfo(): Promise<Read<LeadInfo>> {
+  return rpc<LeadInfo>('lead_info', undefined, 'General info')
+}
+
+/** Business hours: the week and the special dates. */
+export function loadHours(): Promise<Read<BusinessHours>> {
+  return rpc<BusinessHours>('lead_business_hours', undefined, 'The business hours')
 }
 
 /** Every flow, with what each started this week. */

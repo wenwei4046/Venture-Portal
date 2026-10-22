@@ -9,6 +9,7 @@ import { LAYOUT_KEY, LIST_W, RIGHT_W, clampWidth, readLayout, replyingNow, type 
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
 import type { LeadBrand, LeadConfig, LeadContact, LeadMessage, LeadThread } from '@/lib/leads/types'
+import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { LeadIcon } from '@/components/layout/lead-icons'
 import { CHANNEL_LABEL, initials } from './bits'
 import CustomerCard from './CustomerCard'
@@ -22,7 +23,7 @@ import s from './inbox.module.css'
  *
  * Meta is not connected yet: a reply is recorded, not sent, and conversations arrive only through Settings › Test.
  * What the handoff draws that needs the database first is drawn and held, saying so: switching who replies, photos
- * and files, and the General info cards.
+ * and files. The General info menu inserts the brand's live cards (step 3).
  */
 
 type Filter = InboxState | 'all'
@@ -44,6 +45,7 @@ export default function InboxView({
   csName,
   aiBrands,
   aiConnected,
+  info,
 }: {
   config: LeadConfig
   contacts: LeadContact[]
@@ -58,6 +60,8 @@ export default function InboxView({
   aiBrands: string[]
   /** Is there an API key for the AI Agent at all? */
   aiConnected: boolean
+  /** General info (null before its migration): the composer's menu. */
+  info: LeadInfo | null
 }) {
   const [brand, setBrand] = useState<string>('all')
   const [filter, setFilter] = useState<Filter>(initialQuery ? 'all' : 'waiting')
@@ -187,7 +191,7 @@ export default function InboxView({
         <section className={s.chat} aria-label="Chat">
           {contact ? (
             <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
-              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected}
+              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} today={config.today}
               loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
             <div className={s.empty}>Pick a conversation.</div>
@@ -231,7 +235,7 @@ function useDrag(layout: InboxLayout, setLayout: (next: InboxLayout | ((l: Inbox
   }
 }
 
-function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, loading, onSent }: {
+function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, info, today, loading, onSent }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
@@ -239,6 +243,8 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, loa
   canReply: boolean
   aiOn: boolean
   aiConnected: boolean
+  info: LeadInfo | null
+  today: string
   loading: boolean
   onSent: () => void
 }) {
@@ -408,9 +414,8 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, loa
                 <button type="button" className={s.iconBtn} disabled title="Photo, video or file — comes with Meta"><LeadIcon name="paperclip" /></button>
               </span>
               <span className={s.rule} aria-hidden="true" />
-              <button type="button" className={s.toolBtn} disabled title="General info — its page comes in a later step of the redesign">
-                <span className={s.toolAccent}><LeadIcon name="bookOpen" size={13} /></span>General info<LeadIcon name="chevronDown" size={13} />
-              </button>
+              <InfoMenu info={info} brandId={contact.brandId} today={today} disabled={botOn}
+                onInsert={(v, whole) => setText(t => (whole ? (t ? t.replace(/\s*$/, '') + '\n\n' : '') + v : t + (t && !/\s$/.test(t) ? ' ' : '') + v))} />
               {aiOn && aiConnected && !draft ? (
                 <button type="button" className={s.aiBtn} onClick={askDraft} disabled={drafting || botOn}>{drafting ? 'Drafting…' : '✦ AI draft'}</button>
               ) : null}
@@ -443,4 +448,61 @@ function MessageLabel({ m }: { m: LeadMessage }) {
 function metaOf(m: LeadMessage): string {
   if (m.direction === 'in') return timeOf(m.at)
   return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : m.delivery === 'failed' ? 'not sent' : 'sent'].join(' · ')
+}
+
+/** The composer's General info menu (the handoff's 560px panel): a card's header inserts it whole, a line inserts its value. */
+function InfoMenu({ info, brandId, today, disabled, onInsert }: {
+  info: LeadInfo | null
+  brandId: string
+  today: string
+  disabled: boolean
+  onInsert: (value: string, whole: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const entries = info ? infoEntries(info, brandId, today) : []
+  if (!info) {
+    return (
+      <button type="button" className={s.toolBtn} disabled title="General info waits for its database update">
+        <span className={s.toolAccent}><LeadIcon name="bookOpen" size={13} /></span>General info<LeadIcon name="chevronDown" size={13} />
+      </button>
+    )
+  }
+  return (
+    <span className={s.infoWrap}>
+      <button type="button" className={s.toolBtn} onClick={() => setOpen(o => !o)} disabled={disabled} aria-expanded={open}>
+        <span className={s.toolAccent}><LeadIcon name="bookOpen" size={13} /></span>General info<LeadIcon name="chevronDown" size={13} />
+      </button>
+      {open ? (
+        <>
+          <div className={s.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className={s.infoPanel} role="dialog" aria-label="General info">
+            <div className={s.infoHead}>
+              <span className={s.infoTitle}>General info</span>
+              <span className={s.infoHint}>Pick a card to insert it, or one line only</span>
+              <a className={s.link} href="/leads/info">Edit ↗</a>
+            </div>
+            <div className={s.infoGrid}>
+              {entries.length === 0 ? <div className={s.empty}>Nothing in use for this brand yet — add it on General info.</div> : entries.map(e => (
+                <div key={e.card.id} className={s.infoCard}>
+                  <button type="button" className={s.infoCardHead} title="Insert the whole card"
+                    onClick={() => { onInsert(e.card.name + '\n' + e.fields.map(f => `${f.label}: ${f.value}`).join('\n'), true); setOpen(false) }}>
+                    <span className={s.infoCardName}>{e.card.name || e.card.code}</span>
+                    <span className={s.infoInsert}><LeadIcon name="plus" size={12} />Insert</span>
+                  </button>
+                  <div className={s.infoLines}>
+                    {e.fields.map(f => (
+                      <button key={f.token} type="button" className={s.infoLine} title="Insert this line" onClick={() => { onInsert(f.value, false); setOpen(false) }}>
+                        <span className={s.infoLabel}>{f.label}</span>
+                        <span className={s.infoValue}>{f.value}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </span>
+  )
 }
