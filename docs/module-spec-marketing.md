@@ -21,8 +21,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 |---|---|---|
 | ① | The permission and templates; the tables and readers; the shell (sidebar, top bar, search, bell, Appearance, account menu); My Space's task tiles; the Calendar; Projects (list + a project's stages); the Tracking Dashboard (read) | #634, live 2026-10-23 |
 | ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | #639, live 2026-10-23 |
-| ②b-1 | 📦 Product projects up to the PIC: New Project's 📦 (a product on sale today), the project's page — the stepper, the intake minutes written with the PIC and saved as typed, signatures, notes, Generate tracking link (`/t/<random>`), copy / WhatsApp, the PIC's changes and Resend, edited after approval → back to the PIC, start before approval (mig `20261024002000`) | this PR |
-| ⑤-1 | The PIC's minutes link `/t/<code>`: the 👁 fields, approve (a typed name) or changes (≥ 5 characters) — the guest link's pattern | next |
+| ②b-1 | 📦 Product projects up to the PIC: New Project's 📦 (a product on sale today), the project's page — the stepper, the intake minutes written with the PIC and saved as typed, signatures, notes, Generate tracking link (`/t/<random>`), copy / WhatsApp, the PIC's changes and Resend, edited after approval → back to the PIC, start before approval (mig `20261024002000`) | #650, live 2026-10-23 |
+| ⑤-1 | The PIC's minutes link `/t/<code>`: a stranger's page (the guest link's pattern) — the 👁 fields only, approve (a typed full name) or changes (5–500 characters), one answer per sending, why it waits again, the progress, the receipt; the owner (else the managers) told (mig `20261024003000`) | this PR |
 | ②b-2 | The Assignment plan (SLA, approvers ≤ 3 levels, split, 🔓 picked by the stage before), subtasks and Review delivery, reassign, more minutes on a project, the billing drafts and Finance's import | after questions 10–12 |
 | ③a | The Workflow Builder: actions and their templates, the stages (who — at assignment or 🔓 by the stage before, SLA, approval levels, PIC words, subtasks, back to, fields with a table's preset rows), the lock, drafts saved as typed on their count, versions published whole, Clone (mig `20261023235500`) | #642, live 2026-10-23 |
 | ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | #644, live 2026-10-23 |
@@ -87,6 +87,12 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 45. **Locked vs edited after approval** (②b-1). New Project lets the manager edit after the PIC approved (back to the PIC); the Minutes Builder's *Lock after complete* says no edits once signed off. Both kept: minutes locked on completion take no edit; the rest go back to the PIC when something they see changes.
 46. **"Turns red after 4 working hours without a reply"** (②b-1). Needs the PIC's working hours (question 2): the side card says when the link went.
 47. **Meeting date and attendees** (②b-1). The handoff's meeting card holds the date and attendees; here they are the intake template's own fields (every template has the attendees, a new one the date), and the card keeps the PIC's name and WhatsApp.
+48. **One link, many uses** (⑤-1). The handoff's PIC Link approves a deliverable (a video, "What changed since v1"), shows Ads reports and a project's whole progress; ⑤-1 is its first use — the intake minutes. The deliverables (PIC Task Link) come with the stages' work after the Assignment plan, the reports with Ads, the PIC Calendar with the dates.
+49. **No hourly cap** (⑤-1). The guest link caps its writes per hour; the PIC's link takes one answer per sending (only a waiting project takes one), so a leaked code buys a single answer.
+50. **Attach a screenshot** (⑤-1). On the handoff's changes step; files wait for Marketing's R2 bucket.
+51. **"Overdue — please review"** (⑤-1). The handoff's red state after 6 working hours needs the PIC's working hours (question 2) — not drawn.
+52. **Who is told** (⑤-1). The handoff does not say: the project's owner; with none (the Principal started it), Marketing's managers.
+53. **Changes ask no name** (⑤-1). The handoff's changes step has no name field: the reply goes under the PIC's name on the project (Kelvin), approving asks the full name typed.
 
 ## 5. Open questions (for the user)
 
