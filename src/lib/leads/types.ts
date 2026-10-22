@@ -75,6 +75,16 @@ export interface LeadContact {
   adSet?: string
   adAccount?: string
   adLink?: string
+  /** Leads v2 (mig 20261022220000): when each step past the hand-over was reached, a closed sale, a loss. Absent until it is applied. */
+  contactedAt?: string | null
+  apptAt?: string | null
+  cameAt?: string | null
+  closedAt?: string | null
+  saleValue?: number | string | null
+  lostAt?: string | null
+  lostReason?: string
+  stageByName?: string
+  updatedAt?: string
 }
 
 export interface LeadMessage {

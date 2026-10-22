@@ -335,7 +335,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'att_file', 'att_remind',
   // Lead View (mig 20261016300200): each asks has_any_action(leads.*).
   'lead_config', 'lead_inbox', 'lead_thread', 'lead_list', 'lead_reply', 'lead_simulate', 'lead_save_card',
-  'lead_handoff', 'lead_set_outcome', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
+  'lead_handoff', 'lead_set_outcome', 'lead_leads', 'lead_set_stage', 'lead_mark_lost', 'lead_reopen', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
   'lead_flows', 'lead_save_flow', 'lead_remove_flow', 'lead_auto_categories', 'lead_save_auto_category', 'lead_remove_auto_category',
   'lead_knowledge', 'lead_save_knowledge', 'lead_remove_knowledge', 'lead_personas', 'lead_save_persona', 'lead_ai_context',
   'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience',

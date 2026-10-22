@@ -69,8 +69,26 @@ export async function handLeadOver(contactId: string, salesId: string) {
 
 /** What came of a handed lead. */
 export async function setLeadOutcome(contactId: string, appt: Appt, shown: Shown) {
-  await requireActionOn(['/leads', '/leads/list'], 'leads', 'edit')
+  await requireActionOn('/leads', 'leads', 'edit')
   return call<null>('lead_set_outcome', { p_contact: contactId, p_appt: appt, p_shown: shown }, 'The outcome was not saved.')
+}
+
+/** Leads v2: a step past the hand-over (handed · contacted · appt · came · closed, with the sale in RM). */
+export async function setLeadStage(contactId: string, stage: 'handed' | 'contacted' | 'appt' | 'came' | 'closed', saleValue: number | null = null) {
+  await requireActionOn('/leads/list', 'leads', 'edit')
+  return call<null>('lead_set_stage', { p_contact: contactId, p_stage: stage, p_value: saleValue }, 'The status was not saved.')
+}
+
+/** Leads v2: lost, with why. */
+export async function markLeadLost(contactId: string, reason: string) {
+  await requireActionOn('/leads/list', 'leads', 'edit')
+  return call<null>('lead_mark_lost', { p_contact: contactId, p_reason: reason.slice(0, 200) }, 'It was not marked lost.')
+}
+
+/** Leads v2: a lost lead open again. */
+export async function reopenLead(contactId: string) {
+  await requireActionOn('/leads/list', 'leads', 'edit')
+  return call<null>('lead_reopen', { p_contact: contactId }, 'It was not reopened.')
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────

@@ -29,7 +29,8 @@ export default function LeadShell({ user, initialCollapsed, children }: { user: 
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const sections = useMemo(() => visibleLeadNav(leadNavSections(), user), [user])
-  const bare = pathname === '/leads'
+  // The pages the redesign has drawn on the paper (step 1 the Inbox, step 2 Leads); the rest keep the sheet.
+  const bare = pathname === '/leads' || pathname === '/leads/list'
   const clock = officeClock()
 
   const hrefs = useMemo(() => sections.flatMap(sec => sec.items.flatMap(i => (i.href ? [i.href] : []))), [sections])

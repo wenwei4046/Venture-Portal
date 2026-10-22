@@ -455,4 +455,48 @@ check((await q('select public.lead_thread($1) t', [ida]))[0].t.contact.adName, '
 await q('select public.lead_save_meta_ads($1::jsonb) n', [JSON.stringify([meta[0]])])
 check((await q('select public.lead_thread($1) t', [ida]))[0].t.contact.adName, 'Oct Sofa Week · Video', 'Meta’s again')
 
+// ── Leads v2: the pipeline (mig 20261022220000) ──
+await db.exec(await readFile(new URL('../../supabase/migrations/20261022220000_lead_stages.sql', import.meta.url), 'utf8'))
+await as(CS_USER, ALL)
+const stageCard = async c => (await q('select public.lead_thread($1) t', [c]))[0].t.contact
+let stc = await stageCard(aisyah)
+check([stc.contactedAt, stc.closedAt, stc.lostReason, stc.saleValue], [null, null, '', null], 'the card carries the steps, none reached yet')
+await refuses(`select public.lead_set_stage($1, 'maybe', null)`, [aisyah], /Unknown status/, 'an unknown step')
+await refuses(`select public.lead_set_stage($1, 'contacted', 10)`, [aisyah], /closed lead/, 'a value only when closed')
+await refuses(`select public.lead_set_stage($1, 'contacted', null)`, [ida], /Hand the lead over/, 'steps come after the hand-over')
+await q(`select public.lead_set_stage($1, 'closed', 2690)`, [aisyah])
+stc = await stageCard(aisyah)
+check([!!stc.contactedAt, !!stc.apptAt, !!stc.cameAt, !!stc.closedAt, Number(stc.saleValue), stc.appt, stc.shown, stc.stageByName],
+  [true, true, true, true, 2690, 'booked', 'came', 'Mei Ling'], 'closed: every step before it dated, the value kept')
+check((await q('select public.lead_thread($1) t', [aisyah]))[0].t.events.at(-1).what, 'Closed · bought · RM 2,690.00', 'the timeline says the sale')
+await refuses(`select public.lead_mark_lost($1, 'x')`, [aisyah], /closed/, 'a closed lead is not lost')
+await q(`select public.lead_set_stage($1, 'contacted', null)`, [aisyah])
+stc = await stageCard(aisyah)
+check([!!stc.contactedAt, stc.apptAt, stc.cameAt, stc.closedAt, stc.saleValue, stc.appt, stc.shown], [true, null, null, null, null, 'unknown', 'unknown'], 'back a step clears the later ones')
+await q(`select public.lead_mark_lost($1, '  ')`, [aisyah])
+stc = await stageCard(aisyah)
+check([!!stc.lostAt, stc.lostReason, !!stc.contactedAt], [true, 'No reason', true], 'lost, the steps kept for a reopen')
+await q('select public.lead_reopen($1)', [aisyah])
+check([(await stageCard(aisyah)).lostAt, (await q('select public.lead_thread($1) t', [aisyah]))[0].t.events.at(-1).what], [null, 'Reopened'], 'reopened')
+await refuses(`select public.lead_mark_lost($1, 'x')`, [ida], /no phone/, 'no phone, nothing to lose')
+await as(CS_USER, ['leads.view'])
+await refuses(`select public.lead_set_stage($1, 'came', null)`, [aisyah], /Lead View · Edit/, 'the steps need Edit')
+await refuses('select public.lead_reopen($1)', [aisyah], /Lead View · Edit/, 'reopening needs Edit')
+const everyone = (await q('select public.lead_leads(null, null) l'))[0].l
+check(everyone.some(c => c.id === ida) && everyone.some(c => c.id === aisyah), true, 'all time lists everybody, no phone included')
+const todays = (await q(`select public.lead_leads($1::date, ($1::date + 1)) l`, [today]))[0].l
+check(todays.length, everyone.length, 'today, by the last update')
+check((await q(`select public.lead_leads($1::date - 30, $1::date - 1) l`, [today]))[0].l.length, 0, 'a month ago, nobody')
+await refuses(`select public.lead_leads($1::date, null)`, [today], /all time/, 'one bound alone')
+await as(CS_USER, ALL)
+// Its writes ask Leads' boxes (mig 20261022220100); the guard is a stand-in here, so it lets every call through.
+await db.exec(await readFile(new URL('../../supabase/migrations/20261022220100_lead_stages_guards.sql', import.meta.url), 'utf8'))
+for (const fn of ['lead_set_stage', 'lead_mark_lost', 'lead_reopen']) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes("PERFORM public.tab_write_guard(ARRAY['/leads/list'], ARRAY['leads.edit']);"), true, `${fn} asks /leads/list`)
+}
+await q(`select public.lead_set_stage($1, 'came', null)`, [aisyah])
+check((await stageCard(aisyah)).shown, 'came', 'still works behind its guard')
+check((await q('select prosrc from pg_proc where proname = $1', ['lead_set_outcome']))[0].prosrc.includes("PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);"), true, 'the outcome asks the Inbox')
+
 console.log(`validate-leads: ${checks} checks passed`)

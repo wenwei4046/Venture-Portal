@@ -48,6 +48,21 @@ export function loadLeadList(from: string, to: string): Promise<Read<LeadContact
   return rpc<LeadContact[]>('lead_list', { p_from: from, p_to: to }, 'The leads')
 }
 
+/**
+ * Leads v2: everybody who wrote, by the office day of their last update in [from, to) — both null = all time
+ * (lead_leads, mig 20261022220000). Before that migration is applied, Leads falls back to lead_list — the conversations
+ * STARTED in the period, a year back at most for all time — and says the steps wait (`stagesReady`).
+ */
+export async function loadLeads(from: string | null, to: string | null, today: string): Promise<Read<{ contacts: LeadContact[]; stagesReady: boolean }>> {
+  const r = await rpc<LeadContact[]>('lead_leads', { p_from: from, p_to: to }, 'The leads')
+  if (r.ok) return { ok: true, data: { contacts: r.data, stagesReady: true } }
+  if (r.reason !== NOT_SET_UP) return r
+  const back = new Date(Date.parse(today + 'T00:00:00Z') - 399 * 864e5).toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.parse(today + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10)
+  const old = await rpc<LeadContact[]>('lead_list', { p_from: from ?? back, p_to: to ?? tomorrow }, 'The leads')
+  return old.ok ? { ok: true, data: { contacts: old.data, stagesReady: false } } : old
+}
+
 /** Every flow, with what each started this week. */
 export function loadFlows(): Promise<Read<LeadFlow[]>> {
   return rpc<LeadFlow[]>('lead_flows', undefined, 'The flows')
