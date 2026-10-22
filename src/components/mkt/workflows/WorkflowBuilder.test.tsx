@@ -13,6 +13,8 @@ const actions = vi.hoisted(() => ({
   cloneMktWorkflow: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => router }))
 
 import WorkflowBuilder from './WorkflowBuilder'
 
@@ -46,10 +48,9 @@ const BROKEN = {
 const list = (...rows: object[]): WfTemplate[] => workflowsFromRow({ workflows: rows })
 
 beforeEach(() => {
-  for (const f of Object.values(actions)) f.mockReset()
+  for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
   let rev = 5
   actions.saveMktWorkflow.mockImplementation(async (id: string | null) => ({ ok: true, id: id ?? 'w9', rev: id ? ++rev : 1, workflows: null }))
-  window.history.replaceState(null, '', '/marketing/workflows')
 })
 
 const builder = (rows: object[] = [REELS, BROKEN], first: string | null = null) =>
@@ -135,7 +136,7 @@ describe('the Workflow Builder', () => {
     expect([id, rev, patch.action, patch.tname, patch.stages.length]).toEqual([null, null, 'Design photo', 'Standard', 1])
     expect(await screen.findByText('Action “Design photo” created with a Standard template')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Standard')
-    expect(window.location.search).toBe('?w=w9')
+    expect(router.replace).toHaveBeenCalledWith('/marketing/workflows?w=w9', { scroll: false })
   })
 
   it('Clone: a new template of the action, open to be renamed', async () => {

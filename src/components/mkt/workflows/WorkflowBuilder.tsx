@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cloneMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
 import { moveStage, removeStage } from '@/lib/marketing/tasks'
@@ -41,6 +42,7 @@ export default function WorkflowBuilder({
   /** Marketing's roster now: whoever a version names must be on it. */
   team: string[]
 }) {
+  const router = useRouter()
   const start = (first ? initial.find(t => t.id === first) : undefined) ?? initial[0] ?? null
   const [wfs, setWfs] = useState<WfTemplate[]>(initial)
   const [selId, setSelId] = useState<string | null>(start?.id ?? null)
@@ -135,7 +137,8 @@ export default function WorkflowBuilder({
     setEdit(e)
     setStageAt(0)
     setSave({ state: 'saved' })
-    window.history.replaceState(window.history.state, '', `/marketing/workflows?w=${id}`)
+    // Through the router: a URL changed behind its back is put back by the next save's refresh.
+    router.replace(`/marketing/workflows?w=${id}`, { scroll: false })
   }
 
   const create = async (action: string, tname: string, emoji: string | null, done: string) => {

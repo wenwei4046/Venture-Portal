@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { publishMktMinutes, saveMktMinutes } from '@/lib/marketing/actions'
 import {
@@ -28,6 +29,7 @@ export default function MinutesBuilder({ initial, first, attendees }: {
   /** Who the Preview's sample minutes list as attending. */
   attendees: string[]
 }) {
+  const router = useRouter()
   const start = (first ? initial.find(t => t.id === first) : undefined) ?? initial[0] ?? null
   const [list, setList] = useState<MinutesTemplate[]>(initial)
   const [selId, setSelId] = useState<string | null>(start?.id ?? null)
@@ -121,7 +123,8 @@ export default function MinutesBuilder({ initial, first, attendees }: {
     setEdit(e)
     setCol(null)
     setSave({ state: 'saved' })
-    window.history.replaceState(window.history.state, '', `/marketing/minutes?t=${id}`)
+    // Through the router: a URL changed behind its back is put back by the next save's refresh.
+    router.replace(`/marketing/minutes?t=${id}`, { scroll: false })
   }
 
   const newTemplate = async () => {

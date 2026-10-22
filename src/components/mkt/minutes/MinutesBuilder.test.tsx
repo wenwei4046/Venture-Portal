@@ -12,6 +12,8 @@ const actions = vi.hoisted(() => ({
   publishMktMinutes: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => router }))
 
 import MinutesBuilder from './MinutesBuilder'
 
@@ -30,10 +32,9 @@ const KICKOFF = {
 const list = (...rows: object[]): MinutesTemplate[] => minutesTemplatesFromRow({ templates: rows })
 
 beforeEach(() => {
-  for (const f of Object.values(actions)) f.mockReset()
+  for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
   let rev = 3
   actions.saveMktMinutes.mockImplementation(async (id: string | null) => ({ ok: true, id: id ?? 't9', rev: id ? ++rev : 1, templates: null }))
-  window.history.replaceState(null, '', '/marketing/minutes')
 })
 
 const builder = (rows: object[] = [KICKOFF]) => render(<MinutesBuilder initial={list(...rows)} first={null} attendees={['Rachel', 'Siti']} />)
@@ -113,7 +114,7 @@ describe('the Minutes Builder', () => {
     const [id, rev, patch] = actions.saveMktMinutes.mock.calls[0]
     expect([id, rev, patch.name, patch.fields.map((f: { type: string }) => f.type)]).toEqual([null, null, 'New minutes', ['Project link', 'Date', 'People', 'Signature']])
     expect(await screen.findByDisplayValue('New minutes')).toBeTruthy()
-    expect(window.location.search).toBe('?t=t9')
+    expect(router.replace).toHaveBeenCalledWith('/marketing/minutes?t=t9', { scroll: false })
   })
 
   it('the Preview tries the template and keeps nothing: Complete waits for what is required and the signatures', () => {
