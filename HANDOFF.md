@@ -8,8 +8,8 @@ JE-202609-0876), Oct was HR's flow (HV-PV-202610-0541, RM 261,253.69, one 4070 l
 也跟着科目分开?" → the RM 4,677.73 is 8 payslips' deductions (PETER 4,000 unexplained, from his commission balance; 7
 drop sales) → "那就remain 扣在commission & allowance" → before / after sample → "可以，只改 Revenue，开PR做".
 
-- :  /  — Revenue Department's rounds to HR custody
-  split as that month's  (segment revenue_department) splits the pay; Commission & Allowances takes the
+- `lib/inter-billing-cash-flow`: `splitPayrollDrain` / `payrollMonthOf` — Revenue Department's rounds to HR custody
+  split as that month's `payroll_accrual` (segment revenue_department) splits the pay; Commission & Allowances takes the
   rest (deductions + cents). No accrual / failed read → the one 4070 line. Only the report's rows change.
 - Oct'26 → Basic 51,000 / Commission & Allowances 192,476.34 / Travelling 4,760.27 / Hostel 3,469.83 / Staff Allowance
   2,672 / EPF·SOCSO·EIS 6,875.25. Other departments unchanged (4070, the 08-20 rule).
