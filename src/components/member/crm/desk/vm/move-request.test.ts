@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CrmCustomer, CrmData, CrmInvite, CrmPerson } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
-import { alertsVM, chatMenuVM } from "./inbox";
+import { alertsVM, chatMenuVM, moveHolder } from "./inbox";
 
 const person = (id: string, name: string, role: CrmPerson["role"], uplineId: string | null, title = ""): CrmPerson => ({ id, name, role, uplineId, fullTime: false, title });
 const BOSS = person("boss", "LOO WEN WEI", "boss", null, "CHIEF EXECUTIVE OFFICER");
@@ -69,6 +69,12 @@ describe("the desktop's Move is a request, as the phone's", () => {
     // ANNA's customer, opened by PETER: her superior is PETER himself — nobody to hand it to, so no Move (the phone's rule).
     expect(menuLabels(ctxOf(PETER, { chat: "annas" }).ctx)).not.toContain("Move");
     expect(menuLabels(ctxOf(PETER, { chat: "annas" }).ctx)).toEqual(expect.arrayContaining(["Assign to", "Share"]));
+  });
+
+  it("whose superior it asks — the pane's head says so (moveHolder)", () => {
+    expect(moveHolder(ctxOf(PETER).ctx, customer("own", "peter"))).toBe("peter");
+    expect(moveHolder(ctxOf(BOSS).ctx, customer("bens", "ben"))).toBe("ben");
+    expect(moveHolder(ctxOf(BOSS).ctx, customer("nobody", null))).toBe("boss");
   });
 
   it("a request already waiting reads Requested and is not sent twice", () => {

@@ -241,6 +241,13 @@ export function alertsVM(ctx: DeskCtx) {
 export const alertsUnreadN = (ctx: DeskCtx) => alertsVM(ctx).alertsUnread;
 
 /**
+ * Whose direct superior a Move asks — crm_invite's own rule: whoever has the customer, when one may move another's
+ * (Edit · All); oneself for one's own, or one nobody has yet.
+ */
+export const moveHolder = (ctx: DeskCtx, c: DeskCtx["data"]["customers"][number] | undefined) =>
+  c?.assignedTo && c.assignedTo !== ctx.me.id && ctx.data.can.editAll ? c.assignedTo : ctx.me.id;
+
+/**
  * The chat's ⋮ menu (CRM Desktop v2, README › ⋮ menu), three groups: Assign to (CRM · Manage) · Move · Share | Customer
  * info · Appointment · Starred messages | Mark as unread / read · Mute / Unmute · Pin / Unpin chat — the last three are
  * one's own marks on the chat (crm_contact_prefs, the phone's swipe actions), shown on Inbox's row, each with a toast.
@@ -259,8 +266,8 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const unread = !!c && (!!pref?.markedUnread || c.unread > 0), muted = !!pref?.muted, pinned = !!pref?.pinned;
   const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { if (!c) return; patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
   const top = me.role === "boss";
-  // Whom a Move asks — crm_invite's own rule: the superior of whoever has the customer, never oneself.
-  const holder = c?.assignedTo && c.assignedTo !== me.id && data.can.editAll ? c.assignedTo : me.id;
+  // Whom a Move asks: the superior of whoever has the customer, never oneself.
+  const holder = moveHolder(ctx, c);
   const up = personOf(personOf(holder, data.people)?.uplineId, data.people);
   const upTo = up && up.id !== me.id ? up : undefined;
   const items: [string, string, string, () => void, string, boolean][] = [
