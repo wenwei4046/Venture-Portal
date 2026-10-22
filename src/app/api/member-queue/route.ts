@@ -6,6 +6,7 @@ import { flushPush } from '@/lib/push/outbox'
 import { sweepHiringLeftovers } from '@/lib/hiring/leftovers'
 import { sweepDataCenterBin } from '@/lib/documentation/drive-bin-sweep'
 import { refreshAdStatuses } from '@/lib/member/crm-ad-names-meta'
+import { sweepFileObjects } from '@/lib/storage/sweep'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -61,6 +62,9 @@ export async function GET(request: Request) {
     else if (dataCenterBin.expired) console.info('Data center bin let go', dataCenterBin.expired, 'after 30 days; files deleted', dataCenterBin.deleted)
     // …and (2026-10-14) objects nobody recorded a day after they went up — an upload or a copy whose record never came.
     if (dataCenterBin?.orphans) console.info('Data center unrecorded objects removed', dataCenterBin.orphans)
+    // The buckets in R2 (2026-10-23): a row whose file never arrived, a file no row names — a day old. Counts only.
+    const files = await sweepFileObjects(db).catch(() => null)
+    if (files && (files.rowsWithoutFile || files.filesWithoutRow)) console.info('R2 leftovers cleared', files)
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')
