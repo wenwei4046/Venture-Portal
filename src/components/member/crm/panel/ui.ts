@@ -4,7 +4,7 @@ export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" 
 export type Period = "day" | "week" | "month" | "custom";
 export interface Range { a: number; b: number }
 
-export interface AdDraft { id: string; label: string; page: string; leads: number; mode: "even" | "split" | "people" | "unset"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; lockT: string[]; lockP: string[] }
+export interface AdDraft { id: string; label: string; page: string; leads: number; mode: "even" | "split" | "people" | "unset"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; lockT: string[]; lockP: string[]; /** A team share being typed (two decimals; 2026-10-22). */ typing?: { id: string; text: string } | null }
 export interface FtDraft { tid: string; m: "cnt" | "pct"; on: number[]; v: Record<string, Record<number, number>>; sel: { id: string; days: number[] } | null; lockD: Record<number, string[]> }
 export interface RoomDraft {
   i: number; id: string | null; name: string; addr: string; slots: string[]; cap: number; weekly: number[]; blocks: { a: string; b: string; why: string }[];

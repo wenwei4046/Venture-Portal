@@ -29,11 +29,22 @@ export function downlineOf(id: string, people: CrmPerson[]): string[] {
 
 export const personOf = (id: string | null | undefined, people: CrmPerson[]) => (id ? people.find(p => p.id === id) : undefined);
 
-/** The TL at or above someone — the team is the TL's. */
+/**
+ * A team's top (2026-10-22, mig 20261022170000 crm_is_team_top; the owner: "只要是 report to peter (revenue director)，就是一个
+ * team"): a TL, or a TA / RS who reports straight to the Revenue Director or the Boss (or to nobody in the CRM).
+ */
+export function isTeamTop(p: CrmPerson, people: CrmPerson[]): boolean {
+  if (p.role === "tl") return true;
+  if (p.role !== "ta" && p.role !== "rs") return false;
+  const up = personOf(p.uplineId, people);
+  return !up || up.role === "hod" || up.role === "boss";
+}
+
+/** The team's top at or above someone — the team is theirs. */
 export function teamOf(id: string | null | undefined, people: CrmPerson[]): CrmPerson | undefined {
   let p = personOf(id, people);
   for (let i = 0; p && i < 12; i++) {
-    if (p.role === "tl") return p;
+    if (isTeamTop(p, people)) return p;
     p = personOf(p.uplineId, people);
   }
   return undefined;

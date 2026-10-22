@@ -72,4 +72,7 @@ module.exports = [
     "Ads to teams: a locked person's name greyed."],
   ['{!!(t.field) && (<>', '{!!(m.locked) && (<span aria-label="Locked" style={{ flex: "0 0 auto", width: "56px", height: "32px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>)}{!!(t.field && !m.locked) && (<>',
     "Ads to teams: a locked person has a lock, no box."],
+  // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00").
+  ['<input type="text" inputMode="numeric" value={t.pctStr} onChange={t.onRange} style={{ width: "30px",', '<input type="text" inputMode="decimal" value={t.pctStr} onChange={t.onRange} style={{ width: "50px",',
+    "Ads to teams: a team share to two decimals."],
 ];

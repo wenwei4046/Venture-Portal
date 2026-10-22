@@ -32,7 +32,7 @@ export function activeVM(
   draft: Record<string, boolean> | null, setDraft: (d: Record<string, boolean> | null) => void,
   setLocked: (id: string, on: boolean) => Promise<boolean>, told: (msg: string) => void,
 ): ActiveVM {
-  const ini = (n: string) => n.split(/s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const ini = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const d = draft ?? {}, isLocked = (id: string) => d[id] ?? locked.has(id);
   const changed = Object.keys(d).filter(id => d[id] !== locked.has(id));
   return {

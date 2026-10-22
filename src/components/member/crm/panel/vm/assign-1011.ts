@@ -10,6 +10,7 @@ import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
 import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
+import { is100, pctShow } from "../../shared/pct";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
@@ -160,7 +161,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const ftDays = ftr ? [...new Set(Object.entries(ftr.vals).flatMap(([, v]) => Object.entries(v).filter(([, n]) => Number(n) > 0).map(([d]) => Number(d))))].sort((a, b) => a - b) : [];
     return {
       ok, why, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
-      name: t.name, c: t.c, pct: (split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
+      name: t.name, c: t.c, pct: pctShow(split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
       evenLine: "In turn among " + ps.map(p => p.name.split(" ")[0]).join(", ") + " · Full time days apply",
       modes: ([["even", "Evenly"], ["pct", "By %"], ["cnt", "By max"]] as const).map(([k, label]) => ({ label, pick: () => { if (mode !== k) setMode(k); },
         bg: mode === k ? "#fff" : "transparent", fg: mode === k ? "var(--crm-ink)" : "var(--crm-muted)", w: mode === k ? 650 : 500, sh: mode === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
@@ -197,7 +198,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const T = asv.adTeams ?? teams;
     const split = E.split;
     bp.inner = T.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
-    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
+    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = is100(tot) && bp.inner.every(x => x.ok);
     const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
     T.forEach(t => {
       const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
@@ -208,7 +209,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     // A locked member keeps their saved value for when they are unlocked (the dealer skips them meanwhile).
     lk.forEach(id => { if (pv[id] == null && B.pv[id] != null) pv[id] = B.pv[id]; });
     if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
-    const why = tot !== 100 ? "The teams add up to " + tot + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
+    const why = !is100(tot) ? "The teams add up to " + pctShow(tot) + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
     aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {

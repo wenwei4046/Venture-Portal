@@ -809,7 +809,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                               <input type="range" min="0" max="100" step="5" value={t.pct} onChange={t.onRange} aria-label={`${t.name} share`} style={{ position: "absolute", left: "-8px", right: "-8px", top: "-12px", bottom: "-12px", width: "calc(100% + 16px)", margin: "0", opacity: "0", cursor: "pointer" }} />
                             </span>
                             <span style={{ flex: "0 0 64px", height: "34px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
-                              <input type="text" inputMode="numeric" value={t.pctStr} onChange={t.onRange} style={{ width: "30px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
+                              <input type="text" inputMode="decimal" value={t.pctStr} onChange={t.onRange} style={{ width: "50px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
                               <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>%</span>
                             </span>
                           </div>

@@ -149,8 +149,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     loading: addList === null, failed: addList === "error",
     rows: (Array.isArray(addList) ? addList : []).filter(r => !q || r.name.toLowerCase().includes(q) || r.id.includes(q) || r.account.toLowerCase().includes(q)).slice(0, 80)
       .map(r => ({ id: r.id, name: r.name, account: r.account, run: adRunLine({ status: r.status, startAt: r.start, endAt: r.end }, now) || r.status, have: have.has(r.id), pick: () => pickAd(r) })),
-    typed: ui.addAdId, onTyped: (e: { target: { value: string } }) => patch({ addAdId: e.target.value.replace(/D/g, "").slice(0, 32) }),
-    addTyped: () => { const id = ui.addAdId; if (!/^d{5,32}$/.test(id)) return; const known = Array.isArray(addList) ? addList.find(r => r.id === id) : undefined; pickAd(known ?? { id, name: "", status: "", start: null, end: null }); },
+    typed: ui.addAdId, onTyped: (e: { target: { value: string } }) => patch({ addAdId: e.target.value.replace(/\D/g, "").slice(0, 32) }),
+    addTyped: () => { const id = ui.addAdId; if (!/^\d{5,32}$/.test(id)) return; const known = Array.isArray(addList) ? addList.find(r => r.id === id) : undefined; pickAd(known ?? { id, name: "", status: "", start: null, end: null }); },
   };
   return {
     addAd,
