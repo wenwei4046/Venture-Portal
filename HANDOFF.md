@@ -1,5 +1,22 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 c (SHIPPED, #620) — Finance hubs: the cards in a row above the table on a desktop
+
+User, on Payments' cards: "可以帮我把finance 的这些card move 上去吗" → shown a before/after → "可以，原本的底色不要变，
+电话版本的也不要变" (for all five hubs).
+
+- `components/finv/Hub.tsx` `HubCards` + `hub.module.css`: at 768px and up the hub stacks — the cards in one row
+  above, the table at the hub's whole width; the total first at 1.6 cards, a column a card (175px or more, the
+  figure whole), the Allocator's notice under the row; short of room two rows beside the total, then the old wrap.
+  The cards' own box is a container (`@container hub-cards`, steps of 280px + 185px up to step 9); `cardRowFit`
+  picks the step from the figures (the Allocator's "RM 23,456.78 to bill" needs 208px). Names / lines wrap on a
+  desktop. Colours untouched; the phone's layout compared box for box at 320–767px — identical.
+- On the user's 1613px hub: Payments, Fund IN / OUT, Allocator, Approvals one row; Invoices (8 cards) two rows.
+- Guards: `components/finv/hub-row-css.test.ts` (new), `Hub.test.tsx`. DESIGN.md v4.120; finance-view.md note.
+- Next, waiting on the user: Create payment's dialog — "然后着create payment 这里我也是想要优化" (no specifics);
+  proposed a wider dialog, fields two a row (Amount beside Pay to), `*` on the required ones instead of the
+  hint line, everything else kept — asked yes/no, nothing built.
+
 ## CHECKPOINT 2026-10-22 b (BUILT — app only, waiting on the user to merge) — a receipt is received only once its line is in
 
 a's leftover. User, after "不明白" twice: shown it as one receipt of RM 5,000 settling an invoice, in three
