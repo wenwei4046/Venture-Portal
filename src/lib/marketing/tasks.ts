@@ -33,6 +33,21 @@ export interface FormField {
   cols?: { name: string; type: ColType }[]
   /** A workflow table's preset rows, a cell per column: one filled in is fixed for the team, a blank one is theirs. */
   rows?: string[][]
+  /** A workflow template's canvas (lib/marketing/canvas.ts): required before its stage submits (unset = yes, a note never). */
+  req?: boolean
+  /** …shown to the PIC on the link (unset = yes). */
+  pic?: boolean
+  /** …a date on the calendar. */
+  cal?: FieldCal | null
+  /** …a choice's options. */
+  opts?: string[]
+}
+
+/** A date's mark on the calendar: its name there, its colour (a team's), and whether the PIC's calendar shows it. */
+export interface FieldCal {
+  label: string
+  tone: MktDept
+  pic: boolean
 }
 
 export interface WorkLink {
@@ -119,7 +134,16 @@ export function formFromRow(v: unknown): FormField[] {
     const rows = Array.isArray(f.rows)
       ? f.rows.filter(Array.isArray).map(r => (cols ?? []).map((_, i) => (typeof r[i] === 'string' ? r[i] : '')))
       : []
-    return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}) }]
+    // A workflow template's canvas settings, when it has them (a quick task's fields have none).
+    const extras: Partial<FormField> = {}
+    if (typeof f.req === 'boolean') extras.req = f.req
+    if (typeof f.pic === 'boolean') extras.pic = f.pic
+    if (type === 'Date' && isObj(f.cal)) {
+      const cal = f.cal
+      extras.cal = { label: typeof cal.label === 'string' ? cal.label : '', tone: DEPTS.find(d => d === cal.tone) ?? 'social', pic: cal.pic === true }
+    }
+    if ((type === 'Select' || type === 'Multi-select') && Array.isArray(f.opts)) extras.opts = f.opts.filter((o): o is string => typeof o === 'string')
+    return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}), ...extras }]
   })
 }
 

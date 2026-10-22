@@ -2,10 +2,11 @@
 // and a template's stages as the builder edits them — who does each (the manager picks at assignment, or 🔓 the stage
 // before picks from a list), its approval levels (a person, the PIC through the link, a person picked at assignment),
 // its working days, whether it splits into subtasks, what the PIC sees, where changes go back to, the fields it fills
-// in. The lock as a version runs it, what the foot warns of and what publishing refuses — as the database checks it
-// (mkt_workflow_check). Pure.
+// in, and its section on the canvas (lib/marketing/canvas.ts, mig 20261024001000). The lock as a version runs it, what
+// the foot warns of and what publishing refuses — as the database checks it (mkt_workflow_check). Pure.
 
 import type { MktDept } from './board'
+import { canvasFromRow, canvasPayload, DEFAULT_STAGE_SEC, fieldExtras, stageSecFromRow, type StageSec, type WfCanvas } from './canvas'
 import { DEPTS, formFromRow, stageKey, type FormField } from './tasks'
 
 /** One approval level of a template's stage. */
@@ -27,6 +28,8 @@ export interface WfStage {
   /** What the PIC sees on the link. */
   picText: string
   form: FormField[]
+  /** Its section on the canvas. */
+  sec: StageSec
 }
 
 export interface WfTemplate {
@@ -40,6 +43,8 @@ export interface WfTemplate {
   locked: boolean
   /** The stages as last saved — kept as typed. */
   draft: WfStage[]
+  /** The task page's layout as last saved (the Canvas template tab). */
+  canvas: WfCanvas
   /** The draft's save count: a save names the one it was made on. */
   rev: number
   /** The last version published; 0 = never. */
@@ -92,6 +97,7 @@ export function wfStageFromRow(v: unknown): WfStage {
     back: int(s.back),
     picText: str(s.picText),
     form: formFromRow(s.form),
+    sec: stageSecFromRow(s.sec),
   }
 }
 
@@ -107,6 +113,7 @@ export function workflowsFromRow(v: unknown): WfTemplate[] {
     promise: int(w.promise),
     locked: w.locked === true,
     draft: Array.isArray(w.draft) ? w.draft.map(wfStageFromRow) : [],
+    canvas: canvasFromRow(w.canvas),
     rev: int(w.rev) ?? 1,
     version: int(w.version) ?? 0,
     changed: w.changed !== false,
@@ -181,7 +188,7 @@ export function wfApprText(appr: readonly WfAppr[], nameOf: (staff: string) => s
 
 /** A stage added at the end: the last one's team, picked at assignment, a day. */
 export function newWfStage(after: WfStage | undefined): WfStage {
-  return { key: stageKey(), name: 'New stage', dept: after?.dept ?? 'content', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '', form: [] }
+  return { key: stageKey(), name: 'New stage', dept: after?.dept ?? 'content', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '', form: [], sec: { ...DEFAULT_STAGE_SEC } }
 }
 
 /** A new template's one stage (the handoff's): named for its action, Design's, picked at assignment, two days, the PIC approves. */
@@ -208,7 +215,8 @@ export function wfStagesPayload(stages: readonly WfStage[]): Record<string, unkn
     split: s.split,
     back: s.back,
     picText: s.picText,
-    form: s.form.map(f => (f.type === 'Table' ? { label: f.label, type: f.type, cols: f.cols ?? [], rows: f.rows ?? [] } : { label: f.label, type: f.type })),
+    form: s.form.map(f => ({ label: f.label, type: f.type, ...(f.type === 'Table' ? { cols: f.cols ?? [], rows: f.rows ?? [] } : {}), ...fieldExtras(f) })),
+    sec: { emoji: s.sec.emoji, locked: s.sec.locked, req: s.sec.req, pic: s.sec.pic },
   }))
 }
 
@@ -218,6 +226,7 @@ export interface WfEdit {
   locked: boolean
   promise: number | null
   stages: WfStage[]
+  canvas: WfCanvas
 }
 
 /** The parts of `now` not as `saved` had them, as mkt_workflow_save takes them; null when nothing changed. */
@@ -229,5 +238,8 @@ export function wfPatch(saved: WfEdit, now: WfEdit): Record<string, unknown> | n
   const a = JSON.stringify(wfStagesPayload(saved.stages))
   const b = JSON.stringify(wfStagesPayload(now.stages))
   if (a !== b) patch.stages = wfStagesPayload(now.stages)
+  const ca = JSON.stringify(canvasPayload(saved.canvas))
+  const cb = JSON.stringify(canvasPayload(now.canvas))
+  if (ca !== cb) patch.canvas = canvasPayload(now.canvas)
   return Object.keys(patch).length ? patch : null
 }

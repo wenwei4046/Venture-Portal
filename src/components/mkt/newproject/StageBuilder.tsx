@@ -72,7 +72,7 @@ export default function StageBuilder({
         <span className={b.wbTitle}>Stages</span>
         <div className={b.wbTabs}>
           <button type="button" className={`${b.wbTab} ${b.wbTabOn}`}>Workflow stages</button>
-          <button type="button" className={`${b.wbTab} ${b.wbTabOff}`} disabled title="Comes with the builders">Canvas template</button>
+          <button type="button" className={`${b.wbTab} ${b.wbTabOff}`} disabled title="Not on quick tasks yet">Canvas template</button>
         </div>
       </div>
       <div className={b.wbGrid}>
