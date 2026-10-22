@@ -1,5 +1,39 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 a (BUILT — ships with z, waiting on the user to apply + merge) — a half-made voucher or fund source is voided / cancelled, never "deleted"
+
+z's follow-up. User, shown it drawn (two before / after flows): "可以，照这个做"; the third spot: "一起修". On
+z's branch `fix/fund-source-reversal-cleanup` (main merged in, 18d5023d), so one apply + one merge ships both.
+
+- Same class as z, found by scanning production's policies for writes refused to every session: two
+  "rollbacks" on an error path deleted through the session on a `USING (false)` table and removed nothing —
+  `copyPaymentVoucherWork` (pv_no_delete: a blank draft stayed, the answer said *rolled back*) and
+  `createFundSourceInner` (fund_sources_no_delete: a source waited for an approval nobody could see). A third:
+  `createPaymentVoucherInner`'s debit lines insert ignored its error (a draft with no lines, "saved").
+- **Copy** reads the lines BEFORE writing; a line on a header account (one with sub-accounts —
+  `pvs_reject_header_account`) is refused, nothing written: *Line 1's account 3030 is a header account now (it
+  has sub-accounts) — nothing was copied.* 126 receipts / 141 lines are on 3030 AR - Subs (sub-accounts
+  3031–3039, 3073), e.g. HV-OR-202609-0429 — copying one left a blank draft. Lines refused for any other reason →
+  the new draft is voided (`voidHalfMadeVoucher`: UPDATE status voided WHERE still draft — Treasury · Create
+  may), said in words, or that it could not be voided.
+- **Create payment**: the debit lines' error is read; refused → the draft voided, said. The credit branch
+  already threw and is left as it is (a receipt is paid on insert and its invoice marked paid by trigger —
+  another fix).
+- **Record fund in**: an approval request that cannot be queued → the source → `cancelled` (what Withdraw
+  leaves), said; a refused cancel is said too (*withdraw it on its page*).
+- Voiding a draft moves no money: `debit_dest_bank_on_transfer_void` needs OLD paid; the claim / payroll
+  triggers key on links a copy or a new draft has none of yet.
+- **Guard**: `permission-table-writes.test.ts` › *never updates or deletes through the session what the
+  database lets nobody update or delete* — an UPDATE / DELETE (not an upsert; a refused INSERT is an error) on a
+  registered table whose command no action opens, or an INVOKER rpc's such write, fails. Before the fix it
+  named the two deletes (on main it would also name z's).
+- Production today: nothing affected (the one debit voucher without lines, HV-PV-202608-0265, is voided; no
+  pending source lacks its request). No database change in this part.
+- Tests: `payments/actions.half-made-voucher.test.ts` (5), `fund-in/actions.half-made-source.test.ts` (3) — 6 of
+  the 8 and the guard failed before (the two "as before" cases pass both ways).
+- z's migration renumbered `20261021230000` → **`20261022100000`** (#609 recorded 230000 on production as
+  combo_tier_falls_back); its md5 is unchanged, `57373b5f…`.
+
 ## CHECKPOINT 2026-10-21 z (BUILT, DRY-RUN DONE — waiting on the user to apply + merge) — Reverse payment takes a fund-source voucher's repayments with it
 
 Found by y's loan session, proposed apart. User, shown HV-PV-202608-0295's Reverse payment (HOUZS Century's RM 98,000

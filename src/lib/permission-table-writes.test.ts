@@ -371,6 +371,23 @@ describe('the app’s writes', () => {
       .map(s => `${s.file}:${s.line} ${s.table ?? s.rpc}`)
     expect(ungated).toEqual([])
   })
+
+  // 2026-10-21 / 22: an UPDATE or DELETE that no action opens is refused to every session, and RLS
+  // refuses it by leaving the rows out — no row moves and no error says so. Reverse payment's delete
+  // of a voucher's fund_source_repayments (fsr_no_delete USING (false)) left them all; Copy's and
+  // Record fund in's "rollback" deletes left a blank draft and a source nobody could approve. Such a
+  // write is a guarded database step (or the command is registered, if a row policy really opens it).
+  // An INSERT is never silent — its refusal is an error — and an upsert's update half raises one too.
+  it('never updates or deletes through the session what the database lets nobody update or delete', () => {
+    const silent = (table: string, command: WriteCommand) =>
+      (command === 'UPDATE' || command === 'DELETE') && table in TABLE_WRITES && !TABLE_WRITES[table][command]
+    const misses = sites.filter(s => !SERVICE_ROLE_FILES.test(s.file)).flatMap(s => [
+      ...(s.table && s.commands.length === 1 && silent(s.table, s.commands[0]) ? [`${s.file}:${s.line} ${s.table} ${s.commands[0]}`] : []),
+      ...Object.entries(s.rpc ? (INVOKER_WRITES[s.rpc] ?? {}) : {}).flatMap(([table, commands]) =>
+        commands.filter(c => silent(table, c)).map(c => `${s.file}:${s.line} ${s.rpc} → ${table} ${c}`)),
+    ])
+    expect(misses).toEqual([])
+  })
 })
 
 // ── The DEFINER functions ask for an action too (20261009030000) ─────────────

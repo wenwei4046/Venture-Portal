@@ -419,9 +419,20 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
     })
 
   if (approvalError) {
-    // Best-effort rollback: delete the orphan fund_source so user can retry
-    await supabase.from('fund_sources').delete().eq('id', data.id)
-    throw new Error(`Failed to queue approval: ${approvalError.message}`)
+    // The source just filed is cancelled — what Withdraw leaves of a pending
+    // one — never deleted (2026-10-22): fund_sources refuses every session's
+    // DELETE (fund_sources_no_delete USING (false)) without an error, so the
+    // old .delete() left a source waiting for an approval nobody could see.
+    const { data: cancelled, error: cancelErr } = await supabase
+      .from('fund_sources')
+      .update({ status: 'cancelled' })
+      .eq('id', data.id)
+      .eq('status', 'pending_approval')
+      .select('id')
+    const undone = !cancelErr && (cancelled?.length ?? 0) > 0
+    throw new Error(`Failed to queue approval: ${approvalError.message.trim().replace(/\.+$/, '')}. ${undone
+      ? 'The fund source was cancelled — nothing was booked; record it again.'
+      : 'The fund source is left pending and could not be cancelled — withdraw it on its page.'}`)
   }
 
   return data.id as string
