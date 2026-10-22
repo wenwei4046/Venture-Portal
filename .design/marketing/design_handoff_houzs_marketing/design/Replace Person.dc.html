@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes rpIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="max-width:980px;margin:0 auto;padding:26px 36px 72px;box-sizing:border-box;color:rgb(38 33 29)">
+  <div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">🔁</span><span style="font-size:1.5em;font-weight:600">Replace Person</span></div>
+  <div style="font-size:0.92em;color:rgb(98 92 86);margin-top:4px">Swap one person for another across templates, upcoming stages and tasks in hand. Every change is written to the audit trail.</div>
+
+  <div style="display:flex;align-items:center;margin-top:20px;padding:12px 16px;border:1px solid rgb(229 226 220);border-radius:10px;background:#fff">
+    <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <span style="width:22px;height:22px;flex:none;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }};border:{{ s.border }}">{{ s.mark }}</span>
+        <span style="font-size:0.9em;font-weight:{{ s.weight }};color:{{ s.color }};white-space:nowrap">{{ s.label }}</span>
+        <sc-if value="{{ s.hasLine }}"><span style="flex:1;height:1px;background:rgb(226 223 217);margin:0 12px;min-width:12px"></span></sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top:24px;animation:rpIn .2s ease-out">
+      <div style="font-size:1.1em;font-weight:600">Who are you replacing?</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:12px">
+        <sc-for list="{{ people }}" as="p" hint-placeholder-count="8">
+          <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;border:1.5px solid {{ p.border }};background:{{ p.bg }};cursor:pointer" style-hover="border-color:rgb(150 140 130)">
+            <span style="width:32px;height:32px;flex:none;border-radius:50%;background:{{ p.av }};font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>
+            <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.95em">{{ p.name }}</div><div style="font-size:0.8em;color:rgb(98 92 86)">{{ p.role }} · in {{ p.places }} places</div></div>
+            <span style="width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:{{ p.radio }};flex:none"></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px">
+        <div onClick="{{ toStep2 }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;cursor:pointer">{{ findLabel }}</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isStep23 }}">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;margin-top:22px;align-items:start;animation:rpIn .2s ease-out">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:50%;background:oklch(0.92 0.04 350);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">S</span>
+          <div style="flex:1"><div style="font-weight:600">{{ fromName }} appears in {{ total }} places</div><div style="font-size:0.84em;color:rgb(98 92 86)">Untick anything that should stay with {{ fromName }}.</div></div>
+          <span onClick="{{ toggleAll }}" style="font-size:0.86em;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px">{{ allLabel }}</span>
+        </div>
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <div style="border:1px solid rgb(229 226 220);border-radius:10px;background:#fff;overflow:hidden">
+            <div onClick="{{ g.onToggle }}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgb(249 248 246);border-bottom:1px solid rgb(236 233 228);cursor:pointer">
+              <span style="width:16px;height:16px;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ g.box }};background:{{ g.fill }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ g.tick }}</span>
+              <span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(74 68 62)">{{ g.title }}</span>
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(98 92 86)">{{ g.count }}</span>
+              <span style="flex:1"></span>
+              <span style="font-size:0.8em;color:rgb(98 92 86)">{{ g.hint }}</span>
+            </div>
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+              <div onClick="{{ it.onClick }}" style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-bottom:1px solid rgb(244 242 238);cursor:pointer;background:{{ it.bg }}" style-hover="background:rgb(250 249 247)">
+                <span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ it.box }};background:{{ it.fill }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ it.tick }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:0.94em;font-weight:500;color:{{ it.fg }}">{{ it.title }}</div>
+                  <div style="font-size:0.82em;color:rgb(98 92 86);margin-top:1px">{{ it.detail }}</div>
+                </div>
+                <sc-if value="{{ it.hasMeta }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:{{ it.metaFg }};white-space:nowrap">{{ it.meta }}</span></sc-if>
+                <sc-if value="{{ it.stays }}"><span style="font-size:0.78em;color:rgb(98 92 86);padding:1px 7px;border-radius:5px;background:rgb(243 242 239);white-space:nowrap">Stays with {{ fromName }}</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="position:sticky;top:12px;border:1px solid rgb(229 226 220);border-radius:10px;background:#fff;padding:16px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86)">Replace with</span>
+          <sc-for list="{{ toPeople }}" as="p" hint-placeholder-count="3">
+            <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid {{ p.border }};background:{{ p.bg }};cursor:pointer">
+              <span style="width:15px;height:15px;flex:none;border-radius:50%;box-sizing:border-box;border:{{ p.radio }}"></span>
+              <span style="width:24px;height:24px;border-radius:50%;background:{{ p.av }};font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>
+              <span style="font-weight:500;font-size:0.92em">{{ p.name }}</span><span style="font-size:0.84em;color:rgb(98 92 86)">· {{ p.load }} active</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86)">Reason (required)</span>
+          <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ reasons }}" as="r" hint-placeholder-count="4"><span onClick="{{ r.onClick }}" style="height:26px;padding:0 9px;border-radius:6px;display:flex;align-items:center;cursor:pointer;font-size:0.84em;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }}">{{ r.label }}</span></sc-for></div>
+          <input value="{{ reason }}" onChange="{{ onReason }}" placeholder="Or type a reason" style="height:34px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:8px;padding:0 10px;font:inherit;font-size:0.92em;outline:none;color:rgb(38 33 29)">
+        </div>
+        <div style="padding:10px 12px;border-radius:8px;background:rgb(249 248 246);font-size:0.84em;line-height:1.5;color:rgb(74 68 62)">{{ preview }}</div>
+        <div onClick="{{ replace }}" style="height:42px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-weight:600;cursor:{{ rCursor }};opacity:{{ rOp }}">{{ replaceLabel }}</div>
+        <sc-if value="{{ hasBlock }}"><span style="font-size:0.84em;color:rgb(160 36 30);margin-top:-6px">{{ block }}</span></sc-if>
+        <span onClick="{{ toStep1 }}" style="font-size:0.84em;color:rgb(98 92 86);cursor:pointer;text-align:center">← Choose a different person</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isStep4 }}">
+    <div style="margin-top:22px;border:1px solid rgb(229 226 220);border-radius:12px;background:#fff;overflow:hidden;animation:rpIn .25s ease-out">
+      <div style="padding:22px 22px 18px;display:flex;align-items:flex-start;gap:14px;border-bottom:1px solid rgb(240 238 234)">
+        <span style="width:40px;height:40px;flex:none;border-radius:50%;background:rgb(232 244 235);color:rgb(36 100 58);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600">✓</span>
+        <div style="flex:1">
+          <div style="font-size:1.25em;font-weight:600">{{ doneCount }} places updated</div>
+          <div style="font-size:0.92em;color:rgb(74 68 62);margin-top:2px">{{ fromName }} → {{ toName }} · Reason: {{ reasonFinal }} · 27 Oct 2026, 11:40 by Rachel</div>
+        </div>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid rgb(226 223 217);white-space:nowrap">Audit #R-0142</span>
+      </div>
+      <sc-if value="{{ hasInHand }}">
+        <div style="margin:16px 22px 0;padding:11px 14px;border-radius:8px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);font-size:0.92em;display:flex;gap:10px;align-items:flex-start"><span style="width:8px;height:8px;border-radius:50%;background:rgb(214 152 30);flex:none;margin-top:6px"></span><span><strong style="font-weight:600">Tasks in hand need {{ toName }} to Accept again.</strong> {{ inHandNote }}</span></div>
+      </sc-if>
+      <div style="padding:16px 22px 6px">
+        <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:8px 0;font-size:0.76em;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86);border-bottom:1px solid rgb(236 233 228)"><span>Place</span><span>Change</span><span>Status</span></div>
+        <sc-for list="{{ results }}" as="r" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:10px 0;font-size:0.9em;border-bottom:1px solid rgb(244 242 238);align-items:center;color:{{ r.fg }}">
+            <span><span style="font-weight:500">{{ r.title }}</span><br><span style="font-size:0.88em;color:rgb(98 92 86)">{{ r.group }}</span></span>
+            <span>{{ r.change }}</span>
+            <span style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.86em;font-weight:500;padding:2px 9px;border-radius:999px;background:{{ r.stBg }};color:{{ r.stFg }};border:1px solid {{ r.stBorder }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.st }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:14px 22px 18px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:0.86em;color:rgb(98 92 86);flex:1">{{ notifyNote }}</span>
+        <span onClick="{{ restart }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgb(226 223 217);display:flex;align-items:center;font-size:0.92em;cursor:pointer">Replace someone else</span>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1100},&quot;step&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[1,2,4],&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;partial&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const PEOPLE = [
+  ['Siti', 'Graphic Designer', 'oklch(0.92 0.04 350)', 4, 6], ['Aina', 'Graphic Designer', 'oklch(0.92 0.04 350)', 2, 4], ['Hafiz', 'Graphic Designer', 'oklch(0.92 0.04 350)', 3, 5],
+  ['Mei', 'Director', 'oklch(0.90 0.05 295)', 3, 9], ['Ah Kit', 'Videographer', 'oklch(0.90 0.05 195)', 2, 6], ['Ali', 'Editor', 'oklch(0.90 0.05 270)', 3, 8],
+  ['Jason', 'Social Media', 'oklch(0.90 0.05 235)', 5, 11], ['Wei Lun', 'Ads', 'oklch(0.90 0.05 270)', 2, 6],
+];
+const GROUPS = [
+  { k: 'tpl', title: 'Workflow templates', hint: 'Future projects', items: [
+    { id: 't1', title: 'Graphic Post v2 — Stage 2 Design', detail: 'Assignee', change: 'Assignee' },
+    { id: 't2', title: 'Social Media Monthly v3 — candidate list of Stage 2', detail: 'One of 3 candidates (Siti / Aina / Hafiz)', change: 'Candidate', dupe: true },
+  ] },
+  { k: 'up', title: 'Upcoming stages in active projects', hint: 'Not started yet', items: [
+    { id: 'u1', title: 'Carres Nov Content Plan — Stage 2', detail: 'Design graphics', meta: 'starts 4 Nov', change: 'Assignee' },
+    { id: 'u2', title: 'Hookka 12.12 Banner Set — Stage 1', detail: 'Design', meta: 'starts 9 Nov', change: 'Assignee' },
+  ] },
+  { k: 'hand', title: 'Tasks in her hands now', hint: 'Will need Accept again', items: [
+    { id: 'h1', title: 'Thumbnail subtask — MKT-2990-2610-018', detail: 'Red Truck Reels · Edit stage', meta: 'due 24 Oct', change: 'Assignee', red: true },
+    { id: 'h2', title: 'Subtitles BM + EN — MKT-2990-2610-018', detail: 'Red Truck Reels · Edit stage', meta: 'due 24 Oct', change: 'Assignee', red: true },
+  ] },
+];
+const ALL = GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.k, groupTitle: g.title })));
+const ST = { done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(36 100 58)', dot: 'rgb(60 150 90)' }, waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(122 82 8)', dot: 'rgb(214 152 30)' }, draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(90 84 78)', dot: 'rgb(160 154 146)' } };
+
+class Component extends DCLogic {
+  state = { step: this.props.step ?? 1, from: 'Siti', to: 'Hafiz', reason: 'Resigned', sel: Object.fromEntries(ALL.map(i => [i.id, this.props.partial ? !['u2', 't2'].includes(i.id) : true])), done: null };
+  tog(id) { this.setState(s => ({ sel: { ...s.sel, [id]: !s.sel[id] } })); }
+  renderVals() {
+    const s = this.state;
+    const stepIdx = s.step;
+    const steps = ['Choose person', 'Where they appear', 'Replace with', 'Done'].map((label, i) => {
+      const n = i + 1, cur = n === stepIdx || (stepIdx === 2 && n === 3), done = n < stepIdx && !(stepIdx === 2 && n === 3);
+      return { label, mark: done ? '✓' : n, hasLine: n < 4, bg: done ? 'rgb(38 33 29)' : '#fff', fg: done ? '#fff' : cur ? 'rgb(38 33 29)' : 'rgb(160 154 146)', border: done || cur ? '1.5px solid rgb(38 33 29)' : '1.5px solid rgb(214 210 204)', weight: cur ? 600 : 400, color: cur || done ? 'rgb(38 33 29)' : 'rgb(140 134 128)' };
+    });
+    const radio = on => ({ border: on ? 'rgb(38 33 29)' : 'rgb(229 226 220)', bg: on ? 'rgb(249 248 246)' : '#fff', radio: on ? '5px solid rgb(38 33 29)' : '1.5px solid rgb(200 194 188)' });
+    const selIds = ALL.filter(i => s.sel[i.id]);
+    const selCount = selIds.length;
+    const box = on => ({ box: on ? 'rgb(38 33 29)' : 'rgb(200 194 188)', fill: on ? 'rgb(38 33 29)' : '#fff', tick: on ? '✓' : '' });
+    const groups = GROUPS.map(g => {
+      const its = g.items, n = its.filter(i => s.sel[i.id]).length, all = n === its.length;
+      return {
+        title: g.title, hint: g.hint, count: `${n}/${its.length}`,
+        ...(all ? box(true) : n === 0 ? box(false) : { box: 'rgb(38 33 29)', fill: 'rgb(38 33 29)', tick: '–' }),
+        onToggle: () => this.setState(st => ({ sel: { ...st.sel, ...Object.fromEntries(its.map(i => [i.id, !all])) } })),
+        items: its.map(i => {
+          const on = !!s.sel[i.id];
+          const dupe = i.dupe && s.to && ['Aina', 'Hafiz'].includes(s.to);
+          return { ...i, ...box(on), bg: on ? '#fff' : 'rgb(250 249 247)', fg: on ? 'rgb(38 33 29)' : 'rgb(130 124 118)', hasMeta: !!i.meta, metaFg: i.red ? 'rgb(160 36 30)' : 'rgb(98 92 86)', stays: !on,
+            detail: dupe && on ? `${i.detail} · ${s.to} is already a candidate — Siti will just be removed` : i.detail, onClick: () => this.tog(i.id) };
+        }),
+      };
+    });
+    const allOn = selCount === ALL.length;
+    const reasonOk = s.reason.trim().length > 0;
+    const can = selCount > 0 && s.to && reasonOk;
+    const inHandSel = selIds.filter(i => i.group === 'hand');
+    const nTpl = selIds.filter(i => i.group === 'tpl').length, nUp = selIds.filter(i => i.group === 'up').length;
+    const preview = selCount ? `${s.to || '…'} takes over ${selCount} of ${ALL.length}: ${nTpl} template${nTpl === 1 ? '' : 's'}, ${nUp} upcoming stage${nUp === 1 ? '' : 's'}, ${inHandSel.length} task${inHandSel.length === 1 ? '' : 's'} in hand.${ALL.length - selCount ? ` ${ALL.length - selCount} stay with ${s.from}.` : ''}` : 'Nothing selected.';
+    let block = '';
+    if (!selCount) block = 'Tick at least one place'; else if (!reasonOk) block = 'A reason is required';
+    const d = s.done;
+    const results = d ? d.items.map(i => {
+      const k = i.group === 'hand' ? 'waiting' : i.group === 'up' ? 'draft' : 'done';
+      const label = i.group === 'hand' ? `Waiting for ${d.to} to Accept` : i.group === 'up' ? 'Assigned · not started' : 'Template updated';
+      return { title: i.title, group: i.groupTitle, change: i.dupe && ['Aina', 'Hafiz'].includes(d.to) ? `${d.from} removed (${d.to} already listed)` : `${d.from} → ${d.to}`, st: label, stBg: ST[k].bg, stFg: ST[k].fg, stBorder: ST[k].border, dot: ST[k].dot, fg: 'rgb(38 33 29)' };
+    }).concat(d.skipped.map(i => ({ title: i.title, group: i.groupTitle, change: 'No change', st: `Stays with ${d.from}`, stBg: ST.draft.bg, stFg: ST.draft.fg, stBorder: ST.draft.border, dot: ST.draft.dot, fg: 'rgb(130 124 118)' }))) : [];
+    return {
+      steps, isStep1: s.step === 1, isStep23: s.step === 2, isStep4: s.step === 4,
+      people: PEOPLE.map(([name, role, av, load, places]) => ({ name, role, av, places, i: name[0], ...radio(s.from === name), onClick: () => this.setState({ from: name }) })),
+      findLabel: `Find ${s.from} everywhere →`, replaceLabel: `Replace selected (${selCount})`,
+      fromName: s.from, toStep2: () => this.setState({ step: 2 }), toStep1: () => this.setState({ step: 1 }),
+      total: ALL.length, allLabel: allOn ? 'Untick all' : 'Tick all',
+      toggleAll: () => this.setState({ sel: Object.fromEntries(ALL.map(i => [i.id, !allOn])) }),
+      groups,
+      toPeople: PEOPLE.filter(p => p[1] === 'Graphic Designer' && p[0] !== s.from).map(([name, , av, load]) => ({ name, av, load, i: name[0], ...radio(s.to === name), onClick: () => this.setState({ to: name }) })),
+      reasons: ['Resigned', 'Transferred', 'Long leave', 'Workload'].map(r => { const on = s.reason === r; return { label: r, border: on ? 'rgb(38 33 29)' : 'rgb(226 223 217)', bg: on ? 'rgb(38 33 29)' : '#fff', fg: on ? '#fff' : 'rgb(38 33 29)', onClick: () => this.setState({ reason: r }) }; }),
+      reason: s.reason, onReason: e => this.setState({ reason: e.target.value }),
+      preview, selCount, rCursor: can ? 'pointer' : 'not-allowed', rOp: can ? 1 : 0.4, hasBlock: !!block, block,
+      replace: () => can && this.setState({ step: 4, done: { from: s.from, to: s.to, reason: s.reason.trim(), items: selIds, skipped: ALL.filter(i => !s.sel[i.id]) } }),
+      doneCount: d ? d.items.length : 0, toName: d ? d.to : '', reasonFinal: d ? d.reason : '',
+      hasInHand: d ? d.items.some(i => i.group === 'hand') : false,
+      inHandNote: d ? `${d.items.filter(i => i.group === 'hand').length} task(s) moved to ${d.to}'s My Space with an Accept button. Their deadlines are unchanged.` : '',
+      results,
+      notifyNote: d ? `${d.to}, Rachel and Daniel were notified. Each change is a separate entry in the audit trail of its task or template.` : '',
+      restart: () => this.setState({ step: 1, done: null, sel: Object.fromEntries(ALL.map(i => [i.id, true])) }),
+    };
+  }
+}
+</script>
+</body>
+</html>

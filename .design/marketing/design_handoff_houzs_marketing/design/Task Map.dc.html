@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes tmPulse{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.35);opacity:0}}@keyframes tmIn{0%{transform:translateX(12px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="padding:20px 32px 40px;color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <sc-if value="{{ notReplay }}" hint-placeholder-val="{{ true }}">
+      <span style="font-size:18px">🗺️</span>
+      <span style="font-size:1.2em;font-weight:600">Task Map</span>
+      <span style="font-size:0.9em;color:rgb(117 100 86)">Opened by Jason from a Social Media project · now at 🔗 PIC approval</span>
+    </sc-if>
+    <span style="flex:1"></span>
+    <sc-if value="{{ notReplay }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+      <sc-for list="{{ viewOpts }}" as="o" hint-placeholder-count="2">
+        <div onClick="{{ o.onClick }}" style="height:28px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div>
+      </sc-for>
+    </div>
+    </sc-if>
+  </div>
+
+  <div style="position:relative;display:flex;border:1px solid rgb(236 231 224);border-radius:14px;overflow:hidden;background:#fff">
+    <sc-if value="{{ isMap }}" hint-placeholder-val="{{ true }}">
+      <div ref="{{ vpRef }}" onMouseDown="{{ onDown }}" onMouseMove="{{ onMove }}" onMouseUp="{{ onUp }}" onMouseLeave="{{ onUp }}" style="position:relative;flex:1;min-width:0;height:480px;overflow:hidden;cursor:{{ cursor }};background-color:rgb(252 251 249);background-image:radial-gradient(rgb(232 225 216) 1px, transparent 1px);background-size:20px 20px;user-select:none">
+        <div style="position:absolute;left:0;top:0;width:{{ cw }}px;height:{{ ch }}px;transform-origin:0 0;transform:{{ xf }}">
+          <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="4">
+            <div style="position:absolute;left:0;top:{{ l.top }}px;width:{{ cw }}px;height:{{ laneH }}px;background:{{ l.bg }};border-bottom:1px solid {{ l.line }};box-sizing:border-box">
+            </div>
+          </sc-for>
+
+          <svg width="{{ cw }}" height="{{ ch }}" style="position:absolute;left:0;top:0;overflow:visible;pointer-events:none">
+            <defs>
+              <marker id="tmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="rgb(90 78 68)"></path></marker>
+              <marker id="tmArrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="rgb(200 52 42)"></path></marker>
+              <marker id="tmArrowFaint" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="rgb(190 182 172)"></path></marker>
+            </defs>
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="12">
+              <path d="{{ e.d }}" style="fill:none;stroke:{{ e.stroke }};stroke-width:{{ e.w }};stroke-dasharray:{{ e.dash }};marker-end:{{ e.marker }};transition:stroke .3s"></path>
+            </sc-for>
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="12">
+              <path d="{{ e.d }}" onMouseEnter="{{ e.onHover }}" onMouseMove="{{ e.onHover }}" onMouseLeave="{{ e.onLeave }}" style="fill:none;stroke:{{ e.hitStroke }};stroke-width:14;pointer-events:stroke;cursor:help"></path>
+            </sc-for>
+          </svg>
+          <sc-if value="{{ showDot }}">
+            <div style="position:absolute;left:{{ dotX }}px;top:{{ dotY }}px;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:rgb(90 62 43);border:3px solid #fff;box-shadow:0 0 0 2px rgb(90 62 43), 0 4px 10px rgb(51 36 27 / 0.3);pointer-events:none"></div>
+          </sc-if>
+
+          <sc-for list="{{ labels }}" as="t" hint-placeholder-count="2">
+            <div style="position:absolute;left:{{ t.x }}px;top:{{ t.y }}px;transform:translate(-50%,-50%);padding:2px 8px;border-radius:999px;background:#fff;border:1px solid {{ t.border }};color:{{ t.fg }};font-size:11px;font-weight:500;white-space:nowrap">{{ t.text }}</div>
+          </sc-for>
+
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="11">
+            <div onClick="{{ n.onClick }}" style="position:absolute;left:{{ n.left }}px;top:{{ n.top }}px;width:{{ n.w }}px;height:{{ n.h }}px;cursor:pointer">
+              {{ n.pulse }}
+              <div style="position:relative;width:100%;height:100%;box-sizing:border-box;background:{{ n.bg }};border:{{ n.border }};border-radius:{{ n.radius }};box-shadow:{{ n.shadow }};opacity:{{ n.op }};padding:{{ n.pad }};display:flex;flex-direction:column;justify-content:center;align-items:{{ n.align }};gap:4px;text-align:{{ n.talign }};transition:box-shadow .15s, transform .15s" style-hover="transform:translateY(-2px)">
+                <sc-if value="{{ n.isCard }}">
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <span style="width:22px;height:22px;flex:none;border-radius:50%;background:{{ n.avBg }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ n.initial }}</span>
+                    <span style="font-size:12px;color:rgb(74 64 58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.person }}</span>
+                  </div>
+                  <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.title }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgb(117 100 86)">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ n.dot }}"></span>
+                    <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px">{{ n.date }}</span>
+                    <sc-if value="{{ n.hasTag }}"><span style="margin-left:auto;padding:1px 6px;border-radius:5px;background:{{ n.tagBg }};color:{{ n.tagFg }};font-size:10px;font-weight:500">{{ n.tag }}</span></sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ n.isGate }}">
+                  <div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;white-space:nowrap">
+                    <span style="font-size:13px">{{ n.icon }}</span><span>{{ n.person }}</span><span style="color:{{ n.dot }}">{{ n.mark }}</span>
+                  </div>
+                  <div style="font-size:10.5px;color:rgb(90 78 68);line-height:1.25;padding:0 6px">{{ n.title }}</div>
+                </sc-if>
+              </div>
+              <sc-if value="{{ n.isCurrent }}"><div style="position:absolute;left:50%;top:-30px;transform:translateX(-50%);padding:3px 9px;border-radius:999px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:10.5px;font-weight:600;white-space:nowrap">📍 You are here</div></sc-if>
+              <sc-if value="{{ n.isSelected }}"><div style="position:absolute;inset:-5px;border-radius:14px;border:2px solid rgb(90 62 43);pointer-events:none"></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-for list="{{ laneTags }}" as="l" hint-placeholder-count="4">
+          <div style="position:absolute;left:0;top:{{ l.y }}px;height:{{ l.h }}px;width:132px;display:flex;align-items:center;gap:8px;padding-left:14px;box-sizing:border-box;background:{{ l.bg }};border-right:1px solid {{ l.line }};border-bottom:1px solid {{ l.line }};pointer-events:none">
+            <span style="font-size:15px">{{ l.emoji }}</span>
+            <span style="font-size:12px;font-weight:600;color:{{ l.fg }};line-height:1.2">{{ l.name }}</span>
+          </div>
+        </sc-for>
+        <div style="position:absolute;left:14px;bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:8px 12px;border-radius:10px;background:rgb(255 255 255 / 0.94);border:1px solid rgb(236 231 224);font-size:11.5px;color:rgb(74 64 58)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:0;border-top:1.6px solid rgb(90 78 68)"></span>🔒 Assigned by MM</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:0;border-top:1.6px dashed rgb(90 78 68)"></span>🔓 Picked by previous stage</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:0;border-top:1.6px solid rgb(200 52 42)"></span>Returned</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:16px;border:1.5px solid rgb(90 78 68);border-radius:4px 4px 50% 50% / 4px 4px 40% 40%;box-sizing:border-box"></span>Approval gate</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:12px;border:1.5px dashed rgb(190 182 172);border-radius:4px;box-sizing:border-box"></span>Planned</span>
+        </div>
+        <div style="position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:2px;padding:3px;border-radius:10px;background:#fff;border:1px solid rgb(236 231 224);font-size:12px">
+          <span onClick="{{ zoomOut }}" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" style-hover="background:rgb(241 236 228)">−</span>
+          <span style="width:46px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ zoomPct }}</span>
+          <span onClick="{{ zoomIn }}" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" style-hover="background:rgb(241 236 228)">+</span>
+          <span onClick="{{ fit }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;border-left:1px solid rgb(236 231 224)" style-hover="background:rgb(241 236 228)">Fit</span>
+        </div>
+        <div style="position:absolute;right:14px;top:12px;font-size:11px;color:rgb(117 100 86);background:rgb(255 255 255 / 0.9);padding:3px 8px;border-radius:6px">Drag or scroll to move sideways · ⌘/Ctrl + scroll to zoom · hover a line for details</div>
+        <sc-if value="{{ hasHover }}">
+          <div style="position:absolute;left:{{ hov.x }}px;top:{{ hov.y }}px;width:260px;z-index:10;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.16);padding:12px 14px;pointer-events:none;display:flex;flex-direction:column;gap:6px;font-size:12.5px">
+            <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ hov.t }}</div>
+            <div style="font-weight:600;font-size:13.5px">{{ hov.who }}</div>
+            <div style="color:rgb(74 64 58)">{{ hov.what }}</div>
+            <sc-if value="{{ hov.hasReason }}"><div style="padding:6px 8px;border-radius:6px;background:rgb(252 236 233);color:rgb(176 40 34)">"{{ hov.reason }}"</div></sc-if>
+            <sc-if value="{{ hov.hasFile }}"><div style="display:flex;gap:6px;align-items:center;color:rgb(74 64 58)"><span>📎</span><span>{{ hov.file }}</span></div></sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isList }}">
+      <div style="flex:1;min-width:0">
+        <div style="display:grid;grid-template-columns:40px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1.1fr) minmax(0,1.5fr) minmax(0,1.1fr) 90px;gap:12px;padding:10px 16px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:rgb(117 100 86)">
+          <span>#</span><span>Station</span><span>Lane</span><span>Person</span><span>Handoff</span><span>Status</span><span>Date</span>
+        </div>
+        <sc-for list="{{ listRows }}" as="r" hint-placeholder-count="11">
+          <div onClick="{{ r.onClick }}" style="display:grid;grid-template-columns:40px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1.1fr) minmax(0,1.5fr) minmax(0,1.1fr) 90px;gap:12px;align-items:center;padding:0 16px;min-height:48px;border-bottom:1px solid rgb(244 241 236);font-size:0.94em;cursor:pointer;background:{{ r.rowBg }};padding-left:{{ r.indent }}" style-hover="background:rgb(250 248 244)">
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">{{ r.no }}</span>
+            <span style="display:flex;align-items:center;gap:8px;font-weight:500;min-width:0"><span>{{ r.icon }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</span></span>
+            <span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:8px;height:8px;border-radius:3px;background:{{ r.laneDot }}"></span>{{ r.lane }}</span>
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.person }}</span>
+            <span style="color:rgb(74 64 58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.handoff }}</span>
+            <span style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.88em;font-weight:500;padding:2px 9px;border-radius:999px;background:{{ r.stBg }};color:{{ r.stFg }};border:1px solid {{ r.stBorder }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.stLabel }}</span></span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(74 64 58)">{{ r.date }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasSel }}">
+      <div style="width:360px;flex:none;border-left:1px solid rgb(236 231 224);background:#fff;max-height:480px;overflow-y:auto;animation:tmIn .2s ease-out">
+        <div style="padding:18px 20px 14px;border-bottom:1px solid rgb(244 241 236)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:0.75em;font-weight:500;padding:2px 8px;border-radius:6px;background:{{ sel.laneBg }};color:{{ sel.laneFg }}">{{ sel.laneName }}</span>
+            <span style="flex:1"></span>
+            <span onClick="{{ closeSel }}" style="width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86);font-size:16px" style-hover="background:rgb(241 236 228)">×</span>
+          </div>
+          <div style="font-size:1.3em;font-weight:600;margin-top:10px">{{ sel.fullTitle }}</div>
+          <div style="display:flex;margin-top:8px"><span style="display:flex;align-items:center;gap:6px;font-size:0.85em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ sel.stBg }};color:{{ sel.stFg }};border:1px solid {{ sel.stBorder }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ sel.dot }}"></span>{{ sel.stLabel }}</span></div>
+        </div>
+        <div style="padding:14px 20px;display:grid;grid-template-columns:96px 1fr;gap:8px 12px;font-size:0.92em;border-bottom:1px solid rgb(244 241 236)">
+          <sc-for list="{{ sel.facts }}" as="f" hint-placeholder-count="5">
+            <span style="color:rgb(117 100 86)">{{ f.k }}</span><span>{{ f.v }}</span>
+          </sc-for>
+        </div>
+        <div style="padding:14px 20px;border-bottom:1px solid rgb(244 241 236)">
+          <div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:8px">Attachments</div>
+          <sc-for list="{{ sel.files }}" as="f" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:0.92em"><span>📎</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.n }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ f.s }}</span></div>
+          </sc-for>
+          <sc-if value="{{ sel.noFiles }}"><div style="font-size:0.88em;color:rgb(117 100 86)">No attachments at this station.</div></sc-if>
+        </div>
+        <div style="padding:14px 20px;border-bottom:1px solid rgb(244 241 236)">
+          <div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:8px">Versions</div>
+          <sc-for list="{{ sel.versions }}" as="v" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:0.92em"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid rgb(229 222 211)">{{ v.v }}</span><span style="flex:1">{{ v.t }}</span></div>
+          </sc-for>
+          <sc-if value="{{ sel.noVersions }}"><div style="font-size:0.88em;color:rgb(117 100 86)">No versions yet.</div></sc-if>
+        </div>
+        <div style="padding:14px 20px 20px">
+          <div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:8px">Audit · this station</div>
+          <sc-for list="{{ sel.audit }}" as="a" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:92px 1fr;gap:10px;padding:6px 0;border-top:1px solid rgb(246 244 240);font-size:0.88em">
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);padding-top:1px">{{ a.t }}</span><span style="color:rgb(51 36 27)">{{ a.e }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ isReplay }}">
+    <div style="margin-top:12px;border:1px solid rgb(236 231 224);border-radius:14px;background:#fff;padding:14px 18px 12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div onClick="{{ togglePlay }}" style="height:38px;padding:0 18px;border-radius:999px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;gap:8px;font-weight:600;font-size:0.96em;cursor:pointer;white-space:nowrap;flex:none" style-hover="background:#E0893F" style-active="transform:scale(0.97)"><span style="font-size:12px">{{ playIcon }}</span>{{ playLabel }}</div>
+        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:10px;background:rgb(250 248 244);animation:tmIn .25s ease-out">
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);white-space:nowrap">{{ capTime }}</span>
+          <span style="font-size:0.96em;color:rgb(51 36 27);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ capText }}</span>
+          <span style="margin-left:auto;font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);white-space:nowrap">{{ capStep }}</span>
+        </div>
+      </div>
+      <div style="position:relative;padding:0 6px">
+        <input type="range" min="0" max="{{ stepMax }}" step="1" value="{{ stepVal }}" onChange="{{ onScrub }}" style="width:100%;accent-color:rgb(90 62 43);cursor:pointer">
+        <div style="position:relative;height:30px;margin:2px 8px 0">
+          <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="11">
+            <div onClick="{{ t.onClick }}" style="position:absolute;top:0;left:{{ t.left }}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;text-align:center">
+              <span style="width:6px;height:6px;border-radius:50%;background:{{ t.dot }}"></span>
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:{{ t.fg }};white-space:nowrap">{{ t.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:760}}">
+const ST = {
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)', label: 'Waiting' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)', label: 'Done' },
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)', label: 'Planned' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)', label: 'Overdue' },
+};
+const LANES = [
+  { id: 'appr', name: 'Approvals', emoji: '🛡️', bg: 'rgb(246 245 242)', line: 'rgb(226 222 215)', fg: 'rgb(74 64 58)', tagBg: 'rgb(236 233 228)' },
+  { id: 'social', name: 'Social Media', emoji: '📣', bg: 'oklch(0.975 0.018 235)', line: 'oklch(0.89 0.04 235)', fg: 'oklch(0.42 0.10 235)', tagBg: 'oklch(0.94 0.04 235)' },
+  { id: 'content', name: 'Content (Video)', emoji: '🎬', bg: 'oklch(0.975 0.018 295)', line: 'oklch(0.89 0.045 295)', fg: 'oklch(0.42 0.12 295)', tagBg: 'oklch(0.94 0.04 295)' },
+  { id: 'design', name: 'Design (Graphic)', emoji: '🎨', bg: 'oklch(0.975 0.018 350)', line: 'oklch(0.89 0.045 350)', fg: 'oklch(0.45 0.13 350)', tagBg: 'oklch(0.94 0.04 350)' },
+];
+const LANE_H = 150, OFF = 60;
+const AV = { Jason: 'oklch(0.90 0.05 235)', Mei: 'oklch(0.90 0.05 295)', 'Ah Kit': 'oklch(0.90 0.05 195)', Ali: 'oklch(0.90 0.05 270)', Siti: 'oklch(0.92 0.04 350)', Rachel: 'oklch(0.90 0.05 195)', Carmen: 'oklch(0.92 0.03 60)' };
+const NODES = [
+  { id: 'req', lane: 'social', x: 200, kind: 'card', title: 'Requested', full: 'Requested by Jason', person: 'Jason', date: '18 Oct', st: 'done', handoff: 'Opened from Social Media project',
+    files: [['Brief_RedTruck.pdf', '220 KB']], versions: [], audit: [['18 Oct 09:40', 'Jason opened MKT-2990-2610-018 from the Social Media project'], ['18 Oct 10:02', 'Rachel (MM) saved the Assignment plan']] },
+  { id: 'script', lane: 'content', x: 400, kind: 'card', title: 'Script', person: 'Mei', date: '20 Oct', st: 'done', handoff: '🔒 Assigned by MM',
+    files: [['script_v1.docx', '38 KB']], versions: [['v1', 'Approved 21 Oct']], audit: [['18 Oct 14:30', 'Mei accepted'], ['20 Oct 17:45', 'Mei submitted Script v1 → Rachel']] },
+  { id: 'g1', lane: 'appr', x: 600, kind: 'gate', icon: '👤', title: 'approves Script', full: 'Rachel approves Script', person: 'Rachel', date: '21 Oct', st: 'done', handoff: 'Internal approver',
+    files: [], versions: [['v1', 'Approved']], audit: [['21 Oct 09:10', 'Rachel approved Script v1']] },
+  { id: 'shoot', lane: 'content', x: 800, kind: 'card', title: 'Shoot', person: 'Ah Kit + talent', date: '22 Oct', st: 'done', handoff: '🔒 Assigned by MM',
+    files: [['call_sheet.pdf', '90 KB']], versions: [], audit: [['22 Oct 08:30', 'Ah Kit started shoot']] },
+  { id: 'raw', lane: 'content', x: 1000, kind: 'card', title: 'Raw upload', person: 'Ah Kit', date: '22 Oct', st: 'done', handoff: '🔒 Assigned by MM',
+    files: [['RAW_RedTruck_A-cam.zip', '18.2 GB'], ['RAW_RedTruck_B-cam.zip', '9.6 GB']], versions: [], audit: [['22 Oct 18:20', 'Ah Kit uploaded raw footage → Ali']] },
+  { id: 'edit', lane: 'content', x: 1200, kind: 'card', title: 'Edit', person: 'Ali', date: '25 Oct', st: 'done', tag: 'returned ×1', handoff: '🔒 Assigned by MM',
+    files: [['RedTruck_Reels_v2.mp4', '84 MB']], versions: [['Final v1', 'Changes requested by PIC 24 Oct'], ['Final v2', 'Submitted 25 Oct']], audit: [['23 Oct 11:00', 'Ali created subtask "Thumbnail" → Siti'], ['24 Oct 15:00', 'Carmen (PIC) requested changes: "Make the chair bigger in scene 3"'], ['25 Oct 09:30', 'Ali submitted Final v2 → Rachel → PIC']] },
+  { id: 'thumb', lane: 'design', x: 1310, kind: 'card', title: 'Thumbnail', person: 'Siti', date: '24 Oct', st: 'done', tag: 'Subtask', handoff: '🔓 Picked by Ali',
+    files: [['thumb_redtruck_v2.png', '1.1 MB']], versions: [['v1', 'Returned 23 Oct'], ['v2', 'Approved 24 Oct']], audit: [['23 Oct 11:00', 'Ali picked Siti'], ['23 Oct 16:40', 'Ali returned v1: "Logo too small"'], ['24 Oct 10:15', 'Ali approved v2']] },
+  { id: 'rev', lane: 'content', x: 1430, kind: 'gate', mini: true, icon: '', title: 'Review delivery', full: 'Review delivery by Ali', person: 'Ali', date: '24 Oct', st: 'done', handoff: 'Owner of mother station',
+    files: [], versions: [], audit: [['23 Oct 16:40', 'Delivery returned (Thumbnail v1)'], ['24 Oct 10:15', 'Delivery approved (Thumbnail v2)']] },
+  { id: 'g2', lane: 'appr', x: 1620, kind: 'gate', icon: '👤', title: 'approves Final cut', full: 'Rachel approves Final cut', person: 'Rachel', date: '25 Oct', st: 'done', handoff: 'Internal approver',
+    files: [], versions: [['Final v1', 'Passed to PIC'], ['Final v2', 'Passed to PIC']], audit: [['25 Oct 09:30', 'Final v2 passed through to PIC']] },
+  { id: 'g3', lane: 'appr', x: 1840, kind: 'gate', icon: '🔗', title: 'approves Final', full: 'PIC approves Final', person: 'Carmen', date: 'Since 25 Oct', st: 'waiting', current: true, handoff: 'PIC via link',
+    files: [['RedTruck_Reels_v2.mp4', '84 MB']], versions: [['Final v1', 'Changes requested'], ['Final v2', 'Waiting']], audit: [['24 Oct 15:00', 'Carmen requested changes via link'], ['25 Oct 09:30', 'Final v2 sent to Carmen']] },
+  { id: 'deliv', lane: 'social', x: 2060, kind: 'card', title: 'Delivered back', full: 'Delivered back to Jason', person: 'Jason', date: 'Due 28 Oct', st: 'draft', future: true, handoff: '🔒 Assigned by MM',
+    files: [], versions: [], audit: [['—', 'Planned. Opens when Carmen approves.']] },
+];
+const EDGES = [
+  ['req', 'script', 'solid'], ['script', 'g1', 'solid'], ['g1', 'shoot', 'solid'], ['shoot', 'raw', 'solid'], ['raw', 'edit', 'solid'],
+  ['edit', 'thumb', 'dashed', 'picked by Ali', 'down'], ['thumb', 'rev', 'solid', null, 'up'], ['rev', 'thumb', 'return', 'returned ×1', 'back2'], ['edit', 'rev', 'solid'],
+  ['rev', 'g2', 'solid'], ['g2', 'g3', 'solid'], ['g3', 'edit', 'return', 'returned ×1', 'back'], ['g3', 'deliv', 'future'],
+];
+const META = {
+  'req-script': ['18 Oct 10:02', 'Jason → Mei', 'Rachel (MM) saved the plan; Script assigned to Mei', '', 'Brief_RedTruck.pdf'],
+  'script-g1': ['20 Oct 17:45', 'Mei → Rachel', 'Submitted Script v1 for approval', '', 'script_v1.docx'],
+  'g1-shoot': ['21 Oct 09:10', 'Rachel → Ah Kit', 'Approved Script v1', '', ''],
+  'shoot-raw': ['22 Oct', 'Ah Kit → Ah Kit', 'Shoot wrapped, raw upload started', '', 'call_sheet.pdf'],
+  'raw-edit': ['22 Oct 18:20', 'Ah Kit → Ali', 'Raw footage uploaded', '', 'RAW_RedTruck_A-cam.zip'],
+  'edit-thumb': ['23 Oct 11:00', 'Ali → Siti', 'Subtask created: "Thumbnail" (picked by Ali)', '', ''],
+  'thumb-rev': ['24 Oct 10:15', 'Siti → Ali', 'Delivered Thumbnail v2 — approved', '', 'thumb_redtruck_v2.png'],
+  'rev-thumb': ['23 Oct 16:40', 'Ali → Siti', 'Delivery returned', 'Logo too small', 'thumb_redtruck_v1.png'],
+  'edit-rev': ['25 Oct 09:30', 'Ali', 'Final cut + approved Thumbnail packaged', '', ''],
+  'rev-g2': ['25 Oct 09:30', 'Ali → Rachel', 'Submitted Final v2', '', 'RedTruck_Reels_v2.mp4'],
+  'g2-g3': ['25 Oct 09:30', 'Rachel → Carmen (PIC)', 'Final v2 sent via link', '', 'RedTruck_Reels_v2.mp4'],
+  'g3-edit': ['24 Oct 15:00', 'Carmen (PIC) → Ali', 'Changes requested via link on Final v1', 'Make the chair bigger in scene 3', 'RedTruck_Reels_v1.mp4'],
+  'g3-deliv': ['Planned', 'Carmen → Jason', 'Opens when Carmen approves Final v2', '', ''],
+};
+const STEPS = [
+  { t: '18 Oct 10:02', text: 'Rachel (MM) saved the Assignment plan', e: ['req-script'], at: 'script' },
+  { t: '18 Oct 14:30', text: 'Mei accepted Script', e: [], at: 'script' },
+  { t: '20 Oct 17:45', text: 'Mei submitted Script v1 → Rachel', e: ['script-g1'], at: 'g1' },
+  { t: '21 Oct 09:10', text: 'Rachel approved Script v1', e: ['g1-shoot'], at: 'shoot' },
+  { t: '22 Oct 18:20', text: 'Ah Kit uploaded raw footage → Ali', e: ['shoot-raw', 'raw-edit'], at: 'edit' },
+  { t: '23 Oct 11:00', text: 'Ali created subtask "Thumbnail" → Siti', e: ['edit-thumb'], at: 'thumb' },
+  { t: '23 Oct 16:40', text: 'Ali returned Thumbnail v1 to Siti: "Logo too small"', e: ['thumb-rev', 'rev-thumb'], at: 'thumb' },
+  { t: '24 Oct 10:15', text: 'Ali approved Thumbnail v2', e: ['thumb-rev'], at: 'edit' },
+  { t: '24 Oct 15:00', text: 'Carmen (PIC) requested changes via link: "Make the chair bigger in scene 3"', e: ['edit-rev', 'rev-g2', 'g2-g3', 'g3-edit'], at: 'edit' },
+  { t: '25 Oct 09:30', text: 'Ali submitted Final v2 → Rachel → PIC', e: ['edit-rev', 'rev-g2', 'g2-g3'], at: 'g3' },
+];
+const CW = 2220, CH = LANE_H * 4;
+
+function geom(n) {
+  const li = LANES.findIndex(l => l.id === n.lane);
+  const w = n.kind === 'gate' ? (n.mini ? 116 : 140) : 172;
+  const h = n.kind === 'gate' ? (n.mini ? 58 : 74) : 80;
+  const cx = n.x + OFF, cy = li * LANE_H + LANE_H / 2;
+  return { w, h, cx, cy, l: cx - w / 2, r: cx + w / 2, t: cy - h / 2, b: cy + h / 2 };
+}
+const G = Object.fromEntries(NODES.map(n => [n.id, geom(n)]));
+const bez = (p0, p1, p2, p3) => ({ pts: [p0, p1, p2, p3], d: `M${p0[0]},${p0[1]} C${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`, mid: [(p0[0] + 3 * p1[0] + 3 * p2[0] + p3[0]) / 8, (p0[1] + 3 * p1[1] + 3 * p2[1] + p3[1]) / 8] });
+function edgePath(a, b, mode) {
+  const A = G[a], B = G[b];
+  if (mode === 'down') return bez([A.cx, A.b], [A.cx, A.b + 50], [B.cx - 30, B.t - 50], [B.cx - 30, B.t - 2]);
+  if (mode === 'up') return bez([A.r, A.cy], [A.r + 50, A.cy], [B.cx, B.b + 60], [B.cx, B.b + 2]);
+  if (mode === 'back2') return bez([A.cx - 30, A.b - 4], [A.cx - 70, A.b + 60], [B.cx + 30, B.t - 60], [B.cx + 40, B.t - 2]);
+  if (mode === 'back') return bez([A.cx - 10, A.b - 4], [A.cx - 120, A.b + 110], [B.cx + 80, B.t - 110], [B.cx + 40, B.t - 2]);
+  const dx = Math.max(40, (B.l - A.r) / 2);
+  return bez([A.r, A.cy], [A.r + dx, A.cy], [B.l - dx, B.cy], [B.l - 2, B.cy]);
+}
+function pulse() {
+  return React.createElement('div', { style: { position: 'absolute', inset: -6, borderRadius: '20px 20px 50% 50% / 20px 20px 40% 40%', border: '3px solid rgb(214 152 30)', animation: 'tmPulse 1.8s ease-out infinite', pointerEvents: 'none' } });
+}
+
+class Component extends DCLogic {
+  state = { view: 'map', z: 0.5, px: 12, py: 14, sel: null, drag: null, step: STEPS.length, p: 1, playing: false, hover: null };
+  vp = React.createRef();
+  componentDidMount() { this.bindWheel(); }
+  componentDidUpdate() { this.bindWheel(); }
+  componentWillUnmount() { clearInterval(this._iv); if (this._el) this._el.removeEventListener('wheel', this._w); }
+  bindWheel() {
+    const el = this.vp.current;
+    if (!el || el === this._el) return;
+    if (this._el) this._el.removeEventListener('wheel', this._w);
+    this._el = el;
+    this._w = e => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const r = el.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+        this.setState(s => {
+          const z = this.clampZ(s.z * (e.deltaY < 0 ? 1.08 : 0.92));
+          return { z, px: this.clampX(mx - (mx - s.px) * (z / s.z), z) };
+        });
+      } else this.setState(s => ({ px: this.clampX(s.px - (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY), s.z) }));
+    };
+    el.addEventListener('wheel', this._w, { passive: false });
+    this.doFit();
+  }
+  doFit() {
+    const el = this.vp.current; if (!el) return;
+    const vw = el.clientWidth, vh = el.clientHeight;
+    const z = Math.max(this.props.mode === 'replay' ? 0.45 : 0.62, Math.min(1, (vw - 24) / CW));
+    const startPx = 144 - (G.req.l - 10) * z;
+    const px = this.props.mode === 'replay' ? startPx : Math.min(startPx, Math.max(vw - CW * z - 12, vw * 0.55 - G.g3.cx * z));
+    this.setState({ z: this.clampZ(z), px: this.clampX(px, this.clampZ(z)) });
+  }
+  vsize() { const el = this.vp.current; return el ? [el.clientWidth, el.clientHeight] : [1000, 480]; }
+  clampZ(z) { const [, vh] = this.vsize(); return Math.min(Math.min(1.6, (vh - 20) / CH), Math.max(0.3, z)); }
+  clampX(px, z) { const [vw] = this.vsize(), max = 132, min = Math.min(max, vw - CW * z - 12); return Math.min(max, Math.max(min, px)); }
+  stop() { clearInterval(this._iv); this._iv = null; if (this.state.playing) this.setState({ playing: false }); }
+  togglePlay() {
+    if (this.state.playing) return this.stop();
+    if (this.state.step >= STEPS.length) this.setState({ step: 0, p: 1 });
+    this.setState({ playing: true });
+    this._iv = setInterval(() => {
+      this.setState(s => {
+        if (s.p >= 1) {
+          if (s.step >= STEPS.length) { clearInterval(this._iv); this._iv = null; return { playing: false }; }
+          return { step: s.step + 1, p: 0 };
+        }
+        const n = Math.max(1, STEPS[s.step - 1].e.length);
+        return { p: Math.min(1, s.p + 30 / (800 * n)) };
+      });
+    }, 30);
+  }
+  zoomBy(f) { this.setState(s => { const z = this.clampZ(s.z * f); return { z, px: this.clampX(s.px, z) }; }); }
+
+  renderVals() {
+    const { view, z, px, sel, drag } = this.state, py = Math.max(10, (this.vsize()[1] - CH * z) / 2);
+    const lanes = LANES.map((l, i) => ({ ...l, top: i * LANE_H }));
+    const edges = [], labels = [];
+    const replay = this.props.mode === 'replay';
+    const { step, p: prog, hover } = this.state;
+    const done = new Set(), seen = new Set(['req']);
+    STEPS.forEach((st, i) => { if (i < step) st.e.forEach(k => { done.add(k); k.split('-').forEach(n => seen.add(n)); }); });
+    const cur = replay && step > 0 ? STEPS[step - 1] : null;
+    let dot = null;
+    if (replay && cur && cur.e.length && prog < 1) {
+      const n = cur.e.length, seg = Math.min(n - 1, Math.floor(prog * n)), t = prog * n - seg;
+      const [ea, eb] = cur.e[seg].split('-'), def = EDGES.find(x => x[0] === ea && x[1] === eb);
+      const q = edgePath(ea, eb, def[4]).pts, u = 1 - t;
+      dot = [0, 1].map(k => u * u * u * q[0][k] + 3 * u * u * t * q[1][k] + 3 * u * t * t * q[2][k] + t * t * t * q[3][k]);
+    }
+    EDGES.forEach(([a, b, kind, label, mode]) => {
+      const p = edgePath(a, b, mode);
+      const key = `${a}-${b}`;
+      const off = replay && !done.has(key);
+      const red = kind === 'return' && !off, faint = kind === 'future' || off;
+      const m = META[key];
+      edges.push({
+        d: p.d, stroke: red ? 'rgb(200 52 42)' : faint ? 'rgb(214 206 196)' : 'rgb(90 78 68)', w: off ? 1.2 : 1.6, dash: kind === 'dashed' || faint ? '6 5' : 'none', marker: `url(#${red ? 'tmArrowRed' : faint ? 'tmArrowFaint' : 'tmArrow'})`,
+        hitStroke: hover && hover.key === key ? 'rgb(90 62 43 / 0.12)' : 'transparent',
+        onHover: e => {
+          const r = this.vp.current && this.vp.current.getBoundingClientRect(); if (!r) return;
+          let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
+          if (x > r.width - 280) x -= 300; if (y > r.height - 170) y -= 180;
+          this.setState({ hover: { key, x, y } });
+        },
+        onLeave: () => this.setState({ hover: null }),
+      });
+      if (label && !off) labels.push({ x: p.mid[0], y: p.mid[1], text: label, fg: red ? 'rgb(176 40 34)' : 'rgb(74 64 58)', border: red ? 'rgb(236 190 184)' : 'rgb(229 222 211)' });
+    });
+    const laneOf = id => LANES.find(l => l.id === id);
+    const nodes = NODES.map(n => {
+      const g = G[n.id], gate = n.kind === 'gate', lane = laneOf(n.lane);
+      if (replay) {
+        const at = cur ? cur.at : 'req';
+        const hidden = !seen.has(n.id) && n.id !== at;
+        n = { ...n, current: n.id === at, future: hidden, st: n.id === at ? 'waiting' : hidden ? 'draft' : 'done' };
+      }
+      const s = ST[n.st];
+      return {
+        ...n, left: g.l, top: g.t, w: g.w, h: g.h,
+        isCard: !gate, isGate: gate, isCurrent: !!n.current, isSelected: sel === n.id,
+        initial: n.person[0], avBg: AV[n.person.split(' ')[0] === 'Ah' ? 'Ah Kit' : n.person.split(' ')[0]] || '#eee',
+        bg: n.future ? 'rgb(255 255 255 / 0.6)' : '#fff',
+        border: n.future ? '1.5px dashed rgb(200 192 182)' : `1.5px solid ${n.current ? s.dot : s.border}`,
+        radius: gate ? '14px 14px 50% 50% / 14px 14px 38% 38%' : '12px',
+        shadow: n.future ? 'none' : n.current ? '0 6px 18px rgb(214 152 30 / 0.25)' : '0 2px 6px rgb(51 36 27 / 0.06)',
+        op: n.future ? 0.75 : 1, pad: gate ? '0 8px 10px' : '10px 12px', align: gate ? 'center' : 'stretch', talign: gate ? 'center' : 'left',
+        dot: s.dot, mark: n.st === 'done' ? '✓' : '',
+        hasTag: !!n.tag, tagBg: n.tag && n.tag.startsWith('returned') ? ST.red.bg : lane.tagBg, tagFg: n.tag && n.tag.startsWith('returned') ? ST.red.fg : lane.fg,
+        pulse: n.current ? pulse() : null,
+        onClick: () => { if (!this._moved) this.setState({ sel: n.id }); },
+      };
+    });
+    const order = ['req', 'script', 'g1', 'shoot', 'raw', 'edit', 'thumb', 'rev', 'g2', 'g3', 'deliv'];
+    const listRows = order.map((id, i) => {
+      const n = NODES.find(x => x.id === id), s = ST[n.st], lane = laneOf(n.lane);
+      return {
+        no: String(i + 1).padStart(2, '0'), title: n.full || n.title, icon: n.kind === 'gate' ? (n.icon || '☑️') : lane.emoji,
+        lane: lane.name, laneDot: lane.line, person: n.person, handoff: n.handoff + (n.tag === 'returned ×1' ? ' · returned ×1' : ''),
+        stBg: s.bg, stFg: s.fg, stBorder: s.border, dot: s.dot, stLabel: n.current ? 'Waiting · now here' : s.label, date: n.date,
+        rowBg: n.current ? 'rgb(253 249 240)' : sel === id ? 'rgb(250 248 244)' : '#fff', indent: id === 'thumb' ? '40px' : '16px',
+        onClick: () => this.setState({ sel: id }),
+      };
+    });
+    const sn = NODES.find(n => n.id === sel);
+    let selVals = {};
+    if (sn) {
+      const s = ST[sn.st], lane = laneOf(sn.lane);
+      selVals = {
+        laneName: lane.name, laneBg: lane.tagBg, laneFg: lane.fg, fullTitle: sn.full || sn.title,
+        stBg: s.bg, stFg: s.fg, stBorder: s.border, dot: s.dot, stLabel: sn.current ? 'Waiting for PIC' : s.label,
+        facts: [
+          { k: 'Track ID', v: 'MKT-2990-2610-018' }, { k: 'Person', v: sn.person }, { k: 'Handoff', v: sn.handoff },
+          { k: sn.st === 'done' ? 'Completed' : 'Deadline', v: sn.date },
+          { k: 'Approval', v: sn.kind === 'gate' ? (sn.icon === '🔗' ? '🔗 PIC approves via link' : sn.icon === '👤' ? '👤 Internal approver' : 'Review delivery') : sn.id === 'edit' ? '👤 Rachel' : sn.id === 'script' ? '👤 Rachel' : '— No approval' },
+        ],
+        files: sn.files.map(([n, s2]) => ({ n, s: s2 })), noFiles: sn.files.length === 0,
+        versions: sn.versions.map(([v, t]) => ({ v, t })), noVersions: sn.versions.length === 0,
+        audit: sn.audit.map(([t, e]) => ({ t, e })),
+      };
+    }
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    return {
+      viewOpts: [['map', '🗺️ Map view'], ['list', '☰ List view']].map(([k, label]) => ({ label, ...seg(view === k), onClick: () => this.setState({ view: k }) })),
+      isMap: view === 'map', isList: view === 'list',
+      vpRef: this.vp, cw: CW, ch: CH, laneH: LANE_H,
+      xf: `translate(${px}px, ${py}px) scale(${z})`,
+      cursor: drag ? 'grabbing' : 'grab',
+      onDown: e => { this._moved = false; this.setState({ drag: { x: e.clientX, y: e.clientY, px } }); },
+      onMove: e => {
+        const d = this.state.drag; if (!d) return;
+        const dx = e.clientX - d.x, dy = e.clientY - d.y;
+        if (Math.abs(dx) + Math.abs(dy) > 4) this._moved = true;
+        this.setState({ px: this.clampX(d.px + dx, z) });
+      },
+      onUp: () => { if (this.state.drag) this.setState({ drag: null }); setTimeout(() => { this._moved = false; }, 0); },
+      lanes, edges, labels, nodes, listRows,
+      notReplay: !replay, isReplay: replay,
+      showDot: !!dot, dotX: dot ? dot[0] : 0, dotY: dot ? dot[1] : 0,
+      hasHover: !!hover, hov: hover ? (() => { const m = META[hover.key]; return { x: hover.x, y: hover.y, t: m[0], who: m[1], what: m[2], reason: m[3], hasReason: !!m[3], file: m[4], hasFile: !!m[4] }; })() : {},
+      togglePlay: () => this.togglePlay(),
+      playIcon: this.state.playing ? '❚❚' : '▶', playLabel: this.state.playing ? 'Pause' : step >= STEPS.length ? 'Replay' : 'Play',
+      capTime: cur ? cur.t : '18 Oct 09:40', capText: cur ? cur.text : 'Jason opened the task from a Social Media project',
+      capStep: `${step} / ${STEPS.length}`,
+      stepMax: STEPS.length, stepVal: step,
+      onScrub: e => { this.stop(); this.setState({ step: +e.target.value, p: 1 }); },
+      ticks: [{ t: 'Start' }, ...STEPS].map((st, i) => ({ label: i === 0 ? 'Start' : st.t.slice(0, 6), left: (i / STEPS.length) * 100, dot: i <= step ? 'rgb(90 62 43)' : 'rgb(214 206 196)', fg: i === step ? 'rgb(51 36 27)' : 'rgb(150 140 130)', onClick: () => { this.stop(); this.setState({ step: i, p: 1 }); } })),
+      laneTags: LANES.map((l, i) => ({ ...l, y: py + i * LANE_H * z, h: LANE_H * z })),
+      zoomPct: `${Math.round(z * 100)}%`,
+      zoomIn: () => this.zoomBy(1.15), zoomOut: () => this.zoomBy(0.87),
+      fit: () => this.doFit(),
+      hasSel: !!sn, sel: selVals, closeSel: () => this.setState({ sel: null }),
+    };
+  }
+}
+</script>
+</body>
+</html>

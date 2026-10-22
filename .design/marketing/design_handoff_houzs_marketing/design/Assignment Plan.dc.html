@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<style>@keyframes apIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="max-width:1140px;margin:0 auto;padding:26px 36px 72px;box-sizing:border-box;color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:10px;font-size:0.92em;color:rgb(117 100 86);flex-wrap:wrap">
+    <span onClick="{{ back }}" style="cursor:pointer" style-hover="color:rgb(51 36 27);text-decoration:underline">← Projects</span><span>/</span><span>{{ projectName }}</span><span>/</span><span>Assignment plan</span>
+    <span style="flex:1"></span>
+    <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;letter-spacing:0.08em">EXAMPLE</span>
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+      <sc-for list="{{ scenarios }}" as="o" hint-placeholder-count="3">
+        <div onClick="{{ o.onClick }}" style="height:26px;padding:0 10px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:12px;white-space:nowrap">{{ o.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:16px;margin-top:18px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;color:rgb(74 64 58)">{{ trackId }}</div>
+      <div style="font-size:1.6em;font-weight:600;margin-top:4px">{{ projectName }}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;font-size:0.9em">
+        <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgb(232 244 235);color:rgb(40 110 64);border:1px solid rgb(190 222 199);font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:rgb(60 150 90)"></span>Approved by PIC</span>
+        <span style="color:rgb(117 100 86)">Workflow template · {{ templateName }}</span>
+        <sc-if value="{{ isRecurring }}"><span style="white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgb(246 244 240);border:1px solid rgb(229 222 211);font-weight:500">🔁 Repeats monthly · next run 15 Nov</span></sc-if>
+        <sc-if value="{{ isMidway }}"><span style="white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgb(251 243 225);color:rgb(138 92 10);border:1px solid rgb(236 214 164);font-weight:500">In progress · Stage 4 of 5</span></sc-if>
+      </div>
+    </div>
+    <div onClick="{{ toggleLocked }}" title="Workflow setting from Workflow Builder" style="height:34px;padding:0 12px 0 10px;border-radius:8px;border:1px solid {{ lockBorder }};background:{{ lockBg }};display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;white-space:nowrap">
+      <span style="width:28px;height:16px;border-radius:8px;background:{{ lockTrack }};position:relative;transition:background-color .2s"><span style="position:absolute;top:2px;left:{{ lockKnob }}px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></span>
+      <span>🔒 Locked workflow</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ isLocked }}">
+    <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgb(246 244 240);border:1px solid rgb(236 231 224);font-size:0.9em;color:rgb(74 64 58)">Locked workflow: every stage is assigned by MM. "Picked by previous stage" and subtasks are turned off.</div>
+  </sc-if>
+  <sc-if value="{{ isRecurring }}">
+    <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgb(246 244 240);border:1px solid rgb(236 231 224);font-size:0.9em;color:rgb(74 64 58)">Save once. On the 15th of every month the system opens a new task for this same team. Each month's content plan goes to the PIC on the link first.</div>
+  </sc-if>
+  <sc-if value="{{ isMidway }}">
+    <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgb(246 244 240);border:1px solid rgb(236 231 224);font-size:0.9em;color:rgb(74 64 58)">Changing a plan mid-way: finished stages are locked. Every change needs a reason, and a new person on the current stage has to Accept again.</div>
+  </sc-if>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;margin-top:20px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:0">
+      <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+        <div style="position:relative;display:flex;gap:14px">
+          <div style="display:flex;flex-direction:column;align-items:center;width:28px;flex:none">
+            <span style="width:28px;height:28px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-top:16px;background:{{ s.numBg }};color:{{ s.numFg }};border:{{ s.numBorder }}">{{ s.numText }}</span>
+            <sc-if value="{{ s.hasLine }}"><span style="flex:1;width:1.5px;background:rgb(229 222 211);margin-top:4px"></span></sc-if>
+          </div>
+          <div style="flex:1;min-width:0;margin-bottom:12px;border-radius:12px;border:1.5px solid {{ s.border }};background:{{ s.bg }};opacity:{{ s.op }};transition:border-color .2s">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgb(244 241 236)">
+              <span style="font-size:1.08em;font-weight:600">{{ s.name }}</span>
+              <span style="font-size:0.78em;padding:2px 8px;border-radius:5px;background:{{ s.deptBg }};color:{{ s.deptFg }}">{{ s.dept }}</span>
+              <span style="flex:1"></span>
+              <sc-if value="{{ s.hasState }}"><span style="display:flex;align-items:center;gap:6px;font-size:0.82em;font-weight:500;padding:2px 9px;border-radius:999px;background:{{ s.stBg }};color:{{ s.stFg }};border:1px solid {{ s.stBorder }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ s.stDot }}"></span>{{ s.stLabel }}</span></sc-if>
+              <sc-if value="{{ s.unassigned }}"><span style="font-size:0.84em;font-weight:500;color:rgb(176 40 34)">Unassigned</span></sc-if>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px 16px;padding:14px 16px">
+              <div style="position:relative;display:flex;flex-direction:column;gap:6px;min-width:0">
+                <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Assignee</span>
+                <div onClick="{{ s.openAssignee }}" style="min-height:36px;box-sizing:border-box;padding:4px 10px;border-radius:8px;border:1px solid {{ s.fieldBorder }};background:{{ s.fieldBg }};display:flex;align-items:center;gap:8px;cursor:{{ s.cursor }}" style-hover="border-color:rgb(180 170 158)">
+                  <sc-if value="{{ s.hasPerson }}">
+                    <span style="width:22px;height:22px;flex:none;border-radius:50%;background:{{ s.avBg }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ s.initial }}</span>
+                    <span style="font-size:0.94em;font-weight:500;white-space:nowrap">{{ s.person }}</span>
+                    <sc-if value="{{ s.hasExtra }}"><span style="font-size:0.84em;color:rgb(117 100 86);white-space:nowrap">{{ s.extra }}</span></sc-if>
+                    <span style="font-size:11px">🔒</span>
+                  </sc-if>
+                  <sc-if value="{{ s.isPicked }}">
+                    <span style="font-size:12px">🔓</span>
+                    <span style="font-size:0.88em;line-height:1.35"><span style="font-weight:500">Picked by previous stage</span><br><span style="color:rgb(117 100 86)">from {{ s.pickFrom }}</span></span>
+                  </sc-if>
+                  <sc-if value="{{ s.unassigned }}"><span style="font-size:0.92em;color:rgb(176 40 34)">Choose someone…</span></sc-if>
+                  <span style="flex:1"></span>
+                  <sc-if value="{{ s.editable }}"><span style="font-size:9px;color:rgb(117 100 86)">▼</span></sc-if>
+                </div>
+                <sc-if value="{{ s.hasNote }}"><span style="font-size:0.82em;color:{{ s.noteFg }};line-height:1.4">{{ s.note }}</span></sc-if>
+                <sc-if value="{{ s.menuOpen }}">
+                  <div style="position:absolute;top:62px;left:0;z-index:30;width:280px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:6px;animation:apIn .12s ease-out">
+                    <div style="padding:6px 8px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Assign to · {{ s.dept }} first</div>
+                    <sc-for list="{{ s.people }}" as="p" hint-placeholder-count="5">
+                      <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;background:{{ p.bg }}" style-hover="background:rgb(246 244 240)">
+                        <span style="width:22px;height:22px;border-radius:50%;background:{{ p.av }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>
+                        <span style="font-size:13px;font-weight:500">{{ p.name }}</span>
+                        <span style="font-size:12px;color:rgb(117 100 86)">· {{ p.load }} active</span>
+                        <span style="flex:1"></span>
+                        <span style="font-size:11px;color:rgb(150 140 130)">{{ p.role }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ s.canPick }}">
+                      <div style="height:1px;background:rgb(240 236 230);margin:6px 4px"></div>
+                      <div onClick="{{ s.choosePicked }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer" style-hover="background:rgb(246 244 240)">
+                        <span style="font-size:13px">🔓</span><span style="font-size:13px"><span style="font-weight:500">Previous stage picks</span> <span style="color:rgb(117 100 86)">from {{ s.pickPool }}</span></span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ s.pickBlocked }}"><div style="padding:8px;font-size:11.5px;color:rgb(117 100 86);border-top:1px solid rgb(240 236 230);margin-top:4px">{{ s.pickBlockedWhy }}</div></sc-if>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="position:relative;display:flex;flex-direction:column;gap:6px;min-width:0">
+                <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Approver</span>
+                <div style="min-height:36px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+                  <sc-if value="{{ s.noApprover }}"><span style="height:28px;padding:0 10px;border-radius:7px;background:rgb(246 244 240);display:flex;align-items:center;font-size:0.9em;color:rgb(117 100 86)">— No approval</span></sc-if>
+                  <sc-for list="{{ s.approvers }}" as="a" hint-placeholder-count="0">
+                    <sc-if value="{{ a.arrow }}"><span style="color:rgb(150 140 130);font-size:12px">→</span></sc-if>
+                    <span title="Approvers are always locked" style="height:28px;padding:0 6px 0 9px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:5px;font-size:0.9em;white-space:nowrap"><span>{{ a.icon }}</span><span style="font-weight:500">{{ a.name }}</span><span style="font-size:10px">🔒</span><sc-if value="{{ s.editable }}"><span onClick="{{ a.onRemove }}" style="width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(150 140 130)" style-hover="background:rgb(240 236 230)">×</span></sc-if></span>
+                  </sc-for>
+                  <sc-if value="{{ s.editable }}"><span onClick="{{ s.openApprover }}" style="height:28px;padding:0 8px;border-radius:7px;border:1px dashed rgb(214 204 190);display:flex;align-items:center;font-size:0.84em;color:rgb(117 100 86);cursor:pointer;white-space:nowrap" style-hover="background:rgb(250 248 244)">+ Level</span></sc-if>
+                </div>
+                <sc-if value="{{ s.apprMenuOpen }}">
+                  <div style="position:absolute;top:62px;left:0;z-index:30;width:200px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:6px;animation:apIn .12s ease-out">
+                    <sc-for list="{{ s.apprOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px" style-hover="background:rgb(246 244 240)"><span>{{ o.icon }}</span>{{ o.label }}</div></sc-for>
+                    <div style="padding:6px 8px 2px;font-size:11px;color:rgb(117 100 86);border-top:1px solid rgb(240 236 230);margin-top:4px">Approvers are always 🔒 and can't be passed on.</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+                <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">SLA · est. dates</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:7px;height:28px;background:#fff">
+                    <sc-if value="{{ s.editable }}"><span onClick="{{ s.slaDown }}" style="width:24px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(246 244 240)">−</span></sc-if>
+                    <span style="min-width:30px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px">{{ s.sla }}d</span>
+                    <sc-if value="{{ s.editable }}"><span onClick="{{ s.slaUp }}" style="width:24px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(246 244 240)">+</span></sc-if>
+                  </div>
+                  <span style="font-size:0.78em;color:rgb(117 100 86);white-space:nowrap">working days</span>
+                </div>
+                <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(74 64 58);white-space:nowrap">{{ s.dates }}</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Subtasks</span>
+                <div onClick="{{ s.toggleSplit }}" title="{{ s.splitTitle }}" style="height:28px;padding:0 12px;align-self:flex-start;white-space:nowrap;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.9em;font-weight:500;cursor:{{ s.splitCursor }};background:{{ s.splitBg }};color:{{ s.splitFg }};opacity:{{ s.splitOp }}">{{ s.splitLabel }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="position:sticky;top:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;padding:16px">
+        <div style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+          <div><div style="font-size:1.7em;font-weight:600;letter-spacing:-0.02em">{{ totalDays }}</div><div style="font-size:0.82em;color:rgb(117 100 86)">working days</div></div>
+          <div><div style="font-size:1.7em;font-weight:600;letter-spacing:-0.02em">{{ picCount }}</div><div style="font-size:0.82em;color:rgb(117 100 86)">PIC approval{{ picPlural }}</div></div>
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgb(244 241 236);display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:0.9em">
+          <span style="color:rgb(117 100 86)">Starts</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;text-align:right">{{ startLabel }}</span>
+          <span style="color:rgb(117 100 86)">Est. finish</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;text-align:right;font-weight:600">{{ endLabel }}</span>
+          <span style="color:rgb(117 100 86);white-space:nowrap">Internal approvals</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;text-align:right">{{ internalCount }}</span>
+        </div>
+        <div style="margin-top:12px;font-size:0.8em;color:rgb(117 100 86);line-height:1.5">Skips weekends and public holidays: {{ skipped }}</div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgb(244 241 236)">
+          <div style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:8px">On this plan</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ crew }}" as="c" hint-placeholder-count="5"><span style="height:26px;padding:0 9px 0 4px;border-radius:999px;background:rgb(246 244 240);display:flex;align-items:center;gap:6px;font-size:0.86em"><span style="width:18px;height:18px;border-radius:50%;background:{{ c.av }};font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ c.i }}</span>{{ c.name }}</span></sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+        <div onClick="{{ save }}" style="height:40px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.96em;cursor:{{ saveCursor }};opacity:{{ saveOp }}">{{ saveLabel }}</div>
+        <span style="font-size:0.86em;color:{{ saveNoteFg }}">{{ saveNote }}</span>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ reasonOpen }}">
+    <div onClick="{{ cancelReason }}" style="position:fixed;inset:0;z-index:200;background:rgb(51 36 27 / 0.35);display:flex;align-items:center;justify-content:center">
+      <div onClick="{{ stop }}" style="width:440px;background:#fff;border-radius:14px;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;font-size:13px;box-shadow:0 24px 60px rgb(51 36 27 / 0.25);animation:apIn .2s ease-out">
+        <div><div style="font-size:17px;font-weight:600">Reassign {{ pend.stage }}</div><div style="font-size:12.5px;color:rgb(117 100 86);margin-top:4px">{{ pend.from }} → {{ pend.to }}{{ pend.tail }}</div></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Reason (required)</div>
+          <textarea value="{{ reasonDraft }}" onChange="{{ onReason }}" placeholder="e.g. Ali is on MC until Friday" style="min-height:76px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical;outline:none"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <span onClick="{{ cancelReason }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;cursor:pointer">Cancel</span>
+          <span onClick="{{ confirmReason }}" style="height:34px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:500;cursor:{{ rCursor }};opacity:{{ rOp }}">Reassign</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:apIn .2s ease-out">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1300},&quot;scenario&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;plan&quot;,&quot;recurring&quot;,&quot;midway&quot;],&quot;default&quot;:&quot;plan&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;onBack&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const PEOPLE = {
+  Mei: ['Director', 3, 'oklch(0.90 0.05 295)', 'content'], 'Ah Kit': ['Videographer', 2, 'oklch(0.90 0.05 195)', 'content'], Ali: ['Editor', 3, 'oklch(0.90 0.05 270)', 'content'],
+  Jason: ['Social Media', 5, 'oklch(0.90 0.05 235)', 'social'], Siti: ['Graphic Designer', 4, 'oklch(0.92 0.04 350)', 'design'], Aina: ['Graphic Designer', 2, 'oklch(0.92 0.04 350)', 'design'],
+  Hafiz: ['Graphic Designer', 3, 'oklch(0.92 0.04 350)', 'design'], 'Wei Lun': ['Ads', 2, 'oklch(0.90 0.05 270)', 'ads'],
+};
+const DEPT = { content: ['Content', 'oklch(0.94 0.04 295)', 'oklch(0.40 0.12 295)'], social: ['Social Media', 'oklch(0.94 0.04 235)', 'oklch(0.40 0.10 235)'], design: ['Design', 'oklch(0.94 0.04 350)', 'oklch(0.43 0.13 350)'], ads: ['Ads', 'oklch(0.94 0.04 270)', 'oklch(0.40 0.12 270)'] };
+const POOL = { design: ['Siti', 'Aina', 'Hafiz'], content: ['Ali', 'Ah Kit'], social: ['Jason'], ads: ['Wei Lun'] };
+const ST = {
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+};
+const HOL = { '2026-11-09': 'Deepavali (observed) 9 Nov', '2026-12-25': 'Christmas 25 Dec' };
+const SCEN = {
+  plan: {
+    name: 'Carres Year-End Video', track: 'MKT-CAR-2610-007', template: 'Reels Video (5 stages)', start: '2026-11-02', pic: 'Kelvin',
+    stages: [
+      { name: 'Script', dept: 'content', who: 'Mei', sla: 2, appr: [['👤', 'Rachel']], split: false },
+      { name: 'Shoot', dept: 'content', who: 'Ah Kit', extra: '+ talent', sla: 1, appr: [], split: false },
+      { name: 'Raw upload', dept: 'content', who: 'Ah Kit', sla: 1, appr: [], split: false },
+      { name: 'Edit', dept: 'content', who: null, sla: 3, appr: [], split: true },
+      { name: 'Final', dept: 'content', who: null, sla: 1, appr: [['👤', 'Rachel'], ['🔗', 'PIC']], split: false },
+    ],
+  },
+  recurring: {
+    name: 'Carres Social Media Monthly', track: 'MKT-CAR-2611-R01', template: 'Social Media Package A (4 stages)', start: '2026-11-15', pic: 'Kelvin', recurring: true,
+    stages: [
+      { name: 'Monthly content plan', dept: 'social', who: 'Jason', sla: 2, appr: [['🔗', 'PIC']], split: false },
+      { name: 'Design', dept: 'design', who: 'picked', sla: 3, appr: [['👤', 'Rachel']], split: true },
+      { name: 'Captions & scheduling', dept: 'social', who: 'Jason', sla: 1, appr: [], split: false },
+      { name: 'Ads boost', dept: 'ads', who: 'Wei Lun', sla: 1, appr: [], split: false },
+    ],
+  },
+  midway: {
+    name: 'Carres Year-End Video', track: 'MKT-CAR-2610-007', template: 'Reels Video (5 stages)', start: '2026-10-19', pic: 'Kelvin', midway: true,
+    stages: [
+      { name: 'Script', dept: 'content', who: 'Mei', sla: 2, appr: [['👤', 'Rachel']], split: false, done: 'Done 20 Oct' },
+      { name: 'Shoot', dept: 'content', who: 'Ah Kit', extra: '+ talent', sla: 1, appr: [], split: false, done: 'Done 21 Oct' },
+      { name: 'Raw upload', dept: 'content', who: 'Ah Kit', sla: 1, appr: [], split: false, done: 'Done 22 Oct' },
+      { name: 'Edit', dept: 'content', who: 'Ali', sla: 3, appr: [], split: true, current: true },
+      { name: 'Final', dept: 'content', who: 'Ali', sla: 1, appr: [['👤', 'Rachel'], ['🔗', 'PIC']], split: false },
+    ],
+  },
+};
+const iso = d => d.toISOString().slice(0, 10);
+const isWork = d => d.getUTCDay() !== 0 && d.getUTCDay() !== 6 && !HOL[iso(d)];
+const fmt = d => `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()]} ${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]}`;
+const short = d => `${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]}`;
+function schedule(startIso, slas) {
+  let d = new Date(startIso + 'T00:00:00Z');
+  const skipped = new Set(); const out = [];
+  const adv = () => { d = new Date(d.getTime() + 864e5); };
+  while (!isWork(d)) { if (HOL[iso(d)]) skipped.add(HOL[iso(d)]); adv(); }
+  slas.forEach(n => {
+    while (!isWork(d)) { skipped.add(HOL[iso(d)] || 'weekends'); adv(); }
+    const s = new Date(d); let e = new Date(d), left = n;
+    while (left > 0) { if (isWork(d)) { e = new Date(d); left--; } else skipped.add(HOL[iso(d)] || 'weekends'); adv(); }
+    out.push([s, e]);
+  });
+  return { out, skipped: [...skipped] };
+}
+const clone = k => JSON.parse(JSON.stringify(SCEN[k].stages));
+
+const DMAP = { content: 'video', social: 'social', design: 'design', ads: 'ads' };
+const STORE = window.__hmStore;
+class Component extends DCLogic {
+  state = { scen: this.props.scenario ?? 'plan', stages: clone(this.props.scenario ?? 'plan'), locked: false, menu: null, saved: false, pending: null, reasonDraft: '', changes: {}, toast: '' };
+  loadScen(k) { this.setState({ scen: k, stages: clone(k), locked: false, menu: null, saved: false, pending: null, changes: {} }); }
+  upd(i, patch) { this.setState(s => ({ stages: s.stages.map((x, j) => j === i ? { ...x, ...patch } : x), menu: null, saved: false })); }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  assign(i, who) {
+    const s = this.state, st = s.stages[i], sc = SCEN[s.scen];
+    if (sc.midway && who !== st.who) return this.setState({ pending: { i, who }, reasonDraft: '', menu: null });
+    this.upd(i, { who });
+  }
+  renderVals() {
+    const s = this.state, sc = SCEN[s.scen], locked = s.locked;
+    const eff = s.stages.map(st => locked && st.who === 'picked' ? { ...st, who: null, split: false } : locked ? { ...st, split: false } : st);
+    const { out, skipped } = schedule(sc.start, eff.map(x => x.sla));
+    const unassigned = eff.filter(x => !x.who).length;
+    const stages = eff.map((st, i) => {
+      const d = DEPT[st.dept], done = !!st.done, editable = !done;
+      const hasPerson = !!st.who && st.who !== 'picked', isPicked = st.who === 'picked', un = !st.who;
+      const people = Object.entries(PEOPLE).sort((a, b) => (b[1][3] === st.dept) - (a[1][3] === st.dept)).map(([name, [role, load, av]]) => ({ name, role, load, av, i: name[0], bg: st.who === name ? 'rgb(246 244 240)' : 'transparent', onClick: () => this.assign(i, name) }));
+      const ch = s.changes[i];
+      let note = '', noteFg = 'rgb(117 100 86)';
+      if (ch) { note = `Changed from ${ch.from}: "${ch.reason}"${st.current ? ` · ${st.who} must Accept again` : ''}`; noteFg = st.current ? ST.waiting.fg : 'rgb(117 100 86)'; }
+      else if (s.saved && !done && hasPerson) note = st.current ? `${st.who} is working on it` : `Notified · ${st.who} will Accept when it's their turn`;
+      else if (isPicked) note = `${eff[i - 1] ? eff[i - 1].who : 'Previous stage'} chooses when they finish`;
+      const stState = done ? ['done', st.done] : st.current ? (ch ? ['waiting', `Waiting for ${st.who} to Accept`] : ['waiting', 'In progress']) : null;
+      const canPick = !locked && i > 0 && !sc.midway;
+      const apprOpts = [['👤', 'Rachel'], ['👤', 'Daniel'], ['👤', 'Mei'], ['🔗', 'PIC']].filter(([ic, n]) => !st.appr.some(a => a[1] === n)).map(([icon, n]) => ({ icon, label: n === 'PIC' ? `PIC (${sc.pic}) via link` : n, onClick: () => this.upd(i, { appr: [...st.appr, [icon, n]] }) }));
+      return {
+        name: st.name, dept: d[0], deptBg: d[1], deptFg: d[2],
+        numText: done ? '✓' : i + 1, numBg: done ? ST.done.bg : un ? 'rgb(252 236 233)' : st.current ? 'rgb(51 36 27)' : '#fff', numFg: done ? ST.done.fg : un ? 'rgb(176 40 34)' : st.current ? '#fff' : 'rgb(51 36 27)',
+        numBorder: done ? `1.5px solid ${ST.done.border}` : un ? '1.5px solid rgb(236 190 184)' : '1.5px solid rgb(51 36 27)', hasLine: i < eff.length - 1,
+        border: un ? 'rgb(220 120 110)' : st.current ? 'rgb(90 62 43)' : 'rgb(236 231 224)', bg: done ? 'rgb(248 247 245)' : un ? 'rgb(255 249 248)' : '#fff', op: done ? 0.7 : 1,
+        hasState: !!stState, stLabel: stState ? stState[1] : '', ...(stState ? { stBg: ST[stState[0]].bg, stFg: ST[stState[0]].fg, stBorder: ST[stState[0]].border, stDot: ST[stState[0]].dot } : {}),
+        unassigned: un, hasPerson, isPicked, person: st.who, initial: hasPerson ? st.who[0] : '', avBg: hasPerson ? PEOPLE[st.who][2] : '', hasExtra: !!st.extra, extra: st.extra,
+        pickFrom: (POOL[st.dept] || []).join(' / '), pickPool: (POOL[st.dept] || []).join(' / '),
+        fieldBorder: un ? 'rgb(220 120 110)' : 'rgb(229 222 211)', fieldBg: done ? 'transparent' : '#fff', cursor: editable ? 'pointer' : 'default', editable,
+        openAssignee: () => editable && this.setState(p => ({ menu: p.menu && p.menu.i === i && p.menu.k === 'a' ? null : { i, k: 'a' } })),
+        menuOpen: s.menu && s.menu.i === i && s.menu.k === 'a', people, canPick,
+        pickBlocked: !canPick, pickBlockedWhy: locked ? '🔓 Picked by previous stage is off — Locked workflow' : i === 0 ? 'The first stage is always assigned by MM' : 'Mid-way changes must name a person',
+        choosePicked: () => this.upd(i, { who: 'picked' }),
+        hasNote: !!note, note, noteFg,
+        noApprover: st.appr.length === 0, approvers: st.appr.map(([icon, n], k) => ({ icon, name: n === 'PIC' ? `PIC · ${sc.pic}` : n, arrow: k > 0, onRemove: () => this.upd(i, { appr: st.appr.filter((_, j) => j !== k) }) })),
+        openApprover: () => this.setState(p => ({ menu: p.menu && p.menu.i === i && p.menu.k === 'p' ? null : { i, k: 'p' } })),
+        apprMenuOpen: s.menu && s.menu.i === i && s.menu.k === 'p', apprOpts,
+        sla: st.sla, slaUp: () => this.upd(i, { sla: Math.min(20, st.sla + 1) }), slaDown: () => this.upd(i, { sla: Math.max(1, st.sla - 1) }),
+        dates: out[i][0].getTime() === out[i][1].getTime() ? fmt(out[i][0]) : `${short(out[i][0])} → ${short(out[i][1])}`,
+        splitLabel: st.split ? '✓ Yes' : '✗ No', splitBg: st.split ? 'rgb(246 244 240)' : '#fff', splitFg: st.split ? 'rgb(51 36 27)' : 'rgb(117 100 86)',
+        splitCursor: editable && !locked ? 'pointer' : 'not-allowed', splitOp: locked ? 0.5 : 1, splitTitle: locked ? 'Locked workflow: no subtasks' : 'Allow this stage to split into subtasks',
+        toggleSplit: () => editable && !locked && this.upd(i, { split: !st.split }),
+      };
+    });
+    const total = eff.reduce((a, x) => a + x.sla, 0);
+    const picCount = eff.reduce((a, x) => a + x.appr.filter(p => p[1] === 'PIC').length, 0);
+    const internal = eff.reduce((a, x) => a + x.appr.filter(p => p[1] !== 'PIC').length, 0);
+    const crewNames = [...new Set([...eff.filter(x => x.who && x.who !== 'picked').map(x => x.who), ...eff.flatMap(x => x.appr.filter(p => p[1] !== 'PIC').map(p => p[1]))])];
+    const crew = [...crewNames.map(n => ({ name: n, i: n[0], av: (PEOPLE[n] || [0, 0, 'oklch(0.90 0.05 195)'])[2] })), ...(picCount ? [{ name: `${sc.pic} (PIC)`, i: sc.pic[0], av: 'oklch(0.92 0.03 60)' }] : [])];
+    const notifyN = crew.length;
+    const midChanged = Object.keys(s.changes).length;
+    const canSave = unassigned === 0 && (!sc.midway || midChanged > 0) && !s.saved;
+    let saveNote, saveNoteFg = 'rgb(117 100 86)';
+    if (unassigned) { saveNote = `${unassigned} stage${unassigned > 1 ? 's' : ''} unassigned`; saveNoteFg = 'rgb(176 40 34)'; }
+    else if (s.saved) saveNote = sc.recurring ? 'Saved · runs on the 15th every month' : 'Saved · everyone on the plan was notified';
+    else if (sc.midway) saveNote = midChanged ? `${midChanged} change${midChanged > 1 ? 's' : ''} with reasons` : 'Change an assignee to update the plan';
+    else saveNote = `Notifies ${notifyN} people`;
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const pend = s.pending ? (() => { const st = eff[s.pending.i]; return { stage: st.name, from: st.who, to: s.pending.who, tail: st.current ? ` · ${s.pending.who} must Accept again` : '' }; })() : {};
+    return {
+      back: () => this.props.onBack && this.props.onBack(),
+      scenarios: [['plan', 'New plan'], ['recurring', 'Recurring'], ['midway', 'Mid-way change']].map(([k, label]) => ({ label, ...seg(s.scen === k), onClick: () => this.loadScen(k) })),
+      trackId: sc.track, projectName: sc.name, templateName: sc.template,
+      isRecurring: !!sc.recurring, isMidway: !!sc.midway, isLocked: locked,
+      toggleLocked: () => this.setState(p => ({ locked: !p.locked, saved: false })),
+      lockBorder: locked ? 'rgb(51 36 27)' : 'rgb(229 222 211)', lockBg: locked ? 'rgb(246 244 240)' : '#fff', lockTrack: locked ? 'rgb(51 36 27)' : 'rgb(214 206 196)', lockKnob: locked ? 14 : 2,
+      stages,
+      totalDays: total, picCount, picPlural: picCount === 1 ? '' : 's', internalCount: internal,
+      startLabel: fmt(out[0][0]), endLabel: fmt(out[out.length - 1][1]),
+      skipped: skipped.length ? skipped.join(', ') : 'none in this range',
+      crew,
+      save: () => {
+        if (!canSave) return;
+        this.setState({ saved: true });
+        if (sc.midway) { const curCh = eff.some((x, i) => x.current && s.changes[i]); this.flash(`Plan updated · ${midChanged + (curCh ? 0 : 0)} change${midChanged > 1 ? 's' : ''} logged · new assignees notified`); }
+        else {
+          const first = eff[0], who = first.who;
+          const ROWS = [[11, 'Mon', '🛋️ Product Universe', 'Offer'], [12, 'Thu', '💡 Audience Value', 'Tip'], [14, 'Sat', '🌏 Brand World', 'Reels'], [17, 'Tue', '🛋️ Product Universe', 'Post'], [21, 'Sat', '🤝 Social Proof & Community', 'Testimonial'], [26, 'Thu', '🌏 Brand World', 'Reels']];
+          const tasks = who && who !== 'picked' ? [{ topLeft: sc.track, title: sc.name, sub: 'Carres', pic: sc.pic || 'Kelvin', owner: 'Rachel', dept: DMAP[first.dept] || 'social', due: `Due ${short(out[out.length - 1][1])}`, cur: 0, phase: 'todo', apprIdx: 0, ver: 0, picks: {}, changes: null,
+            stages: eff.map((x, i) => ({ name: x.name, who: x.who === 'picked' ? null : x.who, picked: x.who === 'picked', cands: POOL[x.dept] || [], apprRaw: x.appr, due: short(out[i][1]), dept: DMAP[x.dept] || 'social' })),
+            rows: ROWS.map(([d, wd, pillar, type]) => ({ d, date: `${wd} ${d} Nov`, pillar, type, topic: '', caption: '' })), graphics: ROWS.map(() => false),
+            history: [{ t: '10 Nov 09:00', text: 'Rachel (MM) saved the Assignment plan' }] }] : [];
+          const notices = eff.slice(1).filter(x => x.who && x.who !== 'picked' && x.who !== who).map(x => ({ forUser: x.who, text: `You're on the plan for "${sc.name}" — Stage ${eff.indexOf(x) + 1}, starts ${short(out[eff.indexOf(x)][0])}` }));
+          window.__hmStore.push(tasks, notices);
+          this.flash(`${notifyN} people notified${tasks.length ? ` · ${who} has a new task to Accept` : ''}`);
+        }
+      },
+      saveLabel: s.saved ? 'Plan saved ✓' : sc.midway ? 'Save changes' : 'Save plan',
+      saveCursor: canSave ? 'pointer' : 'not-allowed', saveOp: canSave ? 1 : s.saved ? 0.7 : 0.4, saveNote, saveNoteFg,
+      reasonOpen: !!s.pending, pend, reasonDraft: s.reasonDraft, onReason: e => this.setState({ reasonDraft: e.target.value }),
+      rCursor: s.reasonDraft.trim() ? 'pointer' : 'not-allowed', rOp: s.reasonDraft.trim() ? 1 : 0.4,
+      cancelReason: () => this.setState({ pending: null }), stop: e => e.stopPropagation(),
+      confirmReason: () => {
+        if (!s.reasonDraft.trim()) return;
+        const { i, who } = s.pending, from = s.stages[i].who;
+        this.setState(p => ({ stages: p.stages.map((x, j) => j === i ? { ...x, who } : x), changes: { ...p.changes, [i]: { from, reason: p.reasonDraft.trim() } }, pending: null, saved: false }));
+      },
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

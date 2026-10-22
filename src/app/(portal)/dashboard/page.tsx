@@ -22,6 +22,8 @@ import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approv
 import { startRead } from '@/lib/start-read'
 import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
 import { lensOverview } from '@/lib/view-as'
+import { redirect } from 'next/navigation'
+import { isMarketingView } from '@/lib/marketing-view'
 import { canDo } from '@/lib/permission-actions'
 import { bookWindow, loadRepaymentBook, type BookDeal } from '@/lib/repayment-book'
 import { fetchAllRows } from '@/lib/paginate'
@@ -154,6 +156,8 @@ type DashboardSummary = {
 
 export default async function DashboardPage() {
   const user = await requireAuth()
+  // Marketing's view opens on My Space (2026-10-23, the handoff's first page).
+  if (isMarketingView(user)) redirect('/marketing')
   const supabase = await createClient()
 
   // Which Overview, read off the viewer's own cells (2026-10-09, Q7 — it was

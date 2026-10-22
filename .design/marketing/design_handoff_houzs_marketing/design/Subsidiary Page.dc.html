@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<style>@keyframes spIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:32px 36px 64px;box-sizing:border-box;color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="width:52px;height:52px;border-radius:14px;background:oklch(0.95 0.035 235);display:flex;align-items:center;justify-content:center;font-size:28px">🛋️</div>
+    <div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:1.9em;font-weight:600;letter-spacing:-0.01em">Carres</span><span style="width:9px;height:9px;border-radius:50%;background:oklch(0.70 0.12 235)"></span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:0.92em;color:rgb(117 100 86)"><span>PIC</span><span style="display:flex;align-items:center;gap:6px;color:rgb(51 36 27)"><span style="width:20px;height:20px;border-radius:50%;background:oklch(0.92 0.03 60);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">K</span>Kelvin</span><span>· approves via 🔗 link</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:24px">
+    <sc-for list="{{ stats }}" as="s" hint-placeholder-count="5">
+      <div style="padding:14px 16px;border-radius:12px;background:{{ s.bg }};border:1px solid {{ s.border }}">
+        <div style="display:flex;align-items:center;gap:6px;font-size:0.85em;color:{{ s.labelFg }}"><span style="font-size:14px">{{ s.emoji }}</span>{{ s.label }}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><span style="font-size:1.9em;font-weight:600;letter-spacing:-0.02em;color:{{ s.fg }}">{{ s.value }}</span><span style="font-size:0.88em;color:rgb(117 100 86)">{{ s.sub }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:20px;margin-top:24px;align-items:start">
+    <div style="min-width:0">
+      <div style="position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-size:1.35em;font-weight:600">{{ title }}</span>
+        <sc-if value="{{ showNav }}">
+          <div style="display:flex;gap:4px">
+            <span onClick="{{ prev }}" style="width:28px;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(250 248 244)">‹</span>
+            <span onClick="{{ next }}" style="width:28px;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(250 248 244)">›</span>
+          </div>
+        </sc-if>
+        <span style="flex:1"></span>
+        <div onClick="{{ toggleKey }}" style="height:30px;padding:0 10px 0 8px;border-radius:8px;border:1px solid {{ keyBorder }};background:{{ keyBg }};display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;white-space:nowrap">
+          <span style="width:28px;height:16px;border-radius:8px;background:{{ keyTrack }};position:relative;transition:background-color .2s"><span style="position:absolute;top:2px;left:{{ keyKnob }}px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></span>
+          <span>⚑ Key dates</span>
+        </div>
+        <div onClick="{{ toggleFilter }}" style="height:30px;padding:0 10px;border-radius:8px;border:1px solid {{ filterBorder }};background:#fff;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.9em;white-space:nowrap">Filter<sc-if value="{{ hasFilters }}"><span style="min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:rgb(51 36 27);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ filterCount }}</span></sc-if></div>
+        <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+          <sc-for list="{{ views }}" as="o" hint-placeholder-count="3">
+            <div onClick="{{ o.onClick }}" style="height:24px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.88em">{{ o.label }}</div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ filterOpen }}">
+          <div style="position:absolute;top:38px;right:0;z-index:30;width:520px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.16);padding:14px 16px;display:flex;flex-direction:column;gap:12px;animation:spIn .15s ease-out">
+            <sc-for list="{{ filterGroups }}" as="g" hint-placeholder-count="3">
+              <div>
+                <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:6px">{{ g.title }}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="5">
+                    <span onClick="{{ o.onClick }}" style="height:26px;padding:0 10px;border-radius:999px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ o.dot }}"></span>{{ o.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ isMonth }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden;background:#fff">
+          <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+            <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><div style="padding:7px 10px;font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ w }}</div></sc-for>
+          </div>
+          <sc-for list="{{ weeks }}" as="wk" hint-placeholder-count="6">
+            <div style="position:relative;border-bottom:{{ wk.bb }}">
+              <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">
+                <sc-for list="{{ wk.days }}" as="d" hint-placeholder-count="7">
+                  <div style="min-height:{{ wk.minH }}px;padding:4px 5px 6px;box-sizing:border-box;border-right:{{ d.br }};background:{{ d.bg }};display:flex;flex-direction:column;gap:3px">
+                    <div style="display:flex;align-items:center;gap:4px;height:22px">
+                      <sc-for list="{{ d.flags }}" as="f" hint-placeholder-count="0">
+                        <span title="{{ f.name }}" style="display:flex;align-items:center;height:16px;padding:0 7px 0 5px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:9.5px;font-weight:600;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;max-width:86px;clip-path:polygon(0 0,100% 0,calc(100% - 5px) 50%,100% 100%,0 100%);animation:spIn .2s ease-out">⚑ {{ f.short }}</span>
+                      </sc-for>
+                      <span style="flex:1"></span>
+                      <span style="min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:0.85em;font-weight:{{ d.weight }};background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.n }}</span>
+                    </div>
+                    <div style="height:{{ wk.barSpace }}px;flex:none"></div>
+                    <sc-for list="{{ d.items }}" as="it" hint-placeholder-count="0">
+                      <div onClick="{{ it.onClick }}" title="{{ it.title }}" style="display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:5px;background:{{ it.bg }};color:{{ it.fg }};font-size:0.8em;cursor:pointer;min-width:0;opacity:{{ it.op }};border:1px solid {{ it.border }}" style-hover="filter:brightness(0.97)">
+                        <span style="font-size:11px;flex:none">{{ it.emoji }}</span>
+                        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;text-decoration:{{ it.deco }}">{{ it.title }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ wk.bars }}" as="b" hint-placeholder-count="0">
+                <div onClick="{{ b.onClick }}" title="{{ b.title }}" style="position:absolute;left:calc({{ b.left }}% + 4px);width:calc({{ b.width }}% - 8px);top:{{ b.top }}px;height:20px;border-radius:{{ b.radius }};background:{{ b.bg }};color:{{ b.fg }};font-size:0.78em;font-weight:600;display:flex;align-items:center;gap:6px;padding:0 8px;box-sizing:border-box;cursor:pointer;white-space:nowrap;overflow:hidden" style-hover="filter:brightness(0.96)"><span>{{ b.emoji }}</span><span style="overflow:hidden;text-overflow:ellipsis">{{ b.label }}</span></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isWeek }}">
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden;background:#fff">
+          <sc-for list="{{ weekCols }}" as="d" hint-placeholder-count="7">
+            <div style="min-height:380px;border-right:{{ d.br }};background:{{ d.bg }};display:flex;flex-direction:column">
+              <div style="padding:10px;border-bottom:1px solid rgb(240 236 230);display:flex;flex-direction:column;gap:4px">
+                <span style="font-size:0.78em;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ d.wd }}</span>
+                <span style="font-size:1.3em;font-weight:{{ d.weight }};color:{{ d.numFg }}">{{ d.n }}</span>
+                <sc-for list="{{ d.flags }}" as="f" hint-placeholder-count="0"><span style="align-self:flex-start;padding:1px 8px 1px 5px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:10px;font-weight:600;clip-path:polygon(0 0,100% 0,calc(100% - 5px) 50%,100% 100%,0 100%)">⚑ {{ f.name }}</span></sc-for>
+              </div>
+              <div style="padding:8px;display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ d.all }}" as="it" hint-placeholder-count="0">
+                  <div onClick="{{ it.onClick }}" style="padding:7px 8px;border-radius:7px;background:{{ it.bg }};color:{{ it.fg }};border:1px solid {{ it.border }};cursor:pointer;display:flex;flex-direction:column;gap:3px;opacity:{{ it.op }}">
+                    <span style="font-size:0.75em;display:flex;align-items:center;gap:4px"><span>{{ it.emoji }}</span>{{ it.kindLabel }}</span>
+                    <span style="font-size:0.85em;font-weight:600;line-height:1.3;text-decoration:{{ it.deco }}">{{ it.title }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTimeline }}">
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden;background:#fff">
+          <div style="display:grid;grid-template-columns:190px minmax(0,1fr)">
+            <div style="background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);border-right:1px solid rgb(236 231 224);padding:8px 12px;font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);display:flex;align-items:flex-end">Campaign / project</div>
+            <div style="position:relative;height:{{ tlHeadH }}px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+              <sc-for list="{{ tlMonths }}" as="m" hint-placeholder-count="3"><div style="position:absolute;top:6px;left:{{ m.left }}%;padding-left:8px;font-size:0.85em;font-weight:600;border-left:1px solid rgb(229 222 211);height:20px">{{ m.name }}</div></sc-for>
+              <sc-for list="{{ tlWeeks }}" as="w" hint-placeholder-count="10"><div style="position:absolute;top:28px;left:{{ w.left }}%;font-family:'Chivo Mono',Menlo,monospace;font-size:9.5px;color:rgb(150 140 130);transform:translateX(-50%)">{{ w.n }}</div></sc-for>
+              <sc-for list="{{ tlFlags }}" as="f" hint-placeholder-count="0"><div title="{{ f.name }}" style="position:absolute;bottom:4px;left:{{ f.left }}%;padding:1px 7px 1px 4px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:9px;font-weight:600;white-space:nowrap;clip-path:polygon(0 0,100% 0,calc(100% - 4px) 50%,100% 100%,0 100%);animation:spIn .2s ease-out">⚑ {{ f.short }}</div></sc-for>
+            </div>
+            <sc-for list="{{ tlRows }}" as="r" hint-placeholder-count="7">
+              <div style="padding:0 12px;height:44px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgb(244 241 236);border-right:1px solid rgb(236 231 224);font-size:0.9em;background:{{ r.labelBg }};font-weight:{{ r.labelW }};color:{{ r.labelFg }}">
+                <span>{{ r.emoji }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+              </div>
+              <div style="position:relative;height:44px;border-bottom:1px solid rgb(244 241 236);background:{{ r.trackBg }}">
+                <sc-if value="{{ r.isBar }}">
+                  <div onClick="{{ r.onClick }}" title="{{ r.range }}" style="position:absolute;top:10px;height:24px;left:{{ r.left }}%;width:{{ r.width }}%;border-radius:6px;background:{{ r.bg }};border:1px solid {{ r.border }};color:{{ r.fg }};font-size:0.78em;font-weight:600;display:flex;align-items:center;padding:0 8px;box-sizing:border-box;white-space:nowrap;overflow:hidden;cursor:pointer" style-hover="filter:brightness(0.96)">{{ r.range }}</div>
+                </sc-if>
+                <sc-for list="{{ r.overlaps }}" as="o" hint-placeholder-count="0">
+                  <div title="{{ o.title }}" style="position:absolute;top:6px;bottom:6px;left:{{ o.left }}%;width:{{ o.width }}%;border-radius:6px;background:repeating-linear-gradient(135deg, rgb(51 36 27 / 0.75) 0 4px, rgb(51 36 27 / 0.15) 4px 8px)"></div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="position:relative;height:0">
+            <div style="position:absolute;bottom:0;left:calc(190px + {{ todayLeftFrac }} * (100% - 190px));width:0;height:{{ tlBodyH }}px;border-left:1.5px solid rgb(90 62 43);pointer-events:none"></div>
+            <div style="position:absolute;bottom:{{ tlBodyH }}px;left:calc(190px + {{ todayLeftFrac }} * (100% - 190px));transform:translate(-50%,-2px);padding:1px 6px;border-radius:4px;background:#EC9B55;color:rgb(43 31 23);font-size:9.5px;font-weight:600;pointer-events:none">Today</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:0.85em;color:rgb(117 100 86)"><span style="width:22px;height:12px;border-radius:3px;background:repeating-linear-gradient(135deg, rgb(51 36 27 / 0.75) 0 4px, rgb(51 36 27 / 0.15) 4px 8px)"></span>{{ overlapNote }}</div>
+      </sc-if>
+
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:12px;font-size:0.82em;color:rgb(90 78 68)">
+        <sc-for list="{{ legend }}" as="l" hint-placeholder-count="6"><span style="display:flex;align-items:center;gap:5px;white-space:nowrap"><span style="font-size:12px">{{ l.e }}</span>{{ l.t }}</span></sc-for>
+        <span style="flex:1"></span>
+        <span style="white-space:nowrap">📌 Dates sync from task fields marked "Show on calendar"</span>
+      </div>
+    </div>
+
+    <div style="border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:15px">⚡</span><span style="font-size:1.04em;font-weight:600">Recent activity</span></div>
+      <sc-for list="{{ feed }}" as="f" hint-placeholder-count="3">
+        <div onClick="{{ f.onClick }}" style="display:flex;gap:10px;padding:10px 0;border-top:1px solid rgb(244 241 236);cursor:pointer" style-hover="opacity:0.8">
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;background:{{ f.bg }};display:flex;align-items:center;justify-content:center;font-size:14px">{{ f.emoji }}</span>
+          <div style="min-width:0">
+            <div style="font-size:0.9em;line-height:1.45;text-wrap:pretty">{{ f.text }}</div>
+            <div style="font-size:0.8em;color:rgb(117 100 86);margin-top:2px">{{ f.when }}</div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="padding-top:10px;border-top:1px solid rgb(244 241 236);font-size:0.82em;color:rgb(117 100 86)">From the audit trail</div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:16px">📁</span><span style="font-size:1.2em;font-weight:600">Projects</span><span style="font-size:0.9em;color:rgb(117 100 86)">{{ projectCount }}</span></div>
+    <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.2fr) minmax(0,1.6fr) minmax(0,1fr) 96px;gap:14px;padding:9px 16px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:rgb(117 100 86)">
+        <span>Project</span><span>Status</span><span>Progress</span><span>Owner</span><span>Due</span>
+      </div>
+      <sc-for list="{{ projects }}" as="p" hint-placeholder-count="5">
+        <div onClick="{{ p.onClick }}" style="display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.2fr) minmax(0,1.6fr) minmax(0,1fr) 96px;gap:14px;align-items:center;padding:0 16px;min-height:52px;border-bottom:1px solid rgb(244 241 236);font-size:0.94em;cursor:pointer;background:{{ p.rowBg }}" style-hover="background:rgb(250 248 244)">
+          <span style="display:flex;align-items:center;gap:8px;min-width:0"><span>{{ p.emoji }}</span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="flex:none;font-size:0.8em;padding:1px 7px;border-radius:5px;background:{{ p.deptBg }};color:{{ p.deptFg }}">{{ p.dept }}</span></span>
+          <span style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.86em;font-weight:500;padding:2px 9px;border-radius:999px;background:{{ p.stBg }};color:{{ p.stFg }};border:1px solid {{ p.stBorder }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.dot }}"></span>{{ p.stLabel }}</span></span>
+          <span style="display:flex;align-items:center;gap:10px"><span style="flex:1;height:6px;border-radius:3px;background:rgb(240 236 230);overflow:hidden"><span style="display:block;height:100%;width:{{ p.pct }}%;background:{{ p.barBg }};border-radius:3px"></span></span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;width:34px;text-align:right">{{ p.pct }}%</span></span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:22px;height:22px;border-radius:50%;background:{{ p.avBg }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.initial }}</span>{{ p.owner }}</span>
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:{{ p.dueFg }}">{{ p.due }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1500},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;month&quot;,&quot;week&quot;,&quot;timeline&quot;],&quot;default&quot;:&quot;month&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;keyDates&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onOpenTask&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;}}">
+const ST = {
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)', label: 'Draft' },
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)', label: 'Waiting' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)', label: 'Done' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)', label: 'Overdue' },
+};
+const DEPT = {
+  social: { label: 'Social Media', bg: 'oklch(0.94 0.04 235)', fg: 'oklch(0.40 0.10 235)', bar: 'oklch(0.88 0.06 235)' },
+  content: { label: 'Content (Video)', bg: 'oklch(0.94 0.04 295)', fg: 'oklch(0.40 0.12 295)', bar: 'oklch(0.87 0.07 295)' },
+  design: { label: 'Design (Graphic)', bg: 'oklch(0.94 0.04 350)', fg: 'oklch(0.43 0.13 350)', bar: 'oklch(0.88 0.07 350)' },
+  ads: { label: 'Ads', bg: 'oklch(0.94 0.04 270)', fg: 'oklch(0.40 0.12 270)', bar: 'oklch(0.86 0.07 270)' },
+  brand: { label: 'Brand', bg: 'oklch(0.94 0.04 195)', fg: 'oklch(0.38 0.08 195)', bar: 'oklch(0.86 0.06 195)' },
+};
+const TYPE_E = { Reels: '🎞️', Post: '🖼️', Tip: '💡', Launch: '🚀', Offer: '🏷️', Testimonial: '💬' };
+const KIND = { post: 'Post', shoot: 'Shoot day', adsOn: 'Ads go-live', adsOff: 'Ads end', report: 'Report day', pic: 'PIC approval deadline' };
+const KIND_E = { shoot: '🎥', adsOn: '📣', adsOff: '🏁', report: '📊', pic: '⏰' };
+// day index: 0 = 26 Oct 2026 (Mon)
+const di = (m, d) => (m === 10 ? d - 26 : m === 11 ? 5 + d : 35 + d);
+const ITEMS = [
+  { m: 11, d: 2, kind: 'post', type: 'Post', title: 'Rental 101', dept: 'social', st: 'done' },
+  { m: 11, d: 4, kind: 'post', type: 'Tip', title: 'Small-space sofa', dept: 'social', st: 'done' },
+  { m: 11, d: 5, kind: 'shoot', title: 'Year-End Video shoot', dept: 'content', st: 'done' },
+  { m: 11, d: 6, kind: 'post', type: 'Reels', title: '11.11 teaser', dept: 'content', st: 'done' },
+  { m: 11, d: 8, kind: 'post', type: 'Offer', title: '11.11 early access', dept: 'social', st: 'done' },
+  { m: 11, d: 8, kind: 'pic', title: '11.11 banner set', dept: 'design', st: 'red' },
+  { m: 11, d: 9, kind: 'post', type: 'Offer', title: '11.11 deal live', dept: 'social', st: 'done' },
+  { m: 11, d: 9, kind: 'adsOn', title: '11.11 ads go live', dept: 'ads', st: 'done' },
+  { m: 11, d: 10, kind: 'post', type: 'Reels', title: 'Countdown reel', dept: 'content', st: 'red' },
+  { m: 11, d: 11, kind: 'post', type: 'Launch', title: '11.11 is here', dept: 'social', st: 'waiting' },
+  { m: 11, d: 12, kind: 'adsOff', title: '11.11 ads end', dept: 'ads', st: 'waiting' },
+  { m: 11, d: 13, kind: 'post', type: 'Testimonial', title: 'Customer home: Cheras', dept: 'social', st: 'draft' },
+  { m: 11, d: 16, kind: 'report', title: 'Ads report #4', dept: 'ads', st: 'draft' },
+  { m: 11, d: 17, kind: 'post', type: 'Post', title: 'Weekend showroom', dept: 'social', st: 'draft' },
+  { m: 11, d: 19, kind: 'shoot', title: 'Showroom weekend shoot', dept: 'content', st: 'waiting' },
+  { m: 11, d: 20, kind: 'post', type: 'Tip', title: 'Fabric care', dept: 'social', st: 'draft' },
+  { m: 11, d: 24, kind: 'post', type: 'Reels', title: 'Year-End Video teaser', dept: 'content', st: 'draft' },
+  { m: 11, d: 26, kind: 'pic', title: 'Dec content plan', dept: 'social', st: 'waiting' },
+  { m: 11, d: 28, kind: 'post', type: 'Offer', title: 'Payday deal', dept: 'social', st: 'draft' },
+  { m: 12, d: 1, kind: 'post', type: 'Launch', title: 'Year-End Sale opens', dept: 'social', st: 'draft' },
+  { m: 12, d: 4, kind: 'post', type: 'Reels', title: 'Year-End Video', dept: 'content', st: 'draft' },
+].map(x => ({ ...x, i: di(x.m, x.d) }));
+const CAMPAIGNS = [
+  { id: 'c1', name: 'Carres 11.11 Rental Deal', short: '11.11 Rental Deal', emoji: '🏷️', dept: 'brand', s: di(11, 9), e: di(11, 12), range: '9–12 Nov' },
+  { id: 'c2', name: 'Carres Showroom Weekends', short: 'Showroom Weekends', emoji: '🛋️', dept: 'social', s: di(11, 7), e: di(11, 29), range: '7–29 Nov' },
+  { id: 'c3', name: 'Carres Year-End Sale', short: 'Year-End Sale', emoji: '🎄', dept: 'brand', s: di(12, 1), e: di(12, 31), range: '1–31 Dec' },
+];
+const KEYDATES = [
+  { i: di(10, 31), short: 'Payday', name: 'Payday' },
+  { i: di(11, 8), short: 'Deepavali', name: 'Deepavali' },
+  { i: di(11, 11), short: '11.11', name: '11.11 sale day' },
+  { i: di(11, 21), short: 'Showroom', name: 'New Carres showroom opens (Puchong)' },
+  { i: di(11, 30), short: 'Payday', name: 'Payday' },
+  { i: di(12, 12), short: '12.12', name: '12.12 sale day' },
+  { i: di(12, 25), short: 'Christmas', name: 'Christmas' },
+  { i: di(12, 31), short: 'Payday', name: 'Payday' },
+];
+const TODAY = di(11, 10);
+const MONTHS = [
+  { name: 'October 2026', start: di(10, 26) - 0, first: -25, days: 31, label: 'Oct' },
+  { name: 'November 2026', first: di(11, 1), days: 30, label: 'Nov' },
+  { name: 'December 2026', first: di(12, 1), days: 31, label: 'Dec' },
+];
+const dateOf = i => { if (i < -25) return { m: 9, d: 56 + i }; if (i < 6) return { m: 10, d: 26 + i }; if (i < 36) return { m: 11, d: i - 5 }; return { m: 12, d: i - 35 }; };
+const MN = { 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec' };
+const TL_START = 0, TL_DAYS = 67;
+
+class Component extends DCLogic {
+  componentDidMount() { this._u = () => this.forceUpdate(); const go = () => { if (window.__hmStore) window.__hmStore.subs.add(this._u); else setTimeout(go, 50); }; go(); }
+  componentWillUnmount() { window.__hmStore && window.__hmStore.subs.delete(this._u); }
+  state = { view: this.props.view ?? 'month', month: 1, keyOn: this.props.keyDates ?? false, filterOpen: false, f: { type: [], dept: [], status: [] } };
+  tog(g, v) { this.setState(s => { const c = s.f[g]; return { f: { ...s.f, [g]: c.includes(v) ? c.filter(x => x !== v) : [...c, v] } }; }); }
+  renderVals() {
+    const { view, month, keyOn, filterOpen, f } = this.state;
+    const open = () => this.props.onOpenTask && this.props.onOpenTask('MKT-CAR-2610-007');
+    const typeOf = it => it.kind === 'post' ? 'Post' : KIND[it.kind];
+    const pass = it => (!f.type.length || f.type.includes(it.kindName)) && (!f.dept.length || f.dept.includes(it.dept)) && (!f.status.length || f.status.includes(it.st));
+    const deco = it => {
+      const s = ST[it.st], d = DEPT[it.dept], red = it.st === 'red';
+      return {
+        ...it, emoji: it.kind === 'post' ? TYPE_E[it.type] : KIND_E[it.kind], kindLabel: it.kind === 'post' ? it.type : KIND[it.kind],
+        bg: red ? s.bg : d.bg, fg: red ? s.fg : d.fg, border: red ? s.border : 'transparent',
+        op: it.st === 'done' ? 0.62 : 1, deco: 'none', onClick: open,
+      };
+    };
+    const HS = window.__hmStore;
+    const storeItems = HS ? HS.tasks.filter(t => t.sub === 'Carres').flatMap(t => t.rows.map(r => { const ps = HS.postStatus(t, r); return { m: 11, d: r.d, i: di(11, r.d), kind: 'post', type: r.type, title: `${ps.label === 'Posted' ? '✓ Posted · ' : ps.label === 'Scheduled' ? '⏱ ' : ''}${r.topic || r.type + ' · topic TBC'}`, dept: 'social', st: ps.st, storeId: t.topLeft }; })) : [];
+    const items = [...storeItems, ...ITEMS].map(it => ({ ...it, kindName: typeOf(it) })).filter(pass).map(deco).map(it => it.storeId ? { ...it, op: 1, onClick: () => this.props.onOpenTask && this.props.onOpenTask(it.storeId) } : it);
+    const camps = CAMPAIGNS.filter(c => (!f.type.length || f.type.includes('Campaign')) && (!f.dept.length || f.dept.includes(c.dept)) && (!f.status.length || f.status.includes('waiting')));
+
+    // Month
+    const M = MONTHS[month];
+    const gridStart = M.first - ((M.first % 7) + 7) % 7;
+    const weeks = [];
+    const nWeeks = Math.ceil((M.first - gridStart + M.days) / 7);
+    for (let w = 0; w < nWeeks; w++) {
+      const ws = gridStart + w * 7, we = ws + 6;
+      const wc = camps.filter(c => c.s <= we && c.e >= ws);
+      const bars = wc.map((c, k) => {
+        const s = Math.max(c.s, ws), e = Math.min(c.e, we), d = DEPT[c.dept];
+        return { title: `${c.name} · ${c.range}`, label: c.s >= ws || s === ws && w === 0 ? `${c.short} · ${c.range}` : c.short, emoji: c.emoji, left: ((s - ws) / 7) * 100, width: ((e - s + 1) / 7) * 100, top: 28 + k * 23, bg: d.bar, fg: d.fg, radius: `${c.s >= ws ? 6 : 0}px ${c.e <= we ? 6 : 0}px ${c.e <= we ? 6 : 0}px ${c.s >= ws ? 6 : 0}px`, onClick: open };
+      });
+      const days = [];
+      for (let i = ws; i <= we; i++) {
+        const inMonth = i >= M.first && i < M.first + M.days, dt = dateOf(i), today = i === TODAY;
+        days.push({
+          n: dt.d === 1 ? `${dt.d} ${MN[dt.m]}` : dt.d,
+          br: i === we ? 'none' : '1px solid rgb(240 236 230)', bg: inMonth ? '#fff' : 'rgb(251 250 248)',
+          numBg: today ? 'rgb(90 62 43)' : 'transparent', numFg: today ? 'rgb(246 238 230)' : inMonth ? 'rgb(74 64 58)' : 'rgb(190 182 172)', weight: today ? 600 : 400,
+          flags: keyOn ? KEYDATES.filter(k => k.i === i) : [],
+          items: items.filter(x => x.i === i).sort((a, b) => (b.st === 'red') - (a.st === 'red')),
+        });
+      }
+      weeks.push({ days, bars, barSpace: wc.length * 23, minH: 96 + wc.length * 23, bb: w === nWeeks - 1 ? 'none' : '1px solid rgb(236 231 224)' });
+    }
+
+    // Week (9–15 Nov)
+    const wkStart = di(11, 9);
+    const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekCols = WD.map((wd, k) => {
+      const i = wkStart + k, today = i === TODAY;
+      const campItems = camps.filter(c => c.s <= i && c.e >= i).map(c => ({ ...deco({ ...c, kind: 'post', type: 'Offer', st: 'waiting', title: c.short }), emoji: c.emoji, kindLabel: 'Campaign', bg: DEPT[c.dept].bar, fg: DEPT[c.dept].fg, op: 1 }));
+      return { wd, n: dateOf(i).d, weight: today ? 700 : 500, numFg: today ? 'rgb(90 62 43)' : 'rgb(51 36 27)', bg: today ? 'rgb(253 251 247)' : '#fff', br: k === 6 ? 'none' : '1px solid rgb(240 236 230)', flags: keyOn ? KEYDATES.filter(x => x.i === i) : [], all: [...items.filter(x => x.i === i).sort((a, b) => (b.st === 'red') - (a.st === 'red')), ...campItems] };
+    });
+
+    // Timeline
+    const pct = i => ((i - TL_START) / TL_DAYS) * 100;
+    const ov = [];
+    for (let a = 0; a < camps.length; a++) for (let b = a + 1; b < camps.length; b++) {
+      const s = Math.max(camps[a].s, camps[b].s), e = Math.min(camps[a].e, camps[b].e);
+      if (s <= e) ov.push({ s, e, title: `${camps[a].short} overlaps ${camps[b].short}` });
+    }
+    const PROJ = [
+      { name: 'Carres Year-End Video', emoji: '🎬', dept: 'content', s: di(10, 26), e: di(12, 4), range: 'Script → Final · 26 Oct – 4 Dec', red: true },
+      { name: 'Nov content plan (12 posts)', emoji: '📣', dept: 'social', s: di(11, 2), e: di(11, 28), range: '2–28 Nov' },
+      { name: '11.11 Ads flight', emoji: '📈', dept: 'ads', s: di(11, 9), e: di(11, 12), range: '9–12 Nov' },
+    ];
+    const tlRows = [
+      { isHead: true, name: 'Campaigns', emoji: '📢' },
+      ...camps.map(c => ({ ...c, isBar: true, cname: c.name })),
+      { isHead: true, name: 'Overlaps', emoji: '⚠️', overlapsRow: true },
+      { isHead: true, name: 'Projects', emoji: '📁' },
+      ...PROJ.filter(p => !f.dept.length || f.dept.includes(p.dept)).map(p => ({ ...p, isBar: true, cname: p.name })),
+    ].map(r => {
+      const d = DEPT[r.dept];
+      return {
+        emoji: r.emoji, name: r.isHead ? r.name : r.cname,
+        labelBg: r.isHead ? 'rgb(250 248 244)' : '#fff', labelW: r.isHead ? 600 : 400, labelFg: r.isHead ? 'rgb(117 100 86)' : 'rgb(51 36 27)',
+        trackBg: r.isHead ? 'rgb(252 251 249)' : '#fff',
+        isBar: !!r.isBar, range: r.isBar ? (r.short ? `${r.short} · ${r.range}` : r.range) : '',
+        left: r.isBar ? pct(r.s) : 0, width: r.isBar ? ((r.e - r.s + 1) / TL_DAYS) * 100 : 0,
+        bg: r.red ? ST.red.bg : d ? d.bar : '', border: r.red ? ST.red.border : 'transparent', fg: r.red ? ST.red.fg : d ? d.fg : '',
+        overlaps: r.overlapsRow ? ov.map(o => ({ title: o.title, left: pct(o.s), width: ((o.e - o.s + 1) / TL_DAYS) * 100 })) : [],
+        onClick: open,
+      };
+    });
+    const tlMonths = [{ name: 'Oct', i: 0 }, { name: 'November', i: di(11, 1) }, { name: 'December', i: di(12, 1) }].map(m => ({ name: m.name, left: pct(m.i) }));
+    const tlWeeks = []; for (let i = 0; i < TL_DAYS; i += 7) { const dt = dateOf(i); tlWeeks.push({ n: `${dt.d}`, left: pct(i) }); }
+
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const nf = f.type.length + f.dept.length + f.status.length;
+    const chip = (g, v, label, dot) => { const on = f[g].includes(v); return { label, dot, border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(51 36 27)', onClick: () => this.tog(g, v) }; };
+    const projRows = [
+      { name: 'Carres Year-End Video', emoji: '🎬', dept: 'content', st: 'red', stLabel: 'Overdue 1 day', pct: 20, owner: 'Mei', due: '4 Dec' },
+      { name: 'Carres 11.11 Rental Deal', emoji: '🏷️', dept: 'brand', st: 'waiting', stLabel: 'Live', pct: 80, owner: 'Jason', due: '12 Nov' },
+      { name: 'Carres Showroom Weekends', emoji: '🛋️', dept: 'social', st: 'waiting', stLabel: 'In progress', pct: 35, owner: 'Jason', due: '29 Nov' },
+      { name: 'Carres Year-End Sale', emoji: '🎄', dept: 'brand', st: 'draft', stLabel: 'Draft', pct: 10, owner: 'Rachel', due: '31 Dec' },
+      { name: 'Carres Oct content', emoji: '📣', dept: 'social', st: 'done', stLabel: 'Done', pct: 100, owner: 'Jason', due: '31 Oct' },
+    ];
+    const AV = { Mei: 'oklch(0.90 0.05 295)', Jason: 'oklch(0.90 0.05 235)', Rachel: 'oklch(0.90 0.05 195)' };
+    return {
+      stats: [
+        { emoji: '📢', label: 'Campaigns running', value: '2', sub: '' },
+        { emoji: '🖼️', label: 'Posts', value: String(12 + storeItems.length), sub: `${5 + storeItems.filter(x => x.title.startsWith('✓')).length} posted` },
+        { emoji: '🎥', label: 'Shoots', value: '2', sub: '' },
+        { emoji: '📣', label: 'Ads live', value: '1', sub: '' },
+        { emoji: '🔴', label: 'Overdue', value: '2', sub: 'needs action', red: true },
+      ].map(s => ({ ...s, bg: s.red ? ST.red.bg : '#fff', border: s.red ? ST.red.border : 'rgb(236 231 224)', fg: s.red ? ST.red.fg : 'rgb(51 36 27)', labelFg: s.red ? ST.red.fg : 'rgb(117 100 86)' })),
+      title: view === 'month' ? M.name : view === 'week' ? '9 – 15 Nov 2026' : 'Oct – Dec 2026',
+      showNav: view === 'month', prev: () => this.setState(s => ({ month: Math.max(0, s.month - 1) })), next: () => this.setState(s => ({ month: Math.min(2, s.month + 1) })),
+      toggleKey: () => this.setState(s => ({ keyOn: !s.keyOn })),
+      keyBorder: keyOn ? 'rgb(51 36 27)' : 'rgb(229 222 211)', keyBg: keyOn ? 'rgb(246 244 240)' : '#fff', keyTrack: keyOn ? 'rgb(51 36 27)' : 'rgb(214 206 196)', keyKnob: keyOn ? 14 : 2,
+      filterOpen, toggleFilter: () => this.setState(s => ({ filterOpen: !s.filterOpen })), filterBorder: filterOpen || nf ? 'rgb(51 36 27)' : 'rgb(229 222 211)',
+      hasFilters: nf > 0, filterCount: nf,
+      filterGroups: [
+        { title: 'Type', opts: ['Campaign', 'Post', 'Shoot day', 'Ads go-live', 'Ads end', 'Report day', 'PIC approval deadline'].map(t => chip('type', t, t, 'rgb(190 182 172)')) },
+        { title: 'Department', opts: Object.entries(DEPT).map(([k, d]) => chip('dept', k, d.label, d.bar)) },
+        { title: 'Status', opts: ['draft', 'waiting', 'done', 'red'].map(k => chip('status', k, ST[k].label === 'Done' ? 'Approved / Done' : ST[k].label, ST[k].dot)) },
+      ],
+      views: [['month', 'Month'], ['week', 'Week'], ['timeline', 'Timeline']].map(([k, label]) => ({ label, ...seg(view === k), onClick: () => this.setState({ view: k }) })),
+      isMonth: view === 'month', isWeek: view === 'week', isTimeline: view === 'timeline',
+      weekdays: WD, weeks, weekCols,
+      tlRows, tlMonths, tlWeeks, tlHeadH: keyOn ? 66 : 46, tlBodyH: tlRows.length * 44,
+      tlFlags: keyOn ? KEYDATES.map(k => ({ ...k, left: pct(k.i) })) : [],
+      todayLeftFrac: (TODAY + 0.5) / TL_DAYS,
+      overlapNote: ov.length ? `${ov.length} overlap: ${ov.map(o => `${o.title} (${dateOf(o.s).d}–${dateOf(o.e).d} ${MN[dateOf(o.e).m]})`).join(', ')}` : 'No campaign overlaps',
+      legend: [{ e: '🖼️', t: 'Post (by content type)' }, { e: '🎥', t: 'Shoot day' }, { e: '📣', t: 'Ads go-live' }, { e: '🏁', t: 'Ads end' }, { e: '📊', t: 'Report day' }, { e: '⏰', t: 'PIC approval deadline' }],
+      feed: [
+        { emoji: '🔗', bg: 'rgb(246 244 240)', text: 'Kelvin (PIC) approved the Nov content plan', when: '2h ago' },
+        { emoji: '🎬', bg: DEPT.content.bg, text: 'Year-End Video moved to Edit', when: '5h ago' },
+        { emoji: '📊', bg: DEPT.ads.bg, text: 'Ads report #3 published to tracking link', when: 'yesterday' },
+      ].map(x => ({ ...x, onClick: open })),
+      projects: projRows.map(p => { const s = ST[p.st], d = DEPT[p.dept]; return { ...p, stBg: s.bg, stFg: s.fg, stBorder: s.border, dot: s.dot, deptBg: d.bg, deptFg: d.fg, dept: d.label, barBg: p.st === 'red' ? s.dot : p.st === 'done' ? ST.done.dot : 'rgb(90 62 43)', avBg: AV[p.owner], initial: p.owner[0], rowBg: p.st === 'red' ? 'rgb(255 247 245)' : '#fff', dueFg: p.st === 'red' ? s.fg : 'rgb(74 64 58)', onClick: open }; }),
+      projectCount: `${projRows.length}`,
+    };
+  }
+}
+</script>
+</body>
+</html>

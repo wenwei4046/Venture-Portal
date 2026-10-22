@@ -106,7 +106,7 @@ export const PAGE_TABS = {
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.
-  '/admin/rooms': ['hr.meeting_rooms', 'fin.meeting_rooms', 'pri.meeting_rooms', 'dept.meeting_rooms'],
+  '/admin/rooms': ['hr.meeting_rooms', 'fin.meeting_rooms', 'pri.meeting_rooms', 'dept.meeting_rooms', 'mkt.meeting_rooms'],
   // Admin › Guest Link (2026-10-11): HR's.
   '/admin/guest-link': ['hr.guest_link'],
   '/audit-log/access': ['pri.audit_log'],
@@ -173,7 +173,7 @@ export const PAGE_TABS = {
   '/reconciliation/journal-entries/[id]': JOURNAL,
   '/reconciliation/journal-entries/[id]/edit': JOURNAL,
   '/reconciliation/journal-entries/new': JOURNAL,
-  '/claims': ['pri.claims', 'dept.my_claims'],
+  '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims'],
   '/dept-pool': DEPT_POOL,
   '/dept-pool/[slug]': DEPT_POOL,
   '/dept-pool/marketing': DEPT_POOL,
@@ -187,6 +187,13 @@ export const PAGE_TABS = {
 
   // ── Principal and Department views ──
   '/opex': ['pri.opex'],
+
+  // ── Marketing view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup") ──
+  '/marketing': ['mkt.overview'],
+  '/marketing/calendar': ['mkt.calendar'],
+  '/marketing/projects': ['mkt.projects'],
+  '/marketing/projects/[id]': ['mkt.projects'],
+  '/marketing/tracking': ['mkt.tracking'],
 } as const satisfies Record<string, readonly string[]>
 
 export type PageRoute = keyof typeof PAGE_TABS
