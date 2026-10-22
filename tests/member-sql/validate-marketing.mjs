@@ -4,7 +4,9 @@
 // under test: the tables take nothing from a client; the readers ask Marketing · View and refuse anybody else; the
 // roster is the Marketing department's People with Marketing's own word over it; the sidebar counts what is on the
 // caller's plate as My Space draws it (src/lib/marketing/my-space.ts) — a series' pattern, a paused project and a stage
-// not yet open never; the board answers its window; the search and the notices are the caller's. No live I/O.
+// not yet open never; the board answers its window; the search and the notices are the caller's. The next migration
+// (20261023233000, the tasks) runs after it and replaces the board and the sidebar: everything here still holds over
+// its versions (validate-marketing-tasks.mjs tests what it adds). No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -55,6 +57,7 @@ await db.exec(`
   CREATE TABLE public.app_notifications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES public.users(id),
     kind text NOT NULL, title text NOT NULL, body text NOT NULL DEFAULT '', ref_kind text NOT NULL, ref_id text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(), read_at timestamptz, data jsonb);
+  CREATE TABLE public.permission_page_tabs (route text NOT NULL, tab_id text NOT NULL, PRIMARY KEY (route, tab_id));
 
   -- The permission check: any wanted 'fn.action' among the actions handed in.
   CREATE FUNCTION public.has_any_action(p_wants text[]) RETURNS boolean LANGUAGE sql STABLE AS $$
@@ -99,6 +102,7 @@ await db.exec(`
 const file = (await readFile(new URL('20261023214100_marketing_core.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
+await db.exec((await readFile(new URL('20261023233000_marketing_tasks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n'))
 
 // ── The tables and who reaches them ─────────────────────────────────────────────
 check(await q(`SELECT code, name FROM public.mkt_subsidiaries ORDER BY sort_order`), [
