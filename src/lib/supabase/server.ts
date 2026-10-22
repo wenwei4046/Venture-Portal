@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import type { Database } from './database.types'
 import { primeDeptRegistryFromDb } from '@/lib/dept-registry'
 import { VIEW_AS_PERSON_COOKIE } from '@/lib/view-as'
+import { withFileStorage } from '@/lib/storage/server'
 import { readOnly } from './read-only'
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions }
@@ -85,5 +86,9 @@ export async function createClient() {
   // every server path, until the view ends (lib/supabase/read-only.ts). The
   // cookie alone decides: set by hand without view_switch it can only take
   // writes away from its own session, never give any.
-  return cookieStore.getAll().some((c) => c.name === VIEW_AS_PERSON_COOKIE && c.value) ? readOnly(client) : client
+  const session = cookieStore.getAll().some((c) => c.name === VIEW_AS_PERSON_COOKIE && c.value) ? readOnly(client) : client
+  // Files (2026-10-23): `.storage` serves the buckets moved to R2 under this
+  // same session (lib/storage/server.ts) — over the read-only client, so an
+  // upload's row is refused there while viewing as somebody.
+  return withFileStorage(session)
 }
