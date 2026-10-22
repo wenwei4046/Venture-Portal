@@ -124,7 +124,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
               </div>
               <div className={s.minutesTitle}>Meeting minutes · {page.minutes.title}</div>
               <dl className={s.fields}>
-                {page.minutes.fields.map(f => (
+                {page.minutes.fields.filter(f => f.type !== 'Signature' || f.value !== null).map(f => (
                   <div key={f.name} className={s.kv}>
                     <dt className={s.k}>{f.name}</dt>
                     <Value field={f} />

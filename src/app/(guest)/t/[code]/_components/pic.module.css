@@ -13,7 +13,9 @@
 
 .main { max-width: 520px; margin: 0 auto; padding: 20px 16px 48px; box-sizing: border-box; }
 .sub { font-size: 12px; color: rgb(var(--pk-muted)); }
-.title { font-size: 22px; font-weight: 600; letter-spacing: -.01em; margin: 2px 0 0; overflow-wrap: anywhere; }
+/* The handoff's title is the page's own face (Inter 600), never the display serif the portal gives every h1
+   (globals.css `h1:not(.sr-only):not(…)`, which one class alone does not outweigh). */
+.root .title { font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; color: inherit; margin: 2px 0 0; overflow-wrap: anywhere; }
 .idRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .track { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--pk-text-2)); }
 .pill { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
@@ -68,6 +70,8 @@
   height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font: inherit; font-weight: 600; font-size: 15px;
   cursor: pointer; border: 1px solid transparent; flex: 1;
 }
+/* Stacked on a phone: each keeps its height (a column's flex: 1 would squash it). */
+.choose .btn { flex: none; width: 100%; }
 .btn:disabled { cursor: not-allowed; opacity: .4; }
 .approve { background: var(--pk-primary); color: rgb(var(--pk-primary-ink)); }
 .approve:hover:not(:disabled) { background: var(--pk-primary-hover); }
@@ -109,9 +113,10 @@
 
 @media (min-width: 900px) {
   .topIn, .main { max-width: 1040px; padding-left: 32px; padding-right: 32px; }
-  .title { font-size: 26px; }
+  .root .title { font-size: 26px; }
   .grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
   .choose { flex-direction: row; }
+  .choose .btn { flex: 1; width: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .step, .answered { animation: none; }
