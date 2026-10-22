@@ -1,5 +1,20 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 e (SHIPPED, #627) — Cash Flow: Revenue's payroll to HR by account
+
+User, on Revenue's Cash Flow (Oct on 4070 *Accrual - Salary*, Sep on Commission & Allowances): asked why → Sep'26
+was Finance's own PVs HV-PV-202610-0515 / 0516 (Aug pay, by account; Aug's accrual JE-202608-0875 reversed 15 Sep by
+JE-202609-0876), Oct was HR's flow (HV-PV-202610-0541, RM 261,253.69, one 4070 line by the 2026-08-20 rule) → "不能让他
+也跟着科目分开?" → the RM 4,677.73 is 8 payslips' deductions (PETER 4,000 unexplained, from his commission balance; 7
+drop sales) → "那就remain 扣在commission & allowance" → before / after sample → "可以，只改 Revenue，开PR做".
+
+- :  /  — Revenue Department's rounds to HR custody
+  split as that month's  (segment revenue_department) splits the pay; Commission & Allowances takes the
+  rest (deductions + cents). No accrual / failed read → the one 4070 line. Only the report's rows change.
+- Oct'26 → Basic 51,000 / Commission & Allowances 192,476.34 / Travelling 4,760.27 / Hostel 3,469.83 / Staff Allowance
+  2,672 / EPF·SOCSO·EIS 6,875.25. Other departments unchanged (4070, the 08-20 rule).
+- Tests: inter-billing-cash-flow.test.ts (+4), report-reads.test.ts (+1, reads now include journal_entries).
+
 ## CHECKPOINT 2026-10-22 d (SHIPPED, #625 + mig 20261022183000) — Create payment: a line each, with its own words
 
 User, on Create payment: "split pool 这个按钮我不想要，我想maintain之前的add description/line, attachment 就default
