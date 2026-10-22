@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { EMPTY_CANVAS } from './canvas'
 import { moveStage, removeStage } from './tasks'
 import {
   asRun, firstWfStage, newWfStage, nextTemplateName, picTimes, totalDays, wfActions, wfApprText, wfPatch, wfProblems, wfStagesPayload,
@@ -139,7 +140,7 @@ describe('making and moving', () => {
 })
 
 describe('only what changed is saved', () => {
-  const base = { tname: 'Standard', locked: false, promise: 10, stages: [stage({ key: 'k1' })] }
+  const base = { tname: 'Standard', locked: false, promise: 10, stages: [stage({ key: 'k1' })], canvas: EMPTY_CANVAS }
 
   it('nothing changed: nothing to send', () => {
     expect(wfPatch(base, { ...base, stages: [{ ...base.stages[0], key: 'another key' }] })).toBeNull()
@@ -155,6 +156,7 @@ describe('only what changed is saved', () => {
   it('the stages as the database takes them: no keys, a table’s preset rows', () => {
     const s = stage({ form: [{ label: 'T', type: 'Table', cols: [{ name: 'A', type: 'Text' }] }, { label: 'L', type: 'Text' }] })
     expect(wfStagesPayload([s])).toEqual([{ name: 'Design', dept: 'design', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null,
-      picText: '', form: [{ label: 'T', type: 'Table', cols: [{ name: 'A', type: 'Text' }], rows: [] }, { label: 'L', type: 'Text' }] }])
+      picText: '', form: [{ label: 'T', type: 'Table', cols: [{ name: 'A', type: 'Text' }], rows: [], req: true, pic: true }, { label: 'L', type: 'Text', req: true, pic: true }],
+      sec: { emoji: '🎯', locked: false, req: true, pic: true } }])
   })
 })

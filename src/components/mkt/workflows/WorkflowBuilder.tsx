@@ -22,7 +22,7 @@ import w from './workflows.module.css'
 
 type SaveState = { state: 'saved' } | { state: 'saving' } | { state: 'error'; reason: string; stale: boolean }
 
-const editOf = (t: WfTemplate): WfEdit => ({ tname: t.tname, locked: t.locked, promise: t.promise, stages: t.draft })
+const editOf = (t: WfTemplate): WfEdit => ({ tname: t.tname, locked: t.locked, promise: t.promise, stages: t.draft, canvas: t.canvas })
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 /** "12 active tasks stay on v2" */
 const stayOn = (n: number, version: number) => `${n} active task${n === 1 ? ' stays' : 's stay'} on v${version}`

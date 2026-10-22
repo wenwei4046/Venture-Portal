@@ -176,6 +176,7 @@ describe('the Workflow Builder', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(actions.saveMktWorkflow).toHaveBeenCalled(), { timeout: 3000 })
     const patch = actions.saveMktWorkflow.mock.calls.at(-1)?.[2]
-    expect(patch.stages[1].form[0]).toEqual({ label: 'Shot list', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }, { name: 'Due date', type: 'Date' }], rows: [['Opening', '']] })
+    expect(patch.stages[1].form[0]).toEqual({ label: 'Shot list', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }, { name: 'Due date', type: 'Date' }], rows: [['Opening', '']],
+      req: true, pic: true })
   })
 })
