@@ -71,8 +71,11 @@ export function adsPerfVM(ctx: DeskCtx) {
         : [ra - len * DAY, ra - DAY];
   const rangeTxt = (a: number, b: number) => (a === b ? dfmt(isoOf(a)) : `${dfmt(isoOf(a))} – ${dfmt(isoOf(b))}`);
   const status = (_adId: string): string | null => null; // Meta's delivery (PROPOSALS.md C).
-  const ads = [...new Set(data.customers.map(c => c.adId ?? `ch:${c.channel}`))].map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
-    return { id, name: cs[0]?.ad ?? id, ch: cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
+  // Every ad, as Ads to teams lists them (the owner, 2026-10-22: "全部的广告也要在这里"): the ones that brought leads, and the
+  // ones added before their first lead (adNames' `added`, crm_add_ad) with 0s.
+  const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
+  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
+    return { id, name: cs[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !cs.length || cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
   const val = (cs: CrmCustomer[], k: string, a: number, b: number): number | null => crmFigures(cs, ctx, a, b)[k] ?? null;

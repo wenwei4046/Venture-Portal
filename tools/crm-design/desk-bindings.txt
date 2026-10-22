@@ -416,6 +416,8 @@ sheetW
 showScrim
 showToast
 splitFlex
+splitRail
+splitShut
 srAddRange
 srAddTBg
 srAddTime

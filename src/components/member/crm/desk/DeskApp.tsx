@@ -738,7 +738,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
+              {!!(v.splitShut) && (<DeskFoldRail v={v.splitRail} />)}<aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: v.splitShut ? "none" : "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <DeskAdTabs4a v={v} which="split" />
@@ -748,7 +748,6 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     {v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ flex: "1", minWidth: "0", margin: "0", padding: "0", border: "0", background: "transparent", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} />) : (<span style={{ flex: "1", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>{v.ad.name}</span>)}
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"></path></svg>
                   </label>
-                  <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.ad.headline ? <>Meta sends only the headline: &ldquo;{v.ad.headline}&rdquo;. · {v.ad.meta}</> : v.ad.meta}</span>
                 </div>
                 <div style={{ flex: "1", minHeight: "0", overflowY: "auto", overflowX: "hidden", padding: "0 20px 20px", display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
@@ -2762,7 +2761,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     {!!(v.apDlOpen) && (<><div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", right: "0" }}>{(v.apDl).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className="crm4a-row"><span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>))}</div></>)}
                   </span>
                 </div>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Spend and cost per lead appear once Meta grants ads_read. Ad names are the ones managers typed in Assignment.</div>
+                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Ad names come from Ads Manager. Spend and cost per lead are not read from Meta yet.</div>
                 {!!(v.apCmpOn) && (<>
                   <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "18px", fontSize: "13px", fontWeight: "650" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}><span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "var(--crm-rust)" }}>
