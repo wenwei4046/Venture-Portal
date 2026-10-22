@@ -42,6 +42,39 @@
 .deptFilter[data-picked='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* A column's head sorts each band by it (2026-10-22): the head's own words, an
+   arrow after them — on the column that sorts, which way; faint on hover
+   elsewhere, which way a press would put it. */
+.sortHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% + 12px);
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sortHead:hover { background: rgb(var(--hv-head-rule) / 0.45); }
+.sortHead:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 0; }
+.sortArrow { font-size: 8px; opacity: 0; transition: opacity 0.12s; }
+.sortArrow::after { content: '\25BC'; }
+.sortArrow[data-way='asc']::after { content: '\25B2'; }
+.sortHead:hover .sortArrow { opacity: 0.4; }
+.sortHead[data-on='true'] .sortArrow { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sortArrow { transition: none; }
+}
+
 /* A department's band: walnut rule, the cream wash, ▼ that folds it. */
 .band {
   display: flex;

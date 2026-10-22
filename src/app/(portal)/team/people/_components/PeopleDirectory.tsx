@@ -10,7 +10,19 @@ import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { ratePct } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
-import { initialsOf, rosterCounts, rosterDepartments, rosterGroups, rosterMatches, type RosterStatus } from '@/lib/people-roster'
+import {
+  FIRST_WAY,
+  initialsOf,
+  nextSort,
+  rosterCompare,
+  rosterCounts,
+  rosterDepartments,
+  rosterGroups,
+  rosterMatches,
+  type RosterSort,
+  type RosterSortKey,
+  type RosterStatus,
+} from '@/lib/people-roster'
 import PersonWindow from './PersonWindow'
 import s from './people.module.css'
 
@@ -77,6 +89,16 @@ const STALE_DAYS = 42
 /** The handoff's roster grid: Name · Title · Rank · Code · Employment · Last seen · ›. */
 const COLS = 'minmax(0,1.7fr) minmax(0,1.4fr) 130px 80px minmax(0,1.3fr) 100px 40px'
 
+/** The heads a press sorts by (2026-10-22) — every column but the chevron's. */
+const SORT_HEADS: ReadonlyArray<{ key: RosterSortKey; label: string }> = [
+  { key: 'name', label: 'Name' },
+  { key: 'title', label: 'Title' },
+  { key: 'rank', label: 'Rank' },
+  { key: 'code', label: 'Code' },
+  { key: 'employment', label: 'Employment' },
+  { key: 'seen', label: 'Last seen' },
+]
+
 /**
  * The roster as the HR revamp draws it (2026-10-10, the handoff's variant A):
  * five cards over the whole roster, the search, the department filter
@@ -84,8 +106,10 @@ const COLS = 'minmax(0,1.7fr) minmax(0,1.4fr) 130px 80px minmax(0,1.3fr) 100px 4
  * department") and Active · Inactive · All — their counts the department's —
  * then one grid — a walnut-ruled band per department (folds), a row per
  * person in ladder order, by their full name (last name, then first —
- * 2026-10-20). Click a row for their window; right-click for Invite user ·
- * Open card.
+ * 2026-10-20). A column's head sorts each band by it (2026-10-22): pressed,
+ * its first way — names A→Z, the most senior title first — and pressed again,
+ * the other. Click a row for their window; right-click for Invite user · Open
+ * card.
  */
 export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity, onInvite }: Props) {
   const [query, setQuery] = useState('')
@@ -94,6 +118,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  // None pressed yet: the ladder's order, as the roster always read.
+  const [sort, setSort] = useState<RosterSort | null>(null)
 
   const counts = useMemo(() => rosterCounts(people), [people])
   const departments = useMemo(() => rosterDepartments(people.filter(p => rosterMatches(p, '', status))), [people, status])
@@ -101,8 +127,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
   const inDept = useMemo(() => rosterCounts(people.filter(p => rosterMatches(p, '', 'all', dept))), [people, dept])
   const searching = query.trim() !== ''
   const groups = useMemo(
-    () => rosterGroups(people.filter(p => rosterMatches(p, query, status, dept)), compareByLadder),
-    [people, query, status, dept],
+    () => rosterGroups(people.filter(p => rosterMatches(p, query, status, dept)), rosterCompare(sort, compareByLadder)),
+    [people, query, status, dept, sort],
   )
 
   // A click anywhere else, or Escape, puts the menu away.
@@ -216,7 +242,28 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
 
       <div className={s.rosterWrap}>
         <GridTable label="People" scroll style={{ overflow: 'visible' }}>
-          <GridHead cols={COLS} cells={['Name', 'Title', 'Rank', 'Code', 'Employment', 'Last seen', '']} cellStyle={{ padding: '11px 14px' }} />
+          <GridHead
+            cols={COLS}
+            cells={[
+              ...SORT_HEADS.map(h => {
+                const on = sort?.key === h.key
+                // The arrow says which way it reads now — or, faint on hover, which way a press would put it.
+                const way = on ? sort.dir : FIRST_WAY[h.key]
+                return {
+                  label: (
+                    <button type="button" className={s.sortHead} data-on={on ? 'true' : undefined} onClick={() => setSort(nextSort(sort, h.key))}>
+                      {h.label}
+                      {/* ▲ / ▼ drawn by the stylesheet, so the head's text stays its word. */}
+                      <span className={s.sortArrow} data-way={way} aria-hidden="true" />
+                    </button>
+                  ),
+                  sort: on ? (sort.dir === 'asc' ? ('ascending' as const) : ('descending' as const)) : ('none' as const),
+                }
+              }),
+              '',
+            ]}
+            cellStyle={{ padding: '11px 14px' }}
+          />
           {groups.length === 0 ? <div className={hv.gtEmpty}>Nobody matches the current filter.</div> : null}
           {groups.map(group => {
             const unfolded = searching || !folded.has(group.dept)

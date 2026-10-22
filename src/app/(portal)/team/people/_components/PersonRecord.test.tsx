@@ -232,8 +232,11 @@ describe('First Name and Last Name', () => {
   })
 })
 
+// 2026-10-22, the user: "i want the email can be editable, for hr" — HR changes it, and their login moves with it.
 describe('Email follows the login', () => {
+  // The roster's copy may lag the login's; the page shows — and edits from — the email they sign in with.
   const withLogin = view({ login: 'active', contact: { phone: '012-345 6789', email: 'staff@login.example', address: null } })
+  const HELD = 'DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions changes its login\'s email.'
 
   it('reads with its Login word', () => {
     render(<PersonRecord view={withLogin} editor={editor()} inviteHref={null} />)
@@ -241,18 +244,33 @@ describe('Email follows the login', () => {
     expect(screen.getByText('Login')).toBeInTheDocument()
   })
 
-  it('is locked while editing — shown, never a field, never sent', async () => {
-    openEditor(withLogin)
+  it('edited, is a field holding the email they sign in with, its Login word beside it — a change is sent, alone', async () => {
+    openEditor(withLogin, editor({ email: 'old.copy@example.com' }))
+    const field = screen.getByLabelText('Email')
+    expect(field).toHaveValue('staff@login.example')
+    expect(field).toBeRequired()
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(within(bar()).getByText(/No changes/)).toBeInTheDocument()
+    fireEvent.change(field, { target: { value: 'staff.new@login.example' } })
+    expect(field).toHaveAttribute('data-dirty', 'true')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ email: 'staff.new@login.example' })
+  })
+
+  it('a full-access title’s stays locked for an editor who does not manage permissions — shown, never a field, never sent', async () => {
+    openEditor(withLogin, { ...editor(), emailHeld: HELD })
     expect(screen.queryByLabelText('Email')).toBeNull()
     expect(form().elements.namedItem('email')).toBeNull()
-    expect(screen.getByTitle(/the one they sign in with/)).toHaveTextContent('staff@login.example')
+    expect(screen.getByTitle(HELD)).toHaveTextContent('staff@login.example')
     fireEvent.change(screen.getAllByLabelText('Phone')[0], { target: { value: '012-000 1111' } })
     expect(await save()).toEqual({ contact_number: '012-000 1111' })
   })
 
-  it('without a login it is HR’s to edit', () => {
+  it('without a login it is HR’s to edit, as it always was', () => {
     openEditor()
     expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+    expect(screen.getByLabelText('Email')).not.toBeRequired()
+    expect(screen.queryByText('Login')).toBeNull()
   })
 })
 

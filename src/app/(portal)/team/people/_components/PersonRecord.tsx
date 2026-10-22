@@ -26,7 +26,6 @@ import type { UplineGroup } from '@/lib/upline-choices'
 import {
   EPF_LABELS,
   BASIC_FROM_COMMISSION,
-  LOGIN_EMAIL_LOCKED,
   PCB_LABELS,
   SOCSO_LABELS,
   asksPay,
@@ -114,6 +113,12 @@ export interface PersonEditor {
   reportsTo: string | null
   /** The uplines they may have, a group per department — null while they are not on the active roster. */
   uplines: UplineGroup[] | null
+  /**
+   * Why their login's email is not this editor's to change (2026-10-22): a
+   * full-access title, for whoever does not manage permissions. Absent or
+   * null: theirs to change — the login moves with it.
+   */
+  emailHeld?: string | null
 }
 
 /** The editor while editing; null while the page reads. */
@@ -308,7 +313,7 @@ export default function PersonRecord({
     </>
   ) : null
 
-  // Their login's email reads as theirs: a word beside it, and no field.
+  // Their login's email reads as the one they sign in with: a word beside it.
   const email = view.contact.email ? (
     <>
       {view.contact.email}
@@ -505,15 +510,27 @@ export default function PersonRecord({
           mono
           edit={e => <TextField name="contact_number" type="tel" defaultValue={e.staff.contact_number} mono />}
         />
+        {/* A login's email is the one they sign in with: HR changes it here since 2026-10-22 (the user: "i want the
+            email can be editable, for hr") and the login moves with it — but a full-access title's stays locked for
+            whoever does not manage permissions, who is told why. */}
         <Fact
           label="Email"
-          field={view.login ? undefined : 'email'}
+          field={view.login && editor?.emailHeld ? undefined : 'email'}
           value={email}
           edit={e =>
-            view.login ? (
-              <Locked value={view.contact.email} why={LOGIN_EMAIL_LOCKED} icon tag="Login" />
-            ) : (
+            !view.login ? (
               <TextField name="email" type="email" defaultValue={e.staff.email} />
+            ) : e.emailHeld ? (
+              <Locked value={view.contact.email} why={e.emailHeld} icon tag="Login" />
+            ) : (
+              <span className={s.tagged}>
+                <TextField name="email" type="email" defaultValue={view.contact.email} required />
+                <span className={s.fieldTag}>
+                  <Chip tone="plain" soft>
+                    Login
+                  </Chip>
+                </span>
+              </span>
             )
           }
         />
@@ -934,8 +951,8 @@ function NameField({ defaultValue }: { defaultValue: string }) {
 /**
  * A value this editor may not change (DESIGN.md › A hidden value): shown as
  * the reader gave it — •••• when on file — with no field behind it, so the
- * save leaves it as it was. Why, on hover. A login's email wears a padlock
- * and its word.
+ * save leaves it as it was. Why, on hover. A login's email held from this
+ * editor (a full-access title's) wears a padlock and its word.
  */
 function Locked({ value, why, icon = false, tag }: { value: string | null; why: string; icon?: boolean; tag?: string }) {
   return (

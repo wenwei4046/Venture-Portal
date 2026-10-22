@@ -7,9 +7,10 @@ import { formatDate, formatMoney } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
+import { fullAccessTemplate } from '@/lib/invite'
 import { keptParts } from '@/lib/person-name'
 import { addressLines, addressOf } from '@/lib/address/address'
-import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
+import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, loginEmailHeld, payModeOf, tenureLabel } from '@/lib/person-record'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
@@ -18,7 +19,7 @@ import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import PersonWell from '../../_components/PersonWell'
 import w from '../../_components/person-well.module.css'
-import { loadPersonAccess } from '../../_lib/person-permissions'
+import { loadPersonAccess, type PersonAccessData } from '../../_lib/person-permissions'
 import { loadUplineChoices } from '../../_lib/upline-choices'
 import PersonChanges from '../_components/PersonChanges'
 import PersonRecord, { type PersonRecordView } from '../_components/PersonRecord'
@@ -46,6 +47,18 @@ async function uplineOf(supabase: Supabase, direct: boolean, managerId: string |
   }
   const m = (await readOrgChart(supabase)).people.find(p => p.id === managerId)
   return m ? { name: m.employee_name, title: m.titles?.name ?? null, href: null, active: true } : null
+}
+
+/**
+ * A login that can do everything (2026-10-22) — a Principal-kind template, one that ticks Manage permissions, or a
+ * Principal login on no template — with its template's name; null for any other. The database asks the same before
+ * their login's email moves (`person_login_email_move`).
+ */
+function fullAccessOf(access: PersonAccessData, role: string): { template: string | null } | null {
+  if (access.kind === 'template') {
+    return fullAccessTemplate(access.template.baseRole, !!access.template.grants.accounts?.manage) ? { template: access.template.name } : null
+  }
+  return role === 'principal' ? { template: null } : null
 }
 
 export default async function StaffDetailPage({ params, searchParams }: PageProps) {
@@ -132,6 +145,10 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
 
   const [card, uplineChoices] = await Promise.all([changes, uplines])
   const active = staff.status !== 'inactive'
+  // Their login's email is HR's to change here since 2026-10-22 — a full-access title's only whoever manages
+  // permissions' (the editor would choose where that login's mail goes), as Invite user keeps it.
+  const fullAccess = account && access && !canDo(viewer, 'accounts', 'manage') ? fullAccessOf(access, account.role) : null
+  const emailHeld = fullAccess ? loginEmailHeld(titleName, fullAccess.template) : null
 
   // Paid 100% on commission (no basic, no allowances, statutory at 0) or
   // variable pay (the Director department's month, keyed on payroll) — the
@@ -195,6 +212,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                 canSee: { nric: card.canSee.nric, bank: card.canSee.bank },
                 reportsTo: row.reports_to ?? null,
                 uplines: active ? uplineChoices : null,
+                emailHeld,
               }
             : null
         }
