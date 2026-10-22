@@ -1327,7 +1327,7 @@ GRANT EXECUTE ON FUNCTION public.mkt_board(date, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.mkt_shell() TO authenticated;
 
 -- ── New Project in the database's copy of the tab registry ──────────────────
-INSERT INTO public.permission_page_tabs (route, tab_id) VALUES ('/marketing/new', 'mkt.projects')
+INSERT INTO public.permission_page_tabs (page, tab_id) VALUES ('/marketing/new', 'mkt.projects')
 ON CONFLICT DO NOTHING;
 
 NOTIFY pgrst, 'reload schema';

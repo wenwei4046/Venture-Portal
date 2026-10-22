@@ -64,7 +64,7 @@ await db.exec(`
   CREATE TABLE public.app_notifications (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES public.users(id),
     kind text NOT NULL, title text NOT NULL, body text NOT NULL DEFAULT '', ref_kind text NOT NULL, ref_id text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(), read_at timestamptz, data jsonb);
-  CREATE TABLE public.permission_page_tabs (route text NOT NULL, tab_id text NOT NULL, PRIMARY KEY (route, tab_id));
+  CREATE TABLE public.permission_page_tabs (page text NOT NULL, tab_id text NOT NULL, PRIMARY KEY (page, tab_id));
 
   CREATE FUNCTION public.has_any_action(p_wants text[]) RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT EXISTS (SELECT 1 FROM unnest(p_wants) w WHERE w = ANY (string_to_array(current_setting('test.actions', true), ',')))
@@ -125,7 +125,7 @@ for (const fn of HELPERS) {
   check(await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`), false, `${fn} is the functions’ own`)
   check(await one(`SELECT has_function_privilege('service_role', 'public.${fn}', 'EXECUTE')`), true, `${fn}: the service role keeps it`)
 }
-check(await peek(`SELECT route, tab_id FROM public.permission_page_tabs`), [{ route: '/marketing/new', tab_id: 'mkt.projects' }],
+check(await peek(`SELECT page, tab_id FROM public.permission_page_tabs`), [{ page: '/marketing/new', tab_id: 'mkt.projects' }],
   'New Project is the Projects tab’s page in the database’s registry')
 
 // ── Dates: working days, HR's holidays ────────────────────────────────────────────
