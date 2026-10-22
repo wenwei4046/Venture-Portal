@@ -176,8 +176,8 @@ export function assignVM(ctx: DeskCtx) {
   };
 }
 
-/** Send a customer to somebody (crm_send_to), with the 30 s Undo the phone panel has. */
-export async function sendTo(ctx: DeskCtx, customerId: string, staffId: string, verb: "Sent" | "Moved") {
+/** Send a customer to somebody (crm_send_to), with the 30 s Undo the phone panel has. Never "Moved": that is a request. */
+export async function sendTo(ctx: DeskCtx, customerId: string, staffId: string, verb: "Sent" | "Assigned") {
   const c = ctx.data.customers.find(x => x.id === customerId), prev = c?.assignedTo ?? null;
   const ok = await ctx.act.sendTo(customerId, staffId);
   if (!ok) return false;
@@ -201,7 +201,7 @@ export function alertsVM(ctx: DeskCtx) {
   const today = new Date(now).toDateString();
   const when = (iso: string) => { const d = new Date(iso), t = d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
     return d.toDateString() === today ? t : `${d.toLocaleDateString("en-MY", { day: "numeric", month: "short" })}, ${t}`; };
-  const KIND: Record<PanelNotif["kind"], [string, string]> = { move: ["Move", "var(--crm-ink-soft)"], share: ["Share", "var(--crm-ink-soft)"], won: ["Won", "var(--crm-brown)"], lost: ["Lost", "var(--crm-muted)"], overdue: ["Overdue 9 h+", "var(--crm-oxblood)"] };
+  const KIND: Record<PanelNotif["kind"], [string, string]> = { assign: ["Assign", "var(--crm-muted)"], move: ["Move", "var(--crm-ink-soft)"], share: ["Share", "var(--crm-ink-soft)"], won: ["Won", "var(--crm-brown)"], lost: ["Lost", "var(--crm-muted)"], overdue: ["Overdue 9 h+", "var(--crm-oxblood)"] };
   const rows = list.map(n => {
     const c = n.customerId ? data.customers.find(x => x.id === n.customerId) : undefined, unr = !isRead(n), [kind, color] = KIND[n.kind];
     const last = c ? lastReal(c) : undefined;

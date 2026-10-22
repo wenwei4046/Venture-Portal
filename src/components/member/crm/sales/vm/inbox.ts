@@ -149,7 +149,7 @@ export function inboxVM(ctx: SalesCtx) {
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread || marked(c) ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
       // Swipe as WhatsApp's (the owner, 2026-10-14: "往左滑很慢"): the row follows the finger and lets go open or shut.
-      // Left: Assign (a TL / STL, their team's customer) · More. Right: Read (an unread chat of one's own) · Pin / Unpin.
+      // Left: Assign (a TL / STL / TA, to their own people) · More. Right: Read (an unread chat of one's own) · Pin / Unpin.
       // A tap opens the chat (or closes an open swipe).
       ...rowSwipe(c, nRight(c), nLeft(c)),
       moreOp: 1,

@@ -57,7 +57,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     ...T.map(t => ({ label: t.name.toUpperCase(), color: t.color, tint: t.tint, people: t.all })),
   ].map(g => ({ label: g.label, color: g.color, people: g.people.map((p, i) => ({ name: p.name, ini: initials(p.name), sub: g.label.charAt(0) + g.label.slice(1).toLowerCase(),
     bg: i === 0 ? g.color : g.tint, fg: i === 0 ? "#fff" : g.color,
-    pick: () => { if (sf) void sendTo(ctx, sf.id, p.id, opItem === "Awaiting reply" ? "Moved" : "Sent").then(ok => { if (ok) patch({ sendFor: null, awChat: null }); }); } })) }));
+    pick: () => { if (sf) void sendTo(ctx, sf.id, p.id, opItem === "Awaiting reply" ? "Assigned" : "Sent").then(ok => { if (ok) patch({ sendFor: null, awChat: null }); }); } })) }));
 
   // The Awaiting reply chat (D4): the same chat as Inbox, with Assign to / Customer info / Send reminder.
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;

@@ -53,6 +53,13 @@ export interface PanelCtx {
   slotCounts: Record<string, number>;
   /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */
   recents?: import("../../sales/vm/composer").SharedRecents;
+  /**
+   * A chat's ⋮ Assign to — Mine's rule (2026-10-23 — the owner: "照「同一套规则」，跟 Mine 一样"), decided by the SIGNED-IN
+   * account: `any` — it holds CRM · Manage (the Principal, the Director), whoever's Team is on screen: anyone, at once
+   * (crm_send_to); `team` — a TL / STL / TA on their own Team side: their downline in the customer's team (crm_assign_member);
+   * absent — no Assign to (the database would refuse it).
+   */
+  assign?: "any" | "team";
 }
 
 /** The teams, each a TL with everyone below them, in the design's order and colours. */
@@ -212,14 +219,20 @@ export interface PickGroup { name: string; c: string; n: number; people: PickRow
  * Anyone who takes enquiries but sits in no team (a Senior TL above the
  * teams) comes last under "Others", so nobody is unreachable.
  */
-export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: string | null; pick: (id: string) => void; hodLabel?: string }): PickGroup[] {
+export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: string | null; pick: (id: string) => void; hodLabel?: string; only?: CrmPerson[] }): PickGroup[] {
   const row = (p: CrmPerson, c: string): PickRow => {
     const on = o.sel === p.id;
     return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", dot: on ? "var(--crm-rust)" : "transparent", bg: on ? "var(--crm-cream)" : "transparent", r: "12px", pick: () => o.pick(p.id) };
   };
+  // `only`: a leader's own people (2026-10-23 — the chat's Assign to, as Mine's): those people, under their team's name.
+  if (o.only) {
+    const t = ctx.teams.find(x => o.only!.some(p => x.people.some(q => q.id === p.id)));
+    const ps = o.only.filter(p => p.id !== o.skip).sort((a, b) => sortKey(a) - sortKey(b) || a.name.localeCompare(b.name)).map(p => row(p, t?.c ?? "var(--crm-muted)"));
+    return ps.length ? [{ name: t?.name ?? "Your team", c: t?.c ?? "var(--crm-muted)", n: ps.length, people: ps }] : [];
+  }
   const groups: PickGroup[] = [];
   // The Principal can be given a customer too since 2026-10-13 (their Mine); listed first, only where CRM · Manage sends.
-  const boss = ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
+  const boss = ctx.assign === "any" || ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
   if (boss.length) groups.push({ name: "Principal", c: "var(--crm-ink)", n: boss.length, people: boss });
   const dirs = ctx.directors.filter(d => d.id !== o.skip).map(d => row(d, DIRECTOR.c));
   if (dirs.length) groups.push({ name: o.hodLabel ?? "Revenue Director", c: DIRECTOR.c, n: dirs.length, people: dirs });

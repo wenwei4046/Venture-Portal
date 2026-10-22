@@ -27,7 +27,9 @@ export function auditEvents(ctx: DeskCtx): E[] {
     const from = e.data.from ? nameOf(String(e.data.from)) : null;
     const add = (action: string, target: string, detail: string) => out.push({ cat: "chat", at: e.at, who, action, target, detail });
     if (k === "assigned") add(e.actor ? "Lead reassigned" : "Lead assigned", `${name} → ${to}`, c?.ad ?? "");
-    else if (k === "moved") add("Chat moved up", `${name}: ${from ?? "—"} → ${to}`, "Direct upline");
+    // A customer CRM · Manage handed on at once writes `moved` too (crm_send_to, by_manager) — its `assigned` row above is
+    // the record; "Chat moved up" is only a Move, a request the direct upline accepted (2026-10-23).
+    else if (k === "moved" && !e.data.by_manager) add("Chat moved up", `${name}: ${from ?? "—"} → ${to}`, "Direct upline");
     else if (k === "shared") add("Teammate invited", `${to} joined chat with ${name}`, c?.ad ?? "");
     else if (k === "appt_booked") add("Appointment booked", `${name} · ${String(e.data.when ?? "")}`, String(e.data.room ?? ""));
     else if (k === "appt_changed") add("Appointment changed", `${name} · ${String(e.data.when ?? "")}`, String(e.data.room ?? ""));

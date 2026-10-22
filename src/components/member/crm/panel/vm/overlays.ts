@@ -20,7 +20,8 @@ export function waitingByLevel(ctx: PanelCtx) {
     items: withU.filter(x => x.u.level === k).map(({ c: cu, u }) => {
       const rec = ui.movedRec[cu.id];
       return { id: cu.id, name: cu.name, ini: ini(cu.name), ad: cu.ad, owner: nameOf(cu.assignedTo), wait: `${Math.floor(u.waitingMinutes / 60)} h`,
-        movedTo: rec ? `Moved to ${nameOf(rec.to)}` : "", notMoved: !rec,
+        // Handed on at once, so Assign (2026-10-23: "Move" is only a request to one's direct superior).
+        movedTo: rec ? `Assigned to ${nameOf(rec.to)}` : "", notMoved: !rec,
         move: (e: MouseEvent) => { e.stopPropagation(); patch({ mvFor: cu.id, mvSel: null }); } };
     }) }));
 }
@@ -28,7 +29,7 @@ export function waitingByLevel(ctx: PanelCtx) {
 export function overlaysVM(ctx: PanelCtx) {
   const { ui, patch, set, data, nameOf, now } = ctx;
 
-  // Undo: the last send / move, for 30 seconds (the screen counts down).
+  // Undo: the last send / assign, for 30 seconds (the screen counts down).
   const u = ui.undo;
   const undo = {
     undoOn: !!u, undoText: u ? `${u.name} ${u.verb} ${u.to}` : "", undoLeft: u ? `${u.left}s` : "", undoPct: u ? `${(u.left / 30) * 100}%` : "0%",
@@ -52,17 +53,17 @@ export function overlaysVM(ctx: PanelCtx) {
     sdGroups: w ? pickGroups(ctx, { sel: ui.sdSel, pick: id => patch({ sdSel: id }) }) : [],
   };
 
-  // Move: a waiting customer to someone else (Awaiting reply).
+  // Assign: a waiting customer to someone else at once (Awaiting reply; Move until 2026-10-23).
   const L = ui.mvFor ? data.customers.find(c => c.id === ui.mvFor) : undefined;
   const mvName = ui.mvSel ? nameOf(ui.mvSel) : "";
   const mv = {
     mvOpen: !!L, mvClose: () => patch({ mvFor: null, mvSel: null }), mvName: L?.name ?? "", mvAd: L ? `${L.ad} · now with ${nameOf(L.assignedTo)}` : "",
     mvGroups: L ? pickGroups(ctx, { skip: L.assignedTo, sel: ui.mvSel, pick: id => patch({ mvSel: id }) }) : [],
-    mvBtnLabel: mvName ? `Confirm · move to ${mvName}` : "Choose a person", mvBtnBg: mvName ? "var(--crm-rust)" : "var(--crm-line)", mvBtnCur: mvName ? "pointer" : "default",
-    mvConfirm: L && ui.mvSel ? () => void reassign(ctx, L, ui.mvSel!, "move", { mvFor: null, mvSel: null }) : undefined,
+    mvBtnLabel: mvName ? `Confirm · assign to ${mvName}` : "Choose a person", mvBtnBg: mvName ? "var(--crm-rust)" : "var(--crm-line)", mvBtnCur: mvName ? "pointer" : "default",
+    mvConfirm: L && ui.mvSel ? () => void reassign(ctx, L, ui.mvSel!, "assign", { mvFor: null, mvSel: null }) : undefined,
   };
 
-  // Awaiting reply: everyone's waiting customers; tap → their chat; Move hands one on.
+  // Awaiting reply: everyone's waiting customers; tap → their chat; Assign hands one on.
   const by = waitingByLevel(ctx), af = ui.attF, tot = by.reduce((n, g) => n + g.items.length, 0);
   const seg = (k: typeof af, label: string, dot: string, n: number) => ({ label, dot, n, pick: () => patch({ attF: k }), bg: af === k ? dot : "#fff", bd: af === k ? dot : "var(--crm-rule)", fg: af === k ? "#fff" : "var(--crm-ink)", w: af === k ? 650 : 500, nBg: af === k ? "rgba(255,255,255,.22)" : dot, nFg: "#fff" });
   const att = {

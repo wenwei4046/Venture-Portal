@@ -14,6 +14,7 @@ import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sale
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
+import { teamAssignees } from "../../shared/people";
 import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
@@ -28,15 +29,26 @@ import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "..
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
- * Send or move a customer, then offer 30 s to undo it (Organic Leads' Send to,
- * Awaiting reply's Move, the chat's Assign to). Saved first, as everywhere.
+ * Send or assign a customer at once (CRM · Manage, crm_send_to), then offer 30 s to undo it (Organic Leads' Send to,
+ * Awaiting reply's Assign, the chat's Assign to). Saved first, as everywhere. "Move" is only ever a request to one's
+ * direct superior (2026-10-23), so none of these is called that.
  */
-export async function reassign(ctx: PanelCtx, c: CrmCustomer, to: string, kind: "send" | "move", extra: Partial<PanelCtxUi> = {}) {
+export async function reassign(ctx: PanelCtx, c: CrmCustomer, to: string, kind: "send" | "assign", extra: Partial<PanelCtxUi> = {}) {
   const prev = c.assignedTo;
   if (!(await ctx.act.sendTo(c.id, to))) return;
-  ctx.set(u => ({ ...u, ...extra, pick: "", toast: "", movedRec: kind === "move" ? { ...u.movedRec, [c.id]: { from: prev, to } } : u.movedRec,
-    undo: { kind, customerId: c.id, prev, name: c.name, to: ctx.nameOf(to), verb: kind === "send" ? "sent to" : "moved to", left: 30 } }));
+  ctx.set(u => ({ ...u, ...extra, pick: "", toast: "", movedRec: kind === "assign" ? { ...u.movedRec, [c.id]: { from: prev, to } } : u.movedRec,
+    undo: { kind, customerId: c.id, prev, name: c.name, to: ctx.nameOf(to), verb: kind === "send" ? "sent to" : "assigned to", left: 30 } }));
 }
+
+/** A TL / STL / TA gives a customer to one of their own people (crm_assign_member) — at once and with no undo, as in Mine. */
+async function assignInTeam(ctx: PanelCtx, c: CrmCustomer, to: string) {
+  if (!(await ctx.act.assignMember(c.id, to))) return;
+  ctx.set(u => ({ ...u, reSheet: false, pick: "" }));
+  ctx.act.toast(`${c.name} assigned to ${ctx.nameOf(to)}`);
+}
+
+/** Whom a chat's ⋮ Assign to offers (PanelCtx.assign): a TL / STL / TA their own people; CRM · Manage everybody. */
+const assignees = (ctx: PanelCtx, c: CrmCustomer | undefined) => (c && ctx.assign === "team" ? teamAssignees(ctx.me, ctx.data.people, c) : []);
 type PanelCtxUi = PanelCtx["ui"];
 
 const NONE = () => {};
@@ -105,12 +117,14 @@ export function leadVM(ctx: PanelCtx) {
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
       windowNote: "",
       msgs, stop,
-      movedTo: c && rec ? `${c.name} moved from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
-      // Assign to (⋮) moves at once, as the design's inbox mode does.
-      groups: c ? pickGroups(ctx, { skip: ow, sel: ui.pick, pick: id => void reassign(ctx, c, id, "move", { reSheet: false }) }) : [],
+      movedTo: c && rec ? `${c.name} reassigned from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
+      // Assign to (⋮), Mine's rule (2026-10-23): CRM · Manage anyone at once (30 s to undo); a TL / STL / TA their own people.
+      groups: c ? (ctx.assign === "team"
+        ? pickGroups(ctx, { only: assignees(ctx, c), skip: ow, sel: ui.pick, pick: id => void assignInTeam(ctx, c, id) })
+        : pickGroups(ctx, { skip: ow, sel: ui.pick, pick: id => void reassign(ctx, c, id, "assign", { reSheet: false }) })) : [],
       pickLabel: ui.pick ? nameOf(ui.pick) : "Choose a person", moveBg: ui.pick ? "var(--crm-rust)" : "var(--crm-line)",
       sheetOpen: on && ui.reSheet, openSheet: () => patch({ reSheet: true }), closeSheet: () => patch({ reSheet: false }),
-      move: c && ui.pick ? () => void reassign(ctx, c, ui.pick, "move", { reSheet: false }) : undefined,
+      move: c && ui.pick ? () => void (ctx.assign === "team" ? assignInTeam(ctx, c, ui.pick) : reassign(ctx, c, ui.pick, "assign", { reSheet: false })) : undefined,
     },
     lx: lxVM(ctx, c, on),
   };
@@ -307,7 +321,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     cold: on && shut,
     coldMsg: c?.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     menu: [
-      { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) },
+      // Assign to only for whom it can work (2026-10-23 — it showed to every leader, and the database refused all but CRM ·
+      // Manage): CRM · Manage, or a TL / STL / TA with somebody in this customer's team below them.
+      ...(ctx.assign === "any" || assignees(ctx, c).length ? [{ label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) }] : []),
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "var(--crm-tint-follow)", fg: "var(--crm-brown)", go: () => patch({ pMenu: false, pInfo: true }) },
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
       // One's own starred messages in this chat (the message menu's Star, 2026-10-14).

@@ -74,7 +74,7 @@ export interface PanelUi {
   sdSel: string | null;
   mvFor: string | null;
   mvSel: string | null;
-  undo: { kind: "send" | "move"; customerId: string; prev: string | null; name: string; to: string; verb: string; left: number } | null;
+  undo: { kind: "send" | "assign"; customerId: string; prev: string | null; name: string; to: string; verb: string; left: number } | null;
   /** The last reassignment made here, per customer — the chat keeps saying so after the Undo bar is gone. */
   movedRec: Record<string, { from: string | null; to: string }>;
   adEd: AdDraft | null;
