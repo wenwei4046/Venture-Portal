@@ -551,22 +551,22 @@ export function DeskActive({ v }: { v: ActiveVM }) {
         {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
         <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: "14.5px", fontWeight: 650, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
+      {/* One column a team, side by side (the owner, 2026-10-22: "做成直列式的"); more teams than fit scroll sideways. */}
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "8px" }}>
         {groups.map(g => (
-          <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
+          <div key={g.name} style={{ flex: "0 0 252px", minWidth: 0, background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
               <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
-              <strong style={{ flex: "1", fontSize: "14.5px", fontWeight: 700, color: g.color }}>{g.name}</strong>
+              <strong style={{ flex: "1", minWidth: 0, fontSize: "14px", fontWeight: 700, color: g.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</strong>
               <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
             </div>
             {g.people.map(p => (
-              <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
+              <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
                 <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: "12px", fontWeight: 700, display: "grid", placeItems: "center" }}>{p.ini}</span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: "14.5px", fontWeight: 650 }}>{p.name}</strong>
-                  <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{p.role}</span>
+                  <strong style={{ fontSize: "14px", fontWeight: 650, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
+                  <span style={{ fontSize: "12px", color: p.active ? "var(--crm-muted)" : "var(--crm-oxblood)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.active ? p.role : "Locked · no new leads"}</span>
                 </span>
-                <span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.active ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)", color: p.active ? "var(--crm-brown)" : "var(--crm-oxblood)", fontSize: "12px", fontWeight: 700, display: "inline-flex", alignItems: "center" }}>{p.active ? "Active" : "Locked"}</span>
                 <span style={{ flex: "0 0 auto", width: "40px", height: "24px", borderRadius: "12px", background: p.active ? "var(--crm-brown)" : "var(--crm-line)", position: "relative", display: "block" }}>
                   <span style={{ position: "absolute", top: "3px", left: p.active ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                 </span>
