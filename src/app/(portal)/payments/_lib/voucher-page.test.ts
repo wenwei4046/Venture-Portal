@@ -45,6 +45,19 @@ describe('voucherChangeLine', () => {
     expect(
       voucherChangeLine(change({ changed: ['status', 'approved_by', 'approved_at', 'executed_at', 'journal_entry_id'], old_row: { status: 'pending_approval' }, new_row: { status: 'paid' } })),
     ).toBe('Approved and paid')
+    // …who paid it too — the line's own "who" says it (2026-10-22).
+    expect(
+      voucherChangeLine(change({ changed: ['approved_at', 'approved_by', 'executed_at', 'executed_by', 'notes', 'status'], old_row: { status: 'pending_approval' }, new_row: { status: 'paid' } })),
+    ).toBe('Approved and paid · Notes changed')
+  })
+
+  it('a receipt is received — written a draft, nobody approves it (2026-10-22)', () => {
+    expect(
+      voucherChangeLine(change({ changed: ['approved_at', 'approved_by', 'executed_at', 'executed_by', 'status'], old_row: { status: 'draft', direction: 'credit' }, new_row: { status: 'paid', direction: 'credit' } })),
+    ).toBe('Received')
+    expect(
+      voucherChangeLine(change({ changed: ['status'], old_row: { status: 'draft', direction: 'debit' }, new_row: { status: 'paid', direction: 'debit' } })),
+    ).toBe('Approved and paid')
   })
 
   it('says a file was added or taken off, by its name', () => {

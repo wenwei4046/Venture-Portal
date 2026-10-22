@@ -1,5 +1,35 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 b (BUILT — app only, waiting on the user to merge) — a receipt is received only once its line is in
+
+a's leftover. User, after "不明白" twice: shown it as one receipt of RM 5,000 settling an invoice, in three
+steps (open the receipt, write its line, the bank and the books) → "要". Branch `fix/receipt-lines-before-paid`
+(worktree `../vp-receipt-lines`).
+
+- Was: `createPaymentVoucherInner` wrote a receipt `paid` at its insert, so `trg_pv_mark_invoice_paid_on_insert`
+  marked its invoice paid at once; the line came after. A refused line — e.g. 3030, the header a customer with no
+  receivable account of its own falls back to (`resolveArGlCode`) — left the receipt received and the invoice
+  paid, with no bank and no books. Netting's paying-side lookups (its department, "Inter-billing — X"; IT has no
+  such account) threw after the same point.
+- Now every voucher is inserted a draft. A receipt's line goes in, then `UPDATE … status paid, approved / executed
+  by / at WHERE still draft` — `mark_invoice_paid_on_voucher_paid` (the insert twin's body, bar OLD ≠ paid) marks
+  the invoice then — and the bank, the pools and the journal follow as before. A refused line, or a receipt the
+  database will not mark received, voids the draft (`voidHalfMadeVoucher`), said in words: the invoice untouched,
+  nothing posted. Before anything is written: a line on a header account is refused (`lib/postable-accounts.ts`
+  `headerAccounts`, which Copy now uses too; debit lines as well), and the netting paying side is resolved.
+- Invoice's *Settle N →* (`settleInvoicesConsolidated`, Billing · Create — which may insert a voucher but not
+  update one: `pv_update` asks the treasury scope) cannot start a draft; it checks its receivable account before
+  writing, its line otherwise as before.
+- The UPDATE-only triggers that now fire on a receipt's draft → paid all pass receipts by (payroll, claim,
+  transfer, dept-request and statutory guards — read on production); `credit_dept_pool_on_invoice_paid` treats
+  INSERT and UPDATE alike, and no receipt has reference_type 'invoice'. The app's own "invoice settled" step at
+  the end is unchanged.
+- History: a receipt reads *Created …* then *Received* (`voucherChangeLine`); executed_by is left out beside
+  executed_at, so a debit approval no longer adds *Executed by changed*.
+- Tests: `payments/actions.receipt-lines.test.ts` (5 — all failed before), `billing/actions.settle-header.test.ts`
+  (2 — the header one failed before), `voucher-page.test.ts` (+2); `actions.dialog.test.ts`' receipt now draft →
+  received. No database change; production today has no receipt without a line.
+
 ## CHECKPOINT 2026-10-22 a (SHIPPED, with z) — a half-made voucher or fund source is voided / cancelled, never "deleted"
 
 z's follow-up. User, shown it drawn (two before / after flows): "可以，照这个做"; the third spot: "一起修". On

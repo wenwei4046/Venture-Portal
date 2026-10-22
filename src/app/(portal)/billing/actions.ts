@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { resolveArGlCode } from '@/lib/ar-accounts'
+import { AR_PARENT, resolveArGlCode } from '@/lib/ar-accounts'
+import { headerAccounts } from '@/lib/postable-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
@@ -1516,6 +1517,16 @@ export async function settleInvoicesConsolidated(payload: {
   let payeeName = invoices[0].billable_to_freetext_name ?? '—'
   // Every invoice in a settlement belongs to one payer, so one AR account.
   const arCode = await resolveArGlCode(supabase, { invoiceId: invoices[0].id })
+  // Checked BEFORE the receipt is written (2026-10-22): a header account takes
+  // no posting, and the receipt — written received — stayed received with no
+  // line, no bank and no books. A customer with no receivable account of its
+  // own falls back to 3030, a header since AR was split by customer. (Billing ·
+  // Create may not update a voucher, so this receipt cannot start a draft.)
+  if ((await headerAccounts(supabase, [arCode])).size > 0) {
+    throw new Error(`The receivable account ${arCode} is a header account (it has sub-accounts) — nothing was saved. ${arCode === AR_PARENT
+      ? 'This customer has no receivable account of its own yet: give it one first.'
+      : 'Point the customer at one of its sub-accounts first.'}`)
+  }
   if (companyId) {
     const { data: company } = await supabase
       .from('companies')
