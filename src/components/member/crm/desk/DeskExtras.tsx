@@ -195,7 +195,8 @@ export function DeskEmoji({ v }: { v: ReturnType<typeof import("./vm/chat").chat
  * CRM alerts' pane (frame 1d), drawn as the design draws it — its Unread | Read segment, its rows (the kind's dot, the
  * kind and time, the title, the line under it) — with what the owner asked for on 2026-10-15: the tabs work and count,
  * Mark all read, each row says more (what happened, the customer's channel · ad · status · owner, their last words),
- * a tap opens the chat, and Mark as read. Behaviour: vm/inbox.ts › alertsVM.
+ * a tap opens the chat, and Mark as read. Invitations to answer first (2026-10-23: a Move is a request on the computer too)
+ * — the phone's cards, Decline | Accept. Behaviour: vm/inbox.ts › alertsVM.
  */
 export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").alertsVM>["alertsP"] }) {
   return (<>
@@ -208,7 +209,28 @@ export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").al
       {v.markAll && <button type="button" onClick={v.markAll} className={DX.emo} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", whiteSpace: "nowrap" }}>Mark all read</button>}
     </div>
     <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column" }}>
-      {!v.rows.length && <div style={{ padding: "40px 24px", textAlign: "center", fontSize: "13.5px", color: "var(--crm-muted)" }}>{v.empty}</div>}
+      {!!v.invites.length && <>
+        <div style={{ padding: "14px 16px 6px", fontSize: "11px", fontWeight: "700", letterSpacing: ".1em", color: "var(--crm-muted)" }}>INVITATIONS</div>
+        {v.invites.map(i => (
+          <div key={i.key} style={{ display: "flex", gap: "12px", padding: "12px 16px 14px", background: "var(--crm-page)", borderBottom: "1px solid var(--crm-field)" }}>
+            <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: i.color }}></span>
+            <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
+              <span style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
+                <b style={{ fontSize: "12px", fontWeight: "700", color: i.color }}>{i.kind}</b>
+                <span style={{ flex: "1" }}></span>
+                <small style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{i.time}</small>
+              </span>
+              <strong style={{ fontSize: "14px", fontWeight: "650" }}>{i.title}</strong>
+              {i.sub && <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{i.sub}</span>}
+              <span style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <button type="button" onClick={i.decline} className={DX.emo} style={{ height: "30px", padding: "0 14px", borderRadius: "15px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>Decline</button>
+                <button type="button" onClick={i.accept} style={{ height: "30px", padding: "0 14px", borderRadius: "15px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>Accept</button>
+              </span>
+            </span>
+          </div>
+        ))}
+      </>}
+      {!v.rows.length && !v.invites.length && <div style={{ padding: "40px 24px", textAlign: "center", fontSize: "13.5px", color: "var(--crm-muted)" }}>{v.empty}</div>}
       {v.rows.map(a => (
         <div key={a.key} onClick={a.open} className={DX.alert} style={{ display: "flex", gap: "12px", padding: "14px 16px", background: a.bg, borderBottom: "1px solid var(--crm-field)", cursor: a.canOpen ? "pointer" : "default" }}>
           <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: a.dot }}></span>

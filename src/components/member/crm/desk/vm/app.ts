@@ -7,7 +7,7 @@ import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
 import { frame4aVM, heads4a } from "./frame4a";
 import { clistVM, insightVM } from "./insight";
-import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, teamPaneVM } from "./inbox";
+import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
 import { answerOf, formV2 } from "./form";
 import { initials } from "./data";
 import { calendarVM } from "./calendar";
@@ -41,8 +41,8 @@ export function deskVM(ctx: DeskCtx) {
     alerts: { avatar: "", title: "CRM alerts", sub: "Move · Share · Won · Lost · Overdue 9 h+", subColor: "var(--crm-muted)", menu: false },
     section: { avatar: "", title: op, sub: ui.tab === "assignment" ? "Assignment · CRM · Manage" : "Settings · CRM · Manage", subColor: "var(--crm-muted)", menu: false },
     assign: { avatar: "", title: "Assign to", sub: cur ? `${cur.name} · ${cur.ad}` : "", subColor: "var(--crm-muted)", menu: false },
-    // v2's Move / Share heads.
-    move: { avatar: "", title: "Move", sub: cur ? `${cur.name} · to your direct upline only` : "", subColor: "var(--crm-muted)", menu: false },
+    // v2's Move / Share heads. A Move is a request (2026-10-23) — to whose direct upline, as chatMenuVM lists them.
+    move: { avatar: "", title: "Move", sub: cur ? `${cur.name} · a request to ${moveHolder(ctx, cur) === ctx.me.id ? "your" : `${ctx.nameOf(moveHolder(ctx, cur))}'s`} direct upline` : "", subColor: "var(--crm-muted)", menu: false },
     share: { avatar: "", title: ctx.me.role === "boss" ? "Share · invite your team" : "Share", sub: cur ? `${cur.name}${ctx.me.role === "boss" ? " · they join the chat with you" : " · invite a teammate · same team only"}` : "", subColor: "var(--crm-muted)", menu: false },
     metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : "Pick the columns for Ads Performance", subColor: "var(--crm-muted)", menu: false },
     clist: { avatar: "", ...clist.clistHead, subColor: "var(--crm-muted)", menu: false },

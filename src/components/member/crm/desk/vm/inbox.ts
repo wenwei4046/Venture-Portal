@@ -16,6 +16,7 @@ import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
+import { jobTitle, personOf } from "../../shared/people";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -215,10 +216,22 @@ export function alertsVM(ctx: DeskCtx) {
       canOpen: !!c, open,
       markRead: unr ? (e?: { stopPropagation(): void }) => { e?.stopPropagation(); act.readNotifs([n.key]); } : null };
   });
+  // Invitations to me (2026-10-23 — a Move is a request on the computer too, so whoever it asks answers it here): Mine ›
+  // Notifications' own cards (sales/vm/notifs.ts), Accept · Decline through crm_answer_invite. Unread until answered,
+  // never under Read; once answered the database's event (moved / declined, shared / declined) is the alert.
+  const invites = (tab === "read" ? [] : data.invites.filter(i => i.to === ctx.me.id && i.state === "pending"))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(i => {
+      const from = ctx.nameOf(i.from), c = data.customers.find(x => x.id === i.customerId), [kind, color] = KIND[i.kind];
+      return { key: i.id, kind, color, time: when(i.createdAt),
+        title: i.kind === "share" ? `${from} invited you to a chat` : `${from} wants to move a lead to you`,
+        sub: [i.customerName || c?.name, c ? CHANNEL[c.channel].name : ""].filter(Boolean).join(" · "),
+        accept: () => void act.answerInvite(i.id, true), decline: () => void act.answerInvite(i.id, false) };
+    });
+  const waiting = data.invites.filter(i => i.to === ctx.me.id && i.state === "pending").length;
   return {
-    alerts: rows, alertsUnread: unread.length,
-    alertsP: { rows, tab,
-      tabs: ([["all", "All", all.length], ["unread", "Unread", unread.length], ["read", "Read", read.length]] as const).map(([k, label, nn]) => ({ label: nn ? `${label} ${nn}` : label, on: tab === k, pick: () => patch({ alR: k }) })),
+    alerts: rows, alertsUnread: unread.length + waiting,
+    alertsP: { rows, tab, invites,
+      tabs: ([["all", "All", all.length + waiting], ["unread", "Unread", unread.length + waiting], ["read", "Read", read.length]] as const).map(([k, label, nn]) => ({ label: nn ? `${label} ${nn}` : label, on: tab === k, pick: () => patch({ alR: k }) })),
       markAll: unread.length ? () => act.readNotifs(unread.map(n => n.key), true) : null,
       empty: tab === "read" ? "Nothing read yet" : tab === "unread" ? "No unread alerts · you're all caught up" : "No alerts yet" },
   };
@@ -228,13 +241,23 @@ export function alertsVM(ctx: DeskCtx) {
 export const alertsUnreadN = (ctx: DeskCtx) => alertsVM(ctx).alertsUnread;
 
 /**
+ * Whose direct superior a Move asks — crm_invite's own rule: whoever has the customer, when one may move another's
+ * (Edit · All); oneself for one's own, or one nobody has yet.
+ */
+export const moveHolder = (ctx: DeskCtx, c: DeskCtx["data"]["customers"][number] | undefined) =>
+  c?.assignedTo && c.assignedTo !== ctx.me.id && ctx.data.can.editAll ? c.assignedTo : ctx.me.id;
+
+/**
  * The chat's ⋮ menu (CRM Desktop v2, README › ⋮ menu), three groups: Assign to (CRM · Manage) · Move · Share | Customer
  * info · Appointment · Starred messages | Mark as unread / read · Mute / Unmute · Pin / Unpin chat — the last three are
  * one's own marks on the chat (crm_contact_prefs, the phone's swipe actions), shown on Inbox's row, each with a toast.
- * Move / Share (README › Move / Share rules): Move goes to one's DIRECT upline only — the Principal is the top ("You're the
- * top level", Invite your team); the Revenue Director's upline is the Principal (sent there through crm_send_to, which
- * CRM · Manage may). Share invites within one's own chain — above, same level, below, never another team; for the
- * Principal and the Director that is everybody (the database's Edit · All, crm_invite). The invited accepts on their phone.
+ * Move / Share (README › Move / Share rules): Move is the phone's (2026-10-23 — the owner: "桌面版的 move follow 和
+ * 手机版，本质上他们是同一套规则的 by right 是要一样的"; it moved the customer at once through crm_send_to until then): a
+ * REQUEST to the direct superior of whoever has the customer — one's own (or one nobody has yet): one's own superior;
+ * somebody else's, which Edit · All may move: theirs, as crm_invite asks — and nothing changes hands until they Accept
+ * (CRM alerts' Invitations here, Notifications on the phone). Nobody above — the Principal's own — "You're the top
+ * level", Invite your team. Share invites within one's own chain — above, same level, below, never another team; for
+ * the Principal and the Director that is everybody (the database's Edit · All, crm_invite).
  */
 export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(): void }) {
   const { ui, patch, data, me, act, nameOf, teams } = ctx;
@@ -243,9 +266,14 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const unread = !!c && (!!pref?.markedUnread || c.unread > 0), muted = !!pref?.muted, pinned = !!pref?.pinned;
   const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { if (!c) return; patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
   const top = me.role === "boss";
+  // Whom a Move asks: the superior of whoever has the customer, never oneself.
+  const holder = moveHolder(ctx, c);
+  const up = personOf(personOf(holder, data.people)?.uplineId, data.people);
+  const upTo = up && up.id !== me.id ? up : undefined;
   const items: [string, string, string, () => void, string, boolean][] = [
     ...(data.can.manage ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
-    ["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false],
+    // Move only when there is somebody to hand over to, as on the phone — the Principal keeps the design's top-level page.
+    ...(upTo || top ? [["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
     ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null }); }, "", true],
     ["Appointment", "var(--crm-ink-soft)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
@@ -267,22 +295,23 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const stls = data.people.filter(p => p.role === "stl").map(p => ({ id: p.id, name: p.name, sub: "Senior TL" }));
   const teamGroups = teams.map((t, k) => [t.name.toUpperCase(), teamColours(k)[0], t.people.map(p => ({ id: p.id, name: p.name, sub: t.name }))] as [string, string, P[]]);
   const src: [string, string, P[]][] = kind === "move"
-    ? (top || !boss ? [] : [["YOUR DIRECT UPLINE", "var(--crm-ink)", [{ id: boss.id, name: boss.name, sub: "Principal · Top level" }]]])
+    ? (upTo ? [[holder === me.id ? "YOUR DIRECT UPLINE" : `${nameOf(holder).toUpperCase()}'S DIRECT UPLINE`, "var(--crm-ink)", [{ id: upTo.id, name: upTo.name, sub: jobTitle(upTo) }]]] : [])
     : top ? [["REVENUE DIRECTOR", "var(--crm-ink)", ctx.directors.map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))], ["SENIOR TL", "var(--crm-muted)", stls], ...teamGroups]
       : [["ABOVE YOU", "var(--crm-ink)", boss ? [{ id: boss.id, name: boss.name, sub: "Top level" }] : []], ["SAME LEVEL", "var(--crm-rust)", ctx.directors.filter(d => d.id !== me.id).map(d => ({ id: d.id, name: d.name, sub: "Revenue Director" }))],
         ["BELOW YOU", "var(--crm-brown)", [...stls, ...teamGroups.flatMap(g => g[2])]]];
-  const btn = kind === "move" ? "Move" : top ? "Invite" : "Share";
+  const btn = kind === "move" ? "Request" : top ? "Invite" : "Share";
   const pickGroups = src.map(([label, color, ps]) => [label, color, ps.filter(p => p.id !== me.id && p.id !== c?.assignedTo)] as [string, string, P[]]).filter(g => g[2].length)
     .map(([label, color, ps]) => ({ label, color, people: ps.map(p => { const on = done.has(p.id);
       return { name: p.name, sub: p.sub, ini: initials(p.name), btn: on ? (kind === "move" ? "Requested" : top ? "Invited" : "Shared") : btn, bc: on ? "var(--crm-brown)" : "var(--crm-rust)",
         pick: () => {
           if (on || !c) return;
-          if (kind === "move") { void act.sendTo(c.id, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `Moved ${cn} to ${p.name}`, undo: { kind: "send", customerId: c.id, prev: c.assignedTo, until: Date.now() + 30_000 } }); }); return; }
+          // A request, as the phone's (crm_invite): the customer stays where it is until they Accept — so no Undo.
+          if (kind === "move") { void act.invite("move", c.id, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `Move request sent to ${p.name}` }); }); return; }
           void act.invite("share", c.id, p.id).then(ok => { if (ok) patch({ toast: top ? `Invited ${p.name} into the chat with ${cn}` : `Shared ${cn} with ${p.name}` }); });
         } }; }) }));
   return {
     chatMenuItems,
-    kTopMove: kind === "move" && top, kPick: (kind === "move" && !top) || kind === "share", pickBtn: btn, pickGroups,
+    kTopMove: kind === "move" && !upTo, kPick: (kind === "move" && !!upTo) || kind === "share", pickBtn: btn, pickGroups,
     shareFromTop: () => patch({ kind: "share" }),
   };
 }
