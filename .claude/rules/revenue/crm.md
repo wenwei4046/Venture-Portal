@@ -357,3 +357,5 @@ Tests: `crm-ad-running.test.ts` › run line, `crm-ad-names-meta.test.ts` › th
 **AN EVEN SHARE ADDS UP TO 100 (2026-10-22, the owner's screenshot: "Adds up to 99% · needs 100%" on a team of three):** the desktop's default By % share is 34 · 33 · 33, the remainder to the first (`desk/vm/assign.ts` › `valOf`; it was 33 each), as the phone's `evenShare` already did.
 
 **ACTIVE MEMBERS IN COLUMNS (2026-10-22; the owner: "做成直列式的"):** the desktop's Active members draws one column a team, side by side (252 px each, more teams scroll sideways), each person's line under the name reading their title or *Locked · no new leads* in place of the Active / Locked pill (`DeskActive`).
+
+**ADS PERFORMANCE LISTS EVERY AD (2026-10-22; the owner: "全部的广告也要在这里"):** the desktop's Ads Performance lists the ads added before their first lead too (adNames' `added`), with 0s, as Ads to teams does (`desk/vm/adsperf.ts`); its note reads "Ad names come from Ads Manager. Spend and cost per lead are not read from Meta yet." (`desk-4a.cjs`; it still said names were typed in Assignment and spend waited for ads_read).
