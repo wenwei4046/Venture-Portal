@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes pbIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="max-width:1120px;margin:0 auto;padding:26px 36px 72px;box-sizing:border-box;color:rgb(51 36 27)">
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">📦</span><span style="font-size:1.5em;font-weight:600">Product Builder</span></div>
+        <div style="font-size:0.92em;color:rgb(117 100 86);margin-top:4px">Products and packages the marketing team sells to subsidiaries. Prices are visible to MM and AMM only.</div>
+      </div>
+      <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+        <sc-for list="{{ statusTabs }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:28px;padding:0 12px;border-radius:6px;display:flex;align-items:center;gap:6px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.9em;white-space:nowrap">{{ o.label }}<span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ o.n }}</span></div></sc-for>
+      </div>
+      <div onClick="{{ newProduct }}" style="height:36px;padding:0 16px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;gap:6px;font-weight:600;font-size:0.94em;cursor:pointer" style-hover="background:#E0893F">+ New product</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:22px">
+      <sc-for list="{{ cards }}" as="c" hint-placeholder-count="6">
+        <div onClick="{{ c.onClick }}" style="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:12px;border:1px solid rgb(229 226 220);background:{{ c.bg }};cursor:pointer;transition:box-shadow .15s" style-hover="box-shadow:0 6px 18px rgb(51 36 27 / 0.08)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(98 92 86)">{{ c.code }}</span>
+            <span style="flex:1"></span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:0.78em;font-weight:500;padding:2px 8px;border-radius:999px;background:{{ c.stBg }};color:{{ c.stFg }};border:1px solid {{ c.stBorder }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.stDot }}"></span>{{ c.status }}</span>
+          </div>
+          <div style="font-size:1.08em;font-weight:600;line-height:1.3;color:{{ c.nameFg }}">{{ c.name }}</div>
+          <div style="font-size:0.86em;color:rgb(98 92 86);line-height:1.45;min-height:38px">{{ c.included }}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid rgb(240 238 234);font-size:0.82em;color:rgb(98 92 86)">
+            <span style="padding:2px 7px;border-radius:5px;background:rgb(243 242 239);white-space:nowrap">{{ c.type }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px">v{{ c.ver }}</span>
+            <span style="flex:1"></span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;color:rgb(51 36 27);white-space:nowrap">🔒 {{ c.price }}</span>
+          </div>
+          <sc-if value="{{ c.isRetired }}"><div style="font-size:0.8em;color:rgb(98 92 86);margin-top:-2px">Retired {{ c.retiredOn }} · {{ c.active }} projects still running on v{{ c.ver }}</div></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isEdit }}">
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.92em;color:rgb(117 100 86)">
+      <span onClick="{{ toList }}" style="cursor:pointer" style-hover="color:rgb(51 36 27);text-decoration:underline">← Products</span><span>/</span><span>{{ p.name }}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap">
+      <span style="font-size:1.55em;font-weight:600">{{ p.nameOrNew }}</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:0.82em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ st.bg }};color:{{ st.fg }};border:1px solid {{ st.border }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ st.dot }}"></span>{{ p.status }}</span>
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(98 92 86)">{{ verLabel }}</span>
+    </div>
+
+    <sc-if value="{{ p.isRetired }}">
+      <div style="margin-top:16px;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:rgb(243 242 239);border:1px solid rgb(226 223 217);font-size:0.92em;color:rgb(74 64 58)">
+        <span style="flex:1"><strong style="font-weight:600">Retired on {{ p.retiredOn }}.</strong> It can't be picked for new projects. {{ p.active }} projects already running keep v{{ p.ver }} until they finish.</span>
+        <span onClick="{{ reactivate }}" style="height:30px;padding:0 12px;border-radius:7px;border:1px solid rgb(200 192 182);background:#fff;display:flex;align-items:center;font-weight:500;cursor:pointer;white-space:nowrap">Reactivate</span>
+      </div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:28px;margin-top:22px;align-items:start">
+      <div style="position:sticky;top:12px;display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;font-size:0.92em;color:rgb(51 36 27)">
+            <span style="width:20px;height:20px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;background:{{ n.bg }};color:{{ n.fg }};border:{{ n.border }}">{{ n.mark }}</span>{{ n.label }}
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0;opacity:{{ formOp }}">
+        <div style="border:1px solid rgb(229 226 220);border-radius:12px;background:#fff">
+          <div style="padding:12px 18px;border-bottom:1px solid rgb(240 238 234);font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86)">1 · Basics</div>
+          <div style="padding:16px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px">
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Name</span><input value="{{ p.name }}" onChange="{{ on.name }}" disabled="{{ ro }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:8px;padding:0 10px;font:inherit;font-size:0.94em;outline:none;color:rgb(51 36 27);background:#fff"></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Code <span style="font-weight:400;color:rgb(98 92 86)">· auto-generated</span></span><div style="height:36px;box-sizing:border-box;border:1px solid rgb(236 233 228);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:8px;font-size:0.94em;color:rgb(51 36 27);font-family:'Chivo Mono',Menlo,monospace;background:rgb(246 244 240)"><span style="flex:1;min-width:0">{{ p.code }}</span><span style="font-family:inherit;font-size:0.8em;color:rgb(98 92 86)">🔒</span></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1"><span style="font-size:0.88em;font-weight:500">Type</span>
+              <div style="display:flex;gap:8px"><sc-for list="{{ typeOpts }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="flex:1;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid {{ o.border }};background:{{ o.bg }};cursor:pointer"><span style="width:15px;height:15px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }}"></span><div><div style="font-size:0.92em;font-weight:500">{{ o.label }}</div><div style="font-size:0.8em;color:rgb(98 92 86);margin-top:2px">{{ o.hint }}</div></div></div></sc-for></div>
+            </div>
+            
+            <div style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1"><span style="font-size:0.88em;font-weight:500">Description</span><textarea value="{{ p.desc }}" onChange="{{ on.desc }}" disabled="{{ ro }}" style="min-height:60px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:8px;padding:8px 10px;font:inherit;font-size:0.94em;line-height:1.5;resize:vertical;outline:none;color:rgb(51 36 27);background:#fff"></textarea></div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgb(229 226 220);border-radius:12px;background:#fff">
+          <div style="padding:12px 18px;border-bottom:1px solid rgb(240 238 234);display:flex;align-items:center;gap:10px"><span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86)">2 · What's included</span><span style="flex:1"></span><span style="font-size:0.86em;color:rgb(51 36 27);font-weight:500">{{ includedSummary }}</span></div>
+          <div style="padding:8px 18px 16px;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+              <div style="border:1px solid rgb(236 233 228);border-radius:10px;overflow:hidden;margin-top:6px">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgb(250 249 247);border-bottom:1px solid rgb(240 238 234)">
+                  <input value="{{ g.name }}" onChange="{{ g.onName }}" disabled="{{ ro }}" placeholder="Action category, e.g. Graphic Design" style="height:32px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:7px;padding:0 9px;font:inherit;font-size:0.92em;outline:none;background:#fff;color:rgb(51 36 27);min-width:0;flex:1;font-weight:600;font-size:0.98em;background:transparent;border-color:transparent" style-hover="border-color:rgb(226 223 217)" style-focus="border-color:rgb(150 136 120);background:#fff">
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;color:rgb(98 92 86);white-space:nowrap">{{ g.total }}</span>
+                  <span onClick="{{ g.onDel }}" title="Remove category" style="width:22px;text-align:center;color:rgb(170 160 150);cursor:pointer" style-hover="color:rgb(176 40 34)">×</span>
+                </div>
+                <div style="overflow-x:auto"><div style="min-width:680px;padding:4px 12px 8px">
+                  <div style="display:grid;grid-template-columns:minmax(130px,1fr) 92px 104px 88px minmax(170px,1.1fr) 22px;gap:10px;padding:6px 0;font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86)"><span>Action</span><span>Qty {{ perShort }}</span><span>Unit price</span><span style="text-align:right">Total</span><span>Workflow</span><span></span></div>
+                  <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                    <div style="display:grid;grid-template-columns:minmax(130px,1fr) 92px 104px 88px minmax(170px,1.1fr) 22px;gap:10px;align-items:center;padding:3px 0">
+                      <input value="{{ it.name }}" onChange="{{ it.onName }}" disabled="{{ ro }}" placeholder="e.g. Image post" style="height:32px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:7px;padding:0 9px;font:inherit;font-size:0.92em;outline:none;background:#fff;color:rgb(51 36 27);min-width:0" style-focus="border-color:rgb(150 136 120)">
+                      <div style="display:flex;align-items:center;border:1px solid rgb(226 223 217);border-radius:7px;height:32px;box-sizing:border-box;background:#fff">
+                        <span onClick="{{ it.down }}" style="width:26px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(98 92 86)">−</span>
+                        <span style="flex:1;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px">{{ it.qty }}</span>
+                        <span onClick="{{ it.up }}" style="width:26px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(98 92 86)">+</span>
+                      </div>
+                      <div style="display:flex;align-items:center;height:32px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:7px;background:#fff;overflow:hidden"><span style="padding:0 7px;font-size:0.8em;color:rgb(98 92 86)">RM</span><input value="{{ it.price }}" onChange="{{ it.onPrice }}" disabled="{{ ro }}" placeholder="0" style="flex:1;min-width:0;border:0;outline:none;padding:0 6px 0 0;font-family:'Chivo Mono',Menlo,monospace;font-size:12.5px;color:rgb(51 36 27);background:transparent"></div>
+                      <span style="text-align:right;font-family:'Chivo Mono',Menlo,monospace;font-size:12.5px">{{ it.total }}</span>
+                      <div style="display:flex;align-items:center;gap:4px;min-width:0">
+                        <select value="{{ it.wf }}" onChange="{{ it.onWf }}" disabled="{{ ro }}" style="height:32px;flex:1;min-width:0;box-sizing:border-box;border:1px solid {{ it.wfBorder }};border-radius:7px;padding:0 6px;font:inherit;font-size:0.86em;background:{{ it.wfBg }};color:rgb(51 36 27)"><option value="">Link a workflow…</option><sc-for list="{{ it.wfOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for><option value="__new">+ New action workflow</option></select>
+                        <sc-if value="{{ it.hasWf }}"><span onClick="{{ it.openWf }}" title="Open in Workflow Builder" style="flex:none;height:32px;width:30px;border-radius:7px;border:1px solid rgb(226 223 217);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(90 62 43);background:#fff" style-hover="background:rgb(246 244 240)">↗</span></sc-if>
+                      </div>
+                      <span onClick="{{ it.onDel }}" title="Remove" style="text-align:center;color:rgb(170 160 150);cursor:pointer" style-hover="color:rgb(176 40 34)">×</span>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex;padding-top:4px"><span onClick="{{ g.addItem }}" style="height:28px;padding:0 8px;margin-left:-8px;border-radius:6px;display:flex;align-items:center;color:rgb(90 62 43);font-weight:500;font-size:0.92em;cursor:pointer" style-hover="background:rgb(246 244 240)">+ Add action</span></div>
+                </div></div>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+              <input value="{{ catDraft }}" onChange="{{ onCatDraft }}" onKeyDown="{{ onCatKey }}" disabled="{{ ro }}" placeholder="New action category, e.g. Graphic Design, Video" style="height:32px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:7px;padding:0 9px;font:inherit;font-size:0.92em;outline:none;background:#fff;color:rgb(51 36 27);min-width:0;height:36px;flex:1;min-width:220px" style-focus="border-color:rgb(150 136 120)">
+              <span onClick="{{ addCat }}" style="height:36px;padding:0 14px;border-radius:8px;display:flex;align-items:center;font-weight:600;background:rgb(51 36 27);color:#fff;cursor:pointer;opacity:{{ catOp }}">+ Add category</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid rgb(240 238 234)">
+              <span style="font-size:0.9em;color:rgb(98 92 86)">Sum of all actions</span><span style="flex:1"></span>
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:1.05em;font-weight:600">{{ itemsTotal }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgb(229 226 220);border-radius:12px;background:#fff">
+          <div style="padding:12px 18px;border-bottom:1px solid rgb(240 238 234);font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86)">3 · Intake template</div>
+          <div style="padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px 18px;max-width:520px">
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Intake template <span style="font-weight:400;color:rgb(98 92 86)">· used in meeting minutes</span></span>
+              <select value="{{ p.intake }}" onChange="{{ on.intake }}" disabled="{{ ro }}" style="height:36px;border:1px solid rgb(226 223 217);border-radius:8px;padding:0 8px;font:inherit;font-size:0.94em;background:#fff;color:rgb(51 36 27)"><sc-for list="{{ intakeOpts }}" as="o" hint-placeholder-count="5"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+              <span style="font-size:0.8em;color:rgb(98 92 86)">{{ intakeMeta }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgb(229 226 220);border-radius:12px;background:rgb(250 249 247)">
+          <div style="padding:12px 18px;border-bottom:1px solid rgb(240 238 234);display:flex;align-items:center;gap:8px"><span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86)">4 · Pricing</span><span style="font-size:0.78em;padding:2px 7px;border-radius:5px;background:rgb(51 36 27);color:#fff">🔒 Manager only</span><span style="flex:1"></span><span style="font-size:0.8em;color:rgb(98 92 86)">Staff and PIC never see this section</span></div>
+          <div style="padding:16px 18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 18px;align-items:end">
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">List price</span>
+              <div style="display:flex;align-items:center;height:36px;border:1px solid rgb(226 223 217);border-radius:8px;background:#fff;overflow:hidden"><span style="padding:0 10px;font-size:0.86em;color:rgb(98 92 86);border-right:1px solid rgb(240 238 234);height:100%;display:flex;align-items:center">RM</span><input value="{{ p.price }}" onChange="{{ on.price }}" disabled="{{ ro }}" style="flex:1;min-width:0;border:0;outline:none;padding:0 10px;font-family:'Chivo Mono',Menlo,monospace;font-size:13px;color:rgb(51 36 27);background:transparent"><span style="padding:0 10px;font-size:0.8em;color:rgb(98 92 86)">{{ perUnit }}</span></div>
+              <sc-if value="{{ showUseSum }}"><span onClick="{{ useSum }}" style="font-size:0.8em;color:rgb(90 62 43);cursor:pointer;text-decoration:underline">Use sum of actions ({{ itemsTotal }})</span></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Internal cost <span style="font-weight:400;color:rgb(98 92 86)">· optional</span></span>
+              <div style="display:flex;align-items:center;height:36px;border:1px solid rgb(226 223 217);border-radius:8px;background:#fff;overflow:hidden"><span style="padding:0 10px;font-size:0.86em;color:rgb(98 92 86);border-right:1px solid rgb(240 238 234);height:100%;display:flex;align-items:center">RM</span><input value="{{ p.cost }}" onChange="{{ on.cost }}" disabled="{{ ro }}" placeholder="—" style="flex:1;min-width:0;border:0;outline:none;padding:0 10px;font-family:'Chivo Mono',Menlo,monospace;font-size:13px;color:rgb(51 36 27);background:transparent"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Margin</span>
+              <div style="height:36px;display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:1.3em;font-weight:600;color:{{ marginFg }}">{{ margin }}</span><span style="font-size:0.84em;color:rgb(98 92 86)">{{ marginNote }}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgb(229 226 220);border-radius:12px;background:#fff">
+          <div style="padding:12px 18px;border-bottom:1px solid rgb(240 238 234);font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86)">5 · Publish</div>
+          <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Version</span><div style="height:36px;display:flex;align-items:center;font-family:'Chivo Mono',Menlo,monospace;font-size:13px">v{{ nextVer }} <span style="font-family:inherit;color:rgb(98 92 86);margin-left:8px;font-size:11px">{{ verNote }}</span></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Effective from</span><input type="date" value="{{ p.effective }}" onChange="{{ on.effective }}" disabled="{{ ro }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(226 223 217);border-radius:8px;padding:0 10px;font:inherit;font-size:0.94em;color:rgb(51 36 27);background:#fff"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Projects on current version</span><div style="height:36px;display:flex;align-items:center;font-size:0.94em">{{ p.active }} active · stay on v{{ p.ver }}</div></div>
+            </div>
+            <sc-if value="{{ hasHistory }}">
+              <div style="border-top:1px solid rgb(240 238 234);padding-top:12px">
+                <div style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(98 92 86);margin-bottom:6px">Version history</div>
+                <sc-for list="{{ history }}" as="h" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:50px 110px 1fr;gap:12px;padding:6px 0;font-size:0.88em;border-top:1px solid rgb(246 244 240)"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px">{{ h.v }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(98 92 86)">{{ h.d }}</span><span style="color:rgb(74 64 58)">{{ h.t }}</span></div></sc-for>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid rgb(240 238 234)">
+              <sc-if value="{{ canRetire }}"><span onClick="{{ retire }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgb(226 223 217);display:flex;align-items:center;font-size:0.92em;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(246 244 240)">Retire product</span></sc-if>
+              <span style="flex:1"></span>
+              <span style="font-size:0.86em;color:{{ pubNoteFg }}">{{ pubNote }}</span>
+              <sc-if value="{{ notRetired }}"><span onClick="{{ saveDraft }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgb(226 223 217);display:flex;align-items:center;font-size:0.92em;cursor:pointer" style-hover="background:rgb(246 244 240)">Save draft</span></sc-if>
+              <sc-if value="{{ notRetired }}"><span onClick="{{ publish }}" style="height:36px;padding:0 16px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:{{ pubCursor }};opacity:{{ pubOp }}">Publish v{{ nextVer }}</span></sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:pbIn .2s ease-out">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1300},&quot;start&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;list&quot;,&quot;edit&quot;,&quot;retired&quot;],&quot;default&quot;:&quot;list&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const ST = {
+  Draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  Active: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  Retired: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(120 114 108)' },
+};
+const SUBS = [['Carres', 'oklch(0.70 0.12 235)'], ['2990 Home', 'oklch(0.64 0.15 295)'], ['Houzs Century', 'oklch(0.52 0.06 55)'], ['Hookka', 'oklch(0.70 0.13 345)'], ['Colive', 'oklch(0.66 0.10 195)'], ['Dreamcrafter', 'oklch(0.56 0.15 270)'], ['CMI', 'oklch(0.60 0.03 250)'], ['The Conts', 'oklch(0.62 0.12 320)']];
+const SERVICES = [
+  { k: 'graphic', name: 'Graphic design', dept: 'Design', items: [['img', 'Image posts'], ['banner', 'Banners / key visuals']] },
+  { k: 'video', name: 'Video', dept: 'Content', items: [['vid', 'Videos (Reels)'], ['long', 'Long-form videos']] },
+  { k: 'brand', name: 'Brand book', dept: 'Brand', items: [['book', 'Brand book'], ['vm', 'Showroom VM zones']] },
+  { k: 'ads', name: 'Ads management', dept: 'Ads', items: [['camp', 'Ad campaigns'], ['rep', 'Reports']] },
+];
+const INTAKES = ['Social Media Package intake', 'Reels Video intake', 'Media Buying intake', 'Brand Book intake', 'Showroom VM intake'];
+const WFS = ['Design photo · Simple', 'Design photo · With revisions', 'Reels video · Full production', 'Reels video · Quick edit', 'Social media monthly · Standard', 'Media buying · Standard', 'Brand book · Standard', 'Showroom VM · Standard'];
+const UNIT = { img: '450', banner: '600', vid: '1200', long: '2500', book: '9500', vm: '3500', camp: '1000', rep: '250' };
+const WF_OF = { img: 'Design photo · Simple', banner: 'Design photo · With revisions', vid: 'Reels video · Full production', long: 'Reels video · Full production', book: 'Brand book · Standard', vm: 'Showroom VM · Standard', camp: 'Media buying · Standard', rep: 'Media buying · Standard' };
+const toGroups = inc => SERVICES.filter(g => g.items.some(([k]) => inc[k] !== undefined)).map(g => ({ name: g.name, items: g.items.filter(([k]) => inc[k] !== undefined).map(([k, l]) => ({ name: l, qty: inc[k], price: UNIT[k] || '', wf: WF_OF[k] || '' })) }));
+const P = (o) => ({ desc: '', cost: '', subs: SUBS.map(s => s[0]), effective: '2026-11-01', history: [], ...o, groups: o.groups || toGroups(o.inc || {}) });
+const gText = gs => gs.flatMap(g => g.items).filter(it => it.qty > 0 && it.name.trim()).map(it => `${it.qty} ${it.name.toLowerCase()}`).join(' + ') || 'Nothing added yet';
+const gSum = gs => gs.flatMap(g => g.items).reduce((a, it) => a + (parseFloat(it.price) || 0) * it.qty, 0);
+const INIT = [
+  P({ id: 'sma', name: 'Social Media Package A', code: 'PKG-SM-A', type: 'recurring', status: 'Active', ver: 3, active: 6, price: '4800', cost: '3100', desc: 'Monthly social media for one subsidiary: content plan, image posts and short videos.', inc: { img: 4, vid: 2 }, intake: 'Social Media Package intake', workflow: 'Social Media Monthly · v4', history: [['v1', '2 Jan 2026', 'Launched · 6 image posts'], ['v2', '1 Apr 2026', '4 image posts + 1 video'], ['v3', '1 Aug 2026', '4 image posts + 2 videos']] }),
+  P({ id: 'reels', name: 'Reels Video', code: 'PRD-VID-REEL', type: 'one', status: 'Active', ver: 2, active: 12, price: '2200', cost: '1350', desc: 'One short-form video from script to final cut.', inc: { vid: 1 }, intake: 'Reels Video intake', workflow: 'Reels Video · v2', history: [['v1', '10 Feb 2026', 'Launched'], ['v2', '1 Jul 2026', 'Added raw upload stage']] }),
+  P({ id: 'media', name: 'Media Buying', code: 'PRD-ADS-MB', type: 'recurring', status: 'Active', ver: 3, active: 5, price: '1500', cost: '', desc: 'Paid campaigns on Meta and TikTok. Ad spend billed separately.', inc: { camp: 1, rep: 2 }, intake: 'Media Buying intake', workflow: 'Media Buying Campaign · v3', history: [['v3', '1 Sep 2026', 'Reports every 2 weeks']] }),
+  P({ id: 'brand', name: 'Brand Book', code: 'PRD-BRD-BOOK', type: 'one', status: 'Active', ver: 2, active: 1, price: '9500', cost: '6200', desc: 'Logo use, colours, type and tone guide.', inc: { book: 1 }, intake: 'Brand Book intake', workflow: 'Brand Book · v2' }),
+  P({ id: 'vm', name: 'Showroom VM Setup', code: 'PRD-BRD-VM', type: 'one', status: 'Draft', ver: 0, active: 0, price: '7000', cost: '5600', desc: 'Visual merchandising for showroom zones.', inc: { vm: 2 }, intake: 'Showroom VM intake', workflow: 'Showroom VM · v1', subs: ['Carres', '2990 Home', 'Houzs Century'] }),
+  P({ id: 'smb', name: 'Social Media Package B', code: 'PKG-SM-B', type: 'recurring', status: 'Retired', ver: 2, active: 2, price: '3200', cost: '2300', desc: 'Older monthly package, replaced by Package A.', inc: { img: 8 }, intake: 'Social Media Package intake', workflow: 'Social Media Monthly · v4', retiredOn: '31 Jul 2026', history: [['v1', '5 Jan 2025', 'Launched'], ['v2', '1 Jun 2025', '8 image posts']] }),
+];
+const money = v => v ? `RM ${Number(v).toLocaleString('en-MY')}` : '—';
+
+class Component extends DCLogic {
+  state = { catDraft: '', newWfs: [], view: this.props.start === 'retired' ? 'edit' : this.props.start === 'edit' ? 'edit' : 'list', filter: 'All', products: INIT, cur: this.props.start === 'retired' ? 'smb' : 'sma', toast: '' };
+  upd(patch) { this.setState(s => ({ products: s.products.map(p => p.id === s.cur ? { ...p, ...patch } : p) })); }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  renderVals() {
+    const s = this.state;
+    const incText = inc => SERVICES.flatMap(g => g.items).filter(([k]) => inc[k]).map(([k, l]) => `${inc[k]} ${l.toLowerCase()}`).join(' + ') || 'Nothing selected yet';
+    const counts = { All: s.products.length, Active: 0, Draft: 0, Retired: 0 }; s.products.forEach(p => counts[p.status]++);
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const order = { Active: 0, Draft: 1, Retired: 2 };
+    const cards = s.products.filter(p => s.filter === 'All' || p.status === s.filter).sort((a, b) => order[a.status] - order[b.status]).map(p => {
+      const st = ST[p.status], ret = p.status === 'Retired';
+      return { ...p, included: gText(p.groups) + (p.type === 'recurring' ? ' / month' : ''), type: p.type === 'recurring' ? 'Recurring monthly' : 'One-time project', ver: p.ver || '—', price: money(p.price) + (p.type === 'recurring' ? '/mo' : ''), status: p.status, stBg: st.bg, stFg: st.fg, stBorder: st.border, stDot: st.dot, bg: ret ? 'rgb(250 249 247)' : '#fff', nameFg: ret ? 'rgb(120 114 108)' : 'rgb(51 36 27)', isRetired: ret, onClick: () => this.setState({ view: 'edit', cur: p.id }) };
+    });
+    const p = s.products.find(x => x.id === s.cur);
+    let ev = {};
+    if (p) {
+      const ro = p.status === 'Retired';
+      const chip = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(226 223 217)', bg: on ? 'rgb(250 249 247)' : '#fff' });
+      const price = parseFloat(p.price), cost = parseFloat(p.cost);
+      const hasM = price > 0 && cost >= 0 && p.cost !== '';
+      const m = hasM ? Math.round(((price - cost) / price) * 100) : null;
+      const allItems = p.groups.flatMap(g => g.items);
+      const filled = [!!p.name && !!p.code, p.groups.some(g => g.items.some(it => it.qty > 0)), !!p.intake && allItems.length > 0 && allItems.every(it => it.wf), price > 0, !!p.effective];
+      const canPub = filled.every(Boolean) && !ro;
+      const addCat = () => { const n = s.catDraft.trim(); if (!n || ro) return; this.upd({ groups: [...p.groups, { name: n, items: [{ name: '', qty: 1, price: '', wf: '' }] }] }); this.setState({ catDraft: '' }); };
+      const nextVer = p.status === 'Draft' ? Math.max(1, p.ver || 1) : p.ver + 1;
+      ev = {
+        p: { ...p, nameOrNew: p.name || 'New product', isRetired: ro },
+        st: ST[p.status], verLabel: p.ver ? `Live v${p.ver}` : 'Not published yet', ro, formOp: ro ? 0.65 : 1,
+        nav: ['Basics', "What's included", 'Linked templates', 'Pricing', 'Publish'].map((label, i) => ({ label, mark: filled[i] ? '✓' : i + 1, bg: filled[i] ? 'rgb(51 36 27)' : '#fff', fg: filled[i] ? '#fff' : 'rgb(98 92 86)', border: filled[i] ? '1.5px solid rgb(51 36 27)' : '1.5px solid rgb(214 206 196)' })),
+        on: Object.fromEntries(['name', 'code', 'desc', 'intake', 'workflow', 'price', 'cost', 'effective'].map(k => [k, e => !ro && this.upd({ [k]: (k === 'price' || k === 'cost') ? e.target.value.replace(/[^\d.]/g, '') : e.target.value })])),
+        typeOpts: [['recurring', 'Recurring monthly', 'Opens a new task every month for the same team'], ['one', 'One-time project', 'One project, closes when delivered']].map(([k, label, hint]) => ({ label, hint, ...chip(p.type === k), radio: p.type === k ? '4.5px solid rgb(51 36 27)' : '1.5px solid rgb(200 192 182)', onClick: () => !ro && this.upd({ type: k }) })),
+        groups: p.groups.map((g, gi) => {
+          const ug = fn => !ro && this.upd({ groups: p.groups.map((x, xi) => xi === gi ? fn({ ...x, items: x.items.map(it => ({ ...it })) }) : x) });
+          return { name: g.name, total: money(String(gSum([g]))),
+            onName: e => { const v = e.target.value; ug(x => ({ ...x, name: v })); },
+            onDel: () => !ro && this.upd({ groups: p.groups.filter((_, xi) => xi !== gi) }),
+            addItem: () => ug(x => ({ ...x, items: [...x.items, { name: '', qty: 1, price: '', wf: '' }] })),
+            items: g.items.map((it, ii) => {
+              const ui = patch => ug(x => { x.items[ii] = { ...x.items[ii], ...patch }; return x; });
+              const nm = it.name.trim() || 'New action', wfOpts = [...new Set([...WFS, ...s.newWfs])];
+              const openWf = wf => { const [an, tn] = wf.split(' · '); return this.props.onOpenWorkflow ? this.props.onOpenWorkflow({ name: an, tpl: tn || 'Standard', sub: `Used by “${nm}” in ${p.name || 'a new product'}` }) : this.flash(`Opens “${wf}” in Workflow Builder`); };
+              return { name: it.name, qty: it.qty, price: it.price, wf: it.wf || '', wfOpts, hasWf: !!it.wf,
+                wfBorder: it.wf ? 'rgb(226 223 217)' : 'rgb(236 190 184)', wfBg: it.wf ? '#fff' : 'rgb(253 246 244)',
+                onWf: e => { const v = e.target.value; if (v === '__new') { const wf = `${nm} · Standard`; this.setState(st => ({ newWfs: st.newWfs.includes(wf) ? st.newWfs : [...st.newWfs, wf] })); ui({ wf }); openWf(wf); } else ui({ wf: v }); },
+                openWf: () => openWf(it.wf),
+                total: money(String((parseFloat(it.price) || 0) * it.qty)),
+                onName: e => ui({ name: e.target.value }), onPrice: e => ui({ price: e.target.value.replace(/[^\d.]/g, '') }),
+                up: () => ui({ qty: it.qty + 1 }), down: () => ui({ qty: Math.max(0, it.qty - 1) }),
+                onDel: () => ug(x => { x.items.splice(ii, 1); return x; }) };
+            }) };
+        }),
+        wfLinks: allItems.length ? allItems.map(it => ({ action: it.name || 'New action', wf: it.wf || 'Not linked', fg: it.wf ? 'rgb(51 36 27)' : 'rgb(176 40 34)' })) : [{ action: 'No actions yet', wf: '', fg: 'rgb(98 92 86)' }],
+        perShort: p.type === 'recurring' ? '/ mo' : '',
+        catDraft: s.catDraft, onCatDraft: e => this.setState({ catDraft: e.target.value }),
+        onCatKey: e => { if (e.key === 'Enter') addCat(); }, addCat, catOp: s.catDraft.trim() ? 1 : 0.45,
+        itemsTotal: money(String(gSum(p.groups))) + (p.type === 'recurring' ? ' / month' : ''),
+        showUseSum: !ro && gSum(p.groups) > 0 && String(gSum(p.groups)) !== String(p.price), useSum: () => this.upd({ price: String(gSum(p.groups)) }),
+        includedSummary: gText(p.groups) + (p.type === 'recurring' && p.groups.some(g => g.items.some(it => it.qty > 0)) ? ' / month' : ''),
+        intakeOpts: INTAKES, wfOpts: WFS,
+        intakeMeta: 'Fields the MM fills in with the PIC at the meeting',
+        wfMeta: { 'Social Media Monthly · v4': '3 stages · 6 working days · PIC approves 1×', 'Reels Video · v2': '5 stages · 8 working days · PIC approves 1×', 'Media Buying Campaign · v3': '5 stages · 10 days + reports · PIC approves 2×' }[p.workflow] || 'Linear workflow',
+        perUnit: p.type === 'recurring' ? '/ month' : '/ project',
+        margin: m === null ? '—' : `${m}%`, marginFg: m === null ? 'rgb(150 140 130)' : m < 20 ? 'rgb(176 40 34)' : 'rgb(51 36 27)',
+        marginNote: m === null ? 'Add internal cost to see margin' : `RM ${(price - cost).toLocaleString('en-MY')} ${p.type === 'recurring' ? 'per month' : 'per project'}${m < 20 ? ' · below 20%' : ''}`,
+        nextVer, verNote: p.status === 'Draft' ? 'first version' : `replaces v${p.ver}`,
+        hasHistory: p.history.length > 0, history: [...p.history].reverse().map(([v, d, t]) => ({ v, d, t })),
+        canRetire: p.status === 'Active', notRetired: !ro,
+        retire: () => { this.upd({ status: 'Retired', retiredOn: '27 Oct 2026' }); this.flash(`${p.name} retired · ${p.active} running projects keep v${p.ver}`); },
+        reactivate: () => { this.upd({ status: 'Active', retiredOn: null }); this.flash(`${p.name} is active again`); },
+        pubNote: ro ? '' : canPub ? `New projects from ${p.effective.split('-').reverse().join('/')} use v${nextVer}. ${p.active} running projects stay on v${p.ver || '—'}.` : `${filled.filter(x => !x).length} section(s) incomplete`,
+        pubNoteFg: canPub ? 'rgb(98 92 86)' : 'rgb(176 40 34)', pubCursor: canPub ? 'pointer' : 'not-allowed', pubOp: canPub ? 1 : 0.4,
+        saveDraft: () => this.flash('Draft saved'),
+        publish: () => { if (!canPub) return; this.upd({ status: 'Active', ver: nextVer, history: [...p.history, [`v${nextVer}`, '27 Oct 2026', 'Published']] }); this.flash(`Published ${p.name} v${nextVer} · effective ${p.effective.split('-').reverse().join('/')}`); },
+      };
+    }
+    return {
+      isList: s.view === 'list', isEdit: s.view === 'edit',
+      statusTabs: ['All', 'Active', 'Draft', 'Retired'].map(k => ({ label: k, n: counts[k], ...seg(s.filter === k), onClick: () => this.setState({ filter: k }) })),
+      cards,
+      newProduct: () => { const id = 'n' + Date.now(); this.setState(st => { const seq = st.products.filter(x => /^PRD-\d{5}$/.test(x.code)).length + 1; const code = 'PRD-' + String(new Date().getFullYear()).slice(2) + String(seq).padStart(3, '0'); return { products: [...st.products, P({ id, name: '', code, type: 'one', status: 'Draft', ver: 0, active: 0, price: '', inc: {}, intake: '', workflow: '', subs: [] })], cur: id, view: 'edit' }; }); },
+      toList: () => this.setState({ view: 'list' }),
+      ...ev,
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

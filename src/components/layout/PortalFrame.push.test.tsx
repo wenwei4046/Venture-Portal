@@ -21,6 +21,7 @@ vi.mock('./RouteFreshener', () => ({ default: () => null }))
 vi.mock('./HrSidebar', () => ({ default: () => <aside>hr sidebar</aside> }))
 vi.mock('./FinSidebar', () => ({ default: () => <aside>fin sidebar</aside> }))
 vi.mock('./HrTopBar', () => ({ default: () => <div /> }))
+vi.mock('@/components/mkt/shell/MktShell', () => ({ default: (p: { children: React.ReactNode }) => <div data-testid="mkt-shell">{p.children}</div> }))
 vi.mock('@/components/finv/Toast', () => ({ FinToastHost: () => null }))
 
 import PortalFrame from './PortalFrame'

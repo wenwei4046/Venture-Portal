@@ -42,6 +42,8 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   attendance: { actions: ['view', 'create', 'edit', 'approve'], scopes: ['all'] },
   // IT support's desk (mig 20261021020000).
   it_requests: { actions: ['view', 'edit'], scopes: ['all'] },
+  // Marketing's own view (mig 20261023214000).
+  marketing: { actions: ['view', 'create', 'edit', 'approve', 'manage'], scopes: ['all'] },
 }
 
 // `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
@@ -64,6 +66,7 @@ export const CELL_KEYS: CellKey[] = [
   K('documentation', 'view', 'documentation', 'all'), K('hiring', 'view', 'hiring', 'all'), K('rooms', 'view', 'meeting_rooms', 'all'),
   K('rooms', 'edit', 'meeting_rooms_manage', 'all'), K('guest_link', 'view', 'guest_link', 'all'), K('attendance', 'view', 'attendance', 'all'),
   K('it_requests', 'view', 'it_requests', 'all'),
+  K('marketing', 'view', 'marketing', 'all'),
 ]
 
 // The templates exactly as production holds them on 2026-10-11 (permission_template_grants) —
@@ -84,6 +87,10 @@ export const PROD: Record<string, { cells: string; sensitive: SensitiveField[]; 
   fin_maker: { baseRole: 'finance', sensitive: ['bank'], cells: 'billing.create:all billing.edit:all billing.view:all claims.create:own claims.view:own dashboard.view:all reconciliation.create:all reconciliation.edit:all reconciliation.view:all treasury.create:all treasury.edit:all treasury.view:all venture_pool.create:all venture_pool.view:all' + ROOMS },
   full: { baseRole: 'principal', sensitive: ['salary', 'nric', 'bank'], cells: everything(false) },
   hr: { baseRole: 'hr', sensitive: ['salary', 'nric', 'bank'], cells: 'accounts.view:all claims.create:own claims.view:own dashboard.view:all director_pool.view:all director_salary.edit:all director_salary.view:all hr_costing.create:all hr_costing.edit:all hr_costing.export:all hr_costing.view:all member.manage:all member.view:all revenue.create:all revenue.edit:all revenue.manage:all revenue.view:all team.create:all team.edit:all team.view:all' + ROUND2 + ATTENDANCE },
+  // Marketing's two (mig 20261023214000): Staff · Basic's cells, and Marketing — whole for the managers (MM, AMM),
+  // View and Edit for the rest of the department.
+  mkt_manager: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all marketing.approve:all marketing.create:all marketing.edit:all marketing.manage:all marketing.view:all' + ROOMS },
+  mkt_staff: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all marketing.edit:all marketing.view:all' + ROOMS },
   revenue_director: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:all crm.manage:all crm.view:all revenue_app.create:own revenue_app.view:own' },
   revenue_team: { baseRole: 'revenue_member', sensitive: [], cells: 'crm.edit:own crm.view:own revenue_app.create:own revenue_app.view:own' },
   staff: { baseRole: 'staff', sensitive: [], cells: 'claims.create:own claims.edit:own claims.view:own dashboard.view:all' + ROOMS },

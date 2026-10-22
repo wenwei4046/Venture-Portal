@@ -27,6 +27,9 @@ import { lensNav } from '@/lib/view-as'
 import { ToastHost } from '@/components/hrv/toast'
 import { FinToastHost } from '@/components/finv/Toast'
 import PortalPushAsk from '@/components/pwa/PortalPushAsk'
+import MktShell from '@/components/mkt/shell/MktShell'
+import { isMarketingView } from '@/lib/marketing-view'
+import { DEFAULT_LOOK, type Look } from '@/lib/marketing/look'
 
 // Portal shell.
 //
@@ -42,6 +45,8 @@ export default function PortalFrame({
   user,
   navData: layoutNav,
   hrNavCollapsed = false,
+  mktNavCollapsed = false,
+  mktLook = DEFAULT_LOOK,
   phone = false,
   children,
 }: {
@@ -50,6 +55,9 @@ export default function PortalFrame({
   navData: NavData
   /** HR's (or Finance's) sidebar folded to its 64px rail (a cookie, so it draws folded). */
   hrNavCollapsed?: boolean
+  /** Marketing's sidebar folded to its 64px rail, and its Appearance (cookies, so it draws as chosen). */
+  mktNavCollapsed?: boolean
+  mktLook?: Look
   /** A phone, by its browser's own words (lib/one-app.ts): Finance's view keeps the portal's phone shell there. */
   phone?: boolean
   children: React.ReactNode
@@ -78,7 +86,11 @@ export default function PortalFrame({
   // finance kind, the Principal's Finance lens and, since 2026-10-17, the
   // Principal's own view (its few rows added), on a computer (a phone opens
   // the Finance app — the layout sends it there).
-  const finShell = !hr && isFinanceShell(user) && !phone
+  // Marketing's own shell (2026-10-23, the handoff "HOUZS Marketing Module Setup"): the Principal's Marketing lens
+  // and an account whose template opens Marketing's view (lib/marketing-view.ts) — on a computer; a phone keeps the
+  // portal's phone shell until Marketing's app is made.
+  const mkt = isMarketingView(user) && !phone
+  const finShell = !hr && !mkt && isFinanceShell(user) && !phone
   const principalShell = finShell && isPrincipalView(user)
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
@@ -114,6 +126,14 @@ export default function PortalFrame({
   // The menus of HR's / Finance's view list that view's tabs (2026-10-11): the
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
+
+  if (mkt) {
+    return (
+      <MktShell user={user} navUser={navUser} initialCollapsed={mktNavCollapsed} initialLook={mktLook}>
+        {children}
+      </MktShell>
+    )
+  }
 
   if (hr || finShell) {
     // HR's shell — and Finance's since 2026-10-14: the square sidebar, the

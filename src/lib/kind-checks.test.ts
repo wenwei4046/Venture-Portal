@@ -27,6 +27,7 @@ const KIND_IS_THE_POINT: Record<string, string> = {
   'components/layout/MoreSheet.tsx': 'labels and the tab bar it mirrors — presentation',
   'components/layout/TopBar.tsx': 'the role label and the view-as switcher — presentation',
   'components/layout/HrTopBar.tsx': "HR's greeting bar: the role label and the view-as switcher — presentation",
+  'components/mkt/shell/MktTopBar.tsx': "Marketing's top bar: the view-as switcher's value (the Principal's mask) — presentation",
   'test/with-actions.ts': 'test helper: a mocked untemplated account',
 }
 

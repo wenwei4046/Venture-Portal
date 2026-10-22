@@ -19,6 +19,8 @@ import { refKey, refKindOf } from './refs'
 export const AUDIT_AREAS = [
   'Treasury', 'Payments', 'Billing', 'Pools', 'Accounting', 'Payroll',
   'Directors', 'People', 'Revenue', 'Catalogue', 'Member services', 'Settings',
+  // Marketing's view (2026-10-23, mig 20261023214000).
+  'Marketing',
 ] as const
 export type AuditArea = (typeof AUDIT_AREAS)[number]
 

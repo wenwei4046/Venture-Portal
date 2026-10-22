@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { PersonCells, Scope, SensitiveField } from './permission-matrix'
 import { CELL_KEYS, FUNCTIONS, PROD, cellsOf, grantsOf, keysOf } from './permission-tabs.fixtures'
@@ -96,6 +98,8 @@ describe('moving the templates onto tabs loses nothing', () => {
       fin_maker: ['billing.export:all', 'treasury.export:all', 'venture_pool.export:all'],
       full: [],
       hr: ['revenue.export:all', 'team.manage:all'],
+      mkt_manager: [],
+      mkt_staff: [],
       office: [],
       revenue_director: [],
       revenue_team: [],
@@ -111,7 +115,10 @@ describe('moving the templates onto tabs loses nothing', () => {
   })
 
   it('puts each template in the views its pages are in — the company-wide ones out of the Department view', () => {
-    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'rev'])
+    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'mkt', 'rev'])
+    // Marketing's two templates (2026-10-23): worked out from their cells, Staff · Basic's claims and rooms tick the
+    // Department view's tabs beside Marketing's (one reach, side by side) — so the migration stores their ticks.
+    expect(views(moved('mkt_staff'))).toEqual(['dept', 'mkt'])
     expect(views(moved('fin_maker'))).toEqual(['fin', 'dept'])
     expect(views(moved('staff'))).toEqual(['dept'])
     expect(views(moved('hr'))).toEqual(['hr', 'dept'])
@@ -120,6 +127,27 @@ describe('moving the templates onto tabs loses nothing', () => {
     expect([...moved('staff')].sort()).toEqual([
       'dept.meeting_rooms.create', 'dept.meeting_rooms.view', 'dept.my_claims.create', 'dept.my_claims.edit', 'dept.my_claims.view', 'dept.overview.view',
     ])
+  })
+})
+
+describe('Marketing’s two templates keep their ticks (mig 20261023214000)', () => {
+  // The rows the migration stores for each, read off the migration itself.
+  const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261023214000_marketing_permission.sql'), 'utf8')
+  const stored = (key: string) => new Set([...sql.matchAll(new RegExp(`\\('${key}', '(mkt\\.\\w+)', '(\\w+)'\\)`, 'g'))].map(m => grantOf(m[1], m[2] as never)))
+
+  it.each(['mkt_manager', 'mkt_staff'])('%s: Marketing’s view only — every cell it holds, none more', key => {
+    const ticks = stored(key)
+    expect(ticks.size).toBeGreaterThan(0)
+    expect(views(ticks)).toEqual(['mkt'])
+    expect(lossesOf(cellsOf(PROD[key].cells), ticks)).toEqual([])
+    expect(gainsOf(cellsOf(PROD[key].cells), ticks)).toEqual([])
+    // …and they are what the cells give in Marketing's view.
+    expect([...ticks].sort()).toEqual([...moved(key)].filter(g => g.startsWith('mkt.')).sort())
+  })
+
+  it('the manager tracks; the staff does not', () => {
+    expect(stored('mkt_manager').has('mkt.tracking.view')).toBe(true)
+    expect(stored('mkt_staff').has('mkt.tracking.view')).toBe(false)
   })
 })
 

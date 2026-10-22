@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400&display=swap">
+<style>body{margin:0}@keyframes plIn{0%{transform:translateY(6px);opacity:0}100%{transform:none;opacity:1}}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="min-height:100%;background:rgb(246 245 242);font-family:'Inter',system-ui,sans-serif;color:rgb(38 33 29);font-size:14px;line-height:1.45">
+  <div style="background:#fff;border-bottom:1px solid rgb(230 227 222)">
+    <div style="max-width:{{ maxW }}px;margin:0 auto;padding:14px {{ padX }}px;display:flex;align-items:center;gap:10px;box-sizing:border-box">
+      <span style="width:28px;height:28px;border-radius:7px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">H</span>
+      <span style="font-size:14px;font-weight:600">HOUZS Marketing</span>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;color:rgb(110 104 98)">Project tracking</span>
+    </div>
+  </div>
+
+  <div style="max-width:{{ maxW }}px;margin:0 auto;padding:20px {{ padX }}px 48px;box-sizing:border-box">
+    <div style="font-size:12px;color:rgb(110 104 98)">{{ sub }}</div>
+    <div style="font-size:{{ titleSize }}px;font-weight:600;letter-spacing:-0.01em;margin-top:2px">{{ project }}</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;color:rgb(90 84 78)">{{ trackId }}</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ st.bg }};color:{{ st.fg }};border:1px solid {{ st.border }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ st.dot }}"></span>{{ statusLabel }}</span>
+    </div>
+
+    <sc-if value="{{ hasBanner }}">
+      <div style="margin-top:16px;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:10px;background:{{ bn.bg }};border:1px solid {{ bn.border }};color:{{ bn.fg }}">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ bn.dot }};flex:none;margin-top:6px"></span>
+        <div><div style="font-weight:600">{{ bn.title }}</div><div style="font-size:13px;margin-top:2px;opacity:0.9">{{ bn.text }}</div></div>
+      </div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:16px;margin-top:16px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+
+        <sc-if value="{{ showApproval }}">
+          <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;overflow:hidden;animation:plIn .2s ease-out">
+            <div style="padding:14px 16px;border-bottom:1px solid rgb(240 238 234);display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(110 104 98)">Needs your approval</span>
+              <span style="flex:1"></span>
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(110 104 98)">{{ dueText }}</span>
+            </div>
+            <div style="padding:16px;display:flex;gap:14px;flex-direction:{{ prevDir }}">
+              <div style="width:{{ prevW }};aspect-ratio:9 / 16;max-height:{{ prevMaxH }}px;border-radius:10px;background:repeating-linear-gradient(135deg, rgb(52 46 42) 0 8px, rgb(64 57 52) 8px 16px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:rgb(230 226 220);flex:none;align-self:center">
+                <span style="width:40px;height:40px;border-radius:50%;background:rgb(255 255 255 / 0.15);display:flex;align-items:center;justify-content:center;font-size:14px">▶</span>
+                <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px">0:38</span>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:16px;font-weight:600">Final video v2</div>
+                <div style="font-size:12.5px;color:rgb(110 104 98)">RedTruck_Reels_v2.mp4 · 9:16 · sent 25 Oct, 09:30</div>
+                <div style="margin-top:6px;padding:10px 12px;border-radius:8px;background:rgb(246 245 242);font-size:13px">
+                  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(110 104 98);margin-bottom:3px">What changed since v1</div>
+                  {{ changeNote }}
+                </div>
+                <div style="font-size:12.5px;color:rgb(110 104 98);margin-top:4px">Caption: "Have you spotted our red truck yet? From 19 to 25 Oct, our gift box on wheels is out on the road…"</div>
+              </div>
+            </div>
+
+            <sc-if value="{{ stepChoose }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:0 16px 16px;display:flex;gap:10px;flex-direction:{{ btnDir }}">
+                <div onClick="{{ startApprove }}" style="flex:1;height:48px;border-radius:10px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;cursor:pointer" style-hover="background:#E0893F">Approve</div>
+                <div onClick="{{ startChanges }}" style="flex:1;height:48px;border-radius:10px;border:1px solid rgb(210 205 198);background:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;cursor:pointer" style-hover="background:rgb(248 247 245)">Request changes</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ stepApprove }}">
+              <div style="padding:16px;border-top:1px solid rgb(240 238 234);background:rgb(250 249 247);display:flex;flex-direction:column;gap:10px;animation:plIn .2s ease-out">
+                <div style="font-size:15px;font-weight:600">You're approving v2</div>
+                <div style="font-size:13px;color:rgb(90 84 78)">This confirms Final video v2 can go live. Type your full name to sign off.</div>
+                <input value="{{ name }}" onChange="{{ onName }}" placeholder="Full name" style="height:46px;box-sizing:border-box;border:1px solid rgb(210 205 198);border-radius:10px;padding:0 14px;font:inherit;font-size:15px;outline:none;background:#fff;color:rgb(38 33 29)">
+                <div style="display:flex;gap:10px">
+                  <div onClick="{{ backChoose }}" style="height:46px;padding:0 16px;border-radius:10px;border:1px solid rgb(210 205 198);background:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;cursor:pointer">Back</div>
+                  <div onClick="{{ confirmApprove }}" style="flex:1;height:46px;border-radius:10px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;cursor:{{ apCursor }};opacity:{{ apOp }}">Confirm approval</div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ stepChanges }}">
+              <div style="padding:16px;border-top:1px solid rgb(240 238 234);background:rgb(250 249 247);display:flex;flex-direction:column;gap:10px;animation:plIn .2s ease-out">
+                <div style="font-size:15px;font-weight:600">What should change?</div>
+                <div style="font-size:13px;color:rgb(90 84 78)">A reason is required. Be as specific as you can — scene, timing, wording.</div>
+                <textarea value="{{ reason }}" onChange="{{ onReason }}" placeholder="e.g. Make the chair bigger in scene 3" style="min-height:110px;box-sizing:border-box;border:1px solid {{ reasonBorder }};border-radius:10px;padding:12px 14px;font:inherit;font-size:15px;line-height:1.5;resize:vertical;outline:none;background:#fff;color:rgb(38 33 29)"></textarea>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:{{ reasonHintFg }}"><span>{{ reasonHint }}</span><span style="font-family:'Chivo Mono',Menlo,monospace">{{ reasonLen }}</span></div>
+                <div style="height:40px;border-radius:10px;border:1px dashed rgb(200 195 188);display:flex;align-items:center;justify-content:center;font-size:13px;color:rgb(110 104 98);cursor:pointer">Attach a screenshot (optional)</div>
+                <div style="display:flex;gap:10px">
+                  <div onClick="{{ backChoose }}" style="height:46px;padding:0 16px;border-radius:10px;border:1px solid rgb(210 205 198);background:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;cursor:pointer">Back</div>
+                  <div onClick="{{ sendChanges }}" style="flex:1;height:46px;border-radius:10px;background:rgb(38 33 29);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;cursor:{{ chCursor }};opacity:{{ chOp }}">Send to the team</div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showDone }}">
+          <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;padding:24px 18px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;animation:plIn .25s ease-out">
+            <span style="width:52px;height:52px;border-radius:50%;background:{{ done.circleBg }};color:{{ done.circleFg }};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600">{{ done.mark }}</span>
+            <div style="font-size:18px;font-weight:600;margin-top:4px">{{ done.title }}</div>
+            <div style="font-size:13.5px;color:rgb(90 84 78);max-width:360px">{{ done.text }}</div>
+            <sc-if value="{{ done.hasQuote }}"><div style="margin-top:6px;padding:10px 14px;border-radius:8px;background:rgb(246 245 242);font-size:13.5px;max-width:360px;text-align:left">"{{ done.quote }}"</div></sc-if>
+            <div style="margin-top:8px;font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(110 104 98)">{{ done.receipt }}</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showReports }}">
+          <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;overflow:hidden">
+            <div style="padding:14px 16px;border-bottom:1px solid rgb(240 238 234);display:flex;align-items:center"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(110 104 98)">Reports</span><span style="flex:1"></span><span style="font-size:12px;color:rgb(110 104 98)">Every 2 weeks</span></div>
+            <sc-for list="{{ reports }}" as="r" hint-placeholder-count="2">
+              <div style="padding:14px 16px;border-bottom:1px solid rgb(244 242 238)">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:600">{{ r.title }}</span><span style="font-size:12px;color:rgb(110 104 98)">{{ r.range }}</span><span style="flex:1"></span><span style="font-size:12px;font-weight:500;color:rgb(90 62 43);cursor:pointer;text-decoration:underline;text-underline-offset:2px">PDF</span></div>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px">
+                  <sc-for list="{{ r.metrics }}" as="m" hint-placeholder-count="4">
+                    <div style="padding:10px 12px;border-radius:8px;background:rgb(248 247 245)">
+                      <div style="font-size:11.5px;color:rgb(110 104 98)">{{ m.k }}</div>
+                      <div style="font-size:17px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums">{{ m.v }}</div>
+                      <div style="font-size:11.5px;color:{{ m.fg }};margin-top:1px">{{ m.sub }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;padding:14px 16px 6px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(110 104 98);margin-bottom:12px">Progress</div>
+          <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;gap:12px">
+              <div style="display:flex;flex-direction:column;align-items:center;width:20px;flex:none">
+                <span style="width:20px;height:20px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:{{ t.bg }};color:{{ t.fg }};border:{{ t.border }};box-shadow:{{ t.ring }}">{{ t.mark }}</span>
+                <sc-if value="{{ t.hasLine }}"><span style="flex:1;width:2px;min-height:18px;background:{{ t.line }};margin:2px 0"></span></sc-if>
+              </div>
+              <div style="flex:1;min-width:0;padding-bottom:16px">
+                <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span style="font-size:14px;font-weight:{{ t.weight }};color:{{ t.color }}">{{ t.label }}</span><sc-if value="{{ t.hasDate }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(110 104 98)">{{ t.date }}</span></sc-if></div>
+                <sc-if value="{{ t.hasSub }}"><div style="font-size:12.5px;color:rgb(110 104 98);margin-top:2px">{{ t.sub }}</div></sc-if>
+                <sc-if value="{{ t.hasProgress }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:6px"><div style="flex:1;max-width:160px;height:5px;border-radius:3px;background:rgb(236 233 228);overflow:hidden"><div style="height:100%;width:{{ t.pct }}%;background:rgb(90 62 43)"></div></div><span style="font-size:12px;color:rgb(90 84 78)">{{ t.progress }}</span></div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;padding:14px 16px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(110 104 98);margin-bottom:10px">{{ reqTitle }}</div>
+          <sc-for list="{{ reqs }}" as="r" hint-placeholder-count="5">
+            <div style="padding:8px 0;border-top:1px solid rgb(244 242 238);display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:11.5px;color:rgb(110 104 98)">{{ r.k }}</span><span style="font-size:13.5px">{{ r.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:4px 4px 0;font-size:12px;color:rgb(110 104 98);line-height:1.55">
+          Questions? Reply to Rachel on WhatsApp. This link is private to 2990 Home — please don't forward it.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:1400},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;approval&quot;,&quot;overdue&quot;,&quot;updated&quot;,&quot;working&quot;,&quot;allApproved&quot;,&quot;ads&quot;],&quot;default&quot;:&quot;approval&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const ST = {
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(122 82 8)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(36 100 58)', dot: 'rgb(60 150 90)' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(160 36 30)', dot: 'rgb(200 52 42)' },
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(90 84 78)', dot: 'rgb(160 154 146)' },
+};
+
+class Component extends DCLogic {
+  state = { step: 'choose', name: '', reason: '', result: null, scen: this.props.state ?? 'approval' };
+  componentDidUpdate(prev) { if (prev.state !== this.props.state) this.setState({ step: 'choose', name: '', reason: '', result: null, scen: this.props.state ?? 'approval' }); }
+  renderVals() {
+    const s = this.state, desktop = !!this.props.desktop;
+    let scen = s.scen;
+    if (s.result === 'approved') scen = 'allApproved';
+    const ads = scen === 'ads';
+    const pending = ['approval', 'overdue', 'updated'].includes(scen) && !s.result;
+    let stKey = 'waiting', statusLabel = 'Waiting for your approval', bn = null;
+    if (scen === 'approval') bn = { k: 'waiting', title: 'Waiting for your approval', text: 'Final video v2 is ready. Please review it below.' };
+    if (scen === 'overdue') { stKey = 'red'; statusLabel = 'Overdue — please review'; bn = { k: 'red', title: 'Overdue — please review', text: 'Sent 6 working hours ago. The go-live date depends on your approval.' }; }
+    if (scen === 'updated') bn = { k: 'waiting', title: 'Updated after your approval — please review again', text: 'The team changed the caption after you approved v2 on 25 Oct.' };
+    if (scen === 'working') { stKey = 'draft'; statusLabel = 'In progress'; bn = null; }
+    if (scen === 'allApproved') { stKey = 'done'; statusLabel = 'All approved'; bn = { k: 'done', title: 'All approved', text: s.result ? 'Thank you. Nothing else needs your action right now.' : 'Everything is signed off. We will post on 28 Oct.' }; }
+    if (s.result === 'changes') { stKey = 'red'; statusLabel = 'Changes requested'; bn = null; }
+    if (ads) { stKey = 'waiting'; statusLabel = 'Live · reporting'; bn = null; }
+    const bnV = bn ? { ...ST[bn.k], title: bn.title, text: bn.text } : {};
+
+    const T = (label, kind, extra = {}) => ({ label, kind, ...extra });
+    let tl;
+    if (ads) tl = [T('Direction approved', 'done', { date: '14 Oct' }), T('Creative production done', 'done', { date: '18 Oct' }), T('Campaign approved', 'done', { date: '19 Oct' }), T('Ads are live', 'cur', { date: 'Since 20 Oct', sub: 'Next report 3 Nov' }), T('Campaign ends', 'next', { date: '30 Nov' })];
+    else if (scen === 'working') tl = [T('Requirements approved', 'done', { date: '18 Oct' }), T('Content team wrote the script', 'done', { date: '21 Oct' }), T('Shooting done', 'done', { date: '22 Oct' }), T('Content team is editing', 'cur', { sub: 'Expected 25 Oct' }), T('Design team is working', 'cur2', { progress: '2/4 thumbnails', pct: 50 }), T('Your final approval', 'next'), T('Go live', 'next', { date: '25 Oct' })];
+    else {
+      const ap = scen === 'allApproved';
+      tl = [T('Requirements approved', 'done', { date: '18 Oct' }), T('Content team wrote the script', 'done', { date: '21 Oct' }), T('Shooting done', 'done', { date: '22 Oct' }), T('Content team finished editing', 'done', { date: '25 Oct' }),
+        s.result === 'changes' ? T('Content team is making your changes', 'cur', { sub: 'You will get a new version on this link' }) : ap ? T('You approved the final video', 'done', { date: s.result ? '26 Oct' : '25 Oct' }) : T('Your final approval', 'cur', { sub: scen === 'overdue' ? 'Waiting 6 working hours' : 'Waiting for you' }),
+        T('Go live', ap ? 'cur' : 'next', { date: '28 Oct', sub: ap ? 'Scheduled' : '' })];
+    }
+    const timeline = tl.map((t, i) => {
+      const done = t.kind === 'done', cur = t.kind === 'cur' || t.kind === 'cur2', red = cur && scen === 'overdue' && t.label === 'Your final approval';
+      return {
+        ...t, mark: done ? '✓' : '', hasLine: i < tl.length - 1, hasDate: !!t.date, hasSub: !!t.sub, hasProgress: !!t.progress,
+        bg: done ? 'rgb(60 150 90)' : cur ? (red ? 'rgb(200 52 42)' : 'rgb(90 62 43)') : '#fff', fg: '#fff',
+        border: done || cur ? 'none' : '2px solid rgb(210 205 198)', ring: cur ? `0 0 0 4px ${red ? 'rgb(252 236 233)' : 'rgb(240 234 226)'}` : 'none',
+        line: done ? 'rgb(60 150 90)' : 'rgb(226 222 216)', weight: cur ? 600 : 500, color: t.kind === 'next' ? 'rgb(120 114 108)' : 'rgb(38 33 29)',
+      };
+    });
+    const reqs = ads ? [
+      ['Objective', 'Rental leads for the Red Truck roadshow'], ['Budget', 'RM 6,000 over 6 weeks'], ['Channels', 'Facebook, Instagram, TikTok'], ['Targets', 'Cost per lead ≤ RM 20 · Min ROAS 3.0 · Appointment rate 25%'],
+    ] : [
+      ['Objective', 'Promote the red truck roadshow, 19–25 Oct'], ['Platforms', 'Instagram Reels, TikTok'], ['Format', '9:16 video, 30–45 seconds'], ['Must show', 'Truck wrap, a gift box and the 2990 Home end card'], ['Mood', 'Playful and warm'],
+    ];
+    const good = 'rgb(36 100 58)', muted = 'rgb(110 104 98)';
+    const reports = [
+      { title: 'Report #2', range: '20 Oct – 2 Nov', metrics: [{ k: 'Spend so far', v: 'RM 3,240', sub: 'of RM 6,000 budget', fg: muted }, { k: 'Cost per lead', v: 'RM 18.40', sub: 'Target RM 20 · on target', fg: good }, { k: 'Appointments', v: '46', sub: 'Appointment rate 26%', fg: good }, { k: 'ROAS', v: '3.2', sub: 'Min 3.0 · on target', fg: good }] },
+      { title: 'Report #1', range: '6 – 19 Oct', metrics: [{ k: 'Spend', v: 'RM 1,410', sub: '', fg: muted }, { k: 'Cost per lead', v: 'RM 22.10', sub: 'Target RM 20 · above', fg: 'rgb(160 36 30)' }, { k: 'Appointments', v: '17', sub: 'Appointment rate 21%', fg: muted }, { k: 'ROAS', v: '2.7', sub: 'Min 3.0 · below', fg: 'rgb(160 36 30)' }] },
+    ];
+    const nameOk = s.name.trim().length >= 3, reasonOk = s.reason.trim().length >= 5;
+    const done = s.result === 'approved' ? { mark: '✓', circleBg: 'rgb(232 244 235)', circleFg: 'rgb(36 100 58)', title: 'Approved', text: 'You approved Final video v2. The team has been notified and will post on 28 Oct.', hasQuote: false, receipt: `Signed by ${s.name.trim()} · 26 Oct 2026, 10:12 · v2` }
+      : s.result === 'changes' ? { mark: '↺', circleBg: 'rgb(243 242 239)', circleFg: 'rgb(38 33 29)', title: 'Changes sent', text: 'The team has your notes and will send a new version to this link. You do not need to do anything else for now.', hasQuote: true, quote: s.reason.trim(), receipt: 'Sent 26 Oct 2026, 10:12 · on v2' } : {};
+    return {
+      maxW: desktop ? 1040 : 520, padX: desktop ? 32 : 16, titleSize: desktop ? 26 : 22,
+      cols: desktop ? 'minmax(0,1.6fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      prevDir: desktop ? 'row' : 'column', prevW: desktop ? '170px' : '62%', prevMaxH: desktop ? 300 : 360, btnDir: desktop ? 'row' : 'column',
+      sub: ads ? '2990 Home · Media Buying' : '2990 Home · Reels Video',
+      project: ads ? 'Red Truck Ads' : 'Red Truck Reels', trackId: ads ? 'MKT-2990-2610-022' : 'MKT-2990-2610-018',
+      st: ST[stKey], statusLabel, hasBanner: !!bn, bn: bnV,
+      showApproval: pending, dueText: scen === 'overdue' ? 'Sent 6 working hrs ago' : 'Sent 25 Oct',
+      changeNote: scen === 'updated' ? 'Caption updated after your approval. The video is unchanged.' : 'The chair is bigger in scene 3, as you asked.',
+      stepChoose: s.step === 'choose', stepApprove: s.step === 'approve', stepChanges: s.step === 'changes',
+      startApprove: () => this.setState({ step: 'approve' }), startChanges: () => this.setState({ step: 'changes' }), backChoose: () => this.setState({ step: 'choose' }),
+      name: s.name, onName: e => this.setState({ name: e.target.value }),
+      apCursor: nameOk ? 'pointer' : 'not-allowed', apOp: nameOk ? 1 : 0.4,
+      confirmApprove: () => nameOk && this.setState({ result: 'approved', step: 'choose' }),
+      reason: s.reason, onReason: e => this.setState({ reason: e.target.value }),
+      reasonBorder: s.reason && !reasonOk ? 'rgb(220 150 140)' : 'rgb(210 205 198)',
+      reasonHint: reasonOk ? 'Ready to send' : 'Required', reasonHintFg: reasonOk ? good : 'rgb(160 36 30)', reasonLen: `${s.reason.length}/500`,
+      chCursor: reasonOk ? 'pointer' : 'not-allowed', chOp: reasonOk ? 1 : 0.4,
+      sendChanges: () => reasonOk && this.setState({ result: 'changes', step: 'choose' }),
+      showDone: !!s.result, done,
+      showReports: ads, reports,
+      timeline,
+      reqTitle: ads ? 'Direction' : 'Requirements', reqs: reqs.map(([k, v]) => ({ k, v })),
+    };
+  }
+}
+</script>
+</body>
+</html>

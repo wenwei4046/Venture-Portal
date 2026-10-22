@@ -7,7 +7,10 @@ import type { Reach } from '@/lib/sub-department-reach'
 // four hands out. Never shown; see permission_templates.base_role.
 // `dept_manager` is gone (2026-10-17 — the user: "全删"; each department gets a
 // view of its own later): no account or template is of that kind.
-export type UserRole = 'principal' | 'finance' | 'hr' | 'revenue_member' | 'staff'
+// `marketing` (2026-10-23) is a LENS only — the Principal wearing Marketing's view
+// (lib/view-as.ts): no account or template is of that kind; a Marketing login is
+// `staff`, its view decided by its tabs (lib/marketing-view.ts).
+export type UserRole = 'principal' | 'finance' | 'hr' | 'revenue_member' | 'staff' | 'marketing'
 
 export interface User {
   id: string
@@ -24,7 +27,7 @@ export interface User {
   // HR's or Finance's view worn over the account's own power (the LENS,
   // 2026-10-11 — lib/auth.ts). On Finance's, payroll is listed by department
   // as Finance reads it (2026-10-13, lib/roles.ts listsPayrollByPerson).
-  lens?: 'hr' | 'finance'
+  lens?: 'hr' | 'finance' | 'marketing'
   // The REAL account holds `view_switch` (Ultimate full access, and the
   // Principal account) — so the view switcher shows, masked or not. Full
   // access is everything else without it (2026-10-08).

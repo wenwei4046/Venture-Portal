@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:12px;padding:20px 32px 0">
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+      <sc-for list="{{ modes }}" as="o" hint-placeholder-count="2">
+        <div onClick="{{ o.onClick }}" style="height:30px;padding:0 16px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.94em;white-space:nowrap">{{ o.label }}</div>
+      </sc-for>
+    </div>
+    <span style="font-size:0.9em;color:rgb(117 100 86)">{{ modeHint }}</span>
+  </div>
+
+  <sc-if value="{{ isReplay }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top:-6px">
+      <dc-import name="Task Map" mode="replay" hint-size="100%,700px"></dc-import>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isLog }}">
+    <div style="padding:18px 32px 60px">
+      <div style="position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <div onClick="{{ toggleFilter }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid {{ filterBorder }};background:{{ filterBg }};display:flex;align-items:center;gap:8px;font-size:0.92em;font-weight:500;cursor:pointer">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="1" y1="3" x2="11" y2="3"></line><line x1="3" y1="6" x2="9" y2="6"></line><line x1="5" y1="9" x2="7" y2="9"></line></svg>
+          <span>Filter</span>
+          <sc-if value="{{ hasActive }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(51 36 27);color:#fff;font-size:10.5px;display:flex;align-items:center;justify-content:center">{{ activeCount }}</span></sc-if>
+        </div>
+        <sc-for list="{{ activeChips }}" as="c" hint-placeholder-count="0">
+          <span style="height:28px;padding:0 6px 0 10px;border-radius:6px;background:rgb(246 244 240);border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:6px;font-size:0.88em">
+            <span style="color:rgb(117 100 86)">{{ c.group }}:</span><span style="font-weight:500">{{ c.value }}</span>
+            <span onClick="{{ c.onRemove }}" style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(236 231 224)">×</span>
+          </span>
+        </sc-for>
+        <sc-if value="{{ hasActive }}"><span onClick="{{ clearAll }}" style="font-size:0.88em;color:rgb(117 100 86);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Clear all</span></sc-if>
+        <span style="flex:1"></span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">{{ countLabel }}</span>
+        <div style="position:relative">
+          <div onClick="{{ toggleExport }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-size:0.92em;font-weight:500;cursor:pointer" style-hover="background:rgb(250 248 244)">Export <span style="font-size:9px;color:rgb(117 100 86)">▼</span></div>
+          <sc-if value="{{ exportOpen }}">
+            <div style="position:absolute;top:38px;right:0;z-index:20;width:200px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.14);padding:6px">
+              <div onClick="{{ exportPdf }}" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px" style-hover="background:rgb(246 244 240)">Export as PDF</div>
+              <div onClick="{{ exportCsv }}" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px" style-hover="background:rgb(246 244 240)">Export as CSV</div>
+              <div style="padding:6px 10px 4px;font-size:11px;color:rgb(117 100 86);border-top:1px solid rgb(244 241 236);margin-top:4px">Exports the filtered rows</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ filterOpen }}">
+          <div style="position:absolute;top:40px;left:0;z-index:20;width:560px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.16);padding:16px;display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:18px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:6px">{{ g.title }}</div>
+                <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="5">
+                  <div onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px" style-hover="background:rgb(246 244 240)">
+                    <span style="width:15px;height:15px;flex:none;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ o.box }};background:{{ o.fill }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ o.tick }}</span>
+                    <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ o.label }}</span>
+                    <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(150 140 130)">{{ o.n }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="border:1px solid rgb(229 226 220);border-radius:10px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:44px 104px minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,1.6fr) 96px minmax(0,1.3fr);gap:12px;padding:9px 14px;background:rgb(248 247 245);border-bottom:1px solid rgb(229 226 220);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86)">
+          <span>#</span><span>Time</span><span>Actor</span><span>Action</span><span>From → To</span><span>Reason</span><span>Version</span><span>Attachment</span>
+        </div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="11">
+          <div style="display:grid;grid-template-columns:44px 104px minmax(0,1.3fr) minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,1.6fr) 96px minmax(0,1.3fr);gap:12px;align-items:start;padding:11px 14px;border-bottom:1px solid rgb(240 238 234);font-size:12.5px;line-height:1.45;background:{{ r.bg }}">
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(130 122 114)">{{ r.no }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(51 36 27);white-space:nowrap">{{ r.time }}</span>
+            <span>{{ r.actor }}</span>
+            <span style="display:flex;flex-direction:column;gap:2px">
+              <span style="display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ r.dot }}"></span><span style="font-weight:500">{{ r.action }}</span></span>
+              <sc-if value="{{ r.isCorrection }}"><span style="font-size:11px;color:rgb(140 132 124)">correction of #{{ r.corrects }}</span></sc-if>
+            </span>
+            <span style="color:rgb(74 64 58)">{{ r.fromTo }}</span>
+            <span style="color:rgb(74 64 58)">{{ r.reason }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(74 64 58)">{{ r.version }}</span>
+            <span style="color:rgb(74 64 58);word-break:break-all">{{ r.file }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noRows }}">
+          <div style="padding:36px;text-align:center;font-size:13px;color:rgb(117 100 86)">No records match these filters.</div>
+        </sc-if>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11.5px;color:rgb(117 100 86)">
+        <svg width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="5" width="9" height="6" rx="1.5"></rect><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5"></path></svg>
+        <span>Records are read-only. Mistakes are fixed by adding a correction entry, never by editing.</span>
+      </div>
+      <sc-if value="{{ hasToast }}">
+        <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px">{{ toast }}</div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const LOG = [
+  { time: '18 Oct 10:02', actor: 'Rachel (MM)', person: 'Rachel', action: 'Plan saved', stage: '—', fromTo: '—', reason: '—', version: '—', file: '—' },
+  { time: '18 Oct 14:30', actor: 'Mei', person: 'Mei', action: 'Accepted', stage: 'Script', fromTo: 'Script', reason: '—', version: '—', file: '—' },
+  { time: '20 Oct 17:45', actor: 'Mei', person: 'Mei', action: 'Submitted', stage: 'Script', fromTo: 'Mei → Rachel', reason: '—', version: 'Script v1', file: 'script_v1.docx' },
+  { time: '21 Oct 09:10', actor: 'Rachel', person: 'Rachel', action: 'Approved', stage: 'Script', fromTo: '—', reason: '—', version: 'Script v1', file: '—' },
+  { time: '22 Oct 18:20', actor: 'Ah Kit', person: 'Ah Kit', action: 'Raw footage uploaded', stage: 'Raw upload', fromTo: 'Ah Kit → Ali', reason: '—', version: '—', file: 'RAW_RedTruck_A-cam.zip' },
+  { time: '23 Oct 11:00', actor: 'Ali', person: 'Ali', action: 'Subtask created', stage: 'Edit', fromTo: 'Ali → Siti', reason: '"Thumbnail"', version: '—', file: '—' },
+  { time: '23 Oct 16:40', actor: 'Ali', person: 'Ali', action: 'Delivery returned', stage: 'Edit', fromTo: 'Siti', reason: '"Logo too small"', version: 'Thumbnail v1', file: 'thumb_redtruck_v1.png' },
+  { time: '24 Oct 10:15', actor: 'Ali', person: 'Ali', action: 'Delivery approved', stage: 'Edit', fromTo: '—', reason: '—', version: 'Thumbnail v2', file: 'thumb_redtruck_v2.png' },
+  { time: '24 Oct 15:00', actor: 'Carmen (PIC, 2990 Home)', person: 'Carmen', action: 'Changes requested via link', stage: 'Edit', fromTo: '→ Ali', reason: '"Make the chair bigger in scene 3"', version: 'Final v1', file: '—' },
+  { time: '25 Oct 09:30', actor: 'Ali', person: 'Ali', action: 'Submitted', stage: 'Edit', fromTo: 'Ali → Rachel → PIC', reason: '—', version: 'Final v2', file: 'RedTruck_Reels_v2.mp4' },
+  { time: '25 Oct 09:41', actor: 'Rachel (MM)', person: 'Rachel', action: 'Deadline changed', stage: 'Edit', fromTo: '—', reason: 'Final due 28 Oct (entered as 27 Oct)', version: '—', file: '—', corrects: 1 },
+].map((r, i) => ({ ...r, no: i + 1 }));
+const DOT = {
+  'Approved': 'rgb(60 150 90)', 'Delivery approved': 'rgb(60 150 90)', 'PIC approved via link': 'rgb(60 150 90)',
+  'Delivery returned': 'rgb(200 52 42)', 'Changes requested via link': 'rgb(200 52 42)', 'Changes requested': 'rgb(200 52 42)',
+  'Submitted': 'rgb(214 152 30)',
+};
+const uniq = k => [...new Set(LOG.map(r => r[k]))];
+const GROUPS = [['person', 'Person'], ['action', 'Action'], ['stage', 'Stage']];
+
+class Component extends DCLogic {
+  state = { mode: 'replay', filterOpen: false, exportOpen: false, f: { person: [], action: [], stage: [] }, toast: '' };
+  toggle(g, v) { this.setState(s => { const cur = s.f[g]; return { f: { ...s.f, [g]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] } }; }); }
+  flash(t) { this.setState({ toast: t, exportOpen: false }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2200); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  renderVals() {
+    const { mode, f, filterOpen, exportOpen, toast } = this.state;
+    const match = r => GROUPS.every(([g]) => !f[g].length || f[g].includes(r[g]));
+    const rows = LOG.filter(match).map(r => ({ ...r, dot: DOT[r.action] || 'rgb(160 154 146)', isCorrection: !!r.corrects, bg: r.corrects ? 'rgb(250 249 247)' : '#fff' }));
+    const activeChips = GROUPS.flatMap(([g, title]) => f[g].map(v => ({ group: title, value: v, onRemove: () => this.toggle(g, v) })));
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    return {
+      modes: [['replay', '▶ Replay'], ['log', 'Formal log']].map(([k, label]) => ({ label, ...seg(mode === k), onClick: () => this.setState({ mode: k }) })),
+      modeHint: mode === 'replay' ? 'Watch the whole journey, step by step' : 'Every record, read-only',
+      isReplay: mode === 'replay', isLog: mode === 'log',
+      filterOpen, toggleFilter: () => this.setState(s => ({ filterOpen: !s.filterOpen, exportOpen: false })),
+      filterBorder: filterOpen || activeChips.length ? 'rgb(90 78 68)' : 'rgb(229 222 211)', filterBg: filterOpen ? 'rgb(246 244 240)' : '#fff',
+      hasActive: activeChips.length > 0, activeCount: activeChips.length, activeChips,
+      clearAll: () => this.setState({ f: { person: [], action: [], stage: [] } }),
+      groups: GROUPS.map(([g, title]) => ({
+        title: `By ${title.toLowerCase()}`,
+        opts: uniq(g).map(v => { const on = f[g].includes(v); return { label: v, n: LOG.filter(r => r[g] === v).length, tick: on ? '✓' : '', box: on ? 'rgb(51 36 27)' : 'rgb(200 192 182)', fill: on ? 'rgb(51 36 27)' : '#fff', onClick: () => this.toggle(g, v) }; }),
+      })),
+      rows, noRows: rows.length === 0,
+      countLabel: `${rows.length} of ${LOG.length} records`,
+      exportOpen, toggleExport: () => this.setState(s => ({ exportOpen: !s.exportOpen, filterOpen: false })),
+      exportCsv: () => {
+        const head = ['#', 'Time', 'Actor', 'Action', 'From → To', 'Reason', 'Version', 'Attachment'];
+        const body = rows.map(r => [r.no, r.time, r.actor, r.action + (r.corrects ? ` (correction of #${r.corrects})` : ''), r.fromTo, r.reason, r.version, r.file]);
+        const csv = [head, ...body].map(l => l.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = 'MKT-2990-2610-018_audit.csv'; a.click();
+        this.flash('CSV downloaded · MKT-2990-2610-018_audit.csv');
+      },
+      exportPdf: () => this.flash('PDF prepared · MKT-2990-2610-018_audit.pdf'),
+      hasToast: !!toast, toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

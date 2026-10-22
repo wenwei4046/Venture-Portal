@@ -97,6 +97,7 @@ function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; v
       <option value="principal">Principal</option>
       <option value="finance">Finance view</option>
       <option value="hr">HR view</option>
+      <option value="marketing">Marketing view</option>
       <option value="revenue_member">Revenue View</option>
       <option value="person">View as a person…</option>
     </Select>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes mbIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="color:rgb(51 36 27);font-size:13px">
+  <div style="padding:22px 28px 16px;display:flex;align-items:flex-start;gap:16px;border-bottom:1px solid rgb(236 231 224);flex-wrap:wrap">
+    <span style="font-size:22px;line-height:30px">📝</span>
+    <div style="flex:1;min-width:240px">
+      <div style="font-size:1.55em;font-weight:600;letter-spacing:-0.01em">Minutes Builder</div>
+      <div style="color:rgb(117 100 86);margin-top:2px">Set what each kind of meeting minutes asks for, and what must be true before it can be completed.</div>
+    </div>
+    <div onClick="{{ newTpl }}" style="height:34px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:500;cursor:pointer">+ New minutes template</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:220px minmax(0,1fr);min-height:640px">
+    <div style="border-right:1px solid rgb(236 231 224);padding:16px 12px;display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:0.75em;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86);padding:0 8px 8px">Minutes templates</div>
+      <sc-for list="{{ tpls }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.onClick }}" style="padding:9px 10px;border-radius:8px;cursor:pointer;background:{{ t.bg }}" style-hover="background:rgb(246 244 240)">
+          <div style="font-weight:{{ t.weight }}">{{ t.name }}</div>
+          <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px">{{ t.meta }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="padding:20px 24px 40px;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <input value="{{ cur.name }}" onChange="{{ onName }}" style="font:inherit;font-size:1.3em;font-weight:600;border:1px solid transparent;border-radius:6px;padding:2px 6px;margin-left:-6px;outline:none;background:transparent;color:rgb(51 36 27);min-width:0;width:260px" style-focus="border-color:rgb(229 222 211);background:#fff">
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;border:1px solid rgb(229 222 211);border-radius:6px;padding:3px 7px">{{ verLabel }}</span>
+        <span style="color:rgb(117 100 86)">Used by {{ cur.used }}</span>
+        <span style="flex:1"></span>
+        <div style="display:flex;gap:2px;padding:2px;border-radius:8px;background:rgb(241 236 228)">
+          <sc-for list="{{ modes }}" as="m" hint-placeholder-count="2"><span onClick="{{ m.onClick }}" style="height:28px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ m.bg }};font-weight:{{ m.weight }};box-shadow:{{ m.shadow }}">{{ m.label }}</span></sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ isPreview }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:4px 0 20px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center">
+            <span style="color:rgb(117 100 86)">Preview as</span>
+            <div style="display:flex;gap:6px">
+              <sc-for list="{{ viewers }}" as="v" hint-placeholder-count="2"><span onClick="{{ v.onClick }}" style="height:30px;padding:0 11px;border-radius:7px;display:flex;align-items:center;cursor:pointer;border:1px solid {{ v.border }};background:{{ v.bg }};font-weight:{{ v.weight }}">{{ v.label }}</span></sc-for>
+            </div>
+            <span style="color:rgb(117 100 86);font-size:0.9em;white-space:nowrap">{{ viewerHint }}</span>
+          </div>
+
+          <div style="width:100%;max-width:720px;border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;box-shadow:0 8px 28px rgb(51 36 27 / 0.06);overflow:hidden">
+            <div style="padding:22px 28px 18px;border-bottom:1px solid rgb(236 231 224);display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+              <div style="flex:1;min-width:220px">
+                <div style="font-size:0.75em;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Meeting minutes · {{ cur.name }}</div>
+                <div style="font-size:1.45em;font-weight:600;margin-top:4px;letter-spacing:-0.01em">Carres · Year-end Sale Campaign</div>
+                <div style="color:rgb(117 100 86);margin-top:3px;font-family:'Chivo Mono',Menlo,monospace;font-size:11px">HZ-CAR-0412 · {{ verLabel }}</div>
+              </div>
+              <span style="flex:none;white-space:nowrap;padding:4px 10px;border-radius:999px;font-size:0.9em;font-weight:500;background:{{ pvStatusBg }};color:{{ pvStatusFg }}">{{ pvStatus }}</span>
+            </div>
+
+            <div style="padding:8px 28px 4px;display:flex;flex-direction:column">
+              <sc-for list="{{ pvFields }}" as="p" hint-placeholder-count="6">
+                <div style="padding:14px 0;border-bottom:1px solid rgb(244 241 236);display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-weight:600">{{ p.name }}</span>
+                    <sc-if value="{{ p.req }}"><span style="color:rgb(176 40 34)">*</span></sc-if>
+                    <sc-if value="{{ p.auto }}"><span style="font-size:0.85em;color:rgb(117 100 86);white-space:nowrap">· filled from project</span></sc-if>
+                    <span style="flex:1"></span>
+                    <sc-if value="{{ p.picBadge }}"><span style="font-size:0.85em;color:rgb(117 100 86);white-space:nowrap">👁 PIC sees</span></sc-if>
+                  </div>
+                  <sc-if value="{{ p.isShort }}"><input value="{{ p.value }}" onChange="{{ p.onText }}" readOnly="{{ p.ro }}" placeholder="{{ p.ph }}" style="height:38px;width:100%;padding:0 11px;border:1px solid rgb(229 222 211);border-radius:8px;font:inherit;outline:none;color:rgb(51 36 27);box-sizing:border-box;background:{{ p.boxBg }}" style-focus="border-color:rgb(176 140 104);box-shadow:0 0 0 3px rgb(214 180 140 / 0.25)"></sc-if>
+                  <sc-if value="{{ p.isLong }}"><textarea value="{{ p.value }}" onChange="{{ p.onText }}" readOnly="{{ p.ro }}" placeholder="{{ p.ph }}" rows="3" style="width:100%;padding:9px 11px;border:1px solid rgb(229 222 211);border-radius:8px;font:inherit;outline:none;color:rgb(51 36 27);box-sizing:border-box;line-height:1.5;resize:vertical;background:{{ p.boxBg }}" style-focus="border-color:rgb(176 140 104);box-shadow:0 0 0 3px rgb(214 180 140 / 0.25)"></textarea></sc-if>
+                  <sc-if value="{{ p.isChips }}"><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ p.chips }}" as="c"><span onClick="{{ c.onClick }}" style="height:30px;padding:0 11px;border-radius:999px;display:flex;align-items:center;gap:6px;cursor:{{ c.cursor }};border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.fg }};font-weight:{{ c.weight }}">{{ c.label }}</span></sc-for></div></sc-if>
+                  <sc-if value="{{ p.isTask }}"><div style="border:1px solid rgb(229 222 211);border-radius:8px;overflow-x:auto"><div style="min-width:640px">
+                    <div style="display:grid;grid-template-columns:28px minmax(160px,1.6fr) 130px 84px 118px minmax(100px,1fr) 22px;gap:6px;align-items:center;padding:8px 10px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-weight:600"><span>#</span><span style="padding-left:6px">Task</span><span style="padding-left:6px">PIC</span><span style="padding-left:6px">Deadline</span><span>Status</span><span style="padding-left:6px">Remark</span><span></span></div>
+                    <sc-for list="{{ p.tasks }}" as="t"><div style="display:grid;grid-template-columns:28px minmax(160px,1.6fr) 130px 84px 118px minmax(100px,1fr) 22px;gap:6px;align-items:center;padding:4px 10px;border-bottom:1px solid rgb(244 241 236)">
+                      <span style="color:rgb(117 100 86)">{{ t.n }}</span>
+                      <input value="{{ t.task }}" onChange="{{ t.onTask }}" readOnly="{{ p.ro }}" placeholder="What needs doing" style="height:30px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 6px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)">
+                      <select value="{{ t.pic }}" onChange="{{ t.onPic }}" disabled="{{ p.ro }}" style="height:30px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 6px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27);cursor:pointer;appearance:none" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)"><sc-for list="{{ attOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+                      <input value="{{ t.due }}" onChange="{{ t.onDue }}" readOnly="{{ p.ro }}" placeholder="Date" style="height:30px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 6px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)">
+                      <span onClick="{{ t.onStatus }}" title="Click to change" style="height:30px;display:flex;align-items:center;gap:7px;cursor:{{ t.cursor }};border-radius:6px;padding:0 6px;white-space:nowrap" style-hover="background:rgb(246 244 240)"><span style="flex:none;width:10px;height:10px;border-radius:50%;background:{{ t.dot }};border:1.5px solid {{ t.ring }}"></span>{{ t.status }}</span>
+                      <input value="{{ t.remark }}" onChange="{{ t.onRemark }}" readOnly="{{ p.ro }}" placeholder="—" style="height:30px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 6px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)">
+                      <span onClick="{{ t.onDel }}" title="Remove" style="text-align:center;color:rgb(170 160 150);cursor:pointer;opacity:{{ t.delOp }}" style-hover="color:rgb(176 40 34)">×</span>
+                    </div></sc-for>
+                    <sc-if value="{{ p.canAdd }}"><div onClick="{{ p.addTask }}" style="padding:9px 16px;color:rgb(90 62 43);font-weight:500;cursor:pointer" style-hover="background:rgb(250 248 244)">+ Add action item</div></sc-if>
+                  </div></div>
+                  <sc-if value="{{ p.taskNote }}"><span style="font-size:0.85em;color:rgb(117 100 86)">{{ p.taskNote }}</span></sc-if></sc-if>
+                  <sc-if value="{{ p.isFree }}"><div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="border:1px solid rgb(229 222 211);border-radius:8px;overflow-x:auto">
+                      <table style="border-collapse:collapse;min-width:100%">
+                        <thead><tr style="background:rgb(250 248 244)">
+                          <sc-for list="{{ p.free.cols }}" as="c"><th style="padding:4px;border-bottom:1px solid rgb(236 231 224);border-right:1px solid rgb(236 231 224);text-align:left"><div style="display:flex;align-items:center;gap:2px"><input value="{{ c.label }}" onChange="{{ c.onChange }}" readOnly="{{ p.colRo }}" placeholder="Column name" style="height:32px;width:100%;min-width:140px;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 8px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27);font-weight:600" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)"><span onClick="{{ c.onDel }}" title="Remove column" style="flex:none;width:18px;text-align:center;color:rgb(170 160 150);cursor:pointer;font-weight:400;opacity:{{ c.delOp }}" style-hover="color:rgb(176 40 34)">×</span></div></th></sc-for>
+                          <sc-if value="{{ p.canCol }}"><th onClick="{{ p.free.addCol }}" style="padding:0 12px;border-bottom:1px solid rgb(236 231 224);white-space:nowrap;color:rgb(90 62 43);font-weight:500;cursor:pointer;text-align:left" style-hover="background:rgb(244 239 232)">+ Add column</th></sc-if>
+                        </tr></thead>
+                        <tbody><sc-for list="{{ p.free.rows }}" as="row"><tr>
+                          <sc-for list="{{ row.cells }}" as="cell"><td style="padding:3px 4px;border-bottom:1px solid rgb(244 241 236);border-right:1px solid rgb(244 241 236)"><input type="{{ cell.itype }}" value="{{ cell.value }}" onChange="{{ cell.onChange }}" readOnly="{{ p.ro }}" style="height:32px;width:100%;min-width:140px;box-sizing:border-box;border:1px solid transparent;border-radius:6px;padding:0 8px;font:inherit;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff" style-hover="border-color:rgb(229 222 211)"></td></sc-for>
+                          <sc-if value="{{ p.canAdd }}"><td style="border-bottom:1px solid rgb(244 241 236);padding:0 8px"><span onClick="{{ row.onDel }}" title="Remove row" style="color:rgb(170 160 150);cursor:pointer" style-hover="color:rgb(176 40 34)">×</span></td></sc-if>
+                        </tr></sc-for></tbody>
+                      </table>
+                    </div>
+                    <sc-if value="{{ p.canAdd }}"><div style="display:flex"><span onClick="{{ p.free.addRow }}" style="height:30px;padding:0 10px;border-radius:7px;display:flex;align-items:center;color:rgb(90 62 43);font-weight:500;cursor:pointer" style-hover="background:rgb(244 239 232)">+ Add row</span></div></sc-if>
+                  </div></sc-if>
+                  <sc-if value="{{ p.isSig }}"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px"><sc-for list="{{ p.sigs }}" as="g"><div onClick="{{ g.onClick }}" style="border:1px solid {{ g.border }};border-radius:8px;padding:10px 11px;display:flex;flex-direction:column;gap:6px;cursor:{{ g.cursor }};background:#fff" style-hover="border-color:rgb(176 140 104)"><span style="font-family:'Brush Script MT',cursive;font-size:22px;height:26px;color:rgb(51 36 27)">{{ g.mark }}</span><span style="border-top:1px solid rgb(229 222 211);padding-top:5px;font-size:0.9em">{{ g.name }}</span><span style="font-size:0.85em;color:{{ g.fg }}">{{ g.status }}</span></div></sc-for></div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding:16px 28px 20px;background:rgb(250 248 244);display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ pvChecks }}" as="k" hint-placeholder-count="3"><div style="display:flex;gap:8px;align-items:flex-start"><span style="flex:none;width:16px;text-align:center;color:{{ k.fg }}">{{ k.icon }}</span><span style="color:{{ k.fg }}">{{ k.text }}</span></div></sc-for>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                <sc-for list="{{ pvActions }}" as="a" hint-placeholder-count="2"><span onClick="{{ a.onClick }}" style="height:34px;padding:0 16px;border-radius:8px;display:flex;align-items:center;font-weight:500;cursor:{{ a.cursor }};background:{{ a.bg }};color:{{ a.fg }};border:1px solid {{ a.border }};opacity:{{ a.op }}">{{ a.label }}</span></sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;color:rgb(117 100 86);font-size:0.9em"><span>Try it: type in any field, click chips, statuses and signatures. Nothing here is saved.</span><span onClick="{{ pvReset }}" style="text-decoration:underline;cursor:pointer;color:rgb(90 62 43)">Reset sample</span></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:18px;align-items:start">
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid rgb(236 231 224)">
+            <div style="font-size:1.08em;font-weight:600">Form fields</div>
+            <div style="color:rgb(117 100 86);margin-top:2px">What these minutes ask for. Required fields block Complete.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 64px 70px 26px;gap:8px;align-items:center;padding:8px 16px;font-size:0.75em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);border-bottom:1px solid rgb(244 241 236)">
+            <span>Field</span><span>Type</span><span>Required</span><span>PIC sees</span><span></span>
+          </div>
+          <sc-for list="{{ fields }}" as="f" hint-placeholder-count="8"><div style="border-bottom:1px solid rgb(244 241 236)">
+            <div draggable="true" onDragStart="{{ f.onDragStart }}" onDragOver="{{ f.onDragOver }}" onDrop="{{ f.onDrop }}" style="display:grid;grid-template-columns:minmax(0,1fr) 130px 64px 70px 26px;gap:8px;align-items:center;padding:8px 16px;background:{{ f.rowBg }};opacity:{{ f.rowOp }}">
+              <span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="color:rgb(190 180 168);cursor:grab">⋮⋮</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span></span>
+              <span style="display:flex"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211);background:rgb(250 248 244);white-space:nowrap">{{ f.type }}</span></span>
+              
+              <span onClick="{{ f.onReq }}" style="width:34px;height:20px;border-radius:999px;background:{{ f.reqBg }};position:relative;cursor:{{ f.reqCursor }};opacity:{{ f.reqOp }}"><span style="position:absolute;top:2px;left:{{ f.reqX }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2)"></span></span>
+              <span onClick="{{ f.onPic }}" style="font-size:12px;cursor:pointer;color:{{ f.picFg }}">{{ f.picLabel }}</span>
+              <span onClick="{{ f.onDel }}" title="Remove" style="color:rgb(170 160 150);cursor:{{ f.delCursor }};opacity:{{ f.delOp }};text-align:center" style-hover="color:rgb(176 40 34)">×</span>
+            </div>
+            <sc-if value="{{ f.isTable }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 12px 40px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:0.75em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Table columns · filled in during the meeting</span><span style="font-size:0.8em;color:rgb(117 100 86)">Typed table · {{ f.tcount }} columns</span></div>
+              <div style="border:1px solid rgb(236 231 224);border-radius:10px;overflow-x:auto">
+                <div style="display:flex;min-width:max-content">
+                  <sc-for list="{{ f.tcols }}" as="c"><div onClick="{{ c.onSel }}" style="width:132px;flex:none;padding:8px 10px;box-sizing:border-box;border-right:1px solid rgb(240 236 230);background:{{ c.bg }};box-shadow:{{ c.ring }};cursor:pointer;display:flex;flex-direction:column;gap:5px" style-hover="background:rgb(246 244 240)">
+                    <div style="display:flex;align-items:center;gap:5px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ c.glyph }}</span><span style="font-size:0.84em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</span></div>
+                    <span style="font-size:0.72em;color:rgb(117 100 86);white-space:nowrap">{{ c.tLabel }}</span>
+                  </div></sc-for>
+                  <div onClick="{{ f.addTCol }}" title="Add column" style="width:44px;flex:none;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;background:rgb(250 248 244)" style-hover="background:rgb(241 236 228)">+</div>
+                </div>
+              </div>
+              <sc-if value="{{ f.colOpen }}"><div style="width:330px;max-width:100%;box-sizing:border-box;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.12);padding:14px;display:flex;flex-direction:column;gap:12px;font-size:13px">
+                <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Column settings</span><span onClick="{{ f.colClose }}" style="cursor:pointer;color:rgb(117 100 86)">×</span></div>
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font-weight:500">What's this column called?</span><input value="{{ f.col.label }}" onChange="{{ f.col.onChange }}" style="height:32px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 9px;font:inherit;outline:none;color:rgb(51 36 27)"></div>
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="font-weight:500">What kind of answer?</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ f.col.typeOpts }}" as="o"><span onClick="{{ o.onClick }}" style="height:26px;padding:0 9px;border-radius:6px;display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;opacity:0.7">{{ o.glyph }}</span>{{ o.label }}</span></sc-for></div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid rgb(244 241 236)"><span onClick="{{ f.col.onDel }}" style="font-size:12px;cursor:pointer;color:rgb(176 40 34);opacity:{{ f.col.delOp }}">Remove column</span></div>
+              </div></sc-if>
+            </div></sc-if>
+          </div></sc-for>
+          <div style="padding:12px 16px;background:rgb(250 248 244);display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}" placeholder="New field name" style="height:32px;box-sizing:border-box;flex:1;min-width:160px;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 10px;font:inherit;outline:none;background:#fff">
+              <sc-for list="{{ types }}" as="ty" hint-placeholder-count="6"><span onClick="{{ ty.onClick }}" style="height:32px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;border:1px solid {{ ty.border }};background:{{ ty.bg }};font-weight:{{ ty.weight }}">{{ ty.label }}</span></sc-for>
+            </div>
+            <div style="display:flex"><span onClick="{{ addField }}" style="height:32px;padding:0 14px;border-radius:7px;display:flex;align-items:center;font-weight:500;background:#EC9B55;color:rgb(43 31 23);cursor:{{ addCursor }};opacity:{{ addOp }}">Add field</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;overflow:hidden">
+            <div style="padding:14px 16px;border-bottom:1px solid rgb(236 231 224)"><div style="font-size:1.08em;font-weight:600">Completion rules</div><div style="color:rgb(117 100 86);margin-top:2px">Checked when someone presses Complete.</div></div>
+            <sc-for list="{{ rules }}" as="r" hint-placeholder-count="6">
+              <div onClick="{{ r.onClick }}" style="display:flex;gap:12px;align-items:flex-start;padding:11px 16px;border-bottom:1px solid rgb(244 241 236);cursor:pointer">
+                <span style="flex:none;margin-top:1px;width:34px;height:20px;border-radius:999px;background:{{ r.bg }};position:relative"><span style="position:absolute;top:2px;left:{{ r.x }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2)"></span></span>
+                <div><div style="font-weight:500">{{ r.name }}</div><div style="font-size:0.9em;color:rgb(117 100 86);margin-top:1px">{{ r.hint }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="position:sticky;bottom:0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 24px;border-top:1px solid rgb(236 231 224);background:rgb(252 251 249)">
+    <span>{{ summary }}</span>
+    <sc-for list="{{ warns }}" as="w" hint-placeholder-count="0"><span style="padding:3px 9px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(138 92 10);font-size:0.9em">⚠️ {{ w }}</span></sc-for>
+    <span style="flex:1"></span>
+    <span style="color:rgb(117 100 86);font-size:0.9em">{{ pubHint }}</span>
+    <div onClick="{{ publish }}" style="height:34px;padding:0 16px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:500;cursor:pointer">{{ pubLabel }}</div>
+  </div>
+  <sc-if value="{{ hasToast }}"><div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);animation:mbIn .2s ease-out">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900}}">
+const F = (name, type, show, req, pic, lock) => ({ name, type, show, req, pic, lock: !!lock });
+const BASE = () => [F('Project (from Projects)', 'Project link', true, true, true, true), F('Meeting date', 'Date', true, true, true), F('Attendees', 'People', true, true, true, true)];
+const SIGN = () => F('Signatures', 'Signature', true, true, true);
+const TPLS = [
+  { name: 'Kickoff', ver: 3, used: 'every new project', when: 'new', live: 14,
+    fields: [...BASE(), F('Campaign period', 'Date range', true, true, true), F('Channels', 'Choice', true, true, true), F('Objective', 'Long text', true, true, true), F('Budget', 'Number', true, false, false), F('Key message', 'Long text', true, false, true), F('Decisions', 'Long text', true, true, true), F('Action items', 'Task link', true, false, false), SIGN()],
+    rules: { sign: false, pic: true, project: true, task: false, file: true, lock: true } },
+  { name: 'Monthly plan review', ver: 2, used: 'Social Media Package A, B', when: 'monthly', live: 6,
+    fields: [...BASE(), F('Last month results', 'Long text', true, false, true), F('Next month focus', 'Long text', true, true, true), F('Content plan changes', 'Long text', true, false, true), F('Decisions', 'Long text', true, true, true), SIGN()],
+    rules: { sign: false, pic: true, project: true, task: false, file: true, lock: true } },
+  { name: 'Shoot briefing', ver: 1, used: 'Reels Video, Showroom VM', when: 'stage', live: 3,
+    fields: [...BASE(), F('Location', 'Short text', true, true, true), F('Call time', 'Date', true, true, true), F('Shot list', 'Long text', true, true, false), F('Props needed', 'Checkbox', true, false, false), SIGN()],
+    rules: { sign: true, pic: false, project: true, task: true, file: true, lock: false } },
+  { name: 'Campaign wrap-up', ver: 1, used: 'Media Buying Campaign', when: 'done', live: 2,
+    fields: [...BASE(), F('Results vs KPI', 'Long text', true, true, true), F('What worked', 'Long text', true, false, true), F('Next time', 'Long text', true, false, false), SIGN()],
+    rules: { sign: false, pic: true, project: true, task: false, file: true, lock: true } },
+];
+const RULES = [['sign', 'Every attendee signs', 'Complete stays locked until all attendees sign'], ['pic', 'PIC signs off on the link', 'The PIC approves the minutes before the tracking link is created'], ['project', 'Must link a project', 'Pulls the subsidiary, product and dates from the project'], ['file', 'File to Library on complete', 'Saved in the subsidiary’s Library → Minutes folder'], ['lock', 'Lock after complete', 'No edits once signed off · changes need a new version']];
+const WHEN = [['new', 'New project starts', 'Opens as step 2 of New Project, before the tracking link.'], ['monthly', 'Every month (recurring)', 'Opens with each month’s recurring task, before Stage 1.'], ['stage', 'When a stage asks for it', 'A Workflow Builder stage can require these minutes before it starts.'], ['done', 'When the project is done', 'Opens after the last stage closes.']];
+const TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table'];
+const FREE0 = () => ({ cols: ['Item', 'Details', 'Owner'], rows: [['', '', ''], ['', '', '']] });
+const ATT = ['Rachel Tan (PIC)', 'Jason Lim', 'Siti Aminah', 'Wei Lun'];
+const SAMPLE = {
+  'Campaign period': '1 Dec – 31 Dec 2026', 'Channels': ['Facebook', 'Instagram', 'TikTok'], 'Objective': 'Drive showroom visits for the year-end sale. Target 400 walk-ins across the Puchong and Cheras showrooms.',
+  'Budget': 'RM 18,500', 'Key message': 'Up to 40% off sofa sets, December only.', 'Decisions': 'Shoot at Puchong showroom on 18 Nov.\nBoost budget split 60/40 Facebook and TikTok.',
+  'Location': 'Carres Puchong showroom', 'Call time': '18 Nov 2026 · 9:30 AM', 'Shot list': '1. Wide of sofa zone\n2. Price tag close-ups\n3. Walk-through reel, 20s', 'Props needed': ['Price stands', 'Ring light', 'Throw pillows'],
+  'Last month results': 'Reach 182k (+12%). 3 of 12 posts went late.', 'Next month focus': 'Year-end sale and CNY teaser.', 'Content plan changes': 'Swap 2 static posts for reels.',
+  'Results vs KPI': 'Walk-ins 436 vs 400 target. CPL RM 6.20 vs RM 7.00.', 'What worked': 'Price close-up reels.', 'Next time': 'Book the shoot a week earlier.',
+};
+const sampleFor = f => {
+  if (SAMPLE[f.name] != null) return SAMPLE[f.name];
+  if (f.type === 'Project link') return 'HZ-CAR-0412 · Year-end Sale Campaign · Carres';
+  if (f.type === 'Date') return '12 Nov 2026';
+  if (f.type === 'Date range') return '1 Dec – 31 Dec 2026';
+  if (f.type === 'Number') return '0';
+  if (f.type === 'Choice' || f.type === 'Checkbox') return ['Option A', 'Option B'];
+  if (f.type === 'Long text') return '';
+  return '';
+};
+const OPTS = { 'Channels': ['Facebook', 'Instagram', 'TikTok', 'Xiaohongshu', 'YouTube'], 'Props needed': ['Price stands', 'Ring light', 'Throw pillows', 'Banner', 'Plants'] };
+const STATUS = [['Not started', '#fff', 'rgb(170 160 150)'], ['In progress', 'rgb(222 170 50)', 'rgb(222 170 50)'], ['Overdue', 'rgb(196 52 52)', 'rgb(196 52 52)'], ['Done', 'rgb(46 130 70)', 'rgb(46 130 70)']];
+const TASKS0 = [{ task: 'Confirm shoot slot with showroom manager', pic: 'Jason Lim', due: '14 Nov', status: 1, remark: 'Puchong first' }, { task: 'Draft 3 reel scripts', pic: 'Siti Aminah', due: '16 Nov', status: 0, remark: '' }, { task: 'Pull Oct ROAS data', pic: 'Wei Lun', due: '10 Nov', status: 2, remark: 'Waiting on Meta access' }];
+const CTYPES = ['Text', 'Number', 'Date', 'Person'];
+const CGLYPH = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' };
+const colType = (t, name) => t || (/date|due|deadline|day/i.test(name || '') ? 'Date' : 'Text');
+const clone = x => JSON.parse(JSON.stringify(x));
+const sw = (on, dis) => ({ bg: on ? 'rgb(90 62 43)' : 'rgb(222 216 208)', x: on ? '16px' : '2px', cursor: dis ? 'not-allowed' : 'pointer', op: dis ? 0.5 : 1 });
+
+class Component extends DCLogic {
+  state = { tpls: clone(TPLS), mode: 'edit', viewer: 'staff', pv: {}, sel: 0, draft: '', type: 'Short text', drag: null, dirty: {}, toast: '' };
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  pvInit() { return { vals: {}, tasks: clone(TASKS0), signed: { 'Rachel Tan (PIC)': true, 'Jason Lim': true }, approved: false, done: false }; }
+  getPv() { return this.state.pv[this.state.sel] || this.pvInit(); }
+  setPv(fn) { this.setState(s => { const p = clone(s.pv[s.sel] || this.pvInit()); fn(p); return { pv: { ...s.pv, [s.sel]: p } }; }); }
+  edit(fn) { this.setState(s => { const tpls = clone(s.tpls); fn(tpls[s.sel]); return { tpls, dirty: { ...s.dirty, [s.sel]: true } }; }); }
+  renderVals() {
+    const s = this.state, cur = s.tpls[s.sel], dirty = !!s.dirty[s.sel];
+    const fields = cur.fields.map((f, i) => {
+      const a = sw(f.show, f.lock), b = sw(f.req && f.show, f.lock || !f.show);
+      const isTable = f.type === 'Table', tc = f.cols || [], tt = f.ctypes || [];
+      return { ...f, isTable, tcount: tc.length,
+        tcols: tc.map((c, ci) => { const ty = colType(tt[ci], c), on = s.colSel && s.colSel[0] === i && s.colSel[1] === ci;
+          return { label: c, glyph: CGLYPH[ty], tLabel: ty, bg: on ? 'rgb(251 243 232)' : '#fff', ring: on ? 'inset 0 -2px 0 rgb(90 62 43)' : 'none',
+            onSel: () => this.setState({ colSel: on ? null : [i, ci] }) }; }),
+        colOpen: !!(s.colSel && s.colSel[0] === i && tc[s.colSel[1]] != null), colClose: () => this.setState({ colSel: null }),
+        col: (() => { const ci = s.colSel && s.colSel[0] === i ? s.colSel[1] : -1; if (ci < 0 || tc[ci] == null) return { typeOpts: [] }; const c = tc[ci], ty = colType(tt[ci], c);
+          return { label: c, delOp: tc.length < 2 ? 0.35 : 1,
+            typeOpts: CTYPES.map(t2 => ({ label: t2, glyph: CGLYPH[t2], border: t2 === ty ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: t2 === ty ? 'rgb(51 36 27)' : '#fff', fg: t2 === ty ? '#fff' : 'rgb(51 36 27)',
+              onClick: () => this.edit(t => { const x = t.fields[i]; x.ctypes = x.cols.map((cc, k) => colType((x.ctypes || [])[k], cc)); x.ctypes[ci] = t2; }) })),
+            onChange: e => { const x = e.target.value; this.edit(t => { const fx = t.fields[i]; fx.cols[ci] = x; if (fx.ctypes && /date|due|deadline|day/i.test(x) && !/date|due|deadline|day/i.test(c)) fx.ctypes[ci] = 'Date'; }); },
+            onDel: () => { if (tc.length < 2) return; this.edit(t => { const fx = t.fields[i]; fx.cols.splice(ci, 1); if (fx.ctypes) fx.ctypes.splice(ci, 1); }); this.setState({ colSel: null }); } }; })(),
+        addTCol: () => { this.edit(t => { const x = t.fields[i]; x.cols = [...(x.cols || []), 'Column ' + ((x.cols || []).length + 1)]; if (x.ctypes) x.ctypes.push('Text'); }); this.setState({ colSel: [i, tc.length] }); },
+        rowBg: s.drag === i ? 'rgb(250 248 244)' : '#fff', rowOp: f.show ? 1 : 0.55,
+        showBg: a.bg, showX: a.x, showCursor: a.cursor, showOp: a.op, reqBg: b.bg, reqX: b.x, reqCursor: b.cursor, reqOp: b.op,
+        picLabel: f.pic ? '👁 Yes' : '— No', picFg: f.pic ? 'rgb(51 36 27)' : 'rgb(150 140 130)',
+        delCursor: f.lock ? 'not-allowed' : 'pointer', delOp: f.lock ? 0.3 : 1,
+        onShow: () => !f.lock && this.edit(t => { const x = t.fields[i]; x.show = !x.show; if (!x.show) x.req = false; }),
+        onReq: () => !f.lock && f.show && this.edit(t => { t.fields[i].req = !t.fields[i].req; }),
+        onPic: () => this.edit(t => { t.fields[i].pic = !t.fields[i].pic; }),
+        onDel: () => !f.lock && this.edit(t => { t.fields.splice(i, 1); }),
+        onDragStart: () => this.setState({ drag: i }), onDragOver: e => e.preventDefault(),
+        onDrop: () => { const from = s.drag; if (from == null || from === i) return this.setState({ drag: null }); this.edit(t => { const [m] = t.fields.splice(from, 1); t.fields.splice(i, 0, m); }); this.setState({ drag: null }); } };
+    });
+    const add = () => { const n = s.draft.trim(); if (!n) return; this.edit(t => { const si = t.fields.findIndex(f => f.type === 'Signature'); t.fields.splice(si < 0 ? t.fields.length : si, 0, Object.assign(F(n, s.type, true, false, true), s.type === 'Table' ? { cols: ['Item', 'Details', 'Owner'] } : {})); }); this.setState({ draft: '' }); };
+    const shown = cur.fields.filter(f => f.show), req = shown.filter(f => f.req);
+    const warns = [];
+    if (cur.rules.sign && !cur.fields.some(f => f.type === 'Signature' && f.show)) warns.push('“Every attendee signs” is on, but the Signatures field is hidden');
+    if (cur.rules.pic && !shown.some(f => f.pic && f.type !== 'People' && f.type !== 'Project link' && f.type !== 'Date')) warns.push('PIC signs off but can’t see any content field');
+    const w = WHEN.find(x => x[0] === cur.when);
+    const pill = on => ({ border: on ? 'rgb(214 180 140)' : 'rgb(229 222 211)', bg: on ? 'rgb(251 243 232)' : '#fff', weight: on ? 600 : 400 });
+    const pic = s.viewer === 'pic', P = this.getPv(), locked = P.done && cur.rules.lock, ro = pic || locked;
+    const val = f => P.vals[f.name] !== undefined ? P.vals[f.name] : (f.type === 'People' ? ATT.slice() : f.type === 'Free space' ? FREE0() : f.type === 'Table' ? { cols: (f.cols || []).slice(), rows: [0, 1].map(() => (f.cols || []).map(() => '')) } : sampleFor(f));
+    const empty = v => Array.isArray(v) ? !v.length : (v && v.rows) ? !v.rows.some(rw => rw.some(x => String(x).trim())) : !String(v || '').trim();
+    const att = (cur.fields.find(f => f.type === 'People' && f.show) ? val(cur.fields.find(f => f.type === 'People')) : ATT);
+    const setVal = (n, v) => this.setPv(p => { p.vals[n] = v; });
+    const pvFields = shown.filter(f => !pic || f.pic).map(f => {
+      const isTbl = f.type === 'Table', isSig = f.type === 'Signature', isTask = f.type === 'Task link', isFree = f.type === 'Free space' || isTbl;
+      let v = val(f);
+      if (isTbl) { const tc = f.cols || []; v = { cols: tc.slice(), rows: v.rows.map(rw => tc.map((_, ci) => rw[ci] || '')) }; }
+      const isChips = !isSig && !isTask && !isFree && Array.isArray(v), isLong = f.type === 'Long text', isShort = !isSig && !isTask && !isFree && !isChips && !isLong;
+      const fv = (fn) => this.setPv(p => { const t = clone(v); fn(t); p.vals[f.name] = t; });
+      const free = isFree ? { cols: v.cols.map((c, ci) => ({ label: c, delOp: ro || isTbl || v.cols.length < 2 ? 0 : 1, onChange: e => { const x = e.target.value; fv(t => { t.cols[ci] = x; }); }, onDel: () => !isTbl && !ro && v.cols.length > 1 && fv(t => { t.cols.splice(ci, 1); t.rows.forEach(rw => rw.splice(ci, 1)); }) })),
+        rows: v.rows.map((rw, ri) => ({ cells: rw.map((x, ci) => ({ value: x, itype: isTbl ? ({ Date: 'date', Number: 'number' })[colType((f.ctypes || [])[ci], v.cols[ci])] || 'text' : 'text', onChange: e => { const y = e.target.value; fv(t => { t.rows[ri][ci] = y; }); } })), onDel: () => fv(t => { t.rows.splice(ri, 1); }) })),
+        addCol: () => fv(t => { t.cols.push('Column ' + (t.cols.length + 1)); t.rows.forEach(rw => rw.push('')); }),
+        addRow: () => fv(t => { t.rows.push(t.cols.map(() => '')); }) } : { cols: [], rows: [] };
+      const auto = f.type === 'Project link';
+      const opts = f.type === 'People' ? ATT : (OPTS[f.name] || (isChips ? Array.from(new Set([...v, 'Option A', 'Option B', 'Option C'])) : []));
+      return { name: f.name, req: f.req, auto: auto || (cur.rules.project && f.type === 'People'), picBadge: !pic && f.pic,
+        isSig, isTask, isChips, isLong, isShort, isFree, free, colRo: ro || isTbl, canCol: !ro && !isTbl, ro: ro || auto, value: v, ph: f.type === 'Date' ? 'e.g. 12 Nov 2026' : 'Type here…',
+        boxBg: auto || ro ? 'rgb(250 248 244)' : '#fff', onText: e => setVal(f.name, e.target.value),
+        chips: opts.map(o => { const on = v.includes(o); return { label: (f.type === 'Checkbox' ? (on ? '☑ ' : '☐ ') : '') + o, border: on ? 'rgb(176 140 104)' : 'rgb(229 222 211)', bg: on ? 'rgb(251 243 232)' : '#fff', fg: on ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: on ? 600 : 400, cursor: ro ? 'default' : 'pointer',
+          onClick: () => !ro && setVal(f.name, on ? v.filter(x => x !== o) : [...v, o]) }; }),
+        tasks: P.tasks.map((t, i) => { const st = STATUS[t.status]; const upd = (k, x) => this.setPv(p => { p.tasks[i][k] = x; });
+          return { n: i + 1, task: t.task, pic: t.pic, due: t.due, remark: t.remark, status: st[0], dot: st[1], ring: st[2], cursor: ro ? 'default' : 'pointer', delOp: ro ? 0 : 1,
+            onTask: e => upd('task', e.target.value), onPic: e => upd('pic', e.target.value), onDue: e => upd('due', e.target.value), onRemark: e => upd('remark', e.target.value),
+            onStatus: () => !ro && upd('status', (t.status + 1) % STATUS.length), onDel: () => !ro && this.setPv(p => { p.tasks.splice(i, 1); }) }; }),
+        canAdd: !ro, addTask: () => this.setPv(p => { p.tasks.push({ task: '', pic: ATT[1], due: '', status: 0, remark: '' }); }),
+        taskNote: false ? `On Complete, each row opens a task in the PIC’s My Space (${P.tasks.filter(t => t.task.trim()).length} rows).` : '',
+        sigs: att.map(n => { const on = !!P.signed[n]; return { name: n, mark: on ? n.split(' ')[0] : '', status: on ? 'Signed' : (ro ? 'Waiting' : 'Click to sign'), fg: on ? 'rgb(46 110 64)' : 'rgb(138 92 10)', border: on ? 'rgb(170 205 178)' : 'rgb(229 222 211)', cursor: ro ? 'default' : 'pointer',
+          onClick: () => !ro && this.setPv(p => { p.signed[n] = !p.signed[n]; }) }; }) };
+    });
+    const signedN = att.filter(n => P.signed[n]).length;
+    const missingReq = shown.filter(f => f.req && f.type !== 'Signature' && f.type !== 'Task link' && empty(val(f)));
+    const checks = [];
+    if (!pic) {
+      checks.push(missingReq.length ? { ok: false, text: `${missingReq.length} required field${missingReq.length > 1 ? 's' : ''} empty: ${missingReq.map(f => f.name).join(', ')}` } : { ok: true, text: 'All required fields filled' });
+      if (cur.rules.sign) checks.push({ ok: signedN === att.length && att.length > 0, text: `Every attendee signs · ${signedN} of ${att.length} signed` });
+      if (cur.rules.pic) checks.push({ ok: P.approved, text: P.approved ? 'PIC approved on the link' : 'PIC sign-off on the link · switch to “PIC on the link” to approve' });
+      if (cur.rules.file) checks.push({ ok: true, text: 'Files to Carres Library → Minutes on complete' });
+      if (cur.rules.lock) checks.push({ ok: true, text: 'Locks after complete' });
+    } else {
+      checks.push({ ok: true, text: 'Shared by the HOUZS marketing team. Read only.' });
+      if (!cur.rules.pic) checks.push({ ok: false, text: 'PIC sign-off is off for this template, so the PIC can only read.' });
+    }
+    const blocked = !pic && checks.some(c => !c.ok);
+    const btn = (label, primary, dis, onClick) => ({ label, bg: primary ? '#EC9B55' : '#fff', fg: primary ? 'rgb(43 31 23)' : 'rgb(51 36 27)', border: primary ? '#EC9B55' : 'rgb(229 222 211)', op: dis ? 0.45 : 1, cursor: dis ? 'not-allowed' : 'pointer', onClick: () => !dis && onClick && onClick() });
+    const pvActions = pic
+      ? (cur.rules.pic ? [btn('Request changes', false, P.approved, () => this.flash('Change request sent to Jason Lim')), btn(P.approved ? 'Approved ✓' : 'Approve minutes', true, P.approved, () => { this.setPv(p => { p.approved = true; }); this.flash('Minutes approved · staff can now complete'); })] : [btn('Download PDF', false, false, () => this.flash('PDF download (prototype)'))])
+      : P.done ? [btn(locked ? 'Locked · new version needed to edit' : 'Reopen', false, locked, () => this.setPv(p => { p.done = false; }))]
+      : [btn('Save draft', false, false, () => this.flash('Draft saved')), btn('Complete', true, blocked, () => { this.setPv(p => { p.done = true; }); this.flash(cur.rules.file ? 'Minutes completed · filed to Carres Library → Minutes' : 'Minutes completed'); })];
+    const tab = on => ({ bg: on ? '#fff' : 'transparent', weight: on ? 600 : 400, shadow: on ? '0 1px 2px rgb(0 0 0 / 0.08)' : 'none' });
+    const stat = P.done ? ['Completed', 'rgb(230 243 233)', 'rgb(46 110 64)'] : pic ? (cur.rules.pic ? (P.approved ? ['Approved', 'rgb(230 243 233)', 'rgb(46 110 64)'] : ['Needs your approval', 'rgb(251 243 232)', 'rgb(90 62 43)']) : ['Shared with you', 'rgb(251 243 232)', 'rgb(90 62 43)']) : blocked ? ['Draft · can’t complete yet', 'rgb(251 243 225)', 'rgb(138 92 10)'] : ['Ready to complete', 'rgb(230 243 233)', 'rgb(46 110 64)'];
+    return {
+      isPreview: s.mode === 'preview', isEdit: s.mode === 'edit', attOpts: ATT,
+      pvReset: () => this.setState(st => { const pv = { ...st.pv }; delete pv[st.sel]; return { pv }; }),
+      modes: [['edit', 'Edit'], ['preview', 'Preview']].map(([k, l]) => ({ label: l, ...tab(s.mode === k), onClick: () => this.setState({ mode: k }) })),
+      viewers: [['staff', 'Staff filling in'], ['pic', 'PIC on the link']].map(([k, l]) => ({ label: l, ...pill(s.viewer === k), onClick: () => this.setState({ viewer: k }) })),
+      viewerHint: pic ? `${pvFields.length} of ${shown.length} fields visible` : `${shown.length} fields · ${req.length} required`,
+      pvFields, pvChecks: checks.map(c => ({ text: c.text, icon: c.ok ? '✓' : '○', fg: c.ok ? 'rgb(46 110 64)' : 'rgb(138 92 10)' })), pvActions,
+      pvStatus: stat[0], pvStatusBg: stat[1], pvStatusFg: stat[2],
+      tpls: s.tpls.map((t, i) => ({ name: t.name, meta: `v${t.ver}${s.dirty[i] ? ' · draft' : ''} · ${t.fields.length} fields`, bg: i === s.sel ? 'rgb(241 236 228)' : 'transparent', weight: i === s.sel ? 600 : 500, onClick: () => this.setState({ sel: i, draft: '' }) })),
+      newTpl: () => this.setState(st => ({ tpls: [...st.tpls, { name: 'New minutes', ver: 0, used: 'nothing yet', when: 'stage', live: 0, fields: [...BASE(), SIGN()], rules: { sign: false, pic: false, project: true, task: false, file: true, lock: true } }], sel: st.tpls.length, dirty: { ...st.dirty, [st.tpls.length]: true } })),
+      cur, onName: e => { const v = e.target.value; this.edit(t => { t.name = v; }); },
+      verLabel: dirty ? `Draft v${cur.ver + 1}` : cur.ver ? `v${cur.ver} · live` : 'Draft v1',
+      fields, draft: s.draft, onDraft: e => this.setState({ draft: e.target.value }), onDraftKey: e => { if (e.key === 'Enter') add(); },
+      types: TYPES.map(t => ({ label: t, ...pill(s.type === t), onClick: () => this.setState({ type: t }) })),
+      addField: add, addCursor: s.draft.trim() ? 'pointer' : 'not-allowed', addOp: s.draft.trim() ? 1 : 0.45,
+      rules: RULES.map(([k, name, hint]) => { const v = sw(cur.rules[k]); return { name, hint, bg: v.bg, x: v.x, onClick: () => this.edit(t => { t.rules[k] = !t.rules[k]; }) }; }),
+      whens: WHEN.map(([k, label]) => ({ label, ...pill(cur.when === k), onClick: () => this.edit(t => { t.when = k; }) })),
+      whenHint: w ? w[2] : '',
+      summary: `${shown.length} fields shown · ${req.length} required · ${shown.filter(f => f.pic).length} visible to PIC`,
+      warns,
+      pubHint: dirty && cur.live ? `${cur.live} open minutes stay on v${cur.ver}` : '',
+      pubLabel: dirty ? `Publish v${cur.ver + 1}` : 'Published ✓',
+      publish: () => { if (!dirty) return; const v = cur.ver + 1; this.setState(st => { const tpls = clone(st.tpls); tpls[st.sel].ver = v; return { tpls, dirty: { ...st.dirty, [st.sel]: false } }; }); this.flash(`${cur.name} v${v} published · new minutes use it from now`); },
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -24,8 +24,9 @@ export function viewAsPersonId(value: string | null | undefined): string | null 
 }
 
 // The views a Principal can wear over the account (the Dept Manager's never was
-// one, and the kind went on 2026-10-17).
-export const VIEW_AS_ROLES = ['hr', 'finance', 'revenue_member'] as const
+// one, and the kind went on 2026-10-17). Marketing's view since 2026-10-23 — a
+// lens like HR's and Finance's, on the computer.
+export const VIEW_AS_ROLES = ['hr', 'finance', 'marketing', 'revenue_member'] as const
 export type ViewAsRole = (typeof VIEW_AS_ROLES)[number]
 
 export function isViewAsRole(value: string): value is ViewAsRole {
@@ -68,11 +69,11 @@ export function honouredViewAs(value: string | null | undefined, surface: ViewSu
  */
 export const VIEW_AS_MIRROR_COOKIE = 'vp-view'
 
-export type PortalView = 'principal' | 'hr' | 'finance'
+export type PortalView = 'principal' | 'hr' | 'finance' | 'marketing'
 
 /** Which view a portal page is drawn in for this cookie value. */
 export function portalView(value: string | null | undefined): PortalView {
-  return value === 'hr' || value === 'finance' ? value : 'principal'
+  return value === 'hr' || value === 'finance' || value === 'marketing' ? value : 'principal'
 }
 
 /**
@@ -104,16 +105,16 @@ export function isMasked(user: MaskableUser): boolean {
 // keys, actions, tabs and sensitive fields). Seeing the portal exactly as
 // somebody else does is View as a person, read-only.
 
-export type LensView = 'hr' | 'finance'
+export type LensView = 'hr' | 'finance' | 'marketing'
 
-/** The view a lens draws, when the account switched to HR's or Finance's — null in its own. */
+/** The view a lens draws, when the account switched to HR's, Finance's or Marketing's — null in its own. */
 export function lensView(user: MaskableUser): LensView | null {
   // Viewing as a person draws THEIR portal, not a lens over one.
   if (user.viewingAs) return null
-  return isMasked(user) && (user.role === 'hr' || user.role === 'finance') ? user.role : null
+  return isMasked(user) && (user.role === 'hr' || user.role === 'finance' || user.role === 'marketing') ? user.role : null
 }
 
-const LENS_TABS: Readonly<Record<LensView, string>> = { hr: 'hr.', finance: 'fin.' }
+const LENS_TABS: Readonly<Record<LensView, string>> = { hr: 'hr.', finance: 'fin.', marketing: 'mkt.' }
 
 /**
  * The account as a lens's sidebar reads it: only that view's tabs (the user's
@@ -127,8 +128,8 @@ export function lensNav<T extends MaskableUser & { tabs?: string[] }>(user: T): 
   return { ...user, tabs: (user.tabs ?? []).filter(t => t.startsWith(LENS_TABS[view])) }
 }
 
-/** The Overview a lens opens on — HR's, or the treasury's for Finance — null in the account's own view. */
-export function lensOverview(user: MaskableUser): 'hr' | 'treasury' | null {
+/** The Overview a lens opens on — HR's, the treasury's for Finance, My Space for Marketing — null in the account's own view. */
+export function lensOverview(user: MaskableUser): 'hr' | 'treasury' | 'marketing' | null {
   const view = lensView(user)
-  return view === 'hr' ? 'hr' : view === 'finance' ? 'treasury' : null
+  return view === 'hr' ? 'hr' : view === 'finance' ? 'treasury' : view === 'marketing' ? 'marketing' : null
 }

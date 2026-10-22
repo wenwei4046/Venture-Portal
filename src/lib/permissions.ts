@@ -63,6 +63,8 @@ export const PERMISSIONS = [
   'attendance',
   // IT support's desk (2026-10-20, mig 20261021020000): IT requests · View opens it — a Revenue app account may hold it.
   'it_requests',
+  // Marketing's own view (2026-10-23, mig 20261023214000): Marketing · View opens it.
+  'marketing',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

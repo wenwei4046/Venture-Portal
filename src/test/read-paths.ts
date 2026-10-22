@@ -357,6 +357,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
   // An exact request, including older than either list (mig 20261021030000): active sender or IT requests · View.
   'it_request_get',
+  // Marketing's view (mig 20261023214100): its board, sidebar and search by Marketing · View; one's own notices.
+  'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}</style></helmet>
+<div style="padding:36px 40px 48px;box-sizing:border-box;color:rgb(43 31 23)">
+  <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+    <div style="min-width:0">
+      <div style="font-size:0.85em;color:rgb(117 100 86)">Posts, stage due dates and meetings across all subsidiaries</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <span style="font-size:1.85em;font-weight:600;letter-spacing:-0.01em;white-space:nowrap">{{ rangeLabel }}</span>
+        <div style="display:flex;gap:4px">
+          <span onClick="{{ prev }}" style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(250 248 244)">‹</span>
+          <span onClick="{{ next }}" style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(250 248 244)">›</span>
+        </div>
+        <span onClick="{{ goToday }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.92em;cursor:pointer" style-hover="background:rgb(250 248 244)">Today</span>
+      </div>
+    </div>
+    <div style="flex:1"></div>
+    <div onClick="{{ toggleMine }}" style="height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);cursor:pointer;font-size:0.92em;user-select:none" style-hover="background:rgb(250 248 244)">
+      <span style="width:28px;height:16px;border-radius:8px;background:{{ mineTrack }};position:relative;transition:background .15s"><span style="position:absolute;top:2px;left:{{ mineKnob }}px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .15s"></span></span>
+      <span>Only mine</span>
+    </div>
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+      <sc-for list="{{ viewOpts }}" as="o" hint-placeholder-count="3">
+        <div onClick="{{ o.onClick }}" style="height:28px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0 10px">
+    <sc-for list="{{ layers }}" as="l" hint-placeholder-count="3">
+      <div onClick="{{ l.onClick }}" style="height:30px;display:flex;align-items:center;gap:7px;padding:0 12px;border-radius:999px;border:1px solid {{ l.border }};background:{{ l.bg }};color:{{ l.fg }};cursor:pointer;font-size:0.9em;user-select:none;white-space:nowrap">
+        <span style="font-size:13px">{{ l.icon }}</span><span style="font-weight:500">{{ l.label }}</span><span style="color:rgb(117 100 86)">{{ l.count }}</span>
+      </div>
+    </sc-for>
+    <span style="width:1px;height:20px;background:rgb(229 222 211);margin:0 6px"></span>
+    <sc-for list="{{ subChips }}" as="s" hint-placeholder-count="9">
+      <div onClick="{{ s.onClick }}" style="height:30px;display:flex;align-items:center;gap:6px;padding:0 11px;border-radius:999px;border:1px solid {{ s.border }};background:{{ s.bg }};cursor:pointer;font-size:0.88em;font-weight:{{ s.weight }};user-select:none;white-space:nowrap">
+        <sc-if value="{{ s.hasDot }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }}"></span></sc-if>
+        <span>{{ s.label }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-bottom:16px;font-size:0.82em;color:rgb(117 100 86)">
+    <sc-for list="{{ legend }}" as="s" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:5px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }}"></span>{{ s.label }}</span></sc-for>
+  </div>
+
+  <div style="display:flex;gap:16px;align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <sc-if value="{{ isMonth }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+            <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><div style="padding:8px 10px;font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ w }}</div></sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">
+            <sc-for list="{{ cells }}" as="d" hint-placeholder-count="35">
+              <div onClick="{{ d.onDay }}" style="min-height:124px;padding:6px;box-sizing:border-box;border-right:{{ d.br }};border-bottom:{{ d.bb }};background:{{ d.bg }};display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0" style-hover="background:rgb(252 251 249)">
+                <div style="display:flex;justify-content:flex-end;padding:2px 2px 0">
+                  <span style="min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:0.85em;font-weight:{{ d.weight }};background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.n }}</span>
+                </div>
+                <sc-for list="{{ d.shown }}" as="e" hint-placeholder-count="0">
+                  <div onClick="{{ e.onClick }}" title="{{ e.title }}" style="display:flex;flex-direction:column;gap:2px;padding:4px 7px;border-radius:6px;background:{{ e.bg }};border:1px {{ e.borderStyle }} {{ e.border }};outline:{{ e.outline }};cursor:pointer;min-width:0" style-hover="filter:brightness(0.97)">
+                    <div style="display:flex;align-items:center;gap:5px;min-width:0">
+                      <span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ e.dot }}"></span>
+                      <span style="font-size:0.84em;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(51 36 27)">{{ e.title }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:5px;font-size:0.76em;color:rgb(90 78 68);white-space:nowrap;overflow:hidden">
+                      <span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ e.subDot }}"></span>
+                      <span>{{ e.icon }}</span><span style="overflow:hidden;text-overflow:ellipsis">{{ e.line2 }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ d.hasMore }}"><span style="font-size:0.8em;font-weight:500;color:rgb(90 62 43);padding:0 4px">{{ d.moreLabel }}</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isWeek }}">
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+          <sc-for list="{{ weekCols }}" as="c" hint-placeholder-count="7">
+            <div style="border-right:{{ c.br }};min-height:520px;background:{{ c.bg }};display:flex;flex-direction:column;min-width:0">
+              <div onClick="{{ c.onDay }}" style="padding:10px;border-bottom:1px solid rgb(236 231 224);background:rgb(250 248 244);display:flex;align-items:center;gap:8px;cursor:pointer">
+                <span style="font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ c.wd }}</span>
+                <span style="min-width:24px;height:24px;padding:0 5px;box-sizing:border-box;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:0.92em;font-weight:{{ c.weight }};background:{{ c.numBg }};color:{{ c.numFg }}">{{ c.n }}</span>
+              </div>
+              <div style="padding:8px;display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ c.events }}" as="e" hint-placeholder-count="2">
+                  <div onClick="{{ e.onClick }}" style="padding:8px 9px;border-radius:8px;background:{{ e.bg }};border:1px {{ e.borderStyle }} {{ e.border }};outline:{{ e.outline }};cursor:pointer;display:flex;flex-direction:column;gap:5px;min-width:0" style-hover="filter:brightness(0.97)">
+                    <sc-if value="{{ e.hasTime }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(74 64 58)">{{ e.time }}</span></sc-if>
+                    <span style="font-size:0.88em;font-weight:500;line-height:1.3;color:rgb(51 36 27);text-wrap:pretty">{{ e.title }}</span>
+                    <div style="display:flex;align-items:center;gap:5px;font-size:0.78em;color:rgb(90 78 68);min-width:0">
+                      <span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ e.subDot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.sub }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:5px;font-size:0.78em;color:{{ e.fg }}"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ e.dot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.statusLabel }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isList }}">
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+          <sc-if value="{{ listEmpty }}"><div style="padding:48px;text-align:center;color:rgb(117 100 86)">Nothing scheduled this month with the current filters.</div></sc-if>
+          <sc-for list="{{ listDays }}" as="g" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:110px minmax(0,1fr);border-top:{{ g.bt }}">
+              <div style="padding:14px 16px;display:flex;flex-direction:column;gap:2px;background:{{ g.bg }}">
+                <span style="font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:{{ g.wdColor }}">{{ g.wd }}</span>
+                <span style="font-size:1.3em;font-weight:600;color:{{ g.nColor }}">{{ g.n }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ g.events }}" as="e" hint-placeholder-count="2">
+                  <div onClick="{{ e.onClick }}" style="display:grid;grid-template-columns:22px minmax(0,2fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.4fr);gap:12px;align-items:center;padding:0 16px;min-height:54px;border-left:1px solid rgb(244 241 236);border-top:{{ e.rowBt }};background:{{ e.rowBg }};cursor:pointer" style-hover="background:rgb(250 248 244)">
+                    <span style="font-size:14px">{{ e.icon }}</span>
+                    <div style="min-width:0">
+                      <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</div>
+                      <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.metaLine }}</div>
+                    </div>
+                    <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-size:0.94em"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ e.subDot }}"></span>{{ e.sub }}</span>
+                    <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:0.94em">{{ e.whoLine }}</span>
+                    <div style="display:flex;min-width:0"><span style="display:flex;align-items:center;gap:6px;font-size:0.86em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ e.pillBg }};color:{{ e.fg }};border:1px solid {{ e.pillBorder }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ e.dot }}"></span>{{ e.statusLabel }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ hasPanel }}">
+      <div style="width:320px;flex:none;position:sticky;top:16px;border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;box-shadow:0 8px 24px rgb(51 36 27 / 0.08);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgb(244 241 236)">
+          <span style="font-size:0.78em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);flex:1">{{ panelKicker }}</span>
+          <span onClick="{{ closePanel }}" style="width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(246 246 244)">✕</span>
+        </div>
+
+        <sc-if value="{{ panelIsEvent }}">
+          <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">{{ sel.icon }}</span><span style="font-size:0.82em;font-weight:500;color:rgb(117 100 86)">{{ sel.kindLabel }}</span></div>
+              <div style="font-size:1.25em;font-weight:600;line-height:1.3;margin-top:6px;text-wrap:pretty">{{ sel.title }}</div>
+              <sc-if value="{{ sel.hasTid }}"><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);margin-top:4px">{{ sel.tid }}</div></sc-if>
+            </div>
+            <div style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.86em;font-weight:500;padding:3px 10px;border-radius:999px;background:{{ sel.pillBg }};color:{{ sel.fg }};border:1px solid {{ sel.pillBorder }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ sel.dot }}"></span>{{ sel.statusLabel }}</span></div>
+            <div style="display:flex;flex-direction:column;border-top:1px solid rgb(244 241 236)">
+              <sc-for list="{{ sel.rows }}" as="r" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid rgb(244 241 236);font-size:0.92em">
+                  <span style="color:rgb(117 100 86)">{{ r.k }}</span><span style="font-weight:500;text-wrap:pretty">{{ r.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ sel.hasOpen }}">
+              <div onClick="{{ sel.onOpen }}" style="height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);font-weight:500;cursor:pointer" style-hover="background:#E0893F">{{ sel.openLabel }}</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ panelIsDay }}">
+          <div style="padding:14px 16px 4px;font-size:1.25em;font-weight:600">{{ dayTitle }}</div>
+          <sc-if value="{{ dayEmpty }}"><div style="padding:8px 16px 20px;color:rgb(117 100 86);font-size:0.92em">Nothing scheduled.</div></sc-if>
+          <div style="padding:8px 12px 14px;display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ dayEvents }}" as="e" hint-placeholder-count="2">
+              <div onClick="{{ e.onClick }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;background:{{ e.bg }};border:1px {{ e.borderStyle }} {{ e.border }};cursor:pointer;min-width:0" style-hover="filter:brightness(0.97)">
+                <span style="font-size:14px">{{ e.icon }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:0.92em;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</div>
+                  <div style="display:flex;align-items:center;gap:5px;font-size:0.8em;color:rgb(90 78 68);margin-top:2px;white-space:nowrap;overflow:hidden"><span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ e.subDot }}"></span><span style="overflow:hidden;text-overflow:ellipsis">{{ e.sub }} · {{ e.statusLabel }}</span></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:1000},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;month&quot;,&quot;week&quot;,&quot;list&quot;],&quot;default&quot;:&quot;month&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;viewer&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Rachel&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onOpenTask&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;}}">
+const ST = {
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+  meet: { bg: 'oklch(0.96 0.025 235)', border: 'oklch(0.88 0.04 235)', fg: 'oklch(0.42 0.10 235)', dot: 'oklch(0.60 0.12 235)' },
+};
+const SUBS = ['Carres', 'Houzs Century', '2990 Home', 'Hookka', 'Colive', 'Dreamcrafter', 'CMI', 'The Conts'];
+const SUBDOT = {
+  Carres: 'oklch(0.70 0.12 235)', '2990 Home': 'oklch(0.64 0.15 295)', 'Houzs Century': 'oklch(0.52 0.06 55)',
+  Hookka: 'oklch(0.70 0.13 345)', Colive: 'oklch(0.66 0.10 195)', Dreamcrafter: 'oklch(0.56 0.15 270)',
+  CMI: 'oklch(0.60 0.03 250)', 'The Conts': 'oklch(0.62 0.12 320)',
+};
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MON = MONTHS.map(m => m.slice(0, 3));
+const WDS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const TODAY = new Date(2026, 9, 22);
+const DAY = 864e5;
+const LAYERS = [['post', '📣', 'Posts'], ['due', '⏱', 'Stage due dates'], ['meet', '🗓️', 'Shoots & meetings']];
+
+const P = (m, d, title, sub, tid, type, st, label, now) => ({ kind: 'post', m, d, title, sub, tid, type, st, label, people: now ? [now] : [], now: now || '—' });
+const D = (m, d, title, sub, tid, stage, who, done, quick) => ({ kind: 'due', m, d, title, sub, tid, stage, people: [who], now: who, done, quick });
+const M = (m, d, time, title, sub, type, people, tid) => ({ kind: 'meet', m, d, time, title, sub, type, people, now: people.join(', '), tid });
+const EVENTS = [
+  P(9, 2, 'Showroom morning light', 'Carres', 'MKT-CAR-2610-002', 'Post', 'done', 'Posted'),
+  P(9, 6, 'Red Truck Reels ep.1', '2990 Home', 'MKT-2990-2610-004', 'Reels', 'done', 'Posted'),
+  P(9, 9, '3 tips for small rooms', 'Colive', 'MKT-COL-2610-002', 'Tip', 'done', 'Posted'),
+  P(9, 13, 'Customer home: Puchong', 'Hookka', 'MKT-HK-2610-005', 'Testimonial', 'done', 'Posted'),
+  P(9, 16, 'Century lounge teaser', 'Houzs Century', 'MKT-HC-2610-008', 'Launch', 'done', 'Posted'),
+  P(9, 20, 'Kids room makeover', 'Dreamcrafter', 'MKT-DC-2610-004', 'Reels', 'done', 'Posted'),
+  P(9, 21, 'Deepavali early-bird', '2990 Home', 'MKT-2990-2610-021', 'Offer', 'red', 'Overdue · Waiting for PIC', 'Carmen (PIC)'),
+  P(9, 23, 'Year-end sale countdown', 'Carres', 'MKT-CAR-2610-011', 'Offer', 'waiting', 'Waiting for approval', 'Rachel'),
+  P(9, 24, 'Behind the factory', 'CMI', 'MKT-CMI-2610-003', 'Reels', 'waiting', 'Editing', 'Ali'),
+  P(9, 27, 'Resident story: Aisyah', 'Colive', 'MKT-COL-2610-009', 'Testimonial', 'draft', 'Draft', 'Jason'),
+  P(9, 29, 'Container café launch', 'The Conts', 'MKT-TC-2610-002', 'Launch', 'draft', 'Draft', 'Jason'),
+  P(9, 30, 'Rug care tip', 'Hookka', 'MKT-HK-2610-007', 'Tip', 'draft', 'Draft', 'Jason'),
+  P(9, 31, 'Red Truck Reels ep.2', '2990 Home', 'MKT-2990-2610-019', 'Reels', 'waiting', 'Waiting for approval', 'Rachel'),
+  P(10, 5, 'Year-end sale is live', 'Carres', 'MKT-CAR-2611-001', 'Offer', 'draft', 'Draft', 'Jason'),
+  P(10, 11, '11.11 flash deals', '2990 Home', 'MKT-2990-2611-003', 'Offer', 'draft', 'Draft', 'Jason'),
+  P(10, 19, 'Century lounge walkthrough', 'Houzs Century', 'MKT-HC-2611-002', 'Reels', 'draft', 'Draft', 'Mei'),
+  D(9, 14, 'Century lounge teaser', 'Houzs Century', 'MKT-HC-2610-008', 'Stage 3 · Edit', 'Ali', true),
+  D(9, 21, 'Carres Year-End Video', 'Carres', 'MKT-CAR-2610-007', 'Stage 1 · Script', 'Mei'),
+  D(9, 22, 'Fix FB cover price', 'Carres', 'QT-CAR-2610-004', 'Stage 1 · Edit cover', 'Jason', false, true),
+  D(9, 23, 'Year-end sale countdown', 'Carres', 'MKT-CAR-2610-011', 'Stage 3 · Approval', 'Rachel'),
+  D(9, 24, 'Amend Hookka ad copy', 'Hookka', 'QT-HK-2610-002', 'Stage 2 · Update ad set', 'Wei Lun', false, true),
+  D(9, 25, 'Red Truck Reels', '2990 Home', 'MKT-2990-2610-018', 'Stage 4 · Edit', 'Ali'),
+  D(9, 27, 'Resident story: Aisyah', 'Colive', 'MKT-COL-2610-009', 'Stage 1 · Caption', 'Jason'),
+  D(9, 30, 'Raya Reels', 'Houzs Century', 'MKT-HC-2610-011', 'Stage 1 · Script', 'Mei'),
+  M(9, 15, '15:00', 'Campaign wrap-up · Merdeka', 'Hookka', 'Campaign wrap-up', ['Rachel', 'Wei Lun']),
+  M(9, 20, '10:00', 'Shoot · Red Truck ep.2', '2990 Home', 'Shoot', ['Ali', 'Mei'], 'MKT-2990-2610-019'),
+  M(9, 26, '14:30', 'Monthly review · Carres', 'Carres', 'Monthly review', ['Rachel', 'Kelvin (PIC)', 'Jason']),
+  M(9, 28, '09:30', 'Shoot briefing · Colive rooms', 'Colive', 'Shoot briefing', ['Mei', 'Jason']),
+  M(10, 3, '11:00', 'Kickoff · Conts year-end', 'The Conts', 'Kickoff', ['Rachel', 'Jason', 'Siti']),
+];
+
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const dkey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const fmt = d => `${WDS[(d.getDay() + 6) % 7]} ${d.getDate()} ${MON[d.getMonth()]}`;
+const hs = () => window.__hmStore;
+
+class Component extends DCLogic {
+  state = { view: this.props.view ?? 'month', cursor: new Date(2026, 9, 22).getTime(), layers: { post: true, due: true, meet: true }, subs: [], mine: false, sel: null };
+  componentDidMount() { this._u = () => this.forceUpdate(); const go = () => { if (hs()) hs().subs.add(this._u); else if (!this._dead) setTimeout(go, 80); }; go(); }
+  componentWillUnmount() { this._dead = true; hs() && hs().subs.delete(this._u); }
+
+  allEvents() {
+    const base = this.props.empty ? [] : EVENTS;
+    const out = base.map((e, i) => ({ ...e, id: 'e' + i, date: new Date(2026, e.m, e.d) }));
+    (hs() ? hs().tasks : []).forEach(t => (t.stages || []).forEach((s, i) => {
+      const m = /(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.exec(s.due || '');
+      if (!m) return;
+      const mi = MON.findIndex(x => x.toLowerCase() === m[2].toLowerCase());
+      const who = hs().owner(t, i) || '—';
+      out.push({ kind: 'due', id: `s-${t.topLeft}-${i}`, date: new Date(2026, mi, +m[1]), title: t.title, sub: t.sub, tid: t.topLeft, stage: `Stage ${i + 1} · ${s.name}`, people: [who], now: who, done: t.phase === 'done' || i < t.cur, quick: /^QT/.test(t.topLeft) || t.quick, store: true });
+    }));
+    (hs() ? hs().tasks : []).forEach(t => {
+      if (!t.recur || t.recur.status === 'ended') return;
+      const s0 = t.stages[0] || {};
+      t.recur.runs.slice(1).forEach((r, k) => {
+        const [yy, mm, dd] = r.split('-').map(Number);
+        out.push({ kind: 'due', id: `r-${t.topLeft}-${k}`, date: new Date(yy, mm - 1, dd), title: t.title, sub: t.sub, tid: t.topLeft, stage: `Run ${k + 2} opens · ${s0.name || 'Stage 1'}`, people: [s0.who || '—'], now: s0.who || '—', recur: true, paused: t.recur.status === 'paused' });
+      });
+    });
+    return out.map(e => this.decorate(e));
+  }
+
+  decorate(e) {
+    let st = e.st, label = e.label;
+    if (e.kind === 'due') { st = e.done ? 'done' : e.date < TODAY ? 'red' : 'waiting'; label = e.done ? 'Completed' : st === 'red' ? `Overdue · ${e.now}` : `Due · ${e.now}`; if (e.recur) { st = 'draft'; label = e.paused ? 'Paused' : `Scheduled · ${e.now}`; } }
+    if (e.kind === 'meet') { st = 'meet'; label = e.date < TODAY ? 'Minutes filed' : `${e.time} · ${e.type}`; }
+    const s = ST[st], today = sameDay(e.date, TODAY);
+    const icon = e.kind === 'post' ? '📣' : e.kind === 'due' ? (e.recur ? '🔁' : e.quick ? '⚡' : '⏱') : (e.type === 'Shoot' ? '🎬' : '📝');
+    const line2 = e.kind === 'post' ? e.type : e.kind === 'due' ? e.stage : `${e.time} · ${e.type}`;
+    return {
+      ...e, st, icon, line2, statusLabel: label, subDot: SUBDOT[e.sub],
+      bg: e.kind === 'due' ? '#fff' : s.bg, border: s.border, borderStyle: e.kind === 'due' ? 'dashed' : 'solid', dot: s.dot, fg: s.fg,
+      pillBg: s.bg, pillBorder: s.border, hasTime: !!e.time,
+      outline: 'none', today,
+      metaLine: [e.tid, e.kind === 'due' ? e.stage : e.kind === 'meet' ? e.time : e.type].filter(Boolean).join(' · '),
+      whoLine: e.kind === 'meet' ? e.people.join(', ') : e.now,
+      kindLabel: e.kind === 'post' ? `${e.type} · scheduled post` : e.kind === 'due' ? (e.recur ? 'Recurring task · next run' : e.quick ? 'Quick Task · stage due' : 'Project · stage due') : e.type,
+    };
+  }
+
+  renderVals() {
+    const { view, cursor, layers, subs, mine, sel } = this.state;
+    const me = this.props.viewer || 'Rachel';
+    const cur = new Date(cursor), y = cur.getFullYear(), mo = cur.getMonth();
+    const all = this.allEvents();
+    const pass = e => (!subs.length || subs.includes(e.sub)) && (!mine || e.people.some(p => p.startsWith(me)));
+    const filtered = all.filter(e => layers[e.kind] && pass(e)).sort((a, b) => a.date - b.date || (a.time || '').localeCompare(b.time || ''));
+    const byDay = {};
+    filtered.forEach(e => (byDay[dkey(e.date)] = byDay[dkey(e.date)] || []).push(e));
+    const selId = sel && sel.type === 'event' ? sel.id : null;
+    const wire = e => ({ ...e, outline: e.id === selId ? '2px solid rgb(90 62 43)' : 'none', onClick: ev => { ev && ev.stopPropagation && ev.stopPropagation(); this.setState({ sel: { type: 'event', id: e.id } }); } });
+    const dayOf = d => (byDay[dkey(d)] || []).map(wire);
+    const pickDay = d => () => this.setState({ sel: { type: 'day', t: d.getTime() } });
+    const numStyle = (d, out) => {
+      const t = sameDay(d, TODAY);
+      return { numBg: t ? 'rgb(90 62 43)' : 'transparent', numFg: t ? 'rgb(246 238 230)' : out ? 'rgb(190 182 172)' : 'rgb(74 64 58)', weight: t ? 600 : 400 };
+    };
+
+    const first = new Date(y, mo, 1), off = (first.getDay() + 6) % 7, dim = new Date(y, mo + 1, 0).getDate();
+    const weeks = Math.ceil((off + dim) / 7);
+    const cells = Array.from({ length: weeks * 7 }, (_, i) => {
+      const d = new Date(y, mo, 1 - off + i), out = d.getMonth() !== mo, evs = dayOf(d);
+      const selDay = sel && sel.type === 'day' && sameDay(new Date(sel.t), d);
+      return {
+        n: d.getDate(), ...numStyle(d, out),
+        br: i % 7 === 6 ? 'none' : '1px solid rgb(240 236 230)', bb: i >= (weeks - 1) * 7 ? 'none' : '1px solid rgb(240 236 230)',
+        bg: selDay ? 'rgb(250 246 240)' : out ? 'rgb(251 250 248)' : '#fff',
+        shown: evs.slice(0, 3), hasMore: evs.length > 3, moreLabel: `+${evs.length - 3} more`, onDay: pickDay(d),
+      };
+    });
+
+    const ws = new Date(y, mo, cur.getDate() - ((cur.getDay() + 6) % 7));
+    const weekCols = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i);
+      return { wd: WDS[i], n: d.getDate(), ...numStyle(d, false), br: i === 6 ? 'none' : '1px solid rgb(240 236 230)', bg: sameDay(d, TODAY) ? 'rgb(252 250 246)' : '#fff', events: dayOf(d), onDay: pickDay(d) };
+    });
+    const we = new Date(ws.getTime() + 6 * DAY);
+
+    const listDays = Object.values(byDay).filter(evs => evs[0].date.getMonth() === mo && evs[0].date.getFullYear() === y).map((evs, gi) => {
+      const d = evs[0].date, t = sameDay(d, TODAY);
+      return {
+        wd: WDS[(d.getDay() + 6) % 7], n: `${d.getDate()} ${MON[d.getMonth()]}`, bt: gi ? '1px solid rgb(236 231 224)' : 'none',
+        bg: t ? 'rgb(250 246 240)' : 'rgb(251 250 248)', wdColor: t ? 'rgb(90 62 43)' : 'rgb(117 100 86)', nColor: t ? 'rgb(90 62 43)' : 'rgb(51 36 27)',
+        events: evs.map((e, i) => ({ ...wire(e), rowBt: i ? '1px solid rgb(244 241 236)' : 'none', rowBg: e.st === 'red' ? 'rgb(255 247 245)' : e.id === selId ? 'rgb(250 246 240)' : 'transparent' })),
+      };
+    });
+
+    const step = dir => () => this.setState(s => {
+      const c = new Date(s.cursor);
+      return { cursor: s.view === 'week' ? c.getTime() + dir * 7 * DAY : new Date(c.getFullYear(), c.getMonth() + dir, 1).getTime() };
+    });
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const inMonth = e => e.date.getMonth() === mo && e.date.getFullYear() === y && pass(e);
+    const toggleSub = n => () => this.setState(s => ({ subs: s.subs.includes(n) ? s.subs.filter(x => x !== n) : [...s.subs, n] }));
+
+    const selEv = selId ? all.find(e => e.id === selId) : null;
+    let selVals = { rows: [], hasOpen: false };
+    if (selEv) {
+      const rows = [['Subsidiary', selEv.sub], ['Date', fmt(selEv.date) + (selEv.time ? ` · ${selEv.time}` : '')]];
+      if (selEv.kind === 'post') rows.push(['Type', selEv.type], ['Now with', selEv.now]);
+      if (selEv.kind === 'due') rows.push(['Stage', selEv.stage], ['Assignee', selEv.now]);
+      if (selEv.kind === 'meet') rows.push(['Attendees', selEv.people.join(', ')], ['Minutes', `${selEv.type} template`]);
+      selVals = {
+        ...selEv, hasTid: !!selEv.tid, rows: rows.map(([k, v]) => ({ k, v })),
+        hasOpen: !!selEv.tid || selEv.kind === 'meet', openLabel: selEv.tid ? 'Open task' : 'Open minutes',
+        onOpen: () => selEv.tid && this.props.onOpenTask && this.props.onOpenTask(selEv.tid),
+      };
+    }
+    const selDayD = sel && sel.type === 'day' ? new Date(sel.t) : null;
+    const dayEvents = selDayD ? dayOf(selDayD) : [];
+
+    return {
+      rangeLabel: view === 'week' ? `${ws.getDate()} ${MON[ws.getMonth()]} – ${we.getDate()} ${MON[we.getMonth()]} ${we.getFullYear()}` : `${MONTHS[mo]} ${y}`,
+      prev: step(-1), next: step(1), goToday: () => this.setState({ cursor: TODAY.getTime() }),
+      viewOpts: [['month', '▦ Month'], ['week', '▥ Week'], ['list', '☰ List']].map(([k, l]) => ({ label: l, ...seg(view === k), onClick: () => this.setState({ view: k }) })),
+      isMonth: view === 'month', isWeek: view === 'week', isList: view === 'list',
+      mineTrack: mine ? 'rgb(90 62 43)' : 'rgb(214 204 190)', mineKnob: mine ? 14 : 2, toggleMine: () => this.setState(s => ({ mine: !s.mine })),
+      layers: LAYERS.map(([k, icon, label]) => {
+        const on = layers[k];
+        return { icon, label, count: all.filter(e => e.kind === k && inMonth(e)).length, bg: on ? 'rgb(250 246 240)' : '#fff', border: on ? 'rgb(214 190 160)' : 'rgb(229 222 211)', fg: on ? 'rgb(51 36 27)' : 'rgb(160 150 140)', onClick: () => this.setState(s => ({ layers: { ...s.layers, [k]: !s.layers[k] } })) };
+      }),
+      subChips: [{ label: 'All subsidiaries', hasDot: false, on: !subs.length, onClick: () => this.setState({ subs: [] }) }, ...SUBS.map(n => ({ label: n, hasDot: true, dot: SUBDOT[n], on: subs.includes(n), onClick: toggleSub(n) }))]
+        .map(c => ({ ...c, bg: c.on ? 'rgb(51 36 27)' : '#fff', border: c.on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', weight: c.on ? 500 : 400, ...(c.on ? { dot: c.dot } : {}) }))
+        .map(c => (c.on ? { ...c, bg: 'rgb(236 229 219)', border: 'rgb(214 190 160)' } : c)),
+      legend: [['draft', 'Draft'], ['waiting', 'In progress / due'], ['done', 'Posted / completed'], ['red', 'Overdue'], ['meet', 'Meeting / shoot']].map(([k, label]) => ({ label, dot: ST[k].dot })),
+      weekdays: WDS, cells, weekCols, listDays, listEmpty: !listDays.length,
+      hasPanel: !!sel && (!!selEv || !!selDayD), panelIsEvent: !!selEv, panelIsDay: !selEv && !!selDayD,
+      panelKicker: selEv ? 'Details' : 'Day', sel: selVals, closePanel: () => this.setState({ sel: null }),
+      dayTitle: selDayD ? fmt(selDayD) : '', dayEvents, dayEmpty: !dayEvents.length,
+    };
+  }
+}
+</script>
+</body>
+</html>
