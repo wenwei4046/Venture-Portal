@@ -22,7 +22,7 @@ describe("Active members saves on Save", () => {
       draft, d => { draft = d; }, async (id, on) => { calls.push([id, on]); return true; }, m => told.push(m));
     expect(build().dirty).toBe(false);
     build().groups[0].people[0].toggle();
-    let v = build();
+    const v = build();
     expect(v.groups[0].people[0].active).toBe(false);
     expect(v.groups[0].count).toBe("0 of 2 active");
     expect(v.dirty).toBe(true);
