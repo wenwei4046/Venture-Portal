@@ -68,7 +68,11 @@ export default function MinutesBuilder({ initial, first, attendees }: {
       const saved = savedRef.current
       if (!id || !now || !saved) return true
       const patch = minutesPatch(saved, now)
-      if (!patch) return true
+      // Nothing left to send (a change and its undo before the save went): what is on screen is what is kept.
+      if (!patch) {
+        setSave(s => (s.state === 'error' ? s : { state: 'saved' }))
+        return true
+      }
       setSave({ state: 'saving' })
       const r = await saveMktMinutes(id, revRef.current, patch)
       if (!r.ok) {

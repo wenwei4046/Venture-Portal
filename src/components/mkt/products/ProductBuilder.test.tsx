@@ -66,6 +66,17 @@ describe('the Product Builder', () => {
     expect(router.replace).toHaveBeenCalledWith('/marketing/products?p=p9', { scroll: false })
   })
 
+  it('a change undone before its save goes sends nothing and says Saved', async () => {
+    // 2026-10-23: an action added and removed within 0.7 s left *Saving…* up for good, Publish lit (the walk).
+    builder('p1')
+    fireEvent.click(screen.getByRole('button', { name: 'One more' }))
+    expect(screen.getByText('Saving…')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'One less' }))
+    await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy(), { timeout: 3000 })
+    expect(actions.saveMktProduct).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Publish v4' })).toHaveProperty('disabled', true)
+  })
+
   it('saves only what changed, on the draft it was made on; the sum of actions as the price; the margin', async () => {
     builder('p1')
     expect(screen.getByText('35%')).toBeTruthy()

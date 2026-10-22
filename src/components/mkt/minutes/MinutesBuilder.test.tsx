@@ -70,6 +70,17 @@ describe('the Minutes Builder', () => {
     expect(actions.saveMktMinutes.mock.calls[1]).toEqual(['t1', 4, { rules: { sign: true, pic: true, project: true, file: true, lock: false } }])
   })
 
+  it('a change undone before its save goes sends nothing and says Saved', async () => {
+    // 2026-10-23: the save found nothing to send and left *Saving…* up for good, Publish lit (the ③c walk).
+    builder()
+    fireEvent.click(screen.getByRole('switch', { name: 'Lock after complete' }))
+    expect(screen.getByText('Saving…')).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch', { name: 'Lock after complete' }))
+    await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy(), { timeout: 3000 })
+    expect(actions.saveMktMinutes).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Published ✓' })).toBeTruthy()
+  })
+
   it('adds a field before the signatures, and a table’s column by its settings', async () => {
     builder()
     fireEvent.change(screen.getByRole('textbox', { name: 'New field name' }), { target: { value: 'Decisions' } })

@@ -74,6 +74,18 @@ describe('the Workflow Builder', () => {
     expect(actions.saveMktWorkflow.mock.calls[1]).toEqual(['w1', 6, { tname: 'Full shoot' }])
   })
 
+  it('a change undone before its save goes sends nothing and says Saved', async () => {
+    // 2026-10-23: the save found nothing to send and left *Saving…* up for good, Publish lit (the ③c walk).
+    builder()
+    fireEvent.click(screen.getByText('Edit'))
+    fireEvent.click(screen.getByRole('button', { name: 'One day more' }))
+    expect(screen.getByText('Saving…')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'One day less' }))
+    await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy(), { timeout: 3000 })
+    expect(actions.saveMktWorkflow).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Publish v3' })).toHaveProperty('disabled', true)
+  })
+
   it('never writes over somebody else’s save: it says so and offers a reload', async () => {
     actions.saveMktWorkflow.mockResolvedValue({ ok: false, reason: 'Sia Josiah changed this template since you opened it — reload to see it.' })
     builder()

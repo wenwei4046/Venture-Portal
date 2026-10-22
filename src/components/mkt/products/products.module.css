@@ -106,10 +106,11 @@
 .stepper button:disabled { cursor: not-allowed; }
 .stepN { min-width: 26px; text-align: center; font-family: var(--mk-mono); font-size: 12px; }
 .moneyCell, .moneyBig { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgb(var(--mk-line)); border-radius: 7px; height: 32px; padding: 0 8px; background: rgb(var(--mk-white)); }
-.moneyBig { height: 38px; align-self: flex-start; }
+.moneyBig { height: 38px; }
+.moneyBig .muted { white-space: nowrap; font-size: .84em; }
 .rm { font-size: .78em; color: rgb(var(--mk-muted)); }
 .moneyInput { width: 100%; min-width: 0; border: 0; outline: none; font: inherit; font-family: var(--mk-mono); font-size: 12.5px; background: transparent; color: inherit; }
-.moneyBig .moneyInput { width: 120px; font-size: 14px; }
+.moneyBig .moneyInput { flex: 1; width: auto; font-size: 14px; }
 .wfCell { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .wfCell .select { flex: 1; height: 32px; font-size: .86em; }
 .open { flex: none; width: 30px; height: 32px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); display: flex; align-items: center; justify-content: center; color: rgb(var(--mk-ink)); text-decoration: none; }
