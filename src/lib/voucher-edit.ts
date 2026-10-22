@@ -11,6 +11,8 @@ export interface VoucherEditRow {
   pool: string
   amount: string
   account_code: string
+  /** The line's own words (2026-10-22) — the books' line when there are some. */
+  description?: string
   override_account_type?: string
   override_gl_account_code?: string
   override_reason?: string
@@ -77,9 +79,9 @@ function overrideOf(r: VoucherEditRow): [string, string, string] | null {
   return t && g && why ? [t, g, why] : null
 }
 
-const rowKey = (r: VoucherEditRow) => [r.pool, cents(r.amount), r.account_code.trim(), ...(overrideOf(r) ?? ['', '', ''])].join('|')
+const rowKey = (r: VoucherEditRow) => [r.pool, cents(r.amount), r.account_code.trim(), r.description?.trim() ?? '', ...(overrideOf(r) ?? ['', '', ''])].join('|')
 
-/** The rows differ from the stored ones — in number, order, pool, amount, account or override. */
+/** The rows differ from the stored ones — in number, order, pool, amount, account, words or override. */
 export function rowsChanged(was: VoucherEditRow[], now: VoucherEditRow[]): boolean {
   return was.length !== now.length || was.some((r, i) => rowKey(r) !== rowKey(now[i]))
 }
@@ -103,6 +105,7 @@ export function voucherEditForm(id: string, direction: 'debit' | 'credit', was: 
         fd.set(`source_rows[${i}][pool]`, r.pool)
         fd.set(`source_rows[${i}][amount]`, r.amount)
         fd.set(`source_rows[${i}][account_code]`, r.account_code)
+        if (r.description?.trim()) fd.set(`source_rows[${i}][description]`, r.description.trim())
         const ov = overrideOf(r)
         if (ov) {
           fd.set(`source_rows[${i}][override_account_type]`, ov[0])

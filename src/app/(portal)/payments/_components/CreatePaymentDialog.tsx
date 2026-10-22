@@ -17,15 +17,17 @@ import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 import c from './create.module.css'
 
 // Create payment (2026-10-14, the Finance revamp v2 — D07 / D08 of
-// `.design/fin-r2/handoff`): the prototype's 520px dialog — Pay to, Category,
-// Pool, From bank, Amount RM, Description, Payment date (the calendar), *Save
-// draft* and *Submit for approval*. The user: 样子照设计，功能全留 — so what
-// today's form also does opens from the small buttons under the fields: a
-// split across pools, a loan repayment (the deal, its principal / interest /
-// penalty, a line each), an internal transfer, the method, files, notes, a
-// line's GL override. The
-// voucher is the form page's (createPaymentVoucherInner, every rule); the
-// dialog stays on Payments and says what it made.
+// `.design/fin-r2/handoff`): the prototype's dialog, *Save draft* and *Submit
+// for approval*. The user: 样子照设计，功能全留. Redrawn 2026-10-22 ("split pool
+// 这个按钮我不想要，我想maintain之前的add description/line, attachment 就default
+// 要有" → "每行一个，GL override 拿掉"): wider, Pay to beside the date and the
+// bank above the voucher's description; then its lines — each its own words
+// (the books' line), pool, category and amount, + Add line, their total the
+// voucher's amount — and the files, always there. A loan repayment (the deal,
+// its principal / interest / penalty, a line each), an internal transfer, the
+// method and notes open from the small buttons under them. The voucher is the
+// form page's (createPaymentVoucherInner, every rule); the dialog stays on
+// Payments and says what it made.
 
 const METHODS = [
   { value: 'bank_transfer', label: 'Bank transfer' },
@@ -36,32 +38,15 @@ const METHODS = [
 /** The order a payment's categories are offered in — what a payment mostly posts to first. */
 const TYPE_ORDER: AccountType[] = ['expense', 'cost', 'asset', 'fixed_asset', 'liability', 'equity', 'revenue', 'other_income']
 const ROLE_LABEL: Record<RepaymentRole, string> = { principal: 'Principal', interest: 'Interest', penalty: 'Penalty' }
-/** A line's override (mig 218): the account type and GL it posts to instead, and why — the form page's labels. */
-const OVERRIDE_TYPES: Array<{ value: AccountType; label: string }> = [
-  { value: 'equity', label: 'BS · Equity' },
-  { value: 'fixed_asset', label: 'BS · Fixed Asset' },
-  { value: 'asset', label: 'BS · Asset' },
-  { value: 'liability', label: 'BS · Liability' },
-  { value: 'revenue', label: 'P&L · Revenue' },
-  { value: 'cost', label: 'P&L · Cost' },
-  { value: 'other_income', label: 'P&L · Other Inc.' },
-  { value: 'expense', label: 'P&L · Expense' },
-]
-
-interface Override {
-  type: AccountType | ''
-  gl: string
-  reason: string
-}
-const NO_OVERRIDE: Override = { type: '', gl: '', reason: '' }
 
 interface Line {
+  /** The line's own words — what it is for. */
+  description: string
   pool: string
   account: string
   amount: string
   role?: RepaymentRole
   autoAccount?: boolean
-  ov?: Override
 }
 
 // The words are the kit's (components/finv/form-words), kept importable from here.
@@ -80,6 +65,14 @@ export interface PaymentPreset {
   amount?: number
   description?: string
 }
+
+/** A dialog's first line: Venture's, on the amount a payment begun elsewhere brings. */
+const firstLine = (preset: PaymentPreset | null): Line => ({
+  description: '',
+  pool: 'venture_pool',
+  account: '',
+  amount: preset?.amount ? preset.amount.toFixed(2) : '',
+})
 
 export default function CreatePaymentDialog({
   open,
@@ -107,20 +100,15 @@ export default function CreatePaymentDialog({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [payee, setPayee] = useState(preset?.payee ?? '')
   const [companyId, setCompanyId] = useState(preset?.companyId ?? '')
-  const [account, setAccount] = useState('')
-  const [pool, setPool] = useState('venture_pool')
   const [bankId, setBankId] = useState(initial?.banks[0]?.id ?? '')
-  const [amount, setAmount] = useState(preset?.amount ? preset.amount.toFixed(2) : '')
   const [desc, setDesc] = useState(preset?.description ?? '')
   const [date, setDate] = useState(today)
+  const [lines, setLines] = useState<Line[]>(() => [firstLine(preset)])
   // What the small buttons open.
-  const [split, setSplit] = useState(false)
   const [repay, setRepay] = useState(false)
   const [transfer, setTransfer] = useState(false)
   const [showMethod, setShowMethod] = useState(false)
-  const [showFiles, setShowFiles] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
-  const [lines, setLines] = useState<Line[]>([])
   const [dealId, setDealId] = useState('')
   const [principal, setPrincipal] = useState('0.00')
   const [interest, setInterest] = useState('0.00')
@@ -128,8 +116,6 @@ export default function CreatePaymentDialog({
   const [method, setMethod] = useState('bank_transfer')
   const [files, setFiles] = useState<File[]>([])
   const [notes, setNotes] = useState('')
-  const [override, setOverride] = useState(false)
-  const [singleOv, setSingleOv] = useState<Override>(NO_OVERRIDE)
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -156,19 +142,14 @@ export default function CreatePaymentDialog({
   const reset = () => {
     setPayee(preset?.payee ?? '')
     setCompanyId(preset?.companyId ?? '')
-    setAccount('')
-    setPool('venture_pool')
     setBankId(opts?.banks[0]?.id ?? '')
-    setAmount(preset?.amount ? preset.amount.toFixed(2) : '')
     setDesc(preset?.description ?? '')
     setDate(today)
-    setSplit(false)
+    setLines([firstLine(preset)])
     setRepay(false)
     setTransfer(false)
     setShowMethod(false)
-    setShowFiles(false)
     setShowNotes(false)
-    setLines([])
     setDealId('')
     setPrincipal('0.00')
     setInterest('0.00')
@@ -176,8 +157,6 @@ export default function CreatePaymentDialog({
     setMethod('bank_transfer')
     setFiles([])
     setNotes('')
-    setOverride(false)
-    setSingleOv(NO_OVERRIDE)
     setError(null)
   }
   const close = () => {
@@ -193,20 +172,20 @@ export default function CreatePaymentDialog({
   }, [accounts])
   const deal = (opts?.fundSources ?? []).find((f) => f.id === dealId) ?? null
   const repaySum = Math.round((num(principal) + num(interest) + num(penalty)) * 100) / 100
-  const total = repay ? repaySum : num(amount)
-  const useLines = split || repay
+  const lineSum = Math.round(lines.reduce((s, l) => s + num(l.amount), 0) * 100) / 100
+  const total = repay ? repaySum : lineSum
 
   // A repayment's lines follow its principal / interest / penalty (lib/repayment-source-rows): each its
-  // own account by default, a hand-picked account kept through later edits.
+  // own account by default, a hand-picked account kept through later edits, and its words.
   useEffect(() => {
     if (!repay || !deal) return
     setLines((prev) =>
       buildRepaymentSourceRows(
-        prev.map((l) => ({ role: l.role, pool: l.pool, amount: l.amount, account_code: l.account, autoAccount: l.autoAccount })),
+        prev.map((l) => ({ role: l.role, pool: l.pool, amount: l.amount, account_code: l.account, autoAccount: l.autoAccount, description: l.description })),
         { principal: num(principal), interest: num(interest), penalty: num(penalty) },
         deal.account_code,
         hasAccount,
-      ).map((r) => ({ role: r.role, pool: r.pool, account: r.account_code, amount: r.amount, autoAccount: r.autoAccount, ov: prev.find((p) => p.role === r.role)?.ov })),
+      ).map((r) => ({ description: r.description ?? '', role: r.role, pool: r.pool, account: r.account_code, amount: r.amount, autoAccount: r.autoAccount })),
     )
   }, [repay, deal, principal, interest, penalty, hasAccount])
 
@@ -233,34 +212,10 @@ export default function CreatePaymentDialog({
     setInterest(fs.monthly_interest.toFixed(2))
   }
 
-  const toggleSplit = () => {
-    if (repay) return
-    if (split) {
-      const first = lines[0]
-      if (first) {
-        setPool(first.pool || 'venture_pool')
-        setAccount(first.account)
-        setSingleOv(first.ov ?? NO_OVERRIDE)
-      }
-      setLines([])
-      setSplit(false)
-      return
-    }
-    setLines([
-      { pool, account, amount: num(amount) > 0 ? num(amount).toFixed(2) : '', ov: override ? singleOv : undefined },
-      { pool: '', account: '', amount: '', ov: override ? NO_OVERRIDE : undefined },
-    ])
-    setSplit(true)
-  }
   const toggleRepay = () => {
     if (repay) {
       const first = lines[0]
-      if (first) {
-        setPool(first.pool || 'venture_pool')
-        setAccount(first.account)
-      }
-      setAmount(repaySum > 0 ? repaySum.toFixed(2) : amount)
-      setLines([])
+      setLines([{ description: '', pool: first?.pool || 'venture_pool', account: first?.account ?? '', amount: repaySum > 0 ? repaySum.toFixed(2) : '' }])
       setDealId('')
       setPrincipal('0.00')
       setInterest('0.00')
@@ -268,47 +223,27 @@ export default function CreatePaymentDialog({
       setRepay(false)
       return
     }
-    setSplit(false)
     setLines([])
     setRepay(true)
   }
   const setLine = (i: number, patch: Partial<Line>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
-  const typeOf = (code: string) => accounts.find((a) => a.code === code)?.type ?? ''
-  // On: each line (or the one) starts from its own account — the form page's Override; off: none is sent.
-  const toggleOverride = () => {
-    if (override) {
-      setOverride(false)
-      setSingleOv(NO_OVERRIDE)
-      setLines((prev) => prev.map((l) => ({ ...l, ov: undefined })))
-      return
-    }
-    setOverride(true)
-    setSingleOv({ type: typeOf(account) || 'expense', gl: account, reason: '' })
-    setLines((prev) => prev.map((l) => ({ ...l, ov: { type: typeOf(l.account) || 'expense', gl: l.account, reason: '' } })))
-  }
 
   // ── What is still missing ──
-  const lineSum = Math.round(lines.reduce((s, l) => s + num(l.amount), 0) * 100) / 100
   const need: string[] = []
   if (repay && !dealId) need.push('the loan it repays')
   if (!payee.trim()) need.push('Pay to')
   if (!(total > 0)) need.push('an amount')
-  if (useLines) {
-    if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category, amount')
-  } else {
-    if (!account) need.push('a category')
-    if (!pool) need.push('a pool')
-  }
+  if (!repay && lines.length === 1) {
+    if (!lines[0].account) need.push('a category')
+    if (!lines[0].pool) need.push('a pool')
+  } else if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category, amount')
   if (method !== 'netting' && !bankId) need.push('a bank')
   if (!desc.trim()) need.push('a description')
-  const overrides = override ? (useLines ? lines.map((l) => l.ov ?? NO_OVERRIDE) : [singleOv]) : []
-  const overrideOpen = overrides.some((o) => !o.type || !o.gl || !o.reason.trim())
   const filesBytes = files.reduce((n, f) => n + f.size, 0)
-  const offBy = useLines && total > 0 && lines.length > 0 ? Math.round((total - lineSum) * 100) / 100 : 0
+  const offBy = repay && total > 0 && lines.length > 0 ? Math.round((total - lineSum) * 100) / 100 : 0
   const problem =
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
-    (overrideOpen ? 'An override needs its type, its GL account and a reason.' : null) ??
     (filesBytes > FILES_CAP ? `The files come to ${fileSize(filesBytes)} — under 4 MB goes in one save. Compress them or add some later.` : null)
   const ok = problem === null && !!opts
 
@@ -330,19 +265,14 @@ export default function CreatePaymentDialog({
     fd.set('description', desc.trim())
     if (notes.trim()) fd.set('notes', notes.trim())
     fd.set('target_pool', '')
-    const rows: Line[] = useLines ? lines : [{ pool, account, amount: total.toFixed(2), ov: override ? singleOv : undefined }]
-    fd.set('source_rows_count', String(rows.length))
-    rows.forEach((r, i) => {
+    fd.set('source_rows_count', String(lines.length))
+    lines.forEach((r, i) => {
       fd.set(`source_rows[${i}][pool]`, r.pool)
       fd.set(`source_rows[${i}][amount]`, num(r.amount).toFixed(2))
       fd.set(`source_rows[${i}][account_code]`, r.account)
-      if (override && r.ov && r.ov.type && r.ov.gl && r.ov.reason.trim()) {
-        fd.set(`source_rows[${i}][override_account_type]`, r.ov.type)
-        fd.set(`source_rows[${i}][override_gl_account_code]`, r.ov.gl)
-        fd.set(`source_rows[${i}][override_reason]`, r.ov.reason.trim())
-      }
+      if (r.description.trim()) fd.set(`source_rows[${i}][description]`, r.description.trim())
     })
-    fd.set('source_pool', rows[0]?.pool ?? '')
+    fd.set('source_pool', lines[0]?.pool ?? '')
     if (repay && dealId) {
       fd.set('fund_source_id', dealId)
       fd.set('repayment_principal', num(principal).toFixed(2))
@@ -388,7 +318,7 @@ export default function CreatePaymentDialog({
   })
 
   return (
-    <FinDialog open={open} onClose={close} title={preset?.title ?? 'Create payment'} sub={`New payment voucher · ${prefix}`} locked={busy !== null} tall>
+    <FinDialog open={open} onClose={close} title={preset?.title ?? 'Create payment'} sub={`New payment voucher · ${prefix}`} locked={busy !== null} tall wide>
       <DialogForm
         buttons={
           <>
@@ -433,28 +363,76 @@ export default function CreatePaymentDialog({
           </>
         ) : null}
 
-        <Field label="Pay to" htmlFor="cp-payee">
-          <PartyInput
-            id="cp-payee"
-            placeholder="Payee name"
-            value={payee}
-            readOnly={repay}
-            companies={opts?.companies ?? []}
-            companyId={companyId}
-            onChange={(name, id) => {
-              setPayee(name)
-              setCompanyId(id)
-            }}
-          />
+        <div className={fm.pair}>
+          <Field label="Pay to" htmlFor="cp-payee">
+            <PartyInput
+              id="cp-payee"
+              placeholder="Payee name"
+              value={payee}
+              readOnly={repay}
+              companies={opts?.companies ?? []}
+              companyId={companyId}
+              onChange={(name, id) => {
+                setPayee(name)
+                setCompanyId(id)
+              }}
+            />
+          </Field>
+          <Field label="Payment date">
+            <DateField value={date} onChange={setDate} today={today} label="Payment date" />
+          </Field>
+        </div>
+
+        <div className={fm.pair}>
+          <Field label="From bank" htmlFor="cp-bank">
+            <Select id="cp-bank" round={12} className={fm.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+              {method === 'netting' || !opts || opts.banks.length === 0 ? <option value="">{method === 'netting' ? 'No bank — netting' : opts ? 'No active bank account' : '…'}</option> : null}
+              {(opts?.banks ?? []).map((b) => (
+                <option key={b.id} value={b.id}>
+                  {`${b.bank_name} — ${b.account_number}`}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {showMethod ? (
+            <Field label="Method" htmlFor="cp-method">
+              <Select
+                id="cp-method"
+                round={12}
+                className={fm.select}
+                value={method}
+                onChange={(e) => {
+                  setMethod(e.target.value)
+                  if (e.target.value !== 'netting' && !bankId) setBankId(opts?.banks[0]?.id ?? '')
+                }}
+              >
+                {METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
+        </div>
+
+        <Field label="Description" htmlFor="cp-desc">
+          <Input id="cp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What is this for?" />
         </Field>
 
-        {useLines ? (
-          <Field label={repay ? 'Lines' : 'Split across pools'}>
-            <div className={fm.lines}>
-              {lines.map((l, i) => (
-                <div key={i} className={fm.lineWrap}>
-                <div className={c.line} data-repay={repay ? 'true' : undefined}>
+        <Field label="Lines">
+          <div className={fm.lines}>
+            {lines.map((l, i) => (
+              <div key={i} className={fm.lineWrap}>
+                <div className={c.wordsLine} data-repay={repay ? 'true' : undefined}>
                   {repay && l.role ? <span className={c.role}>{ROLE_LABEL[l.role]}</span> : null}
+                  <input
+                    className={`${fm.lineText} ${c.words}`}
+                    value={l.description}
+                    onChange={(e) => setLine(i, { description: e.target.value })}
+                    placeholder="What this line is for"
+                    aria-label={`Line ${i + 1} description`}
+                  />
                   <Select round={12} className={fm.lineSelect} value={l.pool} onChange={(e) => setLine(i, { pool: e.target.value })} aria-label={`Line ${i + 1} pool`}>
                     <option value="">Pool</option>
                     {poolOptions}
@@ -486,98 +464,26 @@ export default function CreatePaymentDialog({
                     <span />
                   )}
                 </div>
-                {override ? <OverrideRow value={l.ov ?? NO_OVERRIDE} onChange={(ov) => setLine(i, { ov })} accounts={accounts} label={`Line ${i + 1} override`} /> : null}
-                </div>
-              ))}
-              <div className={fm.linesFoot}>
-                {repay ? <span /> : (
-                  <button type="button" className={fm.addLine} onClick={() => setLines((prev) => [...prev, { pool: '', account: '', amount: '' }])}>
-                    + Add line
-                  </button>
-                )}
-                <span className={fm.linesTotal} data-off={Math.abs(offBy) > 0.005 ? 'true' : undefined}>
-                  RM {money(lineSum)}
-                </span>
               </div>
-            </div>
-          </Field>
-        ) : (
-          <>
-            <Field label="Category" htmlFor="cp-account">
-              <Select id="cp-account" round={12} className={fm.select} value={account} onChange={(e) => setAccount(e.target.value)}>
-                <option value="">Choose a category</option>
-                {accountOptions}
-              </Select>
-            </Field>
-            <Field label="Pool" htmlFor="cp-pool">
-              <Select id="cp-pool" round={12} className={fm.select} value={pool} onChange={(e) => setPool(e.target.value)}>
-                {opts ? null : <option value="venture_pool">Venture</option>}
-                {poolOptions}
-              </Select>
-            </Field>
-            {override ? (
-              <Field label="GL override">
-                <div className={fm.lines}>
-                  <OverrideRow value={singleOv} onChange={setSingleOv} accounts={accounts} label="Override" />
-                </div>
-              </Field>
-            ) : null}
-          </>
-        )}
-
-        <Field label="From bank" htmlFor="cp-bank">
-          <Select id="cp-bank" round={12} className={fm.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
-            {method === 'netting' || !opts || opts.banks.length === 0 ? <option value="">{method === 'netting' ? 'No bank — netting' : opts ? 'No active bank account' : '…'}</option> : null}
-            {(opts?.banks ?? []).map((b) => (
-              <option key={b.id} value={b.id}>
-                {`${b.bank_name} — ${b.account_number}`}
-              </option>
             ))}
-          </Select>
+            <div className={fm.linesFoot}>
+              {repay ? (
+                <span />
+              ) : (
+                <button type="button" className={fm.addLine} onClick={() => setLines((prev) => [...prev, { description: '', pool: '', account: '', amount: '' }])}>
+                  + Add line
+                </button>
+              )}
+              <span className={fm.linesTotal} data-off={Math.abs(offBy) > 0.005 ? 'true' : undefined}>
+                RM {money(total)}
+              </span>
+            </div>
+          </div>
         </Field>
 
-        <Field label="Amount RM" htmlFor="cp-amount">
-          {repay ? (
-            <Input id="cp-amount" mono align="right" value={money(repaySum)} readOnly className={fm.fixed} />
-          ) : (
-            <Input id="cp-amount" mono align="right" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-          )}
+        <Field label="Attachments">
+          <FilesField files={files} onChange={setFiles} />
         </Field>
-
-        <Field label="Description" htmlFor="cp-desc">
-          <Input id="cp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What is this for?" />
-        </Field>
-
-        <Field label="Payment date">
-          <DateField value={date} onChange={setDate} today={today} label="Payment date" />
-        </Field>
-
-        {showMethod ? (
-          <Field label="Method" htmlFor="cp-method">
-            <Select
-              id="cp-method"
-              round={12}
-              className={fm.select}
-              value={method}
-              onChange={(e) => {
-                setMethod(e.target.value)
-                if (e.target.value !== 'netting' && !bankId) setBankId(opts?.banks[0]?.id ?? '')
-              }}
-            >
-              {METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : null}
-
-        {showFiles ? (
-          <Field label="Attachments">
-            <FilesField files={files} onChange={setFiles} />
-          </Field>
-        ) : null}
 
         {showNotes ? (
           <Field label="Notes" htmlFor="cp-notes">
@@ -586,9 +492,6 @@ export default function CreatePaymentDialog({
         ) : null}
 
         <div className={fm.more} role="group" aria-label="More">
-          <button type="button" className={fm.moreBtn} aria-pressed={split} onClick={toggleSplit} disabled={repay}>
-            Split pools
-          </button>
           {(opts?.fundSources.length ?? 0) > 0 ? (
             <button type="button" className={fm.moreBtn} aria-pressed={repay} onClick={toggleRepay}>
               Loan repayment
@@ -600,56 +503,13 @@ export default function CreatePaymentDialog({
           <button type="button" className={fm.moreBtn} aria-pressed={showMethod} onClick={() => setShowMethod((v) => !v)}>
             Method
           </button>
-          <button type="button" className={fm.moreBtn} aria-pressed={showFiles} onClick={() => setShowFiles((v) => !v)}>
-            Attachments
-          </button>
           <button type="button" className={fm.moreBtn} aria-pressed={showNotes} onClick={() => setShowNotes((v) => !v)}>
             Notes
-          </button>
-          <button type="button" className={fm.moreBtn} aria-pressed={override} onClick={toggleOverride} title="Post a line to another account type and GL, with the reason the auditors will read">
-            GL override
           </button>
         </div>
 
         {loadError ? <Hint danger>{loadError}</Hint> : error ? <Hint danger>{error}</Hint> : problem ? <Hint>{problem}</Hint> : null}
       </DialogForm>
     </FinDialog>
-  )
-}
-
-/** A line's override: the type and the GL it posts to instead (the GLs of that type), and the reason. */
-function OverrideRow({
-  value,
-  onChange,
-  accounts,
-  label,
-}: {
-  value: Override
-  onChange: (o: Override) => void
-  accounts: CreatePaymentOptions['accounts']
-  label: string
-}) {
-  return (
-    <div className={c.override}>
-      <Select round={12} className={fm.lineSelect} value={value.type} onChange={(e) => onChange({ ...value, type: e.target.value as AccountType, gl: '' })} aria-label={`${label} type`}>
-        <option value="">Type</option>
-        {OVERRIDE_TYPES.map((t) => (
-          <option key={t.value} value={t.value}>
-            {t.label}
-          </option>
-        ))}
-      </Select>
-      <Select round={12} className={fm.lineSelect} value={value.gl} onChange={(e) => onChange({ ...value, gl: e.target.value })} aria-label={`${label} GL account`}>
-        <option value="">GL account</option>
-        {accounts
-          .filter((a) => a.type === value.type)
-          .map((a) => (
-            <option key={a.code} value={a.code} data-search={a.code}>
-              {`${a.code} · ${a.name}`}
-            </option>
-          ))}
-      </Select>
-      <input className={fm.lineText} value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} placeholder="Reason" aria-label={`${label} reason`} />
-    </div>
   )
 }

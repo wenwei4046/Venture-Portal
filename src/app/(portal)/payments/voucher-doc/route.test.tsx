@@ -87,6 +87,18 @@ describe('voucher PDF statutory coverage', () => {
     expect(doc.sources[0].pool_label).toBe('Marketing Department Pool')
   })
 
+  it('carries each line’s own words onto the voucher (2026-10-22)', async () => {
+    mockDatabase([voucher('pv', null)], null, null, {
+      payment_voucher_sources: [
+        { voucher_id: 'pv', pool: 'venture_pool', amount: '1200.00', account_code: '9094', description: 'October rent', chart_of_accounts: { name: 'Office Rental' } },
+        { voucher_id: 'pv', pool: 'venture_pool', amount: '250.00', account_code: '9099', description: null, chart_of_accounts: { name: 'Printing & Stationery' } },
+      ],
+    })
+    await GET(new Request('http://localhost/payments/voucher-doc?id=pv'))
+    const [doc] = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
+    expect(doc.sources.map((s: { description: string | null }) => s.description)).toEqual(['October rent', null])
+  })
+
   it('names every pool the user’s way — a department’s by its department', async () => {
     mockDatabase([voucher('pv', null)], null, null, {
       payment_voucher_sources: ['venture_pool', 'dept_pool_director', 'dept_pool_hr', 'dept_pool_revenue_department', 'invoice_payout_pool'].map((pool) => ({

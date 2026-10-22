@@ -177,6 +177,13 @@ describe('a payment voucher’s full page (D06)', () => {
     expect(within(side).getByRole('button', { name: 'Return to draft' })).toBeInTheDocument()
   })
 
+  it('names each line by its pool and its own words, when it has some (2026-10-22)', async () => {
+    asFinance()
+    database('ordinary_payment', [], null, [], [], { sources: [{ ...source, description: 'October water bill' }, { ...source, amount: 0, description: null }], bank })
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByText('Venture Pool · October water bill')).toBeInTheDocument()
+  })
+
   it('says — when no payment date was set', async () => {
     asFinance()
     database('ordinary_payment')

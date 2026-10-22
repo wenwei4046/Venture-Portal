@@ -1,7 +1,8 @@
 /* Create payment (2026-10-14, the Finance revamp v2 — D07): the parts only it
-   has — a split's or a repayment's line, a line's GL override. The card of
-   lines, the fields, the files and the row of small buttons are the kit's
-   (components/finv/form.module.css). */
+   has — a line with its own words (2026-10-22), a repayment's part; the plain
+   line and a line's GL override are the Finance phone app's edit sheet's. The
+   card of lines, the fields, the files and the row of small buttons are the
+   kit's (components/finv/form.module.css). */
 
 /* A line of a split, or a repayment's part. */
 .line {
@@ -22,6 +23,28 @@
   padding: 0 10px 8px 12px;
 }
 .override:first-child { padding-top: 8px; }
+
+/* Create payment's line (2026-10-22): its own words, pool, category, amount
+   and × — a repayment's part first. On a phone it takes three rows: the words,
+   then pool and category, then the amount (and ×). */
+.wordsLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 1.2fr) 104px 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 12px;
+}
+.wordsLine[data-repay='true'] { grid-template-columns: 64px minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1.1fr) 104px; }
+@media (max-width: 560px) {
+  .wordsLine,
+  .wordsLine[data-repay='true'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .wordsLine > .role,
+  .wordsLine > .words { grid-column: 1 / -1; }
+  .wordsLine > :last-child { justify-self: end; }
+}
+
+/* The phone's edit sheet: a line's own words under it (2026-10-22). */
+.wordsUnder { padding: 0 10px 8px 12px; }
 
 /* A narrow dialog (a phone): a line takes two rows — its pool and category,
    then its amount and its × (a repayment's: its part and pool, then its

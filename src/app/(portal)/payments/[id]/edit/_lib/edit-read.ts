@@ -18,6 +18,8 @@ export interface EditSourceRow {
   pool: string
   amount: string
   account_code: string
+  /** The line's own words (2026-10-22). */
+  description?: string
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
@@ -98,7 +100,7 @@ export async function readVoucherEdit(supabase: Client, user: User, id: string):
   ] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
-      .select('pool, amount, account_code, override_account_type, override_gl_account_code, override_reason')
+      .select('pool, amount, account_code, description, override_account_type, override_gl_account_code, override_reason')
       .eq('voucher_id', id)
       .order('amount', { ascending: false }),
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
@@ -120,6 +122,7 @@ export async function readVoucherEdit(supabase: Client, user: User, id: string):
     pool: s.pool,
     amount: Number(s.amount).toFixed(2),
     account_code: s.account_code ?? '',
+    description: s.description ?? '',
     override_account_type: (s.override_account_type as AccountType | null) ?? '',
     override_gl_account_code: s.override_gl_account_code ?? '',
     override_reason: s.override_reason ?? '',

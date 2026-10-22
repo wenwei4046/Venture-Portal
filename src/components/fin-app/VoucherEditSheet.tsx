@@ -325,6 +325,15 @@ function EditForm({ data, today, onClose, onDone }: { data: VoucherEditData; tod
                     <span />
                   )}
                 </div>
+                <div className={c.wordsUnder}>
+                  <input
+                    className={fm.lineText}
+                    value={r.description ?? ''}
+                    onChange={(e) => setRow(i, { description: e.target.value })}
+                    placeholder="What this line is for"
+                    aria-label={`Line ${i + 1} description`}
+                  />
+                </div>
                 {overrides[i] ? (
                   <div className={c.override}>
                     <Select

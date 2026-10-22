@@ -95,6 +95,24 @@ describe('createPaymentFromDialog', () => {
     expect(update?.values).toEqual({ status: 'pending_approval' })
   })
 
+  it('each line keeps its own words (2026-10-22); a line without them keeps none', async () => {
+    const db = database()
+    await createPaymentFromDialog(
+      dialogForm({
+        amount: '500.00',
+        source_rows_count: '2',
+        'source_rows[0][description]': '  Claude Team plan  ',
+        'source_rows[1][pool]': 'dept_pool_marketing',
+        'source_rows[1][amount]': '52.32',
+        'source_rows[1][account_code]': '9087',
+      }),
+    )
+    expect(db.writes('payment_voucher_sources')[0].values).toEqual([
+      expect.objectContaining({ pool: 'venture_pool', amount: 447.68, description: 'Claude Team plan' }),
+      expect.objectContaining({ pool: 'dept_pool_marketing', amount: 52.32, description: null }),
+    ])
+  })
+
   it('a split across pools must add up to the amount — refused before anything is written', async () => {
     const db = database()
     const res = await createPaymentFromDialog(

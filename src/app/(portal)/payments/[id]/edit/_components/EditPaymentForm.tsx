@@ -21,6 +21,8 @@ interface SourceRow {
   pool: string
   amount: string
   account_code: string
+  /** The line's own words (2026-10-22). */
+  description?: string
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
@@ -492,6 +494,18 @@ export default function EditPaymentForm({
                       <div className="w-6" />
                     )}
                   </div>
+                  {/* The line's own words (2026-10-22) — the books' line when there are some. */}
+                  <input
+                    value={row.description ?? ''}
+                    onChange={(e) => {
+                      const next = [...sourceRows]
+                      next[i] = { ...next[i], description: e.target.value }
+                      setSourceRows(next)
+                    }}
+                    placeholder="What this line is for"
+                    aria-label={`Line ${i + 1} description`}
+                    className="mt-2 w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+                  />
                   {/* BS/PL preview + override */}
                   {row.account_code ? (
                     <div className="mt-2 flex items-baseline justify-between gap-3">

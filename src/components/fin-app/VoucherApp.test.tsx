@@ -118,7 +118,7 @@ const DETAIL: VoucherDetail = {
   bank: { name: 'Hong Leong', number: '5123-0098-77' },
   bankBalance: 90000,
   noCash: false,
-  sources: [{ pool: 'Marketing Pool', account: 'Advertising', code: '6100', amount: 25000 }],
+  sources: [{ pool: 'Marketing Pool', account: 'Advertising', code: '6100', amount: 25000, description: null }],
   account: 'Advertising',
   accountCodes: '6100',
   pool: 'Marketing Pool',
@@ -228,6 +228,45 @@ describe('Daily › Payment on the phone', () => {
     expect(Object.fromEntries(fd.entries())).toEqual({ id: '0001', description: 'Ads Oct — Meta' })
     expect(mocks.flash).toHaveBeenCalledWith('Voucher saved')
     expect(mocks.push).not.toHaveBeenCalled()
+  })
+
+  it('a line’s own words show in the sheet, and go with the lines when changed (2026-10-22)', async () => {
+    mocks.openEdit.mockResolvedValue({
+      ok: true,
+      data: {
+        statutoryDetailsLocked: false,
+        salaryDetailsLocked: false,
+        voucher: { id: '0001', voucher_no: 'HV-PV-202610-0001', voucher_type: 'expense', direction: 'debit', amount: 100, payee_name: 'Meta Platforms Ireland', payee_company_id: null, bank_account_id: 'bank', description: 'Ads Oct', notes: null, payment_method: 'bank_transfer', payment_date: '2026-10-05', target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null },
+        initialSources: [{ pool: 'venture_pool', amount: '100.00', account_code: '9010', description: 'October ads', override_account_type: '', override_gl_account_code: '', override_reason: '' }],
+        extraPools: [],
+        fundSourceAccount: null,
+        initialCreditAccountCode: null,
+        companies: [],
+        bankAccounts: [{ id: 'bank', bank_name: 'Hong Leong Bank', account_number: '123', current_balance: 5000 }],
+        glAccounts: [{ code: '9010', name: 'Advertising', type: 'expense', parent_code: null }],
+      },
+    })
+    mocks.update.mockResolvedValue({ ok: true })
+    window.history.replaceState(null, '', '/fin-app/daily/payments?f=all')
+    draw('f=all')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Meta Platforms Ireland/ }))
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const sheet = await screen.findByRole('dialog', { name: /Edit HV-PV-202610-0001/ })
+    expect(await within(sheet).findByLabelText('Line 1 description')).toHaveValue('October ads')
+    fireEvent.change(within(sheet).getByLabelText('Line 1 description'), { target: { value: 'October ads — Meta' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Save changes' }))
+    })
+    expect(Object.fromEntries((mocks.update.mock.calls[0][0] as FormData).entries())).toEqual({
+      id: '0001',
+      source_rows_count: '1',
+      'source_rows[0][pool]': 'venture_pool',
+      'source_rows[0][amount]': '100.00',
+      'source_rows[0][account_code]': '9010',
+      'source_rows[0][description]': 'October ads — Meta',
+    })
   })
 
   it('Void is answered in words — the app stays on its screen (its action ends on the portal’s Payments)', async () => {

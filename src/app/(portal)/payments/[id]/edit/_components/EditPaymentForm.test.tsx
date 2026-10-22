@@ -73,6 +73,33 @@ describe('fund-source repayment draft editor', () => {
 
 // 2026-09-29: HV-PV-202609-0437 was created by the copy path, which omitted
 // payment_date, so the editor opened with a blank date and saving kept the hole.
+describe('a line’s own words (2026-10-22)', () => {
+  const voucher = { id: 'pv-words', voucher_no: 'HV-PV-202610-0600', voucher_type: 'expense', direction: 'debit' as const, amount: 1450, payee_name: 'ABC Sdn Bhd', payee_company_id: null, bank_account_id: 'bank', description: 'October office expenses', notes: null, payment_method: 'bank_transfer', payment_date: '2026-10-22', target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null }
+
+  it('show on each line, and go with the lines when one is changed', async () => {
+    const { container } = render(
+      <EditPaymentForm
+        voucher={voucher}
+        initialSources={[
+          { pool: 'venture_pool', amount: '1200.00', account_code: '9000', description: 'October rent' },
+          { pool: 'venture_pool', amount: '250.00', account_code: '9000' },
+        ]}
+        initialCreditAccountCode={null}
+        companies={[]}
+        bankAccounts={[{ id: 'bank', bank_name: 'HLB', account_number: '1', current_balance: 0 }]}
+        glAccounts={[{ code: '9000', name: 'G&A Expenses', type: 'cost' as const, parent_code: null }]}
+      />,
+    )
+    expect(screen.getByLabelText('Line 1 description')).toHaveValue('October rent')
+    fireEvent.change(screen.getByLabelText('Line 2 description'), { target: { value: 'Roadshow flyers' } })
+    fireEvent.submit(container.querySelector('form') as HTMLFormElement)
+    await waitFor(() => expect(mocks.updatePaymentVoucher).toHaveBeenCalled())
+    const fd = mocks.updatePaymentVoucher.mock.calls[0][0] as FormData
+    expect(fd.get('source_rows[0][description]')).toBe('October rent')
+    expect(fd.get('source_rows[1][description]')).toBe('Roadshow flyers')
+  })
+})
+
 describe('a voucher saved without a payment date', () => {
   const voucher = { id: 'no-date', voucher_no: 'HV-PV-202609-0437', voucher_type: 'expense', direction: 'debit' as const, amount: 899.74, payee_name: 'Claimant', payee_company_id: null, bank_account_id: 'bank', description: "Claude Ai Claim - Sep'26", notes: null, payment_method: 'bank_transfer', payment_date: null, target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null }
 

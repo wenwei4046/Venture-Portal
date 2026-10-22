@@ -180,7 +180,7 @@ describe('a receipt and a payment voucher, as the design draws them', () => {
       {
         ...base, id: 'pv', voucher_no: 'HV-PV-202610-0044', direction: 'debit', status: 'approved', amount: 25000, payment_date: '2026-10-06',
         payee_name: 'Meta Platforms Ireland', payee_kind: null, method: 'Bank transfer', bank: { name: 'Hong Leong Bank', number: '5123-0098-77' },
-        description: 'FB ads top-up', payment_reference: null, sources: [{ pool_label: 'Marketing Pool', account_label: '6100 · Advertising', amount: 25000 }],
+        description: 'FB ads top-up', payment_reference: null, sources: [{ pool_label: 'Marketing Pool', account_label: '6100 · Advertising', amount: 25000, description: 'October Meta ads' }],
         approval: { created: { by: 'Aina', at: '2026-10-06T01:12:00Z' }, submitted: { by: 'Aina', at: '2026-10-06T01:30:00Z' }, approved: { by: 'Loo K.W.', at: '2026-10-06T06:08:00Z' }, paid: null },
       },
     ]} />))
@@ -199,13 +199,13 @@ describe('a receipt and a payment voucher, as the design draws them', () => {
     }
   })
 
-  it('a payment voucher: to pay on its day, deducted from its pool, the approval step by step, three signatures', () => {
+  it('a payment voucher: to pay on its day, deducted from its pool — each line’s own words under it — the approval step by step, three signatures', () => {
     const content = words(sheets.Pages[1])
     for (const w of [
       'Payment voucher', 'Voucher number', 'HV-PV-202610-0044', 'Payment date', '6 October 2026', 'Pay from', 'Hong Leong Bank · 5123-0098-77', 'Status', 'Approved',
       'HOUZS Venture Holding Sdn Bhd', 'hello@houzsventure.com',
       'Pay to', 'Meta Platforms Ireland', 'Bank transfer', 'RM 25,000.00 to pay on 6 October 2026', 'FB ads top-up',
-      'Deducted from', 'Account', 'Marketing Pool', '6100 · Advertising', 'Total RM 25,000.00',
+      'Deducted from', 'Account', 'Marketing Pool', 'October Meta ads', '6100 · Advertising', 'Total RM 25,000.00',
       'Approval', 'Created Aina · 6 Oct 2026, 09:12', 'Submitted Aina · 6 Oct 2026, 09:30', 'Approved Loo K.W. · 6 Oct 2026, 14:08', 'Paid Not yet',
       'Prepared by · Aina', 'Approved by · Loo K.W.', 'Received by', 'HV-PV-202610-0044 · RM 25,000.00 to Meta Platforms Ireland',
     ]) {
