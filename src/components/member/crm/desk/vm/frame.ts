@@ -149,7 +149,7 @@ export function frameVM(ctx: DeskCtx) {
   const sc = SHEET_COPY[tab] ?? ["", "", ""];
   const sheetRows = (L[tab] ?? []).map(([title, sub, ic], i) => ({ title, sub, d: PHONE_IC[title] ?? LI[ic], badge: B[title] || null, bg: SOLID[i % 5], fg: "var(--crm-page)",
     tint: ["var(--crm-tint-attention)", "var(--crm-tint-cold)", "var(--crm-tint-new)", "var(--crm-tint-follow)", "var(--crm-field)"][i % 5], bt: i ? "1px solid var(--crm-field)" : "0",
-    pick: () => patch({ pick: i, stage: "op", adLog: false, mwtLog: false, sendFor: null, awChat: null, ad: null, ftEdit: null, cpSel: null, frmOpen: false, cltEdit: null }) }));
+    pick: () => patch({ pick: i, stage: "op", adLog: false, mwtLog: false, actDraft: null, sendFor: null, awChat: null, ad: null, ftEdit: null, cpSel: null, frmOpen: false, cltEdit: null }) }));
 
   const closePane = () => {
     if (sheetMode) {

@@ -549,7 +549,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive groups={v.actGroups} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "var(--crm-muted)" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>
@@ -854,10 +854,10 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                             {(t.members).map((m, m_i) => (<Fragment key={m_i}>
                               <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "44px", padding: "4px 0", borderTop: "1px solid var(--crm-field)" }}>
                                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                                  <span style={{ fontSize: "13.5px", fontWeight: "600" }}>{m.name}</span>
+                                  <span style={{ fontSize: "13.5px", fontWeight: "600", color: m.locked ? "var(--crm-faint)" : undefined }}>{m.name}</span>
                                   <span style={{ fontSize: "12px", color: m.subColor }}>{m.sub}</span>
                                 </span>
-                                {!!(t.field) && (<>
+                                {!!(m.locked) && (<span aria-label="Locked" style={{ flex: "0 0 auto", width: "56px", height: "32px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>)}{!!(t.field && !m.locked) && (<>
                                   <span style={{ flex: "0 0 auto", height: "32px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "4px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
                                     <input type="text" inputMode="numeric" value={m.valueStr} onChange={m.onVal} style={{ width: "28px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
                                     <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.unit}</span>

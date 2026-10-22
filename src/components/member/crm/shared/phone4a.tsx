@@ -11,7 +11,7 @@ import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEv
 import { useEffect, useRef, useState } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
-import type { ActiveGroup } from "./locked";
+import type { ActiveVM } from "./locked";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
@@ -344,9 +344,10 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
 /**
  * T03 · Assignment › Active (2026-10-22, the owner: its own tab after Ads to teams): every team, each person Active or
  * Locked — a locked member takes no new leads and leaves Assignment's lists, their share to the rest of the team. Saved at
- * once (crm_set_locked; shared/locked.ts › activeGroups).
+ * by Save — Cancel · Save N changes stay at the foot while something changed (crm_set_locked; shared/locked.ts › activeVM).
  */
-export function Phone4aActive({ groups }: { groups: ActiveGroup[] }) {
+export function Phone4aActive({ v }: { v: ActiveVM }) {
+  const { groups } = v;
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
       {groups.map(g => (
@@ -370,6 +371,12 @@ export function Phone4aActive({ groups }: { groups: ActiveGroup[] }) {
           ))}
         </div>
       ))}
+      {v.dirty && (
+        <div style={{ position: "sticky", bottom: "0", display: "flex", gap: "10px", padding: "10px 0 12px", background: "linear-gradient(to bottom, transparent, var(--crm-page) 30%)" }}>
+          <button type="button" onClick={v.cancel} style={{ flex: "0 0 auto", height: "46px", padding: "0 20px", borderRadius: "23px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: fs(14), fontWeight: 500, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>
+          <button type="button" onClick={v.save} style={{ flex: "1", height: "46px", borderRadius: "23px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: fs(14), fontWeight: 600, color: "#fff", cursor: "pointer" }}>{v.saveLabel}</button>
+        </div>
+      )}
     </section>
   );
 }
