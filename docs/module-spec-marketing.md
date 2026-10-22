@@ -28,7 +28,11 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | #644, live 2026-10-23 |
 | ③c | The Product Builder: products one-time or recurring monthly, their code made by the database, categories of actions (quantity, unit price, each on a workflow — or a new one made there), the intake minutes template, list price, cost and margin (the manager's alone), versions taking effect on a day, retire / reactivate (mig `20261023235900`) | #646, live 2026-10-23 |
 | ③d | The Canvas Template Editor (the Workflow Builder's Canvas template tab): the task page laid out — Requirements, a section per stage, the manager's own sections, the Free space; a section's 🔒 / ⭐ / 👁 and stage; a field's ⭐ / 👁, stage, a date on the calendar, a choice's options; the Preview as the staff and as the PIC; kept with the draft and published with the version (mig `20261024001000`) | #648, live 2026-10-23 |
-| ④ | Tracking's actions, the Subsidiary page (stats, month / week / timeline, key dates, feed), the Audit trail (replay, formal log, CSV / PDF), the Task map, Replace Person, Marketing's clients (+ Add subsidiary) | |
+| ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | this PR |
+| ④-2 | The Subsidiary page (stats, Month / Week / Timeline, key dates, the feed, the projects) — what exists; campaigns, posts, shoots and ads wait for questions 13–17 | next |
+| ④-3 | The Audit trail tab: the formal log, its filters; export waits for question 18 | |
+| ④-4 | The Task map and Replay | |
+| ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
@@ -93,6 +97,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 51. **"Overdue — please review"** (⑤-1). The handoff's red state after 6 working hours needs the PIC's working hours (question 2) — not drawn.
 52. **Who is told** (⑤-1). The handoff does not say: the project's owner; with none (the Principal started it), Marketing's managers.
 53. **Changes ask no name** (⑤-1). The handoff's changes step has no name field: the reply goes under the PIC's name on the project (Kelvin), approving asks the full name typed.
+54. **A client's code** (④-1). The handoff's (the name's first four letters and digits, else OTH) can collide or fall under two characters, and a Track ID keeps it for good: the database makes it, numbered when taken.
+55. **A client's WhatsApp** (④-1). The handoff's form has the PIC's name, no WhatsApp; a product project's Meeting card takes it.
+56. **Editing or hiding a client** (④-1). The handoff adds clients and never renames, edits or hides one — not built (question 29). Its sidebar row has no click: built as New Project with the form open.
 
 ## 5. Open questions (for the user)
 
@@ -108,3 +115,21 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 10. A product has several actions, each on its own workflow, each with a quantity. Does a product project become (A) one task per action, the quantity its deliverables (recommended), (B) one task per unit, or (C) one task on one workflow (the handoff's demo)?
 11. Billing: which amount (the product version's list price?) and when does a product project become a billing draft — a one-time project when approved, started or done; a recurring one each month?
 12. A recurring product's runs: on the 15th (the handoff's words) or on the day it started?
+13. The Subsidiary page: what is a "campaign" — a product project with a campaign period, a kind of product, or a record of its own?
+14. Key dates (Payday, 11.11, "Carres showroom opens"): who keeps them — for the group or per subsidiary — and which day is Payday?
+15. What makes a "post", and who marks it Posted or Scheduled?
+16. Should a canvas field's calendar date pick from fixed kinds (Shoot day, Ads go-live, Ads end, Report day) instead of a free name?
+17. A project's Progress % — stages done ÷ stages? And what is "Live" against "In progress"?
+18. Who may export a project's trail (CSV / PDF): all of Marketing, the managers, or a new Export tick?
+19. Corrections on the trail: what may be corrected, by whom — and does a correction change the project or only note the record?
+20. Should the formal log list the Free space's edits (the task page hides them)?
+21. The trail's PDF: a formal document, or the table as on screen?
+22. Map and Audit trail tabs on quick and recurring tasks too, or product projects only?
+23. Can a project be opened from inside another (the handoff's "Opened from Social Media project")? Should the intake (minutes, PIC sign-off) be on the map?
+24. Replace Person on a template: change its draft only, or publish a new version at once?
+25. Must the replacement be on the same team, or anybody on the roster?
+26. Do approvals waiting on the person, approval levels and projects they own count as places to replace?
+27. Who is told — the person replaced, the projects' owners?
+28. "Long leave": is the swap permanent, or do the places go back after the leave?
+29. May a client be renamed, its PIC or WhatsApp changed, or hidden? And may the group companies carry a default PIC?
+30. Are an outside client's projects billed, and how?
