@@ -10,8 +10,9 @@ import { day0, DAY, gb, type PanelCtx } from "./common";
 import { openSummary } from "../../shared/notif-summary";
 import { summaryFor } from "../../shared/notif-summary-data";
 
-type Kind = "move" | "share" | "won" | "lost" | "overdue";
+type Kind = "assign" | "move" | "share" | "won" | "lost" | "overdue";
 const K: Record<Kind, [string, string, string, string]> = {
+  assign: ["Assign", "var(--crm-muted)", "var(--crm-tint-cold)", "M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M16 11h6"],
   move: ["Move", "var(--crm-ink-soft)", "var(--crm-tint-cold)", "M5 12h14m-5-5 5 5-5 5"],
   share: ["Share", "var(--crm-ink-soft)", "var(--crm-tint-new)", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"],
   won: ["Won", "var(--crm-brown)", "var(--crm-tint-follow)", "M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4"],
@@ -38,7 +39,9 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
     const mine = to === me || String(e.data.from ?? "") === me || ownerOf(e.customerId) === me;
     if (!mine) continue;
     const base = { key: `e${e.id}`, at: e.at, who: nameOf(e.actor), lead: cust(e.customerId), customerId: e.customerId };
-    if (e.kind === "moved") out.push({ ...base, kind: "move", text: "moved", tail: ` to ${nameOf(to)}`, extra: e.data.by_manager ? "" : `Accepted by ${nameOf(to)}` });
+    // Handed on at once by CRM · Manage (crm_send_to) is an Assign; a Move is a request the superior accepted (2026-10-23).
+    if (e.kind === "moved") out.push(e.data.by_manager ? { ...base, kind: "assign", text: "assigned", tail: ` to ${nameOf(to)}`, extra: "" }
+      : { ...base, kind: "move", text: "moved", tail: ` to ${nameOf(to)}`, extra: `Accepted by ${nameOf(to)}` });
     if (e.kind === "move_declined") out.push({ ...base, kind: "move", text: "asked to move", tail: ` to ${nameOf(to)}`, extra: `Declined by ${nameOf(to)}` });
     if (e.kind === "shared") out.push({ ...base, kind: "share", text: `shared a chat with ${nameOf(to)} ·`, tail: "", extra: `Accepted by ${nameOf(to)}` });
     if (e.kind === "share_declined") out.push({ ...base, kind: "share", text: `invited ${nameOf(to)} to`, tail: "", extra: `Declined by ${nameOf(to)}` });
@@ -93,7 +96,7 @@ export function notifsVM(ctx: PanelCtx) {
     notifUnread: unread.length ? String(unread.length) : "", notifOpen: ui.nfOpen,
     openNotifs: () => patch({ nfOpen: true }), closeNotifs: () => patch({ nfOpen: false }),
     readAll: () => { if (unread.length) act.readNotifs(unread.map(n => n.key), true); }, readAllFg: unread.length ? "var(--crm-rust)" : "var(--crm-faint-2)",
-    nfChips: ([["", "All", "var(--crm-ink)"], ["move", "Move", K.move[1]], ["share", "Share", K.share[1]], ["won", "Won", K.won[1]], ["lost", "Lost", K.lost[1]], ["overdue", "Overdue 9 h+", K.overdue[1]]] as const).map(([k, label, dot]) => {
+    nfChips: ([["", "All", "var(--crm-ink)"], ["assign", "Assign", K.assign[1]], ["move", "Move", K.move[1]], ["share", "Share", K.share[1]], ["won", "Won", K.won[1]], ["lost", "Lost", K.lost[1]], ["overdue", "Overdue 9 h+", K.overdue[1]]] as const).map(([k, label, dot]) => {
       const on = f === k;
       return { label, dot: on ? "#fff" : dot, n: all.filter(n => inTab(n) && (!k || n.kind === k)).length, bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)", pick: () => patch({ nfF: k }) };
     }),

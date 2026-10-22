@@ -22,6 +22,8 @@ for (const [a, b] of [...PATCHES, ...require("./panel-chat-composer-patches.cjs"
   if (n !== 1) throw new Error(`PanelApp: patch matched ${n} times: ${a}`);
   body = body.replace(a, b);
 }
+// Handing a customer on at once is Assign, never Move (2026-10-23 — assign-words.cjs).
+body = require("./assign-words.cjs")(body);
 // Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs) and its look (2026-10-16 —
 // profile-like-app.cjs, as Mine's), then the Revenue app's type scale on every size (type-scale.cjs) — all after the
 // patches, which match the prototype's px.

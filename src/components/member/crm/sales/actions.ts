@@ -23,7 +23,7 @@ export interface SalesActions {
   openChat(customerId: string): void;
   /** One's own chat's messages read (crm_mark_read) — from Mine, Team or the desktop, once its newest is on screen (shared/seen.ts). Anybody else's: nothing. */
   readChat(customerId: string): void;
-  /** A TL / STL gives their team's customer to someone in that team (crm_assign_member, 2026-10-14). */
+  /** A TL / STL (2026-10-14), or a TA (2026-10-23), gives a customer to one of their own people (crm_assign_member). */
   assignMember(customerId: string, staffId: string): Promise<boolean>;
   send(customerId: string, text: string, replyTo?: string | null): Promise<boolean>;
   react(messageId: string, emoji: string): Promise<void>;

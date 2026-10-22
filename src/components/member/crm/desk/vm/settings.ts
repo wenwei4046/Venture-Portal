@@ -156,7 +156,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   };
   const typeOf: Record<string, string> = { move: "Move", share: "Share", won: "Won", lost: "Lost", overdue: "Overdue" };
   type N = { key: string; at: string; type: string; who: string; rest: string; sub: string; cust: string | null; adId?: string };
-  const list0: N[] = base.map(n => ({ key: n.key, at: n.at, type: typeOf[n.kind], who: n.kind === "overdue" ? n.who : n.lead, rest: n.kind === "overdue" ? `${n.text} a reply` : `was ${n.kind === "move" ? "moved" : n.kind === "share" ? "shared" : `marked as ${n.kind}`}`,
+  // An Assign alert (2026-10-23: a customer CRM · Manage handed on at once) is the `assigned` event listed below — once.
+  const list0: N[] = base.filter(n => n.kind !== "assign").map(n => ({ key: n.key, at: n.at, type: typeOf[n.kind], who: n.kind === "overdue" ? n.who : n.lead, rest: n.kind === "overdue" ? `${n.text} a reply` : `was ${n.kind === "move" ? "moved" : n.kind === "share" ? "shared" : `marked as ${n.kind}`}`,
     sub: [n.who, n.extra].filter(Boolean).join(" · "), cust: data.customers.find(c => c.name === (n.kind === "overdue" ? n.who : n.lead))?.id ?? null }));
   for (const e of data.events) {
     const k = e.kind as string, c = data.customers.find(x => x.id === e.customerId);

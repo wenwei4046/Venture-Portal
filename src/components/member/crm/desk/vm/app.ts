@@ -38,7 +38,7 @@ export function deskVM(ctx: DeskCtx) {
   // The pane's head (the prototype's `ph`), per kind.
   const heads = {
     chat: chat.head ?? { avatar: "", title: "", sub: "", subColor: "var(--crm-brown)", menu: false },
-    alerts: { avatar: "", title: "CRM alerts", sub: "Move · Share · Won · Lost · Overdue 9 h+", subColor: "var(--crm-muted)", menu: false },
+    alerts: { avatar: "", title: "CRM alerts", sub: "Assign · Move · Share · Won · Lost · Overdue 9 h+", subColor: "var(--crm-muted)", menu: false },
     section: { avatar: "", title: op, sub: ui.tab === "assignment" ? "Assignment · CRM · Manage" : "Settings · CRM · Manage", subColor: "var(--crm-muted)", menu: false },
     assign: { avatar: "", title: "Assign to", sub: cur ? `${cur.name} · ${cur.ad}` : "", subColor: "var(--crm-muted)", menu: false },
     // v2's Move / Share heads. A Move is a request (2026-10-23) — to whose direct upline, as chatMenuVM lists them.

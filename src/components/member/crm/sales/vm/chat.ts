@@ -12,7 +12,7 @@
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
-import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
+import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf, teamAssignees } from "../../shared/people";
 import { BORDER, chatStripOf, coldLine, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { bookingSkipsForm, customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
@@ -109,12 +109,10 @@ export function failNote(error: string | null | undefined): string {
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
-/** Who a TL / STL may give this customer to in their own CRM: their downline in the customer's team (none otherwise). */
+/** Who a TL / STL / TA may give this customer to in their own CRM: their downline in the customer's team (none otherwise). */
 export function leaderAssignees(ctx: SalesCtx, c: CrmCustomer | undefined) {
-  const { owner, data } = ctx;
-  if (!c || !c.teamId || ctx.viewingOther || ctx.embedded?.assignTo || (owner.role !== "tl" && owner.role !== "stl")) return [];
-  return downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!)
-    .filter(p => p && p.id !== c.assignedTo && ["stl", "tl", "ta", "rs"].includes(p.role) && teamOf(p.id, data.people)?.id === c.teamId);
+  if (!c || ctx.viewingOther || ctx.embedded?.assignTo) return [];
+  return teamAssignees(ctx.owner, ctx.data.people, c);
 }
 
 export function chatVM(ctx: SalesCtx) {
@@ -230,7 +228,7 @@ export function chatVM(ctx: SalesCtx) {
   const ss = hm.ssel ?? [];
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
   // Offered only with CRM · Manage (CrmApp hands it over then).
-  // A TL / STL in their own CRM assigns their team's customer to someone in that team (the owner, 2026-10-14: "只有上級能
+  // A TL / STL / TA in their own CRM assigns their team's customer to someone in that team (the owner, 2026-10-14: "只有上級能
   //給自己的下級"; crm_assign_member asks the same) — their downline in the customer's team.
   const leaderList = leaderAssignees(ctx, c);
   const assigner = ctx.embedded?.assignTo ?? (leaderList.length ? (cid: string, sid: string) => act.assignMember(cid, sid) : null);

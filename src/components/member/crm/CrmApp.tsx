@@ -315,6 +315,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab) => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
         : sells ? (tab?: SalesTab) => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab] })); } : undefined,
       exitApp: onExit, slotCounts, recents,
+      // A chat's ⋮ Assign to, by what the SIGNED-IN account may do (2026-10-23, Mine's rule): CRM · Manage gives anyone,
+      // whoever's Team is on screen; a TL / STL / TA on their own Team side, their own people; else none.
+      assign: data.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,
     };
     // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
     // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes.

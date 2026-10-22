@@ -50,6 +50,19 @@ export function teamOf(id: string | null | undefined, people: CrmPerson[]): CrmP
   return undefined;
 }
 
+/**
+ * Whom a TL / STL / TA may give a customer to (crm_assign_member asks the same, mig 20261023120000): a customer of a team at
+ * or below them, or with them or somebody below; to their downline in the customer's team, never whoever has it now — none
+ * for anybody else. Mine's chat and the Team side's ask this one rule (2026-10-23; the owner: "ta can assign as well").
+ */
+export function teamAssignees(leader: CrmPerson, people: CrmPerson[], c: { teamId: string | null; assignedTo: string | null }): CrmPerson[] {
+  if (!c.teamId || !["tl", "stl", "ta"].includes(leader.role)) return [];
+  const below = downlineOf(leader.id, people), line = new Set([leader.id, ...below]);
+  if (!line.has(c.teamId) && !(c.assignedTo && line.has(c.assignedTo))) return [];
+  return below.map(id => personOf(id, people)!)
+    .filter(p => p && p.id !== c.assignedTo && ["stl", "tl", "ta", "rs"].includes(p.role) && teamOf(p.id, people)?.id === c.teamId);
+}
+
 /** The team's name, as the design shows it: "Team Aina". */
 export const teamName = (tl: CrmPerson | undefined) => (tl ? `Team ${tl.name.trim().split(/\s+/)[0]}` : "");
 

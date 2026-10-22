@@ -974,7 +974,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                       <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: l.c, whiteSpace: "nowrap" }}>{l.lv}</span>
                       <small style={{ fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.wait}</small>
                     </span>
-                    <span onClick={l.move} title="Move to someone else" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-ink-soft)", display: "grid", placeItems: "center", cursor: "pointer" }}>
+                    <span onClick={l.move} title="Assign to someone else" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-ink-soft)", display: "grid", placeItems: "center", cursor: "pointer" }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3">
                         </path>
@@ -2020,7 +2020,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         <div onClick={v.ol.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", maxHeight: "92%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: "6px" }}>
           <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-rule)" }}>
           </span>
-          <h2 style={{ margin: "4px 0 0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Move {v.ol.mvName} to</h2>
+          <h2 style={{ margin: "4px 0 0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Assign {v.ol.mvName} to</h2>
           <p style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ol.mvAd}</p>
           {(v.ol.mvGroups).map((g, g_i) => (<Fragment key={g_i}>
             <div style={{ display: "flex", flexDirection: "column" }}>
@@ -2077,7 +2077,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "1px" }}>
                   <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c, whiteSpace: "nowrap" }}>{l.wait}</span>
                 </span>
-                <span onClick={l.move} title="Move to someone else" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-rust)", display: "grid", placeItems: "center", cursor: "pointer" }}>
+                <span onClick={l.move} title="Assign to someone else" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", color: "var(--crm-rust)", display: "grid", placeItems: "center", cursor: "pointer" }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3">
                     </path>
