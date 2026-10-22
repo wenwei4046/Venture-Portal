@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { longDay, type MktSub } from '@/lib/marketing/board'
-import { createMktTask, startMktProduct } from '@/lib/marketing/actions'
+import { addMktClient, createMktTask, startMktProduct } from '@/lib/marketing/actions'
 import type { ProductPick } from '@/lib/marketing/project'
 import {
   defaultRule, DAY_NAMES, ENDS, FREQS, INTERVALS, MONTH_DAYS, periodText, recurPreview, rulePayload, ruleText, type RecurRule,
@@ -17,6 +17,7 @@ import s from './newproject.module.css'
 // Recurring task (its Repeat: every day / week / month, from a start, until a day, for so many runs or for good), its
 // title, type and what needs to be done, and its stages (the quick Workflow Builder) — or a 📦 Product project (the
 // manager's): a product on sale, whose intake meeting minutes open next. Created, the task (or the project) opens.
+// The manager adds Marketing's own clients here too (the "+" beside Subsidiary — the handoff's Add & select).
 
 type Mode = 'product' | 'task' | 'recurring'
 
@@ -36,6 +37,8 @@ export default function NewProject({
   holidays,
   firstSub,
   products,
+  canAddSub = false,
+  addFirst = false,
 }: {
   today: string
   me: string | null
@@ -47,6 +50,10 @@ export default function NewProject({
   firstSub: string | null
   /** The products on sale — null when the viewer may not start a product project (the manager's). */
   products: ProductPick[] | null
+  /** Whether the viewer adds Marketing's own clients (+ Add subsidiary — the manager's). */
+  canAddSub?: boolean
+  /** Open with the client form (the sidebar's + Add subsidiary). */
+  addFirst?: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -60,12 +67,18 @@ export default function NewProject({
   const onRoster = !!me && people.some(p => p.id === me)
   const [stages, setStages] = useState<DraftStage[]>(() => starterStages(onRoster ? me : null, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null))
   const [error, setError] = useState<string | null>(null)
+  // Marketing's own clients: added here, picked at once.
+  const [subList, setSubList] = useState(subs)
+  const [adding, setAdding] = useState(canAddSub && addFirst)
+  const [draftName, setDraftName] = useState('')
+  const [draftPic, setDraftPic] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
   const isProduct = mode === 'product'
   const picked = products?.find(p => p.id === product) ?? null
-  const subName = subs.find(x => x.id === sub)?.name ?? ''
+  const subName = subList.find(x => x.id === sub)?.name ?? ''
   const base = isRec ? rule.start : today
   const dates = stageDates(base, stages.map(x => x.sla), hol)
   const problems = stageProblems(stages)
@@ -82,6 +95,28 @@ export default function NewProject({
   else hint = `${subName} · Quick task · ${stages.length} stage${stages.length === 1 ? '' : 's'} · finishes ${dates.length ? longDay(dates[dates.length - 1].dueOn) : '—'}`
 
   const setR = (patch: Partial<RecurRule>) => setRule(r => ({ ...r, ...patch }))
+
+  const closeAdd = () => {
+    setAdding(false)
+    setDraftName('')
+    setDraftPic('')
+    setAddError(null)
+  }
+  const saveSub = () => {
+    const name = draftName.trim()
+    if (!name || pending) return
+    setAddError(null)
+    start(async () => {
+      const r = await addMktClient(name, draftPic.trim())
+      if (!r.ok) {
+        setAddError(r.reason)
+        return
+      }
+      setSubList(l => [...l, r.sub])
+      setSub(r.sub.id)
+      closeAdd()
+    })
+  }
 
   const create = () => {
     if (!ready || pending) return
@@ -135,9 +170,14 @@ export default function NewProject({
 
       <div className={s.lead}>Start a project</div>
 
-      <div className={s.label}>Subsidiary</div>
+      <div className={s.label}>
+        Subsidiary
+        {canAddSub ? (
+          <button type="button" className={s.addSubBtn} title="Add subsidiary" aria-label="Add subsidiary" onClick={() => { setAdding(true); setAddError(null) }}>+</button>
+        ) : null}
+      </div>
       <div className={s.subs} role="radiogroup" aria-label="Subsidiary">
-        {subs.map(x => (
+        {subList.map(x => (
           <button key={x.id} type="button" role="radio" aria-checked={sub === x.id} className={`${s.subCard}${sub === x.id ? ` ${s.cardOn}` : ''}`} onClick={() => setSub(x.id)}>
             <span className={s.subDot} style={{ background: x.dot }} />
             <span className={s.cardText}>
@@ -148,6 +188,32 @@ export default function NewProject({
           </button>
         ))}
       </div>
+      {adding ? (
+        <div className={s.addSub}>
+          <input
+            className={`${s.addInput} ${s.addName}`}
+            value={draftName}
+            maxLength={80}
+            placeholder="Company or client name"
+            aria-label="Company or client name"
+            autoFocus
+            onChange={e => setDraftName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && saveSub()}
+          />
+          <input
+            className={`${s.addInput} ${s.addPic}`}
+            value={draftPic}
+            maxLength={80}
+            placeholder="PIC name (optional)"
+            aria-label="PIC name"
+            onChange={e => setDraftPic(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && saveSub()}
+          />
+          <button type="button" className={s.addCancel} disabled={pending} onClick={closeAdd}>Cancel</button>
+          <button type="button" className={s.addSave} disabled={pending || !draftName.trim()} onClick={saveSub}>Add &amp; select</button>
+          {addError ? <span className={s.addError} role="alert">{addError}</span> : null}
+        </div>
+      ) : null}
 
       <div className={s.label}>What are you starting?</div>
       <div className={s.modes} role="radiogroup" aria-label="What are you starting">
