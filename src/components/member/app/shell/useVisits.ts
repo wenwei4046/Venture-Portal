@@ -19,8 +19,12 @@ export function useVisits(path: string, on: boolean): void {
   const latest = useRef(path);
   latest.current = path;
 
+  // The ref keeps React's development double-effect from writing the same page twice, as PortalFrame's does.
+  const logged = useRef<string | null>(null);
   useEffect(() => {
-    if (on) logPageView(path);
+    if (!on || logged.current === path) return;
+    logged.current = path;
+    logPageView(path);
   }, [on, path]);
 
   useEffect(() => {

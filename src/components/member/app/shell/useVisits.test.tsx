@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 
@@ -32,6 +33,13 @@ describe("useVisits", () => {
     rerender({ path: "/member?page=quote" });
     expect(logPageView).toHaveBeenLastCalledWith("/member?page=quote");
     expect(logPageView).toHaveBeenCalledTimes(2);
+    rerender({ path: "/member" });
+    expect(logPageView).toHaveBeenCalledTimes(3);
+  });
+
+  it("writes the page once under React's development double-effect", () => {
+    renderHook(() => useVisits("/member", true), { wrapper: StrictMode });
+    expect(logPageView).toHaveBeenCalledTimes(1);
   });
 
   it("writes nothing while off — the preview's demo and fixtures", () => {

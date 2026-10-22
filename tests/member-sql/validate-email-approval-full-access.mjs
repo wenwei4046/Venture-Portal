@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261022230000 (2026-10-22, after #619 — the user: "1 and 2 both do"): approving a
+// Local PostgreSQL regression for 20261022231500 (2026-10-22, after #619 — the user: "1 and 2 both do"): approving a
 // Request to change email for a FULL-ACCESS login is whoever manages permissions'. att_login_email_change is loaded as
 // production runs it (20261016190000's body, md5-checked), over stand-ins for the tables it reads; the migration is
 // applied VERBATIM, twice. No live I/O.
@@ -128,7 +128,7 @@ try {
 
   // ── The migration, verbatim — twice: the second run changes nothing ───────────────────────────────
   await db.exec('RESET ROLE')
-  const sql = (await readFile(new URL('20261022230000_email_approval_full_access.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const sql = (await readFile(new URL('20261022231500_email_approval_full_access.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(sql)
   const after = await one("SELECT md5(prosrc) FROM pg_proc WHERE proname = 'att_login_email_change'")
   await db.exec(sql)

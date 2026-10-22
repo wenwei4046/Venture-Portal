@@ -1,10 +1,10 @@
 -- ============================================================================
--- 20261022230000_email_approval_full_access.sql
+-- 20261022231500_email_approval_full_access.sql
 -- Approving a full-access login's email change is whoever manages permissions' (2026-10-22 — after #619, asked whether
 -- to close the same door on Attendance › Requests, the user: "1 and 2 both do").
 -- ============================================================================
 --
--- #619 (mig 20261022150100) lets HR change a login's email on the person's page, except a FULL-ACCESS title's — a
+-- #619 (mig 20261022150000) lets HR change a login's email on the person's page, except a FULL-ACCESS title's — a
 -- Principal-kind template, one that ticks Manage permissions, or a Principal login on no template — which only
 -- whoever manages permissions changes: the editor chooses where that login's mail goes. The Request to change email
 -- (mig 20261016190000) still let HR do exactly that in two steps — file a request on the CEO's behalf (Requests' New
