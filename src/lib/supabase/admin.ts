@@ -1,5 +1,6 @@
 import 'server-only'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { withFileStorage } from '@/lib/storage/server'
 import type { Database } from './database.types'
 
 // Service role client — bypasses RLS. Use only in server-side machine paths
@@ -21,11 +22,13 @@ export function adminClient(): SupabaseClient<Database> {
   if (!url || !key) {
     throw new Error('Supabase service-role client is not configured (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)')
   }
-  client = createClient<Database>(url, key, {
+  // Its `.storage` reaches the buckets moved to R2 too (2026-10-23 — the hourly
+  // sweeps remove files through it), passing every policy as with Storage.
+  client = withFileStorage(createClient<Database>(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  })
+  }))
   return client
 }

@@ -916,3 +916,4 @@ Rate 不固定： fund_sources 每笔手动填 rate，loan 创建时锁定 rate
 PCB： 查 Jadual PCB 表，HR 可手动 override（payroll_pcb 字段直接改）
 Audit trail： 所有表有 created_by + created_at，Settings 有 updated_by
 Supabase RLS： 用 role + department_id 做 Row Level Security
+档案（2026-10-23，搬到 Cloudflare R2）： file_buckets（每个 bucket 的大小上限、类型、公开与否、backend supabase|r2、public_url）+ file_objects（每个档案一行：bucket_id, name, owner, owner_id, metadata{size,mimetype}, created_at — storage.objects 的双胞胎，34 条 policy 原样）。档案本身在 R2；谁能上传 / 看 / 删由 file_objects 的 policy 决定 → .claude/rules/portal-wide/storage.md

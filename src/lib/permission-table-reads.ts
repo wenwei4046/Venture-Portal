@@ -193,6 +193,16 @@ export const READS_WITHOUT_ACTION: Readonly<Record<string, string>> = {
   hr_import_templates: 'Each person’s own saved import mappings.',
 }
 
+/**
+ * Tables whose rows each belong to a BUCKET with policies of its own (2026-10-23, the move to R2): `file_objects` is
+ * storage.objects' twin and carries its policies word for word — one bucket asks Documentation · View, another the
+ * file's owner, another the guest link — so no one list of actions can stand in front of the whole table (it would
+ * close every other bucket). Not registered, like storage.objects never was.
+ */
+export const READS_BY_BUCKET_POLICY: Readonly<Record<string, string>> = {
+  file_objects: 'Each bucket’s own SELECT policy, word for word as on storage.objects (lib/storage/server.ts reads under the caller’s session).',
+}
+
 export function tableReadRows(): Array<{ table: string; actions: Want[] }> {
   return Object.entries(TABLE_READS).map(([table, actions]) => ({ table, actions: [...actions] }))
 }
