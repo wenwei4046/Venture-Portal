@@ -7247,6 +7247,35 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-shadow-dd: 0 14px 34px rgb(51 36 27 / .16); --mk-shadow-dialog: 0 24px 60px rgb(51 36 27 / .25);
   background: rgb(var(--mk-app));
 }
+/* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,
+   drawn light whatever the theme. Channels, as Marketing's. */
+.mkt-pic {
+  color-scheme: light;
+  --pk-page: 246 245 242;
+  --pk-white: 255 255 255;
+  --pk-line: 230 227 222;
+  --pk-line-2: 240 238 234;
+  --pk-line-3: 244 242 238;
+  --pk-ink: 38 33 29;
+  --pk-text-2: 90 84 78;
+  --pk-muted: 110 104 98;
+  --pk-next: 120 114 108;
+  --pk-soft: 250 249 247;
+  --pk-soft-2: 248 247 245;
+  --pk-btn-line: 210 205 198;
+  --pk-rail: 226 222 216;
+  --pk-brown: 90 62 43;
+  --pk-ring: 240 234 226;
+  --pk-miss-line: 220 150 140;
+  --pk-primary: #EC9B55;
+  --pk-primary-hover: #E0893F;
+  --pk-primary-ink: 43 31 23;
+  --pk-wait-bg: 251 243 225; --pk-wait-line: 236 214 164; --pk-wait: 122 82 8; --pk-wait-dot: 214 152 30;
+  --pk-done-bg: 232 244 235; --pk-done-line: 190 222 199; --pk-done: 36 100 58; --pk-done-dot: 60 150 90;
+  --pk-red-bg: 252 236 233; --pk-red-line: 236 190 184; --pk-red: 160 36 30; --pk-red-dot: 200 52 42;
+  --pk-draft-bg: 243 242 239; --pk-draft-line: 226 223 217; --pk-draft: 90 84 78; --pk-draft-dot: 160 154 146;
+  background: rgb(var(--pk-page));
+}
 @keyframes mkIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes mkSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {

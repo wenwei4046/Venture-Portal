@@ -1,7 +1,7 @@
 // DORMANT — nothing loads this file (src/lib/no-active-middleware.test.ts). It was middleware.ts at the repo root, which
 // Next 15 never loaded while the app lives in src/; Next 16's Turbopack build does, so it was renamed on 2026-10-21 to
 // keep the portal as it ran. Switching it on (as src/proxy.ts, Next 16's name) refreshes the session and redirects every
-// request it matches — the guest link (/g/…) and an invitation (/welcome) included, which it does not exclude: its own
+// request it matches — the guest link (/g/…), a PIC's link (/t/…) and an invitation (/welcome) included, which it does not exclude: its own
 // decision, with those paths added to the matcher first.
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
