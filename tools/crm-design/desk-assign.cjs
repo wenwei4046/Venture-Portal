@@ -72,4 +72,7 @@ module.exports = [
   // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00").
   ['<input type="text" inputMode="numeric" value={t.pctStr} onChange={t.onRange} style={{ width: "30px",', '<input type="text" inputMode="decimal" value={t.pctStr} onChange={t.onRange} style={{ width: "50px",',
     "Ads to teams: a team share to two decimals."],
+  // Split folds to its strip, as Ad performance does (the owner, 2026-10-22: "圈起来的部分做可收缩式"; vm/assign-v2.ts › splitShut).
+  [/(\{!!\(v\.adOpen\) && \(<>\s*)(<aside style=\{\{ flex: v\.splitFlex,[\s\S]*?)display: "flex"/,
+    '$1{!!(v.splitShut) && (<DeskFoldRail v={v.splitRail} />)}$2display: v.splitShut ? "none" : "flex"', "Ads to teams: Split folds to its strip."],
 ];

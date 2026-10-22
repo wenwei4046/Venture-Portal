@@ -1123,14 +1123,15 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
 
 /** Frame 06 · each docked panel's head — Split (× closes the ad), Ad performance and Audit log (» folds each to its strip):
  *  three panels side by side, as the Inbox's Customer info and Audit log (the owner, 2026-10-18: "ads performance, audit log 分开"). */
-export function DeskAdTabs4a({ v, which }: { v: { closeAd: () => void; perfFold: () => void; adLogToggle: () => void; ad?: { name?: string } | null }; which: "split" | "perf" | "audit" }) {
+export function DeskAdTabs4a({ v, which }: { v: { closeAd: () => void; perfFold: () => void; adLogToggle: () => void; splitFold?: () => void; ad?: { name?: string } | null }; which: "split" | "perf" | "audit" }) {
   const title = which === "split" ? "Split" : which === "perf" ? "Ad performance" : "Audit log";
   const act = which === "split" ? v.closeAd : which === "perf" ? v.perfFold : v.adLogToggle;
   return (
     <div style={{ flex: "none", height: "48px", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 0 24px", borderBottom: "1px solid var(--crm-rule)" }}>
       <span style={{ font: `500 15px ${TIGHT}`, color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{title}</span>
       {which === "audit" && v.ad?.name && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{v.ad.name}</span>}
-      <button type="button" onClick={act} title={which === "split" ? "Close (Esc)" : `Fold ${title}`} aria-label={which === "split" ? "Close" : `Fold ${title}`} style={{ ...BTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}>
+      {which === "split" && v.splitFold && <button type="button" onClick={v.splitFold} title="Fold Split" aria-label="Fold Split" style={{ ...BTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5" /></svg></button>}
+      <button type="button" onClick={act} title={which === "split" ? "Close (Esc)" : `Fold ${title}`} aria-label={which === "split" ? "Close" : `Fold ${title}`} style={{ ...BTN, marginLeft: which === "split" && v.splitFold ? "0" : "auto", display: "flex", color: "var(--crm-faint)" }}>
         {which === "split" ? <Ic name="x" size={16} /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5" /></svg>}
       </button>
     </div>

@@ -181,6 +181,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     // Ad performance and the Audit log are panels of their own beside Split, each folding to its strip (the owner,
     // 2026-10-18: "ads performance, audit log 分开"); both start folded so the split keeps its room.
     perfShut, perfFold: () => patch({ adPerfShut: true }),
+    // Split folds to its strip too (2026-10-22, the owner: "做可收缩式").
+    splitShut: !!ui.adSplitShut, splitFold: () => patch({ adSplitShut: true }), splitRail: { title: "Split", open: () => patch({ adSplitShut: false }) },
     perfRail: { title: "Ad performance", open: () => patch({ adPerfShut: false, ...(dock ? {} : { adLog: false }) }) },
     adLogOpen: logOpen, adLogClosed: !logOpen, adLogToggle: () => patch({ adLog: !logOpen }), adLog: adL.rows, adLogRail: adL.rail, adLogStyle,
     mwtLogOpen: mwtOpen, mwtLogClosed: mwtShow && !mwtOpen, mwtLogW: ui.mwtLogW ?? 280, mwtLogToggle: () => patch({ mwtLog: !ui.mwtLog }), mwtLog: mwtL.rows, mwtLogRail: mwtL.rail,
