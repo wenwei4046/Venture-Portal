@@ -357,20 +357,26 @@ export function memoVM(m: MemberMemo, local: { read: ReadonlySet<string>; acked:
 
 // ── View as ──
 
-/** Everybody a Principal may view as, a group per sub-department, the top of each tree first. */
+/**
+ * Everybody a Principal may view as, a group per sub-department, by level as the prototype draws it: its Revenue
+ * Directors first (2026-10-23 — no seat, so the snapshot names them `director`; "Revenue Director · Leads Fair"), then
+ * the top of each tree, then everybody below.
+ */
 export function vaGroupsVM(memberships: readonly MemberMembership[], query: string, viewing: string): VaGroupVM[] {
   const q = query.trim().toLowerCase();
   return memberships.map(m => {
     const byId = new Map(m.people.map(p => [p.id, p]));
     const depth = (id: string) => {
-      let d = 0, p = byId.get(id);
+      let d = 1, p = byId.get(id);
       const seen = new Set<string>();
       while (p?.parentId && byId.has(p.parentId) && !seen.has(p.parentId)) { seen.add(p.parentId); p = byId.get(p.parentId); d++; }
       return d;
     };
     const people = m.people
       .filter(p => !q || `${p.name} ${p.title}`.toLowerCase().includes(q))
-      .map(p => ({ id: p.id, departmentId: m.id, name: p.name, ini: initials(p.name), sub: [p.title, p.rank].filter(Boolean).join(" · "), level: depth(p.id), viewing: p.id === viewing }))
+      .map(p => ({ id: p.id, departmentId: m.id, name: p.name, ini: initials(p.name),
+        sub: p.director ? `${p.title} · Leads ${m.name}` : [p.title, p.rank].filter(Boolean).join(" · "),
+        level: p.director ? 0 : depth(p.id), viewing: p.id === viewing }))
       .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
     return { title: `${m.name.toUpperCase()} · ${people.length}`, people };
   }).filter(g => g.people.length);

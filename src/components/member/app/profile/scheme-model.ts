@@ -29,6 +29,8 @@ export function schemeVM(input: {
   membership: MemberMembership | undefined;
   /** The rate when the membership cannot say it (a Principal's view: the engine's, once My income has read it). */
   rate?: number | null;
+  /** A Principal viewing a Revenue Director (2026-10-23), whose membership this view does not hold. */
+  director?: boolean;
   /** The fixed salary on the member's contract; null when none is set, undefined when this view cannot know it. */
   salary: number | null | undefined;
   bands: readonly MemberBand[];
@@ -39,9 +41,9 @@ export function schemeVM(input: {
   const salary = input.salary === undefined ? "—" : input.hidden ? "RM ••••"
     : input.salary === null ? "Not set" : input.salary === 0 ? "Commission only" : rm2(input.salary);
   // A director (2026-10-14) is paid their rung's rate on their own bills and nothing of the brands' ladders —
-  // and in a sub-department where their title holds no rung, no rate at all.
-  const director = !!m?.director;
-  const rate = m ? (director && !m.rank ? null : m.rate) : input.rate ?? null;
+  // and in a sub-department where their title holds no rung, no rate at all. The same in the Principal's View as.
+  const director = m ? !!m.director : !!input.director;
+  const rate = director && !(m ? m.rank : input.rank) ? null : m ? m.rate : input.rate ?? null;
   const codes = director ? [] : [...new Set(input.bands.map(b => b.brand))].sort((a, b) => brandName(a).localeCompare(brandName(b)));
   return {
     name: input.name,
