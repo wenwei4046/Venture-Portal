@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { resolveArGlCode } from '@/lib/ar-accounts'
+import { AR_PARENT, resolveArGlCode } from '@/lib/ar-accounts'
+import { headerAccounts } from '@/lib/postable-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
@@ -327,6 +328,81 @@ async function createPaymentVoucherInner(formData: FormData) {
     throw new Error('Account is required on inbound (credit) vouchers')
   }
 
+  // A line on a header account is refused BEFORE anything is written
+  // (2026-10-22): the database takes no posting on an account with
+  // sub-accounts, and refused after the insert a receipt stayed received with
+  // no line. 3030 is one since AR was split by customer — what a customer with
+  // no receivable account of its own falls back to.
+  const lineAccounts = direction === 'debit' ? rows.map((r) => r.account_code) : targetPool || consolidatedGroups ? [accountCode] : []
+  const [header] = await headerAccounts(supabase, lineAccounts)
+  if (header) {
+    throw new Error(`Account ${header} is a header account (it has sub-accounts) — nothing was saved. ${header === AR_PARENT
+      ? 'This customer has no receivable account of its own yet: give it one, or pick one of 3030’s sub-accounts.'
+      : 'Pick one of its sub-accounts.'}`)
+  }
+
+  // A netting settle's paying side is resolved BEFORE anything is written too
+  // (2026-10-22): its refusals came after the receipt was received and its
+  // invoice marked paid — IT, for one, has no Inter-billing account.
+  // Inter-billing: we resolve THREE things from the invoice's
+  // billable_to_department_id:
+  //   - expenseCode: 9051-9055 leaf to debit in the JE + record on the
+  //     paying-side PV source row (drives the paying dept's P&L expense).
+  //   - payingPool: the dept_pool_* key used to tag the PV source so
+  //     the report layer attributes the expense to that pool.
+  //   - partyLabel: dept name for the JE description.
+  let interBilling: {
+    expenseCode: string
+    payingPool: string
+    partyLabel: string
+  } | null = null
+  if (isAutoComplete && paymentMethod === 'netting' && invoiceId) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('billable_to_type, billable_to_department_id')
+      .eq('id', invoiceId)
+      .maybeSingle()
+    if (inv && inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
+      const { data: dept } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', inv.billable_to_department_id)
+        .maybeSingle()
+      // Fail loud (2026-06-11): if resolution fails, interBilling stays
+      // null and the voucher silently falls through to the BANK settlement
+      // path — bank cache bumped + Dr bank / Cr 3030 for money that never
+      // moved. A netting settle on a dept_pool invoice must resolve or die.
+      if (!dept?.name) {
+        throw new Error(
+          `Netting settle: paying department ${inv.billable_to_department_id} not found for invoice ${invoiceId}`,
+        )
+      }
+      // Convention from mig 253: '9051 Inter-billing — Marketing',
+      // '9052 Inter-billing — Finance', etc. Match by suffix so a
+      // renamed dept still works as long as the COA row exists.
+      const { data: acct } = await supabase
+        .from('chart_of_accounts')
+        .select('code, name')
+        .eq('type', 'expense')
+        .ilike('name', `Inter-billing % ${dept.name}`)
+        .maybeSingle()
+      if (!acct?.code) {
+        throw new Error(
+          `Netting settle: no active expense account named "Inter-billing — ${dept.name}" in the COA (9051–9055 range)`,
+        )
+      }
+      // Pool key follows the dept_pool_<slug> convention used by
+      // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
+      // 'dept_pool_director_office', etc).
+      const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
+      interBilling = {
+        expenseCode: acct.code,
+        payingPool,
+        partyLabel: dept.name,
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('payment_vouchers')
     .insert({
@@ -340,7 +416,10 @@ async function createPaymentVoucherInner(formData: FormData) {
       // target_pool (single destination) as before.
       source_pool: null,
       target_pool: targetPool,
-      status: isAutoComplete ? ('paid' as const) : ('draft' as const),
+      // Every voucher starts a draft (2026-10-22). A receipt is marked received
+      // below, once its line is in — written received, its invoice was marked
+      // paid by the database before the line, and a line refused left both.
+      status: 'draft' as const,
       amount,
       payee_name: payeeName,
       payee_company_id: payeeCompanyId,
@@ -359,12 +438,6 @@ async function createPaymentVoucherInner(formData: FormData) {
       // approve_voucher_batch[_partial] now post the GL on this date, so the
       // P&L reflects Finance's stated payment date, not Principal's approval day.
       payment_date: paymentDateStr,
-      ...(isAutoComplete ? {
-        approved_by: user.id,
-        approved_at: nowIso,
-        executed_by: user.id,
-        executed_at: nowIso,
-      } : {}),
     })
     .select('id')
     .single()
@@ -414,7 +487,29 @@ async function createPaymentVoucherInner(formData: FormData) {
       .from('payment_voucher_sources')
       .insert(creditRows)
     if (primaryInsertErr) {
-      throw new Error(`Failed to insert credit voucher source row: ${primaryInsertErr.message}`)
+      const voided = await voidHalfMadeVoucher(supabase, data.id)
+      throw new Error(`Failed to save the receipt's line: ${clause(primaryInsertErr.message)}. ${voided
+        ? `Receipt ${voucherNo} was voided — it was never received, the invoice was not touched and nothing was posted.`
+        : `Receipt ${voucherNo} is left a draft without its line and could not be voided — void it on its page; nothing was posted.`}`)
+    }
+  }
+
+  // A receipt is received now that its line is in (2026-10-22): the database
+  // marks its invoice paid at this moment (mark_invoice_paid_on_voucher_paid,
+  // the twin of the trigger that did it at the insert), and the bank, the
+  // pools and the books follow below as before.
+  if (isAutoComplete) {
+    const { data: received, error: receivedErr } = await supabase
+      .from('payment_vouchers')
+      .update({ status: 'paid', approved_by: user.id, approved_at: nowIso, executed_by: user.id, executed_at: nowIso })
+      .eq('id', data.id)
+      .eq('status', 'draft')
+      .select('id')
+    if (receivedErr || (received?.length ?? 0) === 0) {
+      const voided = await voidHalfMadeVoucher(supabase, data.id)
+      throw new Error(`Receipt ${voucherNo} could not be marked received${receivedErr ? `: ${clause(receivedErr.message)}` : ''}. ${voided
+        ? 'It was voided — the invoice was not touched and nothing was posted.'
+        : 'It is left a draft — nothing was posted; void it on its page.'}`)
     }
   }
 
@@ -430,65 +525,9 @@ async function createPaymentVoucherInner(formData: FormData) {
   //       only the receiving dept saw revenue and group net profit was
   //       over-stated by the invoiced amount.
   if (isAutoComplete) {
-    // Detect inter-billing first so we know which JE path to take below.
-    // We resolve THREE things from the invoice's billable_to_department_id:
-    //   - expenseCode: 9051-9055 leaf to debit in the JE + record on the
-    //     paying-side PV source row (drives the paying dept's P&L expense).
-    //   - payingPool: the dept_pool_* key used to tag the PV source so
-    //     the report layer attributes the expense to that pool.
-    //   - partyLabel: dept name for the JE description.
-    let interBilling: {
-      expenseCode: string
-      payingPool: string
-      partyLabel: string
-    } | null = null
-    if (paymentMethod === 'netting' && invoiceId) {
-      const { data: inv } = await supabase
-        .from('invoices')
-        .select('billable_to_type, billable_to_department_id')
-        .eq('id', invoiceId)
-        .maybeSingle()
-      if (inv && inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id) {
-        const { data: dept } = await supabase
-          .from('departments')
-          .select('name')
-          .eq('id', inv.billable_to_department_id)
-          .maybeSingle()
-        // Fail loud (2026-06-11): if resolution fails, interBilling stays
-        // null and the voucher silently falls through to the BANK settlement
-        // path — bank cache bumped + Dr bank / Cr 3030 for money that never
-        // moved. A netting settle on a dept_pool invoice must resolve or die.
-        if (!dept?.name) {
-          throw new Error(
-            `Netting settle: paying department ${inv.billable_to_department_id} not found for invoice ${invoiceId}`,
-          )
-        }
-        // Convention from mig 253: '9051 Inter-billing — Marketing',
-        // '9052 Inter-billing — Finance', etc. Match by suffix so a
-        // renamed dept still works as long as the COA row exists.
-        const { data: acct } = await supabase
-          .from('chart_of_accounts')
-          .select('code, name')
-          .eq('type', 'expense')
-          .ilike('name', `Inter-billing % ${dept.name}`)
-          .maybeSingle()
-        if (!acct?.code) {
-          throw new Error(
-            `Netting settle: no active expense account named "Inter-billing — ${dept.name}" in the COA (9051–9055 range)`,
-          )
-        }
-        // Pool key follows the dept_pool_<slug> convention used by
-        // INVOICE_BILLING_MODE_TO_POOL ('dept_pool_marketing',
-        // 'dept_pool_director_office', etc).
-        const payingPool = `dept_pool_${dept.name.toLowerCase().replace(/\s+/g, '_')}`
-        interBilling = {
-          expenseCode: acct.code,
-          payingPool,
-          partyLabel: dept.name,
-        }
-      }
-    }
-
+    // A netting settle’s paying side (interBilling) was resolved before the
+    // voucher was written (2026-10-22).
+    //
     // Bank cache: bump only for real bank settlements. Inter-billing skips
     // because no money actually entered the bank account.
     if (bankAccountId && !interBilling) {
@@ -1082,14 +1121,10 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
     .from('payment_voucher_sources')
     .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
     .eq('voucher_id', sourceId)
-  const lineCodes = [...new Set((srcRows ?? []).map((r) => r.account_code).filter((c): c is string => !!c))]
-  if (lineCodes.length > 0) {
-    const { data: subAccounts } = await supabase.from('chart_of_accounts').select('parent_code').in('parent_code', lineCodes)
-    const headers = new Set((subAccounts ?? []).map((a) => a.parent_code))
-    const at = (srcRows ?? []).findIndex((r) => headers.has(r.account_code))
-    if (at >= 0) {
-      throw new Error(`Line ${at + 1}'s account ${srcRows![at].account_code} is a header account now (it has sub-accounts) — nothing was copied. Make a new voucher on one of its sub-accounts.`)
-    }
+  const headers = await headerAccounts(supabase, (srcRows ?? []).map((r) => r.account_code))
+  const at = (srcRows ?? []).findIndex((r) => headers.has(r.account_code))
+  if (at >= 0) {
+    throw new Error(`Line ${at + 1}'s account ${srcRows![at].account_code} is a header account now (it has sub-accounts) — nothing was copied. Make a new voucher on one of its sub-accounts.`)
   }
 
   // New voucher number — same scheme as createPaymentVoucher.
