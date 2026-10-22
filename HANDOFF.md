@@ -1,5 +1,86 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 a (SHIPPED, with z) — a half-made voucher or fund source is voided / cancelled, never "deleted"
+
+z's follow-up. User, shown it drawn (two before / after flows): "可以，照这个做"; the third spot: "一起修". On
+z's branch `fix/fund-source-reversal-cleanup` (main merged in, 18d5023d), so one apply + one merge ships both.
+
+- Same class as z, found by scanning production's policies for writes refused to every session: two
+  "rollbacks" on an error path deleted through the session on a `USING (false)` table and removed nothing —
+  `copyPaymentVoucherWork` (pv_no_delete: a blank draft stayed, the answer said *rolled back*) and
+  `createFundSourceInner` (fund_sources_no_delete: a source waited for an approval nobody could see). A third:
+  `createPaymentVoucherInner`'s debit lines insert ignored its error (a draft with no lines, "saved").
+- **Copy** reads the lines BEFORE writing; a line on a header account (one with sub-accounts —
+  `pvs_reject_header_account`) is refused, nothing written: *Line 1's account 3030 is a header account now (it
+  has sub-accounts) — nothing was copied.* 126 receipts / 141 lines are on 3030 AR - Subs (sub-accounts
+  3031–3039, 3073), e.g. HV-OR-202609-0429 — copying one left a blank draft. Lines refused for any other reason →
+  the new draft is voided (`voidHalfMadeVoucher`: UPDATE status voided WHERE still draft — Treasury · Create
+  may), said in words, or that it could not be voided.
+- **Create payment**: the debit lines' error is read; refused → the draft voided, said. The credit branch
+  already threw and is left as it is (a receipt is paid on insert and its invoice marked paid by trigger —
+  another fix).
+- **Record fund in**: an approval request that cannot be queued → the source → `cancelled` (what Withdraw
+  leaves), said; a refused cancel is said too (*withdraw it on its page*).
+- Voiding a draft moves no money: `debit_dest_bank_on_transfer_void` needs OLD paid; the claim / payroll
+  triggers key on links a copy or a new draft has none of yet.
+- **Guard**: `permission-table-writes.test.ts` › *never updates or deletes through the session what the
+  database lets nobody update or delete* — an UPDATE / DELETE (not an upsert; a refused INSERT is an error) on a
+  registered table whose command no action opens, or an INVOKER rpc's such write, fails. Before the fix it
+  named the two deletes (on main it would also name z's).
+- Production today: nothing affected (the one debit voucher without lines, HV-PV-202608-0265, is voided; no
+  pending source lacks its request). No database change in this part.
+- Tests: `payments/actions.half-made-voucher.test.ts` (5), `fund-in/actions.half-made-source.test.ts` (3) — 6 of
+  the 8 and the guard failed before (the two "as before" cases pass both ways).
+- z's migration renumbered `20261021230000` → **`20261022100000`** (#609 recorded 230000 on production as
+  combo_tier_falls_back); its md5 is unchanged, `57373b5f…`.
+- Verified in a CI-like tree (LF `git archive` of the branch, the worktree's fresh `npm ci`): unit 9,127 — the 12 that
+  failed were 5 s timeouts under local load, all pass at 60 s; the SQL suite exits 0; eslint clean on the files changed.
+- User: "全绿就上线" → production first (z's migration, below), then the PR, merged once CI was green.
+
+## CHECKPOINT 2026-10-21 z (SHIPPED 2026-10-22, with a) — Reverse payment takes a fund-source voucher's repayments with it
+
+Found by y's loan session, proposed apart. User, shown HV-PV-202608-0295's Reverse payment (HOUZS Century's RM 98,000
+fund source, 98,000 principal + 1,960 interest, 20 Aug) leaving the source repaid → "A：一起删+重开" (B was: refuse
+Reverse on such vouchers). Branch `fix/fund-source-reversal-cleanup` (worktree `../vp-fsr-reversal`).
+
+- Root cause: `reversePaidPayment` step 4 deleted the voucher's `fund_source_repayments` through the RLS client. The
+  table's only DELETE policy is `fsr_no_delete USING (false)` and `authenticated` holds the DELETE privilege, so 0
+  rows went and no error came: bank / GL / pools / voucher reversed, the source still read the instalment paid
+  (repaid, 0 outstanding), and the corrected PV is refused (`createPaymentVoucherInner`: *Cannot repay fund source
+  with status repaid*; approval's `block_repayment_on_inactive_fund_source` the same). Production 2026-10-21: 39 paid
+  fund-source vouchers, 67 rows, none reversed → no bad data.
+- Mig `20261022100000_voucher_reversal_fund_source_repayments.sql`: `reverse_voucher_fund_source_repayments(uuid)`
+  (DEFINER; `tab_write_guard(/payments, /payments/[id], /receipts; treasury.void)` + `has_any_action(treasury.void)`
+  when signed in; EXECUTE authenticated + service_role, not anon / PUBLIC; md5(prosrc) `57373b5f…`). Only a VOIDED
+  voucher qualifies; deletes that voucher's rows (each source locked FOR UPDATE); a repaid source it removed principal
+  from that the principal + netting left no longer cover (`fund_source_outstanding`'s measure) → `active`,
+  repaid_at / repaid_by NULL — all 14 repaid sources went active → repaid (audit_events); nothing sets `matured`
+  (`mark_matured_fund_sources` / `markFundSourceMatured` have no caller). A second run removes nothing.
+- App: the step runs right after the void (step 6), for a voucher with `fund_source_id`; a refusal throws *Reverse
+  HV-PV-…: the voucher is voided, but removing its fund-source repayments failed: …*. `database.types.ts`,
+  `DEFINER_RPCS`. Rule: finance-view.md › A REVERSED PAYMENT TAKES ITS FUND-SOURCE REPAYMENTS WITH IT.
+- Tests: `payments/actions.fund-source-reversal.test.ts` (5; the session's DELETE answered as production answers it —
+  4 failed before the fix: both rows left, no step, no error); `tests/member-sql/validate-fund-source-reversal.mjs`
+  (37 checks: production's row policies + its two trigger bodies, `fund-source-reversal-production.sql`
+  md5-checked; the bug shown, then the migration verbatim — paid / draft / unknown voucher, View only, no actions, a
+  closed tab refused; netting still covering keeps repaid; an interest-only voucher leaves the status). The tab-guard
+  scan was mutation-checked: without the guard it names `reverse_voucher_fund_source_repayments`.
+- Scan (task): in `reversePaidPayment` / `voidPaidReceipt` no other write is refused silently (vouchers / invoices
+  UPDATE and the journal reads all admit treasury.void). App-wide, two more writes production refuses for everybody,
+  both best-effort rollbacks on an error path, left as they are (proposed apart): `copyPaymentVoucher`'s delete of the
+  draft copy (`payments/actions.ts`) and `createFundSource`'s delete of the orphan source (`fund-in/actions.ts`).
+  `permission-table-writes.test.ts` skips a (table, command) with no registry entry as "refused for everybody" — how
+  this one slipped through.
+- Production dry-run (BEGIN … ROLLBACK, as finance@ under `SET LOCAL ROLE authenticated`): md5 `57373b5f…` (=
+  PGlite), grants auth / service only; finance@'s own DELETE removed 0 (the bug, on production); the step refused the
+  still-paid PV; after the void it removed 2, source 89b09736 repaid → active, outstanding 98,000, second run 0, all
+  rows 167 → 165. Afterwards production unchanged (no function, PV paid, 2 rows, source repaid).
+- Applied 2026-10-22 (user: "全绿就上线"), before the merge — the app calls the new RPC: a fresh dry-run first (md5
+  `57373b5f…`, both trigger bodies' md5 unchanged, 39 paid vouchers / 67 rows / 0 orphans, the same outcome as
+  finance@), then the file's LF text in one transaction, refusing itself unless the md5 was the tested one; recorded
+  in schema_migrations as `20261022100000` (created_by `claude-fsr-reversal`). After: DEFINER, search_path public,
+  EXECUTE authenticated + service_role only; nothing moved (HV-PV-202608-0295 paid, 67 rows, the source repaid).
+
 ## CHECKPOINT 2026-10-21 y (DATA FIX + SHIPPED) — Revenue Department's payroll accrual
 
 User: "帮我检查为什么revenue team 的payroll 没有扣" → "这些扣款你就accrual salary 少进就行" →

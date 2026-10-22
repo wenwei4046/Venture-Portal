@@ -376,7 +376,9 @@ async function createPaymentVoucherInner(formData: FormData) {
   // CREDIT: synthetic single row (pool = target_pool, amount = voucher amount).
   if (direction === 'debit') {
     if (rows.length > 0) {
-      await supabase.from('payment_voucher_sources').insert(
+      // Its answer was not read until 2026-10-22: lines the database refused
+      // left a draft with no lines, and the form said it was saved.
+      const { error: linesErr } = await supabase.from('payment_voucher_sources').insert(
         rows.map(r => ({
           voucher_id: data.id,
           pool: r.pool,
@@ -387,6 +389,12 @@ async function createPaymentVoucherInner(formData: FormData) {
           override_reason: r.override_reason,
         })),
       )
+      if (linesErr) {
+        const voided = await voidHalfMadeVoucher(supabase, data.id)
+        throw new Error(`Failed to save the voucher's lines: ${clause(linesErr.message)}. ${voided
+          ? `Draft ${voucherNo} was voided — nothing else was written.`
+          : `Draft ${voucherNo} is left without lines and could not be voided — void it on its page.`}`)
+      }
     }
   } else if (direction === 'credit' && (targetPool || consolidatedGroups)) {
     // Every PV source row must carry an account — reports route lines by the
@@ -1066,6 +1074,24 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
     if (loan && loan.status === 'active') deal = { fund_source_id: null, loan_id: src.loan_id, repayment_breakdown: src.repayment_breakdown }
   }
 
+  // The lines are checked BEFORE the copy is written (2026-10-22): an account
+  // that has sub-accounts since takes no posting (pvs_reject_header_account) —
+  // 126 receipts are on 3030 Accounts Receivable - Subs, a header now — and a
+  // copy refused after its insert left a blank draft behind.
+  const { data: srcRows } = await supabase
+    .from('payment_voucher_sources')
+    .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
+    .eq('voucher_id', sourceId)
+  const lineCodes = [...new Set((srcRows ?? []).map((r) => r.account_code).filter((c): c is string => !!c))]
+  if (lineCodes.length > 0) {
+    const { data: subAccounts } = await supabase.from('chart_of_accounts').select('parent_code').in('parent_code', lineCodes)
+    const headers = new Set((subAccounts ?? []).map((a) => a.parent_code))
+    const at = (srcRows ?? []).findIndex((r) => headers.has(r.account_code))
+    if (at >= 0) {
+      throw new Error(`Line ${at + 1}'s account ${srcRows![at].account_code} is a header account now (it has sub-accounts) — nothing was copied. Make a new voucher on one of its sub-accounts.`)
+    }
+  }
+
   // New voucher number — same scheme as createPaymentVoucher.
   const period = officeTime().format('YYYYMM') // the office's month, not UTC's
   const { count } = await supabase.from('payment_vouchers').select('*', { count: 'exact', head: true })
@@ -1100,10 +1126,6 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
     .single()
   if (insErr || !created) throw new Error(`Failed to copy voucher: ${insErr?.message ?? 'unknown'}`)
 
-  const { data: srcRows } = await supabase
-    .from('payment_voucher_sources')
-    .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
-    .eq('voucher_id', sourceId)
   if (srcRows && srcRows.length > 0) {
     const { error: rowsErr } = await supabase.from('payment_voucher_sources').insert(
       srcRows.map((r) => ({
@@ -1118,13 +1140,37 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
       })),
     )
     if (rowsErr) {
-      await supabase.from('payment_vouchers').delete().eq('id', created.id).eq('status', 'draft')
-      throw new Error(`Failed to copy voucher sources (rolled back): ${rowsErr.message}`)
+      const voided = await voidHalfMadeVoucher(supabase, created.id)
+      throw new Error(`Failed to copy the voucher's lines: ${clause(rowsErr.message)}. ${voided
+        ? `The new draft ${voucherNo} was voided — nothing else was written.`
+        : `The new draft ${voucherNo} is left without lines and could not be voided — void it on its page.`}`)
     }
   }
 
   revalidatePath('/payments')
   return { id: created.id as string, voucherNo }
+}
+
+/**
+ * A voucher whose lines the database refused is voided, never deleted (2026-10-22):
+ * payment_vouchers refuses every session's DELETE (pv_no_delete USING (false)) and
+ * answers with no error, so Copy's "rolled back" delete left the blank draft where it
+ * was. Only while it is still a draft — nothing has posted, so no money moves. True
+ * when it was voided.
+ */
+async function voidHalfMadeVoucher(supabase: Awaited<ReturnType<typeof createClient>>, id: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('payment_vouchers')
+    .update({ status: 'voided' })
+    .eq('id', id)
+    .eq('status', 'draft')
+    .select('id')
+  return !error && (data?.length ?? 0) > 0
+}
+
+/** The database's message as a clause of ours: its closing full stop dropped. */
+function clause(message: string): string {
+  return message.trim().replace(/\.+$/, '')
 }
 
 export async function updatePaymentVoucher(formData: FormData) {
@@ -1743,8 +1789,9 @@ export async function voidPaidReceipt(formData: FormData) {
 // already debited the bank, posted GL, and (for pooled payments) debited a pool.
 // This fully REVERSES it so a wrong payment (e.g. amount keyed wrong) can be
 // undone and re-entered correctly. Steps mirror the receipt reversal: add the
-// bank back, reverse each GL entry, reverse the pool rows, delete auto-synced
-// fund-source repayments, un-settle any linked invoice, mark voided.
+// bank back, reverse each GL entry, reverse the pool rows, un-settle any linked
+// invoice, mark voided — then remove the fund-source repayments approval synced
+// from it (reopening the source they closed).
 //
 // Voucher types that have their OWN dedicated unwind are BLOCKED here with a
 // pointer to the right flow — reversing them generically would leave their
@@ -1863,16 +1910,7 @@ export async function reversePaidPayment(formData: FormData) {
   } as never)
   if (poolRevErr) throw new Error(`Reverse ${v.voucher_no}: pool reversal failed: ${poolRevErr.message}`)
 
-  // 4) Delete auto-synced fund-source repayment rows (HV-repays-a-fund-source vouchers)
-  if (v.fund_source_id) {
-    const { error: fsrErr } = await supabase
-      .from('fund_source_repayments')
-      .delete()
-      .eq('payment_voucher_id', id)
-    if (fsrErr) throw new Error(`Reverse ${v.voucher_no}: fund-source repayment cleanup failed: ${fsrErr.message}`)
-  }
-
-  // 5) Un-settle any invoice this payment closed (billing_payment)
+  // 4) Un-settle any invoice this payment closed (billing_payment)
   const { data: linked } = await supabase
     .from('invoices')
     .select('id')
@@ -1892,13 +1930,26 @@ export async function reversePaidPayment(formData: FormData) {
     if (unsettleErr) throw new Error(`Reverse ${v.voucher_no}: invoice un-settle failed: ${unsettleErr.message}`)
   }
 
-  // 6) Mark the voucher voided (race-guarded on still-paid)
+  // 5) Mark the voucher voided (race-guarded on still-paid)
   const { error: updErr } = await supabase
     .from('payment_vouchers')
     .update({ status: 'voided' })
     .eq('id', id)
     .eq('status', 'paid')
   if (updErr) throw new Error(`Failed to void voucher: ${updErr.message}`)
+
+  // 6) Remove the fund-source repayment rows approval synced from this voucher
+  //    (HV repaying a fund source), reopening the source they had closed —
+  //    reverse_voucher_fund_source_repayments (mig 20261022100000), which takes
+  //    only a voided voucher. Never a .delete() here: fund_source_repayments
+  //    refuses every session's DELETE (fsr_no_delete USING (false)) without an
+  //    error, so the rows stayed and the source still read repaid (2026-10-21).
+  if (v.fund_source_id) {
+    const { error: fsrErr } = await supabase.rpc('reverse_voucher_fund_source_repayments', { p_voucher_id: id })
+    if (fsrErr) {
+      throw new Error(`Reverse ${v.voucher_no}: the voucher is voided, but removing its fund-source repayments failed: ${fsrErr.message}`)
+    }
+  }
 
   // Reset any dangling approval / payroll funding request via SECURITY DEFINER
   // RPC (mig 20260722100000) — a reversed funding PV otherwise leaves its
