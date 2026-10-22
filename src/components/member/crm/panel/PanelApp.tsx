@@ -985,7 +985,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </section>
           </>)}
-          {!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>
+          {!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>
             <section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>
               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-brown)" }}>
               </span>
@@ -1118,13 +1118,13 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                       </>)}
                       {!!(g.custom) && (<>
                         {(g.people).map((p, p_i) => (<Fragment key={p_i}>
-                          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)", opacity: p.locked ? 0.55 : 1 }}>
                             <span style={{ minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
                               <strong style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", lineHeight: "18px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
                               <small style={{ fontSize: "calc(11px * var(--rv-type, 1))", lineHeight: "14px", color: p.noteFg, fontVariantNumeric: "tabular-nums" }}>{p.note}</small>
                             </span>
-                            <input value={p.v} onChange={p.set} onFocus={v.bp.selAll} inputMode="numeric" data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "46px", height: "34px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-tint-cold)", background: "var(--crm-tint-cold)", textAlign: "center", font: "inherit", fontSize: "calc(13.5px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", outline: "none", padding: "0" }} />
-                            <span style={{ width: "30px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{g.unit}</span>
+                            {p.locked ? (<span aria-label="Locked" style={{ width: "46px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><Ic name="lock" size={15} /></span>) : (<input value={p.v} onChange={p.set} onFocus={v.bp.selAll} inputMode="numeric" data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "46px", height: "34px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-tint-cold)", background: "var(--crm-tint-cold)", textAlign: "center", font: "inherit", fontSize: "calc(13.5px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", outline: "none", padding: "0" }} />)}
+                            <span style={{ width: "30px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{p.locked ? "" : g.unit}</span>
                           </div>
                         </Fragment>))}
                         <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>{!!(g.locked) && (<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{g.locked}</span>)}

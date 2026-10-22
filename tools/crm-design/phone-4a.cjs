@@ -375,6 +375,15 @@ function teamSplit(body) {
     const [, e] = el(b.slice(i), "<span onClick={v.as.ae.save}", "span", "split save end");
     b = b.slice(0, i + e) + `{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "${F(13)}", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}` + b.slice(i + e);
   }
+  // A locked person stays in the list, grey with a lock instead of the box (the owner, 2026-10-22: "不要消失在 assignment list
+  // 里面，而是改成小锁头，灰色，不能 edit"; vm/assign-1011.ts appends them with `locked`).
+  b = once(b, 'gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)" }}>', 'gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)", opacity: p.locked ? 0.55 : 1 }}>', "split locked row");
+  {
+    const i = b.indexOf("<input value={p.v} onChange={p.set}"), e = b.indexOf(" />", i);
+    if (i < 0 || e < 0) throw new Error("phone-4a: split person box");
+    b = b.slice(0, i) + '{p.locked ? (<span aria-label="Locked" style={{ width: "46px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><Ic name="lock" size={15} /></span>) : (' + b.slice(i, e + 3) + ")}" + b.slice(e + 3);
+  }
+  b = once(b, "color: \"var(--crm-muted)\" }}>{g.unit}</span>", "color: \"var(--crm-muted)\" }}>{p.locked ? \"\" : g.unit}</span>", "split locked unit");
   // A team with somebody locked says so under its sum (2026-10-22, shared/locked.ts).
   b = once(b, "color: g.sumFg }}>{g.sum}</span>", `color: g.sumFg }}>{g.sum}</span>{!!(g.locked) && (<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(12.5px * var(--rv-type, 1))", color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{g.locked}</span>)}`, "split locked note");
   // The split card and Inside each team a step smaller (2026-10-22, the owner: "下方的设计，字小点"): every size between the
@@ -444,7 +453,7 @@ function panel(body) {
   body = teamSplit(body);
   // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
-  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
+  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
   body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
     '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.v}%, #fff ${r.v}%)`, ["--thumb" as string]: r.c }} />', "split slider");

@@ -15,7 +15,7 @@ import { panelLike } from "./frame";
 import { initials } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
-import { activeGroups, lockedOf } from "../../shared/locked";
+import { activeVM, lockedOf } from "../../shared/locked";
 
 /** The Customer info form as the phone draws it today (sales/vm/customer.ts): the base every edit starts from. */
 export const BASE_FORM: FormSection[] = [
@@ -46,11 +46,11 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     people: t.people.map(p => ({ name: p.name, role: jobTitle(p), wt: on[p.id] ? "Full time" : "Part time", wtBg: on[p.id] ? "var(--crm-tint-follow)" : "var(--crm-field)", wtFg: on[p.id] ? "var(--crm-brown)" : "var(--crm-muted)",
       ini: initials(p.name), track: on[p.id] ? "var(--crm-brown)" : "var(--crm-line)", knob: on[p.id] ? 19 : 3,
       toggle: () => set(u => ({ ...u, mwt: { ...(u.mwt ?? saved), [p.id]: !(u.mwt ?? saved)[p.id] }, mwtSaved: false })) })) }));
-  // ── Active members (2026-10-22, the owner: its own section after Ads to teams): Active or Locked, saved at once.
-  const actGroups = activeGroups([
+  // ── Active members (2026-10-22, the owner: its own section after Ads to teams): Active or Locked, saved by Save.
+  const actVM = activeVM([
     ...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
     ...teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], people: t.people })),
-  ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), act.setLocked, msg => patch({ toast: msg }));
+  ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg }));
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 
@@ -224,7 +224,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   };
   return {
     set4, settings4,
-    actGroups, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
+    actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },
     cltNewT: () => patch({ frmOpen: false, frmDraft: null, cltF: "all", cltEdit: "new", cltDraft: "", cltDN: "", cltDC: "WhatsApp", cltIsNew: true }),

@@ -9,7 +9,7 @@ import type { CrmAdRule, CrmCustomer } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
-import { activeGroups, lockedOf, sharedOut } from "../../shared/locked";
+import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
@@ -25,6 +25,9 @@ function ticks(ctx: PanelCtx, tid: string): Record<string, number[]> {
 }
 /** Full time people: anyone switched to full time in Member work type (any role, rev 1011 Profile). */
 export const ftPeople = (t: Team, locked?: Set<string>) => t.people.filter(p => p.fullTime && !locked?.has(p.id));
+/** The team's full-time people who are locked for now: shown greyed, not editable, their days kept (2026-10-22). */
+const ftLocked = (t: Team, locked: Set<string>) => t.people.filter(p => p.fullTime && locked.has(p.id));
+const greyDays = () => A7.map(d => ({ t: WK[d], bg: "var(--crm-field)", fg: "var(--crm-faint-2)" }));
 const who = (ps: Team["people"], v: Record<string, number[]>, d: number) => ps.filter(p => (v[p.id] ?? []).includes(d)).map(p => p.name);
 const lineOf = (names: string[]) => !names.length ? "" : names.length === 1 ? names[0] + " only" : names.join(", ") + " take turns";
 
@@ -52,17 +55,17 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     tabs4: [
       { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
       // Active members, its own tab after Ads (the owner, 2026-10-22). CRM · Manage only, as Work type.
-      ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false }) }] : []),
+      ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false, actDraft: null }) }] : []),
       { label: "Full time", on: sec === "Ft", pick: go("Ft") },
       ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
     ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
     onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act",
-    act: activeGroups([
+    act: activeVM([
       { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
       ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),
-    ], lk, p => jobTitle(p as Team["people"][number]), act.setLocked, msg => patch({ toast: msg })),
+    ], lk, p => jobTitle(p as Team["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg })),
     cards: ([
       // No Organic Leads card (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
       ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "var(--crm-ink-soft)", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",
@@ -91,7 +94,8 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       const v = ticks(ctx, t.id), ps = ftPeople(t, lk), on = A7.filter(d => who(ps, v, d).length);
       return { name: t.name, mode: on.length ? on.map(d => WKL[d]).join(", ") : "Off · follows Ads to teams", open: () => patch({ ftx: { tid: t.id, v: JSON.parse(JSON.stringify(v)) } }),
         rs: ps.map(p => ({ name: p.name, label: "", tagBg: "transparent", tagFg: "transparent",
-          days: A7.map(d => { const o = (v[p.id] ?? []).includes(d); return { t: WK[d], bg: o ? "var(--crm-brown)" : "var(--crm-tint-follow)", fg: o ? "#fff" : "var(--crm-faint-2)" }; }) })) };
+          days: A7.map(d => { const o = (v[p.id] ?? []).includes(d); return { t: WK[d], bg: o ? "var(--crm-brown)" : "var(--crm-tint-follow)", fg: o ? "#fff" : "var(--crm-faint-2)" }; }) }))
+          .concat(ftLocked(t, lk).map(p => ({ name: p.name, label: "Locked", tagBg: "var(--crm-field)", tagFg: "var(--crm-faint)", days: greyDays() }))) };
     }),
   };
   if (ft && fx) {
@@ -100,12 +104,14 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       const o = (v[p.id] ?? []).includes(d);
       return { title: WKL[d], icon: o ? "m5 12 5 5 9-10" : "", bg: o ? "var(--crm-brown)" : "#fff", fg: "#fff", bd: o ? "var(--crm-brown)" : "var(--crm-line)",
         toggle: () => { const cur = v[p.id] ?? []; setV({ ...v, [p.id]: o ? cur.filter(x => x !== d) : [...cur, d].sort() }); } };
-    }) }));
+    }) })).concat(ftLocked(ft, lk).map(p => ({ name: p.name, sub: "Locked · no new leads", days: A7.map(d => ({ title: WKL[d], icon: "", bg: "var(--crm-field)", fg: "#fff", bd: "var(--crm-rule-soft)", toggle: () => {} })) })));
     ftx.week = A7.map((d, k) => { const n = who(ps, v, d); return { day: WKL[d], text: n.length ? lineOf(n) : "Follows Ads to teams", fg: n.length ? "var(--crm-brown)" : "var(--crm-faint)", weight: n.length ? 650 : 500, rule: k ? "1px solid var(--crm-rule-soft)" : "0" }; });
     ftx.clear = () => setV({});
     ftx.save = () => {
       const days = A7.filter(d => who(ps, v, d).length), vals: Record<string, Record<string, number>> = {};
       ps.forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, (v[p.id] ?? []).includes(d) ? 1 : 0])); });
+      // A locked person's days are kept for when they come back (the dealer skips them meanwhile).
+      ftLocked(ft, lk).forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, (v[p.id] ?? []).includes(d) ? 1 : 0])); });
       void act.saveFtRule(ft.id, "turns", days, vals).then(ok => { if (ok) patch({ ftx: null, toast: ft.name + ": full time days saved" }); });
     };
     // …and to every team: this team as edited; in each other team every full-time person gets the day pattern of the first
@@ -178,8 +184,8 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
           putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] } });
         };
         return { name: p.name, v: String(v), set: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(dig(e)) : putB({ pv: { ...B0.pv, [p.id]: dig(e) } }),
-          note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "var(--crm-oxblood)" : "var(--crm-muted)" };
-      }),
+          note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "var(--crm-oxblood)" : "var(--crm-muted)", locked: false };
+      }).concat(lockedHere.map(p => ({ name: p.name, v: "", set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
       sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
       sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
       locked: lockedHere.length ? lockedHere.map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",

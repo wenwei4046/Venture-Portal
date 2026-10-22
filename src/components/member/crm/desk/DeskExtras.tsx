@@ -11,7 +11,7 @@ import { InfoValue } from "../shared/AdLink";
 import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
-import type { ActiveGroup } from "../shared/locked";
+import type { ActiveVM } from "../shared/locked";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -540,11 +540,17 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
 /**
  * Assignment › Active members (2026-10-22, the owner: a member not active for now but still in the company — its own
  * section after Ads to teams). Each person Active (takes new leads) or Locked (off Assignment's lists; their share to the
- * others), saved at once (crm_set_locked; shared/locked.ts › activeGroups). Member work type's cards, in its look.
+ * others). Saved by Save, as Member work type (crm_set_locked; shared/locked.ts › activeVM); its cards, in its look.
  */
-export function DeskActive({ groups }: { groups: ActiveGroup[] }) {
+export function DeskActive({ v }: { v: ActiveVM }) {
+  const { groups } = v;
   return (
     <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "14px", marginTop: "-10px" }}>
+        {v.dirty && <span style={{ fontSize: "13px", color: "var(--crm-brown)", fontWeight: 650 }}>Unsaved changes</span>}
+        {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
+        <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: "14.5px", fontWeight: 650, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
         {groups.map(g => (
           <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>

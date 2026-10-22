@@ -145,7 +145,9 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
         return { name: p.name, value: val, valueStr: String(val),
           onVal: (e: { target: { value: string } }) => { const nv = Math.min(m === "pct" ? 100 : 999, parseInt(String(e.target.value).replace(/\D/g, ""), 10) || 0); set(u => ({ ...u, mv: { ...u.mv, [key]: nv } })); },
           sub: m === "max" ? (val === 0 ? "Gets none" : `${taken} of ${val} taken${taken >= val ? " · full" : ""}`) : `${taken} taken so far`,
-          subColor: m === "max" && val > 0 && taken >= val ? "var(--crm-oxblood)" : "var(--crm-muted)" }; }),
+          subColor: m === "max" && val > 0 && taken >= val ? "var(--crm-oxblood)" : "var(--crm-muted)", locked: false }; })
+        // A locked person stays in the list, greyed with a lock, not editable (the owner, 2026-10-22).
+        .concat(t.all.filter(p => lk.has(p.id)).map(p => ({ name: p.name, value: 0, valueStr: "", onVal: () => {}, sub: "Locked · no new leads", subColor: "var(--crm-faint)", locked: true }))),
       opts: ([["evenly", "Evenly"], ["pct", "By %"], ["max", "By max"]] as const).map(([v, label]) => ({ label, on: v === m, off: v !== m, pick: () => set(u => ({ ...u, tm: { ...u.tm, [t.id]: v } })) })) }; });
   const ruleFromDraft = () => {
     if (mode === "evenly") return { mode: "even" as const, split: {}, pm: "pct" as const, pp: {}, tm: undefined };
@@ -192,6 +194,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
 
   // ── Full time lead allocation (D5): days per person, taking turns; Off = follows Ads to teams.
   const ftPeople = (tid: string) => (T.find(t => t.id === tid)?.people ?? []).filter(p => p.fullTime);
+  // Locked for now: shown greyed, not editable, their days kept (2026-10-22).
+  const ftLockedOf = (tid: string) => (T.find(t => t.id === tid)?.all ?? []).filter(p => p.fullTime && lk.has(p.id));
   const ticks = (tid: string) => { const r = data.ftRules.find(x => x.tlId === tid), v: Record<string, number[]> = {};
     if (r) for (const id in r.vals) v[id] = [0, 1, 2, 3, 4, 5, 6].map(d => ((r.vals[id]?.[String(d)] ?? 0) > 0 && r.days.includes(d) ? 1 : 0));
     return v; };
@@ -201,7 +205,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     return { name: t.name, color: t.color, state: on ? "On" : "Off", stBg: on ? "var(--crm-tint-follow)" : "var(--crm-field)", stFg: on ? "var(--crm-brown)" : "var(--crm-ink-soft)",
       mode: on ? "" : "Off · follows Ads to teams", cta: data.ftRules.some(r => r.tlId === t.id) ? "Edit days" : "Set up", noTag: true, tag: null as string | null, tagBg: "var(--crm-field)", tagFg: "var(--crm-ink-soft)",
       bd: sel ? "var(--crm-rust)" : "var(--crm-rule)", ring: sel ? "0 0 0 3px var(--crm-tint-attention)" : "none",
-      people: ftPeople(t.id).map(p => ({ name: p.name, days: dayPills(on ? v[p.id] ?? [0, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0], t.color, false) })),
+      people: ftPeople(t.id).map(p => ({ name: p.name, days: dayPills(on ? v[p.id] ?? [0, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0], t.color, false) }))
+        .concat(ftLockedOf(t.id).map(p => ({ name: `${p.name} · Locked`, days: dayPills([0, 0, 0, 0, 0, 0, 0], t.color, false) }))),
       open: () => { const cur = ticks(t.id), days: Record<string, number[]> = {}; ftPeople(t.id).forEach(p => { days[p.id] = cur[p.id] ?? [1, 1, 1, 1, 1, 0, 0]; });
         patch({ ftEdit: t.id, stage: "op", ftDraft: { on: on || !data.ftRules.some(r => r.tlId === t.id), days } }); } }; });
   const en = ui.ftEdit ? T.find(t => t.id === ui.ftEdit) : undefined, dr = ui.ftDraft ?? { on: true, days: {} };
@@ -212,13 +217,16 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const saveFt = async (tid: string, draft: { on: boolean; days: Record<string, number[]> }) => {
     const people = ftPeople(tid), vals: Record<string, Record<string, number>> = {};
     people.forEach(p => { vals[p.id] = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map(d => [String(d), draft.on && (draft.days[p.id] ?? [])[d] ? 1 : 0])); });
+    // A locked person's days are kept for when they come back.
+    const kept = ticks(tid); ftLockedOf(tid).forEach(p => { vals[p.id] = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map(d => [String(d), (kept[p.id] ?? [])[d] ? 1 : 0])); });
     const days = [0, 1, 2, 3, 4, 5, 6].filter(d => draft.on && people.some(p => (draft.days[p.id] ?? [])[d]));
     return ctx.act.saveFtRule(tid, "turns", days, vals);
   };
   const ftEdit = {
     ftCards, ftOpen, ftOn: dr.on, ftOff: !dr.on,
     ftE: { name: en?.name ?? "", color: en?.color ?? "var(--crm-rust)",
-      people: ps.map(p => ({ name: p.name, days: dayPills(dr.days[p.id] ?? [0, 0, 0, 0, 0, 0, 0], en?.color ?? "var(--crm-rust)", true, p.id), allLabel: isFull(p.id) ? "Clear all days" : "Every day", all: () => setDays([p.id], !isFull(p.id)) })),
+      people: ps.map(p => ({ name: p.name, days: dayPills(dr.days[p.id] ?? [0, 0, 0, 0, 0, 0, 0], en?.color ?? "var(--crm-rust)", true, p.id), allLabel: isFull(p.id) ? "Clear all days" : "Every day", all: () => setDays([p.id], !isFull(p.id)) }))
+        .concat(en ? ftLockedOf(en.id).map(p => ({ name: `${p.name} · Locked`, days: dayPills([0, 0, 0, 0, 0, 0, 0], en.color, false), allLabel: "Locked", all: () => {} })) : []),
       summary: DAY_NAMES.map((day, i) => { const who = ps.filter(p => (dr.days[p.id] ?? [])[i]).map(p => p.name);
         return { day, who: !dr.on || !who.length ? "No one · follows Ads to teams" : who.length === 1 ? `${who[0]} only` : `${who.join(", ")} take turns`, fg: dr.on && who.length ? "var(--crm-ink)" : "var(--crm-faint)" }; }) },
     ftAllLabel: ps.length && ps.every(p => isFull(p.id)) ? "Clear all" : "Tick every day", ftAllToggle: () => setDays(ps.map(p => p.id), !(ps.length && ps.every(p => isFull(p.id)))),
