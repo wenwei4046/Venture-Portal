@@ -51,6 +51,13 @@ describe('Add combo', () => {
     expect(moduleSum([], 'PRICE_2', '28')).toBeNull()
   })
 
+  it('a piece priced 0 there is not sold there (2026-10-21: 0 = 还没定价) — never a set total at RM 0', () => {
+    const zero = comboPieces([sku('8069-1A(LHF)', '1A(LHF)', { baseModel: '8069', grid: [{ height: '35', tier: 'PRICE_1', price: 0 }, { height: '28', tier: 'PRICE_1', price: 750 }] })], '8069')
+      .map(p => ({ ...p, n: 1 }))
+    expect(moduleSum(zero, 'PRICE_1', '35')).toBeNull()
+    expect(moduleSum(zero, 'PRICE_1', '28')).toBe(750)
+  })
+
   it('knows the same compartments whatever their order', () => {
     expect(sameCompartments(erp, [['CNR'], ['1NA']])).toBe(true)
     expect(sameCompartments(erp, [['1NA'], ['2NA']])).toBe(false)

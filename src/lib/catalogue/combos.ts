@@ -18,6 +18,12 @@
  *   * Same base model only; one tier and one seat height across the set; the
  *     matched lines must share one quantity (a combo is ONE set, and mixed
  *     quantities have no clean set count — never under-book).
+ *   * The set's price is found at the build's fabric tier the way a module's
+ *     is (`gridPrice`, `catalogue_grid_price`): that tier, else PRICE_2, else
+ *     the lowest tier the portal priced it at (2026-10-21: every sofa bill
+ *     arrives at PRICE_2, the SOFFIO sets are priced at PRICE_1 only, and the
+ *     Quote — which can only offer PRICE_1 for SOFFIO — and the run must cost
+ *     the same sale alike).
  *   * The combo's total is spread across the matched lines in proportion to
  *     their own costs, the rounding residual to the dearest line; evenly when
  *     none of them has a cost.
@@ -146,13 +152,23 @@ function priceAt(combo: PricedCombo, height: string): number | null {
 }
 
 /**
+ * How near a combo's tier is to the build's, in the order `gridPrice` takes a
+ * module's cell: the build's own tier (a tier-specific combo before an
+ * any-tier one), else PRICE_2, else the lowest tier priced.
+ */
+function tierFit(tier: string | null, want: string): number {
+  return tier === want ? 0 : tier === null ? 1 : tier === 'PRICE_2' ? 2 : 3
+}
+
+/**
  * The combo a build is costed at, or null. Candidates are live combos of the
- * same base model whose tier is the build's (or any), that are EXACTLY the
- * build — every piece fills one of their slots, nothing more, nothing less
- * (2026-10-08, user: 完全一样才算; the ERP took a combo the build merely
- * covered) — and that the portal priced at this seat height. A tier-specific combo beats
- * an any-tier one; then the newest effective row, the newest created, the id —
- * the ERP's own tie-breaks.
+ * same base model that are EXACTLY the build — every piece fills one of their
+ * slots, nothing more, nothing less (2026-10-08, user: 完全一样才算; the ERP
+ * took a combo the build merely covered) — and that the portal priced at this
+ * seat height, at any fabric tier. The build's own tier wins — a tier-specific
+ * combo before an any-tier one — else PRICE_2, else the lowest tier, as a
+ * module's price falls back (2026-10-21); then the newest effective row, the
+ * newest created, the id — the ERP's own tie-breaks.
  *
  * `asOf` (an ISO date) drops combos not yet in effect. Without it nothing is
  * dropped — the SQL twin and the ERP default to today, and so does the one
@@ -168,7 +184,6 @@ export function pickCombo(
   const hits: ComboHit[] = []
   for (const combo of combos) {
     if (combo.baseModel.trim().toUpperCase() !== bm) continue
-    if (combo.tier !== null && combo.tier !== build.tier) continue
     if (asOf !== undefined && combo.effectiveFrom > asOf) continue
     const matched = matchComboSlots(build.modules, combo.modules)
     if (matched === null || matched.length !== pieces) continue
@@ -177,10 +192,12 @@ export function pickCombo(
     hits.push({ combo, price, matched })
   }
   if (hits.length === 0) return null
+  const asc = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
   const desc = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0)
   hits.sort(
     (a, b) =>
-      Number(b.combo.tier !== null) - Number(a.combo.tier !== null) ||
+      tierFit(a.combo.tier, build.tier) - tierFit(b.combo.tier, build.tier) ||
+      asc(a.combo.tier ?? '', b.combo.tier ?? '') ||
       desc(a.combo.effectiveFrom, b.combo.effectiveFrom) ||
       desc(a.combo.createdAt ?? '', b.combo.createdAt ?? '') ||
       desc(a.combo.erpId, b.combo.erpId),

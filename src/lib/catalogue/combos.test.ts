@@ -296,6 +296,8 @@ describe('pickCombo — the pick inside catalogue_apply_combos', () => {
     expect(hit?.combo.label).toBe('1A(LHF) + 1A(RHF) + CONSOLE')
     expect(hit?.price).toBe(2140)
     expect(hit?.matched).toEqual([0, 1, 2])
+    // …and so is the bill, which the ERP sends at PRICE_2.
+    expect(pickCombo(build({ modules: ['1A(LHF)', 'Console', '1A(RHF)'], height: '35', tier: 'PRICE_2' }), [soffio, pair])?.price).toBe(2140)
   })
 
   it('another base model never matches', () => {
@@ -306,10 +308,34 @@ describe('pickCombo — the pick inside catalogue_apply_combos', () => {
     expect(pickCombo(build({ modules: ['2A(LHF)', 'CONSOLE'] }), [combo()])).toBeNull()
   })
 
-  it('a tier-specific combo applies to its tier only; a null tier is any tier', () => {
-    expect(pickCombo(build({ tier: 'PRICE_1' }), [combo({ tier: 'PRICE_2' })])).toBeNull()
+  it('a set priced at its tier, or at any tier, is costed at that price', () => {
     expect(pickCombo(build({ tier: 'PRICE_2' }), [combo({ tier: 'PRICE_2' })])?.price).toBe(3200)
     expect(pickCombo(build({ tier: 'PRICE_3' }), [combo({ tier: null })])?.price).toBe(3200)
+  })
+
+  // 2026-10-21: every sofa bill arrives at PRICE_2 (the ERP's fabric list puts 763 fabrics there, and a line with none
+  // reads PRICE_2), while the SOFFIO sets are priced at PRICE_1 only — the one tier the Quote can offer for SOFFIO. A
+  // module's price already falls back that way (gridPrice); a set's must too, or the Quote and the run disagree.
+  it("a set priced at another tier only is found the way a module's cell is: PRICE_2, else the lowest", () => {
+    expect(pickCombo(build({ tier: 'PRICE_2' }), [combo({ tier: 'PRICE_1' })])?.price).toBe(3200)
+    const p1 = combo({ erpId: 'p1', tier: 'PRICE_1', priceByHeight: { '30': 3100 } })
+    const p2 = combo({ erpId: 'p2', tier: 'PRICE_2', priceByHeight: { '30': 3200 } })
+    const p3 = combo({ erpId: 'p3', tier: 'PRICE_3', priceByHeight: { '30': 3300 } })
+    expect(pickCombo(build({ tier: 'PRICE_3' }), [p1, p2])?.combo.erpId).toBe('p2')
+    expect(pickCombo(build({ tier: 'PRICE_1' }), [p3, p2])?.combo.erpId).toBe('p2')
+    expect(pickCombo(build({ tier: 'PRICE_2' }), [p3, p1])?.combo.erpId).toBe('p1')
+  })
+
+  it("the build's own tier always beats a fallback, however new the fallback", () => {
+    const own = combo({ erpId: 'own', tier: 'PRICE_1', effectiveFrom: '2026-01-01', priceByHeight: { '30': 3100 } })
+    const newer = combo({ erpId: 'newer', tier: 'PRICE_2', effectiveFrom: '2026-10-01', priceByHeight: { '30': 3200 } })
+    expect(pickCombo(build({ tier: 'PRICE_1' }), [newer, own])?.combo.erpId).toBe('own')
+  })
+
+  it('a tier with no price at the height never shadows one that has it', () => {
+    const unpriced = combo({ erpId: 'p2-24', tier: 'PRICE_2', priceByHeight: { '24': 3000 } })
+    const priced = combo({ erpId: 'p1-30', tier: 'PRICE_1', priceByHeight: { '30': 3100 } })
+    expect(pickCombo(build({ tier: 'PRICE_2' }), [unpriced, priced])?.combo.erpId).toBe('p1-30')
   })
 
   it('a tier-specific combo beats an any-tier one, even a newer one', () => {
