@@ -1705,7 +1705,7 @@ Superseded by *The Revenue app — built to the prototype*. Its data rules hold:
 
 On hold: proposals A (Espresso & Clay) and C (Orange & Brown) on fictional data at `/member/preview?design=compare`, behind `member_requests_manage`. The live Arena is the Revenue app's. One rule stands: Championship is an additive points total — never a percentage or weighted average — beside Sales, Margin and KPI. Full text: `git show d241acde:docs/DESIGN.md`.
 
-### Marketing's view — its shell and first pages (v4.126, 2026-10-23)
+### Marketing's view — its shell and first pages (2026-10-23)
 
 Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module Setup** (`.design/marketing/design_handoff_houzs_marketing/` — README = spec, `design/Marketing Shell.dc.html`, `My Space.dc.html` → `My Space Bento.dc.html`, `Calendar.dc.html`, `Tracking Dashboard.dc.html`), value for value. Its rules and decisions: `.claude/rules/marketing/marketing-view.md`.
 
