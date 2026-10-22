@@ -114,9 +114,23 @@ describe("vaGroupsVM", () => {
   it("puts the top of the tree first and searches name and title", () => {
     const [g] = vaGroupsVM([fair], "", "b");
     expect(g.title).toBe("FAIR · 3");
-    expect(g.people.map(p => [p.name, p.level, p.viewing])).toEqual([["ADRIAN", 0, false], ["BEN", 1, true], ["CHLOE", 2, false]]);
+    expect(g.people.map(p => [p.name, p.level, p.viewing])).toEqual([["ADRIAN", 1, false], ["BEN", 2, true], ["CHLOE", 3, false]]);
     expect(vaGroupsVM([fair], "senior", "")[0].people.map(p => p.name)).toEqual(["BEN"]);
     expect(vaGroupsVM([fair], "nobody", "")).toEqual([]);
+  });
+
+  // 2026-10-23 — the user: "找不到我的 revenue director 了". A director holds no seat; the snapshot lists them `director`.
+  it("puts the sub-department's Revenue Directors above the top of the tree, as the prototype draws them", () => {
+    const withDirectors: MemberMembership = { ...fair, people: [...fair.people,
+      { id: "p", name: "PETER", title: "Revenue Director", rank: "Rank SS", parentId: null, director: true },
+      { id: "k", name: "KRIS", title: "Revenue Director", rank: "", parentId: null, director: true }] };
+    const [g] = vaGroupsVM([withDirectors], "", "p");
+    expect(g.title).toBe("FAIR · 5");
+    expect(g.people.map(p => [p.name, p.sub, p.level, p.viewing])).toEqual([
+      ["KRIS", "Revenue Director · Leads Fair", 0, false], ["PETER", "Revenue Director · Leads Fair", 0, true],
+      ["ADRIAN", "Team Leader · Rank A", 1, false], ["BEN", "Senior Executive · Rank B", 2, false], ["CHLOE", "Executive · Rank C", 3, false],
+    ]);
+    expect(vaGroupsVM([withDirectors], "director", "")[0].people.map(p => p.name)).toEqual(["KRIS", "PETER"]);
   });
 });
 

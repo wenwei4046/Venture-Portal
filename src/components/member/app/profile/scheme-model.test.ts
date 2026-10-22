@@ -57,6 +57,16 @@ describe("schemeVM", () => {
     expect([ir.role, ir.stats[0].value]).toEqual(["Revenue Director", "—"]);
   });
 
+  // The Principal's View as of a director (2026-10-23): the same sheet, from the viewed person and the engine's rate.
+  it("in a Principal's view of a director: their rung's rate once known, no ladders, no salary", () => {
+    const peter = { name: "PETER", ini: "PE", title: "Revenue Director", membership: undefined, salary: undefined, bands, hidden: false, director: true };
+    const vm = schemeVM({ ...peter, rank: "Rank SS", rate: 0.12 });
+    expect([vm.role, vm.stats.map(s => s.value), vm.brands]).toEqual(["Revenue Director · Rank SS", ["12.0%", "—", "—"], []]);
+    expect(vm.note).toMatch(/^Your own bills pay at your rank's rate\./);
+    expect(schemeVM({ ...peter, rank: "", rate: 0 }).stats[0].value).toBe("—");
+    expect(schemeVM({ ...peter, rank: "Rank SS", rate: null }).stats[0].value).toBe("—");
+  });
+
   it("keeps the salary out of a view that may not see it, and hides it on request", () => {
     expect(schemeVM({ ...who, membership, salary: undefined, bands: [], hidden: false }).stats[1].value).toBe("—");
     expect(schemeVM({ ...who, membership, salary: 3000, bands: [], hidden: true }).stats[1].value).toBe("RM ••••");

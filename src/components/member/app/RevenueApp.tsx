@@ -362,8 +362,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
     ? { staffId: route.staff, subDepartmentId: membershipId } : undefined), [principal, route.staff, membershipId]);
   const viewed = principal && route.staff ? membership?.people.find(p => p.id === route.staff) : undefined;
-  // A Revenue Director's own app (2026-10-14): the sub-department they direct, everybody in it under them.
-  const director = !principal && !!membership?.director;
+  // A Revenue Director's own app (2026-10-14): the sub-department they direct, everybody in it under them — and the
+  // Principal's View as of one (2026-10-23), which reads exactly what their own app does.
+  const director = principal ? !!viewed?.director : !!membership?.director;
 
   const me: Me = useMemo(() => {
     // The greeting's name is the first name (2026-10-17, the user: "只放 first name" — "full name = loo wen wei, wen wei
@@ -1198,8 +1199,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     name: me.name, ini: me.ini, title: me.title, rank: me.rank,
     membership: principal ? undefined : membership,
     rate: principal ? incData?.month.rate ?? null : undefined,
+    director: principal ? director : undefined,
     salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden,
-  }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, data.profile.salary, data.bands, hidden]);
+  }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, director, data.profile.salary, data.bands, hidden]);
 
   // My brand weeks (read only since 2026-10-12): this month and the two before it, newest first, up to this
   // week's weekend and never a later one — where the ERP's Sales Attending puts the person read, else the

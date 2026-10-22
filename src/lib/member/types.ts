@@ -122,6 +122,11 @@ export interface MemberPerson {
   rank: string;
   parentId: string | null;
   self?: boolean;
+  /**
+   * A Revenue Director of the sub-department, in the Principal's View as list (2026-10-23): no seat, listed after the
+   * seats with their title and the rung it holds on the ladder ("" where it has none), no upline.
+   */
+  director?: boolean;
 }
 export interface MemberMembership {
   id: string;
