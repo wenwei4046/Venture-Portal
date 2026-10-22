@@ -101,7 +101,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   // An ad with 3+ leads and not one visit booked is flagged (v2: "No appointments"; its cost per lead is Meta's, not known yet).
   const noAppt = (a: { id: string; leads: number }) => a.leads >= 3 && !data.visits.some(v => v.state !== "cancelled" && data.customers.some(c => c.id === v.customerId && c.adId === a.id));
   const adCards = shownAds.map(a => { const r = ruleOf(a.id), sel = ui.ad === a.id, st = statusOf(a.id), segs = segsOf(r);
-    return { name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger, chFg: a.wa ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger,
+    return { id: a.id, name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger, chFg: a.wa ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger,
       segs, set: !!r && r.mode !== null, unset: !r, status: st ?? "—", stColor: st ? ST_META[st][1] : "var(--crm-faint-2)", stTint: st ? ST_META[st][3] : "var(--crm-field)",
       tag: null as string | null, noTag: true, tagBg: "var(--crm-field)", tagFg: "var(--crm-ink-soft)",
       mode: r ? (r.mode === "even" ? `Evenly · each team 1/${TA.length || 1}` : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",

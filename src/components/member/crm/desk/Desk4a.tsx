@@ -1060,7 +1060,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
 
 interface AdListBits {
   adList4: { summary: string; unsetN: number; legend: { name: string; color: string }[];
-    rows: { name: string; nameless: boolean; paused?: boolean; run?: string; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
+    rows: { name: string; nameless: boolean; paused?: boolean; run?: string; brand?: string; brandHead?: boolean; brandN?: number; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
   stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
 }
 // The name keeps 136 px (the channel icon and "Not named yet"); the split bar gives way first on a narrow screen (the owner, 2026-10-18: "调一下 Split 宽度").
@@ -1094,8 +1094,9 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
         <span>Ad</span><span style={{ textAlign: "right" }}>Leads</span><span>Split</span><span />
       </div>
-      {L.rows.map((r, i) => (
-        <div key={i} onClick={r.open} style={{ display: "grid", gridTemplateColumns: AD_GRID, gap: "12px", alignItems: "center", minHeight: "62px", padding: "0 12px", position: "relative", cursor: "pointer",
+      {L.rows.map((r, i) => (<Fragment key={i}>
+        {r.brandHead && <div style={{ display: "flex", alignItems: "center", gap: "8px", minHeight: "34px", padding: "0 12px", background: "var(--crm-page)", borderBottom: "1px solid var(--crm-rule-soft)", font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-ink-soft)" }}>{r.brand}<span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{r.brandN}</span></div>}
+        <div onClick={r.open} style={{ display: "grid", gridTemplateColumns: AD_GRID, gap: "12px", alignItems: "center", minHeight: "62px", padding: "0 12px", position: "relative", cursor: "pointer",
           borderBottom: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-cream)" : "transparent" }} className={r.sel ? undefined : "crm4a-row"}>
           <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-orange)" : "transparent" }} />
           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
@@ -1115,7 +1116,7 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
               ...(!r.set ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }} className={!r.set ? "crm4a-primary" : "crm4a-outline"}>{!r.set ? "Set up" : "Edit split"}</button>
           </span>
         </div>
-      ))}
+      </Fragment>))}
     </div>
   );
 }

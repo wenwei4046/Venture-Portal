@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -114,5 +114,29 @@ describe('the ads Meta lists for "+"', () => {
   })
   it('throws when Meta refuses the accounts', async () => {
     await expect(listMetaAds('T', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).rejects.toThrow()
+  })
+})
+
+describe("only the ads sent to the CRM's ad number", () => {
+  it('keeps an ad whose ad set sends people to 018-358 0219, drops the rest', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('me/adaccounts')) return new Response(JSON.stringify({ data: [{ id: 'act_1', name: 'IR@The Conts' }] }), { status: 200 })
+      if (u.includes('act_1/ads')) return new Response(JSON.stringify({ data: [
+        { id: '111111', name: 'Ours', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '102351059576534', whatsapp_phone_number: '60183580219' } } },
+        { id: '222222', name: 'Other number', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '478652958664343', whatsapp_phone_number: '601160716133' } } },
+        { id: '333333', name: 'Messenger', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '478652958664343' } } },
+      ] }), { status: 200 })
+      if (u.includes('fields=name')) return new Response(JSON.stringify({ name: 'The Conts' }), { status: 200 })
+      return new Response('{}', { status: 400 })
+    }) as unknown as typeof fetch
+    const rows = await listMetaAds('T', f, { numbers: crmAdNumbers(undefined) })
+    expect(rows.map(r => r.id)).toEqual(['111111'])
+    expect(rows[0].pageName).toBe('The Conts')
+    expect((await listMetaAds('T', f)).length).toBe(3)
+  })
+  it('reads other numbers from the server when named', () => {
+    expect(crmAdNumbers(undefined)).toEqual(['60183580219'])
+    expect(crmAdNumbers('+60 18-358 0219, 60189079042')).toEqual(['60183580219', '60189079042'])
   })
 })

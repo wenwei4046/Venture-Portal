@@ -18,7 +18,7 @@ export interface PanelActions extends SalesActions {
   /** Names an ad (crm_name_ad, CRM · Manage); an empty name takes the given name off. */
   nameAd(ad: string, name: string): Promise<boolean>;
   /** Adds an ad before its first lead (crm_add_ad, CRM · Manage; 2026-10-22): it joins Ads to teams with its run. */
-  addAd(ad: { id: string; name: string; status: string; start: string | null; end: string | null }): Promise<boolean>;
+  addAd(ad: { id: string; name: string; status: string; start: string | null; end: string | null; page?: string | null; pageName?: string | null }): Promise<boolean>;
   /** Meta's ads in the connected ad accounts; also adds, by itself, every one running or about to run (`sync`). */
   metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
@@ -61,11 +61,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async addAd(ad) {
-      if (!(await write("crm_add_ad", { p_ad: ad.id, p_name: ad.name, p_status: ad.status || null, p_start: ad.start, p_end: ad.end }))) return false;
+      if (!(await write("crm_add_ad", { p_ad: ad.id, p_name: ad.name, p_status: ad.status || null, p_start: ad.start, p_end: ad.end, p_page: ad.page ?? null, p_page_name: ad.pageName ?? null }))) return false;
       setData(d => {
         const cur = d.adNames?.[ad.id];
         return { ...d, adNames: { ...(d.adNames ?? {}), [ad.id]: { name: cur?.source === "manual" ? cur.name : ad.name || cur?.name || `Ad ${ad.id}`, source: cur?.source ?? "meta",
-          status: ad.status || cur?.status || null, statusAt: new Date().toISOString(), added: true, startAt: ad.start ?? cur?.startAt ?? null, endAt: ad.end } } };
+          status: ad.status || cur?.status || null, statusAt: new Date().toISOString(), added: true, startAt: ad.start ?? cur?.startAt ?? null, endAt: ad.end, pageId: ad.page ?? cur?.pageId ?? null, pageName: ad.pageName ?? cur?.pageName ?? null } } };
       });
       return true;
     },
@@ -77,7 +77,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
         const now = new Date(), have = data().adNames ?? {};
         for (const a of r.ads) {
           const h = have[a.id];
-          if (!adToSync(a, now) || (h?.added && h.status === a.status && (h.startAt ?? null) === a.start && (h.endAt ?? null) === a.end)) continue;
+          if (!adToSync(a, now) || (h?.added && h.status === a.status && (h.startAt ?? null) === a.start && (h.endAt ?? null) === a.end && (h.pageId ?? null) === a.page)) continue;
           await api.addAd(a);
         }
       }

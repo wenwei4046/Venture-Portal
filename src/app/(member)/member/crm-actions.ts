@@ -11,7 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { listMetaAds, type MetaAdRow } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, listMetaAds, type MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -213,7 +213,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // One's own recent emoji, the chat composer's Recents (mig 20261014251500).
     soft<{ recent_emoji: string[] | null }[]>(db.from("crm_staff_prefs").select("recent_emoji")),
     // Ads' names (mig 20261016120000).
-    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at, added_at, starts_at, ends_at")),
+    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at, added_at, starts_at, ends_at, page_id, page_name")),
     // Settings › General (mig 20261018100000): null before it, so the CRM keeps today's values.
     (async () => { try { const { data, error } = await db.rpc("crm_settings_read"); return error ? null : (data as unknown); } catch { return null; } })(),
     // Members locked out of the dealing for now (mig 20261022130000).
@@ -401,7 +401,8 @@ export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | {
     await requireCrm("manage");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
-    return { ok: true, ads: await listMetaAds(token) };
+    // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers) — not every ad the system user sees.
+    return { ok: true, ads: await listMetaAds(token, fetch, { numbers: crmAdNumbers() }) };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's ads could not be read.") };
   }
