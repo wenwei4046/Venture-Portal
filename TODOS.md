@@ -6,6 +6,31 @@ history (`git log -p -- TODOS.md`).
 
 ---
 
+## Owed — Supabase Storage's old copies, after the move to R2 (2026-10-23)
+
+Every bucket's files moved to Cloudflare R2 on 2026-10-23 (#633, #635, #638;
+`.claude/rules/portal-wide/storage.md`). Storage still holds the 261 old copies
+and its 34 policies, kept as the fallback until the owner says to delete them
+(about two weeks, ~2026-11-06). Before deleting:
+- look for a link still naming Storage's address in `crm_auto_replies.settings`
+  (`….supabase.co/storage/v1/object/public/…`) — an auto-reply page left open
+  over the move saves its old set back — and point it at `cdn.houzsventure.com`;
+- run `scripts/storage-to-r2.mjs --all --apply` and the move migrations'
+  `INSERT … SELECT` once more: a browser still on a pre-#633 bundle uploads
+  straight to Storage, and that file needs its bytes and its row in R2.
+
+## Owed — uploads that pass through a Server Action stop at 4 MB (2026-10-23)
+
+`next.config.ts` caps a Server Action's body at 4 MB (Vercel's own limit is
+4.5 MB), so a file sent through one can never be bigger, whatever its bucket
+allows: payment-voucher attachments (`payments/actions.ts`), Invoice
+Financing's (`ba/actions.ts`, which says "max 15 MB"), and the waiting-list
+form templates (`revenue/waiting-actions.ts`). Every other upload already goes
+from the browser straight to R2 (`startUpload`, a presigned PUT; a 1 GB video
+went up in 37 s on 2026-10-23). Moving these three to the browser-direct path
+lifts the cap. Bigger files elsewhere are each bucket's own
+`file_buckets.file_size_limit` / `allowed_mime_types`, set by a migration.
+
 ## Owed — the React Compiler's lint rules (2026-10-21)
 
 The move to Next 16 brought eslint-plugin-react-hooks 7, whose recommended set
