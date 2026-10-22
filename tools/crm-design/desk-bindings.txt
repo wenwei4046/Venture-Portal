@@ -1,5 +1,6 @@
 H
 W
+actGroups
 ad
 adByTeam
 adCalApply
@@ -258,6 +259,7 @@ infoChat
 insAdCols
 insAdMinW
 insHead
+isActOp
 isCenter
 isCltOp
 isCpOp

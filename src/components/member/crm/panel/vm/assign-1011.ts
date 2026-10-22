@@ -9,8 +9,8 @@ import type { CrmAdRule, CrmCustomer } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
-import { lockedOf, sharedOut } from "../../shared/locked";
-import { DIRECTOR_SPLIT_KEY } from "../../desk/vm/tokens";
+import { activeGroups, lockedOf, sharedOut } from "../../shared/locked";
+import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
@@ -51,12 +51,18 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     onHome: false, inSub: true, back: () => patch({ asSec: null }),
     tabs4: [
       { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
+      // Active members, its own tab after Ads (the owner, 2026-10-22). CRM · Manage only, as Work type.
+      ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false }) }] : []),
       { label: "Full time", on: sec === "Ft", pick: go("Ft") },
       ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
     ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
-    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft",
+    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act",
+    act: activeGroups([
+      { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
+      ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),
+    ], lk, p => jobTitle(p as Team["people"][number]), act.setLocked, msg => patch({ toast: msg })),
     cards: ([
       // No Organic Leads card (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
       ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "var(--crm-ink-soft)", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",

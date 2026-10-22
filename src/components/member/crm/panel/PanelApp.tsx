@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip } from "../shared/phone4a";
+import { Phone4aActive, Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -985,7 +985,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </section>
           </>)}
-          {!!(v.asx.onFt) && (<>
+          {!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>
             <section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>
               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-brown)" }}>
               </span>
@@ -2325,7 +2325,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
                     <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{p.title}</small>
                   </span>
-                  <span role="button" onClick={p.lockToggle} aria-pressed={p.locked} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 9px", borderRadius: "13px", border: p.locked ? "1px solid var(--crm-oxblood)" : "1px solid var(--crm-line)", background: p.locked ? "var(--crm-tint-attention)" : "#fff", color: p.locked ? "var(--crm-oxblood)" : "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", cursor: "pointer" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d={p.locked ? "M7 11V7a5 5 0 0 1 10 0v4" : "M7 11V7a5 5 0 0 1 9.9-1"}></path></svg>{p.locked ? "Locked" : "Lock"}</span><span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg, transition: "background 160ms" }}>
+                  <span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg, transition: "background 160ms" }}>
                     <span style={{ position: "absolute", top: "3px", left: p.swX, width: "20px", height: "20px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left 160ms" }}>
                     </span>
                   </span>

@@ -11,7 +11,7 @@ import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a } from "./Desk4a";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -549,7 +549,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive groups={v.actGroups} />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "var(--crm-muted)" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>
@@ -579,7 +579,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                             <strong style={{ fontSize: "14.5px", fontWeight: "650" }}>{p.name}</strong>
                             <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{p.role}</span>
                           </span>
-                          {!!(p.lockToggle) && (<span role="button" onClick={p.lockToggle} aria-pressed={p.locked} style={{ flex: "0 0 auto", height: "24px", padding: "0 9px", boxSizing: "border-box", borderRadius: "12px", border: p.locked ? "1px solid var(--crm-oxblood)" : "1px solid var(--crm-line)", background: p.locked ? "var(--crm-tint-attention)" : "#fff", color: p.locked ? "var(--crm-oxblood)" : "var(--crm-faint)", fontSize: "12px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d={p.locked ? "M7 11V7a5 5 0 0 1 10 0v4" : "M7 11V7a5 5 0 0 1 9.9-1"}></path></svg>{p.locked ? "Locked" : "Lock"}</span>)}<span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.wtBg, color: p.wtFg, fontSize: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center" }}>{p.wt}</span>
+                          <span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.wtBg, color: p.wtFg, fontSize: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center" }}>{p.wt}</span>
                           <span style={{ flex: "0 0 auto", width: "40px", height: "24px", borderRadius: "12px", background: p.track, position: "relative", display: "block" }}>
                             <span style={{ position: "absolute", top: "3px", left: `${p.knob}px`, width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }}>
                             </span>

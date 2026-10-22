@@ -58,11 +58,10 @@ module.exports = [
   ['fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}>{r.v}</span>',
     'fontWeight: r.w, color: r.c, overflowWrap: "anywhere", textWrap: "pretty" }}><InfoValue v={r.v} href={r.href} /></span>',
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
-  // Member work type: each person's Lock (2026-10-22, the owner: a member not active for now is off Assignment's lists, their
-  // share to the others; saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked in a team.
-  ['<span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.wtBg, color: p.wtFg, fontSize: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center" }}>{p.wt}</span>',
-    '{!!(p.lockToggle) && (<span role="button" onClick={p.lockToggle} aria-pressed={p.locked} style={{ flex: "0 0 auto", height: "24px", padding: "0 9px", boxSizing: "border-box", borderRadius: "12px", border: p.locked ? "1px solid var(--crm-oxblood)" : "1px solid var(--crm-line)", background: p.locked ? "var(--crm-tint-attention)" : "#fff", color: p.locked ? "var(--crm-oxblood)" : "var(--crm-faint)", fontSize: "12px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d={p.locked ? "M7 11V7a5 5 0 0 1 10 0v4" : "M7 11V7a5 5 0 0 1 9.9-1"}></path></svg>{p.locked ? "Locked" : "Lock"}</span>)}<span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.wtBg, color: p.wtFg, fontSize: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center" }}>{p.wt}</span>',
-    "Member work type: Lock per person (crm_set_locked), its own setting."],
+  // Active members (2026-10-22, the owner: a member not active for now is off Assignment's lists, their share to the others;
+  // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
+  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive groups={v.actGroups} />)}',
+    "Assignment › Active members: each person Active or Locked (crm_set_locked)."],
   ['<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>',
     '<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}',
     "Ads to teams: a team with somebody locked says so (their share goes to the others)."],

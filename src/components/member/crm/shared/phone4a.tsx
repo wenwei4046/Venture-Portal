@@ -11,6 +11,7 @@ import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEv
 import { useEffect, useRef, useState } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
+import type { ActiveGroup } from "./locked";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
@@ -337,5 +338,39 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
       <span style={{ marginTop: "8px", maxWidth: "270px", fontSize: fs(15), lineHeight: 1.5, color: "var(--crm-muted)" }}>{e.sub}</span>
       {e.all && <button type="button" onClick={e.all} style={{ ...BTN, marginTop: "20px", height: "44px", padding: "0 20px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", fontWeight: 500, fontSize: fs(15), color: "var(--crm-ink)" }}>See all chats</button>}
     </div>
+  );
+}
+
+/**
+ * T03 · Assignment › Active (2026-10-22, the owner: its own tab after Ads to teams): every team, each person Active or
+ * Locked — a locked member takes no new leads and leaves Assignment's lists, their share to the rest of the team. Saved at
+ * once (crm_set_locked; shared/locked.ts › activeGroups).
+ */
+export function Phone4aActive({ groups }: { groups: ActiveGroup[] }) {
+  return (
+    <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
+      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-muted)" }}>Locked members take no new leads; their share goes to the rest of their team.</span>
+      {groups.map(g => (
+        <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
+            <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: g.color }}>{g.name}</strong>
+            <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
+          </div>
+          {g.people.map((p, k) => (
+            <div key={p.id} role="button" aria-pressed={p.active} onClick={p.toggle} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 14px", borderTop: k ? "1px solid var(--crm-rule-soft)" : "0", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
+              <span style={{ flex: "none", width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: fs(12), fontWeight: 600 }}>{p.ini}</span>
+              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
+                <strong style={{ fontSize: fs(14), fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
+                <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{p.active ? p.role : "Locked · no new leads"}</small>
+              </span>
+              <span style={{ flex: "none", position: "relative", width: "40px", height: "24px", borderRadius: "12px", background: p.active ? "var(--crm-brown)" : "var(--crm-line)", transition: "background 160ms" }}>
+                <span style={{ position: "absolute", top: "3px", left: p.active ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left 160ms" }} />
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
   );
 }

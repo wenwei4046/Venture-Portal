@@ -442,6 +442,9 @@ function panel(body) {
   body = teamInbox(body);
   body = teamAssign(body);
   body = teamSplit(body);
+  // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
+  // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
+  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
   body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
     '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.v}%, #fff ${r.v}%)`, ["--thumb" as string]: r.c }} />', "split slider");
@@ -452,10 +455,6 @@ function panel(body) {
   { const a = body.indexOf('<div onClick={v.fts.openPage}'); if (a < 0) throw new Error("phone-4a: work type row");
     const [x, y] = el(body.slice(a, a + 4000), '<div onClick={v.fts.openPage}', "div", "work type row"); body = body.slice(0, a + x) + body.slice(a + y); }
   body = profile(body, 4);
-  // Member work type: each person's Lock (2026-10-22, the owner: a member not active for now — off Assignment's lists,
-  // their share to the others; its own setting, saved at once through crm_set_locked; vm/profile-1011.ts).
-  body = once(body, '<span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg',
-    `<span role="button" onClick={p.lockToggle} aria-pressed={p.locked} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 9px", borderRadius: "13px", border: p.locked ? "1px solid var(--crm-oxblood)" : "1px solid var(--crm-line)", background: p.locked ? "var(--crm-tint-attention)" : "#fff", color: p.locked ? "var(--crm-oxblood)" : "var(--crm-faint)", fontSize: "${F(12)}", fontWeight: "500", cursor: "pointer" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d={p.locked ? "M7 11V7a5 5 0 0 1 10 0v4" : "M7 11V7a5 5 0 0 1 9.9-1"}></path></svg>{p.locked ? "Locked" : "Lock"}</span><span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg`, "work type lock");
   // Member work type saves on Save (the owner, 2026-10-18: "新加save按钮"): Cancel · Save N changes at the page's foot
   // once a switch is changed (vm/profile-1011.ts › memberWorkTypeVM).
   {
