@@ -141,6 +141,8 @@ describe('where it stands', () => {
 
   it('the trail in words, newest first, on the office’s clock', () => {
     const pp = page({}, {}, [
+      { at: '2026-10-25T10:00:00Z', actor: 'Kelvin Tan (PIC)', action: 'pic approved', reason: 'Kickoff' },
+      { at: '2026-10-25T09:00:00Z', actor: 'Kelvin (PIC)', action: 'pic changes', reason: 'Add Penang' },
       { at: '2026-10-25T08:00:00Z', actor: 'RACHEL', action: 'resent', reason: 'Kelvin' },
       { at: '2026-10-25T07:00:00Z', actor: 'RACHEL', action: 'started before approval', reason: 'Launch is Monday' },
       { at: '2026-10-25T06:00:00Z', actor: 'RACHEL', action: 'edited after approval', reason: 'Meeting date' },
@@ -148,6 +150,8 @@ describe('where it stands', () => {
       { at: '2026-10-24T04:00:00Z', actor: 'SITI', action: 'signed', reason: 'Kickoff' },
     ])
     expect(productTrail(pp).map(l => `${l.t} ${l.text}`)).toEqual([
+      '25 Oct 18:00 Kelvin Tan (PIC) approved Kickoff on the link',
+      '25 Oct 17:00 Kelvin (PIC) asked for changes on the link: "Add Penang"',
       '25 Oct 16:00 RACHEL resent to Kelvin',
       '25 Oct 15:00 RACHEL started before PIC approval: "Launch is Monday"',
       '25 Oct 14:00 RACHEL changed Meeting date after approval · back to the PIC',

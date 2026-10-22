@@ -78,6 +78,15 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
         ],
       },
+      // The PIC's link (2026-10-24, Marketing ⑤-1): the same — its address carries the project's code.
+      {
+        source: '/t/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
 

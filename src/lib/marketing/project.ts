@@ -296,6 +296,8 @@ export function productTrail(page: Pick<ProductProjectPage, 'project' | 'trail'>
       : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
       : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason}"`
       : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
+      : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link`
+      : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason}"`
       : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
     return { key: `${e.at}:${i}`, t: trailTime(e.at), text }
   })
