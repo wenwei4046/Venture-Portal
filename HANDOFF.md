@@ -1,5 +1,27 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 d (SHIPPED, #625 + mig 20261022183000) — Create payment: a line each, with its own words
+
+User, on Create payment: "split pool 这个按钮我不想要，我想maintain之前的add description/line, attachment 就default
+要有" → asked "GL override 是什么？" (shown as two journals, never used: 0 lines) → "每行一个，GL override 拿掉" →
+"帮我开PR做".
+
+- `CreatePaymentDialog` (also the Finance phone app's Create payment): `FinDialog wide` (680px on a desktop);
+  Pay to | date, bank | method, the voucher's Description; **Lines always there** — words / pool / category /
+  amount / ×, + Add line, the total = the voucher's amount; Attachments always shown; small buttons Loan
+  repayment, Internal transfer, Method, Notes (Split pools, Attachments, GL override gone). Phone: fields stack,
+  a line takes three rows (`create.module.css` `.wordsLine`; the phone edit sheet's `.line` untouched).
+- `payment_voucher_sources.description` (mig 20261022183000, applied by execute_sql before the merge, recorded
+  in schema_migrations): the three approve functions write a line's words on its journal debit line — production's
+  bodies swapped in place (`pg_temp.swap_in`, count-checked); no words → "expense - payee (pool)". Dry run on
+  production first: a two-line voucher approved → "Dry run line A" + the old words, bank lines unchanged, rolled back.
+- Carried by Edit (`lib/voucher-edit` rowKey + form), the desktop edit form and the phone sheet (an input under
+  each line), Copy as draft, `lib/repayment-source-rows` (by role); shown on the drawer, the page, the PDF, Approvals.
+- Tests: the dialog rewritten; create / edit actions, voucher-edit, repayment rows, edit form, phone sheet,
+  drawer, page, PDF + route, approval model. DESIGN.md v4.122; finance-view.md note.
+- GL override still exists on a voucher's Edit (desktop form, phone sheet) — the user asked only for Create
+  payment; ask before removing it there.
+
 ## CHECKPOINT 2026-10-22 c (SHIPPED, #620) — Finance hubs: the cards in a row above the table on a desktop
 
 User, on Payments' cards: "可以帮我把finance 的这些card move 上去吗" → shown a before/after → "可以，原本的底色不要变，
