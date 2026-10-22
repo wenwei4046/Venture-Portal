@@ -15,6 +15,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   | 'it_request'
   // Share order (2026-10-21, mig 20261021150100): a bill shared with them, an answer to theirs, HR's decision — Revenue members.
   | 'share_request'
+  // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
+  // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
+  | 'mkt_project'
 
 export interface Notice {
   id: string
@@ -80,6 +83,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'it_request') return app === 'revenue' ? `/member?page=account&view=it&it=${id}` : `/?open=it:${id}`
   // A share request (2026-10-21) is the Revenue app's whichever app the phone signed up in: the request, open over Today.
   if (n.refKind === 'share_request') return `/member?share=${id}`
+  // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.
+  if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`

@@ -25,6 +25,8 @@ import { actionsFromKeys } from './permission-actions'
 const ROLE_DEFAULTS: Record<UserRole, string[]> = {
   // No defaults at all (2026-10-08): a staff account is its title's template.
   staff: [],
+  // The Principal's Marketing lens only (2026-10-23) — no account is created with it, so it has no seed.
+  marketing: [],
   revenue_member: ['member_portal', 'member_quote', 'member_requests', 'member_memos'],
   principal: [
     'dashboard', 'approvals', 'treasury', 'billing', 'categories', 'hr_costing',

@@ -7167,3 +7167,82 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 @media (prefers-reduced-motion: reduce) {
   [data-me] *, [data-me] *::before, [data-me] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ── Marketing's view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup", `.design/marketing`) ──
+   Its own shell and pages, drawn light whatever the theme, as the prototype draws them (DESIGN.md › Marketing's view).
+   Channels (`r g b`), so a page writes rgb(var(--mk-ink)) or rgb(var(--mk-ink) / .04). */
+.mkt-shell {
+  color-scheme: light;
+  --mk-app: 243 243 241;
+  --mk-side: 248 245 240;
+  --mk-line: 229 222 211;
+  --mk-line-2: 236 231 224;
+  --mk-line-3: 240 236 230;
+  --mk-line-4: 244 241 236;
+  --mk-card-line: 229 228 223;
+  --mk-field-line: 232 225 216;
+  --mk-field-hover: 214 204 190;
+  --mk-ink: 51 36 27;
+  --mk-ink-2: 43 31 23;
+  --mk-text-2: 74 64 58;
+  --mk-text-3: 90 78 68;
+  --mk-muted: 117 100 86;
+  --mk-faint: 160 150 140;
+  --mk-white: 255 255 255;
+  --mk-surface: 250 248 244;
+  --mk-surface-2: 246 244 240;
+  --mk-surface-3: 246 246 244;
+  --mk-surface-4: 251 250 248;
+  --mk-hover: 241 236 228;
+  --mk-active: 236 229 219;
+  --mk-brown: 90 62 43;
+  --mk-cream: 246 238 230;
+  --mk-primary: #EC9B55;
+  --mk-primary-hover: #E0893F;
+  /* Statuses (the handoff's README › Status). */
+  --mk-red-bg: 252 236 233; --mk-red-line: 236 190 184; --mk-red: 176 40 34; --mk-red-dot: 200 52 42; --mk-red-soft: 255 247 245;
+  --mk-wait-bg: 251 243 225; --mk-wait-line: 236 214 164; --mk-wait: 138 92 10; --mk-wait-dot: 214 152 30; --mk-wait-soft: 255 250 238;
+  --mk-done-bg: 232 244 235; --mk-done-line: 190 222 199; --mk-done: 40 110 64; --mk-done-dot: 60 150 90;
+  --mk-draft-bg: 243 242 239; --mk-draft-line: 226 223 217; --mk-draft: 98 92 86; --mk-draft-dot: 160 154 146;
+  --mk-risk-dot: 230 170 60; --mk-risk: 150 96 10;
+  /* The sidebar's tile tones. */
+  --mk-tone-sand: 239 228 217;
+  --mk-tone-mist: 230 237 241;
+  --mk-tone-peach: 249 231 216;
+  --mk-tone-cream: 246 238 222;
+  /* Teams (Content · Social Media · Design · Ads · Brand): a chip's ground and words. */
+  --mk-team-content-bg: oklch(0.94 0.04 295); --mk-team-content: oklch(0.40 0.12 295); --mk-team-content-bar: oklch(0.87 0.07 295);
+  --mk-team-social-bg: oklch(0.94 0.04 235); --mk-team-social: oklch(0.40 0.10 235); --mk-team-social-bar: oklch(0.88 0.06 235);
+  --mk-team-design-bg: oklch(0.94 0.04 350); --mk-team-design: oklch(0.43 0.13 350); --mk-team-design-bar: oklch(0.88 0.07 350);
+  --mk-team-ads-bg: oklch(0.94 0.04 270); --mk-team-ads: oklch(0.40 0.12 270); --mk-team-ads-bar: oklch(0.86 0.07 270);
+  --mk-team-brand-bg: oklch(0.94 0.04 195); --mk-team-brand: oklch(0.38 0.08 195); --mk-team-brand-bar: oklch(0.86 0.06 195);
+  --mk-team-manager-bg: oklch(0.94 0.03 60); --mk-team-manager: oklch(0.42 0.06 60); --mk-team-manager-bar: oklch(0.88 0.04 60);
+  --mk-meet-bg: oklch(0.96 0.025 235); --mk-meet-line: oklch(0.88 0.04 235); --mk-meet: oklch(0.42 0.10 235); --mk-meet-dot: oklch(0.60 0.12 235);
+  /* A card just put on somebody's plate; an Assignment plan's notice; My Space's first cover. */
+  --mk-new-bg: 255 251 244; --mk-new-line: 214 180 140;
+  --mk-plan-bg: oklch(0.975 0.015 235); --mk-plan-line: oklch(0.92 0.035 235); --mk-plan: oklch(0.45 0.10 235);
+  --mk-cover: linear-gradient(135deg, oklch(0.86 0.07 60), oklch(0.84 0.07 20) 50%, oklch(0.82 0.06 330));
+  --mk-today-ink: 246 238 230;
+  --mk-shadow-sm: 0 1px 2px rgb(51 36 27 / .04);
+  --mk-shadow-seg: 0 1px 2px rgb(51 36 27 / .14);
+  --mk-shadow-knob: 0 1px 2px rgb(0 0 0 / .2);
+  --mk-shadow-panel: 0 8px 24px rgb(51 36 27 / .08);
+  /* The Calendar's grounds: a day under the pointer, a day picked, today's column; a neighbour month's numbers. */
+  --mk-cell-hover: 252 251 249; --mk-picked: 250 246 240; --mk-today-col: 252 250 246; --mk-out-num: 190 182 172;
+  /* The Tracking Dashboard's: deeper words on a red or waiting tint, a free person, a focused one, the slowest stage. */
+  --mk-red-deep: 160 36 30; --mk-wait-deep: 122 82 8; --mk-stat-hover: 176 140 104;
+  --mk-free-bg: 244 250 245; --mk-focus-bg: 246 240 232; --mk-slow-bg: 255 250 248;
+  --mk-chip-line: 214 190 160;
+  --mk-shadow-hover: 0 6px 18px rgb(51 36 27 / .08);
+  --mk-shadow-drawer: 0 12px 32px rgb(51 36 27 / .08);
+  --mk-shadow-pop: 0 14px 36px rgb(51 36 27 / .18), 0 2px 6px rgb(51 36 27 / .06);
+  --mk-shadow-modal: 0 24px 64px rgb(51 36 27 / .3);
+  --mk-ease: cubic-bezier(.2, .8, .2, 1);
+  --mk-mono: var(--font-mono), Menlo, monospace;
+  background: rgb(var(--mk-app));
+}
+@keyframes mkIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes mkSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mkt-shell *, .mkt-shell *::before, .mkt-shell *::after { transition: none !important; animation: none !important; }
+}

@@ -643,6 +643,11 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
   ],
+  // Marketing's view is the computer's (2026-10-23 — the user: a Marketing phone app comes later). The Principal's
+  // Marketing lens on a phone keeps the bar its own account would have.
+  marketing: [
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+  ],
 }
 
 export function tabsForRole(role: UserRole): TabDef[] {
