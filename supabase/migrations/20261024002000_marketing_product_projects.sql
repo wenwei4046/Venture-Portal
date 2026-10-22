@@ -563,6 +563,11 @@ BEGIN
   IF nullif(btrim(coalesce(v_p.pic_name, '')), '') IS NULL THEN
     RAISE EXCEPTION 'Name the PIC.' USING ERRCODE = '22023';
   END IF;
+  -- The link goes to the PIC on WhatsApp (⭐ on the handoff's meeting card) — when they approve on it.
+  IF coalesce((v_mv.rules -> 'pic') = 'true'::jsonb, false)
+     AND length(regexp_replace(coalesce(v_p.pic_whatsapp, ''), '[^0-9]', '', 'g')) < 8 THEN
+    RAISE EXCEPTION 'Add the PIC''s WhatsApp.' USING ERRCODE = '22023';
+  END IF;
   IF coalesce((v_mv.rules -> 'sign') = 'true'::jsonb, false)
      AND EXISTS (SELECT 1 FROM jsonb_array_elements(v_mv.fields) f WHERE f ->> 'type' = 'Signature') THEN
     v_unsign := ARRAY(SELECT coalesce(public.mkt_staff_name(a), 'Somebody') FROM unnest(public.mkt_minutes_attendees(v_mv.fields, v_m.vals)) a

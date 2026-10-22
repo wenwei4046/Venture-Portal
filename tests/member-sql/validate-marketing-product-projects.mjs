@@ -250,13 +250,16 @@ await as(U.mei, STAFF)
 await one(`SELECT public.mkt_minutes_sign($1)`, [min.id])
 await as(U.josiah, MANAGER)
 await refuses(`SELECT public.mkt_minutes_send($1, 5)`, [min.id], /changed these minutes since you opened them/, 'sent as the caller saw them')
-const sent = await send(6)
+await fill(6, { whatsapp: null })
+await refuses(`SELECT public.mkt_minutes_send($1, 7)`, [min.id], /Add the PIC's WhatsApp/, 'the PIC reachable on WhatsApp when they approve on the link')
+await fill(7, { whatsapp: '+60 12-345 6789' })
+const sent = await send(8)
 check([sent.status, sent.minutes, /^[0-9a-f]{32}$/.test(sent.link)], ['waiting_pic', 'sent', true], 'sent: the project waits for the PIC on a link nobody guesses')
 proj = (await peek(`SELECT * FROM public.mkt_projects WHERE id = $1`, [st.id]))[0]
 check([proj.link_code, proj.link_sent_at !== null], [sent.link, true], 'the link kept, and when it went')
-await refuses(`SELECT public.mkt_minutes_send($1, 7)`, [min.id], /These minutes were sent already/, 'sent once')
+await refuses(`SELECT public.mkt_minutes_send($1, 9)`, [min.id], /These minutes were sent already/, 'sent once')
 // Changed while the PIC has not answered: they read the latest.
-check((await fill(7, { vals: { Objective: 'Year-end walk-ins, Penang too' } })).status, 'waiting_pic', 'edited while waiting: still waiting')
+check((await fill(9, { vals: { Objective: 'Year-end walk-ins, Penang too' } })).status, 'waiting_pic', 'edited while waiting: still waiting')
 
 // ── Started before approval ───────────────────────────────────────────────────────
 await as(U.mei, STAFF)

@@ -5,6 +5,7 @@
 
 import { personFromRow, subFromRow, type MktPerson, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
+import { trailTime, type Tone } from './task'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -199,21 +200,41 @@ export function unsignedOf(doc: Pick<MinutesDoc, 'template' | 'vals' | 'signed'>
   return attendeesOf(doc.template.fields, doc.vals).filter(a => !doc.signed[a])
 }
 
+/** The PIC is reached on WhatsApp when they approve on the link (mkt_minutes_send asks the same 8 digits). */
+export const whatsappOk = (number: string) => number.replace(/\D/g, '').length >= 8
+
 /** What stops the intake minutes going to the PIC, in the order the side card says it. */
-export function sendProblems(doc: MinutesDoc, pic: string, team: readonly MktPerson[]): string[] {
+export function sendProblems(doc: MinutesDoc, pic: { name: string; whatsapp: string }, team: readonly MktPerson[]): string[] {
   const out = minutesMissing(doc.template.fields, doc.vals).map(n => `${n} is empty`)
-  if (!pic.trim()) out.push('Name the PIC')
+  if (!pic.name.trim()) out.push('Name the PIC')
+  if (doc.template.rules.pic && !whatsappOk(pic.whatsapp)) out.push('Add the PIC’s WhatsApp')
   const nameOf = (id: string) => team.find(p => p.id === id)?.first ?? 'Somebody'
   const unsigned = unsignedOf(doc)
   if (unsigned.length) out.push(`Waiting for ${unsigned.map(nameOf).join(', ')} to sign`)
   return out
 }
 
-/** The step a product project stands at: 1 Subsidiary & product · 2 Meeting minutes · 3 Tracking link · 4 PIC response. */
-export function stepOf(status: ProductStatus, pic: boolean): 1 | 2 | 3 | 4 {
-  if (status === 'minutes') return 2
-  if (status === 'waiting_pic') return 3
-  return pic ? 4 : 3
+/** The side card's count: the required fields filled, of all of them — with the PIC's name, and their WhatsApp when
+ * the link goes to them. */
+export function requiredTally(doc: Pick<MinutesDoc, 'template'>, vals: Readonly<Record<string, MinutesValue>>, pic: { name: string; whatsapp: string }): { done: number; total: number } {
+  const fields = doc.template.fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature')
+  const own = [!!pic.name.trim(), ...(doc.template.rules.pic ? [whatsappOk(pic.whatsapp)] : [])]
+  return { done: fields.length - minutesMissing(doc.template.fields, vals).length + own.filter(Boolean).length, total: fields.length + own.length }
+}
+
+/** The stepper (Subsidiary & product · Meeting minutes · Tracking link · PIC response): the PIC's step only when the
+ * minutes go to them; approved without them, every step is done. */
+export function stepsOf(status: ProductStatus, pic: boolean): { label: string; state: 'done' | 'current' | 'todo' }[] {
+  const labels = ['Subsidiary & product', 'Meeting minutes', 'Tracking link', ...(pic ? ['PIC response'] : [])]
+  const cur = status === 'minutes' ? 2 : status === 'waiting_pic' ? 3 : pic ? 4 : labels.length + 1
+  return labels.map((label, i) => ({ label, state: i + 1 < cur ? 'done' : i + 1 === cur ? 'current' : 'todo' }))
+}
+
+/** Back with the PIC because something they see changed after they approved: what changed, else null. */
+export function editedAfterApproval(page: Pick<ProductProjectPage, 'project' | 'trail'>): string | null {
+  if (page.project.status !== 'waiting_pic') return null
+  const last = page.trail.find(e => e.action === 'link sent' || e.action === 'resent' || e.action === 'edited after approval')
+  return last?.action === 'edited after approval' ? last.reason || 'The minutes' : null
 }
 
 export interface MinutesEdit {
@@ -246,6 +267,36 @@ export const linkUrl = (origin: string, code: string) => `${origin.replace(/\/$/
 
 /** WhatsApp, with the link in the message (the number's digits only). */
 export function whatsappUrl(number: string, text: string): string | null {
-  const digits = number.replace(/\D/g, '')
-  return digits.length >= 8 ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null
+  return whatsappOk(number) ? `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(text)}` : null
+}
+
+/** Where a product project stands, in the side card's words and tone. */
+export function productStatus(status: ProductStatus): { label: string; tone: Tone } {
+  switch (status) {
+    case 'minutes': return { label: 'Draft', tone: 'draft' }
+    case 'waiting_pic': return { label: 'Waiting for PIC', tone: 'waiting' }
+    case 'changes': return { label: 'Changes requested', tone: 'red' }
+    case 'approved': return { label: 'Approved', tone: 'done' }
+    case 'active': return { label: 'In progress', tone: 'waiting' }
+    case 'paused': return { label: 'Paused', tone: 'draft' }
+    case 'done': return { label: 'Done', tone: 'done' }
+    case 'cancelled': return { label: 'Cancelled', tone: 'draft' }
+  }
+}
+
+/** The trail newest first, in the store's words (mkt_log's actions on a product project). */
+export function productTrail(page: Pick<ProductProjectPage, 'project' | 'trail'>): { key: string; t: string; text: string }[] {
+  const product = page.project.product
+  return page.trail.map((e, i) => {
+    const who = e.actor || 'Somebody'
+    const text = e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
+      : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
+      : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`
+      : e.action === 'minutes completed' ? `${who} completed ${e.reason || 'the minutes'}`
+      : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
+      : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason}"`
+      : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
+      : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
+    return { key: `${e.at}:${i}`, t: trailTime(e.at), text }
+  })
 }

@@ -8,34 +8,30 @@ import p from './project.module.css'
 // Meeting minutes as they are written (`New Project.dc.html` step 2, on the product's intake template): each field as its
 // kind asks — text, a date, a number, people from the team, a typed table, the Free space, the project it is for — with
 // ⭐ (required) and 👁 / 🔒 (the PIC sees it, or it stays internal); the signatures of those who attended, each signing
-// for themselves; the meeting notes (internal). Read-only when the viewer does not write minutes or they are locked.
+// for themselves. Read-only when the viewer does not write minutes or they are locked.
 
 const FREE_COLS = ['Item', 'Details', 'Owner']
 
 export default function MinutesForm({
   doc,
   vals,
-  notes,
   track,
   title,
   team,
   me,
   readOnly,
   onVal,
-  onNotes,
   onSign,
   signing,
 }: {
   doc: MinutesDoc
   vals: Record<string, MinutesValue>
-  notes: string
   track: string
   title: string
   team: MktPerson[]
   me: string | null
   readOnly: boolean
   onVal: (name: string, v: MinutesValue | undefined) => void
-  onNotes: (notes: string) => void
   onSign: () => void
   signing: boolean
 }) {
@@ -175,10 +171,6 @@ export default function MinutesForm({
   return (
     <div className={p.fields}>
       {doc.template.fields.map(field)}
-      <label className={p.field}>
-        <span className={p.fieldLabel}>Meeting notes<span className={p.marks}><span title="Internal only — the PIC never sees it">🔒</span></span></span>
-        <textarea className={p.textarea} rows={3} value={notes} maxLength={4000} readOnly={readOnly} onChange={e => onNotes(e.target.value)} />
-      </label>
     </div>
   )
 }
