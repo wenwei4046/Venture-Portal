@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<script src="hz-date.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(230,224,217);border-radius:4px;}
+</style>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+  <aside style="width:216px;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;"><div style="font-weight:600;font-size:15px;">HOUZS Venture</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div></div>
+    </div>
+    <a href="Inbox v2.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="inbox" style="width:16px;height:16px;"></i></span>Inbox</a>
+    <a href="Leads.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="users" style="width:16px;height:16px;"></i></span>Leads</a>
+    <a href="Insight.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="chart-column" style="width:16px;height:16px;"></i></span>Insight</a>
+    <a href="Campaigns.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="megaphone" style="width:16px;height:16px;"></i></span>Campaigns</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="split" style="width:16px;height:16px;"></i></span>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="workflow" style="width:16px;height:16px;"></i></span>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="blocks" style="width:16px;height:16px;"></i></span>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="sparkles" style="width:16px;height:16px;"></i></span>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="book-open" style="width:16px;height:16px;"></i></span>General info</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="library" style="width:16px;height:16px;"></i></span>Data Center</div>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="history" style="width:16px;height:16px;"></i></span>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">ADMIN</div>
+    <a href="Business Hours.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="clock" style="width:16px;height:16px;"></i></span>Business hours</a>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="scroll-text" style="width:16px;height:16px;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;"><span style="display:flex;"><i data-lucide="settings" style="width:16px;height:16px;"></i></span>Settings</div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);">
+      <div style="width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;"><div style="font-weight:500;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);background:rgb(242,238,233);padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Test mode</div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <button title="Notifications" style="white-space:nowrap;flex-shrink:0;position:relative;cursor:pointer;width:34px;height:34px;border-radius:8px;border:1px solid rgb(230,224,217);background:rgb(255,255,255);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;"><span style="display:flex;"><i data-lucide="bell" style="width:16px;height:16px;"></i></span><span style="position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);border:1.5px solid rgb(255,255,255);"></span></button>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;background:transparent;border:none;display:flex;flex-direction:column;padding:16px 8px 4px;position:relative;overflow:hidden;">
+      <div style="flex:none;display:flex;align-items:flex-end;gap:12px;padding-bottom:10px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.14em;color:rgb(88,76,68);">SET UP</div>
+          <h1 style="align-self:flex-start;margin:0;line-height:1.15;letter-spacing:-.01em;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Data Center</h1>
+        </div>
+        <div style="flex:none;display:flex;gap:24px;align-self:flex-end;margin-right:12px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+          <button onClick="{{ t.onClick }}" style="white-space:nowrap;flex-shrink:0;border:none;background:transparent;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:15px;font-weight:500;padding:6px 0 10px;margin-bottom:-1px;color:{{ t.fg }};border-bottom:2px solid {{ t.line }};display:flex;gap:6px;">{{ t.label }}<span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(120,108,100);">{{ t.count }}</span></button>
+        </sc-for>
+      </div>
+        
+        <input type="file" ref="{{ upRef }}" multiple="{{ true }}" onChange="{{ onUpload }}" style="display:none;"></input><input type="file" ref="{{ dirUpRef }}" multiple="{{ true }}" onChange="{{ onDirUpload }}" style="display:none;"></input>
+        <sc-if value="{{ showBasic }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;"><button onClick="{{ addShowroom }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="store" style="width:14px;height:14px;"></i></span>Add showroom</button><button onClick="{{ addCustom }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="plus" style="width:14px;height:14px;"></i></span>Add other info</button></div></sc-if>
+        <sc-if value="{{ showFiles }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;"><button onClick="{{ syncAll }}" title="Check every shared link for updates" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 12px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="refresh-cw" style="width:14px;height:14px;"></i></span>{{ syncAllLabel }}</button><div style="position:relative;"><button onClick="{{ toggleNew }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(43,33,28);color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="plus" style="width:14px;height:14px;"></i></span>Add<i data-lucide="chevron-down" style="width:14px;height:14px;"></i></button>
+          <sc-if value="{{ newOpen }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ closeNew }}" style="position:fixed;inset:0;z-index:40;"></div>
+                <div style="position:absolute;top:40px;right:0;width:260px;z-index:41;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;box-shadow:0 10px 28px rgba(43,33,28,.16);padding:6px;">
+                  <button onClick="{{ menuDir }}" style="width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);margin-top:2px;"><i data-lucide="folder-plus" style="width:15px;height:15px;"></i></span><span style="display:flex;flex-direction:column;gap:1px;"><span style="font-size:14px;color:rgb(43,33,28);">New folder</span><span style="font-size:12px;color:rgb(120,108,100);">Inside the folder you are in</span></span></button>
+                  <button onClick="{{ menuUpload }}" style="width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);margin-top:2px;"><i data-lucide="upload" style="width:15px;height:15px;"></i></span><span style="display:flex;flex-direction:column;gap:1px;"><span style="font-size:14px;color:rgb(43,33,28);">Upload file</span><span style="font-size:12px;color:rgb(120,108,100);">PDF, Excel, Word, images</span></span></button>
+                  <button onClick="{{ menuDirUpload }}" style="width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);margin-top:2px;"><i data-lucide="folder-up" style="width:15px;height:15px;"></i></span><span style="display:flex;flex-direction:column;gap:1px;"><span style="font-size:14px;color:rgb(43,33,28);">Upload folder</span><span style="font-size:12px;color:rgb(120,108,100);">Keeps its folders inside</span></span></button>
+                  <button onClick="{{ menuShare }}" style="width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);margin-top:2px;"><i data-lucide="link-2" style="width:15px;height:15px;"></i></span><span style="display:flex;flex-direction:column;gap:1px;"><span style="font-size:14px;color:rgb(43,33,28);">Add shared link</span><span style="font-size:12px;color:rgb(120,108,100);">Web page, Google Drive, OneDrive, Canva…</span></span></button>
+                </div>
+              </sc-if></div></div></sc-if>
+      </div>
+
+
+
+      <sc-if value="{{ showSide }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;min-height:0;display:flex;border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);overflow:hidden;">
+          <section style="width:220px;flex:none;border-right:1px solid rgb(230,224,217);padding:12px 10px;display:flex;flex-direction:column;gap:3px;background:rgb(248,246,243);overflow-y:auto;">
+            <div style="display:flex;align-items:center;gap:6px;padding:0 0 6px 6px;position:relative;">
+              <span style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">CATEGORY</span>
+              <button onClick="{{ menuCat }}" title="Add category" style="cursor:pointer;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><i data-lucide="plus" style="width:15px;height:15px;"></i></button>
+              
+            </div>
+            <sc-for list="{{ types }}" as="f" hint-placeholder-count="7">
+              <div draggable="{{ f.draggable }}" onContextMenu="{{ f.onCtx }}" onDragStart="{{ f.onDragStart }}" onDragOver="{{ f.onDragOver }}" onDrop="{{ f.onDrop }}" onDragEnd="{{ f.onDragEnd }}" onClick="{{ f.onClick }}" style="cursor:pointer;display:flex;align-items:center;gap:6px;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 6px;border-radius:6px;border:1px solid {{ f.border }};background:{{ f.bg }};color:rgb(0,0,0);box-shadow:{{ f.dropLine }};opacity:{{ f.op }};" style-hover="background:rgb(246,243,239);">
+                <span title="Drag to reorder" style="display:flex;color:rgb(190,180,170);cursor:grab;visibility:{{ f.gripVis }};"><i data-lucide="grip-vertical" style="width:13px;height:13px;"></i></span>
+                <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ f.icon }}" style="width:14px;height:14px;"></i></span>
+                <sc-if value="{{ f.renaming }}" hint-placeholder-val="{{ false }}"><input value="{{ f.renIn }}" onChange="{{ f.onRenIn }}" onKeyDown="{{ f.onRenKey }}" onBlur="{{ f.onRenBlur }}" onClick="{{ f.stop }}" autoFocus="{{ true }}" style="flex:1;min-width:0;height:24px;border:1px solid rgb(199,111,70);border-radius:4px;padding:0 6px;font-family:'Lora',Georgia,serif;font-size:13px;background:rgb(255,255,255);"></input></sc-if><sc-if value="{{ f.notRen }}" hint-placeholder-val="{{ true }}"><span onDoubleClick="{{ f.rename }}" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.label }}</span></sc-if>
+                <span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ f.count }}</span>
+                <sc-if value="{{ f.canDel }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:0;"><button onClick="{{ f.rename }}" title="Rename category" style="cursor:pointer;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;border-radius:4px;background:transparent;color:rgb(120,108,100);padding:0;" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="pencil" style="width:13px;height:13px;"></i></span></button><button onClick="{{ f.remove }}" title="Delete category" style="cursor:pointer;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;border-radius:4px;background:transparent;color:rgb(120,108,100);padding:0;" style-hover="background:rgb(240,226,206);color:rgb(176,40,40);"><span style="display:flex;"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></span></button></span></sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ catAdding }}" hint-placeholder-val="{{ false }}"><input value="{{ catIn }}" onChange="{{ onCatIn }}" onKeyDown="{{ onCatKey }}" onBlur="{{ catBlur }}" autoFocus="{{ true }}" placeholder="Category name, press Enter" style="margin-top:6px;height:30px;border:1px solid rgb(199,111,70);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:13px;background:rgb(255,255,255);"></input></sc-if>
+            
+            
+            <div style="flex:1;"></div>
+            <sc-if value="{{ showFiles }}" hint-placeholder-val="{{ true }}">
+            <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);padding:14px 6px 6px;">BLANK TEMPLATES</div>
+            <sc-for list="{{ kbTemplates }}" as="kt" hint-placeholder-count="4">
+              <button onClick="{{ kt.onClick }}" style="cursor:pointer;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;padding:5px 8px;border:none;background:transparent;color:rgb(176,92,54);">{{ kt.label }} ↓</button>
+            </sc-for>
+            </sc-if>
+          </section>
+          <sc-if value="{{ showFiles }}" hint-placeholder-val="{{ true }}">
+          <section style="flex:1;min-width:0;display:flex;flex-direction:column;">
+            <div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);">
+              <div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid rgb(218,210,200);border-radius:6px;min-width:220px;"><i data-lucide="search" style="width:14px;height:14px;color:rgb(120,108,100);"></i><input value="{{ fq }}" onChange="{{ onFq }}" placeholder="Search files" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:13px;"></input></div>
+              <div style="position:relative;">
+                <button onClick="{{ brandDD.toggle }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:6px;border:1px solid {{ brandDD.ring }};background:rgb(255,255,255);font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);" style-hover="border-color:rgb(199,111,70);"><span style="color:rgb(120,108,100);">{{ brandDD.title }}</span>{{ brandDD.summary }}<i data-lucide="chevron-down" style="width:14px;height:14px;color:rgb(104,92,84);"></i></button>
+                <sc-if value="{{ brandDD.open }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ brandDD.close }}" style="position:fixed;inset:0;z-index:40;"></div>
+                  <div style="position:absolute;top:36px;left:0;min-width:220px;z-index:41;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;box-shadow:0 10px 28px rgba(43,33,28,.16);padding:6px;">
+                    <sc-for list="{{ brandDD.opts }}" as="q" hint-placeholder-count="4">
+                      <button onClick="{{ q.onClick }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="flex:none;width:14px;height:14px;border-radius:3px;border:1px solid {{ q.ring }};background:{{ q.fill }};color:rgb(255,255,255);font-size:10px;line-height:12px;text-align:center;">{{ q.tick }}</span><span style="flex:1;">{{ q.label }}</span><span style="font-size:11px;color:rgb(120,108,100);font-variant-numeric:tabular-nums;">{{ q.count }}</span></button>
+                    </sc-for>
+                    <sc-if value="{{ brandDD.any }}" hint-placeholder-val="{{ false }}"><button onClick="{{ brandDD.clear }}" style="width:100%;cursor:pointer;border:none;border-top:1px solid rgb(235,230,224);margin-top:4px;padding:8px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(176,92,54);">Clear</button></sc-if>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="position:relative;">
+                <button onClick="{{ statDD.toggle }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:6px;border:1px solid {{ statDD.ring }};background:rgb(255,255,255);font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);" style-hover="border-color:rgb(199,111,70);"><span style="color:rgb(120,108,100);">{{ statDD.title }}</span>{{ statDD.summary }}<i data-lucide="chevron-down" style="width:14px;height:14px;color:rgb(104,92,84);"></i></button>
+                <sc-if value="{{ statDD.open }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ statDD.close }}" style="position:fixed;inset:0;z-index:40;"></div>
+                  <div style="position:absolute;top:36px;left:0;min-width:220px;z-index:41;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;box-shadow:0 10px 28px rgba(43,33,28,.16);padding:6px;">
+                    <sc-for list="{{ statDD.opts }}" as="q" hint-placeholder-count="4">
+                      <button onClick="{{ q.onClick }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:8px;padding:6px 8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="flex:none;width:14px;height:14px;border-radius:3px;border:1px solid {{ q.ring }};background:{{ q.fill }};color:rgb(255,255,255);font-size:10px;line-height:12px;text-align:center;">{{ q.tick }}</span><span style="flex:1;">{{ q.label }}</span><span style="font-size:11px;color:rgb(120,108,100);font-variant-numeric:tabular-nums;">{{ q.count }}</span></button>
+                    </sc-for>
+                    <sc-if value="{{ statDD.any }}" hint-placeholder-val="{{ false }}"><button onClick="{{ statDD.clear }}" style="width:100%;cursor:pointer;border:none;border-top:1px solid rgb(235,230,224);margin-top:4px;padding:8px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(176,92,54);">Clear</button></sc-if>
+                  </div>
+                </sc-if>
+              </div>
+              <span style="flex:1;"></span>
+              <span style="font-size:13px;color:rgb(120,108,100);font-variant-numeric:tabular-nums;">{{ fileCount }}</span>
+            </div>
+            <div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 10px;min-height:40px;border-bottom:1px solid rgb(235,230,224);font-family:'Lora',Georgia,serif;font-size:14px;">
+              <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="1">
+                <sc-if value="{{ c.sep }}" hint-placeholder-val="{{ false }}"><span style="display:flex;color:rgb(160,150,140);"><i data-lucide="chevron-right" style="width:14px;height:14px;"></i></span></sc-if>
+                <button onClick="{{ c.onClick }}" onDragOver="{{ c.onDragOver }}" onDrop="{{ c.onDrop }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;border:1px solid {{ c.ring }};background:{{ c.bg }};font-family:'Lora',Georgia,serif;font-size:14px;color:{{ c.fg }};font-weight:{{ c.fw }};" style-hover="background:rgb(246,243,239);">{{ c.label }}</button>
+              </sc-for>
+              <sc-if value="{{ flat }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;padding:0 4px;font-size:13px;color:rgb(120,108,100);"><span style="display:flex;"><i data-lucide="folders" style="width:14px;height:14px;"></i></span>Search and filters look in every folder</span></sc-if>
+            </div>
+            <div style="flex:none;display:grid;grid-template-columns:34px minmax(0,1.5fr) 80px 130px 120px 130px minmax(0,1.2fr);gap:12px;padding:9px 14px;border-bottom:1px solid rgb(230,224,217);font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:rgb(88,76,68);">
+              <span></span><span>FILE</span><span>BRAND</span><span>TYPE</span><span>UPDATED</span><span>VALID</span><span>USED BY</span>
+            </div>
+            <div onContextMenu="{{ ctxHere }}" style="flex:1;min-height:0;overflow-y:auto;">
+              <sc-if value="{{ dirAdding }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid rgb(235,230,224);background:rgb(252,240,232);"><span style="display:flex;justify-content:center;color:rgb(176,92,54);"><i data-lucide="folder-plus" style="width:20px;height:20px;"></i></span><input value="{{ dirIn }}" onChange="{{ onDirIn }}" onKeyDown="{{ onDirKey }}" onBlur="{{ onDirBlur }}" autoFocus="{{ true }}" placeholder="Folder name, press Enter" style="max-width:360px;height:30px;border:1px solid rgb(199,111,70);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"></input></div></sc-if>
+              <sc-for list="{{ dirRows }}" as="g" hint-placeholder-count="2">
+                <div draggable="{{ true }}" onContextMenu="{{ g.onCtx }}" onDragStart="{{ g.onDragStart }}" onDragOver="{{ g.onDragOver }}" onDrop="{{ g.onDrop }}" onDragEnd="{{ dragEnd }}" onClick="{{ g.onClick }}" style="cursor:pointer;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid rgb(235,230,224);background:{{ g.bg }};box-shadow:{{ g.ring }};opacity:{{ g.op }};" style-hover="background:rgb(248,246,243);">
+                  <span style="height:24px;display:flex;align-items:center;justify-content:center;color:rgb(176,92,54);"><i data-lucide="folder" style="width:20px;height:20px;"></i></span>
+                  <div style="min-width:0;display:flex;flex-direction:column;gap:2px;">
+                    <sc-if value="{{ g.renaming }}" hint-placeholder-val="{{ false }}"><input value="{{ g.renIn }}" onChange="{{ g.onRenIn }}" onKeyDown="{{ g.onRenKey }}" onBlur="{{ g.onRenBlur }}" onClick="{{ g.stop }}" autoFocus="{{ true }}" style="max-width:360px;height:28px;border:1px solid rgb(199,111,70);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"></input></sc-if>
+                    <sc-if value="{{ g.idle }}" hint-placeholder-val="{{ true }}"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:rgb(0,0,0);">{{ g.name }}</span></sc-if>
+                    <span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ g.sub }}</span>
+                  </div>
+                  <div style="display:flex;gap:2px;">
+                    <button onClick="{{ g.rename }}" title="Rename" style="cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;border-radius:6px;background:transparent;color:rgb(120,108,100);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="pencil" style="width:14px;height:14px;"></i></span></button>
+                    <button onClick="{{ g.remove }}" title="{{ g.removeTitle }}" style="cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;border-radius:6px;background:transparent;color:rgb(120,108,100);" style-hover="background:rgb(240,226,206);color:rgb(176,40,40);"><span style="display:flex;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></span></button>
+                  </div>
+                </div>
+              </sc-for>
+              <sc-for list="{{ files }}" as="f" hint-placeholder-count="8">
+                <div draggable="{{ true }}" onContextMenu="{{ f.onCtx }}" onDragStart="{{ f.onDragStart }}" onDragOver="{{ f.onDragOver }}" onDrop="{{ f.onDrop }}" onDragEnd="{{ dragEnd }}" onClick="{{ f.onClick }}" style="cursor:pointer;opacity:{{ f.op }};box-shadow:{{ f.ring }};display:grid;grid-template-columns:34px minmax(0,1.5fr) 80px 130px 120px 130px minmax(0,1.2fr);gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid rgb(235,230,224);background:{{ f.bg }};" style-hover="background:rgb(248,246,243);">
+                  <span style="height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-size:9px;background:{{ f.extBg }};color:{{ f.extFg }};">{{ f.ext }}</span>
+                  <div style="min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:{{ f.nameFg }};">{{ f.name }}</span><div style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ f.sub }}</span><sc-if value="{{ f.hasKids }}" hint-placeholder-val="{{ false }}"><button onClick="{{ f.enter }}" title="Open what is inside" style="flex:none;cursor:pointer;display:flex;align-items:center;gap:3px;padding:0 4px 0 6px;height:18px;border-radius:3px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(176,92,54);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="folder" style="width:11px;height:11px;"></i></span>{{ f.kidLabel }}<span style="display:flex;"><i data-lucide="chevron-right" style="width:11px;height:11px;"></i></span></button></sc-if></div></div>
+                  <span style="justify-self:start;font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap;background:{{ f.fBg }};color:{{ f.fFg }};">{{ f.folder }}</span>
+                  <span style="font-size:13px;color:rgb(88,76,68);">{{ f.type }}</span>
+                  <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;">{{ f.updated }}</span><span style="font-size:13px;color:rgb(104,92,84);">{{ f.by }}</span></div>
+                  <span style="justify-self:start;font-size:13px;padding:2px 7px;border-radius:3px;white-space:nowrap;background:{{ f.stBg }};color:{{ f.stFg }};">{{ f.status }}</span>
+                  <div style="min-width:0;display:flex;flex-wrap:wrap;gap:4px;">
+                    <sc-for list="{{ f.uses }}" as="u" hint-placeholder-count="1"><span style="display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 7px;border-radius:3px;white-space:nowrap;background:{{ u.bg }};color:{{ u.fg }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ u.dot }};"></span>{{ u.label }}</span></sc-for>
+                    <sc-if value="{{ f.unused }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:rgb(120,108,100);">Not used</span></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noFiles }}" hint-placeholder-val="{{ false }}"><div style="padding:40px;text-align:center;font-size:14px;color:rgb(120,108,100);">{{ emptyMsg }}</div></sc-if>
+              <sc-if value="{{ ctxOpen }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ ctxClose }}" onContextMenu="{{ ctxClose }}" style="position:fixed;inset:0;z-index:60;"></div>
+                <div style="position:fixed;top:{{ ctxY }}px;left:{{ ctxX }}px;width:260px;z-index:61;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;box-shadow:0 10px 28px rgba(43,33,28,.16);padding:6px;display:flex;flex-direction:column;">
+                  <div style="padding:6px 8px 8px;font-size:12px;color:rgb(120,108,100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Inside {{ ctxName }}</div>
+                  <sc-if value="{{ ctxCanOpen }}" hint-placeholder-val="{{ false }}"><button onClick="{{ ctxOpenIt }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="folder-open" style="width:15px;height:15px;"></i></span>Open</button></sc-if>
+                  <div style="height:1px;background:rgb(235,230,224);margin:4px 0;"></div>
+                  <button onClick="{{ ctxDir }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="folder-plus" style="width:15px;height:15px;"></i></span>New folder</button>
+                  <div style="height:1px;background:rgb(235,230,224);margin:4px 0;"></div>
+                  <button onClick="{{ ctxUpload }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="file-up" style="width:15px;height:15px;"></i></span>Upload file</button>
+                  <button onClick="{{ ctxDirUpload }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="folder-up" style="width:15px;height:15px;"></i></span>Upload folder</button>
+                  <button onClick="{{ ctxShare }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="link-2" style="width:15px;height:15px;"></i></span>Add shared link</button>
+                  <sc-if value="{{ ctxIsCat }}" hint-placeholder-val="{{ false }}">
+                    <div style="height:1px;background:rgb(235,230,224);margin:4px 0;"></div>
+                    <button onClick="{{ ctxCatRen }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="pencil" style="width:15px;height:15px;"></i></span>Rename category</button>
+                    <button onClick="{{ ctxCatDel }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,40,40);" style-hover="background:rgb(246,243,239);"><span style="display:flex;"><i data-lucide="trash-2" style="width:15px;height:15px;"></i></span>Delete category</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </section>
+          </sc-if>
+          <sc-if value="{{ showBasic }}" hint-placeholder-val="{{ false }}">
+          <section style="flex:1;min-width:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;align-items:start;">
+              <sc-for list="{{ basicRows }}" as="b" hint-placeholder-count="4">
+                <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);display:flex;flex-direction:column;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);">
+                    <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ b.icon }}" style="width:16px;height:16px;"></i></span>
+                    <input value="{{ b.name }}" onChange="{{ b.onName }}" placeholder="{{ b.namePh }}" style="flex:1;min-width:0;height:30px;border:1px solid transparent;border-radius:6px;padding:0 6px;font-family:'Lora',Georgia,serif;font-size:15px;font-weight:600;color:rgb(43,33,28);background:transparent;" style-hover="border-color:rgb(218,210,200);"></input>
+                    <select value="{{ b.brand }}" data-v="{{ b.brand }}" onChange="{{ b.onBrand }}" title="Brand" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);height:26px;font-size:13px;"><sc-for list="{{ basicBrands }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+                    <span style="font-size:13px;padding:2px 7px;border-radius:3px;white-space:nowrap;background:{{ b.stBg }};color:{{ b.stFg }};">{{ b.status }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;">
+                    <sc-for list="{{ b.fields }}" as="fl" hint-placeholder-count="5">
+                      <div style="display:grid;grid-template-columns:130px minmax(0,1fr) 20px;gap:10px;align-items:center;">
+                        <sc-if value="{{ fl.fixed }}" hint-placeholder-val="{{ true }}"><span style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);"><i data-lucide="{{ fl.icon }}" style="width:14px;height:14px;"></i>{{ fl.label }}</span></sc-if>
+                        <sc-if value="{{ fl.free }}" hint-placeholder-val="{{ false }}"><input value="{{ fl.label }}" onChange="{{ fl.onLabel }}" placeholder="Label" style="min-width:0;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);font-size:13px;color:rgb(88,76,68);border-style:dashed;"></input></sc-if>
+                        <input value="{{ fl.value }}" onChange="{{ fl.onChange }}" placeholder="{{ fl.ph }}" style="min-width:0;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"></input>
+                        <button onClick="{{ fl.remove }}" title="Remove field" style="cursor:pointer;border:none;background:transparent;color:rgb(160,150,140);font-size:15px;padding:0;visibility:{{ fl.delVis }};">×</button>
+                      </div>
+                    </sc-for>
+                    <button onClick="{{ b.addField }}" style="align-self:flex-start;cursor:pointer;border:none;background:transparent;padding:2px 0;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(176,92,54);">+ Add field</button>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 14px;border-top:1px solid rgb(235,230,224);">
+                    <span style="font-size:13px;color:rgb(88,76,68);">AI Agent</span>
+                    <div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;">
+                      <sc-for list="{{ b.seg }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:4px 10px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for>
+                    </div>
+                    <span style="flex:1;"></span>
+                    <div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;">
+                      <sc-for list="{{ b.validSeg }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:4px 10px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for>
+                    </div>
+                    <sc-if value="{{ b.hasEnd }}" hint-placeholder-val="{{ false }}"><input type="date" value="{{ b.until }}" onChange="{{ b.onUntil }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"></input></sc-if>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;padding:0 14px 10px;">
+                    <button onClick="{{ b.remove }}" style="cursor:pointer;display:flex;align-items:center;gap:5px;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(199,111,70);" style-hover="text-decoration:underline;"><span style="display:flex;"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></span>{{ b.delLabel }}</button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ noBasic }}" hint-placeholder-val="{{ false }}"><div style="padding:40px;text-align:center;font-size:14px;color:rgb(120,108,100);">Nothing here.</div></sc-if>
+          </section>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showLinks }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:14px;color:rgb(88,76,68);">Web pages the AI Agent can read. The agent for each brand reads everything in its folder and in Shared. Pause or resume here.</div>
+          <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);max-width:1000px;">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 100px minmax(0,.8fr) 24px;gap:12px;padding:9px 14px;border-bottom:1px solid rgb(230,224,217);font-family:'Lora',Georgia,serif;font-size:10px;letter-spacing:.1em;color:rgb(104,92,84);"><span>LINK</span><span>FOLDER</span><span>USED BY</span><span></span></div>
+            <sc-for list="{{ linkRows }}" as="l" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 100px minmax(0,.8fr) 24px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);">
+                <a href="{{ l.url }}" target="_blank" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ l.url }}</a>
+                <span style="justify-self:start;font-family:'Lora',Georgia,serif;font-size:10px;padding:2px 6px;border-radius:3px;background:rgb(242,238,233);color:rgb(88,76,68);">{{ l.folder }}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;"><sc-for list="{{ l.usesList }}" as="u" hint-placeholder-count="1"><span style="display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 3px 2px 7px;border-radius:3px;white-space:nowrap;background:{{ u.bg }};color:{{ u.fg }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ u.dot }};"></span>{{ u.label }}<button onClick="{{ u.toggle }}" style="cursor:pointer;border:none;border-left:1px solid rgb(218,210,200);background:transparent;padding:0 5px;margin-left:2px;font-family:'Lora',Georgia,serif;font-size:12px;color:rgb(176,92,54);">{{ u.actLabel }}</button></span></sc-for><sc-if value="{{ l.unused }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:rgb(120,108,100);">Not used</span></sc-if></div>
+                <button onClick="{{ l.remove }}" disabled="{{ l.cantDel }}" title="Delete link" style="cursor:pointer;border:none;background:transparent;color:rgb(104,92,84);font-size:15px;padding:0;opacity:{{ l.delOp }};">×</button>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:6px;padding:9px 14px;">
+              <input value="{{ linkIn }}" onChange="{{ onLinkIn }}" onKeyDown="{{ onLinkKey }}" placeholder="Add a web page, e.g. https://2990s.com.my/delivery" style="flex:1;min-width:0;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+              <select value="{{ linkFolder }}" data-v="{{ linkFolder }}" onChange="{{ onLinkFolder }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ linkFolders }}" as="lf" hint-placeholder-count="3"><option value="{{ lf }}">{{ lf }}</option></sc-for></select>
+              <button onClick="{{ addLink }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:0 14px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);">Add link</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showQuick }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:14px;color:rgb(88,76,68);">CS types the shortcut in the Inbox reply box, for example <span style="font-family:'Lora',Georgia,serif;color:rgb(0,0,0);">/instal</span>, to insert the text. The AI Agent can use them as fixed answers too.</div>
+          <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);max-width:1000px;">
+            <div style="display:grid;grid-template-columns:130px 120px minmax(0,1fr) 70px 24px;gap:12px;padding:9px 14px;border-bottom:1px solid rgb(230,224,217);font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:rgb(88,76,68);"><span>SHORTCUT</span><span>BRAND</span><span>TEXT</span><span style="text-align:right;">USED</span><span></span></div>
+            <sc-for list="{{ quick }}" as="q" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:130px 120px minmax(0,1fr) 70px 24px;gap:12px;align-items:start;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);">
+                <input value="{{ q.key }}" onChange="{{ q.onKey }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+                <select value="{{ q.brand }}" data-v="{{ q.brand }}" onChange="{{ q.onBrand }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 6px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ quickBrands }}" as="b" hint-placeholder-count="3"><option value="{{ b }}">{{ b }}</option></sc-for></select>
+                <textarea value="{{ q.text }}" onChange="{{ q.onText }}" rows="2" style="border:1px solid rgb(218,210,200);border-radius:6px;padding:6px 9px;font-family:'Lora',Georgia,serif;font-size:14px;line-height:1.45;resize:vertical;"></textarea>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);padding-top:7px;">{{ q.used }}×</span>
+                <button onClick="{{ q.remove }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;color:rgb(104,92,84);font-size:15px;padding:4px 0 0;">×</button>
+              </div>
+            </sc-for>
+            <div style="padding:9px 14px;"><button onClick="{{ addQuick }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);">+ Add quick reply</button></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ open }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ close }}" style="position:absolute;inset:0;background:rgba(43,33,28,.12);z-index:3;"></div>
+        <aside style="position:absolute;top:0;right:0;bottom:0;width:400px;z-index:4;background:rgb(255,255,255);border-left:1px solid rgb(218,210,200);box-shadow:-12px 0 30px rgba(43,33,28,.08);display:flex;flex-direction:column;">
+          <div style="flex:none;padding:18px 20px 14px;border-bottom:1px solid rgb(235,230,224);display:flex;gap:12px;align-items:flex-start;">
+            <span style="width:40px;height:48px;flex:none;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-size:11px;background:{{ d.extBg }};color:{{ d.extFg }};">{{ d.ext }}</span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;">
+              <div style="font-weight:600;font-size:15px;line-height:1.3;word-break:break-word;">{{ d.name }}</div>
+              <div style="font-size:14px;color:rgb(88,76,68);">{{ d.sub }}</div>
+            </div>
+            <button onClick="{{ close }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:30px;height:30px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);font-size:15px;color:rgb(88,76,68);">×</button>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <sc-if value="{{ d.isPage }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <input value="{{ d.name }}" onChange="{{ onPageName }}" placeholder="Page title" style="height:36px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;font-weight:600;color:rgb(43,33,28);"></input>
+                <textarea value="{{ d.body }}" onChange="{{ onPageBody }}" rows="12" placeholder="Write the info the AI Agent and CS should know, e.g. product details, promotion terms, FAQs" style="border:1px solid rgb(218,210,200);border-radius:6px;padding:10px 12px;font-family:'Lora',Georgia,serif;font-size:14px;line-height:1.55;resize:vertical;color:rgb(43,33,28);"></textarea>
+                <div style="font-size:12px;color:rgb(120,108,100);">{{ d.pageHint }}</div>
+              </div>
+              </sc-if>
+              <sc-if value="{{ d.shared }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;border:1px solid rgb(235,230,224);border-radius:8px;overflow:hidden;">
+                <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgb(248,246,243);border-bottom:1px solid rgb(235,230,224);">
+                  <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="link-2" style="width:15px;height:15px;"></i></span>
+                  <span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">SHARED LINK</span>
+                  <span style="flex:1;"></span>
+                  <span style="font-size:12px;padding:2px 7px;border-radius:3px;background:{{ d.accBg }};color:{{ d.accFg }};">{{ d.access }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;padding:12px;">
+                  <div style="display:flex;align-items:center;gap:8px;"><a href="{{ d.url }}" target="_blank" title="{{ d.url }}" style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ d.url }}</a><a href="{{ d.url }}" target="_blank" title="Open" style="display:flex;color:rgb(176,92,54);"><i data-lucide="external-link" style="width:14px;height:14px;"></i></a></div>
+                  <sc-if value="{{ d.noAccess }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid rgb(199,111,70);border-radius:6px;background:rgb(250,232,226);font-size:13px;line-height:1.45;color:rgb(43,33,28);">
+                      <span>The AI Agent can’t read this file yet. Ask the owner to share it with <span style="font-weight:600;">ai@houzs.my</span> as Viewer, or set it to “Anyone with the link”.</span>
+                      <div style="display:flex;gap:6px;"><button onClick="{{ copyMail }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);"><span style="display:flex;"><i data-lucide="copy" style="width:13px;height:13px;"></i></span>{{ d.copyLabel }}</button><button onClick="{{ syncNow }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);"><span style="display:flex;"><i data-lucide="refresh-cw" style="width:13px;height:13px;"></i></span>Check again</button></div>
+                    </div>
+                  </sc-if>
+                  <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;font-size:13px;"><span style="color:rgb(120,108,100);">Source</span><span style="min-width:0;color:rgb(43,33,28);">{{ d.provider }}</span></div>
+                  <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;font-size:13px;"><span style="color:rgb(120,108,100);">Shared by</span><span style="min-width:0;color:rgb(43,33,28);">{{ d.owner }}</span></div>
+                  <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;font-size:13px;"><span style="color:rgb(120,108,100);">Last updated</span><span style="min-width:0;color:rgb(43,33,28);">{{ d.ownerUpdated }}</span></div>
+                  <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;font-size:13px;"><span style="color:rgb(120,108,100);">Last synced</span><span style="min-width:0;color:rgb(43,33,28);">{{ d.synced }}</span></div>
+                  <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;padding-top:2px;"><span style="color:rgb(120,108,100);">Check for updates</span><div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;align-self:flex-start;"><sc-for list="{{ d.syncSeg }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:4px 10px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid rgb(235,230,224);">
+                  <span style="flex:1;font-size:12px;line-height:1.4;color:rgb(120,108,100);">{{ d.syncHint }}</span>
+                  <button onClick="{{ syncNow }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="refresh-cw" style="width:13px;height:13px;"></i></span>{{ d.syncLabel }}</button>
+                </div>
+              </div>
+              </sc-if>
+              <label style="display:flex;flex-direction:column;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">FOLDER
+                <select value="{{ d.dirV }}" onChange="{{ onDir }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);font-weight:400;letter-spacing:0;"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.label }}</option></sc-for></select></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">BRAND
+                <select value="{{ d.folder }}" data-v="{{ d.folder }}" onChange="{{ onFolder }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);font-weight:400;letter-spacing:0;"><sc-for list="{{ brandList }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">TYPE
+                <select value="{{ d.type }}" data-v="{{ d.type }}" onChange="{{ onType }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);font-weight:400;letter-spacing:0;"><sc-for list="{{ typeList }}" as="o" hint-placeholder-count="5"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+            </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">VALID</span><span style="font-size:13px;padding:2px 7px;border-radius:3px;background:{{ d.stBg }};color:{{ d.stFg }};">{{ d.status }}</span></div>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start;"><div style="min-width:0;display:flex;flex-direction:column;gap:6px;"><span style="font-size:13px;color:rgb(88,76,68);">Start</span><div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;"><sc-for list="{{ d.fromSeg }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="flex:1;white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:5px 6px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div><sc-if value="{{ d.fromOn }}" hint-placeholder-val="{{ false }}"><input type="date" value="{{ d.from }}" onChange="{{ onFrom }}" style="width:100%;box-sizing:border-box;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;"></input></sc-if></div><div style="min-width:0;display:flex;flex-direction:column;gap:6px;"><span style="font-size:13px;color:rgb(88,76,68);">End</span><div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;"><sc-for list="{{ d.endSeg }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="flex:1;white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:5px 6px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div><sc-if value="{{ d.endOn }}" hint-placeholder-val="{{ false }}"><input type="date" value="{{ d.until }}" onChange="{{ onUntil }}" style="width:100%;box-sizing:border-box;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;"></input></sc-if></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">USED BY</div>
+              <sc-for list="{{ d.usesFull }}" as="u" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;padding:7px 10px;border-radius:6px;border:1px solid rgb(235,230,224);">
+                  <span style="flex:1;min-width:0;">{{ u.name }}</span>
+                  <sc-if value="{{ u.isAI }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 7px;border-radius:3px;background:{{ u.bg }};color:{{ u.fg }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ u.dot }};"></span>{{ u.state }}</span>
+                    <button onClick="{{ u.toggle }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:13px;padding:3px 9px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">{{ u.actLabel }}</button>
+                  </sc-if>
+                  <a href="{{ u.href }}" title="Open" style="color:rgb(176,92,54);text-decoration:none;">↗</a>
+                  <button onClick="{{ u.remove }}" title="Remove" style="cursor:pointer;border:none;background:transparent;color:rgb(160,150,140);font-size:15px;padding:0 2px;" style-hover="color:rgb(176,40,40);">×</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{ d.unused }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;color:rgb(120,108,100);">Nothing uses this yet.</div></sc-if>
+              <sc-if value="{{ d.canAdd }}" hint-placeholder-val="{{ true }}"><div style="position:relative;align-self:flex-start;">
+                <button onClick="{{ useAddToggle }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:13px;padding:4px 10px;border-radius:6px;border:1px dashed rgb(199,111,70);background:rgb(255,255,255);color:rgb(176,92,54);" style-hover="background:rgb(252,240,232);"><span style="display:flex;"><i data-lucide="plus" style="width:13px;height:13px;"></i></span>Add</button>
+                <sc-if value="{{ useAddOpen }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ useAddClose }}" style="position:fixed;inset:0;z-index:40;"></div>
+                  <div style="position:absolute;bottom:32px;left:0;width:300px;max-height:280px;overflow-y:auto;z-index:41;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;box-shadow:0 10px 28px rgba(43,33,28,.16);padding:6px;">
+                    <sc-for list="{{ d.addTo }}" as="a" hint-placeholder-count="4"><button onClick="{{ a.onClick }}" style="width:100%;cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ a.icon }}" style="width:14px;height:14px;"></i></span>{{ a.label }}</button></sc-for>
+                  </div>
+                </sc-if>
+              </div></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">VERSIONS</div>
+                <input type="file" ref="{{ verRef }}" onChange="{{ onNewVersion }}" style="display:none;"></input>
+                <sc-if value="{{ d.local }}" hint-placeholder-val="{{ true }}"><button onClick="{{ pickVersion }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:5px 10px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">Upload new version</button></sc-if>
+              </div>
+              <sc-for list="{{ d.versions }}" as="v" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px;padding:6px 0;border-bottom:1px solid rgb(235,230,224);">
+                  <span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">v{{ v.n }}</span>
+                  <div style="display:flex;flex-direction:column;gap:1px;"><span>{{ v.note }}</span><span style="font-size:13px;color:rgb(104,92,84);">{{ v.when }} · {{ v.by }}</span></div>
+                  <sc-if value="{{ v.current }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:rgb(76,110,80);">In use</span></sc-if>
+                  <sc-if value="{{ v.old }}" hint-placeholder-val="{{ true }}"><button onClick="{{ v.restore }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);">Restore</button></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:none;padding:12px 20px;border-top:1px solid rgb(235,230,224);display:flex;align-items:center;gap:10px;">
+            <button onClick="{{ remove }}" disabled="{{ d.cantDelete }}" title="{{ d.deleteHint }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 10px;border-radius:6px;border:1px solid transparent;background:transparent;color:rgb(199,111,70);opacity:{{ d.delOp }};" style-hover="border-color:rgb(218,210,200);"><span style="display:flex;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></span>Delete</button>
+            <span style="flex:1;text-align:right;font-size:13px;color:{{ saveFg }};">{{ saveNote }}</span>
+            <button onClick="{{ cancelEdit }}" disabled="{{ notDirty }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 12px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);opacity:{{ dirtyOp }};" style-hover="background:rgb(240,226,206);">Cancel</button>
+            <button onClick="{{ saveEdit }}" disabled="{{ notDirty }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:6px 16px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(43,33,28);color:rgb(255,255,255);opacity:{{ dirtyOp }};">Save</button>
+          </div>
+        </aside>
+      </sc-if>
+      <sc-if value="{{ shareOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeShare }}" style="position:absolute;inset:0;background:rgba(43,33,28,.18);z-index:7;"></div>
+        <div style="position:absolute;top:70px;left:50%;transform:translateX(-50%);width:560px;max-width:calc(100% - 32px);z-index:8;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:10px;box-shadow:0 18px 50px rgba(43,33,28,.18);display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgb(235,230,224);">
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;"><div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;">Add a shared link</div><div style="font-size:13px;color:rgb(120,108,100);">Google Drive, Docs, Sheets, OneDrive, Dropbox or Canva. The file stays with its owner; we keep a synced copy.</div></div>
+            <button onClick="{{ closeShare }}" style="cursor:pointer;width:30px;height:30px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);font-size:15px;color:rgb(88,76,68);">×</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;padding:16px 20px;">
+            <label style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">LINK</span><input value="{{ sh.url }}" onChange="{{ onShUrl }}" placeholder="Paste the link, e.g. https://drive.google.com/file/d/…" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"></input></label>
+            <sc-if value="{{ sh.hasUrl }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid {{ sh.ring }};background:rgb(248,246,243);font-size:13px;">
+                <span style="display:flex;color:rgb(176,92,54);margin-top:1px;"><i data-lucide="{{ sh.icon }}" style="width:15px;height:15px;"></i></span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;color:rgb(43,33,28);">{{ sh.provider }} · {{ sh.access }}</span><span style="color:rgb(88,76,68);">{{ sh.hint }}</span></div>
+              </div>
+            </sc-if>
+            <label style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">NAME</span><input value="{{ sh.name }}" onChange="{{ onShName }}" placeholder="e.g. Product catalogue Nov 2026" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"></input></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">BRAND</span><select value="{{ sh.folder }}" data-v="{{ sh.folder }}" onChange="{{ onShFolder }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"><sc-for list="{{ brandList }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+              <label style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">TYPE</span><select value="{{ sh.type }}" data-v="{{ sh.type }}" onChange="{{ onShType }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);background:rgb(255,255,255);"><sc-for list="{{ typeList }}" as="o" hint-placeholder-count="5"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">CHECK FOR UPDATES</span><div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;align-self:flex-start;"><sc-for list="{{ sh.syncSeg }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:5px 12px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid rgb(235,230,224);">
+            <button onClick="{{ closeShare }}" style="cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 14px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);">Cancel</button>
+            <button onClick="{{ addShare }}" disabled="{{ sh.cant }}" style="cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 16px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(43,33,28);color:rgb(255,255,255);opacity:{{ sh.op }};">Add link</button>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const K = { dark:'rgb(43,33,28)', cream:'rgb(240,226,206)', accent:'rgb(199,111,70)', peach:'rgb(246,243,239)', otext:'rgb(88,76,68)', hair:'rgb(235,230,224)', frame:'rgb(218,210,200)', brown:'rgb(88,76,68)', faint:'rgb(120,108,100)', blue:'rgb(176,92,54)', blueBg:'rgb(242,238,233)', green:'rgb(76,110,80)', greenBg:'rgb(230,240,231)', amber:'rgb(88,76,68)', amberBg:'rgb(242,238,233)', info:'rgb(242,238,233)', white:'rgb(255,255,255)', red:'rgb(199,111,70)', redBg:'rgb(250,232,226)' };
+const FOLDER = { 'None':{bg:'rgb(255,255,255)',fg:'rgb(120,108,100)'}, '2990s':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Carress':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Both brands':{bg:K.info,fg:K.brown} };
+const TODAY = '2026-10-18';
+const F = o => ({ until:'', uses:[], versions:[{n:1, note:'First upload', when:o.updated, by:o.by}], ...o, version: o.versions ? o.versions.length : 1 });
+const PROV = u => /docs\.google\.com\/spreadsheets/.test(u) ? ['Google Sheets','SHEET','sheet'] : /docs\.google\.com/.test(u) ? ['Google Docs','GDOC','file-text'] : /drive\.google\.com/.test(u) ? ['Google Drive','DRIVE','hard-drive'] : /(sharepoint|onedrive|1drv)/.test(u) ? ['OneDrive','ONEDR','cloud'] : /dropbox/.test(u) ? ['Dropbox','DBX','box'] : /canva\.com/.test(u) ? ['Canva','CANVA','palette'] : ['Web link','LINK','link-2'];
+const SYNC = ['Every hour','Every day','Manual'];
+const TYPES = ['Products & prices','Product details','Photos & videos','Promotions','Catalogues','After-sales'];
+const TYPE_OF = { f1:'Catalogues', f2:'Products & prices', f4:'After-sales', f5:'Promotions', f6:'Photos & videos', f7:'Photos & videos', f8:'Product details', f10:'Promotions', f11:'After-sales', f12:'Product details', f13:'Products & prices' };
+const BASIC_FIELDS = [['address','Address','map-pin','Street, postcode, city'],['hours','Opening hours','clock','e.g. 10am – 10pm daily'],['phone','Phone','phone','03-0000 0000'],['maps','Google Maps','map','https://maps.app.goo.gl/…'],['waze','Waze','navigation','https://waze.com/ul/…']];
+const fid = () => 'x' + Math.random().toString(36).slice(2,8);
+const SR = o => ({ id:fid(), kind:'showroom', until:'', ai:'on', ...o, fields: BASIC_FIELDS.map(([k, label, icon, ph]) => ({ id:fid(), key:k, label, icon, ph, value:(o.v || {})[k] || '' })) });
+const CU = o => ({ id:fid(), kind:'custom', until:'', ai:'on', ...o, fields:(o.rows || [['','']]).map(([label, value]) => ({ id:fid(), label, value })) });
+const BASIC = [
+  SR({ brand:'2990s', name:'KL showroom', v:{ address:'Jalan Klang Lama, 58000 Kuala Lumpur', hours:'10am – 10pm daily', phone:'03-0000 0001', maps:'https://maps.app.goo.gl/2990s-kl', waze:'https://waze.com/ul/2990s-kl' } }),
+  SR({ brand:'2990s', name:'PJ showroom', v:{ address:'Jalan SS 2, 47300 Petaling Jaya', hours:'10am – 9pm daily', phone:'03-0000 0002', maps:'https://maps.app.goo.gl/2990s-pj', waze:'https://waze.com/ul/2990s-pj' } }),
+  SR({ brand:'2990s', name:'KL showroom · Deepavali hours', until:'2026-11-09', v:{ address:'Jalan Klang Lama, 58000 Kuala Lumpur', hours:'Closed on 8 Nov, open 12pm – 8pm on 9 Nov', phone:'03-0000 0001' } }),
+  CU({ brand:'2990s', name:'Delivery and installation', rows:[['Delivery area','Klang Valley, Seremban, Melaka'],['Delivery time','7 to 14 working days'],['Free delivery','Orders above RM 1,500'],['Installation','Free for beds and wardrobes']] }),
+  SR({ brand:'2990s', name:'PJ showroom · Merdeka hours', until:'2026-08-31', v:{ address:'Jalan SS 2, 47300 Petaling Jaya', hours:'Closed on 31 Aug' } }),
+  SR({ brand:'Carress', name:'Puchong showroom', v:{ address:'Jalan Puchong, 47100 Puchong, Selangor', hours:'11am – 9pm, closed Tuesday', phone:'03-0000 0003', maps:'https://maps.app.goo.gl/carress-puchong', waze:'https://waze.com/ul/carress-puchong' } }),
+  CU({ brand:'Carress', name:'Payment methods', rows:[['Instalment','0% for 12 months with Maybank, CIMB and Public Bank cards'],['Others','Cash, debit card, DuitNow QR']] }),
+  SR({ brand:'Carress', name:'Setia Alam pop-up', ai:'off', v:{ address:'Setia City Mall, 40170 Shah Alam', hours:'10am – 10pm daily' } }),
+  SR({ brand:'Carress', name:'Mid Valley roadshow', until:'2026-10-26', ai:'paused', v:{ address:'Mid Valley Megamall, Concourse', hours:'10am – 10pm daily' } })];
+const DIRS = [{ id:'d1', name:'Past promotions', parent:null, type:'Promotions' }, { id:'d2', name:'2026', parent:'d1' }, { id:'d3', name:'Sofa Week', parent:null, type:'Promotions' }, { id:'d4', name:'Sofas', parent:'f2' }, { id:'d5', name:'Beds', parent:'f2' }];
+const DIR_OF = { f5:'d2', f16:'d3', f6:'d3', f2a:'f2', f2b:'f2', f2c:'d4', f2d:'d4', f2e:'d5' };
+const SEED = [
+  F({id:'f1', name:'Product catalogue Oct 2026.pdf', ext:'PDF', size:'4.2 MB', folder:'2990s', updated:'1 Oct 2026', by:'Mei Ling', until:'2026-10-31', uses:[['AI Agent · 2990s','Auto Reply.dc.html'],['Template “Sofa enquiry” · step 5','Auto Reply.dc.html']],
+    versions:[{n:1,note:'September catalogue',when:'2 Sep 2026',by:'Mei Ling'},{n:2,note:'Fixed sofa bed colours',when:'20 Sep 2026',by:'Jia Hui'},{n:3,note:'October catalogue',when:'1 Oct 2026',by:'Mei Ling'}]}),
+  F({id:'f2', name:'Price list 2990s.xlsx', ext:'XLSX', size:'52 KB', folder:'2990s', updated:'1 Oct 2026', by:'Mei Ling', until:'2026-10-31', uses:[['AI Agent · 2990s','Auto Reply.dc.html']],
+    versions:[{n:1,note:'Q3 prices',when:'1 Jul 2026',by:'Mei Ling'},{n:2,note:'Sofa Week prices',when:'1 Oct 2026',by:'Mei Ling'}]}),
+  F({id:'f2a', name:'Price list notes.docx', ext:'DOCX', size:'24 KB', folder:'2990s', updated:'1 Oct 2026', by:'Mei Ling'}),
+  F({id:'f2b', name:'Promo price summary.pdf', ext:'PDF', size:'88 KB', folder:'2990s', updated:'1 Oct 2026', by:'Mei Ling', until:'2026-10-31'}),
+  F({id:'f2c', name:'L-shape sofas.xlsx', ext:'XLSX', size:'18 KB', folder:'2990s', updated:'1 Oct 2026', by:'Mei Ling'}),
+  F({id:'f2d', name:'Sofa beds.xlsx', ext:'XLSX', size:'12 KB', folder:'2990s', updated:'1 Oct 2026', by:'Jia Hui'}),
+  F({id:'f2e', name:'Bed frames.xlsx', ext:'XLSX', size:'15 KB', folder:'2990s', updated:'1 Oct 2026', by:'Jia Hui'}),
+  F({id:'f4', name:'Instalment and delivery policy.pdf', ext:'PDF', size:'310 KB', folder:'Both brands', updated:'3 Jun 2026', by:'Mei Ling', uses:[['AI Agent · 2990s','Auto Reply.dc.html'],['AI Agent · Carress','Auto Reply.dc.html']]}),
+  F({id:'f5', name:'Raya promo 2026.pdf', ext:'PDF', size:'1.1 MB', folder:'2990s', updated:'20 Mar 2026', by:'Mei Ling', until:'2026-04-30', uses:[['AI Agent · 2990s','Auto Reply.dc.html']]}),
+  F({id:'f6', name:'L-shape sofa sand.jpg', ext:'JPG', size:'2.8 MB', folder:'2990s', updated:'28 Sep 2026', by:'Jia Hui', uses:[['Campaign “Last days of Sofa Week”','Campaigns.dc.html']]}),
+  F({id:'f7', name:'KL showroom walkthrough.mp4', ext:'MP4', size:'38 MB', folder:'Both brands', updated:'5 Sep 2026', by:'Jia Hui'}),
+  F({id:'f8', name:'Carress mattress guide.pdf', ext:'PDF', size:'2.4 MB', folder:'Carress', updated:'12 Jul 2026', by:'Mei Ling', uses:[['AI Agent · Carress','Auto Reply.dc.html']]}),
+  F({id:'f10', name:'King Size Sale terms.pdf', ext:'PDF', size:'120 KB', folder:'Carress', updated:'1 Oct 2026', by:'Mei Ling', until:'2026-10-25', uses:[['AI Agent · Carress','Auto Reply.dc.html']]}),
+  F({id:'f11', name:'Warranty and returns 2990s.pdf', ext:'PDF', size:'180 KB', folder:'2990s', updated:'2 Aug 2026', by:'Jia Hui'}),
+  F({id:'f12', name:'Sofa fabrics and care.pdf', ext:'PDF', size:'640 KB', folder:'2990s', updated:'15 Sep 2026', by:'Mei Ling'}),
+  F({id:'f13', name:'Carress price list.xlsx', ext:'XLSX', size:'38 KB', folder:'Carress', updated:'1 Oct 2026', by:'Mei Ling', until:'2026-12-31'})
+,
+  F({id:'f16', name:'Sofa Week FAQ for CS', ext:'PAGE', size:'', folder:'2990s', updated:'19 Oct 2026', by:'Mei Ling', page:true, edited:'19 Oct 15:40', body:'Sofa Week runs 1 to 31 Oct.\nExtra RM 200 off all L-shape sofas, on top of the promo price.\nCannot be combined with other vouchers.\nFree delivery in the Klang Valley for orders above RM 1,500.'}),
+  F({id:'f14', name:'Product catalogue Nov 2026', ext:'DRIVE', size:'', folder:'2990s', updated:'20 Oct 2026', by:'Aaron Lim (Marketing)', until:'2026-11-30', shared:{ url:'https://drive.google.com/file/d/1Nov2026Catalogue/view', provider:'Google Drive', owner:'Aaron Lim · Marketing', synced:'today 09:00', ownerUpdated:'19 Oct 18:20', sync:'Every day', access:'ok' }}),
+  F({id:'f15', name:'Carress promo artwork', ext:'CANVA', size:'', folder:'Carress', updated:'14 Oct 2026', by:'Siti (Marketing)', shared:{ url:'https://www.canva.com/design/DAF-carress-promo/view', provider:'Canva', owner:'Siti · Marketing', synced:'14 Oct 10:20', ownerUpdated:'Unknown, no access', sync:'Manual', access:'none' }})
+].map(f => ({ ...f, dir: DIR_OF[f.id] || null, type: TYPE_OF[f.id] || (f.id === 'f14' ? 'Catalogues' : f.id === 'f15' || f.id === 'f16' ? 'Promotions' : 'Products & prices') }));
+const WEB = l => ({ ...F({ id:'w' + l.url.replace(/[^a-z0-9]/gi, ''), name: l.url.replace(/^https?:\/\//, ''), ext:'WEB', size:'', folder:l.folder, updated:'20 Oct 2026', by:'Mei Ling' }), type:'Product details', web:true, dir:null,
+  shared:{ url:l.url, provider:'Web page', owner: l.url.split('/')[2] || 'Website', synced:'today 09:00', ownerUpdated:'—', sync:'Every day', access:'ok' } });
+const TARGETS = [['Template “Sofa enquiry” · step 5','Auto Reply.dc.html'],['Template “Mattress enquiry” · step 3','Auto Reply.dc.html'],['Template “Showroom visit” · step 2','Auto Reply.dc.html'],['Campaign “Last days of Sofa Week”','Campaigns.dc.html'],['Campaign “King Size Sale”','Campaigns.dc.html']];
+const QUICK = [
+  {id:'q1', key:'/instal', brand:'All brands', text:'Yes! 0% instalments for 12 months with Maybank, CIMB and Public Bank cards.', used:42},
+  {id:'q2', key:'/phone', brand:'All brands', text:'May I have your mobile number? Our salesperson will WhatsApp you the details.', used:118},
+  {id:'q3', key:'/kl', brand:'2990s', text:'Our KL showroom is at Jalan Klang Lama, open 10am to 10pm every day.', used:27},
+  {id:'q4', key:'/delivery', brand:'All brands', text:'We deliver within the Klang Valley in 7 to 14 working days. Free above RM 1,500.', used:35},
+  {id:'q5', key:'/trial', brand:'Carress', text:'Sleep on your Carress mattress for 100 nights. If it is not right, we exchange it once for free.', used:16}
+];
+const KB_TEMPLATES = [
+  { label:'Product and price list', rows:[['Product','Category','Size / seats','Colours','Price (RM)','Promo price (RM)','Showroom','Notes'],['L-shape sofa Oslo','Sofa','3+2 seats, 280 cm','Sand, olive, charcoal','2990','2790','KL, PJ','Fabric is washable']] },
+  { label:'Fixed answers (FAQ)', rows:[['Customer asks','Answer','Valid until (YYYY-MM-DD)'],['Can I pay by instalments?','Yes, 0% for 12 months with Maybank, CIMB and Public Bank cards.','']] },
+  { label:'Promotion', rows:[['Promotion name','What it gives','Products','Start (YYYY-MM-DD)','End (YYYY-MM-DD)','Conditions'],['Oct Sofa Week','Extra RM 200 off','All L-shape sofas','2026-10-01','2026-10-31','Not with other vouchers']] },
+  { label:'Showrooms and hours', rows:[['Showroom','Address','Opening hours','Phone','Waze / Google Maps link'],['KL','Jalan Klang Lama','10am–10pm daily','03-0000 0000','']] }];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const status = f => f.reading ? ['Reading…','amber'] : f.from && f.from > TODAY ? ['Starts ' + Number(f.from.slice(8)) + ' ' + MON[Number(f.from.slice(5,7))-1],'none'] : !f.until ? ['No end date','none'] : f.until < TODAY ? ['Expired','red'] : (new Date(f.until) - new Date(TODAY)) / 864e5 <= 14 ? ['Ends in ' + Math.round((new Date(f.until) - new Date(TODAY)) / 864e5) + ' days','amber'] : ['Until ' + f.until.slice(8) + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(f.until.slice(5,7))-1],'green'];
+const COL = { red:[K.redBg,K.red], amber:[K.amberBg,K.amber], green:[K.greenBg,K.green], none:[K.info,K.brown] };
+const EXT = e => ['JPG','PNG','MP4','MOV','WEBP'].includes(e) ? [K.peach,K.otext] : ['XLSX','CSV','XLS'].includes(e) ? [K.greenBg,K.green] : [K.info,K.brown];
+const size = b => { const kb = b / 1024; return kb > 1024 ? (kb/1024).toFixed(1) + ' MB' : Math.max(1, Math.round(kb)) + ' KB'; };
+
+class Component extends DCLogic {
+  state = { ai: this.loadAI(), files: [...SEED, ...this.loadLinks().map(WEB)], basic: BASIC, brand:'All brands', fBrands:[], fStats:[], fq:'', cats:[], ftype:'All types', kind:'All', stat:null, quick: QUICK, links: this.loadLinks(), linkIn:'', linkFolder:'2990s', tab:'files', openId:null, dirs: DIRS, cwd:null };
+  loadLinks(){ const seed = [{url:'https://2990s.com.my/faq',folder:'2990s',uses:['AI Agent · 2990s']},{url:'https://2990s.com.my/delivery',folder:'2990s',uses:[]},{url:'https://carress.com.my/trial',folder:'Carress',uses:['AI Agent · Carress']}];
+    let extra = []; try { extra = JSON.parse(localStorage.getItem('houzs-dc-links') || '[]'); } catch (e) {} return [...seed, ...extra.filter(x => !seed.some(s => s.url === x.url)).map(x => ({...x, uses:[]}))]; }
+  saveLinks(links){ try { localStorage.setItem('houzs-dc-links', JSON.stringify(links.filter(l => !['https://2990s.com.my/faq','https://2990s.com.my/delivery','https://carress.com.my/trial'].includes(l.url)).map(l => ({url:l.url, folder:l.folder})))); } catch (e) {} }
+  upRef = React.createRef(); verRef = React.createRef(); dirUpRef = React.createRef();
+  dirAttr(){ const el = this.dirUpRef.current; if (el && !el.hasAttribute('webkitdirectory')) el.setAttribute('webkitdirectory', ''); }
+  loadAI(){ try { const s = JSON.parse(localStorage.getItem('houzs-ai-sources') || 'null'); if (s) return s; } catch (e) {}
+    return { '2990s':{ files:['Product catalogue Oct 2026.pdf','Showrooms and opening hours.docx','Instalment and delivery policy.pdf','Price list 2990s.xlsx','Raya promo 2026.pdf'].map(name => ({name, paused:false})), urls:['https://2990s.com.my/faq'], pausedUrls:[], log:[] },
+      'Carress':{ files:['Carress mattress guide.pdf','Carress showroom Puchong.docx'].map(name => ({name, paused:false})), urls:['https://carress.com.my/trial'], pausedUrls:[], log:[] } }; }
+  setAI(brand, name, isUrl){ this.setState(s => { const ai = JSON.parse(JSON.stringify(s.ai)); const b = ai[brand]; if (!b) return null; let paused;
+      if (isUrl) { paused = (b.pausedUrls || []).includes(name); b.pausedUrls = paused ? b.pausedUrls.filter(x => x !== name) : [...(b.pausedUrls || []), name]; }
+      else { const f = b.files.find(x => x.name === name); if (!f) return null; paused = !!f.paused; f.paused = !paused; }
+      b.log = [{ d:'19 Oct 2026', by:'Mei Ling', act: paused ? 'Resumed' : 'Ended', what: name + ' · in Data Center' }, ...(b.log || [])];
+      try { localStorage.setItem('houzs-ai-sources', JSON.stringify(ai)); } catch (e) {} return { ai }; }); }
+  addAI(brand, name, isUrl){ this.setState(s => { const ai = JSON.parse(JSON.stringify(s.ai)); const b = ai[brand]; if (!b) return null;
+      if (isUrl) { if (!(b.urls || []).includes(name)) b.urls = [...(b.urls || []), name]; } else if (!b.files.some(x => x.name === name)) b.files = [...b.files, { name, paused:false }];
+      b.log = [{ d:'20 Oct 2026', by:'Mei Ling', act:'Added', what: name + ' · in Data Center' }, ...(b.log || [])];
+      try { localStorage.setItem('houzs-ai-sources', JSON.stringify(ai)); } catch (e) {} return { ai }; }, () => this.icons()); }
+  delAI(brand, name, isUrl){ this.setState(s => { const ai = JSON.parse(JSON.stringify(s.ai)); const b = ai[brand]; if (!b) return null;
+      if (isUrl) { b.urls = (b.urls || []).filter(x => x !== name); b.pausedUrls = (b.pausedUrls || []).filter(x => x !== name); } else b.files = b.files.filter(x => x.name !== name);
+      b.log = [{ d:'20 Oct 2026', by:'Mei Ling', act:'Removed', what: name + ' · in Data Center' }, ...(b.log || [])];
+      try { localStorage.setItem('houzs-ai-sources', JSON.stringify(ai)); } catch (e) {} return { ai }; }); }
+  componentDidMount(){ this.icons(); this.sync(); this.setState({ ai: this.loadAI() }); }
+  componentDidUpdate(){ this.icons(); this.sync(); this.dirAttr(); }
+  icons(){ if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  sync(){ requestAnimationFrame(() => document.querySelectorAll('select[data-v]').forEach(s => { if (s.dataset.v && s.value !== s.dataset.v) s.value = s.dataset.v; })); }
+  updFile(id, fn){ this.setState(s => ({ files: s.files.map(f => f.id === id ? fn(f) : f) })); }
+  renderVals(){
+    const st = this.state;
+    const IN = ['rgb(230,240,231)','rgb(76,110,80)','rgb(76,110,80)'], PZ = ['rgb(242,238,233)','rgb(104,92,84)','rgb(160,150,140)'], OT = ['rgb(242,238,233)','rgb(88,76,68)','rgb(176,92,54)'];
+    const aiUses = (name, isUrl) => Object.keys(st.ai).flatMap(b => { const a = st.ai[b]; const has = isUrl ? (a.urls || []).includes(name) : (a.files || []).some(x => x.name === name); if (!has) return [];
+      const p = isUrl ? (a.pausedUrls || []).includes(name) : !!(a.files.find(x => x.name === name) || {}).paused; const c = p ? PZ : IN;
+      return [{ isAI:true, brand:b, paused:p, name:'AI Agent · ' + b, label:'AI · ' + b + (p ? ' · Ended' : ' · In use'), state: p ? 'Ended' : 'In use', href:'Auto Reply.dc.html', bg:c[0], fg:c[1], dot:c[2], actLabel: p ? 'Resume' : 'End', toggle: () => this.setAI(b, name, isUrl) }]; });
+    const FILES = st.files.map(f => ({ ...f, uses: [...f.uses.filter(u => !/^AI Agent/.test(u[0])).map(([label, href]) => ({ isAI:false, name:label, label, href, bg:OT[0], fg:OT[1], dot:OT[2] })), ...(f.web ? aiUses(f.shared.url, true) : aiUses(f.name, false))] }));
+    const aiIn = f => f.uses.some(u => u.isAI && !u.paused), aiPz = f => f.uses.some(u => u.isAI && u.paused);
+    const STATS = [['In use','rgb(76,110,80)'],['Ended','rgb(160,150,140)'],['Ending soon',K.amber],['Expired',K.red],['Not used',K.faint]];
+    const fKeys = f => { const c = status(f)[1], k = []; if (aiIn(f)) k.push('In use'); if (aiPz(f)) k.push('Ended'); if (c === 'red') k.push('Expired'); if (c === 'amber' && !f.reading) k.push('Ending soon'); if (!f.uses.length) k.push('Not used'); return k; };
+    const bStatus = b => { const s = status(b)[1]; return s === 'red' ? ['Expired','red'] : s === 'amber' ? [status(b)[0],'amber'] : b.ai === 'off' ? ['Not used','none'] : b.ai === 'paused' ? ['Paused','none'] : ['In use','green']; };
+    const bKeys = b => { const s = status(b)[1], k = []; if (s === 'red') k.push('Expired'); if (s === 'amber') k.push('Ending soon'); k.push(b.ai === 'off' ? 'Not used' : b.ai === 'paused' ? 'Paused' : 'In use'); return k; };
+    const isBasic = st.tab === 'basic';
+    const pool = isBasic ? st.basic : FILES, keysOf = isBasic ? bKeys : fKeys;
+    const byBrand = x => isBasic ? (st.brand === 'All brands' || x.brand === st.brand || x.brand === 'All brands') : (!st.fBrands.length || st.fBrands.some(b => b === 'Shared with me' ? !!x.shared : x.folder === b));
+    const byType = x => isBasic || st.ftype === 'All types' || x.type === st.ftype;
+    const byStat = x => isBasic ? (!st.stat || keysOf(x).includes(st.stat)) : (!st.fStats.length || keysOf(x).some(k => st.fStats.includes(k)));
+    const fql = st.fq.trim().toLowerCase(), byQ = f => !fql || (f.name + ' ' + (f.by || '')).toLowerCase().includes(fql);
+    const shown = FILES.filter(f => byBrand(f) && byType(f) && byStat(f) && byQ(f));
+    const dirs = st.dirs, cwd = st.cwd || null, flat = !!fql || st.fBrands.length > 0 || st.fStats.length > 0;
+    const nodeOf = id => { const d0 = dirs.find(y => y.id === id); if (d0) return { id, name:d0.name, parent:d0.parent || null }; const f0 = st.files.find(y => y.id === id); return f0 ? { id, name:f0.name, parent:f0.dir || null, isFile:true } : null; };
+    const pathOf = id => { const p = []; let x = id ? nodeOf(id) : null, g = 0; while (x && g++ < 60) { p.unshift(x); x = x.parent ? nodeOf(x.parent) : null; } return p; };
+    const pathLabel = id => pathOf(id).map(x => x.name).join(' / ');
+    const under = (id, root) => pathOf(id).some(x => x.id === root);
+    const shownF = flat ? shown : FILES.filter(f => (f.dir || null) === cwd && (cwd || byType(f)));
+    const moveTo = (item, to) => { if (!item) return; const done = { dragItem:null, overDir:null };
+      if (item.id === to || (to && under(to, item.id))) { this.setState(done); return; }
+      if (item.kind === 'dir') { this.setState(s => ({ ...done, dirs: s.dirs.map(x => x.id === item.id ? { ...x, parent:to } : x) })); }
+      else this.setState(s => ({ ...done, files: s.files.map(f => f.id === item.id ? { ...f, dir:to } : f) })); };
+    const dropProps = to => { const k = to || 'root'; return { onDragOver: e => { if (!st.dragItem) return; e.preventDefault(); if (st.overDir !== k) this.setState({ overDir:k }); }, onDrop: e => { e.preventDefault(); e.stopPropagation(); moveTo(st.dragItem, to); } }; };
+    const dragStart = item => e => { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', item.id); } catch (x) {} this.setState({ dragItem:item }); };
+    const kids = id => dirs.filter(x => x.parent === id).length + st.files.filter(f => f.dir === id).length;
+    const commitRen = () => { const v = (st.renIn || '').trim(); this.setState(s => ({ renId:null, dirs: v ? s.dirs.map(x => x.id === s.renId ? { ...x, name:v } : x) : s.dirs })); };
+    const createDir = () => { const v = (st.dirIn || '').trim(); this.setState(s => ({ dirAdding:false, dirIn:'', dirs: v ? [...s.dirs, { id:'d' + Date.now().toString(36), name:v, parent:cwd, type: st.ftype !== 'All types' ? st.ftype : undefined }] : s.dirs })); };
+    const ctxFor = T => e => { e.preventDefault(); e.stopPropagation(); this.setState({ ctx:{ x: Math.min(e.clientX, window.innerWidth - 270), y: Math.min(e.clientY, window.innerHeight - 280), t:T } }, () => this.icons()); };
+    const ctxT = st.ctx ? st.ctx.t : null, ctxNode = ctxT ? nodeOf(ctxT) : null, ctxTy = st.ctx && st.ctx.ty, tySet = ctxTy ? { ftype:ctxTy } : {};
+    const dirRows = flat ? [] : dirs.filter(x => (x.parent || null) === cwd && (cwd || st.ftype === 'All types' || x.type === st.ftype)).sort((a, b) => a.name.localeCompare(b.name)).map(g => { const n = kids(g.id), over = st.overDir === g.id;
+      return { ...g, sub: n ? n + (n > 1 ? ' items' : ' item') : 'Empty', bg: over ? 'rgb(252,240,232)' : 'rgb(255,255,255)', ring: over ? 'inset 0 0 0 1px rgb(199,111,70)' : 'none', op: st.dragItem && st.dragItem.id === g.id ? .4 : 1,
+        renaming: st.renId === g.id, idle: st.renId !== g.id, renIn: st.renIn || '', onRenIn: e => this.setState({ renIn:e.target.value }), onRenBlur: commitRen, stop: e => e.stopPropagation(),
+        onRenKey: e => { if (e.key === 'Enter') commitRen(); if (e.key === 'Escape') this.setState({ renId:null }); },
+        rename: e => { e.stopPropagation(); this.setState({ renId:g.id, renIn:g.name }); },
+        removeTitle: n ? 'Delete folder. Its ' + n + (n > 1 ? ' items move' : ' item moves') + ' up one level' : 'Delete folder',
+        remove: e => { e.stopPropagation(); this.setState(s => ({ dirs: s.dirs.filter(x => x.id !== g.id).map(x => x.parent === g.id ? { ...x, parent:g.parent } : x), files: s.files.map(f => f.dir === g.id ? { ...f, dir:g.parent } : f) })); },
+        onClick: () => { if (st.renId !== g.id) this.setState({ cwd:g.id, renId:null }); }, onCtx: ctxFor(g.id), onDragStart: dragStart({ kind:'dir', id:g.id }), ...dropProps(g.id) }; });
+    const ALLTYPES = (st.catOrder || [...TYPES, ...st.cats]).filter((x, i, a) => a.indexOf(x) === i);
+    const moveCat = (from, to) => { if (!from || from === to) return; const o = [...ALLTYPES].filter(x => x !== from); const i = o.indexOf(to); o.splice(i < 0 ? o.length : i, 0, from); this.setState({ catOrder:o, dragCat:null, overCat:null }); };
+    const TICON = { 'Products & prices':'tag', 'Product details':'file-text', 'Photos & videos':'image', 'Promotions':'percent', 'Catalogues':'book-open', 'After-sales':'wrench' };
+    const multi = (key, title, opts, sel, sk, count) => ({ title: title + ':', summary: sel.length ? sel.join(', ') : 'All', ring: sel.length ? K.accent : K.frame, any: sel.length > 0,
+      open: st.ddOpen === key, toggle: () => this.setState(s => ({ ddOpen: s.ddOpen === key ? null : key }), () => this.icons()), close: () => this.setState({ ddOpen:null }), clear: () => this.setState({ [sk]:[] }),
+      opts: opts.map(o => { const on = sel.includes(o); return { label:o, count: count(o), tick: on ? '✓' : '', ring: on ? K.accent : K.frame, fill: on ? K.accent : K.white, onClick: () => this.setState(s => ({ [sk]: on ? s[sk].filter(x => x !== o) : [...s[sk], o] })) }; }) });
+    const addCat = () => { const v = (st.catIn || '').trim(); if (!v || ALLTYPES.includes(v)) { this.setState({ catAdding:false, catIn:'' }); return; } this.setState(s => ({ cats:[...s.cats, v], catOrder:[...ALLTYPES, v], catIn:'', catAdding:false, ftype:v })); };
+    const byKind = b => st.kind === 'All' || b.kind === st.kind;
+    const basicShown = st.basic.filter(b => byBrand(b) && byStat(b) && byKind(b));
+    const pick = (k, v) => () => this.setState(s => ({ [k]: s[k] === v && k === 'stat' ? null : v }));
+    const sb = (label, count, on, onClick) => ({ label, count, bg: on ? K.peach : 'transparent', border: on ? K.accent : 'transparent', onClick });
+    const updB = (id, o) => this.setState(s => ({ basic: s.basic.map(b => b.id === id ? {...b, ...(typeof o === 'function' ? o(b) : o)} : b) }));
+    const updF = (bid, fidv, o) => updB(bid, b => ({ fields: b.fields.map(x => x.id === fidv ? {...x, ...o} : x) }));
+    const sel = FILES.find(f => f.id === st.openId), rawSel = st.files.find(f => f.id === st.openId);
+    if (st.openId !== this.snapId) { this.snapId = st.openId; this.snap = rawSel ? JSON.stringify(rawSel) : null; }
+    const dirty = !!rawSel && !!this.snap && JSON.stringify(rawSel) !== this.snap;
+    const revert = () => { const o = this.snap && JSON.parse(this.snap); if (!o) return; this.setState(s => ({ files: s.files.map(f => f.id === o.id ? o : f) })); };
+    const target = st.fBrands.length === 1 && ['2990s','Carress','Both brands'].includes(st.fBrands[0]) ? st.fBrands[0] : 'Both brands', tType = st.ftype !== 'All types' ? st.ftype : 'Products & prices';
+    const segOf = (cur, opts, fn) => opts.map(l => ({ label:l, bg: cur === l ? K.dark : K.white, fg: cur === l ? K.cream : K.brown, onClick: () => fn(l) }));
+    const subOf = f => f.page ? 'Page · ' + (f.body || '').trim().split(/\s+/).filter(Boolean).length + ' words' : f.shared ? f.shared.provider + ' · synced ' + f.shared.synced : f.size + ' · v' + f.version;
+    const sh = st.share || {}, shUrl = (sh.url || '').trim(), pv = PROV(shUrl);
+    let d = {};
+    if (sel) { const [s, c] = status(sel); const e = EXT(sel.ext);
+      d = { ...sel, sub: subOf(sel), isPage: !!sel.page, body: sel.body || '', pageHint: 'Saved automatically · edited ' + (sel.edited || sel.updated), local: !sel.shared && !sel.page, shared: !!sel.shared, ...(sel.shared ? { url:sel.shared.url, provider:sel.shared.provider, owner:sel.shared.owner, synced:sel.shared.synced, ownerUpdated: sel.shared.ownerUpdated || '—', noAccess: sel.shared.access !== 'ok', copyLabel: st.copiedMail ? 'Copied' : 'Copy ai@houzs.my', syncHint: sel.shared.sync === 'Manual' ? 'Updates only when you sync.' : 'Next check ' + (sel.shared.sync === 'Every hour' ? 'within the hour' : 'tomorrow 09:00') + '.', access: sel.shared.access === 'ok' ? 'Can read' : 'No access', accBg: sel.shared.access === 'ok' ? K.greenBg : K.redBg, accFg: sel.shared.access === 'ok' ? K.green : K.red, syncLabel: st.syncing ? 'Syncing…' : 'Sync now', syncSeg: segOf(sel.shared.sync, SYNC, v => this.updFile(sel.id, f => ({ ...f, shared:{ ...f.shared, sync:v } }))) } : {}), extBg:e[0], extFg:e[1], status:s, stBg:COL[c][0], stFg:COL[c][1], unused: !sel.uses.length,
+        versions: [...sel.versions].reverse().map(v => ({ ...v, current: v.n === sel.version, old: v.n !== sel.version, restore:() => this.updFile(sel.id, f => ({...f, version:v.n, updated:'18 Oct 2026', by:'Mei Ling'})) })),
+        fromOn: !!sel.fromOn || !!sel.from, endOn: !!sel.untilOn || !!sel.until,
+        fromSeg: [['now','From now'],['date','Date']].map(([v, l]) => { const on = (v === 'date') === (!!sel.fromOn || !!sel.from); return { label:l, bg: on ? K.dark : K.white, fg: on ? K.cream : K.brown, onClick: () => this.updFile(sel.id, f => v === 'date' ? { ...f, fromOn:true, from: f.from || TODAY } : { ...f, fromOn:false, from:'' }) }; }),
+        endSeg: [['never','Never'],['date','Date']].map(([v, l]) => { const on = (v === 'date') === (!!sel.untilOn || !!sel.until); return { label:l, bg: on ? K.dark : K.white, fg: on ? K.cream : K.brown, onClick: () => this.updFile(sel.id, f => v === 'date' ? { ...f, untilOn:true, until: f.until || TODAY } : { ...f, untilOn:false, until:'' }) }; }),
+        addTo: [...Object.keys(st.ai).filter(b => !sel.uses.some(u => u.isAI && u.brand === b)).map(b => ({ label:'AI Agent · ' + b, icon:'bot', onClick: () => { this.setState({ useAddOpen:false }); this.addAI(b, sel.web ? sel.shared.url : sel.name, !!sel.web); } })),
+          ...TARGETS.filter(([l]) => !sel.uses.some(u => u.name === l)).map(([l, href]) => ({ label:l, icon: /^Campaign/.test(l) ? 'megaphone' : 'message-square', onClick: () => { this.setState({ useAddOpen:false }); this.updFile(sel.id, f => ({ ...f, uses:[...f.uses, [l, href]] })); } }))],
+        usesFull: sel.uses.map(u => ({ ...u, remove: () => u.isAI ? this.delAI(u.brand, sel.web ? sel.shared.url : sel.name, !!sel.web) : this.updFile(sel.id, f => ({ ...f, uses: f.uses.filter(x => x[0] !== u.name) })) })),
+        canAdd: Object.keys(st.ai).some(b => !sel.uses.some(u => u.isAI && u.brand === b)) || TARGETS.some(([l]) => !sel.uses.some(u => u.name === l)),
+        cantDelete: sel.uses.length > 0, delOp: sel.uses.length ? .4 : 1, deleteHint: sel.uses.length ? 'Used by ' + sel.uses.length + '. Remove it there first.' : 'Not used anywhere. Safe to delete.' }; }
+    const commitCatRen = () => { const o = st.catRen, v = (st.catRenIn || '').trim(); if (!o || !v || v === o || ALLTYPES.includes(v)) { this.setState({ catRen:null }); return; }
+      this.setState(s => ({ catRen:null, catOrder: ALLTYPES.map(x => x === o ? v : x), cats: s.cats.map(x => x === o ? v : x), catIcons: { ...(s.catIcons || {}), [v]: TICON[o] || (s.catIcons || {})[o] || 'folder' },
+        files: s.files.map(f => f.type === o ? { ...f, type:v } : f), dirs: s.dirs.map(x => x.type === o ? { ...x, type:v } : x), ftype: s.ftype === o ? v : s.ftype })); };
+    const delCat = l => { const n = FILES.filter(f => f.type === l).length; if (n && !window.confirm('Delete category “' + l + '”? Its ' + n + (n > 1 ? ' files stay' : ' file stays') + ' in All, with no category.')) return;
+      this.setState(s => ({ catOrder: ALLTYPES.filter(x => x !== l), cats: s.cats.filter(x => x !== l), files: s.files.map(f => f.type === l ? { ...f, type:'' } : f), dirs: s.dirs.map(x => x.type === l ? { ...x, type:undefined } : x), ftype: s.ftype === l ? 'All types' : s.ftype, cwd: s.ftype === l ? null : s.cwd, ctx:null })); };
+    return {
+      ctxIsCat: !!ctxTy && ctxTy !== 'All types',
+      ctxCatRen: () => this.setState({ ctx:null, catRen:ctxTy, catRenIn:ctxTy }),
+      ctxCatDel: () => { this.setState({ ctx:null }); delCat(ctxTy); },
+      crumbs: flat ? [] : [{ id:null, name:'All files' }, ...pathOf(cwd)].map((c, i, a) => { const last = i === a.length - 1, over = st.overDir === (c.id || 'root');
+        return { label:c.name, sep: i > 0, onClick: () => this.setState({ cwd:c.id, renId:null }), bg: over ? 'rgb(252,240,232)' : 'transparent', ring: over ? K.accent : 'transparent', fg: last ? 'rgb(0,0,0)' : K.brown, fw: last ? 600 : 400, ...dropProps(c.id) }; }),
+      ctxOpen: !!st.ctx, ctxX: st.ctx ? st.ctx.x : 0, ctxY: st.ctx ? st.ctx.y : 0, ctxName: ctxTy ? (ctxTy === 'All types' ? 'All' : ctxTy) : ctxNode ? ctxNode.name : 'All files', ctxCanOpen: !!st.ctx && (ctxTy ? (ctxTy !== st.ftype || !!cwd) : ctxT !== cwd),
+      ctxHere: ctxFor(cwd), ctxClose: e => { if (e) e.preventDefault(); this.setState({ ctx:null }); },
+      ctxOpenIt: () => this.setState({ ctx:null, cwd:ctxT, fq:'', fBrands:[], fStats:[], ...tySet }),
+      ctxDir: () => this.setState({ ctx:null, cwd:ctxT, dirAdding:true, dirIn:'', fq:'', fBrands:[], fStats:[], ...tySet }),
+      ctxUpload: () => { this.upDir = ctxT; this.setState({ ctx:null, ...tySet }); this.upRef.current && this.upRef.current.click(); },
+      ctxDirUpload: () => { this.upDir = ctxT; this.setState({ ctx:null, ...tySet }); this.dirUpRef.current && this.dirUpRef.current.click(); },
+      ctxShare: () => this.setState({ ctx:null, ...tySet, share:{ url:'', name:'', folder: target, type: ctxTy && ctxTy !== 'All types' ? ctxTy : tType, sync:'Every day', dir:ctxT } }, () => this.icons()),
+      dirUpRef: this.dirUpRef, menuDirUpload: () => { this.upDir = undefined; this.setState({ newOpen:false }); this.dirUpRef.current && this.dirUpRef.current.click(); },
+      onDirUpload: e => { const fs = Array.from(e.target.files || []); e.target.value = ''; if (!fs.length) return; const T = this.upDir !== undefined ? this.upDir : cwd; this.upDir = undefined;
+        const nd = [], map = {}, dirFor = parts => { let par = T, key = ''; parts.forEach(p => { key += '/' + p; if (!map[key]) { map[key] = 'd' + Math.random().toString(36).slice(2, 8); nd.push({ id:map[key], name:p, parent:par }); } par = map[key]; }); return par; };
+        const add = fs.map((fl, i) => { const parts = (fl.webkitRelativePath || fl.name).split('/'); parts.pop(); return F({ id:'u' + Date.now() + i, name:fl.name, ext:(fl.name.split('.').pop() || 'FILE').slice(0, 4).toUpperCase(), size:size(fl.size), folder:target, type:tType, updated:'20 Oct 2026', by:'Mei Ling', reading:true, dir:dirFor(parts) }); });
+        this.setState(s => ({ dirs:[...s.dirs, ...nd], files:[...add, ...s.files], cwd:T }));
+        setTimeout(() => this.setState(s => ({ files: s.files.map(f => add.some(a => a.id === f.id) ? { ...f, reading:false } : f) })), 1600); },
+      flat, dirRows, dragEnd: () => this.setState({ dragItem:null, overDir:null }),
+      dirAdding: !!st.dirAdding && !flat, dirIn: st.dirIn || '', onDirIn: e => this.setState({ dirIn:e.target.value }), onDirBlur: createDir,
+      onDirKey: e => { if (e.key === 'Enter') createDir(); if (e.key === 'Escape') this.setState({ dirAdding:false, dirIn:'' }); },
+      menuDir: () => this.setState({ newOpen:false, dirAdding:true, dirIn:'', fq:'', fBrands:[], fStats:[] }),
+      dirOpts: [{ v:'', label:'All files (top level)' }, ...[...dirs.map(x => x.id), ...st.files.filter(f => kids(f.id) > 0).map(f => f.id)].filter(id => !sel || (id !== sel.id && !under(id, sel.id))).map(id => ({ v:id, label:pathLabel(id) })).sort((a, b) => a.label.localeCompare(b.label))],
+      onDir: e => { const v = e.target.value || null; this.updFile(sel.id, f => ({ ...f, dir:v })); },
+      emptyMsg: !flat && cwd ? 'This folder is empty. Drag files here, or use + Add.' : 'Nothing here.',
+      folderName: target,
+      headHint: isBasic ? 'Short facts the AI Agent answers with: addresses, opening hours, phone numbers and map links. Add a valid-until date for temporary hours.' : st.tab === 'files' ? 'Product data the AI Agent, templates and campaigns use. Pause or resume a source for an AI Agent here or in Reply template. Replace a file here and everything that uses it updates.' : '',
+      showSide: isBasic || st.tab === 'files', showBasic: isBasic,
+      brands: (isBasic ? ['All brands','2990s','Carress'] : ['All brands','2990s','Carress','Both brands','Shared with me']).map(l => sb(l, l === 'All brands' ? pool.length : l === 'Shared with me' ? pool.filter(x => x.shared).length : pool.filter(x => (x.folder || x.brand) === l).length, st.brand === l, pick('brand', l))),
+      types: ['All types', ...ALLTYPES].map(l => ({ ...sb(l === 'All types' ? 'All' : l, l === 'All types' ? FILES.filter(f => byBrand(f) && byStat(f)).length : FILES.filter(f => byBrand(f) && byStat(f) && f.type === l).length, st.ftype === l, () => this.setState({ ftype:l, cwd:null })), icon: l === 'All types' ? 'layout-grid' : TICON[l] || (st.catIcons || {})[l] || 'folder',
+        renaming: st.catRen === l, notRen: st.catRen !== l, renIn: st.catRenIn || '', onRenIn: e => this.setState({ catRenIn:e.target.value }), onRenBlur: commitCatRen, stop: e => e.stopPropagation(),
+        onRenKey: e => { if (e.key === 'Enter') commitCatRen(); if (e.key === 'Escape') this.setState({ catRen:null }); },
+        rename: e => { e.stopPropagation(); if (l !== 'All types') this.setState({ catRen:l, catRenIn:l }); },
+        onCtx: e => { e.preventDefault(); e.stopPropagation(); this.setState({ ctx:{ x: Math.min(e.clientX, window.innerWidth - 270), y: Math.min(e.clientY, window.innerHeight - 280), t:null, ty:l } }, () => this.icons()); },
+        draggable: l !== 'All types', gripVis: l === 'All types' ? 'hidden' : 'visible', op: st.dragCat === l ? .4 : 1, dropLine: st.overCat === l && st.dragCat && st.dragCat !== l ? 'inset 0 2px 0 rgb(199,111,70)' : 'none',
+        onDragStart: e => { if (l === 'All types') return; e.dataTransfer.effectAllowed = 'move'; this.setState({ dragCat:l }); },
+        onDragOver: e => { if (!st.dragCat || l === 'All types') return; e.preventDefault(); if (st.overCat !== l) this.setState({ overCat:l }); },
+        onDrop: e => { e.preventDefault(); moveCat(st.dragCat, l); }, onDragEnd: () => this.setState({ dragCat:null, overCat:null }),
+        canDel: st.ftype === l && l !== 'All types' && st.catRen !== l,
+        remove: e => { e.stopPropagation(); delCat(l); } })),
+      brandDD: multi('brand', 'Brand', ['None','2990s','Carress','Both brands','Shared with me'], st.fBrands, 'fBrands', o => FILES.filter(f => o === 'Shared with me' ? f.shared : f.folder === o).length),
+      statDD: multi('stat', 'Status', STATS.map(s => s[0]), st.fStats, 'fStats', o => FILES.filter(f => byBrand(f) && byType(f) && fKeys(f).includes(o)).length),
+      fq: st.fq, onFq: e => this.setState({ fq:e.target.value }), fileCount: shown.length + ' of ' + FILES.length + ' files',
+      catAdding: !!st.catAdding, catIdle: !st.catAdding, startCat: () => this.setState({ catAdding:true }), catIn: st.catIn || '', onCatIn: e => this.setState({ catIn:e.target.value }),
+      onCatKey: e => { if (e.key === 'Enter') addCat(); if (e.key === 'Escape') this.setState({ catAdding:false, catIn:'' }); }, catBlur: () => { if (!(st.catIn || '').trim()) this.setState({ catAdding:false }); },
+      stats: STATS.map(([l, dot]) => ({ ...sb(l, pool.filter(x => byBrand(x) && byType(x) && keysOf(x).includes(l)).length, st.stat === l, pick('stat', l)), dot })),
+      kinds: [['All','All'],['showroom','Showrooms'],['custom','Other info']].map(([k, l]) => sb(l, st.basic.filter(b => byBrand(b) && (k === 'All' || b.kind === k)).length, st.kind === k, () => this.setState({ kind:k }))),
+      basicBrands: ['2990s','Carress','All brands'],
+      basicRows: basicShown.map(b => { const [s, c] = bStatus(b), shop = b.kind === 'showroom', hasEnd = b.untilOn || !!b.until; return { ...b, status:s, stBg:COL[c][0], stFg:COL[c][1],
+        icon: shop ? 'store' : 'file-text', namePh: shop ? 'Showroom name' : 'Title, e.g. Delivery and installation', delLabel: shop ? 'Delete showroom' : 'Delete',
+        onName: e => updB(b.id, { name:e.target.value }), onBrand: e => updB(b.id, { brand:e.target.value }), onUntil: e => updB(b.id, { until:e.target.value }),
+        remove: () => this.setState(s2 => ({ basic: s2.basic.filter(x => x.id !== b.id) })),
+        addField: () => updB(b.id, x => ({ fields:[...x.fields, { id:fid(), label:'', value:'' }] })),
+        fields: b.fields.map(fl => ({ ...fl, fixed: !!fl.key, free: !fl.key, icon: fl.icon || 'dot', ph: fl.ph || 'Value', delVis: fl.key && b.fields.length < 2 ? 'hidden' : 'visible',
+          onLabel: e => updF(b.id, fl.id, { label:e.target.value }), onChange: e => updF(b.id, fl.id, { value:e.target.value }),
+          remove: () => updB(b.id, x => ({ fields: x.fields.filter(y => y.id !== fl.id) })) })),
+        hasEnd, validSeg: [['none','No end date'],['end','Until']].map(([v, l]) => { const on = (v === 'end') === hasEnd; return { label:l, bg: on ? K.dark : K.white, fg: on ? K.cream : K.brown, onClick: () => updB(b.id, v === 'end' ? { untilOn:true, until: b.until || TODAY } : { untilOn:false, until:'' }) }; }),
+        seg: [['on','In use'],['paused','Paused'],['off','Off']].map(([v, l]) => ({ label:l, bg: b.ai === v ? K.dark : K.white, fg: b.ai === v ? K.cream : K.brown, onClick: () => updB(b.id, { ai:v }) })) }; }),
+      noBasic: basicShown.length === 0,
+      addShowroom: () => this.setState(s2 => ({ basic:[SR({ brand: s2.brand === 'Carress' ? 'Carress' : '2990s', name:'' }), ...s2.basic], stat:null, kind: s2.kind === 'custom' ? 'All' : s2.kind })),
+      addCustom: () => this.setState(s2 => ({ basic:[CU({ brand: s2.brand === 'Carress' ? 'Carress' : '2990s', name:'' }), ...s2.basic], stat:null, kind: s2.kind === 'showroom' ? 'All' : s2.kind })),
+      brandList: ['None','2990s','Carress','Both brands'], typeList: ALLTYPES,
+      onFolder: e => { const v = e.target.value; this.updFile(sel.id, f => ({...f, folder:v})); }, onType: e => { const v = e.target.value; this.updFile(sel.id, f => ({...f, type:v})); },
+      tabs: [['files','Product data',FILES.length],['quick','Quick replies',st.quick.length]].map(([k, label, count]) => ({ label, count, onClick:() => this.setState({tab:k, stat:null, brand: k === 'basic' && st.brand === 'Both brands' ? 'All brands' : st.brand}), fg: st.tab === k ? 'rgb(0,0,0)' : K.brown, line: st.tab === k ? K.dark : 'transparent' })),
+      showFiles: st.tab === 'files', showQuick: st.tab === 'quick', showLinks: st.tab === 'links',
+      linkRows: st.links.map((l, i) => { const uses = aiUses(l.url, true); return { ...l, usesList: uses, unused: !uses.length, cantDel: uses.length > 0, delOp: uses.length ? .35 : 1,
+        remove: () => { if (uses.length) return; const links = st.links.filter((_, j) => j !== i); this.saveLinks(links); this.setState({ links }); } }; }),
+      linkIn: st.linkIn, onLinkIn: e => this.setState({ linkIn:e.target.value }), linkFolder: st.linkFolder, onLinkFolder: e => this.setState({ linkFolder:e.target.value }), linkFolders:['2990s','Carress','Both brands'],
+      addLink: () => { let v = st.linkIn.trim(); if (!v) return; if (!/^https?:\/\//.test(v)) v = 'https://' + v; if (st.links.some(l => l.url === v)) return; const links = [...st.links, {url:v, folder:st.linkFolder, uses:[]}]; this.saveLinks(links); this.setState({ links, linkIn:'' }); },
+      onLinkKey: e => { if (e.key === 'Enter') { let v = st.linkIn.trim(); if (!v) return; if (!/^https?:\/\//.test(v)) v = 'https://' + v; if (st.links.some(l => l.url === v)) return; const links = [...st.links, {url:v, folder:st.linkFolder, uses:[]}]; this.saveLinks(links); this.setState({ links, linkIn:'' }); } },
+      files: shownF.map(f => { const [s, c] = status(f); const e = EXT(f.ext); return { ...f, sub: subOf(f) + (flat && f.dir ? ' · in ' + pathLabel(f.dir) : ''), onDragStart: dragStart({ kind:'file', id:f.id }), op: st.dragItem && st.dragItem.id === f.id ? .4 : 1, onCtx: ctxFor(f.id), ...dropProps(f.id), ring: st.overDir === f.id ? 'inset 0 0 0 1px rgb(199,111,70)' : 'none',
+        hasKids: kids(f.id) > 0, kidLabel: kids(f.id) + (kids(f.id) > 1 ? ' items' : ' item'), enter: e => { e.stopPropagation(); this.setState({ cwd:f.id, fq:'', fBrands:[], fStats:[] }); }, extBg:e[0], extFg:e[1], fBg:FOLDER[f.folder].bg, fFg:FOLDER[f.folder].fg, status:s, stBg:COL[c][0], stFg:COL[c][1], nameFg: c === 'red' ? K.faint : 'rgb(0,0,0)',
+        uses: f.uses, unused: !f.uses.length, bg: f.id === st.openId ? 'rgb(252,240,232)' : 'rgb(255,255,255)', onClick:() => this.setState({openId:f.id}) }; }),
+      noFiles: flat ? shown.length === 0 : shownF.length === 0 && dirRows.length === 0 && !st.dirAdding,
+      shareOpen: !!st.share, openShare: () => this.setState({ share:{ url:'', name:'', folder: target, type: tType, sync:'Every day' } }, () => this.icons()), closeShare: () => this.setState({ share:null }),
+      sh: { url: sh.url || '', name: sh.name || '', folder: sh.folder || 'Both brands', type: sh.type || 'Catalogues', hasUrl: !!shUrl, provider: pv[0], icon: pv[2],
+        access: sh.checking ? 'Checking access…' : sh.access === 'ok' ? 'We can read it' : sh.access === 'none' ? 'No access yet' : '',
+        hint: sh.checking ? 'Opening the link to check sharing settings.' : sh.access === 'ok' ? 'Anyone with the link can view. The AI Agent can read it after you add it.' : 'Ask the owner to share it with ai@houzs.my as Viewer, or set it to “Anyone with the link”. You can add it now and we will retry.',
+        ring: sh.access === 'ok' ? K.green : sh.access === 'none' ? K.accent : K.frame, cant: !shUrl || !(sh.name || '').trim(), op: shUrl && (sh.name || '').trim() ? 1 : .45,
+        syncSeg: segOf(sh.sync || 'Every day', SYNC, v => this.setState(s => ({ share:{ ...s.share, sync:v } }))) },
+      onShUrl: e => { const v = e.target.value; const guess = v.trim() && !(st.share || {}).name ? (PROV(v)[0] === 'Web link' ? '' : PROV(v)[0] + ' file') : (st.share || {}).name; this.setState(s => ({ share:{ ...s.share, url:v, name: s.share.nameTouched ? s.share.name : guess, checking: !!v.trim(), access:null } }));
+        clearTimeout(this.chk); if (v.trim()) this.chk = setTimeout(() => this.setState(s => s.share ? { share:{ ...s.share, checking:false, access: /private|restricted/.test(v) ? 'none' : 'ok' } } : null, () => this.icons()), 900); },
+      onShName: e => { const v = e.target.value; this.setState(s => ({ share:{ ...s.share, name:v, nameTouched:true } })); },
+      onShFolder: e => { const v = e.target.value; this.setState(s => ({ share:{ ...s.share, folder:v } })); }, onShType: e => { const v = e.target.value; this.setState(s => ({ share:{ ...s.share, type:v } })); },
+      addShare: () => { if (!shUrl || !(sh.name || '').trim()) return; let url = shUrl; if (!/^https?:\/\//.test(url)) url = 'https://' + url; const p = PROV(url);
+        const f = { ...F({ id:'s' + Date.now(), name:sh.name.trim(), ext:p[1], size:'', folder:sh.folder || 'Both brands', updated:'20 Oct 2026', by:'Mei Ling', dir: sh.dir !== undefined ? sh.dir : cwd }), type: sh.type || 'Catalogues', web: p[0] === 'Web link', shared:{ url, provider: p[0] === 'Web link' ? 'Web page' : p[0], owner:'Shared link', synced:'just now', sync: sh.sync || 'Every day', access: sh.access === 'none' ? 'none' : 'ok' } };
+        if (f.web && !st.links.some(l => l.url === url)) { const links = [...st.links, { url, folder:f.folder, uses:[] }]; this.saveLinks(links); this.setState({ links }); }
+        this.setState(s => ({ files:[f, ...s.files], share:null, openId:f.id })); },
+      copyMail: () => { try { navigator.clipboard.writeText('ai@houzs.my'); } catch (e) {} this.setState({ copiedMail:true }); setTimeout(() => this.setState({ copiedMail:false }), 1800); },
+      syncAllLabel: st.syncingAll ? 'Syncing…' : 'Sync all',
+      syncAll: () => { if (st.syncingAll) return; this.setState({ syncingAll:true }); setTimeout(() => this.setState(s => ({ syncingAll:false, files: s.files.map(f => f.shared ? { ...f, shared:{ ...f.shared, synced:'just now' } } : f) })), 1500); },
+      newOpen: !!st.newOpen, newRing: st.newOpen ? K.accent : K.frame, toggleNew: () => this.setState(s => ({ newOpen:!s.newOpen }), () => this.icons()), closeNew: () => this.setState({ newOpen:false }),
+      menuUpload: () => { this.setState({ newOpen:false }); this.upRef.current && this.upRef.current.click(); },
+      menuShare: () => this.setState({ newOpen:false, share:{ url:'', name:'', folder: target, type: tType, sync:'Every day' } }, () => this.icons()),
+      menuCat: () => this.setState({ newOpen:false, catAdding:true }),
+      newPage: () => { const id = 'p' + Date.now(); const f = { ...F({ id, name:'Untitled page', ext:'PAGE', size:'', folder: target, updated:'20 Oct 2026', by:'Mei Ling', dir: cwd }), type: st.ftype !== 'All types' ? st.ftype : 'Product details', page:true, body:'', edited:'just now' }; this.setState(s => ({ files:[f, ...s.files], openId:id, newOpen:false })); },
+      onPageName: e => { const v = e.target.value; this.updFile(sel.id, f => ({ ...f, name:v, edited:'just now' })); },
+      onPageBody: e => { const v = e.target.value; this.updFile(sel.id, f => ({ ...f, body:v, edited:'just now' })); },
+      syncNow: () => { if (!sel || st.syncing) return; this.setState({ syncing:true }); setTimeout(() => this.setState(s => ({ syncing:false, files: s.files.map(f => f.id === sel.id ? { ...f, updated:'20 Oct 2026', shared:{ ...f.shared, synced:'just now' } } : f) })), 1200); },
+      upRef: this.upRef, pickUpload: () => this.upRef.current && this.upRef.current.click(),
+      onUpload: e => { const fs = Array.from(e.target.files || []); e.target.value = ''; const upT = this.upDir !== undefined ? this.upDir : cwd; this.upDir = undefined; const add = fs.map((fl, i) => F({ id:'u' + Date.now() + i, name:fl.name, ext:(fl.name.split('.').pop() || 'FILE').slice(0,4).toUpperCase(), size:size(fl.size), folder:target, type:tType, updated:'18 Oct 2026', by:'Mei Ling', reading:true, dir: upT }));
+        this.setState(s => ({ files:[...add, ...s.files] }));
+        fs.forEach((fl, i) => { const ext = (fl.name.split('.').pop() || '').toLowerCase(); const save = content => { try { const list = JSON.parse(localStorage.getItem('houzs-dc-uploads') || '[]').filter(x => x.name !== fl.name); list.unshift({ name:fl.name, ext:add[i].ext, size:add[i].size, folder:add[i].folder, until:'', content:(content || '').slice(0, 12000) }); localStorage.setItem('houzs-dc-uploads', JSON.stringify(list.slice(0, 30))); } catch (e) {} };
+          if (['txt','csv','md','json','tsv'].includes(ext) || (fl.type || '').startsWith('text/')) { const r = new FileReader(); r.onload = () => save(String(r.result || '')); r.onerror = () => save(''); r.readAsText(fl); } else save(''); });
+        setTimeout(() => this.setState(s => ({ files: s.files.map(f => add.some(a => a.id === f.id) ? {...f, reading:false} : f) })), 1600); },
+      kbTemplates: KB_TEMPLATES.map(t => ({ label:t.label, onClick:() => { const blob = new Blob(['\ufeff' + t.rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n')], {type:'text/csv;charset=utf-8'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = t.label + '.csv'; document.body.appendChild(a); a.click(); a.remove(); } })),
+      useAddOpen: !!st.useAddOpen, useAddToggle: () => this.setState(s => ({ useAddOpen:!s.useAddOpen }), () => this.icons()), useAddClose: () => this.setState({ useAddOpen:false }),
+      open: !!sel, d, close: () => { if (dirty && !window.confirm('Discard unsaved changes?')) return; if (dirty) revert(); this.setState({ openId:null }); },
+      notDirty: !dirty, dirtyOp: dirty ? 1 : .45, saveNote: dirty ? 'Unsaved changes' : st.savedAt && st.savedFor === st.openId ? 'Saved ' + st.savedAt : '', saveFg: dirty ? K.accent : K.brown,
+      saveEdit: () => { if (!rawSel) return; this.snap = JSON.stringify(rawSel); const t = new Date(); this.setState({ savedAt: String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'), savedFor: st.openId }); },
+      cancelEdit: revert,
+      onUntil: e => { const v = e.target.value; this.updFile(sel.id, f => ({...f, until:v})); },
+      onFrom: e => { const v = e.target.value; this.updFile(sel.id, f => ({...f, from:v})); },
+      verRef: this.verRef, pickVersion: () => this.verRef.current && this.verRef.current.click(),
+      onNewVersion: e => { const fl = (e.target.files || [])[0]; e.target.value = ''; if (!fl) return; this.updFile(sel.id, f => { const n = f.versions.length + 1; return {...f, size:size(fl.size), updated:'18 Oct 2026', by:'Mei Ling', version:n, versions:[...f.versions, {n, note:'Replaced with ' + fl.name, when:'18 Oct 2026', by:'Mei Ling'}]}; }); },
+      remove: () => { if (sel.uses.length) return; const up = sel.dir || null; this.setState(s => ({ files: s.files.filter(f => f.id !== sel.id).map(f => f.dir === sel.id ? { ...f, dir:up } : f), dirs: s.dirs.map(x => x.parent === sel.id ? { ...x, parent:up } : x), openId:null, cwd: s.cwd === sel.id ? up : s.cwd })); },
+      quickBrands: ['All brands','2990s','2990s mini','Carress'],
+      quick: st.quick.map((q, i) => { const set = k => e => { const v = e.target.value; this.setState(s => ({ quick: s.quick.map((x, j) => j === i ? {...x, [k]:v} : x) })); };
+        return { ...q, onKey:set('key'), onBrand:set('brand'), onText:set('text'), remove:() => this.setState(s => ({ quick: s.quick.filter((_, j) => j !== i) })) }; }),
+      addQuick: () => this.setState(s => ({ quick:[...s.quick, {id:'q' + Date.now(), key:'/', brand:'All brands', text:'', used:0}] }))
+    };
+  }
+}
+</script>
+</body>
+</html>

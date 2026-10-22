@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(230,224,217);border-radius:4px;}
+</style>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+  <aside style="width:216px;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;"><div style="font-weight:600;font-size:15px;">HOUZS Venture</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div></div>
+    </div>
+    <a href="Inbox v2.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="inbox" style="width:16px;height:16px;"></i></span>Inbox</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="users" style="width:16px;height:16px;"></i></span>Leads</div>
+    <a href="Insight.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="chart-column" style="width:16px;height:16px;"></i></span>Insight</a>
+    <a href="Campaigns.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="megaphone" style="width:16px;height:16px;"></i></span>Campaigns</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="split" style="width:16px;height:16px;"></i></span>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="workflow" style="width:16px;height:16px;"></i></span>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="blocks" style="width:16px;height:16px;"></i></span>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="sparkles" style="width:16px;height:16px;"></i></span>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="book-open" style="width:16px;height:16px;"></i></span>General info</a>
+    <a href="Data Center.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="library" style="width:16px;height:16px;"></i></span>Data Center</a>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="history" style="width:16px;height:16px;"></i></span>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">ADMIN</div>
+    <a href="Business Hours.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="clock" style="width:16px;height:16px;"></i></span>Business hours</a>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="scroll-text" style="width:16px;height:16px;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;"><span style="display:flex;"><i data-lucide="settings" style="width:16px;height:16px;"></i></span>Settings</div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);">
+      <div style="width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;"><div style="font-weight:500;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);background:rgb(242,238,233);padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Test mode</div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <button title="Notifications" style="white-space:nowrap;flex-shrink:0;position:relative;cursor:pointer;width:34px;height:34px;border-radius:8px;border:1px solid rgb(230,224,217);background:rgb(255,255,255);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;"><span style="display:flex;"><i data-lucide="bell" style="width:16px;height:16px;"></i></span><span style="position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);border:1.5px solid rgb(255,255,255);"></span></button>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;background:transparent;border:none;display:flex;flex-direction:column;padding:16px 8px 4px;position:relative;overflow:hidden;">
+      <div style="flex:none;display:flex;align-items:flex-end;gap:16px;padding-bottom:14px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.14em;color:rgb(88,76,68);">LEAD VIEW</div>
+          <h1 style="align-self:flex-start;margin:0;line-height:1.15;letter-spacing:-.01em;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Leads</h1>
+        </div>
+        <div style="font-size:14px;color:rgb(88,76,68);">Everyone who messaged, from every page and channel.</div>
+        <button onClick="{{ exportCsv }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">Export CSV ↓</button>
+      </div>
+
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;height:32px;width:260px;">
+          <span style="display:flex;color:rgb(120,108,100);"><i data-lucide="search" style="width:14px;height:14px;"></i></span>
+          <input value="{{ q }}" onChange="{{ onSearch }}" placeholder="Name, phone or interest" style="flex:1;min-width:0;border:none;outline:none;font-family:'Lora',Georgia,serif;font-size:14px;background:transparent;"></input>
+        </div>
+        <select value="{{ brand }}" data-v="{{ brand }}" onChange="{{ onBrand }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ brandOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+        <select value="{{ sales }}" data-v="{{ sales }}" onChange="{{ onSales }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ salesOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+        <select value="{{ source }}" data-v="{{ source }}" onChange="{{ onSource }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ sourceOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+        <button onClick="{{ toggleStale }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;padding:0 12px;height:32px;border-radius:6px;border:1px solid {{ staleBtn.border }};background:{{ staleBtn.bg }};color:{{ staleBtn.fg }};"><span style="width:6px;height:6px;border-radius:50%;background:rgb(199,111,70);"></span>Needs follow-up · {{ staleCount }}</button>
+      </div>
+
+      <div style="flex:none;display:flex;border-bottom:1px solid rgb(230,224,217);gap:2px;">
+        <sc-for list="{{ statusTabs }}" as="t" hint-placeholder-count="7">
+          <button onClick="{{ t.onClick }}" style="white-space:nowrap;border:none;background:transparent;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:8px 12px 9px;color:{{ t.fg }};border-bottom:2px solid {{ t.line }};margin-bottom:-1px;display:flex;gap:6px;">{{ t.label }}<span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(120,108,100);">{{ t.count }}</span></button>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;margin-top:12px;border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);">
+        <div style="position:sticky;top:0;z-index:1;user-select:none;display:grid;grid-template-columns:{{ cols }};min-width:max-content;gap:14px;padding:9px 12px;background:rgb(250,248,245);border-bottom:1px solid rgb(230,224,217);font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">
+          <sc-for list="{{ headCols }}" as="hc" hint-placeholder-count="7">
+            <div style="position:relative;min-width:0;white-space:nowrap;overflow:visible;">
+              <button onClick="{{ hc.onSort }}" title="Sort" style="cursor:pointer;border:none;background:transparent;padding:0;font:inherit;letter-spacing:inherit;color:{{ hc.fg }};display:flex;align-items:center;gap:4px;" style-hover="color:rgb(43,33,28);">{{ hc.label }}<span style="font-size:11px;width:10px;color:rgb(199,111,70);">{{ hc.arrow }}</span></button>
+              <sc-if value="{{ hc.resizable }}" hint-placeholder-val="{{ true }}">
+                <div onMouseDown="{{ hc.onDown }}" onDoubleClick="{{ hc.reset }}" title="Drag to resize · double-click to reset" style="position:absolute;top:-10px;bottom:-10px;right:-11px;width:8px;cursor:col-resize;display:flex;justify-content:center;z-index:2;" style-hover="background:rgba(199,111,70,.18);"><div style="width:1px;height:100%;background:rgb(218,210,200);"></div></div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+          <div onClick="{{ r.onClick }}" style="cursor:pointer;display:grid;grid-template-columns:{{ cols }};min-width:max-content;gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid rgb(235,230,224);background:{{ r.bg }};" style-hover="background:rgb(248,246,243);">
+            <div style="min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.name }}</span><span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">{{ r.phone }}</span></div>
+            <span style="justify-self:start;font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap;background:{{ r.bBg }};color:{{ r.bFg }};">{{ r.brand }}</span>
+            <div style="min-width:0;display:flex;align-items:center;gap:6px;"><span style="flex:none;font-family:'Lora',Georgia,serif;font-size:9px;padding:2px 4px;border-radius:3px;color:rgb(255,255,255);background:{{ r.chBg }};">{{ r.ch }}</span><span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.srcFg }};">{{ r.source }}</span></div>
+            <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.interest }}</span>
+            <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.salesFg }};">{{ r.salesShown }}</span>
+            <span style="justify-self:start;font-size:13px;padding:3px 8px;border-radius:3px;white-space:nowrap;background:{{ r.stBg }};color:{{ r.stFg }};">{{ r.stLabel }}</span>
+            <div style="min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">{{ r.updated }}</span><sc-if value="{{ r.stale }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:rgb(199,111,70);">{{ r.stale }}</span></sc-if></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="padding:40px;text-align:center;color:rgb(120,108,100);font-size:14px;">No leads match these filters.</div></sc-if>
+      </div>
+      <div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding-top:10px;font-size:13px;color:rgb(88,76,68);">
+        <span style="display:flex;align-items:center;gap:6px;"><div style="display:flex;border:1px solid rgb(218,210,200);border-radius:5px;overflow:hidden;"><sc-for list="{{ lRanges }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="cursor:pointer;white-space:nowrap;border:none;border-right:1px solid rgb(235,230,224);padding:4px 10px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div></span>
+        <sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;"><input type="date" value="{{ lFrom }}" onChange="{{ onFrom }}" max="2026-10-19" style="height:28px;box-sizing:border-box;border:1px solid rgb(218,210,200);border-radius:5px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);background:rgb(255,255,255);outline:none;" style-focus="border-color:rgb(199,111,70);"></input><span>to</span><input type="date" value="{{ lTo }}" onChange="{{ onTo }}" max="2026-10-19" style="height:28px;box-sizing:border-box;border:1px solid rgb(218,210,200);border-radius:5px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);background:rgb(255,255,255);outline:none;" style-focus="border-color:rgb(199,111,70);"></input></span></sc-if>
+        <span style="display:flex;align-items:center;gap:6px;">Per page <div style="display:flex;border:1px solid rgb(218,210,200);border-radius:5px;overflow:hidden;"><sc-for list="{{ lSizes }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="cursor:pointer;white-space:nowrap;border:none;border-right:1px solid rgb(235,230,224);padding:4px 10px;font-family:'Lora',Georgia,serif;font-size:13px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for></div></span>
+        <span style="flex:1;"></span>
+        <span style="display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums;">{{ lPage }}
+          <button onClick="{{ lPrev }}" title="Previous page" style="cursor:pointer;width:26px;height:26px;border:1px solid rgb(218,210,200);border-radius:5px;background:rgb(255,255,255);font-size:14px;opacity:{{ lPrevOp }};">‹</button>
+          <button onClick="{{ lNext }}" title="Next page" style="cursor:pointer;width:26px;height:26px;border:1px solid rgb(218,210,200);border-radius:5px;background:rgb(255,255,255);font-size:14px;opacity:{{ lNextOp }};">›</button>
+        </span>
+      </div>
+
+      <sc-if value="{{ open }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ close }}" style="position:absolute;inset:0;background:rgba(43,33,28,.12);z-index:3;"></div>
+        <aside style="position:absolute;top:0;right:0;bottom:0;width:420px;z-index:4;background:rgb(255,255,255);border-left:1px solid rgb(218,210,200);box-shadow:-12px 0 30px rgba(43,33,28,.08);display:flex;flex-direction:column;">
+          <div style="flex:none;padding:18px 20px 14px;border-bottom:1px solid rgb(235,230,224);display:flex;gap:12px;align-items:flex-start;">
+            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:6px;"><span style="font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;background:{{ d.bBg }};color:{{ d.bFg }};">{{ d.brand }}</span><span style="font-size:14px;color:rgb(88,76,68);">{{ d.channel }} · {{ d.source }}</span></div>
+              <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:26px;line-height:1.1;">{{ d.name }}</div>
+              <div style="font-family:'Lora',Georgia,serif;font-size:15px;color:{{ d.phoneFg }};">{{ d.phone }}</div>
+            </div>
+            <button onClick="{{ close }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:30px;height:30px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);font-size:15px;color:rgb(88,76,68);">×</button>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:18px;">
+            <sc-if value="{{ d.merged }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:14px;line-height:1.45;color:rgb(176,92,54);background:rgb(242,238,233);padding:8px 10px;border-radius:6px;">{{ d.merged }}</div>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">PROGRESS</div>
+              <div style="display:flex;flex-direction:column;gap:0;">
+                <sc-for list="{{ d.steps }}" as="s" hint-placeholder-count="5">
+                  <div onClick="{{ s.onClick }}" style="cursor:pointer;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;">
+                    <span style="width:14px;height:14px;border-radius:50%;border:1.5px solid {{ s.ring }};background:{{ s.dot }};"></span>
+                    <span style="font-size:15px;font-weight:{{ s.weight }};color:{{ s.fg }};">{{ s.label }}</span>
+                    <span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ s.when }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <sc-if value="{{ d.canLose }}" hint-placeholder-val="{{ true }}"><button onClick="{{ markLost }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:5px 10px;border-radius:5px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(199,111,70);">Mark as lost</button></sc-if>
+                <sc-if value="{{ d.isLost }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;color:rgb(199,111,70);">Lost · {{ d.lostReason }}</span><button onClick="{{ reopen }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);">Reopen</button></sc-if>
+                <span style="flex:1;"></span>
+                <span style="font-size:13px;color:rgb(104,92,84);">{{ d.reportedBy }}</span>
+              </div>
+              <sc-if value="{{ d.closed }}" hint-placeholder-val="{{ false }}">
+                <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:rgb(88,76,68);">Sale value
+                  <input value="{{ d.value }}" onChange="{{ onValue }}" placeholder="RM" style="width:120px;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+                </label>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid rgb(235,230,224);">
+              <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">FOR THE SALESPERSON</div>
+              <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 10px;font-size:14px;">
+                <span style="color:rgb(104,92,84);">Salesperson</span><span>{{ d.salesShown }}</span>
+                <span style="color:rgb(104,92,84);">Handed</span><span>{{ d.handedShown }}</span>
+                <span style="color:rgb(104,92,84);">Interest</span><span>{{ d.interest }}</span>
+                <span style="color:rgb(104,92,84);">Budget</span><span>{{ d.budgetShown }}</span>
+                <span style="color:rgb(104,92,84);">Showroom</span><span>{{ d.showroom }}</span>
+                <span style="color:rgb(104,92,84);">Note</span><span>{{ d.noteShown }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid rgb(235,230,224);">
+              <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">TIMELINE</div>
+              <sc-for list="{{ d.timeline }}" as="e" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:96px 1fr;gap:8px;font-size:14px;"><span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);padding-top:2px;">{{ e.t }}</span><span>{{ e.text }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:none;padding:12px 20px;border-top:1px solid rgb(235,230,224);display:flex;gap:8px;">
+            <a href="Inbox v2.dc.html" style="flex:1;text-align:center;font-size:14px;font-weight:500;padding:8px 12px;border-radius:6px;border:1px solid rgb(43,33,28);color:rgb(43,33,28);text-decoration:none;" style-hover="background:rgb(240,226,206);">Open conversation</a>
+            <sc-if value="{{ d.hasSales }}" hint-placeholder-val="{{ true }}"><a href="{{ d.wa }}" target="_blank" style="flex:1;text-align:center;font-size:14px;padding:8px 12px;border-radius:6px;border:1px solid rgb(218,210,200);color:rgb(43,33,28);text-decoration:none;" style-hover="background:rgb(243,240,236);">Remind salesperson on WhatsApp</a></sc-if>
+          </div>
+        </aside>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const K = { dark:'rgb(43,33,28)', cream:'rgb(240,226,206)', accent:'rgb(199,111,70)', peach:'rgb(246,243,239)', hair:'rgb(235,230,224)', frame:'rgb(218,210,200)', brown:'rgb(88,76,68)', faint:'rgb(120,108,100)', blue:'rgb(176,92,54)', blueBg:'rgb(242,238,233)', green:'rgb(76,110,80)', greenBg:'rgb(230,240,231)', amber:'rgb(88,76,68)', amberBg:'rgb(242,238,233)', info:'rgb(242,238,233)', white:'rgb(255,255,255)', red:'rgb(199,111,70)', redBg:'rgb(250,232,226)', ig:'rgb(104,92,84)', otext:'rgb(88,76,68)' };
+const BRAND = { '2990s':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, '2990s mini':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Carress':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'} };
+const STEPS = [['nophone','First message'],['new','Phone confirmed'],['handed','Handed to sales'],['contacted','Contacted by sales'],['appt','Appointment booked'],['came','Came to showroom'],['closed','Closed · bought']];
+const ST = { nophone:['No phone yet','rgb(242,238,233)','rgb(104,92,84)'], new:['Not handed yet',K.peach,K.otext], handed:['Handed',K.info,K.brown], contacted:['Contacted',K.blueBg,K.blue], appt:['Appointment',K.amberBg,K.amber], came:['Came',K.greenBg,K.green], closed:['Closed',K.green,K.white], lost:['Lost',K.redBg,K.red] };
+const L = (o) => ({ budget:'', note:'', value:'', merged:'', stale:'', lostReason:'', ...o });
+const SEED = [
+  L({id:'aisyah',name:'Aisyah Rahman',phone:'',brand:'2990s',ch:'FB',source:'Oct Sofa Week (video)',interest:'L 型沙發',showroom:'',sales:'',status:'nophone',updated:'18 Oct 14:53',dates:{nophone:'18 Oct 14:31'}}),
+  L({id:'hafiz2',name:'Hafiz Rahman',phone:'',brand:'2990s mini',ch:'IG',source:'Organic',interest:'Bar stool',showroom:'',sales:'',status:'nophone',updated:'18 Oct 11:02',dates:{nophone:'18 Oct 10:58'}}),
+  L({id:'meiyee',name:'Lee Mei Yee',phone:'',brand:'Carress',ch:'FB',source:'King Size Sale',interest:'Mattress price',showroom:'',sales:'',status:'nophone',updated:'17 Oct 21:40',dates:{nophone:'17 Oct 21:36'}}),
+  L({id:'nurul',name:'Nurul Huda',phone:'017-552 0193',brand:'Carress',ch:'IG',source:'Organic',interest:'King mattress',budget:'RM 4,000',showroom:'Puchong',sales:'Alvin Goh',status:'appt',updated:'18 Oct 15:40',dates:{new:'18 Oct 12:12',handed:'18 Oct 12:28',contacted:'18 Oct 13:05',appt:'18 Oct 15:40'},reportedBy:'Reported by Alvin via WhatsApp link'}),
+  L({id:'chloe',name:'Chloe Tan',phone:'017-338 9011',brand:'2990s',ch:'FB',source:'Oct Sofa Week (video)',interest:'L-shape sofa',showroom:'KL',sales:'Daniel Chew',status:'came',updated:'17 Oct 14:00',dates:{new:'15 Oct 16:10',handed:'15 Oct 16:18',contacted:'15 Oct 17:02',appt:'16 Oct 10:30',came:'17 Oct 14:00'},reportedBy:'Reported by Daniel'}),
+  L({id:'jason',name:'Jason Lim',phone:'012-338 4721',brand:'2990s mini',ch:'IG',source:'Organic',interest:'4-seater dining table',showroom:'Kelana Jaya',sales:'',status:'new',updated:'18 Oct 14:48',dates:{new:'18 Oct 14:48'},stale:''}),
+  L({id:'zaki',name:'Ahmad Zaki',phone:'019-221 7788',brand:'2990s',ch:'FB',source:'Oct Sofa Week (video)',interest:'Sofa bed',showroom:'KL',sales:'Sharon Lee',status:'handed',updated:'16 Oct 11:20',dates:{new:'16 Oct 11:02',handed:'16 Oct 11:20'},stale:'Not contacted · 2 days'}),
+  L({id:'weiling',name:'Lim Wei Ling',phone:'012-889 1203',brand:'2990s',ch:'IG',source:'L-shape Reel',interest:'L-shape sofa, olive',showroom:'PJ',sales:'Ahmad Faiz',status:'contacted',updated:'18 Oct 10:15',dates:{new:'17 Oct 20:40',handed:'17 Oct 20:51',contacted:'18 Oct 10:15'}}),
+  L({id:'siti',name:'Siti Nor',phone:'013-405 6612',brand:'Carress',ch:'FB',source:'100-night Mattress Trial',interest:'Queen mattress, medium firm',showroom:'Puchong',sales:'Michelle Wong',status:'closed',value:'RM 2,690',updated:'14 Oct 18:30',dates:{new:'10 Oct 15:00',handed:'10 Oct 15:12',contacted:'10 Oct 16:40',appt:'11 Oct 09:00',came:'13 Oct 11:00',closed:'14 Oct 18:30'}}),
+  L({id:'raj',name:'Raj Kumar',phone:'016-772 3301',brand:'2990s',ch:'FB',source:'Dining Set Promo',interest:'6-seater dining table',showroom:'PJ',sales:'Daniel Chew',status:'lost',lostReason:'Bought elsewhere',prev:'contacted',updated:'15 Oct 12:00',dates:{new:'12 Oct 21:10',handed:'12 Oct 21:30',contacted:'13 Oct 10:00'}}),
+  L({id:'meixin',name:'Tan Mei Xin',phone:'012-660 4410',brand:'2990s mini',ch:'FB',source:'Organic',interest:'Queen bed frame',showroom:'Cheras',sales:'Kimberly Tan',status:'appt',updated:'18 Oct 09:40',dates:{new:'17 Oct 13:00',handed:'17 Oct 13:08',contacted:'17 Oct 15:22',appt:'18 Oct 09:40'}}),
+  L({id:'farah',name:'Farah Aziz',phone:'017-990 2214',brand:'Carress',ch:'IG',source:'King Size Sale',interest:'King mattress',showroom:'Puchong',sales:'Alvin Goh',status:'handed',updated:'17 Oct 13:45',dates:{new:'17 Oct 13:30',handed:'17 Oct 13:45'},stale:'Not contacted · 26 h'}),
+  L({id:'kevin',name:'Kevin Lau',phone:'011-2345 6789',brand:'2990s',ch:'FB',source:'Oct Sofa Week (video)',interest:'L-shape sofa, charcoal',showroom:'KL',sales:'Sharon Lee',status:'closed',value:'RM 2,790',updated:'16 Oct 19:10',dates:{new:'11 Oct 14:00',handed:'11 Oct 14:06',contacted:'11 Oct 15:30',appt:'12 Oct 11:00',came:'14 Oct 15:00',closed:'16 Oct 19:10'}}),
+  L({id:'grace',name:'Grace Ng',phone:'012-556 7120',brand:'2990s',ch:'IG',source:'Organic',interest:'Coffee table',showroom:'KL',sales:'Ahmad Faiz',status:'came',updated:'17 Oct 16:30',merged:'Same phone also messaged on Messenger on 2 Oct. Both chats are merged into this lead.',dates:{new:'14 Oct 12:00',handed:'14 Oct 12:10',contacted:'14 Oct 14:00',appt:'15 Oct 10:00',came:'17 Oct 16:30'}}),
+  L({id:'karho',name:'Wong Kar Ho',phone:'016-330 8891',brand:'2990s mini',ch:'IG',source:'Organic',interest:'3-seater sofa',showroom:'Kelana Jaya',sales:'Hafiz Ismail',status:'contacted',updated:'17 Oct 18:05',dates:{new:'17 Oct 11:30',handed:'17 Oct 11:41',contacted:'17 Oct 18:05'}})
+];
+const DEFAULT_W = [190, 100, 210, 170, 130, 130];
+const HEADS = ['CUSTOMER','BRAND','SOURCE','INTEREST','SALESPERSON','STATUS','LAST UPDATE'];
+const now = () => { const d = new Date(); return '18 Oct ' + String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+
+class Component extends DCLogic {
+  state = { leads: SEED, tab:'all', q:'', brand:'All brands', sales:'All salespeople', source:'All sources', staleOnly:false, openId:null, sort:{k:6, dir:-1}, colW: this.loadW() };
+  loadW(){ try { const w = JSON.parse(localStorage.getItem('houzs-leads-cols') || 'null'); if (Array.isArray(w) && w.length === 6) return w; } catch (e) {} return DEFAULT_W.slice(); }
+  startResize(i, e){ e.preventDefault(); e.stopPropagation(); const x0 = e.clientX, w0 = this.state.colW[i];
+    const move = ev => { const w = Math.max(70, Math.min(480, w0 + ev.clientX - x0)); this.setState(s => { const colW = s.colW.slice(); colW[i] = w; return { colW }; }); };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor = ''; try { localStorage.setItem('houzs-leads-cols', JSON.stringify(this.state.colW)); } catch (err) {} };
+    document.body.style.cursor = 'col-resize'; window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); }
+  componentDidMount(){ this.icons(); this.sync(); }
+  componentDidUpdate(){ this.icons(); this.sync(); }
+  icons(){ if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  sync(){ requestAnimationFrame(() => document.querySelectorAll('select[data-v]').forEach(s => { if (s.dataset.v && s.value !== s.dataset.v) s.value = s.dataset.v; })); }
+  upd(id, fn){ this.setState(s => ({ leads: s.leads.map(l => l.id === id ? fn(l) : l) })); }
+  renderVals(){
+    const st = this.state;
+    const q = st.q.trim().toLowerCase();
+    const base = st.leads.filter(l => (st.brand === 'All brands' || l.brand === st.brand) && (st.sales === 'All salespeople' || l.sales === st.sales)
+      && (st.source === 'All sources' || (st.source === 'Organic' ? l.source === 'Organic' : st.source === 'From ads' ? l.source !== 'Organic' : l.source === st.source))
+      && (!q || [l.name, l.phone.replace(/\D/g,''), l.phone, l.interest].join(' ').toLowerCase().includes(q.replace(/[\s-]/g,'')) || [l.name, l.interest].join(' ').toLowerCase().includes(q)));
+    const tabs = [['all','All'],['nophone','No phone'],['new','Not handed'],['handed','Handed'],['contacted','Contacted'],['appt','Appointment'],['came','Came'],['closed','Closed'],['lost','Lost']];
+    const ORDER = ['nophone','new','handed','contacted','appt','came','closed','lost'], MON = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+    const sv = (l, k) => k === 0 ? l.name : k === 1 ? l.brand : k === 2 ? l.source : k === 3 ? l.interest : k === 4 ? (l.sales || '\uffff') : k === 5 ? ORDER.indexOf(l.status) : (() => { const m = String(l.updated).match(/(\d+) (\w+) (\d+):(\d+)/); return m ? ((MON[m[2]] * 100 + +m[1]) * 10000 + +m[3] * 100 + +m[4]) : 0; })();
+    const lRg = st.lRange || 'month', lPS = +(st.lPS || 20), NOW = new Date('2026-10-19T23:59');
+    const day0 = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()), DAY = 864e5, wk0 = new Date(day0 - ((day0.getDay() + 6) % 7) * DAY), mo0 = new Date(NOW.getFullYear(), NOW.getMonth(), 1), lm0 = new Date(NOW.getFullYear(), NOW.getMonth() - 1, 1);
+    const RANGES = { today:[day0, null], yest:[new Date(day0 - DAY), day0], week:[wk0, null], month:[mo0, null], last:[lm0, mo0] };
+    const inRange = l => { if (lRg === 'all') return true; const m = String(l.updated).match(/(\d+) (\w+)/); if (!m) return true; const d = new Date(m[1] + ' ' + m[2] + ' 2026'); if (isNaN(d)) return true; if (lRg === 'custom') { const f = st.lFrom ? new Date(st.lFrom + 'T00:00') : null, t = st.lTo ? new Date(new Date(st.lTo + 'T00:00').getTime() + DAY) : null; return (!f || d >= f) && (!t || d < t); } const [a, b] = RANGES[lRg]; return d >= a && (!b || d < b); };
+    const shownAll = base.filter(l => (st.tab === 'all' || l.status === st.tab) && (!st.staleOnly || l.stale) && inRange(l))
+      .sort((a, b) => { const x = sv(a, st.sort.k), y = sv(b, st.sort.k); return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y))) * st.sort.dir; });
+    const lPages = Math.max(1, Math.ceil(shownAll.length / lPS)), lP = Math.min(st.lPg || 0, lPages - 1), shown = shownAll.slice(lP * lPS, (lP + 1) * lPS);
+    const lSeg = (list, cur, key) => list.map(([val, label]) => ({ label, onClick:() => this.setState({[key]:val, lPg:0}), bg: cur === val ? 'rgb(43,33,28)' : 'rgb(255,255,255)', fg: cur === val ? 'rgb(255,255,255)' : 'rgb(43,33,28)' }));
+    const lVals = { lRanges: lSeg([['today','Today'],['yest','Yesterday'],['week','This week'],['month','This month'],['last','Last month'],['all','All time'],['custom','Custom']], lRg, 'lRange'), lSizes: lSeg([[20,'20'],[50,'50'],[100,'100']], lPS, 'lPS'),
+      lPage: shownAll.length ? (lP * lPS + 1) + '–' + Math.min(shownAll.length, (lP + 1) * lPS) + ' of ' + shownAll.length : '0 of 0',
+      lPrev: () => this.setState({lPg:Math.max(0, lP - 1)}), lNext: () => this.setState({lPg:Math.min(lPages - 1, lP + 1)}), isCustom: lRg === 'custom', lFrom: st.lFrom || '', lTo: st.lTo || '', onFrom: e => this.setState({lFrom:e.target.value, lPg:0}), onTo: e => this.setState({lTo:e.target.value, lPg:0}), lPrevOp: lP > 0 ? 1 : .35, lNextOp: lP < lPages - 1 ? 1 : .35 };
+    const sel = st.leads.find(l => l.id === st.openId);
+    let d = {};
+    if (sel) {
+      const idx = sel.status === 'lost' ? STEPS.findIndex(s => s[0] === (sel.prev || 'handed')) : STEPS.findIndex(s => s[0] === sel.status);
+      d = { ...sel, phone: sel.phone || 'No phone yet', phoneFg: sel.phone ? 'rgb(76,110,80)' : 'rgb(120,108,100)', hasSales: !!sel.sales, bBg:BRAND[sel.brand].bg, bFg:BRAND[sel.brand].fg, channel: sel.ch === 'IG' ? 'Instagram' : 'Messenger',
+        salesShown: sel.sales || 'Not handed yet', handedShown: sel.dates.handed || '—', budgetShown: sel.budget || '—', noteShown: sel.note || '—',
+        canLose: sel.status !== 'lost' && sel.status !== 'closed' && sel.status !== 'nophone', isLost: sel.status === 'lost', closed: sel.status === 'closed', reportedBy: sel.reportedBy || '',
+        wa: 'https://wa.me/6' + (sel.sales ? '0120001101' : '') ,
+        steps: STEPS.map(([k, label], i) => { const done = i <= idx, cur = i === idx && sel.status !== 'lost';
+          return { label, when: sel.dates[k] || '', ring: done ? K.green : K.frame, dot: done ? K.green : K.white, fg: done ? 'rgb(0,0,0)' : K.faint, weight: cur ? 600 : 400,
+            onClick: () => { if (k === 'new') return; this.upd(sel.id, l => ({ ...l, status:k, stale:'', updated:now(), dates:{ ...Object.fromEntries(Object.entries(l.dates).filter(([kk]) => STEPS.findIndex(s => s[0] === kk) <= i)), [k]: l.dates[k] || now() }, reportedBy:'Updated by Mei Ling' })); } }; }),
+        timeline: [...STEPS.filter(([k]) => sel.dates[k]).map(([k, label]) => ({ t: sel.dates[k], text: label + (k === 'handed' ? ' · ' + sel.sales : '') })), ...(sel.status === 'lost' ? [{ t: sel.updated, text: 'Marked lost · ' + sel.lostReason }] : [])].reverse() };
+    }
+    const sales = [...new Set(SEED.map(l => l.sales).filter(Boolean))];
+    const ads = [...new Set(SEED.map(l => l.source).filter(s => s !== 'Organic'))];
+    return {
+      cols: st.colW.map(w => w + 'px').join(' ') + ' minmax(110px,1fr)',
+      headCols: HEADS.map((label, i) => ({ label, resizable: i < 6, arrow: st.sort.k === i ? (st.sort.dir > 0 ? '↑' : '↓') : '', fg: st.sort.k === i ? 'rgb(43,33,28)' : 'inherit',
+        onSort: () => this.setState(s => ({ sort: s.sort.k === i ? {k:i, dir:-s.sort.dir} : {k:i, dir: i === 6 ? -1 : 1} })), onDown: e => this.startResize(i, e), reset: () => { this.setState(s => { const colW = s.colW.slice(); colW[i] = DEFAULT_W[i]; return { colW }; }); try { localStorage.removeItem('houzs-leads-cols'); } catch (e) {} } })),
+      q: st.q, onSearch: e => this.setState({q:e.target.value}),
+      brand: st.brand, brandOpts: ['All brands','2990s','2990s mini','Carress'], onBrand: e => this.setState({brand:e.target.value}),
+      sales: st.sales, salesOpts: ['All salespeople', ...sales], onSales: e => this.setState({sales:e.target.value}),
+      source: st.source, sourceOpts: ['All sources','Organic','From ads', ...ads], onSource: e => this.setState({source:e.target.value}),
+      staleCount: base.filter(l => l.stale).length, toggleStale: () => this.setState(s => ({staleOnly:!s.staleOnly})),
+      staleBtn: { bg: st.staleOnly ? K.redBg : K.white, fg: st.staleOnly ? K.red : K.dark, border: st.staleOnly ? K.red : K.frame },
+      statusTabs: tabs.map(([k, l]) => ({ label:l, count: base.filter(x => k === 'all' || x.status === k).length, onClick: () => this.setState({tab:k}), fg: st.tab === k ? 'rgb(0,0,0)' : K.brown, line: st.tab === k ? K.dark : 'transparent' })),
+      ...lVals,
+      rows: shown.map(l => { const s = ST[l.status]; return { ...l, phone: l.phone || 'No phone yet', bBg:BRAND[l.brand].bg, bFg:BRAND[l.brand].fg, chBg: l.ch === 'IG' ? K.ig : K.blue, srcFg: l.source === 'Organic' ? K.brown : 'rgb(0,0,0)',
+        salesShown: l.sales || '—', salesFg: l.sales ? 'rgb(0,0,0)' : K.faint, stLabel: s[0], stBg: s[1], stFg: s[2], stale: l.stale || false, bg: st.openId === l.id ? 'rgb(252,240,232)' : 'rgb(255,255,255)', onClick: () => this.setState({openId:l.id}) }; }),
+      empty: shown.length === 0,
+      open: !!sel, d, close: () => this.setState({openId:null}),
+      markLost: () => { const r = window.prompt('Why was it lost?', 'Bought elsewhere'); if (r === null) return; this.upd(sel.id, l => ({ ...l, prev:l.status, status:'lost', lostReason:r || 'No reason', stale:'', updated:now() })); },
+      reopen: () => this.upd(sel.id, l => ({ ...l, status:l.prev || 'handed', updated:now() })),
+      onValue: e => { const v = e.target.value; this.upd(sel.id, l => ({ ...l, value:v })); },
+      exportCsv: () => { const rows = [['Name','Phone','Brand','Channel','Source','Interest','Budget','Showroom','Salesperson','Status','Sale value','Last update'], ...shownAll.map(l => [l.name, l.phone, l.brand, l.ch === 'IG' ? 'Instagram' : 'Messenger', l.source, l.interest, l.budget, l.showroom, l.sales, ST[l.status][0], l.value, l.updated])];
+        const blob = new Blob(['\ufeff' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g,'""') + '"').join(',')).join('\n')], {type:'text/csv;charset=utf-8'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Leads.csv'; document.body.appendChild(a); a.click(); a.remove(); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<script src="hz-date.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+</style>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+
+  <aside style="width:216px;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div style="font-weight:600;font-size:15px;">HOUZS Venture</div>
+        <div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div>
+      </div>
+    </div>
+    <a href="Inbox v2.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="inbox" style="width:16px;height:16px;"></i></span>Inbox</a>
+    <a href="Leads.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="users" style="width:16px;height:16px;"></i></span>Leads</a>
+    <a href="Insight.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="chart-column" style="width:16px;height:16px;"></i></span>Insight</a>
+    <a href="Campaigns.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="megaphone" style="width:16px;height:16px;"></i></span>Campaigns</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="split" style="width:16px;height:16px;"></i></span>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="workflow" style="width:16px;height:16px;"></i></span>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="blocks" style="width:16px;height:16px;"></i></span>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="sparkles" style="width:16px;height:16px;"></i></span>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="book-open" style="width:16px;height:16px;"></i></span>General info</a>
+    <a href="Data Center.dc.html" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="library" style="width:16px;height:16px;"></i></span>Data Center</a>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="history" style="width:16px;height:16px;"></i></span>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">ADMIN</div>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="clock" style="width:16px;height:16px;"></i></span>Business hours</div>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="scroll-text" style="width:16px;height:16px;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:rgba(255,244,235,.72);border:1px solid transparent;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="settings" style="width:16px;height:16px;"></i></span>Settings</div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);">
+      <div style="width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;"><div style="font-weight:500;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 8px 4px;">
+      <div style="display:flex;align-items:flex-end;gap:16px;padding-bottom:14px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-size:11px;letter-spacing:.14em;color:rgb(88,76,68);">SET UP</div>
+          <h1 style="margin:0;line-height:1.15;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Business hours</h1>
+        </div>
+        <button onClick="{{ save }}" style="white-space:nowrap;flex:none;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 16px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">Save changes</button>
+      </div>
+
+      <div style="flex:none;display:flex;gap:24px;border-bottom:1px solid rgb(230,224,217);margin-bottom:14px;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+          <button onClick="{{ t.onClick }}" style="white-space:nowrap;border:none;background:transparent;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:15px;padding:6px 0 10px;margin-bottom:-1px;color:{{ t.fg }};border-bottom:2px solid {{ t.line }};display:flex;flex-direction:column;align-items:flex-start;gap:2px;"><span style="font-weight:500;">{{ t.label }}</span></button>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);padding:28px 32px 32px;">
+
+        <sc-if value="{{ tabWeek }}" hint-placeholder-val="{{ true }}">
+          <div style="max-width:640px;display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:26px;line-height:1.1;">Weekly hours</div>
+              <div style="font-size:14px;color:rgb(88,76,68);">Outside these hours, each page uses its after-hours reply. Kuala Lumpur time (GMT+8).</div>
+            </div>
+            <div style="border-top:1px solid rgb(230,224,217);">
+              <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+                <div style="display:grid;grid-template-columns:120px 52px minmax(0,1fr);gap:16px;align-items:center;height:52px;border-bottom:1px solid rgb(235,230,224);">
+                  <div style="font-weight:500;color:{{ d.nameFg }};">{{ d.name }}</div>
+                  <button onClick="{{ d.toggle }}" title="Open or closed" style="cursor:pointer;width:36px;height:20px;border-radius:999px;border:none;padding:2px;display:flex;justify-content:{{ d.side }};background:{{ d.track }};"><span style="width:16px;height:16px;border-radius:50%;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.25);"></span></button>
+                  <sc-if value="{{ d.on }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:8px;"><select value="{{ d.from }}" data-v="{{ d.from }}" onChange="{{ d.onFrom }}" style="width:118px;height:32px;border-radius:6px;padding:0 8px;font-size:14px;border:1px solid rgb(218,210,200);font-family:'Lora',Georgia,serif;font-variant-numeric:tabular-nums;background:rgb(255,255,255);color:rgb(43,33,28);cursor:pointer;"><sc-for list="{{ times }}" as="t" hint-placeholder-count="1"><option value="{{ t.v }}">{{ t.l }}</option></sc-for></select><span style="color:rgb(120,108,100);">to</span><select value="{{ d.to }}" data-v="{{ d.to }}" onChange="{{ d.onTo }}" style="width:118px;height:32px;border-radius:6px;padding:0 8px;font-size:14px;border:1px solid rgb(218,210,200);font-family:'Lora',Georgia,serif;font-variant-numeric:tabular-nums;background:rgb(255,255,255);color:rgb(43,33,28);cursor:pointer;"><sc-for list="{{ times }}" as="t" hint-placeholder-count="1"><option value="{{ t.v }}">{{ t.l }}</option></sc-for></select></div>
+                  </sc-if>
+                  <sc-if value="{{ d.off }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;font-style:italic;color:rgb(120,108,100);">Closed</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <button onClick="{{ copyMon }}" style="white-space:nowrap;align-self:flex-start;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);">Copy Monday’s hours to all open days</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ tabSpecial }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px;">
+            <div style="display:flex;align-items:flex-end;gap:16px;">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+                <div style="font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:26px;line-height:1.1;">Special dates</div>
+                <div style="font-size:14px;color:rgb(88,76,68);">Public holidays, staff leave or a closed showroom. Replaces the weekly hours on those days.</div>
+              </div>
+              <button onClick="{{ addSpecial }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 14px;border-radius:6px;border:1px solid rgb(199,111,70);background:transparent;color:rgb(176,92,54);" style-hover="background:rgb(252,240,232);">+ Add date</button>
+            </div>
+            <div style="border-top:1px solid rgb(230,224,217);">
+                            <sc-for list="{{ specials }}" as="sp" hint-placeholder-count="2">
+                <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:14px 0;border-bottom:1px solid rgb(235,230,224);">
+                  <input value="{{ sp.name }}" onChange="{{ sp.onName }}" placeholder="e.g. Deepavali" style="flex:1 1 200px;min-width:140px;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+                  <div style="flex:none;display:flex;align-items:center;gap:8px;"><input type="date" value="{{ sp.from }}" onChange="{{ sp.onFrom }}" style="width:136px;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;font-variant-numeric:tabular-nums;"></input><span style="color:rgb(120,108,100);font-size:14px;">to</span><input type="date" value="{{ sp.to }}" onChange="{{ sp.onTo }}" style="width:136px;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;font-variant-numeric:tabular-nums;"></input></div>
+                  <select value="{{ sp.mode }}" data-v="{{ sp.mode }}" onChange="{{ sp.onMode }}" style="flex:none;width:150px;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);color:rgb(43,33,28);cursor:pointer;"><option value="closed">Closed all day</option><option value="custom">Custom hours</option></select>
+                  <div style="flex:none;width:248px;display:flex;align-items:center;min-height:32px;"><sc-if value="{{ sp.custom }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:8px;"><select value="{{ sp.open }}" data-v="{{ sp.open }}" onChange="{{ sp.onOpen }}" style="width:108px;height:32px;border-radius:6px;padding:0 8px;font-size:14px;border:1px solid rgb(218,210,200);font-family:'Lora',Georgia,serif;font-variant-numeric:tabular-nums;background:rgb(255,255,255);color:rgb(43,33,28);cursor:pointer;"><sc-for list="{{ times }}" as="t" hint-placeholder-count="1"><option value="{{ t.v }}">{{ t.l }}</option></sc-for></select><span style="color:rgb(120,108,100);font-size:14px;">to</span><select value="{{ sp.close }}" data-v="{{ sp.close }}" onChange="{{ sp.onClose }}" style="width:108px;height:32px;border-radius:6px;padding:0 8px;font-size:14px;border:1px solid rgb(218,210,200);font-family:'Lora',Georgia,serif;font-variant-numeric:tabular-nums;background:rgb(255,255,255);color:rgb(43,33,28);cursor:pointer;"><sc-for list="{{ times }}" as="t" hint-placeholder-count="1"><option value="{{ t.v }}">{{ t.l }}</option></sc-for></select></div>
+                    </sc-if><sc-if value="{{ sp.closed }}" hint-placeholder-val="{{ true }}"><span style="font-size:14px;font-style:italic;color:rgb(120,108,100);">Closed</span></sc-if></div>
+                  <button onClick="{{ sp.remove }}" title="Remove" style="margin-left:auto;flex:none;width:24px;cursor:pointer;height:32px;border:none;background:transparent;color:rgb(104,92,84);font-size:16px;padding:0;">×</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noSpecials }}" hint-placeholder-val="{{ false }}"><div style="padding:18px 0;font-size:14px;font-style:italic;color:rgb(120,108,100);">No special dates. The weekly hours apply every day.</div></sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const KEY = 'hz-business-hours-v2';
+const FULL = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
+class Component extends DCLogic {
+  state = (() => { try { const v = JSON.parse(localStorage.getItem(KEY)); if (v && v.week) return { ...v, saved:'' }; } catch (e) {}
+    return { week: DAYS.map(d => ({ d, on: d !== 'Sat' && d !== 'Sun', from:'10:00', to:'22:00' })), tab:'week',
+      specials: [{id:'h1', name:'Deepavali', from:'2026-11-08', to:'2026-11-08', mode:'closed', open:'10:00', close:'18:00'},{id:'h2', name:'Mei Ling on leave', from:'2026-11-02', to:'2026-11-04', mode:'custom', open:'12:00', close:'18:00'}], saved:'' }; })();
+  icons(){ if (window.lucide) lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  componentDidMount(){ this.icons(); }
+  componentDidUpdate(){ this.icons(); }
+  renderVals(){
+    const st = this.state;
+    const times = Array.from({length:48}, (_, k) => { const hh = Math.floor(k/2), mm = k%2 ? '30' : '00', v = String(hh).padStart(2,'0')+':'+mm; return { v, l: ((hh%12)||12)+':'+mm+' '+(hh<12?'AM':'PM') }; });
+    const setDay = (i, p) => this.setState(s => ({ week: s.week.map((x, j) => j === i ? {...x, ...p} : x), saved:'' }));
+    const setSp = (i, k) => e => { const v = e.target.value; this.setState(s => ({ specials: s.specials.map((x, j) => j === i ? {...x, [k]:v} : x), saved:'' })); };
+    return {
+      savedNote: st.saved,
+      tabWeek: (st.tab || 'week') === 'week', tabSpecial: st.tab === 'special', noSpecials: !st.specials.length,
+      tabs: [['week','Weekly hours', st.week.filter(d => d.on).length + ' open days'],['special','Special dates', st.specials.length + ' upcoming']].map(([k,label,sub]) => { const on = (st.tab || 'week') === k; return { label, sub, fg: on ? 'rgb(43,33,28)' : 'rgb(104,92,84)', line: on ? 'rgb(199,111,70)' : 'transparent', onClick: () => this.setState({tab:k}) }; }),
+      times,
+      save: () => { localStorage.setItem(KEY, JSON.stringify({ week:st.week, specials:st.specials })); this.setState({ saved:'Saved · just now' }); },
+      week: st.week.map((d, i) => ({ ...d, off:!d.on, toggle:() => setDay(i, {on:!d.on}), onFrom:e => setDay(i, {from:e.target.value}), onTo:e => setDay(i, {to:e.target.value}),
+        name: FULL[d.d], nameFg: d.on ? 'rgb(43,33,28)' : 'rgb(120,108,100)', track: d.on ? 'rgb(199,111,70)' : 'rgb(218,210,200)', side: d.on ? 'flex-end' : 'flex-start' })),
+      copyMon: () => this.setState(s => ({ week: s.week.map(x => x.on ? {...x, from:s.week[0].from, to:s.week[0].to} : x), saved:'' })),
+      specials: st.specials.map((sp, i) => ({ ...sp, custom: sp.mode === 'custom', closed: sp.mode !== 'custom', onName:setSp(i,'name'), onFrom:setSp(i,'from'), onTo:setSp(i,'to'), onMode:setSp(i,'mode'), onOpen:setSp(i,'open'), onClose:setSp(i,'close'),
+        remove:() => this.setState(s => ({ specials: s.specials.filter((_, j) => j !== i), saved:'' })) })),
+      addSpecial: () => this.setState(s => ({ specials:[...s.specials, {id:'h'+Date.now(), name:'', from:'2026-12-25', to:'2026-12-25', mode:'closed', open:'10:00', close:'18:00'}], saved:'' })),
+    };
+  }
+}
+</script>
+</body>
+</html>
