@@ -1940,7 +1940,7 @@ export async function reversePaidPayment(formData: FormData) {
 
   // 6) Remove the fund-source repayment rows approval synced from this voucher
   //    (HV repaying a fund source), reopening the source they had closed —
-  //    reverse_voucher_fund_source_repayments (mig 20261022120000), which takes
+  //    reverse_voucher_fund_source_repayments (mig 20261022100000), which takes
   //    only a voided voucher. Never a .delete() here: fund_source_repayments
   //    refuses every session's DELETE (fsr_no_delete USING (false)) without an
   //    error, so the rows stayed and the source still read repaid (2026-10-21).

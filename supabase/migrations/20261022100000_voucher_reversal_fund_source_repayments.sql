@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261022120000_voucher_reversal_fund_source_repayments.sql
+-- 20261022100000_voucher_reversal_fund_source_repayments.sql
 -- A reversed payment takes its fund-source repayments with it (2026-10-21 — the user, shown HV-PV-202608-0295's
 -- Reverse payment leaving HOUZS Century's RM 98,000 fund source repaid: "A：一起删+重开").
 -- ============================================================================
@@ -82,7 +82,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.reverse_voucher_fund_source_repayments(uuid) IS
-  'A voided voucher''s fund-source repayment rows (payment_voucher_id) removed, and a source repaid by them that the rest no longer covers reopened (repaid → active). Reverse payment''s step after the void (mig 20261022120000); only a voided voucher qualifies.';
+  'A voided voucher''s fund-source repayment rows (payment_voucher_id) removed, and a source repaid by them that the rest no longer covers reopened (repaid → active). Reverse payment''s step after the void (mig 20261022100000); only a voided voucher qualifies.';
 
 -- The guard the scan reads (tab-write-guards.test.ts): the step asks the pages the app's gate in front of it names
 -- (requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'void')), as its sibling steps do. The
