@@ -2,7 +2,7 @@
 -- conts 的不是吗？", then "然后分一下 DC & The conts"). The server now lists only the ads of the CRM's own Pages
 -- (META_PAGE_IDS) and keeps each one's Page id and name with it:
 --   crm_add_ad(ad, name, status, start, end, page, page_name) — the seven-argument function; the five-argument one
---   (mig 20261022150000) stays callable for a page open across the release, EXECUTE taken from no one yet.
+--   (mig 20261022150100) stays callable for a page open across the release, EXECUTE taken from no one yet.
 -- An ad with no Page known (one the system user cannot see) is grouped as Other.
 
 alter table public.crm_ad_names add column if not exists page_id text check (page_id is null or page_id ~ '^\d{3,32}$');
