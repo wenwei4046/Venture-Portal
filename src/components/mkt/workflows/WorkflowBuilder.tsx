@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cloneMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
+import { canvasProblems, canvasRemap, stageMap } from '@/lib/marketing/canvas'
 import { moveStage, removeStage } from '@/lib/marketing/tasks'
 import {
   asRun, firstWfStage, newWfStage, nextTemplateName, picTimes, totalDays, wfActions, wfApprText, wfPatch, wfProblems, wfStagesPayload,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/marketing/workflows'
 import type { BuilderPerson } from '../builder/people'
 import StageList, { Fact } from '../builder/StageList'
+import CanvasEditor from './CanvasEditor'
 import TemplateSettings from './TemplateSettings'
 import b from '../builder/builder.module.css'
 import w from './workflows.module.css'
@@ -48,6 +50,7 @@ export default function WorkflowBuilder({
   const [selId, setSelId] = useState<string | null>(start?.id ?? null)
   const [edit, setEdit] = useState<WfEdit | null>(start ? editOf(start) : null)
   const [stageAt, setStageAt] = useState(0)
+  const [tab, setTab] = useState<'stages' | 'canvas'>('stages')
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -94,7 +97,7 @@ export default function WorkflowBuilder({
       }
       revRef.current = r.rev
       savedRef.current = now
-      setWfs(list => list.map(t => (t.id === id ? { ...t, tname: now.tname.trim() || t.tname, locked: now.locked, promise: now.promise, draft: now.stages, rev: r.rev, changed: true } : t)))
+      setWfs(list => list.map(t => (t.id === id ? { ...t, tname: now.tname.trim() || t.tname, locked: now.locked, promise: now.promise, draft: now.stages, canvas: now.canvas, rev: r.rev, changed: true } : t)))
       if (editRef.current === now) setSave({ state: 'saved' })
       return true
     })
@@ -198,7 +201,7 @@ export default function WorkflowBuilder({
   const at = Math.min(stageAt, Math.max(0, stages.length - 1))
   const run = asRun(stages, locked)
   const teamSet = useMemo(() => new Set(team), [team])
-  const problems = edit ? wfProblems(stages, locked, teamSet) : []
+  const problems = edit ? [...wfProblems(stages, locked, teamSet), ...canvasProblems(stages, edit.canvas)] : []
   const warnings = edit ? [...new Set([...wfWarnings(stages, locked, edit.promise), ...problems])] : []
   const next = (sel?.version ?? 0) + 1
   // Something new since the last version: saved since, or being saved now (Publish saves it first).
@@ -206,7 +209,11 @@ export default function WorkflowBuilder({
   const nameOf = (staff: string) => people.find(p => p.id === staff)?.first ?? approvers.find(p => p.id === staff)?.first ?? 'Someone who left'
 
   const setStages = (nextStages: WfStage[]) => edit && change({ ...edit, stages: nextStages })
+  // A stage moved or taken out: the canvas's sections and fields follow it.
+  const restage = (nextStages: WfStage[]) => edit && change({ ...edit, stages: nextStages, canvas: canvasRemap(edit.canvas, stageMap(stages, nextStages)) })
   const updStage = (patch: Partial<WfStage>) => setStages(stages.map((s, i) => (i === at ? { ...s, ...patch } : s)))
+  /** Whom the canvas's staff view is drawn for at a stage: the first of its team. */
+  const nameAt = (i: number) => people.find(p => p.team === stages[i]?.dept)?.first ?? 'the team'
 
   const publish = async () => {
     if (!sel || !edit || busy) return
@@ -230,9 +237,18 @@ export default function WorkflowBuilder({
       <div className={w.head}>
         <span className={w.headIcon} aria-hidden="true">🧩</span>
         <span className={w.title}>Workflow Builder</span>
-        <div className={b.wbTabs}>
-          <button type="button" className={`${b.wbTab} ${b.wbTabOn}`}>Workflow stages</button>
-          <button type="button" className={`${b.wbTab} ${b.wbTabOff}`} disabled title="Comes with the canvas template editor">Canvas template</button>
+        <div className={b.wbTabs} role="tablist" aria-label="Template">
+          <button type="button" role="tab" aria-selected={tab === 'stages'} className={`${b.wbTab}${tab === 'stages' ? ` ${b.wbTabOn}` : ''}`} onClick={() => setTab('stages')}>Workflow stages</button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'canvas'}
+            className={`${b.wbTab}${tab === 'canvas' ? ` ${b.wbTabOn}` : ''}${sel && edit ? '' : ` ${b.wbTabOff}`}`}
+            disabled={!sel || !edit}
+            onClick={() => setTab('canvas')}
+          >
+            Canvas template
+          </button>
         </div>
         <span className={w.grow} />
         {edit ? (
@@ -249,6 +265,29 @@ export default function WorkflowBuilder({
         ) : null}
       </div>
 
+      {tab === 'canvas' && sel && edit ? (
+        <CanvasEditor
+          title={`${sel.action} · ${edit.tname.trim() || sel.tname}`}
+          version={next}
+          stages={stages}
+          canvas={edit.canvas}
+          saveState={save.state === 'error' ? (
+            <span className={w.notSaved} role="alert">
+              Not saved · {save.reason}
+              {save.stale ? <button type="button" className={w.reload} onClick={() => window.location.reload()}>Reload</button> : null}
+            </span>
+          ) : (
+            <span className={w.saved}>{save.state === 'saving' ? 'Saving…' : 'Saved'}</span>
+          )}
+          nameAt={nameAt}
+          onStages={setStages}
+          onCanvas={canvas => change({ ...edit, canvas })}
+          onEditStage={i => {
+            setStageAt(i)
+            setTab('stages')
+          }}
+        />
+      ) : (
       <div className={w.grid}>
         <nav className={w.actions} aria-label="Actions">
           <div className={w.actHead}>
@@ -333,7 +372,7 @@ export default function WorkflowBuilder({
                   selected={at}
                   onSelect={setStageAt}
                   onMove={(from, to) => {
-                    setStages(moveStage(stages, from, to))
+                    restage(moveStage(stages, from, to))
                     setStageAt(to)
                   }}
                   onAdd={stages.length < WF_MAX_STAGES ? () => {
@@ -372,7 +411,7 @@ export default function WorkflowBuilder({
               nameOf={nameOf}
               onChange={updStage}
               onRemove={() => {
-                setStages(removeStage(stages, at))
+                restage(removeStage(stages, at))
                 setStageAt(Math.max(0, at - 1))
               }}
             />
@@ -381,6 +420,7 @@ export default function WorkflowBuilder({
           )}
         </aside>
       </div>
+      )}
 
       {sel && edit ? (
         <div className={b.wbFoot}>

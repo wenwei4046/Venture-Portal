@@ -74,6 +74,35 @@ describe('the Workflow Builder', () => {
     expect(actions.saveMktWorkflow.mock.calls[1]).toEqual(['w1', 6, { tname: 'Full shoot' }])
   })
 
+  it('the Canvas template tab: a section added is saved as the canvas alone; a choice with no options stops Publish', async () => {
+    builder()
+    fireEvent.click(screen.getByRole('tab', { name: 'Canvas template' }))
+    expect(screen.getByText('Canvas template · draft v3')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '+ Add section' }))
+    await waitFor(() => expect(actions.saveMktWorkflow).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    const [id, rev, patch] = actions.saveMktWorkflow.mock.calls[0]
+    expect([id, rev, Object.keys(patch)]).toEqual(['w1', 5, ['canvas']])
+    expect(patch.canvas.sections[0]).toMatchObject({ title: 'New section', stage: null, fields: [{ label: 'Notes', type: 'Text', stage: 2 }] })
+
+    fireEvent.click(screen.getByRole('button', { name: /Notes/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Field Notes' })).getByRole('button', { name: /Select/ }))
+    expect(screen.getByText('⚠️ A choice has no options')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Publish v3' })).toHaveProperty('disabled', true)
+  })
+
+  it('a stage taken out: the canvas’s fields of it belong to none, saved with the stages', async () => {
+    const canvas = { req: { pic: true }, sections: [{ title: 'Caption', stage: 2, fields: [{ label: 'Caption', type: 'Text', stage: 2 }, { label: 'Brief', type: 'Text', stage: 1 }] }] }
+    builder([{ ...REELS, canvas }, BROKEN])
+    fireEvent.click(screen.getByText('Script'))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove stage' }))
+    await waitFor(() => expect(actions.saveMktWorkflow).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    const patch = actions.saveMktWorkflow.mock.calls[0][2]
+    expect(Object.keys(patch)).toEqual(['stages', 'canvas'])
+    expect(patch.stages.map((s: { name: string }) => s.name)).toEqual(['Edit', 'Final'])
+    expect(patch.canvas.sections[0].stage).toBe(1)
+    expect(patch.canvas.sections[0].fields.map((f: { stage: number | null }) => f.stage)).toEqual([1, 0])
+  })
+
   it('a change undone before its save goes sends nothing and says Saved', async () => {
     // 2026-10-23: the save found nothing to send and left *Saving…* up for good, Publish lit (the ③c walk).
     builder()
