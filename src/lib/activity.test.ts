@@ -82,6 +82,20 @@ describe('describePagePath', () => {
       detail: null,
     })
   })
+
+  // 2026-10-22: the Revenue app writes its visits too — one address, its page in the query.
+  it('names the Revenue app’s pages as the app does', () => {
+    expect(describePagePath('/member', L)).toEqual({ target: 'Revenue app', detail: 'Today' })
+    expect(describePagePath('/member?page=quote', L)).toEqual({ target: 'Revenue app', detail: 'Quote' })
+    expect(describePagePath('/member?page=insight&view=bills', L)).toEqual({ target: 'Revenue app', detail: 'Insight · My sales orders' })
+    expect(describePagePath('/member?page=account&view=memos', L)).toEqual({ target: 'Revenue app', detail: 'Profile · Memos & notifications' })
+    expect(describePagePath('/member?page=account&view=crm', L)).toEqual({ target: 'Revenue app', detail: 'Profile · CRM' })
+    expect(describePagePath('/member?page=arena&view=board', L)).toEqual({ target: 'Revenue app', detail: 'Arena · Board' })
+    expect(describePagePath('/member/products', L)).toEqual({ target: 'Revenue app', detail: 'Product List' })
+    // A page it has no name for still reads, and Member services (/member-admin) is the portal's own page.
+    expect(describePagePath('/member?page=somewhere', L)).toEqual({ target: 'Revenue app', detail: 'Somewhere' })
+    expect(describePagePath('/member-admin', L).target).not.toBe('Revenue app')
+  })
 })
 
 describe('describeActivity', () => {

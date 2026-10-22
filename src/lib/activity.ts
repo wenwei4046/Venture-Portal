@@ -2,8 +2,9 @@
 //
 // `access_log` has recorded privileged reads (salary, payouts, payments) since
 // Phase 1, and from 2026-09-01 it also records page views — one row per
-// navigation, written by the portal shell. Both shapes land in the same table,
-// so both have to render in the same list on somebody's Activity tab.
+// navigation, written by the portal shell (and since 2026-10-22 by the Revenue
+// app, its page in the query). Both shapes land in the same table, so both
+// have to render in the same list on somebody's Activity tab.
 //
 // Pure on purpose: the lookup map is passed in (nav-config owns it) so this
 // file has no import of its own and can be unit-tested against a fixture.
@@ -43,15 +44,62 @@ const RESOURCE_LABELS: Record<string, string> = {
 }
 
 /**
+ * The Revenue app's pages (2026-10-22 — the app writes its visits too): one
+ * address, `/member`, whose screen and page are its query (`?page=…&view=…`),
+ * named as the app names them.
+ */
+const APP_SCREENS: Record<string, string> = {
+  quote: 'Quote',
+  calc: 'Quote',
+  insight: 'Insight',
+  arena: 'Arena',
+  account: 'Profile',
+}
+
+const APP_PAGES: Record<string, string> = {
+  income: 'My income',
+  incOrders: 'Commission by order',
+  honours: 'My honours',
+  team: 'Team & capacity',
+  requests: 'Requests',
+  track: 'Waiting list & replacements',
+  rooms: 'Book a room',
+  docs: 'Documentation',
+  crm: 'CRM',
+  memos: 'Memos & notifications',
+  brandWeeks: 'My brand weeks',
+  it: 'IT support',
+  itdesk: 'IT requests',
+  bills: 'My sales orders',
+  kpi: 'KPI items',
+  brand: 'Margin',
+  board: 'Board',
+  record: 'Record',
+}
+
+function describeAppPath(clean: string, query: string): { target: string; detail: string | null } {
+  if (clean === '/member/products') return { target: 'Revenue app', detail: 'Product List' }
+  if (clean !== '/member') return { target: 'Revenue app', detail: describeRest(clean.slice('/member/'.length)) }
+  const q = new URLSearchParams(query)
+  const page = q.get('page') ?? ''
+  const screen = APP_SCREENS[page] ?? (page ? titleCase(page) : 'Today')
+  const view = APP_PAGES[q.get('view') ?? '']
+  return { target: 'Revenue app', detail: view ? `${screen} · ${view}` : screen }
+}
+
+/**
  * The label the sidebar gives a path, for the deepest nav entry that contains
  * it. `/team/people/<id>` resolves through `/team/people`; a path under no nav
- * entry at all falls back to its own last segment.
+ * entry at all falls back to its own last segment. The Revenue app's pages
+ * read as the app names them.
  */
 export function describePagePath(
   pathname: string,
   labels: ReadonlyMap<string, string>,
 ): { target: string; detail: string | null } {
-  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/'
+  const [path, query = ''] = pathname.split('?')
+  const clean = path.replace(/\/+$/, '') || '/'
+  if (clean === '/member' || clean.startsWith('/member/')) return describeAppPath(clean, query)
 
   let bestPath = ''
   for (const path of labels.keys()) {

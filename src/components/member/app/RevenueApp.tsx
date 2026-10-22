@@ -17,7 +17,8 @@ import base from "./base.module.css";
 import s from "./shell.module.css";
 import { greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
 import { greetingName } from "@/lib/person-name";
-import { PRODUCTS_PATH, appHref, productsHref, useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
+import { PRODUCTS_PATH, appHref, productsHref, useRoute, visitPath, type Board, type InsightView, type Route, type Screen } from "./route";
+import { useVisits } from "./shell/useVisits";
 import { ProductShellContext, type ProductShell } from "./product-shell";
 import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
 import { useInsightData } from "./insight/useInsightData";
@@ -273,6 +274,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const live = device === "live";
   const today = fixedToday ?? klToday();
   const period = today.slice(0, 7);
+  // The app's use reaches People's Last seen and Activity as the portal's does (2026-10-22, shell/useVisits.ts) — the
+  // live app only, never the preview's demo or fixtures.
+  useVisits(visitPath(route), live && !initialData.demo && !fixture);
 
   // ── Profile: its pages' choices and the sheet each opens ──
   const [compact, setCompact] = useState(false);

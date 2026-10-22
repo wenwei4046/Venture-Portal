@@ -92,6 +92,22 @@ export function appHref(route: Route, origin: string): string {
   return `${url.pathname}${url.search}`;
 }
 
+/**
+ * Where a visit to the app is filed (2026-10-22 — the app's use reaches Last seen and Activity, shell/useVisits.ts): its
+ * screen and the page inside it, never whom it is viewed as nor the sub-department — `/member`, `/member?page=quote`,
+ * `/member?page=account&view=memos`; the Product List at its own path.
+ */
+export function visitPath(route: Route): string {
+  if (route.screen === "products") return PRODUCTS_PATH;
+  const q = new URLSearchParams();
+  if (route.screen !== "today") q.set("page", route.screen);
+  const view = route.screen === "account" ? route.pf : route.screen === "insight" && route.ins !== "main" ? route.ins
+    : route.screen === "arena" && route.arena !== "hub" ? route.arena : null;
+  if (view) q.set("view", view);
+  const search = q.toString();
+  return search ? `/member?${search}` : "/member";
+}
+
 /** The Product List, keeping the sub-department the app is on (View as ends there: the list is the account's own). */
 export function productsHref(route: Pick<Route, "department">): string {
   return route.department ? `${PRODUCTS_PATH}?department=${encodeURIComponent(route.department)}` : PRODUCTS_PATH;
