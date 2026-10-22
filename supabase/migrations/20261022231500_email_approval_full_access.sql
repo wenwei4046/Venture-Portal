@@ -7,8 +7,9 @@
 -- #619 (mig 20261022150000) lets HR change a login's email on the person's page, except a FULL-ACCESS title's — a
 -- Principal-kind template, one that ticks Manage permissions, or a Principal login on no template — which only
 -- whoever manages permissions changes: the editor chooses where that login's mail goes. The Request to change email
--- (mig 20261016190000) still let HR do exactly that in two steps — file a request on the CEO's behalf (Requests' New
--- request), then approve it — because att_login_email_change asked only Attendance · Approve and not one's own.
+-- (mig 20261016190000) still let HR do exactly that — approve the CEO's own request, or file one for them and approve
+-- it (att_create_request takes a profile change for anybody from Attendance · Create; the screen's On someone's behalf
+-- offers only leave and overtime) — because att_login_email_change asked only Attendance · Approve and not one's own.
 --
 -- 1. login_email_held(staff) — the refusal's words for a person whose login is full-access, NULL for anybody else.
 --    The definition person_login_email_move keeps; only DEFINER functions call it (PUBLIC, anon and authenticated

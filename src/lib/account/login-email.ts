@@ -13,8 +13,9 @@ import { loginMoveOf, loginMoveRefusal, type LoginMove } from './login-move'
  * that one job and nothing else, asked in this order:
  *
  *   1. the database, under HR's own session: is the step about to be decided HR's last on a login's email — and may
- *      this person decide it (`att_login_email_change()`, mig 20261016190000: not their own, Attendance · Approve)?
- *      Anything else needs no move, and is decided as before;
+ *      this person decide it (`att_login_email_change()`, mig 20261016190000: not their own, Attendance · Approve; a
+ *      full-access title's only whoever manages permissions — mig 20261022231500)? Anything else needs no move, and is
+ *      decided as before;
  *   2. never while viewing as somebody (the portal reads only then);
  *   3. the auth server: the login now signs in with the new email (confirmed — nobody is sent anything).
  *
