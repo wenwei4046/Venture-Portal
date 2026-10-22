@@ -78,6 +78,18 @@ describe("useVisits", () => {
     expect(logPageView).toHaveBeenCalledWith("/member?page=arena");
   });
 
+  it("back out of the page cache after a long time away: one visit, though both events come", () => {
+    renderHook(() => useVisits("/member?page=insight", true));
+    logPageView.mockClear();
+    act(() => {
+      setVisibility("hidden");
+      vi.advanceTimersByTime(VISIT_AGAIN_MS * 2);
+      setVisibility("visible");
+      window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
+    });
+    expect(logPageView).toHaveBeenCalledTimes(1);
+  });
+
   it("stops listening once gone", () => {
     const { unmount } = renderHook(() => useVisits("/member", true));
     unmount();

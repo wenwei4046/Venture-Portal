@@ -30,16 +30,23 @@ export function useVisits(path: string, on: boolean): void {
   useEffect(() => {
     if (!on) return;
     let hiddenAt: number | null = null;
+    // Back out of the page cache after a long time away, both events come at once: one visit.
+    let lastAt = 0;
+    const again = () => {
+      if (Date.now() - lastAt < 1000) return;
+      lastAt = Date.now();
+      logPageView(latest.current);
+    };
     const visibility = () => {
       if (document.visibilityState === "hidden") {
         hiddenAt = Date.now();
         return;
       }
-      if (hiddenAt !== null && Date.now() - hiddenAt >= VISIT_AGAIN_MS) logPageView(latest.current);
+      if (hiddenAt !== null && Date.now() - hiddenAt >= VISIT_AGAIN_MS) again();
       hiddenAt = null;
     };
     const shown = (e: PageTransitionEvent) => {
-      if (e.persisted) logPageView(latest.current);
+      if (e.persisted) again();
     };
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("pageshow", shown);
