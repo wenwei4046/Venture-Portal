@@ -1,6 +1,6 @@
 # HOUZS Venture Portal — Session Handoff
 
-## CHECKPOINT 2026-10-22 a (BUILT — ships with z, waiting on the user to apply + merge) — a half-made voucher or fund source is voided / cancelled, never "deleted"
+## CHECKPOINT 2026-10-22 a (SHIPPED, with z) — a half-made voucher or fund source is voided / cancelled, never "deleted"
 
 z's follow-up. User, shown it drawn (two before / after flows): "可以，照这个做"; the third spot: "一起修". On
 z's branch `fix/fund-source-reversal-cleanup` (main merged in, 18d5023d), so one apply + one merge ships both.
@@ -33,8 +33,11 @@ z's branch `fix/fund-source-reversal-cleanup` (main merged in, 18d5023d), so one
   the 8 and the guard failed before (the two "as before" cases pass both ways).
 - z's migration renumbered `20261021230000` → **`20261022100000`** (#609 recorded 230000 on production as
   combo_tier_falls_back); its md5 is unchanged, `57373b5f…`.
+- Verified in a CI-like tree (LF `git archive` of the branch, the worktree's fresh `npm ci`): unit 9,127 — the 12 that
+  failed were 5 s timeouts under local load, all pass at 60 s; the SQL suite exits 0; eslint clean on the files changed.
+- User: "全绿就上线" → production first (z's migration, below), then the PR, merged once CI was green.
 
-## CHECKPOINT 2026-10-21 z (BUILT, DRY-RUN DONE — waiting on the user to apply + merge) — Reverse payment takes a fund-source voucher's repayments with it
+## CHECKPOINT 2026-10-21 z (SHIPPED 2026-10-22, with a) — Reverse payment takes a fund-source voucher's repayments with it
 
 Found by y's loan session, proposed apart. User, shown HV-PV-202608-0295's Reverse payment (HOUZS Century's RM 98,000
 fund source, 98,000 principal + 1,960 interest, 20 Aug) leaving the source repaid → "A：一起删+重开" (B was: refuse
@@ -72,8 +75,11 @@ Reverse on such vouchers). Branch `fix/fund-source-reversal-cleanup` (worktree `
   PGlite), grants auth / service only; finance@'s own DELETE removed 0 (the bug, on production); the step refused the
   still-paid PV; after the void it removed 2, source 89b09736 repaid → active, outstanding 98,000, second run 0, all
   rows 167 → 165. Afterwards production unchanged (no function, PV paid, 2 rows, source repaid).
-- Next: the user's OK → apply (LF text, one transaction, schema_migrations `20261022100000`, NOTIFY pgrst) → PR →
-  merge. The DB goes first: the app calls the new RPC.
+- Applied 2026-10-22 (user: "全绿就上线"), before the merge — the app calls the new RPC: a fresh dry-run first (md5
+  `57373b5f…`, both trigger bodies' md5 unchanged, 39 paid vouchers / 67 rows / 0 orphans, the same outcome as
+  finance@), then the file's LF text in one transaction, refusing itself unless the md5 was the tested one; recorded
+  in schema_migrations as `20261022100000` (created_by `claude-fsr-reversal`). After: DEFINER, search_path public,
+  EXECUTE authenticated + service_role only; nothing moved (HV-PV-202608-0295 paid, 67 rows, the source repaid).
 
 ## CHECKPOINT 2026-10-21 y (DATA FIX + SHIPPED) — Revenue Department's payroll accrual
 
