@@ -364,6 +364,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // one is on (Manage: any); Nudge and a series paused or ended by Manage; one project read by View.
   'mkt_task_create', 'mkt_stage_accept', 'mkt_stage_save', 'mkt_stage_submit', 'mkt_stage_decide', 'mkt_free_block', 'mkt_nudge',
   'mkt_series_set', 'mkt_project',
+  // Marketing's Workflow Builder (mig 20261023235500): the templates read, saved, published and cloned — all by
+  // Marketing · Manage.
+  'mkt_workflows', 'mkt_workflow_save', 'mkt_workflow_publish', 'mkt_workflow_clone',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

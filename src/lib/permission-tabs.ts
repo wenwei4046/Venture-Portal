@@ -209,7 +209,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('mkt', 'overview', 'My Space', [], OVERVIEW),
   tab('mkt', 'calendar', 'Calendar', ['marketing'], { view: ['marketing.view'] }),
   tab('mkt', 'projects', 'Projects', ['marketing'], MARKETING),
-  tab('mkt', 'tracking', 'Tracking Dashboard', ['marketing'], MARKETING_MANAGE),
+  // The manager's tools — the Tracking Dashboard and the builders — one box: a second box for Marketing · Manage would
+  // make the cell narrow, and every write asking it would have to ask the pages first (tab-write-guards).
+  tab('mkt', 'tracking', 'Manager tools', ['marketing'], MARKETING_MANAGE),
   // One's own claims, listed in Marketing's view for whoever holds Marketing (the key it opens on here, so the move
   // ticks it for Marketing's templates only — Staff · Basic keeps the Department view's). Marketing's tabs come before
   // the Department view's: a narrower tab is ticked only for what an earlier one has not given, so a Marketing

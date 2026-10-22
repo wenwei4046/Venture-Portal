@@ -195,6 +195,7 @@ export const PAGE_TABS = {
   '/marketing/projects': ['mkt.projects'],
   '/marketing/projects/[id]': ['mkt.projects'],
   '/marketing/tracking': ['mkt.tracking'],
+  '/marketing/workflows': ['mkt.tracking'],
 } as const satisfies Record<string, readonly string[]>
 
 export type PageRoute = keyof typeof PAGE_TABS

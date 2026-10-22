@@ -48,11 +48,11 @@ describe("Marketing's shell", () => {
     expect(densityOf('compact')).toEqual({ rowH: 30, subH: 26, tileS: 24 })
   })
 
-  it('lists the rows the viewer’s tabs open, Tracking for a manager only', () => {
+  it('lists the rows the viewer’s tabs open, the manager’s tools for a manager only', () => {
     const staff = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
     expect(mktNavRows(staff).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'claims', 'rooms'])
-    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toContain('tracking')
-    expect(mktNavRows(undefined).length).toBe(7)
+    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'tracking', 'workflow', 'claims', 'rooms'])
+    expect(mktNavRows(undefined).length).toBe(8)
   })
 
   it('lights the row a page is under, a subsidiary by its projects', () => {
@@ -66,6 +66,8 @@ describe("Marketing's shell", () => {
     expect(mktNavActive('/marketing/new', null)).toBe('projects')
     expect(mktCrumb('/marketing/new')).toEqual({ emoji: '📁', label: 'Projects / New project' })
     expect(mktNavActive('/marketing/projects/TSK-CAR-2610-001', null)).toBe('projects')
+    expect(mktNavActive('/marketing/workflows', new URLSearchParams('w=x'))).toBe('workflow')
+    expect(mktCrumb('/marketing/workflows')).toEqual({ emoji: '🧩', label: 'Workflow Builder' })
   })
 
   it('is worn by the Principal’s lens and by a template that opens it — never by HR, Finance or a plain staff', () => {

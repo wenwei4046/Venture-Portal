@@ -7,12 +7,14 @@ import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
+import { workflowsFromRow, type WfTemplate } from './workflows'
 
 /**
- * Marketing's writes (2026-10-23, mig 20261023234000) — New Project's quick and recurring tasks, a stage accepted,
- * worked, handed on, approved or sent back, Nudge, a series paused or ended, the Free space. Each asks its gate here
- * and its cell again in the database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }`
- * in words (production masks a thrown message).
+ * Marketing's writes (2026-10-23, migs 20261023234000 and 20261023235500) — New Project's quick and recurring tasks, a
+ * stage accepted, worked, handed on, approved or sent back, Nudge, a series paused or ended, the Free space; the
+ * Workflow Builder's templates saved, published and cloned. Each asks its gate here and its cell again in the
+ * database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production masks
+ * a thrown message).
  */
 export type Done<T = object> = ({ ok: true } & T) | { ok: false; reason: string }
 
@@ -132,6 +134,52 @@ export async function setMktSeries(series: string, to: 'pause' | 'resume' | 'end
   if (error) return { ok: false, reason: words(error, 'The recurring task could not be changed. Please try again.') }
   freshen()
   return { ok: true, page: await fresh(db, current ?? series) }
+}
+
+/** The Workflow Builder's templates as they now stand (mig 20261023235500); null when they cannot be read. */
+async function freshWorkflows(db: SupabaseClient): Promise<WfTemplate[] | null> {
+  const { data, error } = await db.rpc('mkt_workflows')
+  return error ? null : workflowsFromRow(data)
+}
+
+/** A template made (`id` null: its action, name and first stages), or what changed of its draft saved — `rev`, the draft
+ * the builder last saw; a draft somebody saved since is not written over. */
+export async function saveMktWorkflow(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; rev: number; workflows: WfTemplate[] | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (id !== null && !isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (id !== null && !Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_workflow_save', { p_id: id, p_rev: id === null ? null : rev, p_patch: patch })
+  if (error) return { ok: false, reason: words(error, 'The template could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; rev?: number }
+  // A new template: the list again, so the builder shows it where it belongs.
+  return { ok: true, id: String(r.id ?? ''), rev: Number(r.rev ?? 1), workflows: id === null ? await freshWorkflows(db) : null }
+}
+
+/** The draft, as its publisher saw it, published as the template's next version. */
+export async function publishMktWorkflow(id: string, rev: number): Promise<Done<{ version: number; live: number }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const { data, error } = await (await client()).rpc('mkt_workflow_publish', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The template could not be published. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { version?: number; live?: number }
+  return { ok: true, version: Number(r.version ?? 0), live: Number(r.live ?? 0) }
+}
+
+/** A new template of the same action from this one's draft ("… copy"). */
+export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; tname: string; workflows: WfTemplate[] | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_workflow_clone', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The template could not be cloned. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; tname?: string }
+  return { ok: true, id: String(r.id ?? ''), tname: String(r.tname ?? ''), workflows: await freshWorkflows(db) }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */
