@@ -1,0 +1,119 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { taskFromRow, type MktTaskPage } from '@/lib/marketing/task'
+
+// 2026-10-23 — the task page (`New Task Page.dc.html`, PR ②a) for the people who work it: the stage's owner fills its
+// fields in (each saved on its own — only what changed), hands it on once it is filled; the approver approves or sends
+// it back with a reason. Marketing has no logins yet, so the page's two working sides are walked here against the
+// actions it calls (lib/marketing/actions.ts; the database's side is tests/member-sql/validate-marketing-tasks.mjs).
+
+const actions = vi.hoisted(() => ({
+  acceptMktStage: vi.fn(),
+  saveMktWork: vi.fn(),
+  submitMktStage: vi.fn(),
+  decideMktStage: vi.fn(),
+  setMktSeries: vi.fn(),
+  putMktFree: vi.fn(),
+}))
+vi.mock('@/lib/marketing/actions', () => actions)
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+
+import TaskPage from './TaskPage'
+
+const RACHEL = 's-rachel'
+const SITI = 's-siti'
+const team = [
+  { id: RACHEL, user: 'u1', full: 'RACHEL TAN', first: 'Rachel', title: 'MARKETING MANAGER', team: 'manager', role: null, color: null, capacity: 5 },
+  { id: SITI, user: 'u2', full: 'SITI AMINAH', first: 'Siti', title: 'GRAPHIC DESIGNER', team: 'design', role: null, color: null, capacity: 5 },
+]
+function page(me: string, redesign: Record<string, unknown>): MktTaskPage {
+  return taskFromRow({
+    today: '2026-10-26',
+    me,
+    team,
+    sub: { id: 'sub', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, pic: 'Kelvin' },
+    project: { id: 'p1', trackId: 'TSK-CAR-2610-001', kind: 'quick', sub: 'sub', title: 'Price update', status: 'active', qType: 'social',
+      brief: 'Change the price', owner: RACHEL, cur: 1, startsOn: '2026-10-23', dueOn: '2026-10-28', free: [] },
+    stages: [
+      { project: 'p1', idx: 0, name: 'First draft', dept: 'social', owner: RACHEL, sla: 1, appr: [], spec: { form: [] }, work: { notes: 'Done' },
+        dueOn: '2026-10-26', status: 'done' },
+      { project: 'p1', idx: 1, name: 'Redesign', dept: 'design', owner: SITI, sla: 1, appr: [{ kind: 'person', staff: RACHEL }],
+        spec: { form: [{ label: 'Final artwork', type: 'File' }, { label: 'Logo checked', type: 'Checkbox' }], back: 0 }, work: {},
+        dueOn: '2026-10-27', status: 'accepted', apprIdx: 0, ver: 0, ...redesign },
+    ],
+    subtasks: [],
+    events: [],
+    series: null,
+    holidays: [],
+  }) as MktTaskPage
+}
+const ALL = { edit: true, approve: true, manage: true }
+
+beforeEach(() => {
+  for (const f of Object.values(actions)) f.mockReset()
+  actions.saveMktWork.mockResolvedValue({ ok: true, missing: [] })
+})
+
+describe('the task page, for the people who work it', () => {
+  it('the owner fills the fields in — each saved alone — and hands the stage on once they are', async () => {
+    render(<TaskPage initial={page(SITI, {})} can={ALL} />)
+    const submit = screen.getByRole('button', { name: 'Submit for approval' })
+    expect(submit).toHaveProperty('disabled', true)
+    expect(screen.getByText('Fill in Final artwork, Logo checked')).toBeTruthy()
+
+    const link = screen.getByPlaceholderText('https://… (a link to the file)')
+    fireEvent.change(link, { target: { value: 'https://drive.google.com/a' } })
+    fireEvent.blur(link)
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenCalledWith('p1', { vals: { 'Final artwork': 'https://drive.google.com/a' } }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logo checked' }))
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { 'Logo checked': true } }))
+    expect(screen.getByText('Ready')).toBeTruthy()
+
+    // Blurring again with nothing changed sends nothing.
+    fireEvent.blur(link)
+    expect(actions.saveMktWork).toHaveBeenCalledTimes(2)
+
+    actions.submitMktStage.mockResolvedValue({ ok: true, page: page(SITI, { status: 'review', ver: 1, work: { vals: { 'Final artwork': 'https://drive.google.com/a', 'Logo checked': true } } }) })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
+    })
+    await waitFor(() => expect(actions.submitMktStage).toHaveBeenCalledWith('p1'))
+    expect(await screen.findByText('Submitted · sent to Rachel')).toBeTruthy()
+    expect(screen.getAllByText('Waiting for Rachel').length).toBe(2) // the status and the note
+    expect(screen.queryByRole('button', { name: 'Submit for approval' })).toBeNull()
+  })
+
+  it('the approver sends it back with a reason — to the stage the builder named', async () => {
+    render(<TaskPage initial={page(RACHEL, { status: 'review', ver: 1 })} can={ALL} />)
+    expect(screen.getByText('Siti submitted Redesign v1 for your approval')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Request changes' }))
+    expect(screen.getByText('Redesign v1 · back to First draft (Rachel)')).toBeTruthy()
+    const send = screen.getByRole('button', { name: 'Send back' })
+    expect(send).toHaveProperty('disabled', true)
+    fireEvent.change(screen.getByPlaceholderText('What should change? (required)'), { target: { value: 'Bigger logo' } })
+    actions.decideMktStage.mockResolvedValue({ ok: true, page: page(RACHEL, { status: 'planned' }) })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send back' }))
+    })
+    await waitFor(() => expect(actions.decideMktStage).toHaveBeenCalledWith('p1', false, 'Bigger logo'))
+    expect(await screen.findByText('Sent back')).toBeTruthy()
+  })
+
+  it('a refusal is said in words, and the page stays as it was', async () => {
+    render(<TaskPage initial={page(RACHEL, { status: 'review', ver: 1 })} can={ALL} />)
+    actions.decideMktStage.mockResolvedValue({ ok: false, reason: 'This approval is not yours.' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    })
+    expect(await screen.findByText('This approval is not yours.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy()
+  })
+
+  it('somebody else sees where it stands and does nothing', () => {
+    render(<TaskPage initial={page('s-other', {})} can={{ edit: true, approve: false, manage: false }} />)
+    expect(screen.queryByRole('button', { name: /Accept|Submit|Approve|Complete/ })).toBeNull()
+    expect(screen.getByText('Now with Siti')).toBeTruthy()
+    expect(screen.queryByText('+ Checklist')).toBeNull()
+  })
+})
