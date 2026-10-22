@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip } from "../shared/phone4a";
+import { Phone4aActive, Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -985,7 +985,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </section>
           </>)}
-          {!!(v.asx.onFt) && (<>
+          {!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>
             <section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>
               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-brown)" }}>
               </span>
@@ -1127,7 +1127,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                             <span style={{ width: "30px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{g.unit}</span>
                           </div>
                         </Fragment>))}
-                        <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>
+                        <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>{!!(g.locked) && (<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{g.locked}</span>)}
                       </>)}
                     </div>
                   </Fragment>))}

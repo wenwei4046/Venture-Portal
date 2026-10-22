@@ -223,6 +223,8 @@ export interface CrmData {
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
   adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null }>;
+  /** Members locked out of the dealing for now (mig 20261022130000, crm_staff.locked): off Assignment's lists. */
+  lockedStaff?: string[];
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
@@ -368,6 +370,7 @@ export interface CrmDataRows {
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null }[];
+  locked?: string[];
   /** crm_settings_read()'s answer; absent before the migration. */
   settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
@@ -484,6 +487,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
       return nm ? { ...cu, ad: nm } : cu;
     }),
     adNames,
+    lockedStaff: rows.locked ?? [],
     visits: rows.visits.map(visitFromRow),
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),

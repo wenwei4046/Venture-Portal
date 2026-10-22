@@ -11,6 +11,7 @@ import { InfoValue } from "../shared/AdLink";
 import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
+import type { ActiveGroup } from "../shared/locked";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -533,5 +534,41 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
         {v.many && <button type="button" onClick={v.remove} disabled={!v.canDelete} title={v.deleteTip} style={{ height: "34px", padding: "0 14px", borderRadius: "17px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: v.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: v.canDelete ? "pointer" : "not-allowed" }}>Delete page</button>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Assignment › Active members (2026-10-22, the owner: a member not active for now but still in the company — its own
+ * section after Ads to teams). Each person Active (takes new leads) or Locked (off Assignment's lists; their share to the
+ * others), saved at once (crm_set_locked; shared/locked.ts › activeGroups). Member work type's cards, in its look.
+ */
+export function DeskActive({ groups }: { groups: ActiveGroup[] }) {
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
+        {groups.map(g => (
+          <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
+              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
+              <strong style={{ flex: "1", fontSize: "14.5px", fontWeight: 700, color: g.color }}>{g.name}</strong>
+              <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
+            </div>
+            {g.people.map(p => (
+              <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
+                <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: "12px", fontWeight: 700, display: "grid", placeItems: "center" }}>{p.ini}</span>
+                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
+                  <strong style={{ fontSize: "14.5px", fontWeight: 650 }}>{p.name}</strong>
+                  <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{p.role}</span>
+                </span>
+                <span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.active ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)", color: p.active ? "var(--crm-brown)" : "var(--crm-oxblood)", fontSize: "12px", fontWeight: 700, display: "inline-flex", alignItems: "center" }}>{p.active ? "Active" : "Locked"}</span>
+                <span style={{ flex: "0 0 auto", width: "40px", height: "24px", borderRadius: "12px", background: p.active ? "var(--crm-brown)" : "var(--crm-line)", position: "relative", display: "block" }}>
+                  <span style={{ position: "absolute", top: "3px", left: p.active ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

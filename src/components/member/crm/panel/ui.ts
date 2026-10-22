@@ -39,7 +39,7 @@ export interface PanelUi {
   calInfo: string | null;
   cLs: "leads" | "up" | "came" | false;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
-  asSec: "Org" | "Ads" | "Aw" | "Ft" | null;
+  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
   ftx: { tid: string; v: Record<string, number[]> } | null;
   /** By team's inside-team draft for the ad being edited: modes, values, and who was typed in (for the auto-balance). */

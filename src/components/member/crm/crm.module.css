@@ -36,6 +36,10 @@
   line-height: normal;
   -webkit-font-smoothing: antialiased;
 }
+/* On a phone the CRM's type is a step under the Revenue app's (2026-10-22, the owner: "apps 的字体可以再小点，占版面太多空间
+   了"): every phone size is calc(Npx * var(--rv-type)), so .86 here (the app's .92) takes the whole CRM down ~6.5%. The
+   desktop (≥1024px) keeps its own sizes. */
+@media (max-width: 1023.98px) { .app { --rv-type: .86; } }
 /* The prototype keeps the browser's box sizing (content-box; the design says border-box inline where
    it wants it). Tailwind and the member workspace switch everything to border-box, which shrinks every
    bordered chip and box by its border. Doubled class: above .workspace *. */

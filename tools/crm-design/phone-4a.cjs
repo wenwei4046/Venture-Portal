@@ -375,6 +375,8 @@ function teamSplit(body) {
     const [, e] = el(b.slice(i), "<span onClick={v.as.ae.save}", "span", "split save end");
     b = b.slice(0, i + e) + `{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "${F(13)}", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}` + b.slice(i + e);
   }
+  // A team with somebody locked says so under its sum (2026-10-22, shared/locked.ts).
+  b = once(b, "color: g.sumFg }}>{g.sum}</span>", `color: g.sumFg }}>{g.sum}</span>{!!(g.locked) && (<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(12.5px * var(--rv-type, 1))", color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{g.locked}</span>)}`, "split locked note");
   // The split card and Inside each team a step smaller (2026-10-22, the owner: "下方的设计，字小点"): every size between the
   // modes and the foot 1.5 px down (11 px the least, so .92 keeps it over 10), bold 700 → 600.
   {
@@ -440,6 +442,9 @@ function panel(body) {
   body = teamInbox(body);
   body = teamAssign(body);
   body = teamSplit(body);
+  // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
+  // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
+  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive groups={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
   body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
     '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.v}%, #fff ${r.v}%)`, ["--thumb" as string]: r.c }} />', "split slider");
