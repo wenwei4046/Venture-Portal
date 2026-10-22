@@ -20,9 +20,10 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | PR | Contents | Status |
 |---|---|---|
 | ① | The permission and templates; the tables and readers; the shell (sidebar, top bar, search, bell, Appearance, account menu); My Space's task tiles; the Calendar; Projects (list + a project's stages); the Tracking Dashboard (read) | #634, live 2026-10-23 |
-| ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | this PR |
+| ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | #639, live 2026-10-23 |
 | ②b | 📦 Product projects: product → minutes → PIC tracking link → PIC response, the Assignment plan (SLA, approvers ≤ 3 levels, split, 🔓 picked by the stage before), subtasks and Review delivery, reassign, the billing drafts and Finance's import — after ③, whose builders make the products, workflows and minutes it starts from | after ③ |
-| ③ | The builders: Workflow Builder (stages, who, SLA, approvals, deliverables, form fields, versions, lock), the Canvas Template Editor, Product Builder (one-time / recurring, items × price, cost → margin, versions), Minutes Builder | |
+| ③a | The Workflow Builder: actions and their templates, the stages (who — at assignment or 🔓 by the stage before, SLA, approval levels, PIC words, subtasks, back to, fields with a table's preset rows), the lock, drafts saved as typed on their count, versions published whole, Clone (mig `20261023235500`) | this PR |
+| ③b–d | The Product Builder (one-time / recurring, items × price, cost → margin, versions), the Minutes Builder, the Canvas Template Editor | next |
 | ④ | Tracking's actions, the Subsidiary page (stats, month / week / timeline, key dates, feed), the Audit trail (replay, formal log, CSV / PDF), the Task map, Replace Person, Marketing's clients (+ Add subsidiary) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
@@ -52,8 +53,12 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 16. **No clock** (②a). Production has neither pg_cron nor pg_net, so a recurring run is made ahead (60 days) and opens on its day by itself (readers ask `starts_on ≤ today`); every Marketing write tops the series up. Nobody is told on the morning a run opens — it is on their plate.
 17. **Approvers** (②a). The handoff offers MM, AMM and a content Director; the database answers permissions only for the caller, so the picker offers the roster's managers (team `manager`) and the decision asks Approve. Anybody else — a question.
 18. **Files** (②a). A File field and a stage's files are links until Marketing's R2 bucket (R2 is live since 2026-10-23: `file_buckets` + `file_objects` policies in a migration of Marketing's own).
-19. **A table field** keeps its columns; the handoff's preset rows and filling a table in on the task page come with the Canvas Template Editor (③).
+19. **A table field** keeps its columns; a workflow template's tables keep preset rows (③a); a quick task's tables get them, and the task page fills a table in, with ②b.
 20. **Holidays by state.** HR's holidays carry their states; Marketing skips every one (a Sarawak-only day too) until the user says which state the office keeps.
+21. **A template stage's team** (③a). The handoff's Workflow Builder has no way to set it (a quick stage takes it from its person; a new template stage the last one's). Added: *Which team?* chips in the stage's settings.
+22. **The product's promise** (③a). The handoff shows *Product promise n days* in the Workflow Builder's foot and warns when the stages run longer, but no screen sets it. Added: typed in the foot (1–365 working days, empty = none). The Product Builder may own it later.
+23. **Emoji, the template's note, deliverables** (③a). The handoff's samples carry an emoji, a note (*Used by Ads and Social Media*) and deliverables per stage, but its Workflow Builder edits none of them: a new action's templates are ✨, the note is set by whoever makes it (the Product Builder's *+ New action workflow* later), deliverables are not built.
+24. **A template that is never used** (③a). The handoff cannot delete a template or an action; neither can the portal yet — a question.
 
 ## 5. Open questions (for the user)
 
@@ -64,3 +69,4 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 5. Does anybody besides MM / AMM approve stages (the handoff's content Director)?
 6. Nudge on WhatsApp too (from People's phone numbers)?
 7. Which state's holidays does Marketing keep?
+8. May a manager delete a workflow template (or a whole action) never published or never used? The handoff has no delete.

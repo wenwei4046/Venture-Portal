@@ -222,7 +222,7 @@ export default function WorkflowBuilder({
     <div className={w.page}>
       <div className={w.head}>
         <span className={w.headIcon} aria-hidden="true">🧩</span>
-        <h1 className={w.title}>Workflow Builder</h1>
+        <span className={w.title}>Workflow Builder</span>
         <div className={b.wbTabs}>
           <button type="button" className={`${b.wbTab} ${b.wbTabOn}`}>Workflow stages</button>
           <button type="button" className={`${b.wbTab} ${b.wbTabOff}`} disabled title="Comes with the canvas template editor">Canvas template</button>

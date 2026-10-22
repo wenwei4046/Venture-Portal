@@ -5,7 +5,7 @@
 
 .head { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid rgb(var(--mk-line-2)); flex-wrap: wrap; }
 .headIcon { font-size: 18px; }
-.title { font-size: 1.3em; font-weight: 600; margin: 0; }
+.title { font-size: 1.3em; font-weight: 600; }
 .grow { flex: 1; }
 .lock {
   height: 34px; padding: 0 12px 0 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white));
