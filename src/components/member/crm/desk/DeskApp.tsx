@@ -11,7 +11,7 @@ import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a } from "./Desk4a";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -549,7 +549,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "var(--crm-muted)" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>
@@ -563,7 +563,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                   <button type="button" onClick={v.mwtSave} disabled={v.mwtClean} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.mwtBtnBg, font: "inherit", fontSize: "14.5px", fontWeight: "650", color: "#fff", cursor: v.mwtBtnCur }}>Save</button>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
                   {(v.mwtTeams).map((g, g_i) => (<Fragment key={g_i}>
                     <div style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
@@ -798,7 +798,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {(v.adSplit).map((t, t_i) => (<Fragment key={t_i}>
                           <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "8px 0" }}>
-                            <span style={{ flex: "0 0 104px", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: "650", whiteSpace: "nowrap" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
+                            <span style={{ flex: "0 0 132px", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: "650", lineHeight: "1.25", overflowWrap: "anywhere" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
                               </span>{t.name}</span>
                             <span style={{ flex: "1", position: "relative", height: "4px", borderRadius: "2px", background: "var(--crm-field)" }}>
                               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: `${t.pct}%`, background: t.color, borderRadius: "2px" }}>

@@ -551,10 +551,10 @@ export function DeskActive({ v }: { v: ActiveVM }) {
         {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
         <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: "14.5px", fontWeight: 650, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
       </div>
-      {/* One column a team, side by side (the owner, 2026-10-22: "做成直列式的"); more teams than fit scroll sideways. */}
-      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "8px" }}>
+      {/* One list, team after team, scrolled down (the owner, 2026-10-22: "active member & member work type 做成往下滑的名单"). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
         {groups.map(g => (
-          <div key={g.name} style={{ flex: "0 0 252px", minWidth: 0, background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
+          <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
               <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
               <strong style={{ flex: "1", minWidth: 0, fontSize: "14px", fontWeight: 700, color: g.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</strong>
@@ -618,5 +618,42 @@ export function DeskAddAd({ v }: { v: { close: () => void; q: string; onQ: (e: {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Assignment › Leads by ad (2026-10-22, the owner: "我想要有一个独立的功能，可以看到每个广告谁拿到多少个名单"): every ad, the
+ * people who got its leads with how many and their share, This month | All time (vm/leads-by-ad.ts).
+ */
+export function DeskLeadsByAd({ v }: { v: { periods: { label: string; on: boolean; pick: () => void }[]; ads: { id: string; name: string; total: number; rows: { name: string; team: string; n: number; pct: number }[] }[] } }) {
+  return (
+    <>
+      <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "10px", background: "var(--crm-field)", alignSelf: "flex-start", marginTop: "-10px" }}>
+        {v.periods.map(p => (
+          <button key={p.label} type="button" onClick={p.pick} style={{ height: "32px", padding: "0 14px", borderRadius: "8px", border: 0, background: p.on ? "#fff" : "transparent", boxShadow: p.on ? "0 1px 2px rgba(42,22,12,.1)" : "none", font: "inherit", fontSize: "13px", fontWeight: p.on ? 600 : 500, color: p.on ? "var(--crm-ink)" : "var(--crm-muted)", cursor: "pointer" }}>{p.label}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
+        {!v.ads.length && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px" }}>No ads yet.</div>}
+        {v.ads.map(a => (
+          <div key={a.id} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "10px", padding: "12px 16px", borderBottom: a.rows.length ? "1px solid var(--crm-field)" : "0" }}>
+              <strong style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 650, color: "var(--crm-ink)", lineHeight: 1.3, overflowWrap: "anywhere" }}>{a.name}</strong>
+              <span style={{ flex: "none", fontSize: "13px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{a.total} {a.total === 1 ? "lead" : "leads"}</span>
+            </div>
+            {a.rows.map(r => (
+              <div key={r.name} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 140px 36px", alignItems: "center", gap: "12px", padding: "8px 16px", borderBottom: "1px solid var(--crm-field)" }}>
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                  <span style={{ fontSize: "13.5px", fontWeight: 600, color: r.team ? "var(--crm-ink)" : "var(--crm-oxblood)", lineHeight: 1.25, overflowWrap: "anywhere" }}>{r.name}</span>
+                  {r.team && <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{r.team}</span>}
+                </span>
+                <span style={{ height: "6px", borderRadius: "3px", background: "var(--crm-field)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.round(r.pct * 100)}%`, background: "var(--crm-rust)" }} /></span>
+                <span style={{ textAlign: "right", fontSize: "14px", fontWeight: 650, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{r.n}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

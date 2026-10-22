@@ -1087,7 +1087,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     {(v.as.ae.splits).map((r, r_i) => (<Fragment key={r_i}>
                       <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0, 1fr) 58px", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "12px", background: "#fff" }}>
                         <span style={{ minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
-                          <strong style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600", color: r.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.team}</strong>
+                          <strong style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600", color: r.c, lineHeight: "1.2", overflowWrap: "anywhere" }}>{r.team}</strong>
                         </span>
                         <input type="range" data-crm-range="" min="0" max="100" step="5" value={r.range} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.range}%, #fff ${r.range}%)`, ["--thumb" as string]: r.c }} />
                         <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "34px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", background: "var(--crm-tint-cold)", border: "1px solid var(--crm-tint-cold)" }}>
