@@ -138,7 +138,7 @@ export default function MktShell({
         </div>
         <div className={s.frame} data-hrv-overlay="">
           {own ? (
-            <main className={`${s.content} route-surface page-enter print:p-0`}>{children}</main>
+            <main className={`${s.content} route-surface page-enter print:p-0`} data-mkt-own="">{children}</main>
           ) : (
             <main className="sheet-theme sheet hrv-sheet route-surface page-enter print:p-0">{children}</main>
           )}

@@ -263,4 +263,4 @@
   height: 32px; border-radius: 8px; border: 1px solid rgb(var(--mk-field-line)); background: rgb(var(--mk-white));
   padding: 0 28px 0 10px; font: inherit; font-size: .96em; color: rgb(var(--mk-ink)); cursor: pointer;
 }
-.viewSelect:hover { border-color: rgb(var(--mk-field-hover)); }
+.viewSelect:hover, .viewSelect:focus { border-color: rgb(var(--mk-field-hover)); outline: none; }

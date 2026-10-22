@@ -19,6 +19,7 @@
   height: 36px; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; padding: 0 10px; font: inherit;
   font-size: .92em; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); outline: none; cursor: pointer;
 }
+.select:hover, .select:focus, .date:hover, .date:focus { border-color: rgb(var(--mk-field-hover)); }
 .clear {
   font-size: .88em; color: rgb(var(--mk-muted)); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 0 4px;
   background: transparent; border: 0; font-family: inherit;

@@ -1389,9 +1389,9 @@ html[data-nav-pending] .route-surface {
    app, the Finance app and its sheets (2026-10-15), the guest page — nor in the
    soft dropdown's menu (portaled to <body>), which keep their prototypes' own
    focus (2026-10-11). */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;

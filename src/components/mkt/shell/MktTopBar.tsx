@@ -31,7 +31,7 @@ export default function MktTopBar({
   onBell: () => void
 }) {
   return (
-    <div className={s.top}>
+    <div className={s.top} data-mkt-own="">
       <div className={s.crumb}>
         <span className={s.crumbEmoji} aria-hidden="true">{crumb.emoji}</span>
         <span className={s.crumbLabel}>{crumb.label}</span>
