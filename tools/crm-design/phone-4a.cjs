@@ -384,6 +384,8 @@ function teamSplit(body) {
     b = b.slice(0, i) + '{p.locked ? (<span aria-label="Locked" style={{ width: "46px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><Ic name="lock" size={15} /></span>) : (' + b.slice(i, e + 3) + ")}" + b.slice(e + 3);
   }
   b = once(b, "color: \"var(--crm-muted)\" }}>{g.unit}</span>", "color: \"var(--crm-muted)\" }}>{p.locked ? \"\" : g.unit}</span>", "split locked unit");
+  // A long team name takes two lines (the owner, 2026-10-22: "名字太长的你就分 2 行").
+  b = once(b, 'color: r.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.team}</strong>', 'color: r.c, lineHeight: "1.2", overflowWrap: "anywhere" }}>{r.team}</strong>', "split team name wraps");
   // The split card and Inside each team a step smaller (2026-10-22, the owner: "下方的设计，字小点"): every size between the
   // modes and the foot 1.5 px down (11 px the least, so .92 keeps it over 10), bold 700 → 600.
   {

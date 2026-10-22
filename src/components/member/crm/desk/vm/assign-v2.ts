@@ -16,6 +16,8 @@ import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
 import { adRunLine, adRunning } from "@/lib/member/crm-ad-running";
+import { leadsByAd } from "./leads-by-ad";
+import { teamNameOf } from "./data";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -160,7 +162,14 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     typed: ui.addAdId, onTyped: (e: { target: { value: string } }) => patch({ addAdId: e.target.value.replace(/\D/g, "").slice(0, 32) }),
     addTyped: () => { const id = ui.addAdId; if (!/^\d{5,32}$/.test(id)) return; const known = Array.isArray(addList) ? addList.find(r => r.id === id) : undefined; pickAd(known ?? { id, name: "", status: "", start: null, end: null }); },
   };
+  // Assignment › Leads by ad (2026-10-22): each ad, who got how many of its leads (vm/leads-by-ad.ts).
+  const lbaPer = ui.lbaPer ?? "month";
+  const leadsByAdV = {
+    periods: ([["month", "This month"], ["all", "All time"]] as const).map(([k, label]) => ({ label, on: lbaPer === k, pick: () => patch({ lbaPer: k }) })),
+    ads: leadsByAd(data.customers, adIds, id => adOf(id).label, id => ctx.nameOf(id), id => teamNameOf(ctx, id), lbaPer, now),
+  };
   return {
+    leadsByAd: leadsByAdV,
     addAd,
     adList4,
     saveOne4: as.saveAd, saveAll4: as.applyAll,
