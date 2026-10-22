@@ -52,7 +52,7 @@ describe("Requests in View as (user 2026-10-06: 只能看，不能送出)", () =
   it("each way to start a request opens its form — nothing on the page is switched off", () => {
     const onNew = vi.fn();
     render(<RequestsPage rows={[]} filter="all" onFilter={() => {}} onBack={() => {}} onNew={onNew} onOpen={() => {}} />);
-    for (const [label, kind] of [["Submit claim", "claim"], ["Submit replacement", "replacement"], ["Submit waiting list", "waiting"]] as const) {
+    for (const [label, kind] of [["Submit transport claim", "claim"], ["Submit replacement", "replacement"], ["Submit waiting list", "waiting"]] as const) {
       const row = screen.getByRole("button", { name: new RegExp(label) });
       expect(row).toBeEnabled();
       fireEvent.click(row);
@@ -379,6 +379,24 @@ describe("a waiting list, on HR's form", () => {
     expect(screen.getByRole("group", { name: "Preferred sub-department" })).toHaveTextContent("FairIR");
     expect(screen.getByText("Application form")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload signed form" })).toBeInTheDocument();
+  });
+
+  // 2026-10-20, the user, once HR's own uploads took Word: "need as well".
+  it("takes the filled-in Word file as the signed form too", async () => {
+    const onSubmit = vi.fn(async (data: FormData) => { void data; return { ok: true as const, code: "RQ-2610-010" }; });
+    const { container } = waiting(onSubmit);
+    expect(screen.getByText(/then upload a photo or scan — or the filled-in Word file\./)).toBeInTheDocument();
+    const input = container.querySelector('input[type="file"]')!;
+    expect(input.getAttribute("accept")!.split(",")).toEqual(expect.arrayContaining([
+      "application/pdf", "image/jpeg", "image/png", "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".doc", ".docx",
+    ]));
+    fill();
+    fireEvent.change(input, { target: { files: [new File(["PK"], "Amelia application.docx", { type: "" })] } });
+    expect(screen.getByText("✓ Amelia application.docx")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit" }));
+    expect(await screen.findByText("RQ-2610-010")).toBeInTheDocument();
+    expect((sent(onSubmit).signedForm as File).name).toBe("Amelia application.docx");
   });
 
   it("names what is missing, marks each, then wants the signed form, then the signature", () => {

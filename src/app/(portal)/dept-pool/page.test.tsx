@@ -276,12 +276,3 @@ describe('Department Pools · accrual, for Finance', () => {
     expect(foot).toHaveTextContent('135,300.00')
   })
 })
-
-describe('somebody who reads only their own department', () => {
-  it('keeps the page as it was', async () => {
-    mocks.requirePermission.mockResolvedValue({ ...withActions({ id: 'm', role: 'dept_manager', permissions: ['dept_pool'] }), department_id: 'd-it' })
-    render(await DeptPoolPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · POOL OVERVIEW')
-    expect(screen.queryByRole('group', { name: 'Total balance' })).toBeNull()
-  })
-})

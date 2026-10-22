@@ -6,7 +6,11 @@
 // Which hubs and pages show is the sidebar's answer (fin-nav.ts — the same
 // rows, the same `visible` and tabs), never a list of its own.
 
-export type AppTab = 'home' | 'daily' | 'fund' | 'report' | 'profile'
+/** `approvals` is the Principal's own view's tab (2026-10-17), between the Overview and Daily. */
+export type AppTab = 'home' | 'approvals' | 'daily' | 'fund' | 'report' | 'profile'
+
+/** The Approvals tab's root — the queue as the Principal's own tab (2026-10-17). */
+export const APPROVALS_TAB_HREF = '/fin-app/approvals'
 
 export type HubKey = 'payments' | 'receipts' | 'invoices' | 'billing' | 'fund-out' | 'fund-in' | 'pnl' | 'cf' | 'debtor' | 'loan' | 'bs'
 
@@ -81,11 +85,16 @@ export function hubOfRow(key: string): HubKey | null {
   return HUB_OF_ROW[key] ?? null
 }
 
-/** Where a sidebar row (or a Profile › Admin row) opens in the app: its hub, else a screen of its own. */
-export function appHref(key: string): string {
+/**
+ * Where a sidebar row (or a Profile › Admin row) opens in the app: its hub, else a screen of its own —
+ * Approvals the Principal's own tab, for a reader who has it (`approvalsTab`).
+ */
+export function appHref(key: string, opts: { approvalsTab?: boolean } = {}): string {
   const hub = HUB_OF_ROW[key]
   if (hub) return HUB_HREF[hub]
   if (key === 'overview') return '/fin-app'
+  if (key === 'it-support') return '/fin-app/it-support'
+  if (key === 'approvals' && opts.approvalsTab) return APPROVALS_TAB_HREF
   return `/fin-app/page/${encodeURIComponent(key)}`
 }
 
@@ -108,9 +117,10 @@ export function hubOf(pathname: string): HubKey | null {
  * names none of its own: the Overview's.
  */
 export function tabOf(pathname: string): AppTab {
+  if (pathname === APPROVALS_TAB_HREF || pathname.startsWith(APPROVALS_TAB_HREF + '/')) return 'approvals'
   if (pathname.startsWith('/fin-app/daily')) return 'daily'
   if (pathname.startsWith('/fin-app/fund')) return 'fund'
   if (pathname.startsWith('/fin-app/report')) return 'report'
-  if (pathname.startsWith('/fin-app/profile')) return 'profile'
+  if (pathname.startsWith('/fin-app/profile') || pathname === '/fin-app/it-support') return 'profile'
   return 'home'
 }

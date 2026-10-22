@@ -5,7 +5,7 @@
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
 import { crmWrite, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
-import type { CrmData, CrmRoom, CrmTemplate } from "@/lib/member/crm-data";
+import type { CrmData, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import type { Dispatch, SetStateAction } from "react";
@@ -15,10 +15,14 @@ export interface PanelActions extends SalesActions {
   /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
   /** Names an ad (crm_name_ad, CRM · Manage); an empty name takes the given name off. */
   nameAd(ad: string, name: string): Promise<boolean>;
+  /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
+  saveSettings(s: CrmSettings): Promise<boolean>;
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
+  /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
+  setLocked(staffId: string, on: boolean): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
@@ -43,6 +47,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (!(await write("crm_send_to", { p_contact: customerId, p_staff: staffId }))) return false;
       const team = staffId ? teamOf(staffId, data().people)?.id ?? null : null;
       setData(d => ({ ...d, customers: d.customers.map(c => (c.id === customerId ? { ...c, assignedTo: staffId, teamId: team } : c)) }));
+      return true;
+    },
+    async saveSettings(st) {
+      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders }))) return false;
+      setData(d => ({ ...d, settings: st }));
       return true;
     },
     async nameAd(ad, name) {
@@ -71,6 +80,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
       setData(d => ({ ...d, ftRules: [...d.ftRules.filter(r => r.tlId !== tlId), { tlId, mode, days, vals }] }));
+      return true;
+    },
+    async setLocked(staffId, on) {
+      if (!(await write("crm_set_locked", { p_staff: staffId, p_locked: on }))) return false;
+      setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
       return true;
     },
     async setFullTime(staffId, on) {

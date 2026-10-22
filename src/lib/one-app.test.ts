@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone } from './one-app'
+import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone, startPlace, itSupportPlace, itSupportApp } from './one-app'
 
 // ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是 portal app").
 
@@ -48,11 +48,55 @@ describe('which face of the app opens on a phone', () => {
   })
 })
 
+describe('the start (`/`)', () => {
+  const hr = { role: 'hr', permissions: ['hiring', 'documentation'] }
+  const fin = { role: 'finance', permissions: [] }
+  const rev = { role: 'revenue_member', permissions: [] }
+  it('sends each face where it opens', () => {
+    expect(startPlace(rev, true)).toBe('/member')
+    expect(startPlace(hr, true)).toBe('/hr-app')
+    expect(startPlace(fin, true)).toBe('/fin-app')
+    expect(startPlace(hr, false)).toBe('/dashboard')
+    expect(startPlace(fin, false)).toBe('/dashboard')
+    expect(startPlace(null, true)).toBe('/dashboard')
+  })
+  it('carries a tapped notice about one’s own request on to Me (2026-10-17)', () => {
+    expect(startPlace(hr, true, 'r 1')).toBe('/hr-app?open=me:r%201')
+    expect(startPlace(fin, true, 'r1')).toBe('/fin-app/profile?open=me:r1')
+    expect(startPlace({ role: 'principal', permissions: ['view_switch'] }, true, 'r1')).toBe('/fin-app/profile?open=me:r1')
+    expect(startPlace(fin, false, 'r1')).toBe('/dashboard?open=me:r1')
+    // The Revenue app has no Me.
+    expect(startPlace(rev, true, 'r1')).toBe('/member')
+  })
+})
+
+describe('a tapped IT support notification', () => {
+  it('labels desktop requests by the view that submitted them', () => {
+    expect(itSupportApp({ role: 'hr' })).toBe('hr')
+    expect(itSupportApp({ role: 'finance' })).toBe('finance')
+    expect(itSupportApp({ role: 'principal' })).toBe('portal')
+  })
+  it('keeps the request in HR, Finance or Revenue on a phone and uses the portal on desktop', () => {
+    const hr = { role: 'hr', permissions: ['documentation'] }
+    const finance = { role: 'finance', permissions: ['treasury'] }
+    expect(itSupportPlace(hr, true, 'r 1')).toBe('/hr-app?open=it:r%201')
+    expect(itSupportPlace(finance, true, 'r1')).toBe('/fin-app/it-support?it=r1')
+    expect(itSupportPlace({ role: 'principal', permissions: ['view_switch'] }, true, 'r1')).toBe('/fin-app/it-support?it=r1')
+    expect(itSupportPlace(hr, false, 'r1')).toBe('/it-support?it=r1')
+    expect(itSupportPlace(finance, false, 'r1')).toBe('/it-support?it=r1')
+    expect(itSupportPlace({ role: 'revenue_member', permissions: [] }, true, 'r1')).toBe('/member?page=account&view=it&it=r1')
+  })
+})
+
 describe('the Finance app (2026-10-15, the Finance revamp v2’s phone)', () => {
   it('opens for Finance’s view — the finance kind, or the Principal’s Finance lens — and nobody else', () => {
     expect(opensFinApp({ role: 'finance' })).toBe(true)
-    for (const role of ['principal', 'hr', 'staff', 'dept_manager', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
+    for (const role of ['principal', 'hr', 'staff', 'revenue_member']) expect(opensFinApp({ role })).toBe(false)
     expect(opensFinApp(null)).toBe(false)
+    // The Principal's own view (2026-10-17): "the mobile use the same view with finance app … just add on then
+    // tab for approval tab" — for an account that may switch views.
+    expect(opensFinApp({ role: 'principal', permissions: ['view_switch'] })).toBe(true)
+    expect(opensFinApp({ role: 'hr', permissions: ['view_switch'] })).toBe(false)
   })
 })
 
@@ -73,10 +117,9 @@ describe('one install', () => {
   it('opens the right face from its start: `/` and every portal page send HR’s view on a phone to the HR app', () => {
     const home = readFileSync(resolve(ROOT, 'src/app/page.tsx'), 'utf8')
     const portal = readFileSync(resolve(ROOT, 'src/app/(portal)/layout.tsx'), 'utf8')
-    expect(home).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)
-    expect(home).toMatch(/if \(opensHrAppOnPhone\(user\) && phone\) redirect\('\/hr-app'\)/)
+    // `/` goes where startPlace says (the start, above — 2026-10-17, with a tapped notice's `open=me:` carried on).
+    expect(home).toMatch(/redirect\(startPlace\(user, isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\), /)
     // Finance's view on a phone (2026-10-16): the Finance app, from `/` and from every portal page.
-    expect(home).toMatch(/if \(opensFinApp\(user\) && phone\) redirect\('\/fin-app'\)/)
     expect(portal).toMatch(/if \(opensFinApp\(user\) && phone\) redirect\('\/fin-app'\)/)
     // The portal reads the phone once (2026-10-14): the HR app's redirect, and Finance's shell kept off a phone.
     expect(portal).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)

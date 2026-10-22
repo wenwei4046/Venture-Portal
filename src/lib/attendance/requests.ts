@@ -13,6 +13,15 @@ export type Bucket = 'hr' | 'upline' | 'decided'
 
 export const waitingStep = (r: AttRequest): AttStep | null => (r.status === 'pending' ? r.steps.find(s => s.state === 'waiting') ?? null : null)
 
+/**
+ * The step waits at the viewer's OWN upline seat (2026-10-17): theirs to decide as the upline — `att_decide` records
+ * it so — never "on behalf" of themselves. Known as the request page knows its own (`config.me`, a login's name).
+ */
+export function waitsAtMe(r: AttRequest, config: { me: string; people: ReadonlyArray<{ id: string; name: string; hasLogin: boolean }> }): boolean {
+  const w = waitingStep(r)
+  return w?.role === 'upline' && !!w.approverId && config.people.some(p => p.id === w.approverId && p.hasLogin && p.name === config.me)
+}
+
 /** Pending (waiting for HR) · At upline · Decided. */
 export function bucketOf(r: AttRequest): Bucket {
   const w = waitingStep(r)
@@ -41,8 +50,19 @@ export function kindLabel(r: AttRequest, leaveTypes: readonly AttLeaveType[]): s
   if (r.kind === 'leave') return leaveTypes.find(t => t.code === r.leaveCode)?.name ?? `${r.leaveCode ?? ''} leave`.trim()
   if (r.kind === 'ot') return 'Overtime · asked first'
   if (r.kind === 'correction') return `Correction${str(r.detail.punch) ? ` · ${str(r.detail.punch).toUpperCase()}` : ''}`
+  if (r.kind === 'manpower') return manpowerTitle(r.detail)
   return 'Profile change'
 }
+
+/** "Extra manpower · 2 promoters" (Me › Submit request's own words). */
+export function manpowerTitle(detail: Record<string, unknown>): string {
+  const n = Number(detail.count) || 0
+  const role = str(detail.role).toLowerCase()
+  return role && n ? `Extra manpower · ${n} ${role}${n === 1 ? '' : 's'}` : 'Extra manpower'
+}
+
+/** Calendar days from a to b, inclusive (a fair's days). */
+const calendarDays = (from: string, to: string | null) => Math.max(1, Math.round((Date.parse(to ?? from) - Date.parse(from)) / 86400000) + 1)
 
 /** "Mon 12 Oct", "Thu 22 – Fri 23 Oct", "Fri 30 Oct – Mon 2 Nov". */
 export function rangeLabel(from: string, to: string | null): string {
@@ -63,11 +83,21 @@ export function whenLabel(r: AttRequest): string {
     return `${shortDay(r.from)} · ${from && to ? `${from}–${to}` : DAY_TYPE[dt] ?? 'overtime'}`
   }
   if (r.kind === 'correction') return `${shortDay(r.from)}${str(r.detail.at) ? ` · ${str(r.detail.at)}` : ''}`
+  if (r.kind === 'manpower') return `${str(r.detail.for) ? `${str(r.detail.for)} · ` : ''}${rangeLabel(r.from, r.to)}`
   return rangeLabel(r.from, r.to)
 }
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 const num = (n: number) => String(Math.round(n * 100) / 100)
+
+/**
+ * What the page says once a request is decided: a profile change counts its fields as the record does — "1 field",
+ * "3 fields" (it said "1 fields", found 2026-10-16 approving a Request to change email).
+ */
+export function decidedToast(r: AttRequest, approve: boolean): string {
+  if (r.kind === 'profile') return approve ? `Approved · ${r.who}'s record updated · ${amountLabel(r)}` : `Rejected · record unchanged · ${r.who} told`
+  return `${approve ? 'Approved' : 'Rejected'} · ${r.who} told`
+}
 
 /** "1 day", "6 h", "3 fields". */
 export function amountLabel(r: AttRequest): string {
@@ -77,6 +107,7 @@ export function amountLabel(r: AttRequest): string {
     const n = Array.isArray(r.detail.changes) ? r.detail.changes.length : 0
     return plural(n, 'field')
   }
+  if (r.kind === 'manpower' && r.from) return `${calendarDays(r.from, r.to) * (Number(r.detail.count) || 0)} person-days`
   return '—'
 }
 

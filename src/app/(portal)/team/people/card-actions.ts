@@ -226,6 +226,8 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     staff: {
       id: row.id,
       employee_name: row.employee_name,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
       designation: row.designation ?? null,
       department_id: row.department_id,
       department_name: deptName ?? '—',
@@ -256,6 +258,13 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       contact_number: row.contact_number ?? null,
       email: row.email ?? null,
       address: row.address ?? null,
+      // Its six parts (2026-10-20) — what the person's page edits.
+      address_line1: row.address_line1 ?? null,
+      address_line2: row.address_line2 ?? null,
+      address_postcode: row.address_postcode ?? null,
+      address_city: row.address_city ?? null,
+      address_state: row.address_state ?? null,
+      address_country: row.address_country ?? null,
       emergency_contact_name: row.emergency_contact_name ?? null,
       emergency_contact_phone: row.emergency_contact_phone ?? null,
       emergency_contact_relationship: row.emergency_contact_relationship ?? null,

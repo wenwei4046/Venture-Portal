@@ -9,6 +9,8 @@ import type { CrmAdRule, CrmCustomer } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
+import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
+import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
@@ -22,13 +24,18 @@ function ticks(ctx: PanelCtx, tid: string): Record<string, number[]> {
   return v;
 }
 /** Full time people: anyone switched to full time in Member work type (any role, rev 1011 Profile). */
-export const ftPeople = (t: Team) => t.people.filter(p => p.fullTime);
+export const ftPeople = (t: Team, locked?: Set<string>) => t.people.filter(p => p.fullTime && !locked?.has(p.id));
+/** The team's full-time people who are locked for now: shown greyed, not editable, their days kept (2026-10-22). */
+const ftLocked = (t: Team, locked: Set<string>) => t.people.filter(p => p.fullTime && locked.has(p.id));
+const greyDays = () => A7.map(d => ({ t: WK[d], bg: "var(--crm-field)", fg: "var(--crm-faint-2)" }));
 const who = (ps: Team["people"], v: Record<string, number[]>, d: number) => ps.filter(p => (v[p.id] ?? []).includes(d)).map(p => p.name);
 const lineOf = (names: string[]) => !names.length ? "" : names.length === 1 ? names[0] + " only" : names.join(", ") + " take turns";
 
 export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | undefined) {
   const { ui, patch, data, now, teams, act, nameOf } = ctx;
-  const sec = ui.asSec, go = (k: NonNullable<typeof sec>) => () => patch({ asSec: k });
+  const lk = lockedOf(data);
+  // 4a (T03): the sections are tabs under the title — Ads to teams first; Work type opens Profile's Member work type.
+  const sec = ui.asSec ?? "Ads", go = (k: NonNullable<typeof ui.asSec>) => () => patch({ asSec: k });
   const urgent = (c: CrmCustomer) => {
     const last = [...c.messages].reverse().find(m => !m.auto);
     return !!last && last.from === "lead";
@@ -44,17 +51,28 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const ftTeams = teams.filter(t => Object.values(ticks(ctx, t.id)).some(d => d.length)).length;
 
   const asx = {
-    onHome: !sec, inSub: !!sec, back: () => patch({ asSec: null }),
+    onHome: false, inSub: true, back: () => patch({ asSec: null }),
+    tabs4: [
+      { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
+      // Active members, its own tab after Ads (the owner, 2026-10-22). CRM · Manage only, as Work type.
+      ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false, actDraft: null }) }] : []),
+      { label: "Full time", on: sec === "Ft", pick: go("Ft") },
+      ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
+    ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
-    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft",
+    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act",
+    act: activeVM([
+      { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
+      ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),
+    ], lk, p => jobTitle(p as Team["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg })),
     cards: ([
       // No Organic Leads card (the owner, 2026-10-13: an enquiry from no ad goes straight to the Revenue Director).
-      ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "#2F6FB5", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",
+      ["Ads", data.can.viewAll ? "Ads to teams" : "Ads to my team", "var(--crm-ink-soft)", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6",
         adIds.length + " ads" + (heldC.length ? " · " + heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit" : unset ? " · " + unset + " on the default (evenly)" : " · all set"), heldC.length],
       // No Awaiting reply card (the owner, 2026-10-13): the Team inbox's Attention is the same list.
-      ["Ft", "Full time lead allocation", "#387557", "M8 2v4m8-4v4M3 10h18M5 4h14v17H5V4Zm4 11 2 2 4-4", ftTeams ? ftTeams + " of " + teams.length + " teams set" : "Not set for any team", 0],
-    ] as const).map(([k, title, c, icon, sub, n]) => ({ title, c, icon, sub, subFg: "#806B60", n, hasN: n > 0, go: go(k) })),
+      ["Ft", "Full time lead allocation", "var(--crm-brown)", "M8 2v4m8-4v4M3 10h18M5 4h14v17H5V4Zm4 11 2 2 4-4", ftTeams ? ftTeams + " of " + teams.length + " teams set" : "Not set for any team", 0],
+    ] as const).map(([k, title, c, icon, sub, n]) => ({ title, c, icon, sub, subFg: "var(--crm-muted)", n, hasN: n > 0, go: go(k) })),
     held: heldAds.map(ad => {
       const cs = heldC.filter(c => c.ad === ad), r = data.adRules.find(x => x.label === ad);
       const full = r?.tm ? teams.filter(t => r.tm![t.id] === "cnt" && (r.split[t.id] || 0) > 0).map(t => t.name) : [];
@@ -71,36 +89,39 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     week: [] as { day: string; text: string; fg: string; weight: number; rule: string }[],
     clear: () => {}, save: () => {},
     // Round 2 (rev 1011 §8): "Save and apply to all N teams" — off until somebody here has a day ticked.
-    applyLabel: "", applyFg: "#B5C4BA", applyBd: "#D8E3DC", applyCur: "default", applyAll: undefined as (() => void) | undefined,
+    applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-follow)", applyCur: "default", applyAll: undefined as (() => void) | undefined,
     sum: teams.map(t => {
-      const v = ticks(ctx, t.id), ps = ftPeople(t), on = A7.filter(d => who(ps, v, d).length);
+      const v = ticks(ctx, t.id), ps = ftPeople(t, lk), on = A7.filter(d => who(ps, v, d).length);
       return { name: t.name, mode: on.length ? on.map(d => WKL[d]).join(", ") : "Off · follows Ads to teams", open: () => patch({ ftx: { tid: t.id, v: JSON.parse(JSON.stringify(v)) } }),
         rs: ps.map(p => ({ name: p.name, label: "", tagBg: "transparent", tagFg: "transparent",
-          days: A7.map(d => { const o = (v[p.id] ?? []).includes(d); return { t: WK[d], bg: o ? "#387557" : "#EEF3EF", fg: o ? "#fff" : "#B5C4BA" }; }) })) };
+          days: A7.map(d => { const o = (v[p.id] ?? []).includes(d); return { t: WK[d], bg: o ? "var(--crm-brown)" : "var(--crm-tint-follow)", fg: o ? "#fff" : "var(--crm-faint-2)" }; }) }))
+          .concat(ftLocked(t, lk).map(p => ({ name: p.name, label: "Locked", tagBg: "var(--crm-field)", tagFg: "var(--crm-faint)", days: greyDays() }))) };
     }),
   };
   if (ft && fx) {
-    const ps = ftPeople(ft), v = fx.v, setV = (nv: Record<string, number[]>) => patch({ ftx: { ...fx, v: nv } });
+    const ps = ftPeople(ft, lk), v = fx.v, setV = (nv: Record<string, number[]>) => patch({ ftx: { ...fx, v: nv } });
     ftx.people = ps.map(p => ({ name: p.name, sub: `${jobTitle(p)} · Full time`, days: A7.map(d => {
       const o = (v[p.id] ?? []).includes(d);
-      return { title: WKL[d], icon: o ? "m5 12 5 5 9-10" : "", bg: o ? "#387557" : "#fff", fg: "#fff", bd: o ? "#387557" : "#D9C7BA",
+      return { title: WKL[d], icon: o ? "m5 12 5 5 9-10" : "", bg: o ? "var(--crm-brown)" : "#fff", fg: "#fff", bd: o ? "var(--crm-brown)" : "var(--crm-line)",
         toggle: () => { const cur = v[p.id] ?? []; setV({ ...v, [p.id]: o ? cur.filter(x => x !== d) : [...cur, d].sort() }); } };
-    }) }));
-    ftx.week = A7.map((d, k) => { const n = who(ps, v, d); return { day: WKL[d], text: n.length ? lineOf(n) : "Follows Ads to teams", fg: n.length ? "#2E6B4C" : "#A8968B", weight: n.length ? 650 : 500, rule: k ? "1px solid #F3E9E1" : "0" }; });
+    }) })).concat(ftLocked(ft, lk).map(p => ({ name: p.name, sub: "Locked · no new leads", days: A7.map(d => ({ title: WKL[d], icon: "", bg: "var(--crm-field)", fg: "#fff", bd: "var(--crm-rule-soft)", toggle: () => {} })) })));
+    ftx.week = A7.map((d, k) => { const n = who(ps, v, d); return { day: WKL[d], text: n.length ? lineOf(n) : "Follows Ads to teams", fg: n.length ? "var(--crm-brown)" : "var(--crm-faint)", weight: n.length ? 650 : 500, rule: k ? "1px solid var(--crm-rule-soft)" : "0" }; });
     ftx.clear = () => setV({});
     ftx.save = () => {
       const days = A7.filter(d => who(ps, v, d).length), vals: Record<string, Record<string, number>> = {};
       ps.forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, (v[p.id] ?? []).includes(d) ? 1 : 0])); });
+      // A locked person's days are kept for when they come back (the dealer skips them meanwhile).
+      ftLocked(ft, lk).forEach(p => { vals[p.id] = Object.fromEntries(A7.map(d => [d, (v[p.id] ?? []).includes(d) ? 1 : 0])); });
       void act.saveFtRule(ft.id, "turns", days, vals).then(ok => { if (ok) patch({ ftx: null, toast: ft.name + ": full time days saved" }); });
     };
     // …and to every team: this team as edited; in each other team every full-time person gets the day pattern of the first
     // ticked person here. A team with no full-time person is skipped. One crm_save_fulltime per team (the prototype's).
     const pat = ps.map(p => v[p.id] ?? []).find(a => a.length) ?? [];
     ftx.applyLabel = "Save and apply to all " + teams.length + " teams";
-    ftx.applyFg = pat.length ? "#387557" : "#B5C4BA"; ftx.applyBd = pat.length ? "#387557" : "#D8E3DC"; ftx.applyCur = pat.length ? "pointer" : "default";
+    ftx.applyFg = pat.length ? "var(--crm-brown)" : "var(--crm-faint-2)"; ftx.applyBd = pat.length ? "var(--crm-brown)" : "var(--crm-tint-follow)"; ftx.applyCur = pat.length ? "pointer" : "default";
     ftx.applyAll = pat.length ? () => void (async () => {
       for (const t of teams) {
-        const tps = ftPeople(t);
+        const tps = ftPeople(t, lk);
         if (!tps.length) continue;
         const vv: Record<string, number[]> = {};
         tps.forEach(p => { vv[p.id] = t.id === ft.id ? (v[p.id] ?? []) : [...pat]; });
@@ -118,23 +139,31 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const B = isSp && E ? (ui.bp && ui.bp.adId === E.id ? ui.bp : { adId: E.id, tm: { ...(rule?.tm ?? {}) }, pv: { ...(rule?.pp ?? {}) }, touch: {} as Record<string, string[]> }) : null;
   const takenOf = (adId: string, pid: string) => data.customers.filter(c => c.adId === adId && c.assignedTo === pid).length;
   const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[] };
-  let aeSave: { saveBg: string; save: (() => void) | undefined } | null = null;
+  let aeSave: { why: string; saveBg: string; save: (() => void) | undefined } | null = null;
   let byTeamRule: CrmRuleIn | null = null;
   function innerOf(t: Team, B0: NonNullable<typeof B>, split: Record<string, number>) {
     const putB = (p: Partial<NonNullable<typeof B>>) => patch({ bp: { ...B0, ...p } });
     const mode: Mode = B0.tm[t.id] ?? "pct", ps = t.people, es = evenShare(ps.length || 1), custom = mode !== "even";
-    const val = (p: Team["people"][number], k: number) => B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0);
+    // A % saved for the team as it was (somebody since joined or left) no longer adds up: it opens as an even share, as
+    // a team never set does — it was Save's silent block (the owner, 2026-10-18: "为什么我调整后，save处于灰色？").
+    const stored = ps.reduce((x, p) => x + (B0.pv[p.id] ?? 0), 0), touched = (B0.touch[t.id] ?? []).length > 0;
+    const whole = t.id === DIRECTOR_SPLIT_KEY ? data.people.filter(p => p.role === "hod") : (teams.find(x => x.id === t.id)?.people ?? []);
+    const lockedHere = whole.filter(p => lk.has(p.id)), scaled = mode === "pct" && !touched ? sharedOut(B0.pv, ps.map(p => p.id), lockedHere.length > 0) : null;
+    const stale = !scaled && mode === "pct" && !touched && ps.some(p => B0.pv[p.id] != null) && stored !== 100;
+    const val = (p: Team["people"][number], k: number) => (scaled ? scaled[p.id] ?? 0 : stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
     const sum = ps.reduce((x, p, k) => x + val(p, k), 0);
-    const ok = mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
+    // A team with nobody in it has nothing to split.
+    const ok = !ps.length || mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
+    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + sum + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
     const setMode = (m: Mode) => { const pv = { ...B0.pv }; ps.forEach((p, k) => { if (m === "even") delete pv[p.id]; else pv[p.id] = m === "pct" ? es(k) : 0; }); putB({ tm: { ...B0.tm, [t.id]: m }, pv, touch: { ...B0.touch, [t.id]: [] } }); };
     const ftr = data.ftRules.find(f => f.tlId === t.id);
     const ftDays = ftr ? [...new Set(Object.entries(ftr.vals).flatMap(([, v]) => Object.entries(v).filter(([, n]) => Number(n) > 0).map(([d]) => Number(d))))].sort((a, b) => a - b) : [];
     return {
-      ok, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
+      ok, why, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
       name: t.name, c: t.c, pct: (split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
       evenLine: "In turn among " + ps.map(p => p.name.split(" ")[0]).join(", ") + " · Full time days apply",
       modes: ([["even", "Evenly"], ["pct", "By %"], ["cnt", "By max"]] as const).map(([k, label]) => ({ label, pick: () => { if (mode !== k) setMode(k); },
-        bg: mode === k ? "#fff" : "transparent", fg: mode === k ? "#3F2B22" : "#806B60", w: mode === k ? 650 : 500, sh: mode === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
+        bg: mode === k ? "#fff" : "transparent", fg: mode === k ? "var(--crm-ink)" : "var(--crm-muted)", w: mode === k ? 650 : 500, sh: mode === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
       people: ps.map((p, k) => {
         const v = val(p, k), tk = E ? takenOf(E.id, p.id) : 0, full = mode === "cnt" && v > 0 && tk >= v;
         // By %: typing one person's % spreads the rest evenly over those not yet edited (always 100); edited people keep
@@ -155,23 +184,32 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
           putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] } });
         };
         return { name: p.name, v: String(v), set: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(dig(e)) : putB({ pv: { ...B0.pv, [p.id]: dig(e) } }),
-          note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "#A3371A" : "#806B60" };
-      }),
+          note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "var(--crm-oxblood)" : "var(--crm-muted)", locked: false };
+      }).concat(lockedHere.map(p => ({ name: p.name, v: "", set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
       sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
-      sumFg: ok ? "#387557" : "#A3371A",
+      sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
+      locked: lockedHere.length ? lockedHere.map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
     };
   }
   if (B && E && asv?.ae) {
+    // The Revenue Director's row too (mig 20261016010000): Save counted the teams alone, so a split giving the director any
+    // share never reached 100 and Save stayed grey (the owner, 2026-10-18).
+    const T = asv.adTeams ?? teams;
     const split = E.split;
-    bp.inner = teams.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
-    const tot = teams.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
+    bp.inner = T.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
+    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
     const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
-    teams.forEach(t => {
+    T.forEach(t => {
       const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
-      const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
+      // What is saved is what the editor shows (a stale % is saved as its even share).
+      const shown = bp.inner.find(x => x.name === t.name);
+      const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = shown ? Number(shown.people[k]?.v ?? 0) : B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
     });
+    // A locked member keeps their saved value for when they are unlocked (the dealer skips them meanwhile).
+    lk.forEach(id => { if (pv[id] == null && B.pv[id] != null) pv[id] = B.pv[id]; });
     if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
-    aeSave = { saveBg: ok ? "#2F6FB5" : "#C9D6E6", save: ok ? () => {
+    const why = tot !== 100 ? "The teams add up to " + tot + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
+    aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
         if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
@@ -182,7 +220,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   // Round 2 (rev 1011 §8): "Save and apply to all N ads" — this ad's whole setting (the split, every team's inside mode
   // and values) saved to EVERY ad, each keeping its own name and taken counts; one crm_save_ad_assign per ad, each dealing
   // its own waiting leads. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
-  const aeApply = { applyLabel: "", applyFg: "#C9D6E6", applyBd: "#DCE6F2", applyCur: "default", applyAll: undefined as (() => void) | undefined };
+  const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined };
   if (E && asv?.ae) {
     const mp = new Map<string, string>();
     data.customers.forEach(c => { if (c.adId) mp.set(c.adId, c.ad); });
@@ -191,7 +229,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const all = [...mp], okAll = isSp ? !!byTeamRule : !!asv.ae.save;
     const ruleFor = (): CrmRuleIn | null => isSp ? byTeamRule : E.mode === "unset" ? null : { mode: "even", split: { ...E.split }, pm: E.pm, pp: { ...E.pp } };
     Object.assign(aeApply, {
-      applyLabel: "Save and apply to all " + all.length + " ads", applyFg: okAll ? "#2F6FB5" : "#C9D6E6", applyBd: okAll ? "#2F6FB5" : "#DCE6F2", applyCur: okAll ? "pointer" : "default",
+      applyLabel: "Save and apply to all " + all.length + " ads", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
       applyAll: okAll ? () => void (async () => {
         const r = ruleFor();
         if (r) for (const [id, label] of all) if (!(await act.saveAdRule(id, label, r))) return;
@@ -203,7 +241,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   // The ad cards (compact): a legend per team, and "N waiting" when a full By max team holds leads of that ad.
   const adRows = (asv?.adRows ?? []).map(row => {
     const r = data.adRules.find(x => x.label === row.name), tm = r?.tm ?? {}, sp = r && (r.mode === "split" || r.mode === "people") ? r.split : null;
-    const leg = sp ? teams.filter(t => (sp[t.id] || 0) > 0).map(t => ({ c: t.c, name: t.name.replace(/^Team /, ""), pct: sp[t.id] + "%", mode: tm[t.id] === "cnt" ? " · max" : tm[t.id] === "even" ? " · evenly" : "" })) : [];
+    const leg = sp ? (asv?.adTeams ?? teams).filter(t => (sp[t.id] || 0) > 0).map(t => ({ c: t.c, name: t.name.replace(/^Team /, ""), pct: sp[t.id] + "%", mode: tm[t.id] === "cnt" ? " · max" : tm[t.id] === "even" ? " · evenly" : "" })) : [];
     const hn = heldC.filter(c => c.ad === row.name).length;
     return { ...row, held: hn > 0, heldTxt: hn + " waiting", hasLeg: !!leg.length, leg, tag: row.tag === "Evenly · default" ? "Not set · evenly" : row.tag };
   });
@@ -220,7 +258,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
         edit: () => { patch({ hlOpen: false }); const row = asv?.adRows.find(x => x.name === ad); if (row) setTimeout(() => row.edit(), 0); },
         rows: cs.map((c, k) => {
           const lastIn = [...c.messages].reverse().find(m => m.from === "lead"), at = new Date((lastIn ?? c.messages[0])?.at ?? c.createdAt), mins = Math.round((now.getTime() - at.getTime()) / 6e4);
-          return { name: c.name, rule: k ? "1px solid #F3E9E1" : "0", meta: (c.channel === "messenger" ? "Messenger" : "WhatsApp") + " · waiting " + (mins < 60 ? mins + " min" : Math.floor(mins / 60) + " h"),
+          return { name: c.name, rule: k ? "1px solid var(--crm-rule-soft)" : "0", meta: (c.channel === "messenger" ? "Messenger" : "WhatsApp") + " · waiting " + (mins < 60 ? mins + " min" : Math.floor(mins / 60) + " h"),
             chat: () => patch({ lead: c.id, pick: "", toast: "" }), send: () => patch({ sendFor: c.id, sdSel: null }) };
         }) };
     }),

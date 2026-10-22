@@ -53,7 +53,7 @@ export interface QModule {
 export interface QModel {
   key: string;
   name: string;
-  /** What a search also reads: the prototype's `desc`; the Product List has none. */
+  /** What a search also reads: the prototype's `desc`; from the Product List, a sofa's code (5071), which its name alone does not show. */
   desc: string;
   /** A mattress: the SKU of each size it comes in. */
   sizes: Partial<Record<SizeKey, string>>;
@@ -289,7 +289,8 @@ export function catalogFromProducts(
     if (kind === "SOFA") {
       sofa = true;
       const key = p.modelId ?? p.baseModel ?? p.name;
-      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
+      // A named sofa is shown by its name alone (2026-10-20); its code stays searchable.
+      const model = models.get(key) ?? { key, name: p.name, desc: (p.baseModel ?? "").trim(), sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
       const code = (p.moduleCode ?? p.size ?? "").trim() || p.code;
       const info = moduleInfo(code);
       model.modules.push({ code, desc: info.desc, seats: info.seats, chaise: info.chaise, productId: p.id, options: p.options ?? [] });
@@ -337,6 +338,13 @@ export function sizesText(model: QModel): string {
   return SIZES.filter(z => model.sizes[z.key]).map(z => z.label).join(" · ");
 }
 
+/** *All models*' search: a model by its name, its `desc` (a sofa's code), its sizes or its modules. `q` comes trimmed and in small letters. */
+export function modelMatches(model: QModel, q: string): boolean {
+  if (!q) return true;
+  const hay = [model.name, model.desc, sizesText(model), ...model.modules.map(x => `${x.code} ${x.desc}`)].join(" ").toLowerCase();
+  return hay.includes(q);
+}
+
 /** The size a sheet opens on: Queen when the model has it, else the nearest one. */
 export function defaultSize(sizes: Partial<Record<SizeKey, string>>, wanted: SizeKey = "Q"): SizeKey {
   if (sizes[wanted]) return wanted;
@@ -349,6 +357,16 @@ export function accAt(acc: QAcc, size: SizeKey | null): { productId: string; siz
   if (size && acc.sizes[size]) return { productId: acc.sizes[size]!, size };
   if (acc.any) return { productId: acc.any, size: null };
   return null;
+}
+
+/** Every SKU that can be bought separately, with fitted sizes in bed-size order. */
+export function accVariants(acc: QAcc): { productId: string; size: SizeKey | null }[] {
+  const variants: { productId: string; size: SizeKey | null }[] = acc.any ? [{ productId: acc.any, size: null }] : [];
+  for (const size of ["S", "SS", "Q", "K", "SK"] as const) {
+    const productId = acc.sizes[size];
+    if (productId) variants.push({ productId, size });
+  }
+  return variants;
 }
 
 // ── the sheet ─────────────────────────────────────────────────────────────
@@ -377,7 +395,8 @@ export type SheetState =
       leg: string | null; specials: string[];
     }
   | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
-  | { mode: "acc"; size: SizeKey; acc: Record<string, number>; accAll: boolean };
+  /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
+  | { mode: "acc"; acc: Record<string, number>; accAll: boolean };
 
 /** The first bed frame that comes in a size, A–Z; empty when none does. */
 export function firstFrame(catalog: QCatalog, size: SizeKey): string {
@@ -432,11 +451,13 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
   }
   if (sh.mode === "model" || sh.mode === "acc") {
     for (const acc of catalog.accs) {
-      const n = (sh.acc[acc.key] ?? 0) * sets;
-      if (!n) continue;
-      const at = accAt(acc, sh.size);
-      if (!at) continue;
-      push(out, { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty: n, productId: at.productId });
+      const variants = sh.mode === "acc" ? accVariants(acc) : [accAt(acc, sh.size)];
+      for (const at of variants) {
+        if (!at) continue;
+        const n = (sh.acc[sh.mode === "acc" ? at.productId : acc.key] ?? 0) * sets;
+        if (!n) continue;
+        push(out, { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty: n, productId: at.productId });
+      }
     }
   }
   return out;
@@ -542,7 +563,8 @@ const sameFrame = (a: RecentFrame, b: RecentFrame) =>
   a.size === b.size && a.frame === b.frame && a.kpi.join() === b.kpi.join() && bedframeKey(a.build) === bedframeKey(b.build);
 
 /** What adding a sheet teaches the memory (the prototype's `addSheet`). */
-export function remember(memory: QuoteMemory, sh: SheetState, brand: string): QuoteMemory {
+export function remember(memory: QuoteMemory, sh: SheetState, catalog: QCatalog): QuoteMemory {
+  const brand = catalog.brand;
   const next: QuoteMemory = { sets: { ...memory.sets }, layouts: { ...memory.layouts }, frames: memory.frames, accs: { ...memory.accs } };
   const sets = next.sets[brand] ?? [];
   if (sh.mode === "sofa") {
@@ -561,7 +583,9 @@ export function remember(memory: QuoteMemory, sh: SheetState, brand: string): Qu
     next.frames = [f, ...memory.frames.filter(r => !sameFrame(r, f))].slice(0, 3);
   }
   if (sh.mode === "model" || sh.mode === "acc") {
-    const used = Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k);
+    const used = sh.mode === "acc"
+      ? catalog.accs.filter(acc => accVariants(acc).some(at => (sh.acc[at.productId] ?? 0) > 0)).map(acc => acc.key)
+      : Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k);
     if (used.length) next.accs[brand] = [...used, ...(memory.accs[brand] ?? []).filter(k => !used.includes(k))].slice(0, 12);
   }
   return next;

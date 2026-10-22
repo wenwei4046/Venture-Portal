@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AddStaffForm, { type AddStaffDepartment } from './AddStaffForm'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
@@ -6,6 +6,10 @@ import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staf
 const actions = vi.hoisted(() => ({ addStaff: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => actions)
+// Each test waits for ITS OWN submit (CI flake on #582, 2026-10-20): the submit awaits Malaysia's list before it calls
+// addStaff, so on a busy runner `toHaveBeenCalled` passed on an earlier test's call and read its empty address — and
+// the late call then landed in the next test.
+beforeEach(() => { actions.addStaff.mockClear() })
 
 const departments: AddStaffDepartment[] = [
   { id: 'revenue', name: 'Revenue Department', payroll_source: 'commission', segment_key: 'revenue' },
@@ -112,5 +116,46 @@ describe('Add Staff — the sub-department and the reporting line', () => {
     fireEvent.change(department, { target: { value: 'marketing' } })
     expect(base.value).toBe('')
     expect(upline.value).toBe('')
+  })
+})
+
+// The address in six parts (2026-10-20): State → City → Postcode picked from Malaysia's list, the form carrying the
+// six by their columns' names; three that are not one place are refused before anything is sent.
+describe('Add Staff — the address', () => {
+  const field = (key: string) => document.getElementById(`staff-address-${key}`) as HTMLInputElement | HTMLSelectElement
+  const listed = () => waitFor(() => expect(field('state')).not.toBeDisabled())
+  const submit = () => act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+
+  it('files the six parts picked in turn', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 8, Jalan Mawar 2' } })
+    fireEvent.change(field('state'), { target: { value: 'Johor' } })
+    fireEvent.change(field('city'), { target: { value: 'Rengit' } })
+    expect(field('postcode')).toHaveValue('83100')
+
+    await submit()
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(Object.fromEntries([...sent.entries()].filter(([key]) => key.startsWith('address')))).toEqual({
+      address_line1: 'No 8, Jalan Mawar 2', address_line2: '', address_state: 'Johor', address_city: 'Rengit',
+      address_postcode: '83100', address_country: 'Malaysia',
+    })
+  })
+
+  it('asks for the postcode before sending anything', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 83, Jalan Jambu 3' } })
+    fireEvent.change(field('state'), { target: { value: 'Pulau Pinang' } })
+    fireEvent.change(field('city'), { target: { value: 'Bukit Mertajam' } })
+
+    await submit()
+    expect(await screen.findByText('Pick the postcode.')).toBeInTheDocument()
+    expect(actions.addStaff).not.toHaveBeenCalled()
   })
 })

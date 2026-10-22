@@ -10,7 +10,9 @@ import {
   erpAllows,
   isRestricted,
   isRiderModel,
+  leadNameOf,
   MAINTENANCE_SECTIONS,
+  modelLabelOf,
   needsBrandPick,
   optionKeysOf,
   RIDER,
@@ -18,6 +20,7 @@ import {
   sizeWordOf,
   skuKeyOf,
   skuOptionLabel,
+  takesModelName,
 } from './options'
 import { isPricedPool, poolPriceOf, POOLS } from './pricing'
 
@@ -338,5 +341,32 @@ describe('skuOptionLabel', () => {
     expect(skuOptionLabel(sku({ category: 'SOFA', item_code: '8030-SET' }))).toBe('8030-SET')
     expect(skuOptionLabel(sku({ category: 'BEDFRAME', item_code: 'BF-1' }))).toBe('BF-1')
     expect(skuOptionLabel(sku({ category: 'ACCESSORY', size_code: 'K', module_code: 'X', item_code: 'PIL-1' }))).toBe('PIL-1')
+  })
+})
+
+// 2026-10-19, the user: "sofa category same as mattress have the model name … then it can be add and edit, on here".
+describe('a model name of the portal’s own', () => {
+  it('is offered for a sofa only — a mattress’s or a bed frame’s model is its name already', () => {
+    expect(['SOFA', 'sofa', ' Sofa '].map(takesModelName)).toEqual([true, true, true])
+    expect(['MATTRESS', 'BEDFRAME', 'ACCESSORY', 'FABRIC_ACCESSORY', '', null].map(takesModelName)).toEqual([false, false, false, false, false, false])
+  })
+
+  it('names a model in a list as its code and its name, never the code twice', () => {
+    expect(modelLabelOf('5066', 'ROMA')).toBe('5066 · ROMA')
+    expect(modelLabelOf('5066', '5066')).toBe('5066')
+    expect(modelLabelOf('5066', null)).toBe('5066')
+    expect(modelLabelOf('5066', '')).toBe('5066')
+  })
+
+  // The user, on 5071's card: "以名字先，然后下面再 code … 只要你一下名字，就这样子倒反".
+  it('leads a named sofa with its name — its own or the ERP’s — and every other model with its code', () => {
+    expect(leadNameOf('SOFA', '5071', 'AAAA')).toBe('AAAA')
+    expect(leadNameOf('sofa', '5535', 'NOVA')).toBe('NOVA')
+    expect(leadNameOf('SOFA', '5066', null)).toBeNull()
+    expect(leadNameOf('SOFA', '5066', '')).toBeNull()
+    expect(leadNameOf('SOFA', '5066', '5066')).toBeNull()
+    expect(leadNameOf('MATTRESS', 'APEX', 'Apex Firm')).toBeNull()
+    expect(leadNameOf('BEDFRAME', 'BF-1', 'Oslo')).toBeNull()
+    expect(leadNameOf(null, 'X', 'Y')).toBeNull()
   })
 })

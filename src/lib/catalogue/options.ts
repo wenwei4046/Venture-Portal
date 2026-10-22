@@ -167,6 +167,33 @@ export function isRiderModel(category: string | null, brandPick: string | null):
   return brandPick === RIDER
 }
 
+/**
+ * Whether Modular offers a model a name of the portal's own (2026-10-19, user:
+ * "sofa category same as mattress have the model name … then it can be add and
+ * edit"): a sofa only. A mattress's model IS its name (APEX); a sofa's is a
+ * number (5066), and the ERP names a dozen of them. Kept in
+ * `catalogue_models.model_name`, shown before the ERP's own name.
+ */
+export function takesModelName(category: string | null): boolean {
+  return (category ?? '').trim().toUpperCase() === 'SOFA'
+}
+
+/** A model as a list names it: `5066 · ROMA`, or the code alone when it has no other name. */
+export function modelLabelOf(code: string, name: string | null): string {
+  return name && name !== code ? `${code} · ${name}` : code
+}
+
+/**
+ * The name a sofa leads with where its name and code are drawn one above the
+ * other — a Modular card, the window's title, SKU Master's MODEL cell — its
+ * code under it (2026-10-19, the user: "以名字先，然后下面再 code … 只要你一下
+ * 名字，就这样子倒反"). Null for a sofa with no name of its own (the code
+ * leads) and for every other category, whose code leads as before.
+ */
+export function leadNameOf(category: string | null, code: string | null, name: string | null): string | null {
+  return takesModelName(category) && name && name !== code ? name : null
+}
+
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
 export function calcCategoryOf(category: string | null, name: string | null): string {
   const c = (category ?? '').trim().toUpperCase()

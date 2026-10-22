@@ -24,11 +24,13 @@ function sources(dir: string): string[] {
 }
 
 // The portal's pages and the shared pieces they are built from. Not the phone
-// apps (components/member, components/hr-app), and not a PDF / CSV export
+// apps (components/member, components/hr-app), nor Me (components/me — the
+// Staff App, a phone module the user asked for word for word, 2026-10-17,
+// whose sub lines are the handoff's), and not a PDF / CSV export
 // (`export/`, `_format/`): a document is not the view.
 const files = [
   ...sources(resolve(ROOT, 'src/app/(portal)')),
-  ...sources(resolve(ROOT, 'src/components')).filter(path => !/[\\/]components[\\/](member|hr-app)[\\/]/.test(path)),
+  ...sources(resolve(ROOT, 'src/components')).filter(path => !/[\\/]components[\\/](member|hr-app|me)[\\/]/.test(path)),
 ]
   .filter(path => !/[\\/](export|_format)[\\/]/.test(path))
   .map(path => ({ at: where(path), text: readFileSync(path, 'utf8') }))

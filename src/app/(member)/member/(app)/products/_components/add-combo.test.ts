@@ -51,9 +51,52 @@ describe('Add combo', () => {
     expect(moduleSum([], 'PRICE_2', '28')).toBeNull()
   })
 
+  it('a piece priced 0 there is not sold there (2026-10-21: 0 = 还没定价) — never a set total at RM 0', () => {
+    const zero = comboPieces([sku('8069-1A(LHF)', '1A(LHF)', { baseModel: '8069', grid: [{ height: '35', tier: 'PRICE_1', price: 0 }, { height: '28', tier: 'PRICE_1', price: 750 }] })], '8069')
+      .map(p => ({ ...p, n: 1 }))
+    expect(moduleSum(zero, 'PRICE_1', '35')).toBeNull()
+    expect(moduleSum(zero, 'PRICE_1', '28')).toBe(750)
+  })
+
   it('knows the same compartments whatever their order', () => {
     expect(sameCompartments(erp, [['CNR'], ['1NA']])).toBe(true)
     expect(sameCompartments(erp, [['1NA'], ['2NA']])).toBe(false)
+  })
+
+  // 2026-10-21: the ERP keeps the SOFFIO console as 8030-Console and a retired 8030-CONSOLE. Two cards let a set be
+  // made on the one no quote sells — and it never costed a quote.
+  describe('a module spelled two ways (2026-10-21)', () => {
+    const consoles = [
+      sku('8030-1A(LHF)', '1A(LHF)'),
+      sku('8030-1A(RHF)', '1A(RHF)'),
+      sku('8030-CONSOLE', 'CONSOLE', { active: false }),
+      sku('8030-Console', 'Console', { grid: [{ height: '35', tier: 'PRICE_1', price: 700 }] }),
+    ]
+    const made: ComboRow = {
+      ...erp, label: '1A(LHF) + 1A(RHF) + CONSOLE', slots: [['1A(LHF)'], ['1A(RHF)'], ['CONSOLE']],
+      slotsKey: '[["1A(LHF)"], ["1A(RHF)"], ["CONSOLE"]]', tier: 'PRICE_1',
+    }
+
+    it("is one card, the live SKU's spelling and prices, where the module first shows", () => {
+      const pieces = comboPieces(consoles, '8030')
+      expect(pieces.map(p => [p.key, p.code])).toEqual([
+        ['1A(LHF)', '8030-1A(LHF)'], ['1A(RHF)', '8030-1A(RHF)'], ['either:1A', 'LHF / RHF'], ['Console', '8030-Console'],
+      ])
+      expect(pieces[3].grid).toEqual([{ height: '35', tier: 'PRICE_1', price: 700 }])
+    })
+
+    it('keeps a retired spelling only when no live SKU has the module', () => {
+      expect(comboPieces([sku('8030-CONSOLE', 'CONSOLE', { active: false })], '8030').map(p => p.code)).toEqual(['8030-CONSOLE'])
+    })
+
+    it('knows a set the model has in another case', () => {
+      expect(sameCompartments(made, [['Console'], ['1A(RHF)'], ['1A(LHF)']])).toBe(true)
+      const check = checkCombo(
+        draft({ pcs: { '1A(LHF)': 1, '1A(RHF)': 1, Console: 1 }, prices: { 'PRICE_1#35': '2140' } }),
+        comboPieces(consoles, '8030'), ['35'], [made],
+      )
+      expect(check.problem).toBe('This model already has a combo with these compartments.')
+    })
   })
 
   it('checks in the window order: model, pieces, a number, a price, the set, the name', () => {

@@ -48,18 +48,7 @@ const users = [
 async function main() {
   console.log('Seeding test users...\n')
 
-  // Get departments to link dept_manager (Phase 2 ready)
-  const { data: depts } = await supabase.from('departments').select('id, name')
-  const marketingDept = depts?.find((d) => d.name === 'Marketing')
-
-  if (marketingDept) {
-    users.push({
-      email: 'marketing@venture.my',
-      name: 'Marketing Manager',
-      role: 'dept_manager',
-      department_id: marketingDept.id,
-    })
-  }
+  // (marketing@, the Dept Manager, went with the kind on 2026-10-17.)
 
   // List existing auth users once
   const { data: listData, error: listError } = await supabase.auth.admin.listUsers()

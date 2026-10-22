@@ -13,6 +13,7 @@ import { canDo } from '@/lib/permission-actions'
 import { opensPath } from '@/lib/page-tabs'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { statementDepts, statementPath, type StatementDept } from '@/lib/dept-statements'
+import { AREA_OF_VIEW, reachesSub, subsInReach, type Reach } from '@/lib/sub-department-reach'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -22,7 +23,6 @@ import {
   canAccessDirectorPool,
   canAccessDirectorSalary,
   canAccessDocumentation,
-  canAccessMyBilling,
   canAccessOpex,
   canAccessReconciliation,
   canAccessReports,
@@ -154,8 +154,10 @@ const isHR = (v: NavViewer) => v.role === 'hr'
  *  Principal): Dept Pool lists each department's own P&L and Cash Flow
  *  (2026-10-09, user: 我要把每个 department 的 cash flow, P&L 放过来). */
 export const readsDeptStatements = (v: NavViewer) => canDo(v, 'dept_pool', 'view') && reportsCompanyWide(v)
-const keepsPoolBases = (v: NavViewer) => canAccessDeptPool(v) && !readsDeptStatements(v)
 const isHRorPrincipal = (v: NavViewer) => canAccessTeam(v)
+/** Cash Flow, Receipt & Payment and Debtor Aging: their own key (Department reports) and the reports company-wide
+ *  — the Dept Manager's own-department reading went with the kind (2026-10-17). */
+const readsDeptReports = (v: NavViewer) => canAccessDeptReports(v) && canAccessReports(v)
 
 /**
  * The parts of the nav that cannot be written down ahead of time.
@@ -171,20 +173,66 @@ export interface NavData {
    *  (2026-10-10): the one last picked on a Revenue page's switcher (a cookie),
    *  else the first. Null while there is none. */
   revenueSub?: string | null
+  /** Each Revenue page's link (2026-10-16 — sub-departments per person): the
+   *  sub-department it opens, `revenueSub` where the viewer reaches it on that
+   *  page, else the first they do there; null leaves the link out. Left out =
+   *  `revenueSub` for all three. */
+  revenueSubFor?: RevenueSubFor
+  /** The slugs the viewer reaches on each Revenue page — so a Revenue page's
+   *  own sub-department moves only the links that reach it. */
+  revenueReach?: Readonly<Record<RevenueNavView, readonly string[]>>
   /** Dept Pool's departments (2026-10-09): the five, then the registry's
    *  added ones — IT, Revenue Department. Left out = the five alone. */
   deptPoolDepts?: StatementDept[]
 }
 
+/** Revenue's three pages, by the switcher's names: Comm Cal, Sales Groups, Rules. */
+export type RevenueNavView = keyof typeof AREA_OF_VIEW
+export type RevenueSubFor = Readonly<Record<RevenueNavView, string | null>>
+
 export const emptyNavData: NavData = { revenueSubDepts: [] }
 
-/** On a Revenue page the links follow that page's own sub-department. */
+/**
+ * The Revenue part of the nav for one viewer (2026-10-16): the sub-departments
+ * they reach on any Revenue page (the old single list), the one last picked if
+ * they reach it, and per page the one its link opens — the picked one where
+ * they reach it there, else the home one, else the first; none, no link.
+ */
+export function revenueNavData(
+  subs: ReadonlyArray<{ id: string; slug: string; name: string; isHome: boolean }>,
+  reach: Reach | null | undefined,
+  picked: string | undefined,
+): Pick<NavData, 'revenueSubDepts' | 'revenueSub' | 'revenueSubFor' | 'revenueReach'> {
+  const views = Object.keys(AREA_OF_VIEW) as RevenueNavView[]
+  const inView = (view: RevenueNavView) => subsInReach(subs, reach, AREA_OF_VIEW[view])
+  const pick = (list: typeof subs) => (list.find(s => s.slug === picked) ?? list.find(s => s.isHome) ?? list[0])?.slug ?? null
+  const union = subs.filter(s => views.some(v => reachesSub(reach, AREA_OF_VIEW[v], s.id)))
+  return {
+    revenueSubDepts: union.map(s => ({ slug: s.slug, name: s.name })),
+    revenueSub: pick(union),
+    revenueSubFor: Object.fromEntries(views.map(v => [v, pick(inView(v))])) as RevenueSubFor,
+    revenueReach: Object.fromEntries(views.map(v => [v, inView(v).map(s => s.slug)])) as Record<RevenueNavView, string[]>,
+  }
+}
+
+/** Each Revenue page's link: `revenueSubFor`, else `revenueSub` for all three. */
+export function revenueSubsOf(data: Pick<NavData, 'revenueSub' | 'revenueSubFor'>): RevenueSubFor {
+  const one = data.revenueSub ?? null
+  return data.revenueSubFor ?? { cc: one, sg: one, rules: one }
+}
+
+/** On a Revenue page the links follow that page's own sub-department — each link only where its page reaches it. */
 export function withPathRevenueSub(data: NavData, pathname: string): NavData {
   const parts = pathname.split('/').filter(Boolean)
   if (parts[0] !== 'revenue' || !parts[1]) return data
   const slug = parts[1]
-  if (slug === data.revenueSub || !data.revenueSubDepts.some(s => s.slug === slug)) return data
-  return { ...data, revenueSub: slug }
+  if (!data.revenueSubDepts.some(s => s.slug === slug)) return data
+  const before = data.revenueSubFor
+  const follow = (v: RevenueNavView) => (data.revenueReach?.[v]?.includes(slug) ? slug : before![v])
+  const subFor: RevenueSubFor | undefined = before ? { cc: follow('cc'), sg: follow('sg'), rules: follow('rules') } : undefined
+  const same = slug === data.revenueSub && (!before || (subFor!.cc === before.cc && subFor!.sg === before.sg && subFor!.rules === before.rules))
+  if (same) return data
+  return { ...data, revenueSub: slug, ...(subFor ? { revenueSubFor: subFor } : {}) }
 }
 
 /**
@@ -218,6 +266,7 @@ function withTabGates(entries: NavEntry[]): NavEntry[] {
 
 // Layout per user spec 2026-06-10 (re-grouped from the original phase layout).
 function navEntries(data: NavData): NavEntry[] {
+  const subs = revenueSubsOf(data)
   return [
     { href: '/dashboard', label: 'Overview', visible: () => true },
 
@@ -278,20 +327,16 @@ function navEntries(data: NavData): NavEntry[] {
       section: 'Departments',
       visible: canAccessDeptPool,
       children: [
-        // A department manager (and whoever reads one department, or no
-        // reports) keeps the two bases. Listed first so the activity log keeps
-        // naming /dept-pool "Dept Pool · Cash".
-        { href: '/dept-pool', label: 'Cash', notBasis: ['accrual'], visible: keepsPoolBases },
-        { href: '/dept-pool?basis=accrual', label: 'Accrual P&L', basis: 'accrual', visible: keepsPoolBases },
-        // Whoever reads them all (2026-10-09): the overview — Cash | Accrual
-        // P&L switched in its head — then each department's own P&L and Cash
-        // Flow. A department still lights on the pool page it already had.
+        // The overview — Cash | Accrual P&L switched in its head — for whoever
+        // reaches the pool; then, for whoever also reads the reports
+        // (2026-10-09), each department's own P&L and Cash Flow. A department
+        // still lights on the pool page it already had.
         {
           href: '/dept-pool',
           label: 'Overview',
           exact: true,
           alsoPaths: ['/dept-pool/submissions', '/dept-pool/contracts'],
-          visible: readsDeptStatements,
+          visible: canAccessDeptPool,
         },
         ...(data.deptPoolDepts ?? statementDepts([])).map((d) => ({
           href: statementPath(d.slug),
@@ -306,16 +351,11 @@ function navEntries(data: NavData): NavEntry[] {
     // when reasoning about money flow. Not under Treasury — Loo grouped it here.
     { href: '/venture-pool', label: 'Venture Pool', section: 'Departments', visible: canAccessVenturePool },
     // OPEX shows a department's payroll breakdown (per-employee Basic / KPI /
-    // Allowance / ER statutory). Dept Manager sees own dept only; Principal
-    // picks any dept via the in-page switcher.
+    // Allowance / ER statutory); whoever reads it picks the department in the
+    // page's switcher.
     { href: '/opex', label: 'OPEX', section: 'Departments', visible: canAccessOpex },
-    // Dept-manager billing workbench (2026-08-20): own-segment invoices with
-    // 回款 status, 开单 (draft-only), contract tracking with expiry.
-    { href: '/my-billing', label: 'My Billing', section: 'Departments', visible: canAccessMyBilling },
-    // Marketing dept_manager can create service contracts for their dept
-    // (mig 207 RLS). The page self-gates on Marketing dept — other dept_managers
-    // clicking this would hit notFound().
-    { href: '/billing/contracts/new', label: 'New Contract', section: 'Departments', visible: canAccessMyBilling },
+    // My Billing and its New Contract (the Dept Manager's, 2026-08-20) went
+    // with the kind (2026-10-17); a contract is made from Invoices.
     {
       label: 'Director',
       section: 'Departments',
@@ -350,24 +390,25 @@ function navEntries(data: NavData): NavEntry[] {
       label: 'Revenue',
       section: 'Departments',
       visible: canAccessRevenue,
+      // Each page opens a sub-department the viewer reaches there (2026-10-16); none, no link.
       children: [
-        ...(data.revenueSub
+        ...(subs.cc
           ? [
               {
-                href: revenuePath(data.revenueSub),
+                href: revenuePath(subs.cc),
                 // "Comm Cal", not "Commission Calculation" (user 2026-09-01).
                 // A month opened from the calculation list — /revenue/fair/
                 // 2026-08-01 and the import, open-bill and statement pages
                 // under it — is still Calculation, so no `exact` here.
                 label: 'Comm Cal',
-                notPaths: [revenuePath(data.revenueSub, 'hierarchy'), revenuePath(data.revenueSub, 'rules')],
+                notPaths: [revenuePath(subs.cc, 'hierarchy'), revenuePath(subs.cc, 'rules')],
                 visible: canAccessRevenue,
               },
-              // Was "Staff Hierarchy" (renamed 2026-10-10).
-              { href: revenuePath(data.revenueSub, 'hierarchy'), label: 'Sales Groups', visible: canAccessRevenue },
-              { href: revenuePath(data.revenueSub, 'rules'), label: 'Rules', visible: canAccessRevenue },
             ]
           : []),
+        // Was "Staff Hierarchy" (renamed 2026-10-10).
+        ...(subs.sg ? [{ href: revenuePath(subs.sg, 'hierarchy'), label: 'Sales Groups', visible: canAccessRevenue }] : []),
+        ...(subs.rules ? [{ href: revenuePath(subs.rules, 'rules'), label: 'Rules', visible: canAccessRevenue }] : []),
         // Venues went on 2026-09-27: the ERP names every bill's fair — venue,
         // organiser and days — so nothing about a fair is typed here any more.
         // The department as a whole (2026-09-30): its mode, cost center or
@@ -414,25 +455,21 @@ function navEntries(data: NavData): NavEntry[] {
     {
       label: 'Reports',
       section: 'Reports & Admin',
-      // dept_manager sees the group for their own-department reports (P&L / Cash
-      // Flow / Debtor Aging); the whole-company reports below stay principal/finance.
-      visible: canAccessDeptReports,
+      visible: canAccessReports,
       children: [
-        // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
-        // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
+        // Each statement page carries a Single month ｜ Month by month switch
+        // in its head (ReportModeSwitch, 2026-10-09), so the Monthly * entries
         // no longer need their own sidebar rows.
-        // P&L opens month by month for whoever reads the reports company-wide
-        // (2026-10-09, the Finance revamp handoff: "P&L defaults to Monthly
-        // P&L"); a department manager's still opens their single month.
+        // P&L opens month by month (2026-10-09, the Finance revamp handoff:
+        // "P&L defaults to Monthly P&L").
         { href: '/reports/monthly-pnl', label: 'P&L', alsoPaths: ['/reports/income-statement'], visible: canAccessReports },
-        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: (v) => canAccessDeptReports(v) && !canAccessReports(v) },
-        { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
-        { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
+        { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: readsDeptReports },
+        { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: readsDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
         { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
         // Fund Summary + Claims Report dropped from the menu (user 2026-09-15
         // "remove 掉"); routes still exist for direct links.
-        { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
+        { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: readsDeptReports },
         { href: '/reports/loan-aging', label: 'Loan Aging', visible: canAccessReports },
         { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
       ],
@@ -606,22 +643,14 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
   ],
-  // Dept managers see one department. Billing and OPEX are the two pages they
-  // live in; reports is their read-only rollup.
-  dept_manager: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/my-billing', label: '账单', icon: 'billing' },
-    { href: '/opex', label: 'OPEX', icon: 'staff' },
-    { href: '/reports/income-statement', label: '报表', icon: 'report' },
-  ],
 }
 
 export function tabsForRole(role: UserRole): TabDef[] {
-  return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.dept_manager
+  return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.staff
 }
 
 /** The fifth tab's label. Finance's and the Principal's bar reads in English
- *  (2026-10-07, user: "下面还是华语字体"); HR's and a department manager's as it was. */
+ *  (2026-10-07, user: "下面还是华语字体"); HR's as it was. */
 export function moreTabLabel(role: UserRole): string {
   return role === 'finance' || role === 'principal' || role === 'staff' ? 'More' : '更多'
 }

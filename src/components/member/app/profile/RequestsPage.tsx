@@ -9,7 +9,7 @@ import s from "./profile.module.css";
 export type RequestFilter = "all" | RequestKindVM;
 
 const NEW: { kind: RequestKindVM; title: string; sub: string; d: string; tone: string }[] = [
-  { kind: "claim", title: "Submit claim", sub: "Outstation and Airbnb stays", d: ICON.receipt, tone: s.newClaim },
+  { kind: "claim", title: "Submit transport claim", sub: "Outstation and Airbnb stays", d: ICON.receipt, tone: s.newClaim },
   { kind: "food", title: "Submit food claim", sub: "Meals on the days you worked a fair", d: ICON.food, tone: s.newFood },
   { kind: "replacement", title: "Submit replacement", sub: "Replacements, transfers and exits", d: ICON.team, tone: s.newRepl },
   { kind: "waiting", title: "Submit waiting list", sub: "Joining requests and allocation", d: ICON.calendar, tone: s.newWait },

@@ -48,7 +48,7 @@ describe('describePagePath', () => {
   })
 
   it('ignores a query string', () => {
-    expect(describePagePath('/dept-pool?basis=accrual', L).target).toBe('Dept Pool · Cash')
+    expect(describePagePath('/dept-pool?basis=accrual', L).target).toBe('Dept Pool · Overview')
   })
 
   it('names a data-driven Revenue sub-department', () => {

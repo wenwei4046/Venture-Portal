@@ -37,6 +37,9 @@
 .rosterWrap [role='table'] > :last-child { border-radius: 0 0 10px 10px; }
 .toolbar { margin-bottom: 14px; }
 .search { flex: 1; min-width: 200px; max-width: 440px; }
+/* The department filter (2026-10-20): the kit's soft dropdown, peach once a department is picked. */
+.deptFilter { width: 230px; max-width: 100%; }
+.deptFilter[data-picked='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* A department's band: walnut rule, the cream wash, ▼ that folds it. */
@@ -82,8 +85,10 @@
   font-weight: 500;
 }
 .tile[data-login='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-peach)); }
+/* Their full name, in capitals as an IC writes it — a last name HR typed as "Teoh" reads TEOH CHEA HUAN (2026-10-20). */
 .name {
   font-weight: 500;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

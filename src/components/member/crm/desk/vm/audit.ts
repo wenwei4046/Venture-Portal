@@ -14,7 +14,7 @@ import { arrayDrag } from "./columns";
 import { MON } from "./insight";
 
 const DAY = 86_400_000;
-const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "#BD4A19", "#FFF0E4"], marketing: ["Marketing", "#2F6FB5", "#E4EDF8"], management: ["Management", "#8E4B6E", "#F3E8EF"] };
+const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "var(--crm-rust)", "var(--crm-tint-attention)"], marketing: ["Marketing", "var(--crm-ink-soft)", "var(--crm-tint-cold)"], management: ["Management", "var(--crm-ink-soft)", "var(--crm-tint-new)"] };
 type E = { cat: "chat" | "marketing" | "management"; at: string; who: string; action: string; target: string; detail: string };
 const AREA: Record<string, string> = { crm_fulltime_rules: "Full time days set", crm_staff: "Work type changed", crm_showrooms: "Showroom changed", crm_forms: "Form edited", crm_templates: "Template changed", crm_channels: "Channel changed" };
 
@@ -61,15 +61,31 @@ function histEvent(h: HistRow): E[] {
     target: h.what, detail: change || (h.op === "INSERT" ? "Added" : h.op === "DELETE" ? "Removed" : "") }];
 }
 
+/** 4a's columns (frame 11): the page an event belongs to, the change named, and its before → after where it has one. */
+const AREAS = ["Inbox", "Calendar", "Assignment", "Showrooms", "Customer form", "Channels"];
+export function facet(e: E): { area: string; change: string; before: string; after: string } {
+  const area = e.cat === "marketing" ? "Assignment" : e.cat === "chat" ? (/^Appointment/.test(e.action) ? "Calendar" : "Inbox")
+    : /^(Full time|Work type)/.test(e.action) ? "Assignment" : /^Showroom/.test(e.action) ? "Showrooms" : /^Form/.test(e.action) ? "Customer form" : "Channels";
+  const m = /^(.*?): (.*) → (.*)$/.exec(e.target), arrow = /^(.*) → (.*)$/.exec(e.target), one = /^([^·]*?): ([^·]*) → ([^·]*)$/.exec(e.detail);
+  if (m) return { area, change: `${e.action} · ${m[1]}`, before: m[2], after: m[3] };
+  if (arrow) return { area, change: `${e.action} · ${arrow[1]}`, before: "—", after: arrow[2] };
+  if (one) return { area, change: `${e.action} · ${e.target} · ${one[1]}`, before: one[2], after: one[3] };
+  const two = /^(.*) → (.*)$/.exec(e.detail);
+  if (two && !e.detail.includes("·")) return { area, change: `${e.action} · ${e.target}`, before: two[1], after: two[2] };
+  return { area, change: e.target ? `${e.action} · ${e.target}` : e.action, before: "—", after: e.detail || "—" };
+}
+
 export function auditVM(ctx: DeskCtx) {
   const { ui, set, patch, now } = ctx;
   const all = ui.tab === "auditlog" ? auditEvents(ctx) : [];
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const lo = ui.auPer === "today" ? T : ui.auPer === "7d" ? T - 6 * DAY : new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const cat = ui.auCat, q = ui.auQ.trim().toLowerCase(), who = ui.auWho;
-  const inCat = all.filter(e => e.cat === cat);
+  // 4a: every area on one list, narrowed by the Area menu (production's three tabs, Chat flow · Marketing · Management, are its areas).
+  const area = ui.auArea, inCat = all.filter(e => area === "all" || facet(e).area === area);
+  void cat;
   const rows = inCat.filter(e => new Date(e.at).getTime() >= lo && (who === "all" || e.who === who) && (!q || `${e.action} ${e.target} ${e.detail} ${e.who}`.toLowerCase().includes(q)));
-  const ppl = [...new Set(inCat.map(e => e.who))];
+  const ppl = [...new Set(all.map(e => e.who))];
   const c = CAT[cat];
   const dayLbl = (t: number) => { const d = new Date(t), s = `${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}`; const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     return d0 === T ? `Today · ${s}` : d0 === T - DAY ? `Yesterday · ${s}` : s; };
@@ -81,15 +97,34 @@ export function auditVM(ctx: DeskCtx) {
       pick: () => patch({ auCat: k as typeof ui.auCat, auWho: "all" }) })),
     auPers: ([["today", "Today"], ["7d", "Last 7 days"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: k === ui.auPer, off: k !== ui.auPer, pick: () => patch({ auPer: k }) })),
     auWhoOpts: [{ label: "Anyone", on: who === "all", pick: () => patch({ auWho: "all" }) }, ...ppl.map(n => ({ label: n, on: who === n, pick: () => patch({ auWho: n }) }))]
-      .map(o => ({ ...o, bg: o.on ? "#3F2B22" : "#fff", fg: o.on ? "#fff" : "#3F2B22", bd: o.on ? "#3F2B22" : "#E2CFC1" })),
+      .map(o => ({ ...o, bg: o.on ? "var(--crm-ink)" : "#fff", fg: o.on ? "#fff" : "var(--crm-ink)", bd: o.on ? "var(--crm-ink)" : "var(--crm-line)" })),
     auQ: ui.auQ, setAuQ: (e: { target: { value: string } }) => patch({ auQ: e.target.value }),
     auStats: [["Changes", String(rows.length), ui.auPer === "today" ? "today" : ui.auPer === "7d" ? "last 7 days" : "this month"], ["People", String(new Set(rows.map(e => e.who)).size), "made a change"],
       ["Last change", rows[0] ? `${dayLbl(new Date(rows[0].at).getTime()).replace(/^(Today|Yesterday) · /, "")} · ${time(rows[0].at)}` : "—", rows[0]?.who ?? ""]].map(([k, v, sub]) => ({ k, v, sub })),
     auRows: rows.map(e => { const d = dayLbl(new Date(e.at).getTime()), showD = d !== prev; prev = d; const sys = e.who === "System" || e.who === "The CRM";
       return { day: showD ? d : "", showDay: showD, time: time(e.at), who: e.who, ini: sys ? "S" : e.who.split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase(),
-        avBg: sys ? "#F2F0EB" : c[2], avFg: sys ? "#6B645A" : c[1], action: e.action, target: e.target, detail: e.detail }; }),
+        avBg: sys ? "var(--crm-field)" : c[2], avFg: sys ? "var(--crm-ink-soft)" : c[1], action: e.action, target: e.target, detail: e.detail }; }),
     auGrid: `${w0[0]}px ${w0[1]}px ${w0[2]}px minmax(160px, 1fr)`,
     auDrag0: mk(0), auDrag1: mk(1), auDrag2: mk(2), auReset: () => patch({ auCols: null }),
-    auEmpty: !rows.length, auHas: rows.length > 0, auClear: () => patch({ auWho: "all", auQ: "" }),
+    // 4a's Export CSV (2026-10-18): the rows on screen — this filter, this search — as a CSV the browser saves.
+    auCount: rows.length,
+    auditCsv: () => {
+      const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+      const lines = [["When", "Who", "Change", "Area", "Before → after"], ...rows.map(e => [new Date(e.at).toISOString(), e.who, e.action, e.target, e.detail ?? ""])];
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.map(l => l.map(x => esc(String(x))).join(",")).join("\n")], { type: "text/csv" }));
+      a.download = "CRM audit log.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    },
+    au4: {
+      open: ui.auOpen, toggle: (k: "who" | "area" | "per") => patch({ auOpen: ui.auOpen === k ? null : k }), close: () => patch({ auOpen: null }),
+      whoLabel: who === "all" ? "Everyone" : who, areaLabel: area === "all" ? "All areas" : area,
+      perLabel: ui.auPer === "today" ? "Today" : ui.auPer === "7d" ? "Last 7 days" : "This month",
+      who: [{ label: "Everyone", on: who === "all", pick: () => patch({ auWho: "all", auOpen: null }) }, ...ppl.map(n => ({ label: n, on: who === n, pick: () => patch({ auWho: n, auOpen: null }) }))],
+      areas: [{ label: "All areas", on: area === "all", pick: () => patch({ auArea: "all", auOpen: null }) }, ...AREAS.map(a => ({ label: a, on: area === a, pick: () => patch({ auArea: a, auOpen: null }) }))],
+      pers: ([["today", "Today"], ["7d", "Last 7 days"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: k === ui.auPer, pick: () => patch({ auPer: k, auOpen: null }) })),
+      rows: rows.map(e => { const f = facet(e), d = dayLbl(new Date(e.at).getTime()), sys = e.who === "System" || e.who === "The CRM";
+        return { time: time(e.at).replace(/\s?(am|pm)$/i, ""), day: d.replace(/ · .*$/, "").replace(/^(\d+ \w+)$/, (x) => { const t = new Date(e.at); return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][t.getDay()]} ${x}`; }),
+          who: e.who, sys, ...f }; }),
+    },
+    auEmpty: !rows.length, auHas: rows.length > 0, auClear: () => patch({ auWho: "all", auQ: "", auArea: "all" }),
   };
 }

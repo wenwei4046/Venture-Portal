@@ -15,9 +15,10 @@ import SubDeptSwitcher from '../../_components/SubDeptSwitcher'
 import { loadSwitcherData, type SwitcherData } from '../../_lib/switcher'
 import type { OrgDepartment, OrgPerson, OrgRank } from './_components/OrgChart'
 import type { OrgDirector } from './_components/org-chart-types'
-import { loadTeam } from '../../_components/config/load'
+import { loadDepartmentPeople, loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
+import { subsInReach } from '@/lib/sub-department-reach'
 import { loadMembershipDestinations } from '../../_lib/membership-destinations'
 import { loadEmployeeDepartmentDestinations } from '../../_lib/employee-destinations'
 
@@ -56,14 +57,16 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   const employmentToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const { sub } = await params
   // The same authenticated/RLS-filtered list used by the sidebar. Only
-  // siblings of this route belong on its overview, not another department.
-  const subDepartments = await listSubDepartments()
+  // siblings of this route belong on its overview, not another department —
+  // and only those the viewer reaches in Sales Groups (2026-10-16: what they
+  // handle, every one when they handle none, their own ticks over it).
+  const subDepartments = subsInReach(await listSubDepartments(), user.reach, 'sales_groups')
   const subDept = subDepartments.find(department => department.slug === sub)
   if (!subDept) notFound()
 
   // Nothing can be charted against a sub-department with no scheme: a rank is
   // a scheme's row, and a position points at one.
-  const switcher = await loadSwitcherData(user, subDept)
+  const switcher = await loadSwitcherData(user, subDept, 'sales_groups')
   const head = <SalesGroupsHead name={subDept.name} switcher={switcher} />
   if (!subDept.schemeId) return <NoScheme subDept={subDept} head={head} />
 
@@ -77,7 +80,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
   // waiting list's form and the places left (Transfer waits while it is full)
   // with them.
   const seesRequests = can(user, 'member_requests_manage')
-  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, replacementForm, capacity] = await Promise.all([
+  const [team, departments, membershipDestinations, employeeDepartments, requests, waitingForm, replacementForm, capacity, departmentPeople] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -98,6 +101,8 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     seesRequests ? loadWaitingForm() : Promise.resolve(null),
     seesRequests ? loadReplacementForm() : Promise.resolve(null),
     seesRequests ? loadSubDepartmentCapacity(subDept.id) : Promise.resolve(null),
+    // "Submitted by" offers the whole department (2026-10-20), not only who the chart draws.
+    seesRequests ? loadDepartmentPeople(subDept.departmentId) : Promise.resolve(null),
   ])
 
   return (
@@ -115,6 +120,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       waitingForm={waitingForm}
       replacementForm={replacementForm}
       capacity={capacity?.ok ? capacity.data : null}
+      departmentPeople={departmentPeople}
       canTransfer={canDo(user, 'team', 'create')}
       canAddToWaiting={seesRequests && canDo(user, 'member', 'manage')}
       head={head}

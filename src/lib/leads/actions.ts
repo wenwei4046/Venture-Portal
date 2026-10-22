@@ -79,7 +79,7 @@ export async function setLeadOutcome(contactId: string, appt: Appt, shown: Shown
 export async function sendTestEnquiry(brandId: string, channel: 'messenger' | 'instagram', name: string, ad: string, body: string, adId = '') {
   await requireActionOn('/leads/settings', 'leads', 'create')
   const sent = await call<string>('lead_simulate', { p_brand: brandId, p_channel: channel, p_name: name, p_ad: ad, p_body: body }, 'The test message was not sent.')
-  // An ad id, as Meta's message from an ad would carry it (mig 20261018100000).
+  // An ad id, as Meta's message from an ad would carry it (mig 20261018110000).
   if (sent.ok && adId.trim()) {
     const tagged = await call<null>('lead_test_ad', { p_contact: sent.data, p_ad_id: adId.trim() }, 'The ad id was not kept.')
     if (!tagged.ok) return tagged
@@ -254,7 +254,7 @@ export async function setOptIn(contactId: string, state: OptIn) {
   return call<null>('lead_set_opt_in', { p_contact: contactId, p_state: state }, 'The consent was not saved.')
 }
 
-// ── Ads: name, source, link (mig 20261018100000) ────────────────────────────
+// ── Ads: name, source, link (mig 20261018110000) ────────────────────────────
 
 /** Settings › Ads: name an ad by hand (all empty takes the hand's name away). */
 export async function nameAd(adId: string, data: { name: string; campaign: string; adset: string; link: string }) {

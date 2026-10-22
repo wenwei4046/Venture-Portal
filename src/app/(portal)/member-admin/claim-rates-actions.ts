@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { readClaimRatesAdmin, validClaimRatesToSave, type ClaimRatesAdmin, type ClaimRatesToSave } from "@/lib/member/claim-rates-admin";
 
 /**
- * People › Member services › Claim rates (2026-10-05): the fair-claim rates
+ * People › Member services › Transport claim (Claim rates until 2026-10-20; since 2026-10-05): the fair-claim rates
  * and the regions' spots that a member's claim is worked out from — and, since
  * 2026-10-06, which regions are flown to, the region of every venue the
  * ERP's fairs name and the Airbnb small group (how many people, the most a
@@ -20,7 +20,7 @@ import { readClaimRatesAdmin, validClaimRatesToSave, type ClaimRatesAdmin, type 
 async function backOffice() {
   const user = await requireAuth();
   if (!user.permissions.includes("member_requests_manage")) {
-    throw new Error("Claim rates need HR request management access.");
+    throw new Error("The transport claim needs HR request management access.");
   }
   return (await createClient()) as unknown as SupabaseClient;
 }
@@ -30,7 +30,7 @@ function failure(error: unknown) {
   return {
     ok: false as const,
     error: !message || /schema cache|does not exist|could not find|JWT/i.test(message)
-      ? "Claim rates could not be loaded. Please try again."
+      ? "The transport claim could not be loaded. Please try again."
       : message.slice(0, 250),
   };
 }
@@ -41,7 +41,7 @@ export async function fetchClaimRatesAdmin(): Promise<{ ok: true; data: ClaimRat
     const { data, error } = await db.rpc("member_admin_claim_settings");
     if (error) throw new Error(error.message);
     const settings = readClaimRatesAdmin(data);
-    if (!settings) throw new Error("Claim rates are temporarily unavailable.");
+    if (!settings) throw new Error("The transport claim is temporarily unavailable.");
     return { ok: true, data: settings };
   } catch (error) { return failure(error); }
 }

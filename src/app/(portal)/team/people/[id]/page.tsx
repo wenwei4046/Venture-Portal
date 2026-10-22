@@ -7,6 +7,8 @@ import { formatDate, formatMoney } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
+import { keptParts } from '@/lib/person-name'
+import { addressLines, addressOf } from '@/lib/address/address'
 import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -134,8 +136,11 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // Paid 100% on commission (no basic, no allowances, statutory at 0) or
   // variable pay (the Director department's month, keyed on payroll) — the
   // record words its salary and statutory by how they are paid.
+  const parts = keptParts(row)
   const view: PersonRecordView = {
     name: staff.employee_name,
+    firstName: parts.first,
+    lastName: parts.last,
     department: deptName,
     code: staff.employee_code,
     title: titleName,
@@ -148,7 +153,8 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     resignationDate: staff.resignation_date ? formatDate(staff.resignation_date) : null,
     nric: priv.nric,
     infotechCode: staff.infotech_code,
-    contact: { phone: staff.contact_number, email: account?.email ?? staff.email, address: staff.address },
+    // The address a line each from its six parts (2026-10-20); an older record without them, its one box.
+    contact: { phone: staff.contact_number, email: account?.email ?? staff.email, address: addressLines(addressOf(row)).join('\n') || staff.address },
     emergency: {
       name: staff.emergency_contact_name,
       relationship: staff.emergency_contact_relationship,

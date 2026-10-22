@@ -22,7 +22,7 @@ describe('debtor aging by days since the invoice', () => {
   })
 
   it('puts each invoice by its age in days, an undated one in the first', () => {
-    const v = debtorAgingView(RAW, '2026-10-09', 'days')
+    const v = debtorAgingView(RAW, '2026-10-09')
     const byId = new Map(v.invoices.map((i) => [i.id, i]))
     expect(byId.get('A')?.bucket).toBe('d0_30')
     expect(byId.get('B')?.bucket).toBe('d31_60')
@@ -35,11 +35,15 @@ describe('debtor aging by days since the invoice', () => {
     expect(v.invoices[0].id).toBe('D') // oldest first
   })
 
-  it('reads the months view exactly as the month aging does', () => {
-    const v = debtorAgingView(RAW, '2026-10-09', 'months')
+  // The page's Total receivable card reads the month aging's totals beside
+  // this table (2026-10-17: the month columns themselves went with the Dept
+  // Manager's view) — the two must agree on the money, the companies and the
+  // invoices.
+  it('agrees with the month aging on the total, each company and the count', () => {
+    const v = debtorAgingView(RAW, '2026-10-09')
     const a = buildDebtorAging(RAW, '2026-10-09')
-    expect(v.totals).toEqual(a.totals)
-    expect(v.byPayer).toEqual(a.byPayer)
-    expect(v.columns.map((c) => c.key)).toEqual(['this_month', 'm1', 'm2', 'm3', 'm4', 'm5_plus'])
+    expect(v.totals.total).toBe(a.totals.total)
+    expect(v.totals.count).toBe(a.totals.count)
+    expect(v.byPayer.map((p) => [p.payer, p.total, p.count])).toEqual(a.byPayer.map((p) => [p.payer, p.total, p.count]))
   })
 })

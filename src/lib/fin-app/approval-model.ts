@@ -335,11 +335,30 @@ export interface ApprovalRecordModel {
     description: string
     sources: Array<{ pool: string; account: string | null; amount: number }>
     files: Array<{ id: string; name: string; size: number | null }>
-    /** What raised it, where it has a page: in the app (a loan, a fund source) or the portal's (a payroll run). */
-    upstream: { label: string; href: string } | null
+    /** What raised it, where it has a page: in the app (a loan, a fund source) or the portal's (a payroll run) — and its portal page, for the computer's drawer. */
+    upstream: { label: string; href: string; portalHref: string } | null
   } | null
   /** Any other request's own record in the app (a fund source's, a loan's cancellation). */
   open: AppRecordRef | null
+}
+
+/** A record's own page on the computer (2026-10-17, the desktop Approvals drawer): a voucher's, a loan's, a fund source's. */
+export function portalHrefOf(r: AppRecordRef): string {
+  const base = r.hub === 'payments' ? '/payments' : r.hub === 'fund-out' ? '/fund-out' : '/fund-in'
+  return `${base}/${encodeURIComponent(r.id)}`
+}
+
+/**
+ * Where a request leads on the computer, each to a page of its own (2026-10-17 — the Approvals drawer's ⋯ and the
+ * request's full page): the voucher, what raised it, the loan, the fund source.
+ */
+export function recordLinks(r: Pick<ApprovalRecordModel, 'voucher' | 'loan' | 'open'>): Array<{ key: string; label: string; href: string }> {
+  return [
+    ...(r.voucher ? [{ key: 'voucher', label: 'Open the voucher', href: `/payments/${r.voucher.id}` }] : []),
+    ...(r.voucher?.upstream ? [{ key: 'upstream', label: `Open the ${r.voucher.upstream.label.toLowerCase()}`, href: r.voucher.upstream.portalHref }] : []),
+    ...(r.loan ? [{ key: 'loan', label: 'Open the loan', href: portalHrefOf(r.loan.open) }] : []),
+    ...(r.open ? [{ key: 'open', label: r.open.hub === 'fund-in' ? 'Open the fund source' : r.open.hub === 'fund-out' ? 'Open the loan' : 'Open the voucher', href: portalHrefOf(r.open) }] : []),
+  ]
 }
 
 /** A portal page's address, in the app where it has a screen. */
@@ -416,7 +435,7 @@ export function approvalRecordModel(read: {
           description: vc.voucher.description,
           sources: vc.sources.map((s) => ({ pool: formatPoolLabel(s.pool) ?? s.pool, account: s.account_label, amount: Number(s.amount) })),
           files: vc.attachments.map((f) => ({ id: f.id, name: f.file_name, size: f.file_size })),
-          upstream: upstreamHref ? { label: voucherUpstreamLabel(vc.voucher.reference_type) ?? 'Upstream record', href: inApp(upstreamHref) } : null,
+          upstream: upstreamHref ? { label: voucherUpstreamLabel(vc.voucher.reference_type) ?? 'Upstream record', href: inApp(upstreamHref), portalHref: upstreamHref } : null,
         }
       : null,
     open: vc || loan ? null : recordOf(table, a.reference_id),

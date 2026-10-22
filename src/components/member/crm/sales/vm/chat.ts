@@ -13,14 +13,14 @@
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
 import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
-import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
-import { customerFormVM, infoRows } from "./customer";
+import { BORDER, chatStripOf, coldLine, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
+import { bookingSkipsForm, customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor, tickPathOf } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
@@ -29,11 +29,12 @@ import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerI
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
+import { avatarTint } from "../../shared/palette";
 
-const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
-/** Own bubbles (rev 1010 §1.2; was #FFF0E4). */
+const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
+/** Own bubbles (rev 1010 §1.2; was var(--crm-tint-attention)). */
 /** The desk menu's copy of a message stays the light peach it always was (it sits on the page, not in the chat). */
-const MINE = "#FCD6B8";
+const MINE = "var(--crm-tint-attention)";
 const parts = (text: string) => String(text).split(/(\*[^*\n]+\*)/).filter(Boolean).map(t => (/^\*[^*]+\*$/.test(t) ? { t: t.slice(1, -1), w: 650 } : { t, w: "inherit" as const }));
 const plain = (text: string) => text.replace(/\*([^*\n]+)\*/g, "$1");
 
@@ -148,7 +149,7 @@ export function chatVM(ctx: SalesCtx) {
     if (it.kind === "sys") return {
       sep, plain: true, align: "center", max: "100%", rowDir: "row" as const, rxGap: "0", radius: "12px", bg: "rgba(255,255,255,.8)", borderStyle: "dashed", border: BORDER, textAlign: "center" as const, fg: SUB,
       ...NO_MEDIA, quote: null, ev: null, pDisp: "block", size: typePx(12), textStyle: "normal", textColor: "inherit", parts: parts(it.text), timeJustify: "center", timeColor: SUB, by: "", at: msgTime(at),
-      tick: false, tickColor: "#A8968B", tickLabel: "", tickPath: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
+      tick: false, tickColor: "var(--crm-faint)", tickLabel: "", tickPath: "", failNote: "", showTools: false, openMenu: undefined, openReact: undefined, reaction: "", rxLeft: "auto", rxRight: "auto", rbLeft: "auto", rbRight: "auto",
       enter: undefined, leave: undefined, press: NO_PRESS,
     };
     const m = it.m, mine = m.from === "me", key = m.id;
@@ -168,19 +169,19 @@ export function chatVM(ctx: SalesCtx) {
       ev: card && cd ? {
         kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
         time: timeLabel(cd), room: card.room, addr: card.addr,
-        bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
+        bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
         // Tap the card → Calendar on the visit's date.
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
       ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px", ...(md?.kind === "audio" ? { inPad: "0 2px" } : {}) } : {}), ...(!md && !card && m.text ? INLINE_TIME : {}),
-      pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(14), textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
+      pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
       tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
-      // Sending: a small clock until it went (then the two ticks).
-      tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
+      // Sending: a small clock until it went (then the two ticks); not delivered: a "!" (shared/chat-media.ts).
+      tickPath: tickPathOf(m.status),
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.
@@ -217,7 +218,7 @@ export function chatVM(ctx: SalesCtx) {
     [isPinned ? "Unpin" : "Pin", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", () => { close(); void act.setPref(c.id, { pinnedMessageId: isPinned ? null : mu.msgId }); }],
     // A sent WhatsApp cannot be unsent: Delete takes it off this person's chat only.
     ["Delete for me", "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3", () => { close(); void act.hideMessage(mu.msgId); }],
-  ] as [string, string, () => void][]).map(([label, icon, go]) => ({ label, icon, go, color: label.startsWith("Delete") ? "#A3371A" : "#3F2B22", rule: label.startsWith("Delete") ? "1px solid #EBDDD2" : "0" })) : [];
+  ] as [string, string, () => void][]).map(([label, icon, go]) => ({ label, icon, go, color: label.startsWith("Delete") ? "var(--crm-oxblood)" : "var(--crm-ink)", rule: label.startsWith("Delete") ? "1px solid var(--crm-rule)" : "0" })) : [];
 
   // ── ⋮ menu ──
   const hm = ui.hm ?? {}, setHm = (p: NonNullable<typeof ui.hm>) => set(u => ({ ...u, hm: { ...(u.hm ?? {}), ...p } }));
@@ -244,22 +245,22 @@ export function chatVM(ctx: SalesCtx) {
   const assignSel = assigning ? assignList.find(p => p.id === hm.sel) : undefined;
   const sNames = teamPeople.filter(p => ss.includes(p.id)).map(p => p.name);
   const goBook = () => {
-    // A first booking asks for the customer's details first (step 1 of 2).
-    if (c.detailsSaved) set(u => ({ ...u, hm: null, book: { customerId: c.id, room: 0, day: firstOpenDay(0, day0(now)), slot: null } }));
+    // Booking asks for the customer's details first (step 1 of 2) until they are complete (bookingSkipsForm, 2026-10-19).
+    if (bookingSkipsForm(c, data)) set(u => ({ ...u, hm: null, book: { customerId: c.id, room: 0, day: firstOpenDay(0, day0(now)), slot: null } }));
     else set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: false } }));
   };
   const firstOpenDay = (ri: number, from: number) => { for (let k = 0; k < 60; k++) { const d = from + k * DAY; if (!roomClosed(rooms[ri], d)) return d; } return from; };
   const hmVM = {
     // The ⋮ button has no ring of its own (the composer handoff's header): a tint only while its menu is open.
-    open: !!hm.menu, btnBg: hm.menu ? "#F5EBE3" : "transparent", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
+    open: !!hm.menu, btnBg: hm.menu ? "var(--crm-field)" : "transparent", toggle: () => setHm({ menu: !hm.menu }), close: () => patch({ hm: null }), toast: hm.toast ?? "",
     items: ([
-      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), ctx.embedded?.assignTo ? "Give this customer to anyone" : "Give to someone in your team", "#E4EDF8", "#2F6FB5"]] : []),
-      ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "#FFF0E4", "#BD4A19"],
+      ...(assigner ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, assign: true, sel: null }), ctx.embedded?.assignTo ? "Give this customer to anyone" : "Give to someone in your team", "var(--crm-tint-cold)", "var(--crm-ink-soft)"]] : []),
+      ["Share", "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m-8-4 4-4 4 4", () => setHm({ menu: false, share: true, ssel: [] }), "Invite a teammate", "var(--crm-tint-attention)", "var(--crm-rust)"],
       // Move only when there is somebody to hand over to (rev 1010 §1.5): no upline → no Move. Never by title.
-      ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "#E4EDF8", "#2F6FB5"]] : []),
-      ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "#E4F1E8", "#387557"],
-      ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "#F3E8EF", "#8E4B6E"],
-      ["Starred messages", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { setHm({ menu: false }); openStarred(c.messages.filter(m => stars.has(m.id)).map(m => ({ id: m.id, who: m.from === "me" ? "You" : c.name, text: m.text || (m.media ? mediaWord(m) : ""), at: msgTime(m.at) }))); }, `${c.messages.filter(m => stars.has(m.id)).length} in this chat`, "#FBF1D9", "#A46312"],
+      ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "var(--crm-tint-cold)", "var(--crm-ink-soft)"]] : []),
+      ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "var(--crm-tint-follow)", "var(--crm-brown)"],
+      ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "var(--crm-tint-new)", "var(--crm-ink-soft)"],
+      ["Starred messages", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { setHm({ menu: false }); openStarred(c.messages.filter(m => stars.has(m.id)).map(m => ({ id: m.id, who: m.from === "me" ? "You" : c.name, text: m.text || (m.media ? mediaWord(m) : ""), at: msgTime(m.at) }))); }, `${c.messages.filter(m => stars.has(m.id)).length} in this chat`, "var(--crm-tint-appt)", "var(--crm-brown)"],
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
@@ -272,10 +273,10 @@ export function chatVM(ctx: SalesCtx) {
     shareOpen: !!hm.share,
     groups: [{ name: myTeam ? teamName(myTeam) : "My team", c: RUST, n: teamPeople.length, people: teamPeople.map(p => {
       const done = already.has(p.id), on = done || ss.includes(p.id);
-      return { label: p.name, sub: done ? `${titleOf(p)} · in this chat` : titleOf(p), on, ring: on ? RUST : "#D9C7BA", fill: on ? RUST : "transparent", op: done ? 0.55 : 1, cur: done ? "default" : "pointer",
+      return { label: p.name, sub: done ? `${titleOf(p)} · in this chat` : titleOf(p), on, ring: on ? RUST : "var(--crm-line)", fill: on ? RUST : "transparent", op: done ? 0.55 : 1, cur: done ? "default" : "pointer",
         pick: done ? undefined : () => setHm({ ssel: ss.includes(p.id) ? ss.filter(x => x !== p.id) : [...ss, p.id] }) };
     }) }],
-    sLabel: sNames.length ? `Send invite to ${sNames.length === 1 ? sNames[0] : sNames.length + " people"}` : "Choose people", sBg: sNames.length ? RUST : "#D9C7BA",
+    sLabel: sNames.length ? `Send invite to ${sNames.length === 1 ? sNames[0] : sNames.length + " people"}` : "Choose people", sBg: sNames.length ? RUST : "var(--crm-line)",
     sConfirm: sNames.length ? async () => {
       let sent = 0;
       for (const id of ss) if (await act.invite("share", c.id, id)) sent++;
@@ -285,11 +286,11 @@ export function chatVM(ctx: SalesCtx) {
     moveOpen: !!(hm.move || assigning), moveTitle: `${assigning ? "Assign" : "Move"} ${c.name} to`,
     people: assigning ? assignList.map((p, k) => {
       const g = groupOf(p), first = !k || groupOf(assignList[k - 1]) !== g;
-      return { name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "#D9C7BA", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }),
-        hasHead: first, head: first ? `${g} · ${assignList.filter(x => groupOf(x) === g).length}` : "", rule: first ? "0" : "1px solid #EBDDD2" };
+      return { name: p.id === c.assignedTo ? `${p.name} · now` : p.name, role: titleOf(p), ini: ini(p.name), ring: hm.sel === p.id ? RUST : "var(--crm-line)", dot: hm.sel === p.id ? RUST : "transparent", pick: () => setHm({ sel: p.id }),
+        hasHead: first, head: first ? `${g} · ${assignList.filter(x => groupOf(x) === g).length}` : "", rule: first ? "0" : "1px solid var(--crm-rule)" };
     })
-      : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }), hasHead: false, head: "", rule: "1px solid #EBDDD2" }] : [],
-    cLabel: assigning ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigning ? !!assignSel : !!(superior && hm.sel)) ? RUST : "#D9C7BA",
+      : superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "var(--crm-line)", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }), hasHead: false, head: "", rule: "1px solid var(--crm-rule)" }] : [],
+    cLabel: assigning ? (assignSel ? `Assign to ${assignSel.name}` : "Choose a person") : superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: (assigning ? !!assignSel : !!(superior && hm.sel)) ? RUST : "var(--crm-line)",
     confirm: assigning ? (assignSel && assignSel.id !== c.assignedTo ? async () => {
       if (!(await assigner?.(c.id, assignSel.id))) return;
       // The customer leaves this person's CRM: back to their Inbox, and say where it went.
@@ -311,9 +312,9 @@ export function chatVM(ctx: SalesCtx) {
   };
   let book = {
     bookOpen: false, closeBook, rooms: [] as { name: string; addr: string; pick: () => void; border: string; bg: string; dot: string }[],
-    monthLabel: "", monthOpen: false, toggleMonth: () => {}, pickYear: 0, yPrev: undefined as undefined | (() => void), yPrevFg: "#D9C7BA", yPrevCur: "default", yNext: undefined as undefined | (() => void), yNextFg: "#D9C7BA", yNextCur: "default",
+    monthLabel: "", monthOpen: false, toggleMonth: () => {}, pickYear: 0, yPrev: undefined as undefined | (() => void), yPrevFg: "var(--crm-line)", yPrevCur: "default", yNext: undefined as undefined | (() => void), yNextFg: "var(--crm-line)", yNextCur: "default",
     ymonths: [] as { label: string; weight: number; cursor: string; bg: string; fg: string; pick?: () => void }[],
-    isWeekView: true, isMonthView: false, viewWeek: () => {}, viewMonth: () => {}, viewWeekBg: "#fff", viewWeekFg: "#3F2B22", viewMonthBg: "transparent", viewMonthFg: "#806B60",
+    isWeekView: true, isMonthView: false, viewWeek: () => {}, viewMonth: () => {}, viewWeekBg: "#fff", viewWeekFg: "var(--crm-ink)", viewMonthBg: "transparent", viewMonthFg: "var(--crm-muted)",
     days: [] as { wk: string; n: number; pick?: () => void; bg: string; fg: string; border: string }[], wkHead: [] as string[],
     monthCells: [] as { n: number | string; pick?: () => void; cursor: string; weight: number; deco: string; bg: string; fg: string; border: string }[],
     slots: [] as { t: string; left: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
@@ -354,27 +355,27 @@ export function chatVM(ctx: SalesCtx) {
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
     book = {
       ...book, bookOpen: true,
-      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "#FFF8F2" : "#fff", dot: b.room === i ? RUST : "transparent",
+      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-cream)" : "#fff", dot: b.room === i ? RUST : "transparent",
         pick: () => put({ room: i, slot: null, ...(roomClosed(r, b.day) ? { day: firstOpenDay(i, T) } : {}) }) })),
       monthLabel: gb(dd, { month: "short", year: "numeric" }), monthOpen: !!b.monthOpen,
       toggleMonth: () => put({ monthOpen: !b.monthOpen, pickYear: dd.getFullYear() }),
       pickYear: py,
-      yPrev: py > now.getFullYear() ? () => put({ pickYear: py - 1 }) : undefined, yPrevFg: py > now.getFullYear() ? INK : "#D9C7BA", yPrevCur: py > now.getFullYear() ? "pointer" : "default",
-      yNext: py < now.getFullYear() + 1 ? () => put({ pickYear: py + 1 }) : undefined, yNextFg: py < now.getFullYear() + 1 ? INK : "#D9C7BA", yNextCur: py < now.getFullYear() + 1 ? "pointer" : "default",
+      yPrev: py > now.getFullYear() ? () => put({ pickYear: py - 1 }) : undefined, yPrevFg: py > now.getFullYear() ? INK : "var(--crm-line)", yPrevCur: py > now.getFullYear() ? "pointer" : "default",
+      yNext: py < now.getFullYear() + 1 ? () => put({ pickYear: py + 1 }) : undefined, yNextFg: py < now.getFullYear() + 1 ? INK : "var(--crm-line)", yNextCur: py < now.getFullYear() + 1 ? "pointer" : "default",
       // A year ahead from this month.
       ymonths: Array.from({ length: 12 }, (_, m) => {
         const idx = (py - now.getFullYear()) * 12 + m - now.getMonth(), ok = idx >= 0 && idx <= 12, on = idx === curIdx;
         const firstDay = Math.max(T, new Date(py, m, 1).getTime());
-        return { label: gb(new Date(py, m, 1), { month: "short" }), weight: on ? 650 : 500, cursor: ok ? "pointer" : "default", bg: on ? RUST : "transparent", fg: on ? "#fff" : ok ? INK : "#D9C7BA",
+        return { label: gb(new Date(py, m, 1), { month: "short" }), weight: on ? 650 : 500, cursor: ok ? "pointer" : "default", bg: on ? RUST : "transparent", fg: on ? "#fff" : ok ? INK : "var(--crm-line)",
           pick: ok ? () => put({ day: firstDay, slot: null, monthOpen: false, pickYear: undefined }) : undefined };
       }),
       isWeekView: !mv, isMonthView: mv,
       viewWeek: () => put({ view: "week" }), viewMonth: () => put({ view: "month", monthOpen: false }),
-      viewWeekBg: mv ? "transparent" : "#fff", viewWeekFg: mv ? "#806B60" : "#3F2B22", viewMonthBg: mv ? "#fff" : "transparent", viewMonthFg: mv ? "#3F2B22" : "#806B60",
+      viewWeekBg: mv ? "transparent" : "#fff", viewWeekFg: mv ? "var(--crm-muted)" : "var(--crm-ink)", viewMonthBg: mv ? "#fff" : "transparent", viewMonthFg: mv ? "var(--crm-ink)" : "var(--crm-muted)",
       days: Array.from({ length: 120 }, (_, i) => {
         const t = T + i * DAY, x = new Date(t), blk = blocked(t), on = b.day === t && !blk;
         return { wk: blk ? "Closed" : i === 0 ? "Today" : x.toLocaleDateString("en-GB", { weekday: "short" }), n: x.getDate(), pick: blk ? undefined : () => put({ day: t, slot: null }),
-          bg: on ? RUST : blk ? "#F5F0EC" : "#fff", fg: on ? "#fff" : blk ? "#B5A398" : INK, border: on ? RUST : blk ? "#F5F0EC" : BD };
+          bg: on ? RUST : blk ? "var(--crm-field)" : "#fff", fg: on ? "#fff" : blk ? "var(--crm-faint)" : INK, border: on ? RUST : blk ? "var(--crm-field)" : BD };
       }),
       wkHead: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       monthCells: [
@@ -382,16 +383,16 @@ export function chatVM(ctx: SalesCtx) {
         ...Array.from({ length: dim }, (_, k) => {
           const t = new Date(dd.getFullYear(), dd.getMonth(), k + 1).getTime(), past = t < T, blk = !past && blocked(t), ok = !past && !blk, on = t === b.day && !blk;
           return { n: k + 1, pick: ok ? () => put({ day: t, slot: null }) : undefined, cursor: blk ? "not-allowed" : ok ? "pointer" : "default", weight: on || t === T ? 650 : 500, deco: blk ? "line-through" : "none",
-            bg: on ? RUST : blk ? "#F5F0EC" : "transparent", fg: on ? "#fff" : blk ? "#B5A398" : ok ? INK : "#C9B8AC", border: on ? RUST : blk ? "#F5F0EC" : t === T ? BD : "transparent" };
+            bg: on ? RUST : blk ? "var(--crm-field)" : "transparent", fg: on ? "#fff" : blk ? "var(--crm-faint)" : ok ? INK : "var(--crm-faint-2)", border: on ? RUST : blk ? "var(--crm-field)" : t === T ? BD : "transparent" };
         }),
       ],
       slots: SLOTS.map(t => {
         const off = taken(b.day, t), on = b.slot === t && !off;
         return { t, left: leftOf(b.day, t), pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
-          bg: on ? RUST : off ? "#FBF6F2" : "#fff", fg: on ? "#fff" : off ? "#B5A398" : INK, border: on ? RUST : off ? "#FBF6F2" : BD, weight: on ? 650 : 500 };
+          bg: on ? RUST : off ? "var(--crm-cream-nav)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint)" : INK, border: on ? RUST : off ? "var(--crm-cream-nav)" : BD, weight: on ? 650 : 500 };
       }),
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",
-      confirmBg: ready ? RUST : "#D9C7BA",
+      confirmBg: ready ? RUST : "var(--crm-line)",
       confirmBook: ready && room ? () => void oneAtATime(`book:${c.id}`, async () => {
         const start = slotAt(b.day, b.slot!).toISOString();
         let ok: boolean;
@@ -479,10 +480,10 @@ export function chatVM(ctx: SalesCtx) {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: !shut,
-    openTpl: () => void openTpl(),
+    openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
-    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
+    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     qrEdit: () => patch({ qr: false, qrPage: "list" }),
     rec: recOn ? { time: recTime(ui.rec as number, ui.recTick && ui.recTick > (ui.rec as number) ? ui.recTick : Date.now()) } : null,
     voiceStart: async () => {
@@ -506,7 +507,7 @@ export function chatVM(ctx: SalesCtx) {
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
 
   return {
-    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon },
+    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),
@@ -551,7 +552,7 @@ export function chatVM(ctx: SalesCtx) {
       await Promise.all(files.map((f, i) => act.sendMedia(c.id, f, captions[i] ?? "")));
     }),
     qrOpen: ui.qr, closeQR: () => patch({ qr: false }),
-    qrList: qrs.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0",
+    qrList: qrs.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0",
       pick: () => set(u => ({ ...u, qr: false, draft: { ...u.draft, [c.id]: q.message } })),
       editIt: () => patch({ qrPage: "new", qrNew: { s: q.shortcut, m: q.message }, qrEditIdx: i }),
       remove: () => void act.saveQuickReplies(qrs.filter((_, j) => j !== i).map(x => ({ shortcut: x.shortcut, message: x.message }))) })),
@@ -563,7 +564,7 @@ export function chatVM(ctx: SalesCtx) {
     qrNewS: nw.s, qrNewM: nw.m,
     qrSetS: (e: ChangeEvent<HTMLInputElement>) => patch({ qrNew: { ...nw, s: e.target.value } }),
     qrSetM: (e: ChangeEvent<HTMLTextAreaElement>) => patch({ qrNew: { ...nw, m: e.target.value } }),
-    qrSaveBg: canSave ? RUST : "#D9C7BA", qrSaveCur: canSave ? "pointer" : "default",
+    qrSaveBg: canSave ? RUST : "var(--crm-line)", qrSaveCur: canSave ? "pointer" : "default",
     qrSave: canSave ? async () => {
       const list = qrs.map(x => ({ shortcut: x.shortcut, message: x.message }));
       const next = ui.qrEditIdx != null ? list.map((x, j) => (j === ui.qrEditIdx ? { shortcut: nw.s.trim(), message: nw.m.trim() } : x)) : [{ shortcut: nw.s.trim(), message: nw.m.trim() }, ...list];
@@ -571,8 +572,8 @@ export function chatVM(ctx: SalesCtx) {
       patch({ qrNew: { s: "", m: "" }, qrEditIdx: null, qrPage: "list" });
     } : undefined,
     menuOpen: !!mu, closeMenu: close, menuFull: !!mu?.full, menuAlign: mu?.from === "me" ? "flex-end" : "flex-start",
-    menuMsg: { text: mu ? plain(mu.text) : "", bg: mu?.from === "me" ? MINE : "#fff", border: mu?.from === "me" ? MINE : "#EBDDD2", radius: mu?.from === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px" },
-    reactBar: ["👍", "❤️", "😂", "😮", "😢", "🙏"].map(e => ({ e, bg: muMsg?.myReaction === e ? "#F5EBE3" : "transparent",
+    menuMsg: { text: mu ? plain(mu.text) : "", bg: mu?.from === "me" ? MINE : "#fff", border: mu?.from === "me" ? MINE : "var(--crm-rule)", radius: mu?.from === "me" ? "16px 16px 4px 16px" : "16px 16px 16px 4px" },
+    reactBar: ["👍", "❤️", "😂", "😮", "😢", "🙏"].map(e => ({ e, bg: muMsg?.myReaction === e ? "var(--crm-field)" : "transparent",
       pick: (ev: MouseEvent) => { ev.stopPropagation(); if (!mu) return; close(); void act.react(mu.msgId, muMsg?.myReaction === e ? "" : e); } })),
     menuItems,
     tplOpen: ui.tpl, closeTpl: () => patch({ tpl: false }), tplList,

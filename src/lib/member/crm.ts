@@ -250,6 +250,17 @@ export type CrmUrgency = "none" | "soon" | "urgent" | "overdue";
 
 export const URGENCY_THRESHOLDS = { soonMinutes: 3 * 60, urgentMinutes: 6 * 60, overdueMinutes: 9 * 60 };
 
+/**
+ * Settings › Reply targets (mig 20261018100000): the CRM sets the three lines from what it read, before its screens are
+ * drawn, so every list, badge and notice follows them; nothing given keeps 3 · 6 · 9 h.
+ */
+export function setUrgencyThresholds(h?: { replySoonH: number; replyUrgentH: number; replyOverdueH: number } | null): void {
+  const s = h ?? { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9 };
+  URGENCY_THRESHOLDS.soonMinutes = s.replySoonH * 60;
+  URGENCY_THRESHOLDS.urgentMinutes = s.replyUrgentH * 60;
+  URGENCY_THRESHOLDS.overdueMinutes = s.replyOverdueH * 60;
+}
+
 /** Showroom opening hours: the booking slots and the after-hours auto-reply (not the reply clock). */
 export const OPENING_HOURS = { open: 8, close: 20 };
 

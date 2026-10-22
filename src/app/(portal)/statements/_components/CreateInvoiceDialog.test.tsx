@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 // Create invoice (2026-10-14, the Finance revamp v2 — D10's inv-form): the
 // design's seven fields and two buttons, the old Create Invoice's batch behind
@@ -65,6 +65,11 @@ const pick = (label: string, value: string) => fireEvent.change(screen.getByLabe
 const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 'Save draft' }))
 const hint = () => within(dialog()).getAllByText((_, el) => el?.tagName === 'P').map((p) => p.textContent)
+// A typed party's address, in its six parts (2026-10-20): line 1 typed, then State → City → Postcode from the list.
+const part = (key: 'line1' | 'state' | 'city' | 'postcode', value: string) =>
+  fireEvent.change(document.getElementById(`ci-address-${key}`) as HTMLElement, { target: { value } })
+const listReady = () => waitFor(() => expect(document.getElementById('ci-address-state')).not.toBeDisabled())
+const PENANG = { line1: 'No 83, Jalan Jambu 3', line2: '', postcode: '11060', city: 'Paya Terubong', state: 'Pulau Pinang', country: 'Malaysia' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -144,7 +149,12 @@ describe('one invoice', () => {
     draw()
     pick('Bill to', 'freetext')
     type('Name', 'Rygis Private Gym')
-    type('Address', '12 Jalan Ipoh, KL')
+    await listReady()
+    part('line1', 'No 83, Jalan Jambu 3')
+    part('state', 'Pulau Pinang')
+    part('city', 'Paya Terubong')
+    // Paya Terubong has one postcode: picked with it.
+    expect(document.getElementById('ci-address-postcode')).toHaveValue('11060')
     type('Phone', '012-345 6789')
     type('Email', 'ops@rygis.my')
     type('Description', 'Marketing service')
@@ -152,10 +162,46 @@ describe('one invoice', () => {
     pick('Billing mode', 'marketing_project')
     type('Amount RM', '1000')
     save()
-    await flush()
+    // The save reads the list first, to check the address.
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled())
     expect(mocks.create).toHaveBeenCalledWith(
-      expect.objectContaining({ billKind: 'freetext', name: 'Rygis Private Gym', address: '12 Jalan Ipoh, KL', phone: '012-345 6789', email: 'ops@rygis.my', amount: 1000 }),
+      expect.objectContaining({
+        billKind: 'freetext',
+        name: 'Rygis Private Gym',
+        address: 'No 83, Jalan Jambu 3, 11060 Paya Terubong, Pulau Pinang, Malaysia',
+        addressParts: PENANG,
+        phone: '012-345 6789',
+        email: 'ops@rygis.my',
+        amount: 1000,
+      }),
     )
+  })
+
+  it('an address half picked is refused in words, and nothing is sent', async () => {
+    draw()
+    pick('Bill to', 'freetext')
+    type('Name', 'Rygis Private Gym')
+    await listReady()
+    part('line1', 'No 83, Jalan Jambu 3')
+    part('state', 'Pulau Pinang')
+    type('Description', 'Marketing service')
+    pick('Category', '5050')
+    type('Amount RM', '1000')
+    save()
+    await waitFor(() => expect(hint()).toContain('Pick the city, postcode.'))
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+
+  it('someone else with no address at all is billed without one', async () => {
+    draw()
+    pick('Bill to', 'freetext')
+    type('Name', 'Rygis Private Gym')
+    type('Description', 'Marketing service')
+    pick('Category', '5050')
+    type('Amount RM', '1000')
+    save()
+    await flush()
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ billKind: 'freetext', address: '', addressParts: null }))
   })
 
   it('Period moves the month and the invoice date with it; Reference no is sent; hidden again, neither is', async () => {

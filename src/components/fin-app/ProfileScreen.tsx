@@ -1,27 +1,36 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
-import { ChangePasswordDialog, EditProfileDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
+import { MeCard } from '@/components/me/MeCard'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
+import PushRow from './PushRow'
 import s from './fin-app.module.css'
 
+const ROMAN = ['I.', 'II.', 'III.', 'IV.']
+
 // The Finance app's Profile (2026-10-15, the Finance revamp v2's phone — M17,
-// M18): who is signed in, I. Account — Edit profile and Change password, a
-// login of one's own only, each its window rising as a sheet — II. Admin —
+// M18): who is signed in, I. Account — Change password, a login of one's own
+// only, its window rising as a sheet (and, 2026-10-16, Request to change email
+// beside it, HR approving it; Edit profile gone 2026-10-17 — the user: one's
+// record changes through Me › Profile, which HR approves) — II. Admin —
 // Audit Log, Departments, Meeting Rooms, the desktop's account menu's rows —
 // and Sign out, asked first. The windows are the desktop's own (AccountMenu).
 // For an account that may switch views (2026-10-16 — on a phone the portal's
 // Finance pages open this app, lib/one-app.ts): the views of the one app, as
 // the HR app's More has them — each opens where it lives.
 
-/** The views of the one app: the view, its name, where it opens, its icon. */
+/**
+ * The views of the one app: the view, its name, where it opens, its icon. The Principal's own view opens this
+ * app too since 2026-10-17 — with its Approvals tab.
+ */
 const VIEWS: ReadonlyArray<readonly [string, string, string, HrIconName]> = [
-  ['principal', 'Principal', 'The portal', 'home'],
+  ['principal', 'Principal', 'This app, with Approvals', 'home'],
   ['finance', 'Finance', 'This app', 'report'],
   ['hr', 'HR', 'The HR app', 'people'],
   ['revenue_member', 'Revenue team', 'The Revenue app', 'staff'],
@@ -38,22 +47,31 @@ export interface ProfileAdminRow {
 export default function ProfileScreen({
   name,
   email,
-  phone,
   personal,
   admin,
   canSwitch = false,
+  view = 'finance',
+  push = false,
+  me = false,
+  itSupport = false,
 }: {
   name: string
   email: string
-  phone: string
-  /** A login of the person's own: Edit profile and Change password are theirs. */
+  /** A login of the person's own: Change password and Request to change email are theirs. */
   personal: boolean
   admin: ProfileAdminRow[]
   /** The account may switch views (and is not viewing as a person). */
   canSwitch?: boolean
+  /** The view the app is open in: Finance's, or the Principal's own (2026-10-17). */
+  view?: 'finance' | 'principal'
+  /** This phone's notifications (2026-10-17) — never while viewing as a person. */
+  push?: boolean
+  /** Me's card on top (2026-10-17): a login of one's own, not while viewing as a person. */
+  me?: boolean
+  /** Every signed-in account's own requests, including shared logins; hidden while viewing as a person. */
+  itSupport?: boolean
 }) {
-  const router = useRouter()
-  const [win, setWin] = useState<'profile' | 'password' | 'signout' | null>(null)
+  const [win, setWin] = useState<'password' | 'email' | 'signout' | null>(null)
   const [switching, startSwitch] = useTransition()
   const switchTo = (view: string) => {
     const form = new FormData()
@@ -63,6 +81,7 @@ export default function ProfileScreen({
     })
   }
   const initial = (name.trim()[0] ?? 'F').toUpperCase()
+  const hasAccount = personal || itSupport
 
   return (
     <>
@@ -73,40 +92,60 @@ export default function ProfileScreen({
           </span>
           <span className={s.pText}>
             <span className={s.pName}>{name}</span>
-            <span className={s.pSub}>{email} · Finance view</span>
+            <span className={s.pSub}>
+              {email} · {view === 'principal' ? 'Principal view' : 'Finance view'}
+            </span>
           </span>
         </div>
 
-        {personal ? (
+        {/* Me (2026-10-17): today's punch, and the way into one's own attendance, leave, payslips and record. */}
+        {me ? <MeCard backLabel="Profile" /> : null}
+
+        {hasAccount ? (
           <>
             <div className={s.menuHead}>
               <span className={s.roman}>I.</span>
               <span className={s.caps}>Account</span>
             </div>
             <div className={s.menu}>
-              <button type="button" className={s.menuRow} onClick={() => setWin('profile')}>
-                <span className={`${s.menuIcon} ${s.walnut}`}>
-                  <HrIcon name="staff" size={16} />
-                </span>
-                <span className={s.menuText}>
-                  <span className={s.menuLabel}>Edit profile</span>
-                  {phone ? <span className={s.menuSub}>{phone}</span> : null}
-                </span>
-                <span className={s.menuChev} aria-hidden="true">
-                  ›
-                </span>
-              </button>
-              <button type="button" className={s.menuRow} onClick={() => setWin('password')}>
-                <span className={`${s.menuIcon} ${s.walnut}`}>
-                  <HrIcon name="lock" size={16} />
-                </span>
-                <span className={s.menuText}>
-                  <span className={s.menuLabel}>Change password</span>
-                </span>
-                <span className={s.menuChev} aria-hidden="true">
-                  ›
-                </span>
-              </button>
+              {personal ? (
+                <>
+                  <button type="button" className={s.menuRow} onClick={() => setWin('password')}>
+                    <span className={`${s.menuIcon} ${s.walnut}`}>
+                      <HrIcon name="lock" size={16} />
+                    </span>
+                    <span className={s.menuText}>
+                      <span className={s.menuLabel}>Change password</span>
+                    </span>
+                    <span className={s.menuChev} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                  <button type="button" className={s.menuRow} onClick={() => setWin('email')}>
+                    <span className={`${s.menuIcon} ${s.walnut}`}>
+                      <HrIcon name="mail" size={16} />
+                    </span>
+                    <span className={s.menuText}>
+                      <span className={s.menuLabel}>{EMAIL_WORDS.title}</span>
+                      {email ? <span className={s.menuSub}>{email}</span> : null}
+                    </span>
+                    <span className={s.menuChev} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                </>
+              ) : null}
+              {itSupport ? (
+                <Link href="/fin-app/it-support" className={s.menuRow} onClick={pushIntent}>
+                  <span className={`${s.menuIcon} ${s.walnut}`}>
+                    <HrIcon name="buoy" size={16} />
+                  </span>
+                  <span className={s.menuText}>
+                    <span className={s.menuLabel}>IT support</span>
+                  </span>
+                  <span className={s.menuChev} aria-hidden="true">›</span>
+                </Link>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -114,7 +153,7 @@ export default function ProfileScreen({
         {admin.length > 0 ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{personal ? 'II.' : 'I.'}</span>
+              <span className={s.roman}>{ROMAN[hasAccount ? 1 : 0]}</span>
               <span className={s.caps}>Admin</span>
             </div>
             <div className={s.menu}>
@@ -139,14 +178,14 @@ export default function ProfileScreen({
         {canSwitch ? (
           <>
             <div className={s.menuHead}>
-              <span className={s.roman}>{['I.', 'II.', 'III.'][(personal ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
+              <span className={s.roman}>{ROMAN[(hasAccount ? 1 : 0) + (admin.length > 0 ? 1 : 0)]}</span>
               <span className={s.caps}>Switch view</span>
             </div>
             <div className={s.menu} aria-label="Switch view">
-              {VIEWS.map(([view, label, where, icon]) => {
-                const here = view === 'finance'
+              {VIEWS.map(([to, label, where, icon]) => {
+                const here = to === view
                 return (
-                  <button key={view} type="button" className={s.menuRow} disabled={here || switching} aria-current={here ? 'true' : undefined} onClick={() => switchTo(view)}>
+                  <button key={to} type="button" className={s.menuRow} disabled={here || switching} aria-current={here ? 'true' : undefined} onClick={() => switchTo(to)}>
                     <span className={`${s.menuIcon} ${s.walnut}`}>
                       <HrIcon name={icon} size={16} />
                     </span>
@@ -166,6 +205,9 @@ export default function ProfileScreen({
           </>
         ) : null}
 
+        {/* This phone's notifications (2026-10-17): the last section, drawn only where the phone can show them. */}
+        {push ? <PushRow roman={ROMAN[(hasAccount ? 1 : 0) + (admin.length > 0 ? 1 : 0) + (canSwitch ? 1 : 0)]} /> : null}
+
         <div className={s.signOutWrap}>
           <button type="button" className={s.signOut} onClick={() => setWin('signout')}>
             Sign out
@@ -176,11 +218,11 @@ export default function ProfileScreen({
 
       {personal ? (
         <>
-          <EditProfileDialog open={win === 'profile'} onClose={() => setWin(null)} user={{ name, email }} onSaved={() => router.refresh()} />
           <ChangePasswordDialog open={win === 'password'} onClose={() => setWin(null)} />
+          <RequestEmailDialog open={win === 'email'} onClose={() => setWin(null)} />
         </>
       ) : null}
-      <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} />
+      <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} view={view === 'principal' ? 'the Principal view' : 'the Finance view'} />
     </>
   )
 }

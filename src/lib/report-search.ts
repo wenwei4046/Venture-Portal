@@ -54,28 +54,3 @@ export function highlight(text: string, query: string): HighlightPart[] {
   if (from < text.length) parts.push({ text: text.slice(from), hit: false })
   return parts
 }
-
-/**
- * Ancestor keys that must be forced open so every match is on screen.
- * `rows` is a pre-order (depth-first) list — the same order both report views
- * already render in — so an ancestor is simply the nearest earlier row at each
- * shallower depth.
- */
-export function ancestorsOfMatches<T extends { key: string; depth: number }>(
-  rows: T[],
-  isMatch: (row: T) => boolean,
-): Set<string> {
-  const open = new Set<string>()
-  // Nearest row seen at each depth, as we walk forward.
-  const stack: T[] = []
-  for (const row of rows) {
-    stack.length = row.depth
-    stack[row.depth] = row
-    if (!isMatch(row)) continue
-    for (let d = 0; d < row.depth; d++) {
-      const anc = stack[d]
-      if (anc) open.add(anc.key)
-    }
-  }
-  return open
-}

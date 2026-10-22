@@ -3,12 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { canDo } from '@/lib/permission-actions'
 import type { User } from '@/types'
-import { listSubDepartments, type SubDepartment } from './sub-departments'
+import { listSubDepartments, type RevenuePageArea, type SubDepartment } from './sub-departments'
+import { subsInReach } from '@/lib/sub-department-reach'
 
 /**
  * What the sub-department switcher on a Revenue page's head needs
  * (2026-10-10, the HR revamp: Fair | IR left the sidebar for this switcher):
- * every sub-department, and — for whoever may create one (Revenue · Manage,
+ * every sub-department the viewer reaches on that page (2026-10-16), and — for whoever may create one (Revenue · Manage,
  * the gate `createSubDepartment` asks) — the departments a new one can sit in.
  */
 export interface SwitcherData {
@@ -18,8 +19,8 @@ export interface SwitcherData {
   departments: Array<{ id: string; name: string }>
 }
 
-export async function loadSwitcherData(user: User, current: SubDepartment): Promise<SwitcherData> {
-  const subs = await listSubDepartments()
+export async function loadSwitcherData(user: User, current: SubDepartment, area: RevenuePageArea): Promise<SwitcherData> {
+  const subs = subsInReach(await listSubDepartments(), user.reach, area)
   const canCreate = canDo(user, 'revenue', 'manage')
   let departments: Array<{ id: string; name: string }> = []
   if (canCreate) {

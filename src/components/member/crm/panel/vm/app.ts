@@ -50,7 +50,8 @@ export function panelAppVM(ctx: PanelCtx) {
   });
   const hd0 = headVM(ctx), bl = bellVM(ctx);
   // Assignment: a section open → the top back link reads "‹ Assignment" and returns to the overview (rev 1011 §6.1).
-  const hd = tab === "assign" && ui.asSec && !lead ? { ...hd0, showHead: true, backLabel: "Assignment", back: () => ctx.patch({ asSec: null }) } : hd0;
+  // 4a (T03): Assignment's sections are tabs under its title, so no "‹ Assignment" bar.
+  const hd = hd0;
   const as0 = show.as ? assignVM(ctx) : undefined;
   const x = assignExtraVM(ctx, as0);
   const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
@@ -76,7 +77,7 @@ export function panelAppVM(ctx: PanelCtx) {
     accessLbl: ctx.data.can.viewAll ? "All access" : teamName(teamOf(ctx.me.id, ctx.data.people)) || "My team",
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.
     pfAdmin: ctx.data.can.manage,
-    chromeBg: "#FFFFFF",
+    chromeBg: "var(--crm-page)",
     cl: calendarListVM(ctx, cal), ci: calendarInfoVM(ctx),
     ov: show.ov ? overviewVM(ctx) : off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),

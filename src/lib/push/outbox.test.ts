@@ -7,7 +7,7 @@ vi.mock('./config', () => ({
   VAPID_SUBJECT: 'https://venture.example',
 }))
 import { flushPush, outboxSecret, pushMessageOf } from './outbox'
-import { crmPushFromRow, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
+import { crmPushFromRow, meOpenTarget, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
 
 // RFC 8291's example keys stand in for the server's (any valid P-256 pair will do).
 const PRIVATE = 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw'
@@ -72,6 +72,25 @@ describe('pushing what is due', () => {
     expect(done.args.p_gone).toEqual(['https://fcm.googleapis.com/gone'])
   })
 
+  // 2026-10-16: the user's iPhone got nothing, and nothing said what Apple answered — the notice counted as sent
+  // because the Android took it. A push service's refusal is said in the server's log, by host and its own words.
+  it('says what a push service refused, even when another device took the notice', async () => {
+    process.env.VAPID_PRIVATE_KEY = PRIVATE
+    const db = fakeDb([
+      { id: 'n1', title: 'Principal added you to a meeting', body: '', refKind: 'booking', refId: 'b1',
+        subs: [{ endpoint: 'https://fcm.googleapis.com/a', ...DEVICE, app: 'hr' }, { endpoint: 'https://web.push.apple.com/secret-token', ...DEVICE, app: 'hr' }] },
+    ])
+    const fetcher = vi.fn(async (url: string) => url.includes('apple')
+      ? new Response('{"reason":"BadJwtToken"}', { status: 403 })
+      : new Response(null, { status: 201 }))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await flushPush({ client: db.client as never, fetcher: fetcher as never })).toEqual({ sent: 1, gone: 0 })
+    expect(log).toHaveBeenCalledWith('[push] refused', JSON.stringify({ host: 'web.push.apple.com', status: 403, reason: '{"reason":"BadJwtToken"}' }))
+    // The host only — never the device's own address.
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-token')
+    log.mockRestore()
+  })
+
   it('never throws into the work that called it', async () => {
     process.env.VAPID_PRIVATE_KEY = PRIVATE
     const client = { rpc: async () => { throw new Error('network') } }
@@ -86,11 +105,32 @@ describe('a notice', () => {
     expect(noticeUrl({ refKind: 'member_request', refId: 'r9' }, 'hr')).toBe('/hr-app?open=req:r9')
     expect(noticeUrl({ refKind: 'booking', refId: 'b1' }, 'revenue')).toBe('/member?page=account&view=rooms')
     expect(noticeUrl({ refKind: 'hiring_request', refId: 'HR-301' }, 'revenue')).toBe('/member?bell=1')
+    // A memo names its page as well (2026-10-17): the app's first drawing is Profile › Memos with the memo, not Today.
+    expect(noticeUrl({ refKind: 'memo', refId: 'm 1' }, 'revenue')).toBe('/member?page=account&view=memos&memo=m%201')
+    expect(noticeUrl({ refKind: 'memo', refId: 'm1' }, 'hr')).toBe('/hr-app?open=memo:m1')
+    expect(noticeUrl({ refKind: 'it_request', refId: 'it 1' }, 'hr')).toBe('/?open=it:it%201')
+    expect(noticeUrl({ refKind: 'it_request', refId: 'it1' }, 'revenue')).toBe('/member?page=account&view=it&it=it1')
+    expect(openTarget('it:it1')).toEqual({ k: 'it', id: 'it1' })
+    // A share request (2026-10-21): the Revenue app's, whichever app the phone signed up in — the request over Today.
+    expect(noticeUrl({ refKind: 'share_request', refId: 's 1' }, 'revenue')).toBe('/member?share=s%201')
+    expect(noticeUrl({ refKind: 'share_request', refId: 's1' }, 'hr')).toBe('/member?share=s1')
     // Today › Remind all (2026-10-15): the app's front page, either app.
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')
     expect(openTarget('hire:HR-301')).toEqual({ k: 'hire', id: 'HR-301' })
     expect(openTarget('nope:1')).toBeNull()
+  })
+
+  it('about one’s own request, decided (2026-10-17): Me on that request — through the start, which knows the face', () => {
+    expect(noticeUrl({ refKind: 'att_request', refId: 'a1b2' }, 'hr')).toBe('/?open=me:a1b2')
+    // The Revenue app has no Me: its front page.
+    expect(noticeUrl({ refKind: 'att_request', refId: 'a1b2' }, 'revenue')).toBe('/member')
+    expect(openTarget('me:a1b2')).toEqual({ k: 'me', id: 'a1b2' })
+    expect(meOpenTarget('?open=me:a1b2&x=1')).toBe('a1b2')
+    expect(meOpenTarget('?open=hire:HR-301')).toBeNull()
+    expect(meOpenTarget('')).toBeNull()
+    // Never in a bell.
+    expect(noticesFromRow({ unread: 0, items: [{ id: 'n', kind: 'attendance', title: 'T', refKind: 'att_request', refId: 'a1b2' }] }).items).toEqual([])
   })
 
   it('reads the database’s answer, keeping only well-formed notices', () => {

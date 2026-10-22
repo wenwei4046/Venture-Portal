@@ -5,10 +5,10 @@ import { Button } from '@/components/ds/Button'
 import { Field, TextField, Textarea } from '@/components/ds/Field'
 import { PanelHead, SidePanel } from '@/components/ds/Overlay'
 import { addLedger, bookLeave } from '@/lib/attendance/actions'
-import { dayMon, type Balance, type LedgerRow } from '@/lib/attendance/engine'
+import { dayMon, leaveDaysFor, type Balance, type LedgerRow } from '@/lib/attendance/engine'
 import { atLabel, officeDateOf } from '@/lib/attendance/requests'
 import type { AttConfig, AttLeaveType, AttLedger, AttPerson } from '@/lib/attendance/types'
-import { RangeCalendar, workingDaysIn } from './BalanceCalendar'
+import { RangeCalendar } from './BalanceCalendar'
 
 /**
  * Leave balances' right-hand panel (the handoff's `ledOpen`, lines 295–383,
@@ -154,7 +154,8 @@ export function LedgerPanel({
   const nv = Number.isNaN(nv0) ? NaN : Math.max(0, nv0)
   const delta = Number.isNaN(nv) ? 0 : Math.round((nv - left) * 100) / 100
   const editHint = Number.isNaN(nv) || nv === left ? 'Enter the corrected days left.' : `Adds an adjustment of ${delta > 0 ? '+' : '−'}${fmt(Math.abs(delta))} · ${type.name} becomes ${fmt(left + delta)} left`
-  const count = workingDaysIn(range.from, range.to)
+  const calendarDays = type.counts === 'calendar'
+  const count = leaveDaysFor(person, range.from, range.to || range.from, config, { calendar: calendarDays })
   const after = Math.round((left - count) * 100) / 100
   const balLine = unpaid ? 'Unpaid · goes to payroll' : !count ? `${fmt(left)} left now` : after < 0 ? `Only ${fmt(left)} left · this goes ${fmt(after)}` : `${fmt(left)} left now · ${fmt(after)} left after`
   const code = type.drawsFrom ?? type.code
@@ -225,7 +226,7 @@ export function LedgerPanel({
             <RangeCalendar from={range.from} to={range.to} today={config.today} onChange={setRange} />
             <div style={{ border: '1px solid var(--ds-border)', background: 'var(--ds-surface-2)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>Working days · weekends skipped</span>
+                <span style={{ fontSize: 12.5, color: 'var(--ds-ink-2)' }}>{calendarDays ? 'Calendar days' : 'Work days · days off and holidays skipped'}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18 }}>{count}</span>
               </div>
               <div style={{ fontSize: 12.5, color: !unpaid && after < 0 ? 'var(--ds-danger)' : 'var(--ds-ink-2)' }}>{balLine}</div>

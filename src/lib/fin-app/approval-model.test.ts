@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildQueueRows, queueSummary, type ApprovalRequestRow } from '@/lib/approval-queue'
-import { approvalHubModel, approvalRecordModel, decidedRows, groupTitle, inApp, pendingRows, recordOf, waitLabel } from './approval-model'
+import { approvalHubModel, approvalRecordModel, decidedRows, groupTitle, inApp, pendingRows, recordLinks, recordOf, waitLabel } from './approval-model'
 
 // The Finance phone app's Approvals (2026-10-15, part 5): the queue's own
 // figures, shaped as the app's hub, lists, combined requests and a request's
@@ -257,5 +257,18 @@ describe('where a record opens', () => {
     expect(inApp('/fund-out/l1')).toBe('/fin-app/fund/out?id=l1')
     expect(inApp('/fund-in/f1')).toBe('/fin-app/fund/in?id=f1')
     expect(inApp('/approvals/payroll-run/r1')).toBe('/approvals/payroll-run/r1')
+  })
+})
+
+describe('recordLinks', () => {
+  it('leads to the voucher and what raised it, the loan, or the fund source — on the computer', () => {
+    const voucher = { id: 'v1', upstream: { label: 'Payroll run', href: '/hr-costing/payment', portalHref: '/hr-costing/payment' } } as never
+    expect(recordLinks({ voucher, loan: null, open: null })).toEqual([
+      { key: 'voucher', label: 'Open the voucher', href: '/payments/v1' },
+      { key: 'upstream', label: 'Open the payroll run', href: '/hr-costing/payment' },
+    ])
+    expect(recordLinks({ voucher: null, loan: { open: { hub: 'fund-out', id: 'l1' } } as never, open: null })).toEqual([{ key: 'loan', label: 'Open the loan', href: '/fund-out/l1' }])
+    expect(recordLinks({ voucher: null, loan: null, open: { hub: 'fund-in', id: 'fs1' } })).toEqual([{ key: 'open', label: 'Open the fund source', href: '/fund-in/fs1' }])
+    expect(recordLinks({ voucher: null, loan: null, open: null })).toEqual([])
   })
 })

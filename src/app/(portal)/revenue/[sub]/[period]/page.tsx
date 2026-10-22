@@ -34,6 +34,10 @@ import { explainDoubleClaim } from '@/lib/commission/double-claim-reasons'
 import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
+import ShareRequestsPanel from './_components/ShareRequestsPanel'
+import { shareRequestsFromRow, type ShareRequest } from '@/lib/member/share-requests'
+import { canDo } from '@/lib/permission-actions'
+import { actionsOnPage } from '@/lib/page-tabs'
 import ErpChangesPanel, { type ChangeBrief, type TrailRowView } from './_components/ErpChangesPanel'
 import { loadSalespersonCloses } from '../../_lib/salesperson-closes'
 import { loadBillsByDocNo } from '../../_lib/row-origins'
@@ -120,9 +124,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   // In flight while the permission is checked; only awaited once it passes,
   // so a reader without it is redirected, never shown a 404.
-  const subDeptLookup = requireSubDepartment(sub)
+  const subDeptLookup = requireSubDepartment(sub, 'comm_cal')
   subDeptLookup.catch(() => {})
-  await requirePermission('revenue')
+  const user = await requirePermission('revenue')
   const subDept = await subDeptLookup
   const supabase = (await createClient()) as unknown as SupabaseClient
 
@@ -240,6 +244,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // Share this bill (2026-09-30): the team a bill may be shared with. A failed
   // read leaves the menu without the row rather than the month without a page.
   const shareTeamRead = loadShareTeam(supabase, subDept.schemeId).catch(() => undefined)
+  // Requests (2026-10-21): the salespeople's share requests on this month's bills. Read softly: a list that cannot be
+  // read leaves its tab saying so, never the month without a page.
+  const shareRequestsRead = once(supabase.rpc('revenue_share_requests', { p_sub_department: subDept.id, p_period: period }))
+    .then(({ data, error }) => (error
+      ? { requests: [] as ShareRequest[], unavailable: error.message }
+      : { requests: shareRequestsFromRow(data), unavailable: null }))
+    .catch((err: unknown) => ({ requests: [] as ShareRequest[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
 
   // The drops and upsells the ERP found that somebody paid into this month
   // (Undo sends one back), those still to answer from any month (paid into
@@ -491,6 +502,16 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // groups not yet checked, and the months that ride in unpaid.
   const changesWaiting = pendingAdjustments.length
   const claimsWaiting = claimGroups.filter(group => !group.dismissed).length + carriedUnpaid.length
+  // Requests (2026-10-21): what waits is a request every colleague accepted — HR's to approve. Approve and Reject are
+  // Revenue · Edit on this page's tab, as the function asks.
+  const shareRequests = await shareRequestsRead
+  const acting = user.closed?.length ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, '/revenue/[sub]/[period]') } : user
+  const shareRequestsPanel = (
+    <ShareRequestsPanel key="share-requests" requests={shareRequests.requests} unavailable={shareRequests.unavailable}
+      canDecide={canDo(acting, 'revenue', 'edit')} basePath={revenuePath(subDept.slug)}
+      returnTo={`${revenuePath(subDept.slug, period)}?view=requests`} period={period} />
+  )
+  const requestsWaiting = shareRequests.requests.filter(q => q.status === 'hr').length
 
   const monthHeader = (
       <div key="month-head" className="page-head">
@@ -571,6 +592,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         reviews={{
           changes: { panel: erpChangesPanel, count: changesWaiting },
           claims: doubleClaimPanel ? { panel: doubleClaimPanel, count: claimsWaiting } : undefined,
+          requests: { panel: shareRequestsPanel, count: requestsWaiting },
         }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}

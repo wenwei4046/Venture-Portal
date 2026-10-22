@@ -6,6 +6,7 @@
 // The 支出对象 paid-to breakdown was removed on request (2026-08-24: "我只是
 // 要还没收回的就好").
 
+import { notFound } from 'next/navigation'
 import { officeMonth } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
 import Link from 'next/link'
@@ -23,12 +24,9 @@ import { monthColumns, type MatrixRow } from '@/lib/monthly-matrix'
 import { buildRnpMatrixRows, fetchRnpInvoiceEvents } from '@/lib/monthly-rnp'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
-import MonthlyMatrix from '../_components/MonthlyMatrix'
 import SheetReport from '../_components/SheetReport'
 import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
-import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
-import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { formatMoney } from '@/lib/utils'
 import { sliceMatrixMonths } from '@/lib/monthly-matrix'
@@ -47,18 +45,20 @@ interface Props {
 export default async function MonthlyReceiptPaymentPage({ searchParams }: Props) {
   await requirePage('/reports/monthly-receipt-payment')
   const user = await requirePermission('dept_reports')
+  // For whoever reads the reports company-wide (Reports · View at All); the
+  // Dept Manager's own-segment page went with the kind (2026-10-17).
+  if (!reportsCompanyWide(user)) notFound()
   // The files only for whoever may take them out — as the export route asks (2026-10-16).
-  const canExport = canDo(user, 'dept_reports', 'export', 'dept')
+  const canExport = canDo(user, 'dept_reports', 'export')
   const supabase = await createClient()
 
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : (params.segment ?? '')
+  const segment = params.segment ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const consolidated = !isDeptMgr && !segment
+  const consolidated = !segment
   // The bridge starts beside the journal read with the bank codes still
   // pending (2026-10-08), and is not read where its lines are dropped.
   const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
@@ -73,7 +73,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
       // Every event, paged past PostgREST's cap (lib/monthly-rnp.ts).
-      fetchRnpInvoiceEvents(supabase, isDeptMgr || !segment ? {} : { p_segment: segment }),
+      fetchRnpInvoiceEvents(supabase, segment ? { p_segment: segment } : {}),
       supabase.from('companies').select('id, name, short_code'),
     ])
   const ibLines = ib ? ib.lines : []
@@ -104,140 +104,83 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     ...rnpRows,
   ]
 
-  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
-  // Design handoff): the period From – To, the two views and the exports in
-  // the head, the cards, one control row, the months separated. A department
-  // manager keeps the page below, as it was.
-  if (!isDeptMgr) {
-    const nowYM = officeMonth()
-    const range = reportRange({ from: params.from, period }, nowYM)
-    const cut = sliceMatrixMonths(data.columns, rows, range.from)
-    // A card reads the Accumulated of its line as cut to From: a flow adds up, an
-    // opening reads its first month, a closing or a balance its last.
-    const pick = (values: number[], key = 'flow') => sliceMatrixMonths(data.columns, [{ key, values }], range.from).rows[0].values[0]
-    const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
-    const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
-    const exportHref = (format: 'xlsx' | 'pdf') => {
-      const qs = new URLSearchParams({ format, period: range.to })
-      if (segment) qs.set('segment', segment)
-      if (!range.wholeYear) qs.set('from', range.from)
-      return `/reports/monthly-receipt-payment/export?${qs.toString()}`
-    }
-    // Each line as a % of the month's receipts (2026-10-10, the handoff).
-    const receipts = sliceMatrixMonths(data.columns, [{ key: 'flow', values: data.inflowTotalByCol }], range.from).rows[0].values
-    return (
-      <div>
-        <div className="page-head">
-          <div className="min-w-0">
-            <div className="page-eyebrow">
-              <em>I.</em> REPORTS · RECEIPT &amp; PAYMENT · {rangeLabel(range.from, range.to).toUpperCase()}
-            </div>
-            <h1 className="page-title">Receipt &amp; Payment</h1>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <ReportModeSwitch pair="receipt-payment" active="monthly" period={range.to} segment={segment || undefined} />
-            <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
-              Edit layout
-            </Link>
-            {canExport ? (
-              <a href={exportHref('xlsx')} className="btn-quiet-sheet">
-                Excel
-              </a>
-            ) : null}
-            {canExport ? (
-              <a href={exportHref('pdf')} className="btn-quiet-sheet">
-                PDF
-              </a>
-            ) : null}
-          </div>
-        </div>
-
-        <StatCards label="Receipt and payment">
-          <StatCard label="Receipts" value={formatMoney(pick(data.inflowTotalByCol))} icon="inbox" tone="ledger" note="Selected period" />
-          <StatCard label="Payments" value={formatMoney(pick(data.outflowTotalByCol))} icon="send" tone="danger" note="Selected period" />
-          <StatCard label="Net" value={formatMoney(pick(data.netChangeByCol))} icon="swap" tone="primary" note="Receipts − payments" />
-          <StatCard
-            label="Outstanding at month end"
-            value={formatMoney(pick(rows.find((r) => r.key === 'AR_OUTSTANDING')?.values ?? data.columns.map(() => 0), 'AR_OUTSTANDING'))}
-            icon="receipt"
-            note="Invoices not yet received"
-          />
-        </StatCards>
-
-        <ReportSearchProvider level={3}>
-          <section className="mb-6">
-            <div className="sect-head">
-              <h2>Monthly receipt &amp; payment</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">
-                {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
-              </span>
-            </div>
-            <ReportToolbar
-              from={range.from}
-              to={range.to}
-              fromOptions={fromChoices(range.to)}
-              toOptions={toChoices(nowYM)}
-              segment={segment}
-              segments={segments}
-            />
-            <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={receipts} />
-          </section>
-        </ReportSearchProvider>
-      </div>
-    )
+  // The page (2026-10-09, the user's Claude Design handoff): the period From –
+  // To, the two views and the exports in the head, the cards, one control row,
+  // the months separated.
+  const nowYM = officeMonth()
+  const range = reportRange({ from: params.from, period }, nowYM)
+  const cut = sliceMatrixMonths(data.columns, rows, range.from)
+  // A card reads the Accumulated of its line as cut to From: a flow adds up, an
+  // opening reads its first month, a closing or a balance its last.
+  const pick = (values: number[], key = 'flow') => sliceMatrixMonths(data.columns, [{ key, values }], range.from).rows[0].values[0]
+  const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+  const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
+  const exportHref = (format: 'xlsx' | 'pdf') => {
+    const qs = new URLSearchParams({ format, period: range.to })
+    if (segment) qs.set('segment', segment)
+    if (!range.wholeYear) qs.set('from', range.from)
+    return `/reports/monthly-receipt-payment/export?${qs.toString()}`
   }
-
+  // Each line as a % of the month's receipts (2026-10-10, the handoff).
+  const receipts = sliceMatrixMonths(data.columns, [{ key: 'flow', values: data.inflowTotalByCol }], range.from).rows[0].values
   return (
     <div>
-      <Link href="/reports" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Reports
-      </Link>
-
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>·</em> REPORTS · MONTHLY RECEIPT &amp; PAYMENT · FY {year}
+            <em>I.</em> REPORTS · RECEIPT &amp; PAYMENT · {rangeLabel(range.from, range.to).toUpperCase()}
           </div>
-          <h1 className="page-title">Monthly Receipt &amp; Payment</h1>
+          <h1 className="page-title">Receipt &amp; Payment</h1>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {!isDeptMgr && (
-            <Link
-              href={`/reports/cash-flow/layout`}
-              className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-xs font-sans transition-colors"
-            >
-              Edit layout
-            </Link>
-          )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ReportModeSwitch pair="receipt-payment" active="monthly" period={range.to} segment={segment || undefined} />
+          <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
+            Edit layout
+          </Link>
           {canExport ? (
-            <a
-              href={`/reports/monthly-receipt-payment/export?format=xlsx&period=${period}${segment ? `&segment=${segment}` : ''}`}
-              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-            >
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
               Excel
             </a>
           ) : null}
           {canExport ? (
-            <a
-              href={`/reports/monthly-receipt-payment/export?format=pdf&period=${period}${segment ? `&segment=${segment}` : ''}`}
-              className="px-3 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors"
-            >
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
               PDF
             </a>
           ) : null}
         </div>
       </div>
 
-      <ReportViewToggle pair="receipt-payment" active="monthly" period={period} segment={segment || undefined} />
+      <StatCards label="Receipt and payment">
+        <StatCard label="Receipts" value={formatMoney(pick(data.inflowTotalByCol))} icon="inbox" tone="ledger" note="Selected period" />
+        <StatCard label="Payments" value={formatMoney(pick(data.outflowTotalByCol))} icon="send" tone="danger" note="Selected period" />
+        <StatCard label="Net" value={formatMoney(pick(data.netChangeByCol))} icon="swap" tone="primary" note="Receipts − payments" />
+        <StatCard
+          label="Outstanding at month end"
+          value={formatMoney(pick(rows.find((r) => r.key === 'AR_OUTSTANDING')?.values ?? data.columns.map(() => 0), 'AR_OUTSTANDING'))}
+          icon="receipt"
+          note="Invoices not yet received"
+        />
+      </StatCards>
 
-      <ReportSearchProvider>
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch lg:items-start">
-          <MonthlyReportControls period={period} segment={segment} hideSegment={isDeptMgr} extraSegments={extraReportSegments(primedRegistryRows())} />
-          <div className="min-w-0 flex-1">
-            <MonthlyMatrix columns={data.columns} rows={rows} nowKey={period} />
+      <ReportSearchProvider level={3}>
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Monthly receipt &amp; payment</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
+            </span>
           </div>
-        </div>
+          <ReportToolbar
+            from={range.from}
+            to={range.to}
+            fromOptions={fromChoices(range.to)}
+            toOptions={toChoices(nowYM)}
+            segment={segment}
+            segments={segments}
+          />
+          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={receipts} />
+        </section>
       </ReportSearchProvider>
     </div>
   )

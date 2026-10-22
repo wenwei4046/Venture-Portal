@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { requireAuth } from '@/lib/auth'
 import PortalFrame from '@/components/layout/PortalFrame'
-import { emptyNavData, readsDeptStatements, type NavData } from '@/components/layout/nav-config'
+import { emptyNavData, readsDeptStatements, revenueNavData, type NavData } from '@/components/layout/nav-config'
 import { canAccessRevenue } from '@/lib/roles'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts } from '@/lib/dept-statements'
@@ -25,6 +25,7 @@ export default async function PortalLayout({
   if (opensHrAppOnPhone(user) && phone) redirect('/hr-app')
   // …and Finance's view IS the Finance app (2026-10-16): every page of it is an app screen now (the user: 我不要再用那种
   // portal 的手机版了). A statement's print stands outside the portal — (paper) — and the files are route handlers.
+  // The Principal's own view opens it too (2026-10-17), with its Approvals tab.
   if (opensFinApp(user) && phone) redirect('/fin-app')
   const jar = await cookies()
   // Admin › Change password is a personal login's own (2026-10-12): asked beside the nav's rows.
@@ -38,11 +39,9 @@ export default async function PortalLayout({
   if (canAccessRevenue(user)) {
     const subs = await listSubDepartments()
     // Comm Cal / Sales Groups / Rules open the sub-department last picked on a
-    // Revenue page's switcher (2026-10-10) — else the home one, the oldest.
-    const picked = jar.get(REVENUE_SUB_COOKIE)?.value
-    const home = subs.find(s => s.isHome) ?? subs[0]
-    const revenueSub = subs.find(s => s.slug === picked)?.slug ?? home?.slug ?? null
-    navData = { ...navData, revenueSubDepts: subs, revenueSub }
+    // Revenue page's switcher (2026-10-10) — else the home one, the oldest —
+    // of those the viewer reaches on that page (2026-10-16).
+    navData = { ...navData, ...revenueNavData(subs, user.reach, jar.get(REVENUE_SUB_COOKIE)?.value) }
   }
   // Dept Pool lists each department for whoever reads them all (2026-10-09);
   // the ones added since — IT, Revenue Department — come from the registry
@@ -57,8 +56,8 @@ export default async function PortalLayout({
     <PortalFrame
       user={personalLogin ? { ...user, personalLogin } : user}
       navData={navData}
-      // HR's sidebar and Finance's (2026-10-14) fold alike, on the one cookie.
-      hrNavCollapsed={(isHrView(user.role) || isFinanceShell(user.role)) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
+      // HR's sidebar and Finance's (2026-10-14; the Principal's own view's since 2026-10-17) fold alike, on the one cookie.
+      hrNavCollapsed={(isHrView(user.role) || isFinanceShell(user)) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
       phone={phone}
     >
       {children}

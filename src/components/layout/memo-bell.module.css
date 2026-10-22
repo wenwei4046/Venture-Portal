@@ -104,6 +104,11 @@
   cursor: pointer;
 }
 .ack:disabled { opacity: 0.6; cursor: wait; }
+.ack:disabled:not([aria-busy]) { cursor: not-allowed; }
+/* The signature before Acknowledge (2026-10-20, components/memos/SignaturePad) on the kit's edges and type. */
+.signLabel { font-size: 12.5px; font-weight: 600; color: rgb(var(--hv-ink)); }
+.sign { --sig-line: rgb(var(--hv-hairline)); --sig-sub: rgb(var(--hv-brown)); --sig-font: 12.5px; --sig-radius: 12px; }
+.signed { --sig-line: rgb(var(--hv-hairline)); max-width: 220px; }
 .ackNote { font-size: 12px; line-height: 1.45; color: rgb(var(--hv-brown)); text-align: center; }
 .acked { font-size: 13px; color: rgb(21 110 78); font-weight: 500; }
 .err { font-size: 12.5px; color: rgb(var(--hv-danger)); }

@@ -412,16 +412,16 @@ check((await q('select public.lead_campaigns() l'))[0].l.some(k => k.id === draf
 // The flow runner leaves a campaign message alone.
 check((await q('select flow_state from public.lead_contacts where id = $1', [who.Eve]))[0].flow_state, 'none', 'no flow started or stopped')
 
-// ── Ads: name, source, link (migs 20261018100000 / 100100) ───────────────────
-await db.exec(await readFile(new URL('../../supabase/migrations/20261018100000_lead_ads.sql', import.meta.url), 'utf8'))
-const adsGuards = (await readFile(new URL('../../supabase/migrations/20261018100100_lead_ads_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+// ── Ads: name, source, link (migs 20261018110000 / 110100) ───────────────────
+await db.exec(await readFile(new URL('../../supabase/migrations/20261018110000_lead_ads.sql', import.meta.url), 'utf8'))
+const adsGuards = (await readFile(new URL('../../supabase/migrations/20261018110100_lead_ads_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(adsGuards.slice(adsGuards.indexOf('CREATE OR REPLACE FUNCTION pg_temp.guard_put')))
 for (const [fn, want] of [['lead_name_ad', 'leads.manage'], ['lead_save_meta_ads', 'leads.manage'], ['lead_test_ad', 'leads.create']]) {
   const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads/settings'], ARRAY['${want}']);`), true, `${fn} asks /leads/settings`)
 }
 // Applying it again changes nothing (the adCard's keys and join go in once).
-await db.exec(await readFile(new URL('../../supabase/migrations/20261018100000_lead_ads.sql', import.meta.url), 'utf8'))
+await db.exec(await readFile(new URL('../../supabase/migrations/20261018110000_lead_ads.sql', import.meta.url), 'utf8'))
 check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_ads' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on lead_ads')
 // A test conversation from an ad, with its id.
 const ida = (await q(`select public.lead_simulate($1, 'instagram', 'Ida', 'Chat with us', 'hi') c`, [b2990]))[0].c

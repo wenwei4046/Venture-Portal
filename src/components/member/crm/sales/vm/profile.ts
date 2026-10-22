@@ -12,7 +12,7 @@ import { openSummary } from "../../shared/notif-summary";
 import { lastWordsOf, summaryFor } from "../../shared/notif-summary-data";
 import { isReadNotif, salesNotifs } from "./notifs";
 
-const swv = (on: boolean) => ({ Bg: on ? "#387557" : "#D9C7BA", X: on ? "21px" : "3px" });
+const swv = (on: boolean) => ({ Bg: on ? "var(--crm-brown)" : "var(--crm-line)", X: on ? "21px" : "3px" });
 const to12 = (hhmm: string) => { const [H, M] = hhmm.split(":").map(Number); return { h: H % 12 || 12, m: M, ap: (H < 12 ? "AM" : "PM") as "AM" | "PM" }; };
 const lbl = (hhmm: string) => { const t = to12(hhmm); return `${t.h}:${String(t.m).padStart(2, "0")} ${t.ap}`; };
 
@@ -38,7 +38,7 @@ export function profileVM(ctx: SalesCtx) {
   // All · Unread · Read, on All (the owner, 2026-10-16: "Notification 要有一個 all，看過的要能看回去").
   const vis = notifs.filter(n => nTab === "all" || (nTab === "unread") === !isRead(n));
   const team = viewingOther ? [] : downlineOf(owner.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(Boolean);
-  const K = { share: ["#BD4A19", "#FFF0E4", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"], move: ["#2F6FB5", "#E4EDF8", "M5 12h14m-5-5 5 5-5 5"] } as const;
+  const K = { share: ["var(--crm-rust)", "var(--crm-tint-attention)", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"], move: ["var(--crm-ink-soft)", "var(--crm-tint-cold)", "M5 12h14m-5-5 5 5-5 5"] } as const;
 
   // Quick replies: the person's list, or the design's starters until they keep their own.
   const qrs = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
@@ -54,7 +54,7 @@ export function profileVM(ctx: SalesCtx) {
   });
   const W = AR.welcome, A = AR.after;
   const tp = ui.tp, setTp = (p: Partial<NonNullable<typeof ui.tp>>) => set(u => (u.tp ? { ...u, tp: { ...u.tp, ...p } } : u));
-  const sel = (on: boolean) => ({ bg: on ? "#4E2F20" : "#F5EBE3", fg: on ? "#fff" : "#3F2B22", weight: on ? 700 : 500 });
+  const sel = (on: boolean) => ({ bg: on ? "var(--crm-ink)" : "var(--crm-field)", fg: on ? "#fff" : "var(--crm-ink)", weight: on ? 700 : 500 });
   const openTp = (k: "from" | "to") => () => { const t = to12(k === "from" ? A.from : A.to); patch({ tp: { k, ...t, m: [0, 15, 30, 45].includes(t.m) ? t.m : 0 } }); };
 
   return {
@@ -69,7 +69,8 @@ export function profileVM(ctx: SalesCtx) {
     hasNotifBadge: unread > 0, notifBadge: unread ? String(unread) : "",
     openNotif: () => patch({ profSub: "notif", nTab: "all" }),
     nTabs: ([["all", "All", 0], ["unread", "Unread", unread], ["read", "Read", 0]] as const).map(([k, label, n]) => ({
-      label, n: n || 0, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "#3F2B22" : "#806B60", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" })),
+      // 4a (M13): every tab shows its count.
+      label, n: n || 0, on: nTab === k, cnt: k === "all" ? notifs.length : k === "unread" ? notifs.filter(x => !isRead(x)).length : notifs.filter(x => isRead(x)).length, pick: () => patch({ nTab: k }), bg: nTab === k ? "#fff" : "transparent", fg: nTab === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: nTab === k ? 650 : 500, shadow: nTab === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
     // Mark all as read: every update, never an invitation still to answer.
     canMarkAll: nTab !== "read" && notifs.some(n => !n.pending && !isRead(n)),
     markAll: () => act.readNotifs(notifs.filter(n => !n.pending && !isRead(n)).map(n => n.id), true),
@@ -85,16 +86,16 @@ export function profileVM(ctx: SalesCtx) {
     hasUpd: vis.some(n => !n.pending),
     notifUpd: vis.filter(n => !n.pending).map((n, k) => ({
       // Tapped: read, and — when it is about one of their own customers — that chat opens (user 2026-10-13).
-      unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "#806B60" : "#3F2B22", open: () => {
+      unread: !isRead(n), weight: isRead(n) ? 500 : 650, fg: isRead(n) ? "var(--crm-muted)" : "var(--crm-ink)", open: () => {
         if (!isRead(n)) act.readNotifs([n.id]);
         summaryOf(n);
       },
-      text: n.text, rule: k ? "1px solid #EBDDD2" : "0",
+      text: n.text, rule: k ? "1px solid var(--crm-rule)" : "0",
       meta: (() => { const c = custOf(n.customerId); return [n.lead, c ? CHANNEL[c.channel].name : "", n.at].filter(Boolean).join(" · "); })(),
       sum: lastWords(n.customerId),
-      ...(n.tone === "appt" ? { c: "#8E4B6E", bg: "#F3E8EF", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14" }
-        : n.tone === "wait" ? { c: "#A46312", bg: "#FBF1D9", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" }
-        : { c: n.ok ? "#387557" : "#A3371A", bg: n.ok ? "#E4F1E8" : "#FBEAE6", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18" }),
+      ...(n.tone === "appt" ? { c: "var(--crm-ink-soft)", bg: "var(--crm-tint-new)", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14" }
+        : n.tone === "wait" ? { c: "var(--crm-brown)", bg: "var(--crm-tint-appt)", icon: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" }
+        : { c: n.ok ? "var(--crm-brown)" : "var(--crm-oxblood)", bg: n.ok ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)", icon: n.ok ? "m5 12 5 5 9-10" : "M6 6l12 12M18 6 6 18" }),
     })),
     qrRows: qrs.map((q, i) => ({
       title: q.shortcut, text: q.message,

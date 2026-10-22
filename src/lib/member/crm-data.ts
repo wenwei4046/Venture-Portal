@@ -222,7 +222,9 @@ export interface CrmData {
    * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
-  adNames?: Record<string, { name: string; source: "manual" | "meta" }>;
+  adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null }>;
+  /** Members locked out of the dealing for now (mig 20261022130000, crm_staff.locked): off Assignment's lists. */
+  lockedStaff?: string[];
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
@@ -234,6 +236,36 @@ export interface CrmData {
   forms?: CrmForm[];
   /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
   notes?: CrmNote[];
+  /** Settings › General (mig 20261018100000, crm_settings_read): the reply lines, the template button, auto-assign. */
+  settings?: CrmSettings;
+}
+
+/** Settings › General, editable round 1 (the owner, 2026-10-18: "可以，照这三项做"). */
+export interface CrmSettings {
+  replySoonH: number;
+  replyUrgentH: number;
+  replyOverdueH: number;
+  /** The template button on a cold chat. */
+  suggestTemplate: boolean;
+  /** Off: a new lead is dealt to nobody and waits in the Team inbox to be sent by hand. */
+  autoAssign: boolean;
+  /** Off: no phone is told of a customer's message (the CRM's inbox is untouched). */
+  pushMessages: boolean;
+  /** Off: no reminders — the hourly sweep's pushes, and the screens' own. */
+  reminders: boolean;
+}
+
+/** What the CRM did before Settings were stored — and what it reads when the database gives nothing. */
+export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true };
+
+/** The database's answer, checked: the three lines rising within 1–24 h, else today's values. */
+export function settingsFrom(raw: unknown): CrmSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const n = (v: unknown, d: number) => (typeof v === "number" && Number.isInteger(v) ? v : d);
+  const D = DEFAULT_CRM_SETTINGS;
+  const s = n(r.replySoonH, D.replySoonH), u = n(r.replyUrgentH, D.replyUrgentH), o = n(r.replyOverdueH, D.replyOverdueH);
+  const lines = s >= 1 && u > s && o > u && o <= 24 ? { replySoonH: s, replyUrgentH: u, replyOverdueH: o } : { replySoonH: D.replySoonH, replyUrgentH: D.replyUrgentH, replyOverdueH: D.replyOverdueH };
+  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false };
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
@@ -337,7 +369,10 @@ export interface CrmDataRows {
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
-  adNames?: { ad_source_id: string; name: string; source: string }[];
+  adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null }[];
+  locked?: string[];
+  /** crm_settings_read()'s answer; absent before the migration. */
+  settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
@@ -437,7 +472,7 @@ export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAu
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
-  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual" };
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}) };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {
@@ -452,6 +487,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
       return nm ? { ...cu, ad: nm } : cu;
     }),
     adNames,
+    lockedStaff: rows.locked ?? [],
     visits: rows.visits.map(visitFromRow),
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
@@ -468,6 +504,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
     notifDeleted: rows.staffPrefs[0]?.notif_deleted ?? [],
     recentEmoji: rows.staffPrefs[0]?.recent_emoji ?? [],
+    settings: settingsFrom(rows.settings),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),

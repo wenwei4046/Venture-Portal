@@ -4,6 +4,7 @@ import {
   pickCat, pushRecent, recentList, toggleSearch, togglePanel, type ComposerState,
 } from "./composer";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 // The chat composer handoff (docs/design/chat-composer, 2026-10-14): the prototype's logic class, as the app keeps it.
@@ -20,10 +21,18 @@ describe("the composer's content is the prototype's", () => {
   });
   it("the search keywords, the icons and the Attach tiles, word for word", () => {
     for (const [k, e] of Object.entries(NAMES)) expect(PROTO).toMatch(new RegExp(`${k}: '${e}'`));
-    for (const [k, d] of Object.entries(ICON)) if (k !== "send" && k !== "mic") expect(PROTO).toContain(`${k}: '${d}'`);
+    // The sticker button is the 4a frames' smiley (2026-10-18, docs/design_handoff_crm_redesign wins on look).
+    for (const [k, d] of Object.entries(ICON)) if (k !== "send" && k !== "mic" && k !== "stk") expect(PROTO).toContain(`${k}: '${d}'`);
+    expect(ICON.stk).toMatch(/^M12 22a10 10/);
     expect(PROTO).toContain(`'${ICON.send}'`);
     expect(PROTO).toContain(`'${ICON.mic}'`);
-    for (const [label, icon, color] of TILES) expect(PROTO).toContain(`['${label}', '${icon}', '${color}']`);
+    // 4a (2026-10-18): the tiles keep the prototype's colours as their --crm-* tokens (tools/crm-design/palette-4a.cjs)
+    const palette = createRequire(import.meta.url)("../../../../../../tools/crm-design/palette-4a.cjs") as (s: string) => string;
+    for (const [label, icon, color] of TILES) {
+      const at = PROTO.indexOf(`['${label}', '${icon}', '#`);
+      expect(at, label).toBeGreaterThan(-1);
+      expect(palette(PROTO.slice(at, PROTO.indexOf("]", at) + 1))).toBe(`['${label}', '${icon}', '${color}']`);
+    }
   });
   it("Emoji is the panel's one tab while GIF and Sticker wait (the owner, 2026-10-14)", () => {
     expect(TABS.map(t => t[1])).toEqual(["Emoji"]);
@@ -109,7 +118,7 @@ describe("the prototype's state changes", () => {
     expect(pickCat(s0({ searching: true, q: "bed" }), "home")).toMatchObject({ ecat: "home", searching: false, q: "" });
   });
   it("the strip takes the colour of what is above it", () => {
-    expect([homeBg("sticker"), homeBg("attach"), homeBg(null)]).toEqual(["#fff", "#FBF7F3", "transparent"]);
+    expect([homeBg("sticker"), homeBg("attach"), homeBg(null)]).toEqual(["#fff", "var(--crm-page)", "transparent"]);
   });
   it("a chat's composer state is its own: another chat (reached any way) opens with nothing open", () => {
     const a = { ...s0({ panel: "sticker", searching: true, q: "bed" }), chat: "lead-a" };

@@ -20,6 +20,7 @@ import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { initialsOf } from '@/lib/people-roster'
+import { keptParts } from '@/lib/person-name'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
 import type { UplineGroup } from '@/lib/upline-choices'
 import {
@@ -40,6 +41,10 @@ import {
   payModeOf,
   type PayMode,
 } from '@/lib/person-record'
+import AddressFields from '@/components/address/AddressFields'
+import { EMPTY_ADDRESS, addressOf, addressRefusal, isEmptyAddress, sameAddress, type Address } from '@/lib/address/address'
+import { addressFormEntries } from '@/lib/address/address-form'
+import { loadMalaysia } from '@/lib/address/malaysia'
 import { updateStaff } from '../actions'
 import PersonWell from '../../_components/PersonWell'
 import s from './person-record.module.css'
@@ -63,6 +68,9 @@ import s from './person-record.module.css'
 /** What the page reads, worded — and masked — by the server as this viewer may see it. */
 export interface PersonRecordView {
   name: string
+  /** What the apps call them (2026-10-17) — the full name above stays the one on their IC. */
+  firstName: string | null
+  lastName: string | null
   department: string
   code: string | null
   title: string | null
@@ -144,13 +152,20 @@ export default function PersonRecord({
   const [settling, setSettling] = useState(false)
   const savedFrom = useRef<PersonRecordView | null>(null)
 
+  // The address in its six parts (2026-10-20): kept here, not on the form — State, City and Postcode are picked in
+  // turn — and sent whole when it changed, as a bank account is.
+  const addressWas = useMemo<Address>(() => (editor ? addressOf(editor.staff) : EMPTY_ADDRESS), [editor])
+  const [address, setAddress] = useState<Address>(addressWas)
+
   const ed = editing ? editor : null
-  const count = changed.size + (ed && mode !== initialMode ? 1 : 0)
+  const addressChanged = ed !== null && !sameAddress(address, addressWas)
+  const count = changed.size + (ed && mode !== initialMode ? 1 : 0) + (addressChanged ? 1 : 0)
   const busy = saving || settling
 
   function enter() {
     setMode(initialMode)
     setChanged(new Set())
+    setAddress(addressWas)
     setError(null)
     setEditing(true)
   }
@@ -226,9 +241,16 @@ export default function PersonRecord({
     // sent, so the save cannot put back an older value over somebody else's
     // change made since this page was opened.
     const data = changedFormData(event.currentTarget, changedFields(event.currentTarget), mode !== initialMode ? payModeFields(mode) : {})
+    if (addressChanged) for (const [name, value] of addressFormEntries(address)) data.set(name, value)
     setError(null)
     startSaving(async () => {
       try {
+        // An address is checked against Malaysia's list here first, so the refusal reads at once (the server asks again).
+        const refused = addressChanged ? addressRefusal(address, await loadMalaysia()) : null
+        if (refused) {
+          setError(refused)
+          return
+        }
         const outcome = await updateStaff(editor.staff.id, data)
         if (outcome.ok) {
           savedFrom.current = view
@@ -421,6 +443,20 @@ export default function PersonRecord({
   const wells = (
     <div className={s.wells}>
       <Well title="Identity" icon="idCard">
+        {/* First and last name (2026-10-17, the user: "大家的名字需要拆分为 first name 和 last name"): what the apps
+            call them — the Revenue app greets by the first. Filled from the full name's first word and the rest. */}
+        <Fact
+          label="First Name"
+          field="first_name"
+          value={view.firstName}
+          edit={e => <TextField name="first_name" defaultValue={keptParts(e.staff).first} maxLength={80} autoComplete="off" />}
+        />
+        <Fact
+          label="Last Name"
+          field="last_name"
+          value={view.lastName}
+          edit={e => <TextField name="last_name" defaultValue={keptParts(e.staff).last} maxLength={120} autoComplete="off" />}
+        />
         <Fact
           label="NRIC"
           field="nric"
@@ -483,11 +519,25 @@ export default function PersonRecord({
         />
         <Fact
           label="Address"
-          field="address"
           value={view.contact.address}
           multiline
           wide
-          edit={e => <AreaField name="address" defaultValue={e.staff.address} />}
+          edit={e => (
+            <AddressFields
+              value={address}
+              was={addressWas}
+              onChange={next => {
+                setAddress(next)
+                setError(null)
+              }}
+              idPrefix="person-address"
+              // An older record kept its address in one box: shown above the fields until it is written in parts.
+              onFile={isEmptyAddress(addressWas) ? e.staff.address : null}
+              disabled={busy}
+              inputClassName={s.input}
+              selectClassName={s.select}
+            />
+          )}
         />
       </Well>
 
@@ -824,19 +874,6 @@ function TextField({
       data-dirty={useChanged(name)}
       className={mono ? `${s.input} ${s.inputMono}` : s.input}
       {...rest}
-    />
-  )
-}
-
-function AreaField({ name, defaultValue }: { name: string; defaultValue: string | null }) {
-  return (
-    <textarea
-      id={fieldId(name)}
-      name={name}
-      rows={2}
-      defaultValue={defaultValue ?? ''}
-      data-dirty={useChanged(name)}
-      className={`${s.input} ${s.area}`}
     />
   )
 }

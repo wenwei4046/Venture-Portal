@@ -109,9 +109,18 @@ export function waitingAddDetail(
 
 // ─── The signed application form ────────────────────────────────────────────
 
-/** The member app's rule (`verifiedUpload`): a PDF, PNG or JPG of 3 MB or less. */
-export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg'
+/**
+ * What HR attaches as an applicant's signed form — with "+" and in the waiting drawer: the member app's PDF, PNG
+ * or JPG (`verifiedUpload`), and since 2026-10-20 a Word file too (the user: "want word file as well"), each of
+ * 3 MB or less. The member app itself still takes a PDF, PNG or JPG only.
+ */
+export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx'
 export const SIGNED_FORM_MAX_BYTES = 3 * 1024 * 1024
+export const SIGNED_FORM_KINDS = 'a PDF, Word, PNG or JPG file'
+
+/** Word's own types, as the bucket keeps them (mig 20261020160000). */
+export const WORD_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+export const WORD_DOC = 'application/msword'
 
 /** What the window can tell before sending: the size. The bytes are checked on the server. */
 export function signedFormRefusal(file: { size: number }): string | null {
@@ -137,27 +146,83 @@ export function signedFormKind(bytes: Uint8Array, declared: string): { mime: str
   return kind
 }
 
+export type LetterKind = { mime: string; extension: 'png' | 'jpg' | 'pdf' | 'docx' | 'doc' }
+
+/** `needle` somewhere in `bytes`. */
+function holds(bytes: Uint8Array, needle: readonly number[]): boolean {
+  const first = needle[0]
+  for (let i = bytes.indexOf(first); i !== -1 && i <= bytes.length - needle.length; i = bytes.indexOf(first, i + 1)) {
+    let j = 1
+    while (j < needle.length && bytes[i + j] === needle[j]) j++
+    if (j === needle.length) return true
+  }
+  return false
+}
+const ascii = (s: string) => Array.from(s, c => c.charCodeAt(0))
+/** A name as an OLE file's directory writes it: UTF-16, little end first. */
+const utf16 = (s: string) => Array.from(s).flatMap(c => [c.charCodeAt(0), 0])
+
+const ZIP = [0x50, 0x4b, 0x03, 0x04]
+const OLE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+
+/**
+ * An applicant's signed form as HR attaches it, looked at byte by byte, whatever its name says: what the member
+ * app takes (`signedFormKind`, its declared type agreeing), or a Word file — a .docx (a ZIP holding
+ * `word/document.xml`) or an old .doc (an OLE file holding a `WordDocument` stream). Browsers often leave Word's
+ * type blank, so Word is known by its bytes alone. A Word file holding macros (`vbaProject.bin`, `_VBA_PROJECT`)
+ * is `'macros'`: HR opens these files on their own computers. Null = none of them.
+ */
+export function letterKind(bytes: Uint8Array, declared: string): LetterKind | 'macros' | null {
+  const kind = signedFormKind(bytes, declared)
+  if (kind) return kind
+  const starts = (sig: readonly number[]) => bytes.length >= sig.length && sig.every((b, i) => bytes[i] === b)
+  if (starts(ZIP) && holds(bytes, ascii('word/document.xml'))) {
+    return holds(bytes, ascii('vbaProject.bin')) ? 'macros' : { mime: WORD_DOCX, extension: 'docx' }
+  }
+  if (starts(OLE) && holds(bytes, utf16('WordDocument'))) {
+    return holds(bytes, utf16('_VBA_PROJECT')) ? 'macros' : { mime: WORD_DOC, extension: 'doc' }
+  }
+  return null
+}
+
+/** Why a Word file holding macros is refused — HR's uploads and the member app's say it alike. */
+export const WORD_MACROS_REFUSAL = 'This Word file holds macros — save it as a plain Word document (.docx) or a PDF, then upload it.'
+
+/** The file as the signed form — its kind, or why it cannot be one, in words. */
+export function letterFile(bytes: Uint8Array, declared: string): { ok: true; kind: LetterKind } | { ok: false; reason: string } {
+  const kind = letterKind(bytes, declared)
+  if (kind === 'macros') return { ok: false, reason: WORD_MACROS_REFUSAL }
+  if (!kind) return { ok: false, reason: `The signed form must be ${SIGNED_FORM_KINDS}.` }
+  return { ok: true, kind }
+}
+
 // ─── "Submitted by" ─────────────────────────────────────────────────────────
 
 export interface SubmitterGroup {
-  /** The sub-department ("Fair"). */
+  /** The sub-department ("Fair"), or the department for whoever is placed in none. */
   group: string
   people: Array<{ id: string; name: string; title: string | null }>
 }
 
+type Submitter = { staffId: string; name: string; titleName?: string | null }
+
 /**
  * Who may have brought them in: the Revenue team as the page charts it — this sub-department first,
- * then its siblings — each person once (where they come first), by name. The database asks the same
- * (an active placement in a sub-department of the department).
+ * then its siblings — each person once (where they come first), by name; then (2026-10-20, the user:
+ * "它应该要能选到 Revenue department 的全部人，不管什么 title") everybody else active in the department, under
+ * its name — the Revenue Directors, who hold no placement, and anybody in a sub-department the chart
+ * does not draw. The database asks the same: active, and in the department or placed in one of its
+ * sub-departments.
  */
 export function submitterGroups(
-  departments: ReadonlyArray<{ name: string; people: ReadonlyArray<{ staffId: string; name: string; titleName?: string | null }> }>,
+  departments: ReadonlyArray<{ name: string; people: ReadonlyArray<Submitter> }>,
   current: string,
+  department: { name: string; people: ReadonlyArray<Submitter> } | null = null,
 ): SubmitterGroup[] {
   const ordered = [...departments].sort((a, b) => Number(b.name === current) - Number(a.name === current))
   const seen = new Set<string>()
   const groups: SubmitterGroup[] = []
-  for (const d of ordered) {
+  for (const d of department ? [...ordered, department] : ordered) {
     const people = d.people
       .filter(p => !seen.has(p.staffId))
       .map(p => ({ id: p.staffId, name: p.name, title: p.titleName ?? null }))
@@ -166,4 +231,77 @@ export function submitterGroups(
     if (people.length) groups.push({ group: d.name, people })
   }
   return groups
+}
+
+// ─── Edit, in the applicant's drawer ────────────────────────────────────────
+
+/**
+ * What the drawer's Edit changes (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"):
+ * the applicant's name and phone, the joining date and who brought them in. The department is the list's
+ * own and stays.
+ */
+export interface WaitingEditDraft {
+  name: string
+  contact: string
+  /** YYYY-MM-DD, or `anytime` (`ANY_TIME`). */
+  start: string
+  /** The Revenue-team member who brought them in: their staff id. */
+  submittedBy: string
+}
+
+/** Only what changed — a shared login on two computers never writes back what nobody touched. */
+export type WaitingEditChanges = Partial<WaitingEditDraft>
+
+/** The fields' words, in the drawer's order. */
+const EDIT_WORDS: Readonly<Record<keyof WaitingEditDraft, string>> = {
+  name: 'New member name',
+  contact: 'Mobile number',
+  start: 'Joining date',
+  submittedBy: 'Submitted by',
+}
+
+/** The fields the draft changed against the applicant as the drawer drew them (a name or phone compared trimmed). */
+export function waitingEditChanges(was: WaitingEditDraft, now: WaitingEditDraft): WaitingEditChanges {
+  const out: WaitingEditChanges = {}
+  if (now.name.trim() !== was.name.trim()) out.name = now.name.trim()
+  if (now.contact.trim() !== was.contact.trim()) out.contact = now.contact.trim()
+  if (now.start !== was.start) out.start = now.start
+  if (now.submittedBy !== was.submittedBy) out.submittedBy = now.submittedBy
+  return out
+}
+
+/** What stops a save, in words, in the drawer's order — or null. The database asks the same again. */
+export function waitingEditRefusal(changes: WaitingEditChanges): string | null {
+  const keys = Object.keys(changes) as Array<keyof WaitingEditDraft>
+  if (keys.length === 0) return 'Nothing has changed.'
+  const blank = keys.filter(k => k !== 'start' && !(changes[k] ?? '').trim())
+  if (blank.length) return fillIn(blank.map(k => ({ label: EDIT_WORDS[k] })))
+  if (changes.name !== undefined && changes.name.length > 160) return 'Keep the name under 160 characters.'
+  if (changes.contact !== undefined && changes.contact.length > 60) return 'Keep the phone number under 60 characters.'
+  if (changes.start !== undefined && !isJoiningDate(changes.start)) return 'Pick the joining date.'
+  if (changes.submittedBy !== undefined && !UUID.test(changes.submittedBy)) return 'Reload the page and try again.'
+  return null
+}
+
+/** What the browser sent, read on the server: only the four fields, only as strings. Null = not a change at all. */
+export function waitingEditChangesFrom(raw: unknown): WaitingEditChanges | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const out: WaitingEditChanges = {}
+  for (const key of Object.keys(EDIT_WORDS) as Array<keyof WaitingEditDraft>) {
+    if (!(key in o)) continue
+    if (typeof o[key] !== 'string') return null
+    out[key] = (o[key] as string).trim()
+  }
+  return out
+}
+
+/** The changes as `member_waiting_edit` takes them: the request's own words for each field. */
+export function waitingEditPayload(changes: WaitingEditChanges): Record<string, string> {
+  return {
+    ...(changes.name !== undefined ? { newPerson: changes.name } : {}),
+    ...(changes.contact !== undefined ? { contact: changes.contact } : {}),
+    ...(changes.start !== undefined ? { start: changes.start } : {}),
+    ...(changes.submittedBy !== undefined ? { staffId: changes.submittedBy } : {}),
+  }
 }

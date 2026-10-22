@@ -31,6 +31,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   // STABLE in the database (2026-10-11):
   // People's invite links not used yet (mig 20261016170000): STABLE, reading only.
   'account_invite_states',
+  // Sub-departments per person (mig 20261016180000): STABLE — the caller's reach, a person's window.
+  'my_sub_department_reach', 'person_sub_department_reach',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',
   'bridge_ref_flags', 'build_hr_cost_submission_payload', 'calculate_dept_np', 'claim_payment_queue', 'comm_home_sub_department',
   'comm_open_bill_on', 'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',
@@ -44,6 +46,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
   // Member services › Food claim (mig 20261013150000).
   'member_admin_food_claim',
+  'member_admin_transport_claim',
   // The replacement list's form (mig 20261011130000).
   'member_replacement_form',
   // Documentation (mig 20261011070000): the page's read, a file's path, a member's documents.
@@ -52,6 +55,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_drive', 'hr_drive_file',
   // …Publish › Preview and a memo's file (mig 20261012210000): both STABLE, reading only.
   'hr_memo_preview', 'memo_attachment',
+  // …a letter's signature, and one's own on a memo (mig 20261021013000): both STABLE, reading only.
+  'hr_letter_signature', 'my_memo_signature',
   // …and, the Revenue app's View as, one member's (mig 20261011110000) — Company and Personal since mig 20261014190000.
   'member_documents_of', 'my_documents_of',
   // Hiring (round 2): the board and where a file is — and the Talent Bank's folders (mig 20261013030000).
@@ -60,6 +65,12 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'director_hv_share_of',
   // The Revenue app's CRM chat button — one's own chats' unread (mig 20261014120000): STABLE.
   'crm_my_unread',
+  // IT support (mig 20261021020100): one's own requests, the desk's, a file's path — all STABLE.
+  'my_it_requests', 'it_requests_desk', 'it_request_file',
+  // Exact notification detail, including older than either list (mig 20261021030000): STABLE, reading only.
+  'it_request_get',
+  // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
+  'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',

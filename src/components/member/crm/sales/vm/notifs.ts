@@ -1,12 +1,11 @@
 /**
  * A salesperson's notifications (README › Roles): share / move invitations to
- * them (Accept · Decline), the answers to the ones they sent, and — for
- * someone with people below them — Won, Lost and Overdue 9 h+ about THEIR OWN
- * subordinates only. Unread = newer than when they last opened the page.
+ * them (Accept · Decline), the answers to the ones they sent, and their own
+ * customers' news — never another person's, a subordinate's included (2026-10-16).
+ * Unread = newer than when they last opened the page.
  */
-import { downlineOf } from "../../shared/people";
-import { CRM_LOST_REASONS } from "@/lib/member/crm";
-import { gb, day0, DAY, firstName, ini, isCold, money, urgencyOf, type SalesCtx } from "./common";
+import { gb, day0, DAY, firstName, ini, isCold, urgencyOf, type SalesCtx } from "./common";
+import { URGENCY_THRESHOLDS } from "@/lib/member/crm";
 
 export interface SalesNotif {
   id: string;
@@ -36,7 +35,6 @@ const atLabel = (t: number, now: Date) => {
 export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   const { data, owner, now, nameOf } = ctx;
   const me = owner.id, out: SalesNotif[] = [];
-  const reason = (r: unknown) => CRM_LOST_REASONS.find(x => x.value === r)?.label ?? "No reason";
   for (const i of data.invites) {
     const t = new Date(i.decidedAt ?? i.createdAt).getTime();
     if (i.to === me && i.state === "pending") {
@@ -66,8 +64,10 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   }
   // Their own customers' visits TOMORROW (the owner, 2026-10-14: "notification 要包含 upcoming appt 可以提前 1 天，就是通知
   // 業務去 send reminder 給客戶"): from the start of the day before, until the visit; "reminder sent" once it went.
+  // Settings › Notifications › Reminders off: none of the four reminders below (the hourly sweep sends none either).
+  const rem = data.settings?.reminders !== false;
   const tomorrow = day0(now) + DAY;
-  for (const v of data.visits) {
+  for (const v of rem ? data.visits : []) {
     if (v.state !== "booked") continue;
     const c = data.customers.find(x => x.id === v.customerId);
     if (!c || c.assignedTo !== me) continue;
@@ -79,19 +79,21 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   }
   // Their own chats waiting for their reply past 3 h · 6 h · 9 h (the owner, 2026-10-14: "有 3h, 6h, 9h 未回復的也有
   // notification 提醒，要儘快回復"): the line it crossed, one notice a line — each new line is unread again.
-  for (const c of data.customers) {
+  // The lines are Settings' (URGENCY_THRESHOLDS, 3 · 6 · 9 h until changed).
+  const L = { soon: URGENCY_THRESHOLDS.soonMinutes / 60, urgent: URGENCY_THRESHOLDS.urgentMinutes / 60, overdue: URGENCY_THRESHOLDS.overdueMinutes / 60 };
+  for (const c of rem ? data.customers : []) {
     if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now)) continue;
     const u = urgencyOf(c, now);
     if (u.level === "none") continue;
-    const h = u.level === "overdue" ? 9 : u.level === "urgent" ? 6 : 3, t = new Date(c.lastCustomerAt).getTime() + h * 3_600_000;
+    const h = L[u.level], t = new Date(c.lastCustomerAt).getTime() + h * 3_600_000;
     out.push({ id: `w${c.id}@${c.lastCustomerAt}:${h}`, customerId: c.id, tone: "wait", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, ok: false, pending: false,
-      text: u.level === "overdue" ? `Overdue · waiting ${Math.floor(u.waitingMinutes / 60)} h for your reply` : u.level === "urgent" ? "Urgent · waiting 6 h for your reply" : "Waiting for your reply · 3 h" });
+      text: u.level === "overdue" ? `Overdue · waiting ${Math.floor(u.waitingMinutes / 60)} h for your reply` : u.level === "urgent" ? `Urgent · waiting ${L.urgent} h for your reply` : `Waiting for your reply · ${L.soon} h` });
   }
   // Everything else about their own customers (the owner, 2026-10-15: "只要是關於到業務員本身的（appt, upcoming, chat）都要通知"):
   // a visit TODAY still to come, a visit gone by and not yet marked, a chat whose 24-hour window is about to shut, and a
   // visit somebody else booked, moved or cancelled for them. notify_crm_due() pushes the first three to the phone.
   const today = day0(now), hm = (d: Date) => d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
-  for (const v of data.visits) {
+  for (const v of rem ? data.visits : []) {
     if (v.state !== "booked") continue;
     const c = data.customers.find(x => x.id === v.customerId);
     if (!c || c.assignedTo !== me) continue;
@@ -103,7 +105,7 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
       out.push({ id: "k" + v.id, customerId: c.id, visitId: v.id, tone: "appt", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(st, now), time: st + 3_600_000, pending: false,
         ok: false, text: `Visit at ${hm(s0)} has passed · mark whether they came` });
   }
-  for (const c of data.customers) {
+  for (const c of rem ? data.customers : []) {
     if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || c.status === "won" || c.status === "lost") continue;
     const left = new Date(c.lastCustomerAt).getTime() + DAY - now.getTime();
     if (left <= 0 || left > 3 * 3_600_000) continue;
@@ -117,24 +119,8 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
     out.push({ id: "v" + e.id, customerId: e.customerId, tone: "appt", kind: "status", from: by, ini: ini(by), lead: cn, at: atLabel(t, now), time: t, ok: e.kind !== "appt_cancelled", pending: false,
       text: `${firstName(by)} ${e.kind === "appt_booked" ? "booked a visit" : e.kind === "appt_changed" ? "moved the visit" : "cancelled the visit"}` });
   }
-  // About the people below them, only theirs.
-  const below = new Set(downlineOf(me, data.people).filter(id => id !== me));
-  if (below.size) {
-    const custName = (id: string) => data.customers.find(c => c.id === id)?.name ?? "";
-    for (const e of data.events) {
-      if (!e.owner || !below.has(e.owner) || (e.kind !== "won" && e.kind !== "lost")) continue;
-      const who = firstName(nameOf(e.owner)), t = new Date(e.at).getTime();
-      out.push({ id: "e" + e.id, customerId: e.customerId, kind: "status", from: who, ini: ini(nameOf(e.owner)), lead: custName(e.customerId), at: atLabel(t, now), time: t, pending: false,
-        ok: e.kind === "won", text: e.kind === "won" ? `${who} marked a customer as Won${typeof e.data.amount === "number" || typeof e.data.amount === "string" ? " · " + money(Number(e.data.amount)) : ""}` : `${who} marked a customer as Lost · ${reason(e.data.reason)}` });
-    }
-    for (const c of data.customers) {
-      if (!c.assignedTo || !below.has(c.assignedTo)) continue;
-      const u = urgencyOf(c, now);
-      if (u.level !== "overdue") continue;
-      const who = firstName(nameOf(c.assignedTo)), t = now.getTime() - u.waitingMinutes * 60_000 + 9 * 3_600_000;
-      out.push({ id: "o" + c.id, customerId: c.id, kind: "status", from: who, ini: ini(nameOf(c.assignedTo)), lead: c.name, text: `${who}'s customer has waited ${Math.floor(u.waitingMinutes / 60)} h for a reply`, at: atLabel(t, now), time: t, ok: false, pending: false });
-    }
-  }
+  // Nothing about the people below them (the owner, 2026-10-16: "notification 只跳關於自己的" — a leader was told of their
+  // downline's Won / Lost and overdue chats; the Team side shows those, nothing tells of them).
   return out.sort((a, b) => b.time - a.time);
 }
 

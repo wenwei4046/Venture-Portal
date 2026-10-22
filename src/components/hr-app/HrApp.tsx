@@ -1,34 +1,51 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { officeTime } from '@/lib/office-time'
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
 import { PUSH_WORDS, popUpNeedsTurningOn, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
 import PopUpGuide from '@/components/pwa/PopUpGuide'
 import PushAsk from '@/components/pwa/PushAsk'
 import { useTuckOnScroll } from '@/components/pwa/tuck'
 import tuck from '@/components/pwa/tuck.module.css'
-import { pageKeyOf, usePageScroll } from './page-scroll'
 import { Select } from '@/components/hrv/select'
+import type { HrIconName } from '@/components/hrv/icons'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import { PASSWORD_CHANGED, useChangePassword, type ChangePassword } from '@/components/account/use-change-password'
+import { useRequestEmail, type RequestEmailActions } from '@/components/account/use-request-email'
 import { MIN_PASSWORD_LENGTH } from '@/lib/account/password'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
+import { MeOverlay } from '@/components/me/MeOverlay'
+import ItSupport from '@/components/it-support/ItSupport'
+import { useMe, useClock } from '@/components/me/useMe'
+import { ListCard, ListItem, Label } from '@/components/me/kit'
+import { todayCard } from '@/lib/me/today'
+import { officeToday } from '@/lib/office-time'
+import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
+import { missingAnswers } from '@/lib/hiring/view'
+import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  CAND_STAGE, CHIP, HIRE_FILTERS, HR_APP_VIEWS, MAJOR_EVENTS, MEMBER_KIND, MEMO_TAG, ORANGE, SLATE,
-  bookingTimes, budgetLabel, candChip, clashOf, dayLabel, daysToFill, hireChip, hm, hourFrom, initials, isPendingHire,
-  isPendingRequest, missingFor, noticeAgo, noticeTag, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
-  type CandStage, type HrAppData, type HrAppView, type HrBooking, type HrHire,
+  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, requestView,
+  todayCounts, todayRows, type TodayKey,
+} from '@/lib/hr-app/hr-view'
+import {
+  CAND_STAGE, CHIP, HR_APP_VIEWS, MEMBER_KIND, bookingTimes, candChip, clashOf, dayLabel, hm, hourFrom, isPendingHire, isPendingRequest, positionLabel,
+  type CandStage, type HrAppData, type HrAppView, type HrHire,
 } from '@/lib/hr-app/model'
-import { ackedLine, memoDay, memoFileExt, memoParas, memoUnread, memoWaiting, memoWhen, memosInOrder, type MyMemo } from '@/lib/memos/model'
-import { letterState, personalIn, personalPath, personalUnseen, type MyDocuments } from '@/lib/documentation/personal'
-import { docDay } from '@/lib/documentation/model'
+import { memoUnread, memoWaiting, memosInOrder, type MyMemo } from '@/lib/memos/model'
+import { personalUnseen, type MyDocuments } from '@/lib/documentation/personal'
+import { pageKeyOf, usePageScroll } from './page-scroll'
+import { Avatar, Field, Icon, MONO, Sheet, SheetFacts, Toast, useToast, type SheetAction } from './kit'
+import {
+  ApproveScreen, BalancesScreen, CloseScreen, DeskScreen, GenScreen, HireScreen, HomeScreen, MemberScreen, MemoScreen, MemosScreen, MyDocsScreen,
+  NoticesScreen, PeopleScreen, PersonScreen, RequestScreen, STAGES, TalentScreen, TodayScreen, type ApproveTab, type HomeItem,
+} from './screens'
 import s from './hr-app.module.css'
 
-// The HR phone app (2026-10-11, HR revamp round 2 — README §17, the handoff's
-// `HR Mobile App.dc.html`): Home · Review · Hiring · Rooms · More, a stack of
-// pages pushed on top of a tab, and sheets that slide up over everything.
-// It reads the portal's own modules and writes through their actions; the
-// app keeps only where you are and what you are typing.
+// The HR app — HR Mobile (2026-10-17, the Claude Design handoff `design_handoff_hr_mobile`; the user: "make sure is
+// same 100% with the prototype", and of the old app's functions the design does not draw, "keep all"). Four tabs —
+// Home · Today · Approve · People — a stack of sub screens pushed from anywhere, sheets rising from the bottom, the
+// bottom bar stepping away while reading on. The avatar on the head opens Me (components/me). It reads the portal's
+// own modules and writes through their actions; the app keeps only where you are and what you are typing.
 
 export type ActResult = { ok: true } | { ok: false; reason: string }
 
@@ -38,135 +55,169 @@ export interface HrAppActions {
   hireDecline(id: string, note: string): Promise<ActResult>
   hireCancel(id: string): Promise<ActResult>
   hireFill(id: string, hired: string, source: string, cost: string): Promise<ActResult>
+  /** "+ New hiring request" (2026-10-17): the desktop drawer's own Submit to HR. */
+  hireNew(requestedBy: string, answers: Record<string, string>): Promise<{ ok: true; id: string } | { ok: false; reason: string }>
   candStage(hireId: string, candId: string, stage: CandStage): Promise<ActResult>
   candAdd(hireId: string, cand: { name: string; phone: string; note: string }): Promise<ActResult>
   requestDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string, route?: 'payroll' | 'payment'): Promise<ActResult>
+  /** HR › Attendance › Requests (2026-10-17): the waiting step — HR's, or the upline's on their behalf. */
+  attDecide(id: string, approve: boolean, note: string): Promise<ActResult>
   book(b: { title: string; dept: string; roomId: string; date: string; from: number; to: number; attendees: string[]; pax: number }): Promise<ActResult>
   bookCancel(id: string): Promise<ActResult>
   talentNotes(id: string, notes: string): Promise<ActResult>
   talentRemove(id: string): Promise<ActResult>
-  letterLink(letterId: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
+  /** A Data center letter's (or, 2026-10-17, a company document's) short link, made at the press. */
+  letterLink(id: string, kind?: 'letter' | 'document'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** Their notifications read: these, or all (2026-10-11). */
   noticesRead(ids?: string[] | null): Promise<ActResult>
   /** This phone's pushes on / off. */
   pushSave(s: { endpoint: string; p256dh: string; auth: string; app: 'hr' | 'revenue' }): Promise<ActResult>
   pushRemove(endpoint: string): Promise<ActResult>
-  /** What went wrong turning them on, told to the server's log. */
   pushTrouble: PushTrouble
   /** Another view of the one app (setViewAs): it opens where that view lives. */
   switchView(view: HrAppView): void
-  /** This login's own password (2026-10-12): the current one, then the new one twice — a personal login only. */
+  /** This login's own password (2026-10-12) — a personal login only. */
   changePassword: ChangePassword
+  /** Request to change email (2026-10-16) — a personal login only. Absent: the row is not drawn. */
+  requestEmail?: RequestEmailActions
   /**
-   * Their own memo (2026-10-12): opened (`ack` false) or acknowledged — the LOGIN's receipt, so it is done in every
-   * view (the portal's bell, the Revenue app) at once. The account's own, not a module's (lib/memos/actions.ts).
+   * Their own memo (2026-10-12): opened, or acknowledged — the LOGIN's receipt, in every view at once. Acknowledged
+   * with their own signature (2026-10-20): the pad's PNG, refused without one.
    */
-  memoMark(id: string, ack: boolean): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
-  /** A memo's file: a short link made at the press. */
+  memoMark(id: string, ack: boolean, signature?: string | null): Promise<{ ok: true; acknowledgedAt?: string | null } | { ok: false; reason: string }>
+  /** The signature an acknowledged memo of theirs was given (2026-10-20) — drawn under it; null when there is none. */
+  memoSignature?(id: string): Promise<string | null>
   memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
-  /** One of their own documents (2026-10-14): a short link made at the press, the open recorded for HR. The login's own. */
+  /** One of their own documents (2026-10-14): a short link made at the press. */
   myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** After a write: read the app's data again. */
   refresh(): void
 }
 
-type Tab = 'home' | 'review' | 'hiring' | 'rooms' | 'more'
+type Tab = 'home' | 'today' | 'approve' | 'people'
+
 type Page =
-  | { k: 'hire'; id: string }
   | { k: 'req'; id: string }
-  | { k: 'insights' }
-  | { k: 'talents' }
-  | { k: 'talent'; id: string }
-  | { k: 'docs' }
+  | { k: 'mreq'; id: string }
   | { k: 'person'; id: string }
+  | { k: 'leave' }
+  | { k: 'close' }
+  | { k: 'gen'; id: GenKey }
+  | { k: 'desk'; id: string; icon: HrIconName }
+  | { k: 'hire'; id: string }
+  | { k: 'talent'; id: string }
   | { k: 'notices' }
   | { k: 'memos' }
   | { k: 'memo'; id: string }
+  | { k: 'it'; id?: string }
   | { k: 'mydocs' }
   | { k: 'mydocsFolder'; id: string }
-type Sheet =
+
+type SheetK =
+  | { k: 'facts'; eyebrow: string; title: string; sub?: string; facts: Array<[string, string]>; actions?: SheetAction[] }
   | { k: 'stage'; cid: string; name: string; cur: CandStage }
-  | { k: 'ack' }
-  | { k: 'info' }
-  | { k: 'fill' }
-  | { k: 'cand' }
+  | { k: 'ack' } | { k: 'info' } | { k: 'fill' } | { k: 'cand' } | { k: 'newHire' }
   | { k: 'book' }
   | { k: 'booking'; id: string }
-  | { k: 'approve'; id: string }
-  | { k: 'password' }
+  | { k: 'claim'; id: string }
+  | { k: 'password' } | { k: 'email' }
+  | { k: 'account' }
 
 type Form = Record<string, string | string[] | number | undefined>
 
-// The tab bar's icons (the prototype's own two-path glyphs, 21px, stroke 1.8).
-const TAB_ICON: Record<Tab, [string, string]> = {
-  home: ['M3 10.5 12 4l9 6.5', 'M5.5 9.5V20h13V9.5'],
-  review: ['M4 5.5h16v13H4z', 'M8 12.2l2.7 2.7L16 9.6'],
-  hiring: ['M10 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z M4 20c0-3.6 2.7-6 6-6 1.2 0 2.3.3 3.2.8', 'M18 14v6M15 17h6'],
-  rooms: ['M3.5 5h17v15h-17z', 'M8 3v4M16 3v4M3.5 10h17'],
-  more: ['M5 12h.01M12 12h.01M19 12h.01', 'M4 6h16M4 18h16'],
-}
-const TABS: Array<[Tab, string]> = [['home', 'Home'], ['review', 'Review'], ['hiring', 'Hiring'], ['rooms', 'Rooms'], ['more', 'More']]
-const TITLES: Record<string, [string, string]> = {
-  home: ['', 'Human Resource'], review: ['Inbox', 'Review'], hiring: ['Hiring', 'Requests'], rooms: ['Admin', 'Meeting rooms'],
-  more: ['HR', 'More'], insights: ['Hiring', 'Insights'], talents: ['Hiring', 'Talent Bank'], docs: ['Documentation', 'Data center'],
-  notices: ['HR', 'Notifications'], memos: ['For you', 'Memos'], mydocs: ['For you', 'My documents'],
-}
+const TABS: Array<[Tab, string, HrIconName]> = [['home', 'Home', 'home'], ['today', 'Today', 'in'], ['approve', 'Approve', 'approve'], ['people', 'People', 'staff']]
+const TITLE: Record<Tab, string> = { home: '', today: 'Today', approve: 'Approve', people: 'People' }
 
-/** The book sheet opens on HR, as the prototype's does — or the first department there is. */
+/** The book sheet opens on HR, as the old app's did — or the first department there is. */
 const defaultDept = (d: HrAppData) => (d.bookDepts.find(x => x.name === 'HR') ?? d.bookDepts[0])?.id ?? ''
 
-const Chevron = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(128 107 96)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-    <path d="M9 6l6 6-6 6" />
-  </svg>
-)
+/** The number Call and Message dial: "012-345 6789" → +60123456789 for WhatsApp. */
+function waNumber(phone: string): string {
+  const digits = phone.replace(/[^\d+]/g, '').replace(/^\+/, '')
+  return digits.startsWith('0') ? `6${digits}` : digits
+}
 
-export default function HrApp({ data, actions }: { data: HrAppData; actions: HrAppActions }) {
+/** A link made at the press, opened in a tab readied in the tap (never kept; no handle back on the app). */
+function openInTab(get: () => Promise<{ ok: true; url: string } | { ok: false; reason: string }>, fail: (m: string) => void, after?: () => void) {
+  const win = window.open('', '_blank')
+  if (win) win.opener = null
+  void get().then(res => {
+    if (res.ok && win) win.location.href = res.url
+    else {
+      win?.close()
+      if (!res.ok) fail(res.reason)
+    }
+    if (res.ok) after?.()
+  })
+}
+
+export default function HrApp({ data: d, actions }: { data: HrAppData; actions: HrAppActions }) {
   const [tab, setTab] = useState<Tab>('home')
   const [stack, setStack] = useState<Page[]>([])
-  const [sheet, setSheet] = useState<Sheet | null>(null)
+  const [sheet, setSheet] = useState<SheetK | null>(null)
   const [form, setForm] = useState<Form>({})
   const [formErr, setFormErr] = useState('')
   const [note, setNote] = useState('')
-  const [rvTab, setRvTab] = useState<'all' | 'hire' | 'req'>('all')
-  const [hFilter, setHFilter] = useState('open')
-  const [roomView, setRoomView] = useState<'cards' | 'timeline'>('cards')
-  const [date, setDate] = useState<string | null>(null)
-  const [tq, setTq] = useState('')
-  const [arm, setArm] = useState(false)
-  const [talentNotes, setTalentNotes] = useState<{ id: string; text: string } | null>(null)
-  // My documents (2026-10-14): Company or Personal.
+  const [todayF, setTodayF] = useState<TodayKey | 'all'>('all')
+  const [reqF, setReqF] = useState<ApproveTab>('hr')
+  const [lvF, setLvF] = useState<'all' | 'low'>('all')
+  const [gF, setGF] = useState<Partial<Record<GenKey, string>>>({})
+  const [q, setQ] = useState('')
   const [mdTab, setMdTab] = useState<'company' | 'personal'>('company')
+  const [talentNotes, setTalentNotes] = useState<{ id: string; text: string } | null>(null)
+  const [arm, setArm] = useState(false)
   const [busy, startBusy] = useTransition()
-  const [error, setError] = useState('')
+  const [toast, flash] = useToast()
+  const [meOpen, setMeOpen] = useState(false)
+  const [meStart, setMeStart] = useState<string | null>(null)
 
-  // A part their tabs close is left out of every list (2026-10-11): Hiring › Requests closed, no request is
-  // listed or reviewed — Insights alone still reads them (parts.insights).
-  const d = useMemo(() => (data.parts.hiring ? data : { ...data, hires: [] }), [data])
   const top = stack[stack.length - 1]
-  const view: string = top ? top.k : tab
-  // Every page opens at its top and Back returns to where its page was left; the tab bar steps out of the way while
-  // reading on, and is back on scrolling up or on another page (2026-10-11).
+  const att = d.att ?? null
+  const now = useMemo(() => new Date(), [d])
+  // Every page opens at its top and Back returns to where its page was left; the bar steps away while reading on.
   const page = pageKeyOf(tab, stack)
   const scrollerRef = useRef<HTMLDivElement>(null)
   usePageScroll(scrollerRef, page)
   const barRef = useRef<HTMLElement>(null)
-  const tucked = useTuckOnScroll(barRef, true, page)
-  const today = d.today
-  const day = date ?? today
-  const live = d.bookings
-  const items = useMemo(() => reviewItems(d), [d])
-  const staffName = (id: string | null | undefined) => d.staff.find(p => p.id === id)?.name ?? id ?? '—'
-  // Their own memos (2026-10-12): waiting first, newest first — and what was opened or acknowledged here shows at
-  // once, before the app reads again.
+  const tucked = useTuckOnScroll(barRef, !top, page)
+
+  // Me (2026-10-17): the avatar opens it, for a login of their own with a People record; it reads today on opening.
+  const personal = !!d.personalLogin && !d.viewingAs
+  // A personal login is one a People record names (lib/account/personal-login.ts): Me is theirs.
+  const mine = personal
+  const me = useMe(mine)
+  const nowSec = useClock(me.s.today?.now, me.s.todayAt)
+  const card = todayCard(me.s.today, nowSec, officeToday())
+  const meName = d.meLine?.split(' · ')[0] || d.greetName
+  const meAv = avatarOf(meName || 'Me')
+
+  // Their own memos (2026-10-12): what was opened or acknowledged here shows at once, before the app reads again.
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   const [acked, setAcked] = useState<ReadonlyMap<string, string>>(() => new Map())
+  // The signature before Acknowledge (2026-10-20): the pad's picture for the memo open, and each acknowledged memo's
+  // signature once given here or read back.
+  const [memoSig, setMemoSig] = useState<string | null>(null)
+  const [memoSigned, setMemoSigned] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const memoSigAsked = useRef<Set<string>>(new Set())
   const memos = useMemo<MyMemo[]>(() => memosInOrder((d.memos ?? []).map(m => ({
     ...m,
     readAt: m.readAt ?? (opened.has(m.id) || acked.has(m.id) ? m.publishedAt : null),
     acknowledgedAt: m.acknowledgedAt ?? acked.get(m.id) ?? null,
   }))), [d.memos, opened, acked])
 
+  // ── What the tabs count ──
+  const tRows = useMemo(() => (att && d.parts.today ? todayRows(att) : []), [att, d.parts.today])
+  const tCounts = todayCounts(tRows)
+  const aCounts = att && d.parts.approve ? approveCounts(att.requests) : { hr: 0, upline: 0, decided: 0 }
+  const membersOn = d.parts.requests
+  const memberPending = d.requests.filter(isPendingRequest).length
+  const hrWaiting = aCounts.hr + (membersOn ? memberPending : 0)
+  const bRows = useMemo(() => (att && d.parts.balances ? balanceRows(att) : []), [att, d.parts.balances])
+  const lowLeave = bRows.filter(r => r.low).length
+  const pendingHires = d.parts.hiring ? d.hires.filter(isPendingHire).length : 0
+  const attShut = (open: boolean) => (!open ? 'This is not open to your account.' : !att ? d.attError ?? 'Attendance could not be read.' : null)
+
+  // ── Moving about ──
   const push = (p: Page) => {
     setStack(st => [...st, p])
     setNote('')
@@ -178,44 +229,92 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     setStack([])
     setSheet(null)
   }
+  const openSheet = (sh: SheetK, f: Form = {}) => {
+    setSheet(sh)
+    setForm(f)
+    setFormErr('')
+    setArm(false)
+  }
+  const closeSheet = () => setSheet(null)
 
-  // ── Notifications (2026-10-11): a notice opens what it is about, or its tab when it has left the lists. ──
+  /** Run a write; close what asked for it on success, say why on a refusal. */
+  const run = (fn: () => Promise<ActResult>, after?: () => void, done?: string) => {
+    startBusy(async () => {
+      const res = await fn()
+      if (!res.ok) {
+        if (sheet) setFormErr(res.reason)
+        else flash(res.reason)
+        return
+      }
+      after?.()
+      if (done) flash(done)
+      actions.refresh()
+    })
+  }
+
+  const genOpen = (key: GenKey) => {
+    const g = genPage(key, d, gF[key] ?? null, gF.roomSched ?? d.today)
+    if (g) push({ k: 'gen', id: key })
+    else push({ k: 'desk', id: GEN_META[key].label, icon: GEN_META[key].icon })
+  }
+
+  // IT support belongs to the signed-in account, including shared logins; it stays inside HR's app.
+  const openIt = (id?: string) => {
+    if (d.viewingAs) return
+    setSheet(null)
+    setMeOpen(false)
+    setTab('home')
+    setStack([{ k: 'it', id }])
+  }
+
+  // ── Notifications: a notice opens what it is about, or its list when it has left it ──
   const openRef = (kind: NoticeRef, id: string) => {
     setSheet(null)
+    if (kind === 'it_request') {
+      openIt(id)
+      return
+    }
     if (kind === 'hiring_request') {
-      setTab('hiring')
-      setStack(d.hires.some(h => h.id === id) ? [{ k: 'hire', id }] : [])
-    } else if (kind === 'memo') {
-      // A memo or letter for them (2026-10-12): it opens; one taken back since leaves its list.
       setTab('home')
-      setStack(memos.some(m => m.id === id) ? [{ k: 'memo', id }] : [{ k: 'memos' }])
+      setStack(d.hires.some(h => h.id === id) ? [{ k: 'gen', id: 'hire' }, { k: 'hire', id }] : [{ k: 'gen', id: 'hire' }])
+    } else if (kind === 'memo') {
+      setTab('home')
+      setStack(memos.some(m => m.id === id) ? [{ k: 'memos' }, { k: 'memo', id }] : [{ k: 'memos' }])
     } else if (kind === 'member_request') {
-      setTab('review')
-      setStack(d.requests.some(r => r.id === id) ? [{ k: 'req', id }] : [])
+      setTab('approve')
+      setReqF('members')
+      setStack(d.requests.some(r => r.id === id) ? [{ k: 'mreq', id }] : [])
     } else {
-      setTab('rooms')
-      setStack([])
-      if (live.some(b => b.id === id)) openSheet({ k: 'booking', id })
+      setTab('home')
+      setStack([{ k: 'gen', id: 'roomSched' }])
+      if (d.bookings.some(b => b.id === id)) openSheet({ k: 'booking', id })
     }
   }
-  // Which were new when the bell was opened: still marked on its page after the dot goes.
   const [fresh] = useState(() => new Set(d.notices.items.filter(n => !n.read).map(n => n.id)))
   const openNotices = () => {
     push({ k: 'notices' })
     if (d.notices.unread > 0) void actions.noticesRead(null).then(r => { if (r.ok) actions.refresh() })
   }
   // A tapped push opens the app at `?open=hire:HR-205` (lib/push/notices noticeUrl): go there once, then forget it.
+  // One's own request, decided (`open=me:<id>`, 2026-10-17): Me, on that request.
   useEffect(() => {
     const target = openTarget(new URLSearchParams(window.location.search).get('open'))
     if (!target) return
     window.history.replaceState(null, '', window.location.pathname)
-    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : 'booking', target.id)
+    if (target.k === 'me') {
+      if (mine) {
+        setMeStart(target.id)
+        setMeOpen(true)
+      }
+      return
+    }
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
   // This phone's pushes: asked of the browser once the app is open; the permission only when the row is pressed.
   const [pushNow, setPushNow] = useState<PushState | null>(null)
-  // Make them pop up (2026-10-14): an Android phone shows them in the shade only, until the person turns that on.
   const [popUpGuide, setPopUpGuide] = useState(false)
   useEffect(() => {
     void pushState().then(setPushNow).catch(() => setPushNow('unsupported'))
@@ -224,1037 +323,407 @@ export default function HrApp({ data, actions }: { data: HrAppData; actions: HrA
     startBusy(async () => {
       const res = pushNow === 'on' ? await turnPushOff(actions.pushRemove) : await turnPushOn('hr', actions.pushSave, actions.pushTrouble)
       setPushNow(res.state)
-      setError(res.reason ?? '')
-    })
-  }
-  const openSheet = (sh: Sheet, f: Form = {}) => {
-    setSheet(sh)
-    setForm(f)
-    setFormErr('')
-    setArm(false)
-  }
-
-  /** Run a write; close what asked for it on success, say why on a refusal. */
-  const run = (fn: () => Promise<ActResult>, after?: () => void, inSheet = true) => {
-    startBusy(async () => {
-      const res = await fn()
-      if (!res.ok) {
-        if (inSheet && sheet) setFormErr(res.reason)
-        else setError(res.reason)
-        return
-      }
-      setError('')
-      after?.()
-      actions.refresh()
+      if (res.reason) flash(res.reason)
     })
   }
 
-  // ── the open hiring request ──
+  // ── The open things ──
+  const ar = top?.k === 'req' && att ? att.requests.find(r => r.id === top.id) ?? null : null
+  const mr = top?.k === 'mreq' ? d.requests.find(r => r.id === top.id) ?? null : null
   const hr = top?.k === 'hire' ? d.hires.find(h => h.id === top.id) ?? null : null
-  // ── the open member request ──
-  const rr = top?.k === 'req' ? d.requests.find(r => r.id === top.id) ?? null : null
-  // ── the open talent / person ──
   const tt = top?.k === 'talent' ? d.talents.find(t => t.id === top.id) ?? null : null
-  const pp = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
-  // ── the open memo (2026-10-12) ──
   const mm = top?.k === 'memo' ? memos.find(m => m.id === top.id) ?? null : null
+  const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
+  const attPerson = top?.k === 'person' && att ? att.config.people.find(p => p.id === top.id) ?? null : null
+  const staffPerson = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
 
-  // Opening a memo is reading it: the login's receipt, the same in every view (and its notice goes quiet).
+  // Opening a memo is reading it: the login's receipt, the same in every view.
   const memoOpen = mm && memoUnread(mm) && !d.viewingAs ? mm.id : null
   useEffect(() => {
     if (!memoOpen) return
     setOpened(prev => new Set(prev).add(memoOpen))
-    void actions.memoMark(memoOpen, false).then(r => {
-      if (r.ok) actions.refresh()
-    })
+    void actions.memoMark(memoOpen, false).then(r => { if (r.ok) actions.refresh() })
     // Once per memo opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memoOpen])
-  const ackMemo = (id: string) =>
-    run(async () => {
-      const r = await actions.memoMark(id, true)
-      if (r.ok) setAcked(prev => new Map(prev).set(id, r.acknowledgedAt ?? new Date().toISOString()))
-      return r
-    }, undefined, false)
-  const openMemoFile = (id: string) => {
-    // A link made at the press (never kept): opened in a tab readied in the tap, with no handle back on the app.
-    const win = window.open('', '_blank')
-    if (win) win.opener = null
-    void actions.memoFile(id, 'view').then(res => {
-      if (res.ok && win) win.location.href = res.url
-      else {
-        win?.close()
-        if (!res.ok) setError(res.reason)
-      }
+  // Another memo, or none: the pad starts clean. One they acknowledged: its signature read back once, to draw under it.
+  const memoShown = mm?.id ?? null
+  useEffect(() => { setMemoSig(null) }, [memoShown])
+  const memoSignedAt = mm && mm.acknowledgedAt && !d.viewingAs ? mm.id : null
+  useEffect(() => {
+    if (!memoSignedAt || !actions.memoSignature || memoSigAsked.current.has(memoSignedAt)) return
+    memoSigAsked.current.add(memoSignedAt)
+    const id = memoSignedAt
+    void actions.memoSignature(id).then(png => {
+      if (png) setMemoSigned(prev => (prev.has(id) ? prev : new Map(prev).set(id, png)))
     })
+    // Once per acknowledged memo opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoSignedAt])
+
+  // ── An attendance request decided (HR's step, or the upline's on their behalf) ──
+  const arView = ar && att ? requestView(ar, att.config, att.ledger, att.requests) : null
+  const arCanDecide = !!ar && !!arView?.waitsAt && d.may.attDecide && !d.viewingAs
+  const arOwn = !!ar && !!att && att.config.people.some(p => p.id === ar.staffId && p.hasLogin && p.name === att.config.me)
+  // At the upline's step: on their behalf — unless the viewer IS that upline (2026-10-17), whose own step it is.
+  const arBehalf = arView?.waitsAt === 'upline' && !(ar && att && waitsAtMe(ar, att.config))
+  const decideAtt = (approve: boolean) => {
+    if (!ar || !att) return
+    if (!approve && !note.trim()) { flash('Add a note to reject'); return }
+    run(() => actions.attDecide(ar.id, approve, note), () => { pop(); setNote('') }, decidedWords(ar, att.config.leaveTypes, approve))
+  }
+  const decideMember = (approve: boolean) => {
+    if (!mr) return
+    if (!approve) {
+      if (!note.trim()) { flash('Add a note to reject'); return }
+      run(() => actions.requestDecide(mr.id, 'reject', note), pop, `${MEMBER_KIND[mr.kind]} · rejected`)
+      return
+    }
+    if (mr.kind === 'claim') return openSheet({ k: 'claim', id: mr.id }, { note })
+    run(() => actions.requestDecide(mr.id, mr.kind === 'waiting' ? 'accept' : 'approve', note), pop, mr.kind === 'waiting' ? 'Accepted to the waiting list' : `${MEMBER_KIND[mr.kind]} · approved`)
   }
 
-  // One of their own documents (2026-10-14): a link made at the press, in a tab readied in the tap; the open is recorded
-  // (seen, a letter's memo read), so the app reads again.
-  const openMine = (kind: 'document' | 'drive' | 'letter', id: string) => {
-    const win = window.open('', '_blank')
-    if (win) win.opener = null
-    void actions.myDocLink(kind, id).then(res => {
-      if (res.ok && win) win.location.href = res.url
-      else {
-        win?.close()
-        if (!res.ok) setError(res.reason)
-      }
-      if (res.ok) actions.refresh()
-    })
+  // ── A row of a generic page opened ──
+  const openRow = (r: GenRow) => {
+    const o = r.open
+    if (o.k === 'person') {
+      if (att?.config.people.some(p => p.id === o.id) || d.staff.some(p => p.id === o.id)) push({ k: 'person', id: o.id })
+    } else if (o.k === 'hire') push({ k: 'hire', id: o.id })
+    else if (o.k === 'talent') push({ k: 'talent', id: o.id })
+    else if (o.k === 'booking') openSheet({ k: 'booking', id: o.id })
+    else if (o.k === 'book') {
+      if (d.may.book) openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: o.roomId, from: '540', to: String(hourFrom(540)) })
+    } else if (o.k === 'letter' || o.k === 'document') {
+      const kind = o.k
+      const l = kind === 'letter' ? d.letters.find(x => x.id === o.id) : null
+      const doc = kind === 'document' ? d.documents?.find(x => x.id === o.id) : null
+      openSheet({
+        k: 'facts', eyebrow: kind === 'letter' ? 'Letters' : 'Documents', title: r.title, sub: r.sub,
+        facts: kind === 'letter' && l ? [['Person', l.staffName ?? ''], ['File', l.file], ['Status', r.chip ?? '—']] : [['File', doc?.file ?? ''], ['Shared with', doc?.depts.join(', ') || 'Everybody']],
+        actions: [{ label: 'View', primary: true, onClick: () => { closeSheet(); openInTab(() => actions.letterLink(o.id, kind), flash) } }],
+      })
+    } else openSheet({ k: 'facts', eyebrow: top?.k === 'gen' ? GEN_META[top.id].label : '', title: r.title, sub: r.sub, facts: o.facts })
   }
-  const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
+  const onPrimary = (key: GenKey) => {
+    const g = genPage(key, d, gF[key] ?? null, gF.roomSched ?? d.today)
+    if (!g?.primary) return
+    if (g.primary.act === 'newHire') openSheet({ k: 'newHire' }, { by: d.hireMe ?? '' })
+    else if (g.primary.act === 'book') openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })
+    else flash('Letters are written and filed on the desktop.')
+  }
 
-  const [kicker, title] =
-    view === 'hire' ? [hr?.id ?? '', hr ? hr.position : '']
-      : view === 'req' ? [rr ? MEMBER_KIND[rr.kind] : '', rr ? requestTitle(rr) : '']
-        : view === 'talent' ? ['Talent Bank', tt?.name ?? '']
-          : view === 'person' ? ['Data center', pp?.name ?? '']
-            : view === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
-              : view === 'mydocsFolder' ? ['My documents', mf?.name ?? '']
-              : TITLES[view] ?? ['', '']
+  // ── A person's buttons ──
+  const callOf = (id: string, name: string, how: 'call' | 'message') => {
+    const phone = d.phones?.[id]
+    if (!phone) { flash('No mobile on file'); return }
+    if (how === 'call') { flash(`Calling ${name}`); window.location.href = `tel:${phone.replace(/[^\d+]/g, '')}` }
+    else { flash('Opens WhatsApp'); window.open(`https://wa.me/${waNumber(phone)}`, '_blank', 'noopener') }
+  }
+
+  // ── Home ──
+  const avail: Partial<Record<string, boolean>> = {
+    today: d.parts.today, requests: d.parts.approve || membersOn, balances: d.parts.balances, close: d.parts.close, records: d.parts.records,
+    hire: d.parts.hiring, hireIns: d.parts.insights, talent: d.parts.talent, docDocs: d.parts.docs, docLetters: d.parts.docs, roomSched: d.parts.rooms,
+  }
+  const act = (k: string): (() => void) => {
+    if (k === 'today') return () => goTab('today')
+    if (k === 'requests') return () => goTab('approve')
+    if (k === 'pplPeople') return () => goTab('people')
+    if (k === 'balances') return () => push({ k: 'leave' })
+    if (k === 'close') return () => push({ k: 'close' })
+    return () => genOpen(k as GenKey)
+  }
+  const badges: Record<string, number> = { requests: hrWaiting, balances: lowLeave, hire: pendingHires }
+  const item = (k: string, label: string, icon: HrIconName, tone: HomeItem['tone']): HomeItem => ({ key: k, label, icon, tone, badge: badges[k] || undefined, go: act(k) })
+  const shown = (k: string) => avail[k] !== false
+  const quick = ([
+    ['today', 'Today', 'in', 'olive'], ['requests', 'Approve', 'approve', 'olive'], ['balances', 'Leave', 'calendar', 'olive'], ['close', 'Month close', 'lock', 'olive'],
+    ['hire', 'Hiring', 'hire', 'clay'], ['pay', 'Payroll', 'payroll', 'clay'], ['pplPeople', 'People', 'staff', 'olive'], ['docDocs', 'Documents', 'doc', 'olive'],
+  ] as Array<[string, string, HrIconName, HomeItem['tone']]>).filter(([k]) => shown(k)).map(([k, l, i, t]) => item(k, l, i, t))
+  const NAV: Array<[string, HomeItem['tone'], Array<[string, string, HrIconName]>]> = [
+    ['Hiring', 'clay', [['hire', 'Requests', 'hire'], ['hireIns', 'Insights', 'report'], ['talent', 'Talent Bank', 'staff']]],
+    ['Attendance', 'olive', [['today', 'Today', 'in'], ['records', 'Records', 'report'], ['requests', 'Requests', 'approve'], ['balances', 'Leave balances', 'calendar'], ['close', 'Month close', 'lock']]],
+    ['HR & Payroll', 'clay', [['hrc', 'HR Costing', 'report'], ['pay', 'Payroll', 'payroll'], ['pmt', 'Payment', 'out']]],
+    ['People Management', 'olive', [['pplPeople', 'People', 'staff'], ['hierChart', 'Org chart', 'org'], ['hierLevels', 'Levels', 'tree']]],
+    ['Documentation', 'olive', [['docDocs', 'Documents', 'doc'], ['docLetters', 'Letters', 'doc']]],
+    ['Admin', 'walnut', [['roomSched', 'Room schedule', 'room'], ['audit', 'Audit Log', 'report']]],
+  ]
+  const ROMAN = ['I.', 'II.', 'III.', 'IV.', 'V.', 'VI.']
+  const cats = NAV.map(([label, tone, items]) => ({ label, tone, items: items.filter(([k]) => shown(k)).map(([k, l, i]) => item(k, l, i, tone)) }))
+    .filter(c => c.items.length > 0).map((c, i) => ({ ...c, roman: ROMAN[i] }))
+
+  // ── The head ──
+  const genKey = top?.k === 'gen' ? top.id : null
+  const g = genKey ? genPage(genKey, d, gF[genKey] ?? null, gF.roomSched ?? d.today) : null
+  const [eyebrow, title] = !top ? ['', '']
+    : top.k === 'req' ? [ar?.ref ?? '', ar && att ? kindLabel(ar, att.config.leaveTypes) : '']
+      : top.k === 'mreq' ? [mr?.code ?? '', mr ? MEMBER_KIND[mr.kind] : '']
+        : top.k === 'person' ? [attPerson?.department ?? staffPerson?.dept ?? '', attPerson?.name ?? staffPerson?.name ?? '']
+          : top.k === 'leave' ? ['Attendance', 'Leave balances']
+            : top.k === 'close' ? ['Attendance', 'Month close']
+              : top.k === 'gen' ? [g?.eyebrow ?? '', g?.title ?? '']
+                : top.k === 'desk' ? ['Opens on desktop', top.id]
+                  : top.k === 'hire' ? [hr?.id ?? '', hr ? positionLabel(hr) : '']
+                    : top.k === 'talent' ? ['Talent Bank', tt?.name ?? '']
+                      : top.k === 'notices' ? ['HR', 'Notifications']
+                        : top.k === 'it' ? ['Account', 'IT support']
+                          : top.k === 'memos' ? ['For you', 'Memos']
+                            : top.k === 'memo' ? [mm?.kind ?? 'Memo', mm?.title ?? '']
+                              : top.k === 'mydocs' ? ['For you', 'My documents']
+                                : ['My documents', mf?.name ?? '']
+
+  // ── Me's Profile carries the old More's rows (the user, 2026-10-17: "keep all … inside Me › Profile") ──
+  const leaveMe = (then: () => void) => { setMeOpen(false); setTimeout(then, 280) }
+  const accountRows = (
+    <AccountRows d={d} memos={memos} pushNow={pushNow} busy={busy} togglePush={togglePush} openGuide={() => setPopUpGuide(true)}
+      hasEmail={!!actions.requestEmail} switchView={actions.switchView}
+      go={(what) => leaveMe(() => {
+        if (what === 'memos') { setTab('home'); setStack([{ k: 'memos' }]) }
+        else if (what === 'mydocs') { setTab('home'); setStack([{ k: 'mydocs' }]) }
+        else if (what === 'it') openIt()
+        else openSheet({ k: what })
+      })} />
+  )
+
+  const main = !top
+  const decideBar = (left: ReactNode, right: ReactNode) => <div className={s.decide}>{left}{right}</div>
 
   return (
     <div className={s.app} data-hr-app="">
       {d.viewingAs ? <ViewingAsBanner name={d.viewingAs} /> : null}
-      {/* The first open asks once whether this phone gets notifications (2026-10-11, the user). */}
       {!d.viewingAs ? <PushAsk app="hr" save={actions.pushSave} trouble={actions.pushTrouble} onState={setPushNow} /> : null}
-      <div ref={scrollerRef} className={s.scroller}>
-        <header className={s.head}>
-          {stack.length > 0 ? (
-            <button type="button" className={s.back} onClick={pop} aria-label="Back">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-            </button>
-          ) : null}
-          {view === 'home' ? (
-            <span className={s.homeTile} aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3" /><path d="M3 20v-1a6 6 0 0 1 12 0v1" /><path d="M16 5.2a3 3 0 0 1 0 5.6M18 14.4a5 5 0 0 1 3 4.6v1" /></svg>
-            </span>
-          ) : null}
-          <div className={s.headText}>
-            {kicker ? <div className={s.kicker}>{kicker}</div> : null}
-            {/* A div, as the prototype's: the portal's global h1 rule would set it in the display serif. */}
-            <div className={s.title} role="heading" aria-level={1}>{title}</div>
+
+      {main ? (
+        <div className={s.mainHead}>
+          {tab === 'home' ? (
+            <div className={s.brand}>
+              <span className={s.brandTile}>H</span>
+              <div className={s.brandText}>
+                <span className={s.brandName}>HOUZS HR</span>
+                <span className={s.brandWho}>{d.meLine || d.greetName}</span>
+              </div>
+            </div>
+          ) : <div className={s.mainTitle} role="heading" aria-level={1}>{TITLE[tab]}</div>}
+          <div className={s.headRight}>
+            <span className={s.date} style={MONO}>{dayLabel(d.today, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+            {tab === 'home' && !d.viewingAs ? (
+              <button type="button" className={s.bell} onClick={openNotices} aria-label={d.notices.unread ? `Notifications, ${d.notices.unread} new` : 'Notifications'}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
+                {d.notices.unread ? <span className={s.bellDot}>{d.notices.unread > 9 ? '9+' : d.notices.unread}</span> : null}
+              </button>
+            ) : null}
+            {!d.viewingAs ? (
+              <button type="button" className={s.meBtn} aria-label={mine ? 'Me' : 'Account'} onClick={() => (mine ? setMeOpen(true) : openSheet({ k: 'account' }))}>
+                <Avatar bg={mine ? 'rgb(var(--tone-walnut-deep))' : meAv.bg} fg={mine ? 'var(--hr2-on-accent)' : meAv.fg} ini={meAv.ini} size={34} radius={17} font={12} />
+                {card?.punch ? <span className={s.meDot} style={{ background: card.chip === 'Late' ? 'var(--ds-danger)' : 'var(--hr2-accent)' }} /> : null}
+              </button>
+            ) : null}
           </div>
-          {view === 'home' && !d.viewingAs ? (
-            <button type="button" className={s.bell} onClick={openNotices} aria-label={d.notices.unread ? `Notifications, ${d.notices.unread} new` : 'Notifications'}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
-              {d.notices.unread ? <span className={s.bellDot}>{d.notices.unread > 9 ? '9+' : d.notices.unread}</span> : null}
-            </button>
-          ) : null}
-          {view === 'rooms' && d.may.book ? (
-            // With no room yet there is nothing to book: the portal's "+ Book a room" greys out too.
-            <button type="button" className={s.headAction} disabled={!d.rooms.length} onClick={() => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d) })}>
-              + Book
-            </button>
-          ) : null}
-        </header>
-
-        {/* The body slides in once, as the prototype's; each screen is new when the view or its page changes. */}
-        <div className={s.body}>
-          <Fragment key={view + (top && 'id' in top ? top.id : '')}>
-          {error ? <div className={s.formErr} role="alert">{error}</div> : null}
-
-          {view === 'home' ? (
-            <HomeScreen d={d} items={items} memos={memos} goTab={goTab} push={push} openBooking={id => openSheet({ k: 'booking', id })} staffName={staffName} />
-          ) : null}
-
-          {view === 'review' ? (
-            <>
-              <div className={s.chips}>
-                {([['all', 'All', items.length], ['hire', 'Hiring', d.hires.filter(isPendingHire).length], ['req', 'Member services', d.requests.filter(isPendingRequest).length]] as const).map(([k, label, n]) => (
-                  <button key={k} type="button" className={s.chip} onClick={() => setRvTab(k)} style={rvTab === k ? { background: 'rgb(43 31 23)', color: 'rgb(246 238 230)' } : { background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }}>
-                    {label}<span className={s.chipN}>{n}</span>
-                  </button>
-                ))}
-              </div>
-              {items.filter(it => rvTab === 'all' || it.k === rvTab).map(it => (
-                <button key={it.k + it.id} type="button" className={s.item} onClick={() => push({ k: it.k, id: it.id })}>
-                  <div className={s.itemTop}>
-                    <span className={s.itemTag} style={{ background: it.tagBg, color: it.tagFg }}>{it.tag}</span>
-                    <span className={s.spacer} />
-                    <span className={s.itemWhen}>{it.when}</span>
-                  </div>
-                  <div className={s.itemTitle}>{it.title}</div>
-                  <div className={s.itemMeta}>{it.meta}</div>
-                </button>
-              ))}
-              {items.filter(it => rvTab === 'all' || it.k === rvTab).length === 0 ? <div className={s.emptyCard}>Nothing waiting.</div> : null}
-            </>
-          ) : null}
-
-          {view === 'hiring' ? (
-            <>
-              <div className={s.chips}>
-                {HIRE_FILTERS.map(f => (
-                  <button key={f.key} type="button" className={s.chip} onClick={() => setHFilter(f.key)} style={hFilter === f.key ? { background: 'rgb(43 31 23)', color: 'rgb(246 238 230)' } : { background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }}>
-                    {f.label}<span className={s.chipN}>{d.hires.filter(h => f.statuses.includes(h.status)).length}</span>
-                  </button>
-                ))}
-              </div>
-              {d.hires.filter(h => (HIRE_FILTERS.find(f => f.key === hFilter)?.statuses ?? []).includes(h.status)).map(h => {
-                const ch = hireChip(h.status)
-                return (
-                  <button key={h.id} type="button" className={s.hire} style={{ borderLeftColor: ch.fg }} onClick={() => push({ k: 'hire', id: h.id })}>
-                    <div className={s.itemTop}>
-                      <span className={s.hireId}>{h.id}</span>
-                      <span className={s.spacer} />
-                      <span className={s.statusChip} style={{ background: ch.bg, color: ch.fg }}>{ch.label}</span>
-                    </div>
-                    <div className={s.hirePos}>{positionLabel(h)}</div>
-                    <div className={s.hireMeta}>
-                      <span>{h.dept}</span>
-                      <span className={s.budget}>{budgetLabel(h.budget)}</span>
-                      <span>{h.ownerName ?? 'No owner'}</span>
-                    </div>
-                    <div className={s.pipe}>
-                      {pipeline(h.candidates).map(p => (
-                        <span key={p.l} className={s.pipePill}><b>{p.v}</b> {p.l}</span>
-                      ))}
-                    </div>
-                  </button>
-                )
-              })}
-              {/* Not in the handoff (its sample always has requests): the Review's own empty card. */}
-              {d.hires.every(h => !(HIRE_FILTERS.find(f => f.key === hFilter)?.statuses ?? []).includes(h.status)) ? <div className={s.emptyCard}>No requests here.</div> : null}
-            </>
-          ) : null}
-
-          {view === 'hire' && hr ? <HireScreen hr={hr} openSheet={openSheet} may={d.may} /> : null}
-
-          {view === 'req' && rr ? (
-            <>
-              <div className={s.reqChips}>
-                <span className={s.pageChip} style={{ background: 'rgb(249 238 214)', color: 'rgb(150 100 12)' }}>{requestStatusLabel(rr.status)}</span>
-                <span className={s.pageChip} style={{ background: 'rgb(240 236 230)' }}>{MEMBER_KIND[rr.kind]}</span>
-              </div>
-              <section className={s.facts}>
-                {([
-                  ['Reference', rr.code], ['Sub-department', rr.sub], ['Submitted by', rr.byName],
-                  ...(rr.kind === 'waiting'
-                    ? [['Applicant', rr.newPerson], ['Mobile', rr.contact], ['Joining', rr.start]]
-                    : rr.kind === 'claim'
-                      ? [['Category', rr.category], ['Location', rr.location], ['Amount', rr.amount ? `RM ${rr.amount}` : '']]
-                      : [['Leaving', rr.originalName], ['Effective', rr.effective], ['Reason', rr.reason]]),
-                ] as Array<[string, string | null | undefined]>).filter(([, v]) => v).map(([l, v]) => (
-                  <div key={l} className={s.fact}><span className={s.factL}>{l}</span><span className={s.factV}>{v}</span></div>
-                ))}
-              </section>
-              <textarea className={s.note} rows={3} placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
-              {isPendingRequest(rr) && rr.kind !== 'replacement' && d.may.decide ? (
-                <div className={s.btnRow}>
-                  <button type="button" className={s.rejectBtn} disabled={busy} onClick={() => run(() => actions.requestDecide(rr.id, 'reject', note), pop, false)}>Reject</button>
-                  <button
-                    type="button"
-                    className={s.approveBtn}
-                    disabled={busy}
-                    onClick={() => (rr.kind === 'claim' ? openSheet({ k: 'approve', id: rr.id }, { note }) : run(() => actions.requestDecide(rr.id, rr.kind === 'waiting' ? 'accept' : 'approve', note), pop, false))}
-                  >
-                    {rr.kind === 'waiting' ? 'Accept to waiting list' : 'Approve'}
-                  </button>
-                </div>
-              ) : null}
-              {rr.kind === 'replacement' ? <div className={s.replNote}>Replacements need a person and an effective date. Finish them in Member services on the desktop.</div> : null}
-            </>
-          ) : null}
-
-          {view === 'rooms' ? (
-            <RoomsScreen
-              d={d} day={day} today={today} setDate={setDate} roomView={roomView} setRoomView={setRoomView}
-              openBooking={id => openSheet({ k: 'booking', id })}
-              bookAt={d.may.book ? (roomId, from) => openSheet({ k: 'book' }, { pax: 1, att: d.meId ? [d.meId] : [], dept: defaultDept(d), room: roomId, from: String(from), to: String(hourFrom(from)) }) : undefined}
-            />
-          ) : null}
-
-          {view === 'more' ? (
-            <section className={s.more}>
-              {/* Not in the handoff (2026-10-12): their own memos — the same ones the portal's bell and the Revenue app show. */}
-              {(memos.length > 0 || d.personalLogin) && !d.viewingAs ? (
-                <button type="button" className={s.moreRow} onClick={() => push({ k: 'memos' })}>
-                  <span className={s.moreIcon} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>✉</span>
-                  <span className={s.grow}>
-                    <span className={s.moreTitle}>Memos</span>
-                    <span className={s.moreSub}>
-                      {memos.filter(memoWaiting).length ? `${memos.filter(memoWaiting).length} waiting for your acknowledgement` : memos.length ? 'All acknowledged' : 'None for you yet'}
-                    </span>
-                  </span>
-                  <Chevron />
-                </button>
-              ) : null}
-              {/* Not in the handoff (2026-10-14): their own documents — Company and Personal, as the Revenue app has them. */}
-              {d.myDocs?.staffId && !d.viewingAs ? (
-                <button type="button" className={s.moreRow} onClick={() => push({ k: 'mydocs' })}>
-                  <span className={s.moreIcon} style={{ background: 'rgb(255 244 231)', color: 'rgb(163 78 37)' }}>▥</span>
-                  <span className={s.grow}>
-                    <span className={s.moreTitle}>My documents</span>
-                    <span className={s.moreSub}>{myDocsLine(d.myDocs)}</span>
-                  </span>
-                  <Chevron />
-                </button>
-              ) : null}
-              {([
-                ['insights', 'Insights', 'Hiring time, cost and sources', '◔', 'rgb(230 237 241)', SLATE, d.parts.insights],
-                ['talents', 'Talent Bank', `${d.talents.length} people kept on file`, '★', 'rgb(255 244 231)', 'rgb(163 78 37)', d.parts.talent],
-                ['docs', 'Data center', 'Letters on each person’s record', '▤', 'rgb(238 240 226)', 'rgb(88 98 68)', d.parts.docs],
-              ] as const).filter(row => row[6]).map(([k, t, sub, icon, bg, fg]) => (
-                <button key={k} type="button" className={s.moreRow} onClick={() => push({ k } as Page)}>
-                  <span className={s.moreIcon} style={{ background: bg, color: fg }}>{icon}</span>
-                  <span className={s.grow}><span className={s.moreTitle}>{t}</span><span className={s.moreSub}>{sub}</span></span>
-                  <Chevron />
-                </button>
-              ))}
-              {/* Not in the handoff (2026-10-11): this phone's notifications — asked for only when pressed. */}
-              {!d.viewingAs ? (
-                <button type="button" className={s.moreRow} disabled={busy || pushNow === null || pushNow === 'unsupported' || pushNow === 'denied' || pushNow === 'install'} onClick={togglePush}>
-                  <span className={s.moreIcon} style={{ background: 'rgb(255 240 228)', color: 'rgb(189 74 25)' }}>●</span>
-                  <span className={s.grow}><span className={s.moreTitle}>Phone notifications</span><span className={s.moreSub}>{pushNow ? PUSH_WORDS[pushNow] : '…'}</span></span>
-                  <span className={s.pushSwitch} data-on={pushNow === 'on' ? '1' : undefined} aria-hidden="true" />
-                </button>
-              ) : null}
-              {!d.viewingAs && pushNow === 'on' && popUpNeedsTurningOn() ? (
-                <button type="button" className={s.moreRow} onClick={() => setPopUpGuide(true)}>
-                  <span className={s.moreIcon} style={{ background: 'rgb(255 240 228)', color: 'rgb(189 74 25)' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2ZM8.5 5h7a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2.5 14h2" />
-                    </svg>
-                  </span>
-                  <span className={s.grow}><span className={s.moreTitle}>Make them pop up</span><span className={s.moreSub}>Pop on screen, once per phone</span></span>
-                  <Chevron />
-                </button>
-              ) : null}
-              {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
-              {/* Not in the handoff (2026-10-12 — the user: a change password "in their profile tab", "just for that
-                  personal acc"): a login of their own only, never hr@ or another shared one, never while viewing as. */}
-              {d.personalLogin && !d.viewingAs ? (
-                <button type="button" className={s.moreRow} onClick={() => openSheet({ k: 'password' })}>
-                  <span className={s.moreIcon} style={{ background: 'rgb(238 235 231)', color: 'rgb(90 78 68)' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2" />
-                    </svg>
-                  </span>
-                  <span className={s.grow}><span className={s.moreTitle}>Change password</span><span className={s.moreSub}>The current one, then a new one twice</span></span>
-                  <Chevron />
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-          {/* Not in the handoff (2026-10-11 — one app, lib/one-app.ts): the views of the app, for an account that may
-              switch them — the portal's switcher, as the Revenue app's module menu has it. */}
-          {view === 'more' && d.views ? (
-            <section className={s.more} style={{ marginTop: 12 }} aria-label="Switch view">
-              {HR_APP_VIEWS.map(([v, name, where, dot]) => {
-                const here = v === d.views?.current
-                return (
-                  <button key={v} type="button" className={s.moreRow} disabled={here} aria-current={here ? 'true' : undefined} onClick={() => actions.switchView(v)}>
-                    <span className={s.moreIcon} style={{ background: 'rgb(246 242 236)' }}>
-                      <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 5, background: dot }} />
-                    </span>
-                    <span className={s.grow}><span className={s.moreTitle}>{name}</span><span className={s.moreSub}>{here ? 'You are here' : where}</span></span>
-                    {here ? null : <Chevron />}
-                  </button>
-                )
-              })}
-            </section>
-          ) : null}
-
-          {view === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
-
-          {view === 'memos' ? (
-            <>
-              {memos.map(m => (
-                <button key={m.id} type="button" className={s.item} onClick={() => push({ k: 'memo', id: m.id })}>
-                  <div className={s.itemTop}>
-                    <span className={s.itemTag} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>{m.kind === 'Memo' ? 'MEMO' : m.kind.toUpperCase()}</span>
-                    <span className={s.spacer} />
-                    <span className={s.itemWhen}>{memoDay(m.publishedAt)}</span>
-                  </div>
-                  <div className={s.itemTitle} style={memoUnread(m) ? { fontWeight: 700 } : undefined}>{m.title}</div>
-                  <div className={s.itemMeta}>
-                    {memoWaiting(m) ? `From ${m.sender} · needs your acknowledgement` : m.acknowledgedAt ? ackedLine(m.acknowledgedAt) : `From ${m.sender}`}
-                  </div>
-                </button>
-              ))}
-              {memos.length === 0 ? <div className={s.emptyCard}>No memos for you yet.</div> : null}
-            </>
-          ) : null}
-
-          {view === 'memo' && mm ? (
-            <>
-              <div className={s.pageChips}>
-                <span
-                  className={s.pageChip}
-                  style={memoWaiting(mm) ? { background: CHIP.alert[0], color: CHIP.alert[1] } : { background: CHIP.ledger[0], color: CHIP.ledger[1] }}
-                >
-                  {memoWaiting(mm) ? 'Needs your acknowledgement' : mm.acknowledgedAt ? 'Acknowledged' : 'Read'}
-                </span>
-              </div>
-              <div className={s.pageMeta}>From {mm.sender} · {memoWhen(mm.publishedAt)}</div>
-              {memoParas(mm.body).length ? (
-                <section className={s.long}>
-                  {memoParas(mm.body).map((p, i) => <p key={i} className={s.memoPara}>{p}</p>)}
-                </section>
-              ) : null}
-              {mm.attachment ? (
-                <div className={s.letter}>
-                  <span className={s.letterIcon}>{memoFileExt(mm.attachment.name)}</span>
-                  <span className={s.memoFileName}>{mm.attachment.name}</span>
-                  <button type="button" className={s.viewBtn} onClick={() => openMemoFile(mm.id)}>View</button>
-                </div>
-              ) : null}
-              {mm.acknowledgedAt ? <div className={s.memoAcked}>✓ {ackedLine(mm.acknowledgedAt)}</div> : null}
-            </>
-          ) : null}
-          {view === 'memo' && !mm ? <div className={s.emptyCard}>This memo was taken back.</div> : null}
-
-          {view === 'mydocs' ? (
-            <MyDocsScreen docs={d.myDocs ?? null} folder={null} tab={mdTab} setTab={setMdTab} openFolder={id => push({ k: 'mydocsFolder', id })} open={openMine} />
-          ) : null}
-          {top?.k === 'mydocsFolder' ? (
-            <MyDocsScreen docs={d.myDocs ?? null} folder={top.id} tab="personal" setTab={setMdTab} openFolder={id => push({ k: 'mydocsFolder', id })} open={openMine} />
-          ) : null}
-
-          {view === 'insights' ? <InsightsScreen d={data} /> : null}
-
-          {view === 'talents' ? (
-            <>
-              <input className={s.search} placeholder="Search talent" value={tq} onChange={e => setTq(e.target.value)} />
-              {d.talents.filter(t => !tq.trim() || `${t.name} ${t.position} ${t.notes}`.toLowerCase().includes(tq.trim().toLowerCase())).map(t => (
-                <button key={t.id} type="button" className={s.talent} onClick={() => push({ k: 'talent', id: t.id })}>
-                  <span className={s.talentIni}>{initials(t.name)}</span>
-                  <span className={s.grow}>
-                    <span className={s.candName}>{t.name}</span>
-                    <span className={s.talentSub}>{t.position} · {t.dept}</span>
-                    <span className={s.talentNote}>{(t.notes || '').split('\n')[0]}</span>
-                  </span>
-                </button>
-              ))}
-              {d.talents.length === 0 ? <div className={s.emptyCard}>Nobody kept on file yet.</div> : null}
-            </>
-          ) : null}
-
-          {view === 'talent' && tt ? (
-            <>
-              <section className={s.facts}>
-                {([['Good fit for', tt.position], ['Department', tt.dept], ['Phone', tt.phone], ['Email', tt.email], ['Saved from', tt.from || 'Added directly'], ['Saved', tt.when]] as Array<[string, string | null | undefined]>).filter(([, v]) => v).map(([l, v]) => (
-                  <div key={l} className={s.fact}><span className={s.factL}>{l}</span><span className={s.factV}>{v}</span></div>
-                ))}
-              </section>
-              <section className={s.long}>
-                <div className={s.capsLabel}>HR notes</div>
-                <textarea
-                  className={s.notesBox}
-                  rows={5}
-                  readOnly={!d.may.talentEdit}
-                  value={talentNotes?.id === tt.id ? talentNotes.text : tt.notes}
-                  onChange={e => setTalentNotes({ id: tt.id, text: e.target.value })}
-                  onBlur={() => {
-                    if (d.may.talentEdit && talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, false)
-                  }}
-                />
-              </section>
-              {d.may.talentEdit ? (
-                <button
-                  type="button"
-                  className={s.removeBtn}
-                  style={{ background: arm ? 'rgb(250 228 224)' : 'rgb(255 255 255)' }}
-                  disabled={busy}
-                  onClick={() => {
-                    if (!arm) return setArm(true)
-                    run(() => actions.talentRemove(tt.id), () => { pop(); setArm(false) }, false)
-                  }}
-                >
-                  {arm ? 'Tap again to remove' : 'Remove from Talent Bank'}
-                </button>
-              ) : null}
-            </>
-          ) : null}
-
-          {view === 'docs' ? (
-            d.staff.map(p => {
-              const n = d.letters.filter(l => l.staffId === p.id).length
-              return (
-                <button key={p.id} type="button" className={s.person} onClick={() => push({ k: 'person', id: p.id })}>
-                  <span className={s.grow}>
-                    <span className={s.candName}>{p.name}</span>
-                    <span className={s.meta12} style={{ marginTop: 0 }}>{p.title} · {p.dept}</span>
-                  </span>
-                  {missingFor(d, p.id).length ? <span className={s.bang}>!</span> : null}
-                  <span className={s.count}>{n}</span>
-                </button>
-              )
-            })
-          ) : null}
-
-          {view === 'person' && pp ? (
-            <>
-              {missingFor(d, pp.id).map(m => <div key={m} className={s.missing}>{m} missing</div>)}
-              {d.letters.filter(l => l.staffId === pp.id).map(l => (
-                <div key={l.id} className={s.letter}>
-                  <span className={s.letterIcon}>{(l.file.split('.').pop() || 'PDF').toUpperCase().slice(0, 4)}</span>
-                  <span className={s.letterType}>{d.docTypes.find(t => t.id === l.typeId)?.name ?? l.typeName}</span>
-                  <button
-                    type="button"
-                    className={s.viewBtn}
-                    onClick={() => {
-                      // A link made at the press (never kept): opened in a tab of its own.
-                      const tab = window.open('', '_blank')
-                      // The file's page gets no handle back on the app.
-                      if (tab) tab.opener = null
-                      void actions.letterLink(l.id).then(res => {
-                        if (res.ok && tab) tab.location.href = res.url
-                        else {
-                          tab?.close()
-                          if (!res.ok) setError(res.reason)
-                        }
-                      })
-                    }}
-                  >
-                    View
-                  </button>
-                </div>
-              ))}
-              {d.letters.filter(l => l.staffId === pp.id).length === 0 ? <div className={s.noLetters}>No letters on file.</div> : null}
-            </>
-          ) : null}
-          </Fragment>
         </div>
+      ) : (
+        <div className={s.subHead}>
+          <button type="button" className={s.back} onClick={pop} aria-label="Back">‹</button>
+          <div className={s.subText}>
+            <span className={s.subEyebrow}>{eyebrow}</span>
+            <span className={s.subTitle} role="heading" aria-level={1}>{title}</span>
+          </div>
+        </div>
+      )}
+
+      <div ref={scrollerRef} className={s.scroller}>
+        {main && tab === 'home' ? (
+          <HomeScreen first={d.greetName} quick={quick} cats={cats} memos={d.viewingAs ? [] : memos.filter(memoWaiting)} openMemo={id => push({ k: 'memo', id })}
+            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null)} />
+        ) : null}
+        {main && tab === 'today' ? (
+          <TodayScreen rows={tRows} counts={tCounts} filter={todayF} setFilter={setTodayF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.today)} />
+        ) : null}
+        {main && tab === 'approve' ? (
+          <ApproveScreen tab={reqF} setTab={setReqF} counts={aCounts} membersOn={membersOn} members={d.requests}
+            rows={att && d.parts.approve && reqF !== 'members' ? approveRows(att, reqF, now) : []}
+            open={id => push({ k: 'req', id })} openMember={id => push({ k: 'mreq', id })} closed={attShut(d.parts.approve)} />
+        ) : null}
+        {main && tab === 'people' ? (
+          <PeopleScreen q={q} setQ={setQ} open={id => push({ k: 'person', id })}
+            groups={peopleGroups(att ? att.config.people.map(p => ({ id: p.id, name: p.name, title: p.title ?? 'No title', dept: p.department ?? '' })) : d.staff, q)} />
+        ) : null}
+
+        {top?.k === 'req' && ar && arView ? (
+          <RequestScreen who={ar.who} kind={att ? kindLabel(ar, att.config.leaveTypes) : ''} when={whenLabel(ar)} v={arView} note={note} setNote={setNote} canDecide={arCanDecide} />
+        ) : null}
+        {top?.k === 'mreq' && mr ? <MemberScreen r={mr} note={note} setNote={setNote} canDecide={isPendingRequest(mr) && mr.kind !== 'replacement' && d.may.decide && !d.viewingAs} /> : null}
+        {top?.k === 'person' && attPerson && att ? (
+          <PersonScreen v={personView(att, attPerson)} onCall={() => callOf(attPerson.id, attPerson.name, 'call')} onMessage={() => callOf(attPerson.id, attPerson.name, 'message')}
+            onRecords={() => flash(`${dayLabel(att.month.month, { month: 'long' })} records · desktop`)} />
+        ) : null}
+        {top?.k === 'person' && !attPerson && staffPerson ? (
+          <PersonScreen v={{ name: staffPerson.name, title: staffPerson.title || 'No title', dept: staffPerson.dept || 'No department', chip: { label: 'Today · —', bg: 'var(--ds-surface-3)', fg: 'var(--ds-ink-2)' }, facts: [], leave: [] }}
+            onCall={() => callOf(staffPerson.id, staffPerson.name, 'call')} onMessage={() => callOf(staffPerson.id, staffPerson.name, 'message')} onRecords={() => flash('Records · desktop')} />
+        ) : null}
+        {top?.k === 'leave' ? <BalancesScreen rows={bRows} filter={lvF} setFilter={setLvF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.balances)} /> : null}
+        {top?.k === 'close' ? <CloseScreen v={att && d.parts.close ? closeView(att) : null} closed={attShut(d.parts.close)} /> : null}
+        {top?.k === 'gen' && g ? (
+          <GenScreen g={g} filter={gF[top.id] ?? null} setFilter={k => setGF(x => ({ ...x, [top.id]: k }))} onPrimary={() => onPrimary(top.id)} openRow={openRow} />
+        ) : null}
+        {top?.k === 'desk' ? <DeskScreen title={top.id} icon={top.icon} /> : null}
+        {top?.k === 'hire' && hr ? (
+          <HireScreen hr={hr} mayEdit={d.may.hireEdit && !d.viewingAs} mayCreate={d.may.hireCreate && !d.viewingAs}
+            onStage={(cid, name, cur) => openSheet({ k: 'stage', cid, name, cur })} onAdd={() => openSheet({ k: 'cand' })} />
+        ) : null}
+        {top?.k === 'talent' && tt ? (
+          <TalentScreen t={tt} mayEdit={d.may.talentEdit && !d.viewingAs} notes={talentNotes?.id === tt.id ? talentNotes.text : tt.notes}
+            setNotes={text => setTalentNotes({ id: tt.id, text })}
+            saveNotes={() => { if (d.may.talentEdit && talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, 'Notes saved') }} />
+        ) : null}
+        {top?.k === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
+        {top?.k === 'it' && !d.viewingAs ? <ItSupport key={top.id ?? 'mine'} app="hr" initialId={top.id} /> : null}
+        {top?.k === 'memos' ? <MemosScreen memos={memos} open={id => push({ k: 'memo', id })} /> : null}
+        {top?.k === 'memo' ? (
+          <MemoScreen m={mm} openFile={id => openInTab(() => actions.memoFile(id, 'view'), flash)}
+            signing={mm && memoWaiting(mm) && !d.viewingAs ? { value: memoSig, onChange: setMemoSig, busy } : null}
+            signature={mm && !d.viewingAs ? memoSigned.get(mm.id) ?? null : null} />
+        ) : null}
+        {top?.k === 'mydocs' || top?.k === 'mydocsFolder' ? (
+          <MyDocsScreen docs={d.myDocs ?? null} folder={top.k === 'mydocsFolder' ? top.id : null} tab={top.k === 'mydocsFolder' ? 'personal' : mdTab} setTab={setMdTab}
+            openFolder={id => push({ k: 'mydocsFolder', id })} open={(kind, id) => openInTab(() => actions.myDocLink(kind, id), flash, actions.refresh)} />
+        ) : null}
       </div>
 
-      {view === 'hire' && hr && d.may.hireApprove ? <HireBar hr={hr} busy={busy} openSheet={openSheet} cancel={() => run(() => actions.hireCancel(hr.id), undefined, false)} meId={d.meId} /> : null}
-      {/* A memo still waiting (2026-10-12): Acknowledge, once — for every view. Never while viewing as somebody. */}
-      {view === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
+      {top?.k === 'req' && arCanDecide && arView ? decideBar(
+        <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => decideAtt(false)} style={{ color: note.trim() ? 'var(--ds-danger)' : 'var(--ds-ink-3)' }}>Reject</button>,
+        <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || arOwn} onClick={() => decideAtt(true)}>{arBehalf ? 'Approve on behalf' : 'Approve'}</button>,
+      ) : null}
+      {top?.k === 'mreq' && mr && isPendingRequest(mr) && mr.kind !== 'replacement' && d.may.decide && !d.viewingAs ? decideBar(
+        <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => decideMember(false)} style={{ color: note.trim() ? 'var(--ds-danger)' : 'var(--ds-ink-3)' }}>Reject</button>,
+        <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy} onClick={() => decideMember(true)}>{mr.kind === 'waiting' ? 'Accept to waiting list' : 'Approve'}</button>,
+      ) : null}
+      {top?.k === 'hire' && hr && d.may.hireApprove && !d.viewingAs && (hr.status === 'submitted' || hr.status === 'needs_info' || hr.status === 'acknowledged') ? (
+        hr.status === 'acknowledged' ? decideBar(
+          <button type="button" className={`${s.decideBtn} ${s.outline}`} style={{ color: arm ? 'var(--ds-danger)' : 'var(--ds-ink)' }} disabled={busy}
+            onClick={() => { if (!arm) { setArm(true); return } run(() => actions.hireCancel(hr.id), () => setArm(false), `${hr.id} cancelled`) }}>{arm ? 'Tap again' : 'Cancel'}</button>,
+          <button type="button" className={`${s.decideBtn} ${s.accent}`} onClick={() => openSheet({ k: 'fill' }, { hired: '', source: '', cost: '' })}>Mark filled</button>,
+        ) : decideBar(
+          <button type="button" className={`${s.decideBtn} ${s.outline}`} onClick={() => openSheet({ k: 'info' }, { note: '' })}>More info</button>,
+          <button type="button" className={`${s.decideBtn} ${s.accent}`} onClick={() => openSheet({ k: 'ack' }, { owner: d.meId ?? '' })}>Acknowledge</button>,
+        )
+      ) : null}
+      {top?.k === 'talent' && tt && d.may.talentEdit && !d.viewingAs ? (
         <div className={s.actBar}>
-          <button type="button" className={s.actBtn} style={{ borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)', flex: 1 }} disabled={busy} onClick={() => ackMemo(mm.id)}>
-            {busy ? 'Recording…' : 'Acknowledge'}
+          <button type="button" className={`${s.decideBtn} ${s.outline}`} style={{ color: 'var(--ds-danger)', background: arm ? 'var(--ds-danger-bg)' : undefined }} disabled={busy}
+            onClick={() => { if (!arm) { setArm(true); return } run(() => actions.talentRemove(tt.id), () => { pop(); setArm(false) }, `${tt.name} removed`) }}>
+            {arm ? 'Tap again to remove' : 'Remove from Talent Bank'}
           </button>
         </div>
       ) : null}
-
-      <nav ref={barRef} className={`${s.tabs} ${tuck.tuckable}`} data-tucked={tucked ? '' : undefined} inert={tucked || undefined} aria-label="HR app">
-        {TABS.map(([k, label]) => {
-          const on = tab === k
-          const badge = k === 'review' && items.length ? String(items.length) : ''
-          return (
-            <button key={k} type="button" className={s.tab} aria-current={on ? 'page' : undefined} onClick={() => goTab(k)}>
-              <span className={s.tabPill}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={TAB_ICON[k][0]} />
-                  <path d={TAB_ICON[k][1]} />
-                </svg>
-              </span>
-              {badge ? <span className={s.tabBadge}>{badge}</span> : null}
-              <span className={s.tabLabel}>{label}</span>
-            </button>
-          )
-        })}
-      </nav>
-
-      {sheet ? (
-        <SheetView
-          d={d} sheet={sheet} hr={hr} day={day} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr}
-          busy={busy} arm={arm} setArm={setArm} close={() => setSheet(null)} pop={pop} run={run} actions={actions} live={live}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-/** The bell's page (2026-10-11): what was new when it opened, then the rest; a tap opens what it is about. */
-/** More › My documents' line: what is new, or what is there. */
-function myDocsLine(docs: MyDocuments): string {
-  const fresh = docs.company.filter(x => !x.seen).length + personalUnseen(docs.personal)
-  return fresh ? `${fresh} new for you` : 'Company and personal'
-}
-
-const CHIP_ON = { background: 'rgb(43 31 23)', color: 'rgb(246 238 230)' }
-const CHIP_OFF = { background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
-
-/**
- * My documents (2026-10-14 — the user: Documentation in two, company and personal; "他在手机那边用自己的 user 账号
- * login，就可以 view 到他自己的资料"): Company — what HR shares with their department — and Personal — what of their own
- * Data center folder HR shares with them: their letters at the top, folders (a press goes in), files. Each opens by a
- * link made at the press. A folder's page is Personal only.
- */
-function MyDocsScreen({ docs, folder, tab, setTab, openFolder, open }: {
-  docs: MyDocuments | null
-  folder: string | null
-  tab: 'company' | 'personal'
-  setTab: (t: 'company' | 'personal') => void
-  openFolder: (id: string) => void
-  open: (kind: 'document' | 'drive' | 'letter', id: string) => void
-}) {
-  if (!docs) return <div className={s.emptyCard}>Your documents could not be read.</div>
-  const held = personalIn(docs.personal, folder)
-  const fileRow = (key: string, ext: string, name: string, line: string, onView: () => void) => (
-    <div key={key} className={s.letter}>
-      <span className={s.letterIcon}>{ext || 'FILE'}</span>
-      <span className={s.grow}>
-        <span className={s.memoFileName} style={{ display: 'block' }}>{name}</span>
-        <span className={s.meta12}>{line}</span>
-      </span>
-      <button type="button" className={s.viewBtn} onClick={onView}>View</button>
-    </div>
-  )
-  return (
-    <>
-      {folder === null ? (
-        <div className={s.chips}>
-          {([['company', 'Company', docs.company.filter(x => !x.seen).length], ['personal', 'Personal', personalUnseen(docs.personal)]] as const).map(([k, label, n]) => (
-            <button key={k} type="button" className={s.chip} onClick={() => setTab(k)} style={tab === k ? CHIP_ON : CHIP_OFF} aria-pressed={tab === k}>
-              {label}{n ? <span className={s.chipN}>{n} new</span> : null}
-            </button>
-          ))}
+      {top?.k === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
+        <div className={s.actBar}>
+          <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || !memoSig} onClick={() => {
+            const signature = memoSig
+            if (!signature) return
+            run(async () => {
+              const r = await actions.memoMark(mm.id, true, signature)
+              if (r.ok) {
+                setAcked(prev => new Map(prev).set(mm.id, r.acknowledgedAt ?? new Date().toISOString()))
+                setMemoSigned(prev => new Map(prev).set(mm.id, signature))
+                setMemoSig(null)
+              }
+              return r.ok ? { ok: true } : r
+            }, undefined, 'Acknowledged')
+          }}>{busy ? 'Recording…' : 'Acknowledge'}</button>
         </div>
-      ) : (
-        <div className={s.meta12}>{personalPath(docs.personal, folder).map(x => x.name).join(' › ')}</div>
-      )}
-      {tab === 'company' && folder === null ? (
-        docs.company.length ? (
-          docs.company.map(doc => fileRow(doc.id, doc.ext, doc.name, `Added ${docDay(doc.uploadedAt)}${doc.seen ? '' : ' · New'}`, () => open('document', doc.id)))
-        ) : (
-          <div className={s.emptyCard}>Nothing shared with your department yet.</div>
-        )
-      ) : (
-        <>
-          {held.letters.map(l =>
-            fileRow(l.id, l.ext, l.typeName, `${l.name} · ${docDay(l.at)}${letterState(l) === 'new' ? ' · New' : ''}`, () => open('letter', l.id)),
-          )}
-          {held.folders.map(f => (
-            <button key={f.id} type="button" className={s.moreRow} onClick={() => openFolder(f.id)}>
-              <span className={s.moreIcon} style={{ background: 'rgb(238 240 226)', color: 'rgb(88 98 68)' }}>▤</span>
-              <span className={s.grow}>
-                <span className={s.moreTitle}>{f.name}</span>
-                <span className={s.moreSub}>{f.files === 1 ? '1 file' : `${f.files} files`}{f.unseen ? ` · ${f.unseen} new` : ''}</span>
-              </span>
-              <Chevron />
-            </button>
-          ))}
-          {held.files.map(f => fileRow(f.id, f.ext, f.name, `Added ${docDay(f.at)}${f.seen ? '' : ' · New'}`, () => open('drive', f.id)))}
-          {!held.letters.length && !held.folders.length && !held.files.length ? (
-            <div className={s.emptyCard}>{folder ? 'This folder is empty.' : 'Nothing of yours is shared with you yet.'}</div>
-          ) : null}
-        </>
-      )}
-    </>
-  )
-}
+      ) : null}
 
-function NoticesScreen({ items, fresh, open }: { items: Notice[]; fresh: ReadonlySet<string>; open: (n: Notice) => void }) {
-  const now = new Date()
-  if (!items.length) return <div className={s.emptyCard}>No notifications yet.</div>
-  const groups: Array<[string, Notice[]]> = [['New', items.filter(n => fresh.has(n.id))], ['Earlier', items.filter(n => !fresh.has(n.id))]]
-  return (
-    <>
-      {groups.filter(([, list]) => list.length > 0).map(([label, list]) => (
-        <section key={label} className={s.card18}>
-          <div className={s.cardHead}>
-            <span className={s.cardTitle}>{label}</span>
-          </div>
-          {list.map(n => {
-            const t = noticeTag(n)
+      {main ? (
+        <nav ref={barRef} className={`${s.tabs} ${tuck.tuckable}`} style={{ transitionDuration: '.32s' }} data-tucked={tucked ? '' : undefined} inert={tucked || undefined} aria-label="HR app">
+          {TABS.map(([k, label, icon]) => {
+            const on = tab === k
             return (
-              <button key={n.id} type="button" className={s.todo} onClick={() => open(n)}>
-                <span className={s.todoTag} style={{ background: t.bg, color: t.fg }}>{t.tag}</span>
-                <span className={s.grow}>
-                  <span className={s.line}>{n.title}</span>
-                  <span className={s.meta12}>{[n.body, noticeAgo(n.at, now)].filter(Boolean).join(' · ')}</span>
-                </span>
-                <Chevron />
+              <button key={k} type="button" className={s.tab} aria-current={on ? 'page' : undefined} onClick={() => goTab(k)}
+                style={{ color: on ? 'rgb(var(--tone-clay-deep))' : 'var(--ds-ink-3)' }}>
+                <Icon name={icon} size={21} />
+                <span className={s.tabLabel} style={{ fontWeight: on ? 700 : 500 }}>{label}</span>
+                {k === 'approve' && hrWaiting > 0 ? <span className={s.tabBadge}>{hrWaiting}</span> : null}
               </button>
             )
           })}
-        </section>
-      ))}
-    </>
-  )
-}
+        </nav>
+      ) : null}
 
-function HomeScreen({ d, items, memos, goTab, push, openBooking, staffName }: {
-  d: HrAppData
-  items: ReturnType<typeof reviewItems>
-  /** Their own memos (2026-10-12): the ones still waiting for Acknowledge head "Waiting for you". */
-  memos: MyMemo[]
-  goTab: (t: Tab) => void
-  push: (p: Page) => void
-  openBooking: (id: string) => void
-  staffName: (id: string | null) => string
-}) {
-  const missing = d.staff.filter(p => missingFor(d, p.id).length).length
-  const meetings = d.bookings.filter(b => b.date === d.today).sort((a, b) => a.from - b.from)
-  const waiting = memos.filter(memoWaiting)
-  void staffName
-  return (
-    <>
-      <div className={s.hero}>
-        <div>
-          <div className={s.heroHello}>Good {greeting()},</div>
-          <div className={s.heroName}>{d.greetName}</div>
-        </div>
-        <div className={s.heroStats}>
-          {([
-            [String(items.length), 'To review', 'rgb(244 178 120)', () => goTab('review')],
-            [String(d.hires.filter(h => h.status === 'acknowledged').length), 'Open roles', 'rgb(246 238 230)', () => goTab('hiring')],
-            [String(missing), 'Letters missing', 'rgb(240 150 140)', () => { goTab('more'); push({ k: 'docs' }) }],
-          ] as const).map(([v, l, c, click]) => (
-            <button key={l} type="button" className={s.heroStat} onClick={click}>
-              <div className={s.heroStatV} style={{ color: c }}>{v}</div>
-              <div className={s.heroStatL}>{l}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-      <section className={s.card18}>
-        <div className={s.cardHead}>
-          <span className={s.cardTitle}>Waiting for you</span>
-          <button type="button" className={s.cardLink} onClick={() => goTab('review')}>See all</button>
-        </div>
-        {/* A memo or letter waiting for their Acknowledge comes first (2026-10-12): it is theirs alone to do. */}
-        {waiting.slice(0, 4).map(m => (
-          <button key={`memo-${m.id}`} type="button" className={s.todo} onClick={() => push({ k: 'memo', id: m.id })}>
-            <span className={s.todoTag} style={{ background: MEMO_TAG.bg, color: MEMO_TAG.fg }}>{MEMO_TAG.tag}</span>
-            <span className={s.grow}>
-              <span className={s.line}>{m.title}</span>
-              <span className={s.meta12}>From {m.sender} · please acknowledge</span>
-            </span>
-            <Chevron />
-          </button>
-        ))}
-        {items.slice(0, Math.max(0, 4 - waiting.length)).map(it => (
-          <button key={it.k + it.id} type="button" className={s.todo} onClick={() => push({ k: it.k, id: it.id })}>
-            <span className={s.todoTag} style={{ background: it.tagBg, color: it.tagFg }}>{it.tag}</span>
-            <span className={s.grow}>
-              <span className={s.line}>{it.title}</span>
-              <span className={s.meta12}>{it.meta}</span>
-            </span>
-            <Chevron />
-          </button>
-        ))}
-        {items.length === 0 && waiting.length === 0 ? <div className={s.allClear}>All clear.</div> : null}
-      </section>
-      <section className={s.card18}>
-        <div className={s.cardHead}>
-          <span className={s.cardTitle}>{"Today's meetings"}</span>
-          <button type="button" className={s.cardLink} onClick={() => goTab('rooms')}>Rooms</button>
-        </div>
-        {meetings.map(b => (
-          <button key={b.id} type="button" className={s.meet} onClick={() => openBooking(b.id)}>
-            <span className={s.meetTime}>{hm(b.from)}</span>
-            <span className={s.meetBlock} style={{ borderLeftColor: b.guest ? ORANGE : SLATE }}>
-              <span className={s.line}>{b.title}</span>
-              <span className={s.meetMeta}>{(d.rooms.find(r => r.id === b.roomId)?.name ?? '') + ' · ' + (b.guest ? b.company ?? '' : b.byName)}</span>
-            </span>
-          </button>
-        ))}
-        {meetings.length === 0 ? <div className={s.meetNone}>No meetings today.</div> : null}
-      </section>
-    </>
-  )
-}
-
-/** "afternoon" — by the office's clock (UTC+8), as the portal greets. */
-function greeting(): string {
-  const h = officeTime().hour()
-  return h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
-}
-
-function HireScreen({ hr, openSheet, may }: { hr: HrHire; openSheet: (sh: Sheet, f?: Form) => void; may: HrAppData['may'] }) {
-  const ch = hireChip(hr.status)
-  const facts = ([
-    ['Department', hr.dept], ['Requested by', hr.requester], ['Employment', hr.employment], ['Reason', hr.reason], ['Age', hr.age], ['Gender', hr.gender],
-    ...(hr.status === 'filled' ? [['Hired', hr.hired], ['Hired through', hr.source], ['Cost', hr.cost ? `RM ${hr.cost}` : '—']] : []),
-  ] as Array<[string, string | null | undefined]>).filter(([, v]) => v)
-  const longs = ([['Job description', hr.jd], ['Special notes', hr.notes]] as Array<[string, string | undefined]>).filter(([, v]) => v)
-  return (
-    <>
-      <div className={s.pageChips}>
-        <span className={s.pageChip} style={{ background: ch.bg, color: ch.fg }}>{ch.label}</span>
-        <span className={s.pageChip} style={{ background: 'rgb(255 244 231)', color: 'rgb(163 78 37)' }}>{hr.ownerName ? `Owner: ${hr.ownerName}` : 'No owner yet'}</span>
-      </div>
-      <div className={s.pageMeta}>From {hr.company || hr.requester} · {hr.when}</div>
-      <div className={s.keyGrid}>
-        {([['Budget', budgetLabel(hr.budget)], ['Headcount', String(hr.headcount || 1)], ['Start', (hr.start || '—').replace('Within ', '≤ ')]] as const).map(([l, v]) => (
-          <div key={l} className={s.keyTile}><div className={s.keyL}>{l}</div><div className={s.keyV}>{v}</div></div>
-        ))}
-      </div>
-      <section className={s.facts}>
-        {facts.map(([l, v]) => <div key={l} className={s.fact}><span className={s.factL}>{l}</span><span className={s.factV}>{v}</span></div>)}
-      </section>
-      {longs.map(([l, v]) => (
-        <section key={l} className={s.long}><div className={s.capsLabel}>{l}</div><div className={s.longText}>{v}</div></section>
-      ))}
-      <section className={s.cands}>
-        <div className={s.candsHead}>
-          <span className={s.candsTitle}>Candidates · {hr.candidates.length}</span>
-          {may.hireCreate ? <button type="button" className={s.plus} aria-label="Add a candidate" onClick={() => openSheet({ k: 'cand' })}>+</button> : null}
-        </div>
-        {hr.candidates.map(c => {
-          const cc = candChip(c.stage)
-          return (
-            <div key={c.id} className={s.cand}>
-              <span className={s.candIni} style={{ background: cc.bg, color: cc.fg }}>{initials(c.name)}</span>
-              <span className={s.grow}>
-                <span className={s.candName}>{c.name}</span>
-                <span className={s.candMeta}>{[c.source, c.phone, c.note].filter(Boolean).join(' · ')}</span>
-              </span>
-              {may.hireEdit ? (
-                <button type="button" className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }} onClick={() => openSheet({ k: 'stage', cid: c.id, name: c.name, cur: c.stage })}>
-                  {cc.label} ▾
-                </button>
-              ) : (
-                <span className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }}>{cc.label}</span>
-              )}
-            </div>
-          )
-        })}
-        {hr.candidates.length === 0 ? <div className={s.noCands}>No candidates yet.</div> : null}
-      </section>
-      <section className={s.trail}>
-        <div className={s.trailTitle}>Audit trail</div>
-        {[...hr.events].reverse().map((e, i) => {
-          const major = MAJOR_EVENTS.includes(e.what)
-          return (
-            <div key={i} className={s.ev}>
-              <span
-                className={s.evDot}
-                style={{ width: major ? 10 : 7, height: major ? 10 : 7, background: major ? ORANGE : 'rgb(255 255 255)', boxShadow: major ? 'none' : 'inset 0 0 0 1.5px rgb(205 184 162)' }}
-              />
-              <span className={s.grow}>
-                <span className={s.evWhat} style={{ fontSize: major ? 14 : 13, fontWeight: major ? 700 : 500 }}>{e.what}</span>
-                <span className={s.evWho}>{e.who} · {e.when}</span>
-                {e.note ? <span className={s.evNote}>{e.note}</span> : null}
-              </span>
-            </div>
-          )
-        })}
-      </section>
-    </>
-  )
-}
-
-function HireBar({ hr, busy, openSheet, cancel, meId }: { hr: HrHire; busy: boolean; openSheet: (sh: Sheet, f?: Form) => void; cancel: () => void; meId: string | null }) {
-  const pending = hr.status === 'submitted' || hr.status === 'needs_info'
-  if (!pending && hr.status !== 'acknowledged') return null
-  const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
-  const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
-  return (
-    <div className={s.actBar}>
-      {pending ? (
-        <>
-          <button type="button" className={s.actBtn} style={{ ...outline, flex: 1 }} onClick={() => openSheet({ k: 'info' }, { note: '' })}>More info</button>
-          <button type="button" className={s.actBtn} style={{ ...go, flex: 2 }} onClick={() => openSheet({ k: 'ack' }, { owner: meId ?? '' })}>Acknowledge</button>
-        </>
-      ) : (
-        <>
-          <button type="button" className={s.actBtn} style={{ borderColor: 'rgb(236 190 184)', background: 'rgb(255 255 255)', color: 'rgb(176 40 34)', flex: 1 }} disabled={busy} onClick={cancel}>Cancel</button>
-          <button type="button" className={s.actBtn} style={{ ...go, flex: 2 }} onClick={() => openSheet({ k: 'fill' }, { hired: '', source: '', cost: '' })}>Mark filled</button>
-        </>
-      )}
+      <SheetLayer d={d} sheet={sheet} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr} busy={busy} arm={arm} setArm={setArm}
+        close={closeSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
+        openGuide={() => setPopUpGuide(true)} openIt={() => openIt()} flash={flash} />
+      {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
+      <Toast msg={toast} />
+      {mine ? <MeOverlay me={me} open={meOpen} onClose={() => { setMeOpen(false); setMeStart(null) }} backLabel="HR" startRequest={meStart} accountRows={accountRows} /> : null}
     </div>
   )
 }
 
-function RoomsScreen({ d, day, today, setDate, roomView, setRoomView, openBooking, bookAt }: {
+// ── Me › Profile's rows (the old More's) ─────────────────────────────────────
+
+function myDocsLine(docs: MyDocuments): string {
+  const freshN = docs.company.filter(x => !x.seen).length + personalUnseen(docs.personal)
+  return freshN ? `${freshN} new for you` : 'Company and personal'
+}
+
+/** A row's tile: the old More's glyph on its tint. */
+const Tile = ({ bg, fg, children }: { bg: string; fg: string; children: ReactNode }) => (
+  <span style={{ width: 36, height: 36, borderRadius: 10, background: bg, color: fg, display: 'grid', placeItems: 'center', flex: 'none', fontSize: 15 }}>{children}</span>
+)
+
+function AccountRows({ d, memos, pushNow, busy, togglePush, openGuide, hasEmail, switchView, go }: {
   d: HrAppData
-  day: string
-  today: string
-  setDate: (x: string) => void
-  roomView: 'cards' | 'timeline'
-  setRoomView: (v: 'cards' | 'timeline') => void
-  openBooking: (id: string) => void
-  /** Absent when they may not book (Meeting rooms · Create closed): the slots take no tap. */
-  bookAt?: (roomId: string, from: number) => void
+  memos: MyMemo[]
+  pushNow: PushState | null
+  busy: boolean
+  togglePush: () => void
+  openGuide: () => void
+  hasEmail: boolean
+  switchView: (v: HrAppView) => void
+  go: (what: 'memos' | 'mydocs' | 'password' | 'email' | 'it') => void
 }) {
-  const days = Array.from({ length: 7 }, (_, i) => shiftDay(today, i))
-  const cols = `40px repeat(${Math.max(1, d.rooms.length)}, minmax(0,1fr))`
-  const pax = (b: HrBooking) => b.pax
+  const waiting = memos.filter(memoWaiting).length
+  const pushOff = busy || pushNow === null || pushNow === 'unsupported' || pushNow === 'denied' || pushNow === 'install'
   return (
-    <>
-      <div className={s.modes}>
-        {([['cards', 'By room'], ['timeline', 'Timeline']] as const).map(([k, label]) => (
-          <button key={k} type="button" className={s.mode} aria-pressed={roomView === k} onClick={() => setRoomView(k)}>{label}</button>
-        ))}
-      </div>
-      <div className={s.days}>
-        {days.map(x => (
-          <button key={x} type="button" className={s.day} aria-pressed={x === day} onClick={() => setDate(x)}>
-            <span className={s.dayWd}>{x === today ? 'Today' : dayLabel(x, { weekday: 'short' })}</span>
-            <span className={s.dayN}>{dayLabel(x, { day: 'numeric' })}</span>
-          </button>
-        ))}
-      </div>
-      {d.rooms.length === 0 ? (
-        // Rooms start empty (the user, 2026-10-11): HR adds them on Admin › Meeting Rooms.
-        <div className={s.noLetters}>No meeting rooms yet.</div>
-      ) : roomView === 'timeline' ? (
-        <>
-          <div className={s.tl}>
-            <div className={s.tlHead} style={{ gridTemplateColumns: cols }}>
-              <span />
-              {d.rooms.map(r => <span key={r.id} className={s.tlRoom}>{r.name.replace('Meeting Room', 'Room')}</span>)}
-            </div>
-            <div className={s.tlGrid} style={{ gridTemplateColumns: cols }}>
-              <div className={s.tlHours}>
-                {Array.from({ length: 12 }, (_, i) => <span key={i} className={s.tlHour}>{hm((8 + i) * 60)}</span>)}
-              </div>
-              {d.rooms.map(r => (
-                <div
-                  key={r.id}
-                  className={s.tlCol}
-                  onClick={bookAt ? e => {
-                    const rc = e.currentTarget.getBoundingClientRect()
-                    bookAt(r.id, slotAt(e.clientY - rc.top, rc.height))
-                  } : undefined}
-                >
-                  {d.bookings.filter(b => b.roomId === r.id && b.date === day).map(b => {
-                    const dur = b.to - b.from
-                    return (
-                      <div
-                        key={b.id}
-                        className={s.tlBlock}
-                        style={{ top: ((b.from - 480) / 60) * 64 + 1, height: (dur / 60) * 64 - 2, background: b.guest ? 'rgb(255 244 231)' : 'rgb(230 237 241)', borderLeftColor: b.guest ? ORANGE : SLATE }}
-                        onClick={ev => { ev.stopPropagation(); openBooking(b.id) }}
-                      >
-                        <div className={s.tlTitle} style={{ WebkitLineClamp: dur <= 30 ? 1 : dur <= 60 ? 3 : 5 }}>{b.title}</div>
-                        <div className={s.tlTime}>{hm(b.from)}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-          {bookAt ? <div className={s.tlHint}>Tap an empty slot to book it.</div> : null}
-        </>
-      ) : (
-        d.rooms.map(r => {
-          const its = d.bookings.filter(b => b.roomId === r.id && b.date === day).sort((a, b) => a.from - b.from)
-          return (
-            <section key={r.id} className={s.room}>
-              <div className={s.roomHead}><span className={s.roomName}>{r.name}</span><span className={s.roomMeta}>{r.seats} seats</span></div>
-              {its.map(b => (
-                <button key={b.id} type="button" className={s.roomItem} onClick={() => openBooking(b.id)}>
-                  <span className={s.roomTime}>{hm(b.from)}–{hm(b.to)}</span>
-                  <span className={s.roomBlock} style={{ borderLeftColor: b.guest ? ORANGE : SLATE }}>
-                    <span className={s.roomTitle}>{b.title}</span>
-                    <span className={s.roomWho}>{(b.guest ? b.company ?? '' : b.byName) + ' · ' + pax(b) + ' pax'}</span>
-                  </span>
-                </button>
-              ))}
-              {its.length === 0 ? <div className={s.free}>Free all day</div> : null}
-            </section>
-          )
-        })
-      )}
-    </>
-  )
-}
-
-function InsightsScreen({ d }: { d: HrAppData }) {
-  const days = daysToFill(d.hires).sort((a, b) => b.days - a.days)
-  const maxD = Math.max(1, ...days.map(x => x.days))
-  const cost = d.hires.filter(h => h.status === 'filled').reduce((sum, h) => sum + (Number(String(h.cost ?? '').replace(/[^\d.]/g, '')) || 0), 0)
-  const cards: Array<[string, string, string]> = [
-    ['Open requests', String(d.hires.filter(h => ['submitted', 'needs_info', 'acknowledged'].includes(h.status)).length), 'rgb(205 184 162)'],
-    ['People hired', String(days.length), 'rgb(21 110 78)'],
-    ['Avg days to fill', days.length ? String(Math.round(days.reduce((sum, x) => sum + x.days, 0) / days.length)) : '—', 'rgb(205 184 162)'],
-    ['Hiring cost', cost ? `RM ${cost.toLocaleString('en-US')}` : '—', 'rgb(222 178 104)'],
-  ]
-  return (
-    <>
-      <div className={s.insGrid}>
-        {cards.map(([l, v, bar]) => (
-          <div key={l} className={s.insCard}>
-            <span className={s.insBar} style={{ background: bar }} />
-            <span className={s.insL}>{l}</span>
-            <span className={s.insV}>{v}</span>
-          </div>
-        ))}
-      </div>
-      <section className={s.bars}>
-        <div className={s.trailTitle}>Days to fill</div>
-        {days.length === 0 ? <div className={s.noLetters}>No request filled yet.</div> : null}
-        {days.map(x => (
-          <div key={x.hire.id} className={s.barRow}>
-            <div className={s.barTop}><span>{x.hire.position}</span><span className={s.mono}>{x.days} d</span></div>
-            <span className={s.track}><span className={s.fill} style={{ width: `${(x.days / maxD) * 100}%` }} /></span>
-          </div>
-        ))}
-      </section>
-    </>
-  )
-}
-
-// Declared here, not inside SheetView: a component made afresh on every render is a new
-// component each time, and React would remount its input after every keystroke (2026-10-11).
-// A group of controls (Attending, Total pax) is a div, not a label: a label clicks its first button when its
-// text is pressed — pressing "Attending" removed the first person, "Total pax" took one off (the prototype's
-// × and − are spans, so its labels never did).
-function Field({ label, group = false, children }: { label: string; group?: boolean; children: ReactNode }) {
-  const Box = group ? 'div' : 'label'
-  return <Box className={s.field}><span className={s.fieldL}>{label}</span>{children}</Box>
-}
-
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: Array<{ v: string; l: string }> }) {
-  return (
-    <Field label={label}>
-      <Select bare className={s.selectBox} value={value} onChange={e => onChange(e.target.value)}>
-        <option value="">Choose…</option>
-        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </Select>
-    </Field>
-  )
-}
-
-/**
- * More › Change password's sheet (2026-10-12): the current password, the new one, the new one again —
- * the portal's own rules and action (lib/account). Done, it says so and closes on Done.
- */
-function PasswordForm({ change, close, onBusy }: { change: ChangePassword; close: () => void; onBusy: (busy: boolean) => void }) {
-  const f = useChangePassword(change)
-  const type = f.shown ? 'text' : 'password'
-  // While it is being sent the sheet stays (its scrim and Cancel wait): the answer is said here (the review, 2026-10-12).
-  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
-  useEffect(() => () => onBusy(false), [onBusy])
-  const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
-  if (f.done) {
-    return (
-      <>
-        <p className={s.replNote} role="status">{PASSWORD_CHANGED}</p>
-        <div className={s.btnRow}>
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 1 }} onClick={close}>Done</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} data-hr-account="">
+      <Label>Account</Label>
+      <ListCard>
+        <ListItem leading={<Tile bg="rgb(238 240 226)" fg="rgb(88 98 68)">✉</Tile>} title="Memos" onClick={() => go('memos')}
+          subtitle={waiting ? `${waiting} waiting for your acknowledgement` : memos.length ? 'All acknowledged' : 'None for you yet'} />
+        {d.myDocs?.staffId ? <ListItem leading={<Tile bg="rgb(255 244 231)" fg="rgb(163 78 37)">▥</Tile>} title="My documents" subtitle={myDocsLine(d.myDocs)} onClick={() => go('mydocs')} /> : null}
+        <ListItem leading={<Tile bg="rgb(255 240 228)" fg="rgb(189 74 25)">●</Tile>} title="Phone notifications" subtitle={pushNow ? PUSH_WORDS[pushNow] : '…'} chevron={false}
+          trailing={<span aria-hidden="true" style={{ width: 36, height: 22, borderRadius: 11, background: pushNow === 'on' ? 'var(--ds-success)' : 'var(--ds-border)', position: 'relative', display: 'inline-block' }}>
+            <span style={{ position: 'absolute', top: 2, left: pushNow === 'on' ? 16 : 2, width: 18, height: 18, borderRadius: 9, background: 'rgb(255 255 255)', transition: 'left .2s' }} />
+          </span>}
+          onClick={pushOff ? undefined : togglePush} />
+        {pushNow === 'on' && popUpNeedsTurningOn() ? <ListItem leading={<Tile bg="rgb(255 240 228)" fg="rgb(189 74 25)">▣</Tile>} title="Make them pop up" subtitle="Pop on screen, once per phone" onClick={openGuide} /> : null}
+        <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">⚿</Tile>} title="Change password" subtitle="The current one, then a new one twice" onClick={() => go('password')} divider={hasEmail || !d.viewingAs} />
+        {hasEmail ? <ListItem leading={<Tile bg="rgb(238 235 231)" fg="rgb(90 78 68)">@</Tile>} title={EMAIL_WORDS.title} subtitle="HR approves the new one" onClick={() => go('email')} divider={!d.viewingAs} /> : null}
+        {!d.viewingAs ? <ListItem leading={<Tile bg="var(--ds-surface-2)" fg="var(--ds-ink-2)">?</Tile>} title="IT support" subtitle="Send a request and follow its status" onClick={() => go('it')} divider={false} /> : null}
+      </ListCard>
+      {d.views ? (
+        <div role="group" aria-label="Switch view" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+          <Label>Switch view</Label>
+          <ListCard>
+            {HR_APP_VIEWS.map(([v, name, where, dot], i) => {
+              const here = v === d.views?.current
+              return (
+                <ListItem key={v} leading={<Tile bg="rgb(246 242 236)" fg={dot}><span style={{ width: 10, height: 10, borderRadius: 5, background: dot }} /></Tile>} title={name}
+                  subtitle={here ? 'You are here' : where} chevron={!here} onClick={here ? undefined : () => switchView(v)} divider={i < HR_APP_VIEWS.length - 1} />
+              )
+            })}
+          </ListCard>
         </div>
-      </>
-    )
-  }
-  return (
-    <form className={s.pwForm} noValidate onSubmit={e => { e.preventDefault(); f.submit() }}>
-      <Field label="Current password">
-        <input className={s.input} type={type} autoComplete="current-password" spellCheck={false} value={f.form.current} onChange={e => f.set('current')(e.target.value)} />
-      </Field>
-      <Field label={`New password · at least ${MIN_PASSWORD_LENGTH} characters`}>
-        <input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.next} onChange={e => f.set('next')(e.target.value)} />
-      </Field>
-      <Field label="Confirm new password">
-        <input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.confirm} onChange={e => f.set('confirm')(e.target.value)} />
-      </Field>
-      <label className={s.pwShow}>
-        <input type="checkbox" checked={f.shown} onChange={e => f.setShown(e.target.checked)} />
-        Show passwords
-      </label>
-      {f.error ? <span className={s.formErr} role="alert">{f.error}</span> : null}
-      <div className={s.btnRow}>
-        <button type="button" className={s.formBtn} style={{ borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)', flex: 1 }} onClick={close} disabled={f.busy}>Cancel</button>
-        <button type="submit" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={f.busy}>{f.busy ? 'Changing…' : 'Change password'}</button>
-      </div>
-    </form>
+      ) : null}
+    </div>
   )
 }
 
-function SheetView(p: {
+// ── The sheets ───────────────────────────────────────────────────────────────
+
+function SheetLayer(p: {
   d: HrAppData
-  sheet: Sheet
-  hr: HrHire | null
-  day: string
+  sheet: SheetK | null
   form: Form
   setForm: (f: Form) => void
   formErr: string
@@ -1263,240 +732,342 @@ function SheetView(p: {
   arm: boolean
   setArm: (a: boolean) => void
   close: () => void
-  /** Back out of the screen under the sheet (a request decided leaves its page). */
   pop: () => void
-  run: (fn: () => Promise<ActResult>, after?: () => void, inSheet?: boolean) => void
+  run: (fn: () => Promise<ActResult>, after?: () => void, done?: string) => void
   actions: HrAppActions
-  live: HrBooking[]
+  hr: HrHire | null
+  day: string
+  pushNow: PushState | null
+  togglePush: () => void
+  openGuide: () => void
+  openIt: () => void
+  flash: (m: string) => void
 }) {
-  const { d, sheet: sh, hr, day, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, live } = p
-  // A send in flight (Change password): its scrim does not close it until the answer is in.
+  const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, day, pushNow, togglePush, flash } = p
+  const hr = p.hr
   const [locked, setLocked] = useState(false)
+  if (!sh) return null
   const set = (k: string) => (v: string) => { setForm({ ...F, [k]: v }); setFormErr('') }
   const str = (k: string) => (F[k] == null ? '' : String(F[k]))
-  const outline = { borderColor: 'rgb(222 214 203)', background: 'rgb(255 255 255)', color: 'rgb(43 31 23)' }
-  const go = { borderColor: ORANGE, background: ORANGE, color: 'rgb(43 31 23)' }
-  const cancelBtn = <button type="button" className={s.formBtn} style={{ ...outline, flex: 1 }} onClick={close}>Cancel</button>
+  const err = formErr ? <span className={s.err} role="alert">{formErr}</span> : null
+  const select = (k: string, label: string, options: Array<{ v: string; l: string }>, choose = true) => (
+    <Field label={label}>
+      <Select bare className={s.select} value={str(k)} onChange={e => set(k)(e.target.value)}>
+        {choose ? <option value="">Choose…</option> : null}
+        {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </Select>
+    </Field>
+  )
 
-  let title = ''
-  let body: ReactNode = null
+  if (sh.k === 'facts') {
+    return <Sheet open eyebrow={sh.eyebrow} title={sh.title} sub={sh.sub} onClose={close} actions={sh.actions ?? [{ label: 'Close', onClick: close }]}><SheetFacts items={sh.facts} /></Sheet>
+  }
 
   if (sh.k === 'stage' && hr) {
-    title = `Status · ${sh.name}`
-    body = (Object.keys(CAND_STAGE) as CandStage[]).map(v => {
-      const cc = candChip(v)
-      const on = v === sh.cur
-      return (
-        <button
-          key={v}
-          type="button"
-          className={s.stageOpt}
-          style={{ background: on ? 'rgb(255 244 231)' : 'rgb(246 242 236)' }}
-          onClick={() => {
-            if (v === sh.cur) return close()
-            run(() => actions.candStage(hr.id, sh.cid, v), close)
-          }}
-        >
-          <span className={s.stageDot} style={{ background: CHIP[cc.tone][1] }} />
-          <span className={s.stageLabel} style={{ fontWeight: on ? 700 : 500 }}>{cc.label}</span>
-          <span className={s.tick}>{on ? '✓' : ''}</span>
-        </button>
-      )
-    })
-  }
-
-  // A select's value and its setter, by the form's key.
-  const pick = (k: string) => ({ value: str(k), onChange: set(k) })
-
-  // A claim approved: where its money goes, as Member services asks it on the desktop.
-  if (sh.k === 'approve') {
-    const decide = (route: 'payroll' | 'payment') => run(() => actions.requestDecide(sh.id, 'approve', str('note'), route), () => { close(); pop() })
-    title = 'Approve claim'
-    body = (
-      <>
-        <p className={s.replNote}>Add to payroll pays it with the salary. Request payment sends it to Finance to pay on its own.</p>
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          <button type="button" className={s.formBtn} style={{ ...outline, flex: 1 }} disabled={busy} onClick={() => decide('payment')}>Request payment</button>
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 1 }} disabled={busy} onClick={() => decide('payroll')}>Add to payroll</button>
-        </div>
-      </>
+    return (
+      <Sheet open eyebrow={hr.id} title={`Status · ${sh.name}`} onClose={close}>
+        {STAGES.map(v => {
+          const cc = candChip(v)
+          const on = v === sh.cur
+          return (
+            <button key={v} type="button" className={s.option} style={{ background: on ? 'var(--hr2-pill-on)' : 'var(--ds-surface-2)' }}
+              onClick={() => (on ? close() : run(() => actions.candStage(hr.id, sh.cid, v), close, `${sh.name} · ${CAND_STAGE[v][0]}`))}>
+              <span className={s.optionDot} style={{ background: CHIP[cc.tone][1] }} />
+              <span style={{ flex: 1, fontWeight: on ? 700 : 500 }}>{cc.label}</span>
+              <span>{on ? '✓' : ''}</span>
+            </button>
+          )
+        })}
+        {err}
+      </Sheet>
     )
-  }
-
-  // More › Change password (2026-10-12): its boxes keep their own state, so a sheet closed and opened starts empty.
-  if (sh.k === 'password') {
-    title = 'Change password'
-    body = <PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} />
   }
 
   if (sh.k === 'ack' && hr) {
-    title = `Acknowledge ${hr.id}`
-    body = (
-      <>
-        <SelectField {...pick('owner')} label="Owner" options={d.owners.map(o => ({ v: o.id, l: o.name }))} />
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          {cancelBtn}
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={busy} onClick={() => {
-            if (!str('owner')) return setFormErr('Pick the owner.')
-            run(() => actions.hireAck(hr.id, str('owner')), close)
-          }}>Acknowledge</button>
-        </div>
-      </>
+    return (
+      <Sheet open eyebrow={hr.id} title={`Acknowledge ${hr.id}`} sub="Pick who in HR owns it" onClose={close} actions={[
+        { label: 'Cancel', onClick: close },
+        { label: 'Acknowledge', primary: true, disabled: busy, onClick: () => (str('owner') ? run(() => actions.hireAck(hr.id, str('owner')), close, `${hr.id} acknowledged`) : setFormErr('Pick the owner.')) },
+      ]}>
+        {select('owner', 'Owner', d.owners.map(o => ({ v: o.id, l: o.name })))}
+        {err}
+      </Sheet>
     )
   }
+
   if (sh.k === 'info' && hr) {
-    title = 'Ask for more, or decline'
-    body = (
-      <>
-        <Field label="Note to requester">
-          <textarea className={s.area} rows={3} placeholder="What do you need from them?" value={str('note')} onChange={e => set('note')(e.target.value)} />
-        </Field>
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          <button type="button" className={s.formBtn} style={{ ...outline, color: 'rgb(176 40 34)', borderColor: 'rgb(236 190 184)', flex: 1 }} disabled={busy} onClick={() => {
-            if (!str('note')) return setFormErr('Give a reason.')
-            run(() => actions.hireDecline(hr.id, str('note')), close)
-          }}>Decline</button>
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={busy} onClick={() => {
-            if (!str('note')) return setFormErr('Write what you need.')
-            run(() => actions.hireInfo(hr.id, str('note')), close)
-          }}>Request more info</button>
-        </div>
-      </>
+    return (
+      <Sheet open eyebrow={hr.id} title="Ask for more, or decline" onClose={close} actions={[
+        { label: 'Decline', danger: true, disabled: busy, onClick: () => (str('note') ? run(() => actions.hireDecline(hr.id, str('note')), close, `${hr.id} declined`) : setFormErr('Give a reason.')) },
+        { label: 'Request more info', primary: true, disabled: busy, onClick: () => (str('note') ? run(() => actions.hireInfo(hr.id, str('note')), close, 'More info requested') : setFormErr('Write what you need.')) },
+      ]}>
+        <Field label="Note to requester"><textarea className={s.textarea} rows={3} placeholder="What do you need from them?" value={str('note')} onChange={e => set('note')(e.target.value)} /></Field>
+        {err}
+      </Sheet>
     )
   }
+
   if (sh.k === 'fill' && hr) {
-    title = 'Mark filled'
-    body = (
-      <>
-        <SelectField {...pick('hired')} label="Hired" options={hr.candidates.filter(c => c.stage !== 'rejected').map(c => ({ v: c.name, l: c.name }))} />
-        <SelectField {...pick('source')} label="Hired through" options={d.sources.map(x => ({ v: x, l: x }))} />
-        <Field label="Hiring cost (RM)">
-          <input className={s.input} placeholder="0" value={str('cost')} onChange={e => set('cost')(e.target.value)} />
-        </Field>
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          {cancelBtn}
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={busy} onClick={() => {
+    return (
+      <Sheet open eyebrow={hr.id} title="Mark filled" onClose={close} actions={[
+        { label: 'Cancel', onClick: close },
+        {
+          label: 'Mark filled', primary: true, disabled: busy, onClick: () => {
             if (!str('hired') || !str('source')) return setFormErr('Pick who was hired and where from.')
-            run(() => actions.hireFill(hr.id, str('hired'), str('source'), str('cost').replace(/[^\d.]/g, '')), close)
-          }}>Mark filled</button>
-        </div>
-      </>
+            run(() => actions.hireFill(hr.id, str('hired'), str('source'), str('cost').replace(/[^\d.]/g, '')), close, `${hr.id} filled`)
+          },
+        },
+      ]}>
+        {select('hired', 'Hired', hr.candidates.filter(c => c.stage !== 'rejected').map(c => ({ v: c.name, l: c.name })))}
+        {select('source', 'Hired through', d.sources.map(x => ({ v: x, l: x })))}
+        <Field label="Hiring cost (RM)"><input className={s.input} inputMode="decimal" placeholder="0" value={str('cost')} onChange={e => set('cost')(e.target.value)} /></Field>
+        {err}
+      </Sheet>
     )
   }
+
   if (sh.k === 'cand' && hr) {
-    title = 'New candidate'
-    body = (
-      <>
+    return (
+      <Sheet open eyebrow={hr.id} title="New candidate" onClose={close} actions={[
+        { label: 'Cancel', onClick: close },
+        { label: 'Add', primary: true, disabled: busy, onClick: () => (str('name') ? run(() => actions.candAdd(hr.id, { name: str('name'), phone: str('phone'), note: str('note') }), close, `${str('name')} added`) : setFormErr('Add a name.')) },
+      ]}>
         <Field label="Name"><input className={s.input} value={str('name')} onChange={e => set('name')(e.target.value)} /></Field>
-        <Field label="Phone"><input className={s.input} value={str('phone')} onChange={e => set('phone')(e.target.value)} /></Field>
-        <Field label="Reference / note">
-          <textarea className={s.area} rows={3} placeholder="e.g. Referred by Chea Huan" value={str('note')} onChange={e => set('note')(e.target.value)} />
-        </Field>
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          {cancelBtn}
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={busy} onClick={() => {
-            if (!str('name')) return setFormErr('Add a name.')
-            run(() => actions.candAdd(hr.id, { name: str('name'), phone: str('phone'), note: str('note') }), close)
-          }}>Add</button>
-        </div>
-      </>
+        <Field label="Phone"><input className={s.input} inputMode="tel" value={str('phone')} onChange={e => set('phone')(e.target.value)} /></Field>
+        <Field label="Reference / note"><textarea className={s.textarea} rows={3} placeholder="e.g. Referred by Chea Huan" value={str('note')} onChange={e => set('note')(e.target.value)} /></Field>
+        {err}
+      </Sheet>
     )
   }
+
+  if (sh.k === 'newHire') {
+    const fields = d.hireFields ?? []
+    const answers: Record<string, string> = Object.fromEntries(fields.map(f => [f.id, str(`a:${f.id}`)]))
+    return (
+      <Sheet open eyebrow="New" title="New hiring request" sub="Sent to HR as Pending" onClose={close} actions={[
+        { label: 'Cancel', onClick: close },
+        {
+          label: 'Send', primary: true, disabled: busy, onClick: () => {
+            const missing = missingAnswers(fields, answers)
+            if (missing.length) return setFormErr('Fill in ' + missing.join(', ') + '.')
+            if (!str('by')) return setFormErr('Pick who is asking.')
+            run(async () => {
+              const r = await actions.hireNew(str('by'), answers)
+              if (r.ok) flash(`${r.id} · hiring request sent`)
+              return r.ok ? { ok: true } : r
+            }, close)
+          },
+        },
+      ]}>
+        {select('by', 'Requested by', (d.hirePeople ?? []).map(x => ({ v: x.id, l: x.name + (x.dept ? ` · ${x.dept}` : '') })), !d.hireMe)}
+        {fields.map(f => (
+          <Field key={f.id} label={f.label + (f.required ? ' *' : '')}>
+            {f.type === 'longtext' ? <textarea className={s.textarea} rows={3} value={str(`a:${f.id}`)} onChange={e => set(`a:${f.id}`)(e.target.value)} />
+              : f.type === 'select' ? (
+                <Select bare className={s.select} value={str(`a:${f.id}`)} onChange={e => set(`a:${f.id}`)(e.target.value)}>
+                  <option value="">Choose…</option>
+                  {f.options.split(',').map(o => o.trim()).filter(Boolean).map(o => <option key={o} value={o}>{o}</option>)}
+                </Select>
+              ) : f.type === 'range' ? (
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input className={s.input} inputMode="numeric" placeholder="From" value={str(`a:${f.id}`).split('–')[0] ?? ''} onChange={e => set(`a:${f.id}`)(`${e.target.value}–${str(`a:${f.id}`).split('–')[1] ?? ''}`)} />
+                  <span>to</span>
+                  <input className={s.input} inputMode="numeric" placeholder="To" value={str(`a:${f.id}`).split('–')[1] ?? ''} onChange={e => set(`a:${f.id}`)(`${str(`a:${f.id}`).split('–')[0] ?? ''}–${e.target.value}`)} />
+                </span>
+              ) : <input className={s.input} inputMode={f.type === 'number' ? 'numeric' : undefined} value={str(`a:${f.id}`)} onChange={e => set(`a:${f.id}`)(e.target.value)} />}
+          </Field>
+        ))}
+        {err}
+      </Sheet>
+    )
+  }
+
   if (sh.k === 'book') {
-    title = 'Book a room'
-    const att = (F.att as string[] | undefined) ?? (d.meId ? [d.meId] : [])
-    const total = Math.max(att.length, Number(F.pax) || 1)
+    const attending = (F.att as string[] | undefined) ?? (d.meId ? [d.meId] : [])
+    const total = Math.max(attending.length, Number(F.pax) || 1)
     const pq = str('pq').trim().toLowerCase()
     const times = bookingTimes()
-    body = (
-      <>
+    return (
+      <Sheet open eyebrow="Book a room" title="Book a room" sub={dayLabel(day, { weekday: 'short', day: 'numeric', month: 'short' })} onClose={close} actions={[
+        { label: 'Cancel', onClick: close },
+        {
+          label: 'Book', primary: true, disabled: busy, onClick: () => {
+            const fr = Number(F.from), to = Number(F.to)
+            if (!str('title') || !str('dept') || !str('room') || !fr || !to) return setFormErr('Fill in the title, department, room and time.')
+            if (to <= fr) return setFormErr('End must be after start.')
+            const clash = clashOf(d.bookings, str('room'), day, fr, to)
+            if (clash) return setFormErr(`Taken ${hm(clash.from)}–${hm(clash.to)} · ${clash.title}`)
+            const room = d.rooms.find(r => r.id === str('room'))?.name ?? 'Room'
+            run(() => actions.book({ title: str('title'), dept: str('dept'), roomId: str('room'), date: day, from: fr, to, attendees: attending, pax: total }), close, `${room} booked ${hm(fr)}–${hm(to)}`)
+          },
+        },
+      ]}>
         <Field label="Meeting title"><input className={s.input} placeholder="e.g. Interview" value={str('title')} onChange={e => set('title')(e.target.value)} /></Field>
-        <SelectField {...pick('dept')} label="Department" options={d.bookDepts.map(x => ({ v: x.id, l: x.name }))} />
-        <SelectField {...pick('room')} label="Room" options={d.rooms.map(r => ({ v: r.id, l: `${r.name} · ${r.seats} seats` }))} />
-        <SelectField {...pick('from')} label="From" options={times} />
-        <SelectField {...pick('to')} label="To" options={times} />
+        {select('dept', 'Department', d.bookDepts.map(x => ({ v: x.id, l: x.name })))}
+        {select('room', 'Room', d.rooms.map(r => ({ v: r.id, l: `${r.name} · ${r.seats} seats` })))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {select('from', 'From', times)}
+          {select('to', 'To', times)}
+        </div>
         <Field label="Attending" group>
           <div className={s.people}>
             <div className={s.picked}>
-              {att.map(id => (
-                <span key={id} className={s.pickedChip}>
-                  {d.staff.find(x => x.id === id)?.name ?? id}
-                  <button type="button" className={s.pickedX} aria-label={`Remove ${d.staff.find(x => x.id === id)?.name ?? id}`} onClick={() => setForm({ ...F, att: att.filter(x => x !== id) })}>×</button>
-                </span>
-              ))}
+              {attending.map(id => {
+                const name = d.staff.find(x => x.id === id)?.name ?? id
+                return (
+                  <span key={id} className={s.pickedChip}>
+                    {name}
+                    <button type="button" className={s.pickedX} aria-label={`Remove ${name}`} onClick={() => setForm({ ...F, att: attending.filter(x => x !== id) })}>×</button>
+                  </span>
+                )
+              })}
             </div>
-            <input className={s.peopleInput} placeholder="Add a colleague — type a name" aria-label="Add a colleague" value={str('pq')} onChange={e => setForm({ ...F, pq: e.target.value })} />
+            <input className={s.input} placeholder="Add a colleague — type a name" aria-label="Add a colleague" value={str('pq')} onChange={e => setForm({ ...F, pq: e.target.value })} />
             {pq ? (
               <div className={s.picked}>
-                {d.staff.filter(x => !att.includes(x.id) && x.name.toLowerCase().includes(pq)).slice(0, 6).map(x => (
-                  <button key={x.id} type="button" className={s.sugg} onClick={() => setForm({ ...F, att: [...att, x.id], pq: '' })}>+ {x.name}</button>
+                {d.staff.filter(x => !attending.includes(x.id) && x.name.toLowerCase().includes(pq)).slice(0, 6).map(x => (
+                  <button key={x.id} type="button" className={s.sugg} onClick={() => setForm({ ...F, att: [...attending, x.id], pq: '' })}>+ {x.name}</button>
                 ))}
               </div>
             ) : null}
           </div>
         </Field>
-        <Field label={`Total pax · ${att.length} named`} group>
+        <Field label={`Total pax · ${attending.length} named`} group>
           <span className={s.stepper}>
-            <button type="button" className={s.stepBtn} aria-label="One fewer" onClick={() => setForm({ ...F, pax: Math.max(att.length, total - 1) })}>−</button>
-            <span className={s.stepV}>{total}</span>
+            <button type="button" className={s.stepBtn} aria-label="One fewer" onClick={() => setForm({ ...F, pax: Math.max(attending.length, total - 1) })}>−</button>
+            <span style={{ ...MONO, minWidth: 24, textAlign: 'center' }}>{total}</span>
             <button type="button" className={s.stepBtn} aria-label="One more" onClick={() => setForm({ ...F, pax: total + 1 })}>+</button>
           </span>
         </Field>
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-        <div className={s.btnRow}>
-          {cancelBtn}
-          <button type="button" className={s.formBtn} style={{ ...go, flex: 2 }} disabled={busy} onClick={() => {
-            const fr = Number(F.from), to = Number(F.to)
-            if (!str('title') || !str('dept') || !str('room') || !fr || !to) return setFormErr('Fill in the title, department, room and time.')
-            if (to <= fr) return setFormErr('End must be after start.')
-            const clash = clashOf(live, str('room'), day, fr, to)
-            if (clash) return setFormErr(`Taken ${hm(clash.from)}–${hm(clash.to)} · ${clash.title}`)
-            run(() => actions.book({ title: str('title'), dept: str('dept'), roomId: str('room'), date: day, from: fr, to, attendees: att, pax: total }), close)
-          }}>Book</button>
-        </div>
-      </>
-    )
-  }
-  const bk = sh.k === 'booking' ? live.find(b => b.id === sh.id) ?? null : null
-  if (sh.k === 'booking') {
-    if (!bk) return null
-    title = bk.title
-    body = (
-      <>
-        <div className={s.bookWhen}>{dayLabel(bk.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {hm(bk.from)}–{hm(bk.to)}</div>
-        <div className={s.bookFacts}>
-          {([['Room', d.rooms.find(r => r.id === bk.roomId)?.name ?? ''], ['Booked by', bk.byName], ['From', bk.guest ? bk.company ?? '' : bk.dept], ['People', `${bk.pax} pax`]] as const).map(([l, v]) => (
-            <div key={l} className={s.bookFact}><span className={s.factL}>{l}</span><span className={s.bookFactV}>{v}</span></div>
-          ))}
-        </div>
-        {bk.mine ? (
-          <button type="button" className={s.cancelBtn} style={{ background: arm ? 'rgb(250 228 224)' : 'rgb(255 255 255)' }} disabled={busy} onClick={() => {
-            if (!arm) return setArm(true)
-            run(() => actions.bookCancel(bk.id), () => { close(); setArm(false) })
-          }}>
-            {arm ? 'Tap again to cancel' : 'Cancel meeting'}
-          </button>
-        ) : (
-          <div className={s.onlyBooker}>Only {bk.byName} can cancel this meeting.</div>
-        )}
-        {formErr ? <span className={s.formErr}>{formErr}</span> : null}
-      </>
+        {err}
+      </Sheet>
     )
   }
 
+  if (sh.k === 'booking') {
+    const bk = d.bookings.find(b => b.id === sh.id)
+    if (!bk) return null
+    return (
+      <Sheet open eyebrow={d.rooms.find(r => r.id === bk.roomId)?.name ?? 'Meeting'} title={bk.title} sub={`${dayLabel(bk.date, { weekday: 'short', day: 'numeric', month: 'short' })} · ${hm(bk.from)}–${hm(bk.to)}`} onClose={close}
+        actions={bk.mine && !d.viewingAs ? [
+          { label: 'Close', onClick: close },
+          { label: arm ? 'Tap again to cancel' : 'Cancel meeting', danger: true, disabled: busy, onClick: () => { if (!arm) { setArm(true); return } run(() => actions.bookCancel(bk.id), () => { close(); setArm(false) }, 'Meeting cancelled') } },
+        ] : [{ label: 'Close', onClick: close }]}>
+        <SheetFacts items={[['Room', d.rooms.find(r => r.id === bk.roomId)?.name ?? ''], ['Booked by', bk.byName], ['From', bk.guest ? bk.company ?? '' : bk.dept], ['People', `${bk.pax} pax`]]} />
+        {!bk.mine ? <div className={s.meta}>Only {bk.byName} can cancel this meeting.</div> : null}
+        {err}
+      </Sheet>
+    )
+  }
+
+  if (sh.k === 'claim') {
+    const decide = (route: 'payroll' | 'payment') => run(() => actions.requestDecide(sh.id, 'approve', str('note'), route), () => { close(); pop() }, route === 'payroll' ? 'Claim approved · added to payroll' : 'Claim approved · payment requested')
+    return (
+      <Sheet open eyebrow="Member services" title="Approve claim" sub="Where the money goes" onClose={close} actions={[
+        { label: 'Request payment', disabled: busy, onClick: () => decide('payment') },
+        { label: 'Add to payroll', primary: true, disabled: busy, onClick: () => decide('payroll') },
+      ]}>
+        <div className={s.meta}>Add to payroll pays it with the salary. Request payment sends it to Finance to pay on its own.</div>
+        {err}
+      </Sheet>
+    )
+  }
+
+  if (sh.k === 'password') {
+    return <Sheet open eyebrow="Account" title="Change password" onClose={close} locked={locked}><PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} /></Sheet>
+  }
+  if (sh.k === 'email' && actions.requestEmail) {
+    return <Sheet open eyebrow="Account" title={EMAIL_WORDS.title} onClose={close} locked={locked}><EmailForm actions={actions.requestEmail} close={close} onBusy={setLocked} /></Sheet>
+  }
+
+  if (sh.k === 'account') {
+    const pushOff = busy || pushNow === null || pushNow === 'unsupported' || pushNow === 'denied' || pushNow === 'install'
+    return (
+      <Sheet open eyebrow="HOUZS HR" title="Account" sub={d.greetName} onClose={close}>
+        <SheetFacts items={[['This phone', pushNow ? PUSH_WORDS[pushNow] : '…']]} />
+        {!d.viewingAs ? <button type="button" className={`${s.sheetBtn}`} disabled={pushOff} onClick={togglePush}>{pushNow === 'on' ? 'Turn notifications off' : 'Turn notifications on'}</button> : null}
+        {pushNow === 'on' && popUpNeedsTurningOn() ? <button type="button" className={s.sheetBtn} onClick={() => { close(); p.openGuide() }}>Make them pop up</button> : null}
+        {!d.viewingAs ? <button type="button" className={s.sheetBtn} onClick={p.openIt}>IT support</button> : null}
+        {d.views ? HR_APP_VIEWS.filter(([v]) => v !== d.views?.current).map(([v, name, where]) => (
+          <button key={v} type="button" className={s.sheetBtn} onClick={() => actions.switchView(v)}>{name} · {where}</button>
+        )) : null}
+        <div style={{ height: 6 }} />
+      </Sheet>
+    )
+  }
+  return null
+}
+
+/** Change password's form (2026-10-12): the current one, the new one twice — the portal's own rules and action. */
+function PasswordForm({ change, close, onBusy }: { change: ChangePassword; close: () => void; onBusy: (busy: boolean) => void }) {
+  const f = useChangePassword(change)
+  const type = f.shown ? 'text' : 'password'
+  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
+  if (f.done) {
+    return (
+      <>
+        <div className={s.meta} role="status">{PASSWORD_CHANGED}</div>
+        <button type="button" className={`${s.sheetBtn} ${s.accent}`} style={{ marginBottom: 'calc(10px + max(20px, var(--safe-bottom)))' }} onClick={close}>Done</button>
+      </>
+    )
+  }
   return (
-    <>
-      <div className={s.scrim} onClick={locked ? undefined : close} aria-hidden="true" />
-      <div className={s.sheet} role="dialog" aria-modal="true" aria-label={title}>
-        <span className={s.grab} aria-hidden="true" />
-        <div className={s.sheetTitle}>{title}</div>
-        {body}
+    <form noValidate onSubmit={e => { e.preventDefault(); f.submit() }} style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 'calc(10px + max(20px, var(--safe-bottom)))' }}>
+      <Field label="Current password"><input className={s.input} type={type} autoComplete="current-password" spellCheck={false} value={f.form.current} onChange={e => f.set('current')(e.target.value)} /></Field>
+      <Field label={`New password · at least ${MIN_PASSWORD_LENGTH} characters`}><input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.next} onChange={e => f.set('next')(e.target.value)} /></Field>
+      <Field label="Confirm new password"><input className={s.input} type={type} autoComplete="new-password" spellCheck={false} value={f.form.confirm} onChange={e => f.set('confirm')(e.target.value)} /></Field>
+      <label className={s.check}><input type="checkbox" checked={f.shown} onChange={e => f.setShown(e.target.checked)} />Show passwords</label>
+      {f.error ? <span className={s.err} role="alert">{f.error}</span> : null}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button type="button" className={s.sheetBtn} onClick={close} disabled={f.busy}>Cancel</button>
+        <button type="submit" className={`${s.sheetBtn} ${s.accent}`} disabled={f.busy}>{f.busy ? 'Changing…' : 'Change password'}</button>
       </div>
-    </>
+    </form>
   )
 }
+
+/** Request to change email's form (2026-10-16): the email they sign in with, their latest request, the new one. */
+function EmailForm({ actions, close, onBusy }: { actions: RequestEmailActions; close: () => void; onBusy: (busy: boolean) => void }) {
+  const f = useRequestEmail(actions, true)
+  useEffect(() => { onBusy(f.busy) }, [f.busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
+  const W = EMAIL_WORDS
+  const current = f.mine?.email ?? ''
+  const st = f.state
+  const tone = st?.kind === 'waiting' ? CHIP.alert : st?.kind === 'approved' ? CHIP.ledger : CHIP.danger
+  const foot = { paddingBottom: 'calc(10px + max(20px, var(--safe-bottom)))' }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Field label={W.current} group><span style={{ fontSize: 14 }}>{f.loading && !current ? '…' : current || '—'}</span></Field>
+      {f.sent && st?.kind === 'waiting' ? <div className={s.meta} role="status">{W.sent(current)}</div> : null}
+      {st ? (
+        <div className={s.facts} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}>
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className={s.chip} style={{ background: tone[0], color: tone[1], padding: '3px 9px', fontSize: 11.5 }}>{st.kind === 'waiting' ? W.waiting : st.kind === 'approved' ? W.approved : W.declined}</span>
+            {st.kind === 'waiting' && st.ref ? <span style={{ ...MONO, fontSize: 11, color: 'var(--ds-ink-3)' }}>{st.ref}</span> : null}
+          </span>
+          <span style={{ fontSize: 13.5 }}>{st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}`}</span>
+          {st.kind === 'declined' && st.note ? <span style={{ fontSize: 13.5 }}>“{st.note}”</span> : null}
+          {st.kind === 'waiting' ? <button type="button" className={s.sheetBtn} style={{ height: 40 }} disabled={f.busy} onClick={f.withdraw}>{f.busy ? W.withdrawing : W.withdraw}</button> : null}
+        </div>
+      ) : null}
+      {st?.kind === 'waiting' ? (
+        <div style={foot}>
+          {f.error ? <span className={s.err} role="alert">{f.error}</span> : null}
+          <button type="button" className={`${s.sheetBtn} ${s.accent}`} style={{ width: '100%', boxSizing: 'border-box' }} onClick={close} disabled={f.busy}>Done</button>
+        </div>
+      ) : (
+        <form noValidate onSubmit={e => { e.preventDefault(); f.submit() }} style={{ display: 'flex', flexDirection: 'column', gap: 12, ...foot }}>
+          <Field label={W.next}><input className={s.input} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={f.next} onChange={e => f.setNext(e.target.value)} disabled={!f.mine} /></Field>
+          {f.error ? <span className={s.err} role="alert">{f.error}</span> : null}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <button type="button" className={s.sheetBtn} onClick={close} disabled={f.busy}>Cancel</button>
+            <button type="submit" className={`${s.sheetBtn} ${s.accent}`} disabled={f.busy || !f.mine}>{f.busy ? W.sending : W.send}</button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+

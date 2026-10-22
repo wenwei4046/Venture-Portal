@@ -156,7 +156,7 @@ export function useQuote(args: UseQuoteArgs) {
     if (!catalog) return;
     setSheet({ mode: "frame", size: "Q", frame: firstFrame(catalog, "Q"), kpi: [], qty: 1, drop: false });
   }, [catalog]);
-  const openAccOnly = useCallback(() => setSheet({ mode: "acc", size: "Q", acc: {}, accAll: false }), []);
+  const openAccOnly = useCallback(() => setSheet({ mode: "acc", acc: {}, accAll: false }), []);
   const closeSheet = useCallback(() => setSheet(null), []);
   const patch = useCallback((p: Partial<SheetState>) => setSheet(s => (s ? ({ ...s, ...p } as SheetState) : s)), []);
 
@@ -194,9 +194,9 @@ export function useQuote(args: UseQuoteArgs) {
       setBuild(b => ({ ...(sofa.graded ? { height: sofa.height, tier: sofa.tier } : { height: b.height, tier: b.tier }), leg: sofa.leg, specials: sofa.picked }));
     }
     setCart(c => addLines(c, lines));
-    setMemory(m => remember(m, sheet, brand));
+    setMemory(m => remember(m, sheet, catalog));
     setSheet(null);
-  }, [readOnly, sheet, catalog, cart, build, brand]);
+  }, [readOnly, sheet, catalog, cart, build]);
 
   // ── the cart ──
   const bump = useCallback((id: string, d: number) => setCart(c => bumpLine(c, id, d)), []);

@@ -15,12 +15,14 @@ import { formatIntlDate } from "@/lib/utils";
 export const gb = (d: Date, o: Intl.DateTimeFormatOptions) => formatIntlDate(d, o, "en-GB");
 
 export type { CSSProperties };
-export const INK = "#3F2B22", SUB = "#806B60", RUST = "#BD4A19", BORDER = "rgb(235 221 210)";
+export const INK = "var(--crm-ink)", SUB = "var(--crm-muted)", RUST = "var(--crm-rust)", BORDER = "rgb(235 221 210)";
 
 /** The design's channel badges: WhatsApp's handset bubble, Messenger's bolt bubble. */
 export const CHANNEL = {
-  whatsapp: { name: "WhatsApp", fg: "#1F7A4D", bg: "#E3F2EA", icon: "M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.2 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .2-3.3-.7-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4Z" },
-  messenger: { name: "Messenger", fg: "#2F6FB5", bg: "#E4EDF8", icon: "M12 2C6.5 2 2 6.2 2 11.4c0 2.9 1.4 5.5 3.6 7.2V22l3.3-1.8c1 .3 2 .4 3.1.4 5.5 0 10-4.2 10-9.4S17.5 2 12 2Zm1 12.6-2.5-2.7-4.9 2.7 5.4-5.7 2.6 2.7 4.8-2.7-5.4 5.7Z" },
+  whatsapp: { name: "WhatsApp", fg: "#25D366", bg: "#E5F9EC", // palette:keep — public/sw.js draws the badge on a canvas with these (4a channel colours)
+    icon: "M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.2 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .2-3.3-.7-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4Z" },
+  messenger: { name: "Messenger", fg: "#0A7CFF", bg: "#E2EFFF", // palette:keep
+    icon: "M12 2C6.5 2 2 6.2 2 11.4c0 2.9 1.4 5.5 3.6 7.2V22l3.3-1.8c1 .3 2 .4 3.1.4 5.5 0 10-4.2 10-9.4S17.5 2 12 2Zm1 12.6-2.5-2.7-4.9 2.7 5.4-5.7 2.6 2.7 4.8-2.7-5.4 5.7Z" },
 } as const;
 
 export const STATUS_LABEL: Record<CrmStatus, string> = { new: "New", follow_up: "Follow up", appointment: "Appointment", won: "Won", lost: "Lost" };
@@ -62,19 +64,32 @@ export function windowShut(c: CrmCustomer, now: Date): boolean {
 }
 
 /**
- * Cold lead (README): the reply window has closed and WE sent the last
- * message. It leaves All for Cold leads, and comes back when the customer
- * writes again (their message reopens the window).
+ * Cold lead: the reply window has closed — only a template can reach the customer now, whoever wrote last. It leaves All
+ * for Cold leads, and comes back when the customer writes again (their message reopens the window). Until 2026-10-18 it
+ * also needed OUR message to be the last, so a customer left unanswered past 24 h stayed in Attention though nothing but
+ * a template could reach them (the owner: "这个客户已经超过30h没被我们回复，他是否也应该在cold lead?").
  */
 export function isCold(c: CrmCustomer, now: Date): boolean {
-  const last = lastReal(c);
-  return !!last && last.from === "me" && windowShut(c, now);
+  return !!lastReal(c) && windowShut(c, now);
+}
+
+/**
+ * Frame M08's cold card line: "Ahmad last wrote 2 days ago. WhatsApp only lets an approved template open the chat again."
+ * Messenger has no templates here (Meta reviews WhatsApp's only), so its line says the chat opens when they write.
+ */
+export function coldLine(c: CrmCustomer, now: Date): string {
+  const first = c.name.trim().split(/\s+/)[0] || "The customer", at = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
+  const h = at == null ? null : Math.max(1, Math.floor((now.getTime() - at) / 3_600_000));
+  const when = h == null ? "a while ago" : h < 48 ? (h + (h === 1 ? " hour" : " hours") + " ago") : (Math.floor(h / 24) + " days ago");
+  return c.channel === "messenger" ? first + " last wrote " + when + ". Messenger opens the chat again when they write."
+    : first + " last wrote " + when + ". WhatsApp only lets an approved template open the chat again.";
 }
 
 /** Reply urgency, from the one rule (crm.ts: 3 h · 6 h · 9 h on real time). */
 export function urgencyOf(c: CrmCustomer, now: Date) {
   const u = replyUrgency(asLead(c), now);
-  const color = u.level === "overdue" ? RUST : u.level === "urgent" ? "#9A5A2E" : SUB;
+  // 4a (change list 3): Urgent and Overdue are urgent text in oxblood, Reply soon in ink.
+  const color = u.level === "overdue" || u.level === "urgent" ? "var(--crm-oxblood)" : "var(--crm-ink)";
   const label = u.level === "none" ? "" : `${u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : "Reply soon"} · ${Math.floor(u.waitingMinutes / 60)} h`;
   return { ...u, color, label };
 }
@@ -110,4 +125,28 @@ export interface SalesCtx {
     toTeam?: () => void;
     /** The Principal / Director give a customer to anyone (crm_send_to) — their chat menu's Assign to. */
     assignTo?: (customerId: string, staffId: string) => Promise<boolean> } | null;
+}
+
+/**
+ * 4a change list 18 · the chat's status strip, under the header (M04 / M08; the desktop's chat header says the same):
+ * the status and how long the customer has waited, and how long the 24-hour reply window has left — oxblood on the
+ * pale orange; a cold chat grey ("Cold · no reply for N days" / "Window closed"). From the status and the customer's
+ * last message time only.
+ */
+export function chatStripOf(c: CrmCustomer, now: Date) {
+  const H = 3_600_000, last = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
+  if (isCold(c, now)) {
+    const lr = lastReal(c), since = now.getTime() - new Date(lr?.at ?? now).getTime(), days = Math.max(1, Math.floor(since / (24 * H)));
+    // The customer wrote last and nobody answered: how long they have waited (hours under two days).
+    const left = lr?.from === "lead"
+      ? (since < 48 * H ? `Cold · waited ${Math.floor(since / H)} h for a reply` : `Cold · waited ${days} days for a reply`)
+      : `Cold · no reply for ${days} ${days === 1 ? "day" : "days"}`;
+    return { cold: true, left, right: "Window closed", dot: "var(--crm-faint-2)" };
+  }
+  const u = urgencyOf(c, now), attention = u.level !== "none", h = Math.floor(u.waitingMinutes / 60);
+  const left = (attention ? "Attention" : STATUS_LABEL[c.status]) + (attention && h >= 1 ? ` · waiting ${h} h` : "");
+  const leftMs = last == null ? 0 : last + 24 * H - now.getTime();
+  const right = last == null ? "" : leftMs <= 0 ? "Window closed" : leftMs >= H ? `Reply window · ${Math.floor(leftMs / H)} h left` : `Reply window · ${Math.max(1, Math.floor(leftMs / 60_000))} min left`;
+  const dot = attention ? "var(--crm-st-attention)" : c.status === "new" ? "var(--crm-st-new)" : c.status === "follow_up" ? "var(--crm-st-follow)" : c.status === "appointment" ? "var(--crm-st-appt)" : c.status === "won" ? "var(--crm-st-won)" : "var(--crm-st-lost)";
+  return { cold: false, left, right, dot };
 }

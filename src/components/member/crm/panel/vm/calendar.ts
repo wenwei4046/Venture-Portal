@@ -10,8 +10,8 @@ import { DAY, day0, gb, NO_SEAT, pickGroups, seatOf, stop, type PanelCtx } from 
 
 const f = (t: number) => gb(t, { day: "numeric", month: "short" });
 const tm = (d: Date) => d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
-const SS = { attended: ["Showed up", "#E6F0EA", "#387557"], no_show: ["No show", "#FBE7E2", "#A3371A"], booked: ["Booked", "#FFF0E4", "#BD4A19"], mark: ["To mark", "#F5EBE3", "#806B60"] } as const;
-const FIN = { won: ["Won", "#E4F1E8", "#387557"], follow_up: ["Follow up", "#FBF1E3", "#A46312"], lost: ["Lost", "#FBEAE6", "#A3371A"] } as const;
+const SS = { attended: ["Showed up", "var(--crm-tint-follow)", "var(--crm-brown)"], no_show: ["No show", "var(--crm-tint-attention)", "var(--crm-oxblood)"], booked: ["Booked", "var(--crm-tint-attention)", "var(--crm-rust)"], mark: ["To mark", "var(--crm-field)", "var(--crm-muted)"] } as const;
+const FIN = { won: ["Won", "var(--crm-tint-follow)", "var(--crm-brown)"], follow_up: ["Follow up", "var(--crm-tint-appt)", "var(--crm-brown)"], lost: ["Lost", "var(--crm-tint-attention)", "var(--crm-oxblood)"] } as const;
 
 export function calendarVM(ctx: PanelCtx) {
   const { ui, patch, set, data, now, nameOf } = ctx;
@@ -31,24 +31,24 @@ export function calendarVM(ctx: PanelCtx) {
     const s = SS[a.v.state === "booked" && isPast(a) ? "mark" : (a.v.state as "attended" | "no_show" | "booked")];
     return { status: s[0], sBg: s[1], sFg: s[2] };
   };
-  const view = ui.cView, segv = (k: "list" | "grid", label: string) => ({ label, pick: () => patch({ cView: k }), bg: view === k ? "#fff" : "transparent", fg: view === k ? "#3F2B22" : "#806B60", w: view === k ? 650 : 500, sh: view === k ? "0 1px 3px rgba(63,43,34,.12)" : "none" });
+  const view = ui.cView, segv = (k: "list" | "grid", label: string) => ({ label, pick: () => patch({ cView: k }), bg: view === k ? "var(--crm-rust)" : "transparent", fg: view === k ? "#fff" : "var(--crm-muted)", w: view === k ? 500 : 400, sh: "none" });
   const sel = ui.cDay, shown = view === "grid" && sel != null ? list.filter(a => day0(a.at) === sel) : list;
-  const item = (a: typeof all[number], k: number) => ({ name: a.name, who: nameOf(a.who), room: a.room, time: tm(a.at), tc: a.seat.c, rule: k ? "1px solid #EBDDD2" : "0", ...statusOf(a),
+  const item = (a: typeof all[number], k: number) => ({ name: a.name, who: nameOf(a.who), room: a.room, time: tm(a.at), tc: a.seat.c, rule: k ? "1px solid var(--crm-rule)" : "0", ...statusOf(a),
     // rev 1011 §5.1: a visit opens Customer info first (Open chat there), as RS rev 1010 §3.
     open: () => patch({ calInfo: a.v.customerId }) });
   const days: { day: string; color: string; items: ReturnType<typeof item>[] }[] = [];
   shown.forEach(a => {
     const lab = (day0(a.at) === T ? "Today · " : "") + gb(a.at, { weekday: "short", day: "numeric", month: "short" });
-    let g = days.find(x => x.day === lab); if (!g) days.push(g = { day: lab, color: lab.startsWith("Today") ? "#BD4A19" : "#806B60", items: [] });
+    let g = days.find(x => x.day === lab); if (!g) days.push(g = { day: lab, color: lab.startsWith("Today") ? "var(--crm-rust)" : "var(--crm-muted)", items: [] });
     g.items.push(item(a, g.items.length));
   });
   const gm = ui.cGM ?? [new Date(rg.a).getFullYear(), new Date(rg.a).getMonth()], g1 = new Date(gm[0], gm[1], 1), lead0 = (g1.getDay() + 6) % 7, rows = Math.ceil((lead0 + new Date(gm[0], gm[1] + 1, 0).getDate()) / 7);
   const teamKeys = [...(ctx.directors.length ? ["hod"] : []), ...ctx.teams.map(t => t.id)];
   const seatName = (id: string) => (id === "hod" ? "Director" : ctx.teams.find(t => t.id === id)?.name ?? "");
-  const seatC = (id: string) => (id === "hod" ? "#387557" : ctx.teams.find(t => t.id === id)?.c ?? "#806B60");
+  const seatC = (id: string) => (id === "hod" ? "var(--crm-brown)" : ctx.teams.find(t => t.id === id)?.c ?? "var(--crm-muted)");
   // The person sheet: everyone in the chosen team (TAs book no visits).
   const inTeam = (id: string) => ts === "all" || (seatOf(ctx, id)?.id ?? "") === ts;
-  const groups = pickGroups(ctx, { sel: pp, pick: id => patch({ cPerson: id, cpSheet: false }), hodLabel: "Director" })
+  const groups = pickGroups(ctx, { sel: pp, pick: id => patch({ cPerson: id, cpSheet: false }), hodLabel: "Revenue Director" })
     .map(g => ({ ...g, people: g.people.filter(p => inTeam(p.id) && ctx.data.people.find(x => x.id === p.id)?.role !== "ta") })).map(g => ({ ...g, n: g.people.length })).filter(g => g.n);
   const persons = groups.reduce((n, g) => n + g.n, 0);
   // Leads in the range (rev 1011: the hero's first figure), by the team / person chips.
@@ -63,14 +63,14 @@ export function calendarVM(ctx: PanelCtx) {
     cCameV: list.filter(a => a.v.state === "attended").map(a => ({ cid: a.v.customerId, start: a.v.start })),
     onCal: ui.tab === "calendar" && !ui.lead, stop,
     cRangeLabel: `${list.length} visits · ${up} upcoming`, cRangeBtn: `${f(rg.a)} – ${f(rg.b)}`,
-    cTeams: [["all", "All teams", ""], ...(ctx.directors.length ? [["hod", "Director", "#387557"]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c])].map(([k, label, dot]) => ({ label, dot,
-      pick: () => patch({ cTeam: k, cPerson: "" }), bg: ts === k ? "#3F2B22" : "#fff", fg: ts === k ? "#fff" : "#3F2B22", bd: ts === k ? "#3F2B22" : "#EBDDD2" })),
+    cTeams: [["all", "All teams", ""], ...(ctx.directors.length ? [["hod", "Director", "var(--crm-brown)"]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c])].map(([k, label, dot]) => ({ label, dot,
+      pick: () => patch({ cTeam: k, cPerson: "" }), on: ts === k, bg: ts === k ? "var(--crm-rust)" : "var(--crm-field)", fg: ts === k ? "#fff" : "var(--crm-ink)", bd: ts === k ? "var(--crm-rust)" : "var(--crm-field)" })),
     cPersonLabel: pp ? nameOf(pp) : "Everyone",
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
-    cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "#FFF8F2", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
-    cViews: [segv("list", "List"), segv("grid", "Calendar")], cIsGrid: view === "grid",
+    cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-cream)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
+    cViews: [segv("grid", "Month"), segv("list", "List")], cIsGrid: view === "grid",
     // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
-    cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "#F6B48A"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
+    cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
       open: label === "Show-up" ? undefined : () => patch({ cLs: label === "Leads" ? "leads" as const : label === "Upcoming" ? "up" as const : "came" as const }),
       cur: label === "Show-up" ? "default" : "pointer", deco: label === "Show-up" ? "none" : "underline dotted rgba(255,255,255,.5)" })),
     cByTeam: (ts === "all" ? teamKeys : [ts]).map(id => {
@@ -81,8 +81,8 @@ export function calendarVM(ctx: PanelCtx) {
     cPrevM: () => patch({ cGM: [gm[1] ? gm[0] : gm[0] - 1, (gm[1] + 11) % 12] }), cNextM: () => patch({ cGM: [gm[1] === 11 ? gm[0] + 1 : gm[0], (gm[1] + 1) % 12] }),
     cCells: Array.from({ length: rows * 7 }, (_, k) => {
       const d = new Date(gm[0], gm[1], 1 - lead0 + k), t = d.getTime(), on = t === sel, isT = t === T, inRg = t >= rg.a && t <= rg.b;
-      return { n: d.getDate(), dots: list.filter(a => day0(a.at) === t).slice(0, 4).map(a => ({ c: a.seat.c })), edge: k % 7 ? "1px solid #F3E9E1" : "0", bg: on ? "#FFF0E4" : "transparent", op: inRg ? 1 : 0.4,
-        dotBg: isT ? "#BD4A19" : "transparent", fg: isT ? "#fff" : d.getMonth() === gm[1] ? "#3F2B22" : "#C9B5A8", w: on || isT ? 700 : 500, pick: () => set(u => ({ ...u, cDay: u.cDay === t ? null : t })) };
+      return { n: d.getDate(), dots: list.filter(a => day0(a.at) === t).slice(0, 4).map(a => ({ c: a.seat.c })), edge: k % 7 ? "1px solid var(--crm-rule-soft)" : "0", bg: on ? "var(--crm-tint-attention)" : "transparent", op: inRg ? 1 : 0.4,
+        dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : d.getMonth() === gm[1] ? "var(--crm-ink)" : "var(--crm-faint-2)", w: on || isT ? 700 : 500, pick: () => set(u => ({ ...u, cDay: u.cDay === t ? null : t })) };
     }),
     cDayTitle: sel != null ? gb(sel, { weekday: "long", day: "numeric", month: "long" }) : `All visits · ${rg.a === rg.b ? f(rg.a) : `${f(rg.a)} – ${f(rg.b)}`}`,
     cShowAll: sel != null, cAll: () => patch({ cDay: null }),
@@ -91,7 +91,7 @@ export function calendarVM(ctx: PanelCtx) {
     crOpen: !!ui.crSheet, crClose: () => patch({ crSheet: null }),
     crTitle: "", crPrev: () => {}, crNext: () => {}, crPresets: [] as { label: string; bd: string; bg: string; fg: string; pick: () => void }[],
     crCells: [] as { n: number; band: string; bandR: string; bg: string; sh: string; fg: string; w: number; pick: () => void }[],
-    crFrom: "", crTo: "", crFromBd: "#EBDDD2", crToBd: "#EBDDD2", crApplyLabel: "", crApplyBg: "#BD4A19", crApply: () => {},
+    crFrom: "", crTo: "", crFromBd: "var(--crm-rule)", crToBd: "var(--crm-rule)", crApplyLabel: "", crApplyBg: "var(--crm-rust)", crApply: () => {},
   };
   const sh = ui.crSheet;
   if (!sh) return base;
@@ -105,16 +105,16 @@ export function calendarVM(ctx: PanelCtx) {
     ...base,
     crTitle: gb(c1, { month: "long", year: "numeric" }),
     crPrev: () => setS({ cm: [cm[1] ? cm[0] : cm[0] - 1, (cm[1] + 11) % 12] }), crNext: () => setS({ cm: [cm[1] === 11 ? cm[0] + 1 : cm[0], (cm[1] + 1) % 12] }),
-    crPresets: P.map(([label, a, b]) => { const on = lo === a && hi === b; return { label, bd: on ? "#3F2B22" : "#EBDDD2", bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", pick: () => patch({ cRange: { a, b }, crSheet: null, cGM: null, cDay: null }) }; }),
+    crPresets: P.map(([label, a, b]) => { const on = lo === a && hi === b; return { label, bd: on ? "var(--crm-ink)" : "var(--crm-rule)", bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", pick: () => patch({ cRange: { a, b }, crSheet: null, cGM: null, cDay: null }) }; }),
     crCells: Array.from({ length: rr * 7 }, (_, k) => {
       const d = new Date(cm[0], cm[1], 1 - l0 + k), t = d.getTime(), inn = t >= lo && t <= hi, end = t === lo || t === hi, col = k % 7;
-      return { n: d.getDate(), band: inn && lo !== hi ? "#FCE6D6" : "transparent",
+      return { n: d.getDate(), band: inn && lo !== hi ? "var(--crm-tint-attention)" : "transparent",
         bandR: !inn || lo === hi ? "0" : t === lo || col === 0 ? (t === hi || col === 6 ? "20px" : "20px 0 0 20px") : t === hi || col === 6 ? "0 20px 20px 0" : "0",
-        bg: end ? "#BD4A19" : t === T ? "#fff" : "transparent", sh: end ? "0 3px 8px rgba(189,74,25,.30)" : t === T ? "inset 0 0 0 1.5px #BD4A19" : "none",
-        fg: end ? "#fff" : d.getMonth() === cm[1] ? "#3F2B22" : "#C9B5A8", w: end || t === T ? 700 : 500,
+        bg: end ? "var(--crm-rust)" : t === T ? "#fff" : "transparent", sh: end ? "0 3px 8px rgba(189,74,25,.30)" : t === T ? "inset 0 0 0 1.5px var(--crm-rust)" : "none",
+        fg: end ? "#fff" : d.getMonth() === cm[1] ? "var(--crm-ink)" : "var(--crm-faint-2)", w: end || t === T ? 700 : 500,
         pick: () => setS(sh.step === 1 ? { b: t, step: 0 } : { a: t, b: t, step: 1 }) };
     }),
-    crFrom: f(lo), crTo: sh.step === 1 ? "Pick end" : f(hi), crToBd: sh.step === 1 ? "#BD4A19" : "#EBDDD2",
+    crFrom: f(lo), crTo: sh.step === 1 ? "Pick end" : f(hi), crToBd: sh.step === 1 ? "var(--crm-rust)" : "var(--crm-rule)",
     crApplyLabel: `Show ${lo === hi ? f(lo) : `${f(lo)} – ${f(hi)}`}`,
     crApply: () => patch({ cRange: { a: lo, b: hi }, crSheet: null, cGM: null, cDay: null }),
   };

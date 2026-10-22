@@ -22,11 +22,15 @@ for (const [a, b] of [...PATCHES, ...require("./panel-chat-composer-patches.cjs"
   if (n !== 1) throw new Error(`PanelApp: patch matched ${n} times: ${a}`);
   body = body.replace(a, b);
 }
-// Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs), then the Revenue app's type scale on
-// every size (type-scale.cjs) — both after the patches, which match the prototype's px.
+// Profile's main page in the Revenue app Profile's sizes (2026-10-14 — profile-type.cjs) and its look (2026-10-16 —
+// profile-like-app.cjs, as Mine's), then the Revenue app's type scale on every size (type-scale.cjs) — all after the
+// patches, which match the prototype's px.
 body = require("./ad-link.cjs")(body);
 body = require("./profile-type.cjs")(body, "{!!(v.pf.onProfile) && (<>");
+body = require("./profile-like-app.cjs").team(body, "{!!(v.pf.onProfile) && (<>");
+body = require("./palette-4a.cjs")(body, "PanelApp");
 body = require("./type-scale.cjs")(body);
+body = require("./phone-4a.cjs").panel(body);
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";
 ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */\n" : ""}
@@ -38,7 +42,7 @@ import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 ${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import type { PanelAppVM } from "./vm/app";
+${require("./phone-4a.cjs").IMPORT(body, "../shared/phone4a")}import type { PanelAppVM } from "./vm/app";
 
 /** The whole Control panel: the top bar, every tab, every sheet and page, the toast and the bottom bar. */
 export default function PanelApp({ v }: { v: PanelAppVM }) {

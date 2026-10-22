@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { User } from '@/types'
-import { hrNavSections, visibleHrNav } from './hr-nav'
+import { hrNavSections, visibleHrNav, type HrRevenueSubs } from './hr-nav'
 import ViewSidebar from './ViewSidebar'
 
 // HR's sidebar (2026-10-10, the HR revamp handoff): the view sidebar with HR's
@@ -16,8 +16,8 @@ export default function HrSidebar({
   initialCollapsed,
 }: {
   user: User
-  /** The Revenue sub-department Comm Cal / Sales Groups / Rules open (null = none yet). */
-  revenueSub: string | null
+  /** The Revenue sub-department Comm Cal / Sales Groups / Rules open (null = none yet) — one each since 2026-10-16. */
+  revenueSub: string | null | HrRevenueSubs
   initialCollapsed: boolean
 }) {
   const sections = useMemo(() => visibleHrNav(hrNavSections(revenueSub), user), [revenueSub, user])

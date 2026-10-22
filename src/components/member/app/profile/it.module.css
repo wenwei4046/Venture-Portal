@@ -1,0 +1,130 @@
+/* IT support (2026-10-20 — not in the prototype): what Profile's own pages do not draw already — the files going up with
+   a request or a note, a request's pictures and files, its thread, and the box that writes on it. Every size × --rv-type,
+   colours through the app's tokens only. */
+
+/* The files attached, going up or ready: a tile, the name and size, × to take it off. */
+.files { display: flex; flex-direction: column; gap: 8px; }
+.fileRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+}
+.fileTile {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--rv-sand);
+  color: var(--rv-brown);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: max(10px, calc(10.5px * var(--rv-type)));
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.fileTile img { width: 100%; height: 100%; object-fit: cover; }
+.fileText { min-width: 0; }
+.fileName { display: block; font-size: calc(13.5px * var(--rv-type)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fileMeta { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
+.fileErr { color: var(--rv-red); }
+.fileX {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--rv-sub);
+  display: grid;
+  place-items: center;
+}
+.fileActions { display: flex; align-items: center; gap: 6px; }
+.attach {
+  align-self: flex-start;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 19px;
+  border: 1px solid var(--rv-handle);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  font-size: calc(13.5px * var(--rv-type));
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.attach:disabled { opacity: .55; }
+.hint { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
+
+/* A request read: its words keep their lines. */
+.details { margin: 0; font-size: calc(14.5px * var(--rv-type)); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.label { margin: 0 0 8px; font-size: calc(12px * var(--rv-type)); font-weight: 650; letter-spacing: .06em; color: var(--rv-sub); }
+
+/* Its pictures as previews (a tap opens the picture), its other files as rows. */
+.thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.thumb {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-paper-warm);
+  overflow: hidden;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--rv-sub);
+  font-size: calc(11px * var(--rv-type));
+  font-weight: 650;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.picture { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.picture .thumb { width: 100%; }
+.mark { border: 1px solid var(--rv-line); border-radius: 8px; padding: 7px 9px; background: var(--rv-white); color: var(--rv-accent); font-size: calc(12px * var(--rv-type)); font-weight: 600; }
+.mark:disabled { opacity: .5; }
+.docs { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.docRow {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  text-align: left;
+  color: var(--rv-ink);
+}
+.docOpen { font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-accent); }
+
+/* The thread: IT's notes on the peach, the sender's on white; a status it set as a line of its own. */
+.thread { display: flex; flex-direction: column; gap: 10px; }
+.note { border-radius: 14px; padding: 12px 14px; border: 1px solid var(--rv-line); background: var(--rv-white); display: flex; flex-direction: column; gap: 6px; }
+.noteIt { background: var(--rv-cream); border-color: var(--rv-peach-bg); }
+.noteHead { display: flex; justify-content: space-between; gap: 10px; font-size: calc(12.5px * var(--rv-type)); }
+.noteWho { font-weight: 650; color: var(--rv-ink); }
+.noteWhen { color: var(--rv-sub); white-space: nowrap; }
+.noteStatus { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
+.noteBody { margin: 0; font-size: calc(14px * var(--rv-type)); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Writing on it: the words, files, IT's status, Send. */
+.composer { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.composeRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.send {
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+}
+.send:disabled { opacity: .55; }
+
+/* Keep Done full-width and comfortably tall even when a long thread fills the scrolling sheet. */
+.requestDone { width: 100%; flex: 0 0 48px; min-height: 48px; }

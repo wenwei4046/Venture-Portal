@@ -53,6 +53,7 @@ export default function SalesGroupsView({
   waitingForm = null,
   replacementForm = null,
   capacity = null,
+  departmentPeople = null,
   canTransfer = false,
   canAddToWaiting = false,
   head,
@@ -75,6 +76,8 @@ export default function SalesGroupsView({
   replacementForm?: WaitingFormRead | null
   /** This sub-department's places: Transfer waits while it is full. */
   capacity?: SubDepartmentCapacity | null
+  /** Everybody active in the department — "Submitted by" offers them all (2026-10-20). */
+  departmentPeople?: { name: string; people: Array<{ staffId: string; name: string; titleName: string | null }> } | null
   /** People › Create: Transfer files an employee. */
   canTransfer?: boolean
   /** Member services · Edit: the waiting list's "+" (2026-10-11). */
@@ -150,7 +153,7 @@ export default function SalesGroupsView({
             canTransfer={canTransfer}
             subOptions={departments.map(d => d.name)}
             subDepartmentId={team.subDepartmentId ?? ''}
-            submitters={submitterGroups(departments, subDept.name)}
+            submitters={submitterGroups(departments, subDept.name, departmentPeople)}
             canAdd={canAddToWaiting}
           />
         ) : (

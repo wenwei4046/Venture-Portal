@@ -4,6 +4,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { KEY_ACTIONS } from './permission-actions'
 import { TABLE_WRITES, WRITES_WITHOUT_ACTION, tableWriteRows, type Want, type WriteCommand } from './permission-table-writes'
+import { functionScopes } from '@/test/read-paths'
 
 const MIGRATIONS = resolve(process.cwd(), 'supabase/migrations')
 const THIS_MIGRATION = '20261009020000_writes_ask_for_the_action.sql'
@@ -20,6 +21,27 @@ const DEFINER_ASKS: Readonly<Record<string, readonly Want[]>> = Object.fromEntri
     /swap_check\('public\.([a-z_]+)\([^)]*\)',\n\s+\$q\$[\s\S]*?\$q\$,\n\s+\$q\$[^$]*?has_any_action\(ARRAY\[([^\]]*)\]\)/g,
   )].map(m => [m[1], [...m[2].matchAll(/'([^']+)'/g)].map(a => a[1] as Want)]),
 )
+/**
+ * …as later migrations left them: a function dropped and not made again is
+ * gone, and one whose check was swapped (`pg_temp.swap_in`, the Dept Manager
+ * going, 20261017160000) asks what its new check asks.
+ */
+const DEFINER_ASKS_NOW: Readonly<Record<string, readonly Want[]>> = (() => {
+  const out: Record<string, readonly Want[]> = { ...DEFINER_ASKS }
+  const dropped = new Set<string>()
+  for (const f of files.filter(f => f > FUNCTIONS_MIGRATION)) {
+    const sql = sqlOf(f)
+    for (const m of sql.matchAll(/(DROP FUNCTION IF EXISTS|CREATE OR REPLACE FUNCTION|CREATE FUNCTION) public\.([a-z_]+)\(/g)) {
+      if (m[1].startsWith('DROP')) dropped.add(m[2])
+      else dropped.delete(m[2])
+    }
+    for (const m of sql.matchAll(/swap_in\('public\.([a-z_]+)\([^)]*\)',\n\s+\$q\$[\s\S]*?\$q\$,\n\s+\$q\$[^$]*?has_any_action\(ARRAY\[([^\]]*)\]\)/g)) {
+      if (m[1] in out) out[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map(a => a[1] as Want)
+    }
+  }
+  for (const name of dropped) delete out[name]
+  return out
+})()
 /** …of which these also let in whoever may approve the request at hand (`approvable_types()`). */
 const DEFINER_LETS_IN_APPROVERS: ReadonlySet<string> = new Set(
   [...sqlOf(FUNCTIONS_MIGRATION).matchAll(
@@ -49,11 +71,7 @@ describe('TABLE_WRITES', () => {
   })
 
   it('asks for a reach only where the function has it', () => {
-    const scopes = new Map<string, string[]>()
-    const pr1 = sqlOf('20261008120000_permission_templates.sql')
-    for (const m of pr1.matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
-      scopes.set(m[1], [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1]))
-    }
+    const scopes = new Map(Object.entries(functionScopes()))
     expect(scopes.size).toBeGreaterThan(20)
     const reaches = tableWriteRows().flatMap(r => r.actions.filter(a => a.includes(':')))
     expect(reaches.filter(a => {
@@ -148,7 +166,6 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   ladder_insert_level: { title_levels: ['INSERT', 'UPDATE'] },
   match_erp_salesperson: { comm_agent_aliases: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'] },
   member_transfer_waiting: { hr_staff_costs: ['INSERT'] },
-  recost_sales_order_lines: { sales_order_lines: ['UPDATE'] },
   revenue_apply_fair_calendar: { sales_import_batches: ['UPDATE'], sales_orders: ['UPDATE'] },
   revenue_dismiss_double_claim: { comm_double_claim_dismissals: ['INSERT', 'UPDATE'] },
   revenue_restore_double_claim: { comm_double_claim_dismissals: ['DELETE'] },
@@ -280,7 +297,7 @@ function scanApp(): Site[] {
             if (table) pending.push({ fn: here, site: { file, line, table, commands: COMMANDS[op] } })
           } else if (op === 'rpc') {
             const rpc = literal(n.arguments[0])
-            if (rpc && (rpc in INVOKER_WRITES || rpc in DEFINER_ASKS)) pending.push({ fn: here, site: { file, line, rpc, commands: [] } })
+            if (rpc && (rpc in INVOKER_WRITES || rpc in DEFINER_ASKS_NOW)) pending.push({ fn: here, site: { file, line, rpc, commands: [] } })
           }
         }
       }
@@ -354,6 +371,23 @@ describe('the app’s writes', () => {
       .map(s => `${s.file}:${s.line} ${s.table ?? s.rpc}`)
     expect(ungated).toEqual([])
   })
+
+  // 2026-10-21 / 22: an UPDATE or DELETE that no action opens is refused to every session, and RLS
+  // refuses it by leaving the rows out — no row moves and no error says so. Reverse payment's delete
+  // of a voucher's fund_source_repayments (fsr_no_delete USING (false)) left them all; Copy's and
+  // Record fund in's "rollback" deletes left a blank draft and a source nobody could approve. Such a
+  // write is a guarded database step (or the command is registered, if a row policy really opens it).
+  // An INSERT is never silent — its refusal is an error — and an upsert's update half raises one too.
+  it('never updates or deletes through the session what the database lets nobody update or delete', () => {
+    const silent = (table: string, command: WriteCommand) =>
+      (command === 'UPDATE' || command === 'DELETE') && table in TABLE_WRITES && !TABLE_WRITES[table][command]
+    const misses = sites.filter(s => !SERVICE_ROLE_FILES.test(s.file)).flatMap(s => [
+      ...(s.table && s.commands.length === 1 && silent(s.table, s.commands[0]) ? [`${s.file}:${s.line} ${s.table} ${s.commands[0]}`] : []),
+      ...Object.entries(s.rpc ? (INVOKER_WRITES[s.rpc] ?? {}) : {}).flatMap(([table, commands]) =>
+        commands.filter(c => silent(table, c)).map(c => `${s.file}:${s.line} ${s.rpc} → ${table} ${c}`)),
+    ])
+    expect(misses).toEqual([])
+  })
 })
 
 // ── The DEFINER functions ask for an action too (20261009030000) ─────────────
@@ -361,7 +395,7 @@ describe('the app’s writes', () => {
 // gates let call it must hold one of them, at the reach it asks (All covers
 // Dept covers Own), or the database refuses somebody the app let in.
 describe('the DEFINER functions that ask for an action', () => {
-  const sites = scanApp().filter(s => s.rpc && s.rpc in DEFINER_ASKS)
+  const sites = scanApp().filter(s => s.rpc && s.rpc in DEFINER_ASKS_NOW)
   /**
    * Calls behind `requireApprover()` — any domain's Approve — where the action
    * narrows it to one domain before the call, out of this scan's sight.
@@ -384,15 +418,17 @@ describe('the DEFINER functions that ask for an action', () => {
     })
   }
 
-  it('reads all 70 from the migration', () => {
+  it('reads all 70 from the migration — 68 since My Billing’s two requests were dropped', () => {
     expect(Object.keys(DEFINER_ASKS)).toHaveLength(70)
+    expect(Object.keys(DEFINER_ASKS).filter(name => !(name in DEFINER_ASKS_NOW)).sort()).toEqual(['submit_dept_payment_request', 'submit_invoice_request'])
+    expect(DEFINER_ASKS_NOW.mint_invoice_no).toEqual(['billing.create'])
     expect(Object.values(DEFINER_ASKS).every(asked => asked.length > 0)).toBe(true)
     expect([...DEFINER_LETS_IN_APPROVERS]).toEqual(['dept_request_pv_rejected'])
   })
 
   it('asks only for actions a key can give', () => {
     const given = new Set<string>(Object.values(KEY_ACTIONS).flat())
-    const asked = new Set(Object.values(DEFINER_ASKS).flat().map(a => a.split(':')[0]))
+    const asked = new Set(Object.values(DEFINER_ASKS_NOW).flat().map(a => a.split(':')[0]))
     expect([...asked].filter(fa => !given.has(fa))).toEqual([])
   })
 
@@ -403,7 +439,7 @@ describe('the DEFINER functions that ask for an action', () => {
   it('whoever gets through a call’s gates holds an action the function asks for', () => {
     const misses: string[] = []
     for (const s of sites) {
-      const asked = DEFINER_ASKS[s.rpc as string]
+      const asked = DEFINER_ASKS_NOW[s.rpc as string]
       if (`${s.file} ${s.rpc}` in DECIDED_IN_ONE_DOMAIN) {
         expect(asked).toEqual(expect.arrayContaining(['treasury.approve', 'approvals.approve']))
         continue

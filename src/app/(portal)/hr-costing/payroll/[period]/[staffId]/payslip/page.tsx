@@ -290,8 +290,8 @@ export default async function PayslipPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Footer */}
-        <div className="text-center pt-4 border-t border-hairline">
+        {/* Footer — HR's own note, never on the employee's copy. */}
+        <div className="text-center pt-4 border-t border-hairline print:hidden">
           <div className="text-xs">
             Status: <span className={`chip ${STATUS_TONE[row.status] ?? ''}`}><span className="dot" />{row.status}</span>
             {row.status === 'paid' && ' · This payslip is final.'}
@@ -302,6 +302,20 @@ export default async function PayslipPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* The slip goes to the employee: a zero page margin leaves the browser
+          no room for its own header and footer (date, page title, URL, page
+          number), and the margin is put back as padding on every page. */}
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          .payslip-container {
+            padding: 12mm 14mm !important;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+          }
+        }
+      `}</style>
     </div>
   )
 }

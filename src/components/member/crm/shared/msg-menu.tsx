@@ -87,8 +87,8 @@ export function pressToOpen(open: () => void, reply?: () => void) {
     el.style.transition = ""; el.style.transform = shift ? `translateX(${shift}px)` : "";
     if (!arrow) {
       arrow = document.createElement("div");
-      arrow.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3F2B22" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${MENU_ICON.reply}"/></svg>`;
-      Object.assign(arrow.style, { position: "fixed", zIndex: "2147480000", width: "30px", height: "30px", borderRadius: "15px", background: "rgba(63,43,34,.12)", display: "grid", placeItems: "center", pointerEvents: "none" });
+      arrow.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${MENU_ICON.reply}"/></svg>`;
+      Object.assign(arrow.style, { position: "fixed", zIndex: "2147480000", width: "30px", height: "30px", borderRadius: "15px", background: "rgba(42,22,12,.12)", display: "grid", placeItems: "center", pointerEvents: "none" });
       document.body.appendChild(arrow);
     }
     const r = el.getBoundingClientRect();
@@ -141,16 +141,16 @@ export function MessageMenu() {
       <div onClick={closeMenu} role="dialog" aria-modal="true" aria-label="Starred messages" style={{ position: "fixed", inset: 0, zIndex: 2147481000, background: "rgba(40,30,25,.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(var(--safe-bottom, 0px) + 16px)", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif" }}>
         <div onClick={e => e.stopPropagation()} style={{ width: "340px", maxWidth: "92vw", maxHeight: "80vh", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", boxShadow: "0 6px 24px rgba(0,0,0,.18)", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", padding: "14px 16px 10px" }}>
-            <strong style={{ flex: "1", fontSize: typePx(17), color: "#3F2B22" }}>★ Starred messages</strong>
-            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "#806B60", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <strong style={{ flex: "1", fontSize: typePx(17), color: "var(--crm-ink)" }}>★ Starred messages</strong>
+            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "var(--crm-muted)", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Done</button>
           </div>
           <div style={{ overflowY: "auto", flex: "1", minHeight: 0 }}>
-            {!st.items.length && <p style={{ margin: "8px 16px 18px", color: "#806B60", fontSize: typePx(14), lineHeight: 1.45 }}>No starred messages in this chat. Long-press a message and tap Star to keep it here.</p>}
+            {!st.items.length && <p style={{ margin: "8px 16px 18px", color: "var(--crm-muted)", fontSize: typePx(14), lineHeight: 1.45 }}>No starred messages in this chat. Long-press a message and tap Star to keep it here.</p>}
             {st.items.map(it => (
               <button key={it.id} type="button" onClick={() => { closeMenu(); setTimeout(() => goToMessage(it.id), 60); }}
-                style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px", padding: "11px 16px", border: 0, borderTop: "1px solid #F3E9E1", background: "transparent", textAlign: "left", cursor: "pointer" }}>
-                <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", fontSize: typePx(12), color: "#806B60" }}><strong style={{ color: "#BD4A19", fontWeight: 650 }}>{it.who}</strong><span>{it.at}</span></span>
-                <span style={{ fontSize: typePx(14), color: "#3F2B22", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{it.text}</span>
+                style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px", padding: "11px 16px", border: 0, borderTop: "1px solid var(--crm-rule-soft)", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", fontSize: typePx(12), color: "var(--crm-muted)" }}><strong style={{ color: "var(--crm-rust)", fontWeight: 650 }}>{it.who}</strong><span>{it.at}</span></span>
+                <span style={{ fontSize: typePx(14), color: "var(--crm-ink)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{it.text}</span>
               </button>
             ))}
           </div>
@@ -169,20 +169,20 @@ export function MessageMenu() {
       <div onClick={closeMenu} role="dialog" aria-modal="true" aria-label="Forward to" style={{ position: "fixed", inset: 0, zIndex: 2147481000, background: "rgba(40,30,25,.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top, 0px) + 16px) 14px calc(var(--safe-bottom, 0px) + 16px)", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif" }}>
         <div onClick={e => e.stopPropagation()} style={{ ...card, display: "flex", flexDirection: "column", maxHeight: "80vh" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "14px 16px 10px" }}>
-            <strong style={{ flex: "1", fontSize: typePx(17), color: "#3F2B22" }}>Forward to…</strong>
-            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "#806B60", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+            <strong style={{ flex: "1", fontSize: typePx(17), color: "var(--crm-ink)" }}>Forward to…</strong>
+            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "var(--crm-muted)", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Cancel</button>
           </div>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search a customer" autoFocus
-            style={{ margin: "0 16px 8px", height: "40px", padding: "0 14px", borderRadius: "20px", border: "1px solid #EBDDD2", background: "#FBF7F3", fontSize: typePx(16), outline: "none" }} />
+            style={{ margin: "0 16px 8px", height: "40px", padding: "0 14px", borderRadius: "20px", border: "1px solid var(--crm-rule)", background: "var(--crm-page)", fontSize: typePx(16), outline: "none" }} />
           <div style={{ overflowY: "auto", flex: "1", minHeight: 0 }}>
-            {!shown.length && <p style={{ margin: "16px", color: "#806B60", fontSize: typePx(14) }}>No customer to forward to.</p>}
+            {!shown.length && <p style={{ margin: "16px", color: "var(--crm-muted)", fontSize: typePx(14) }}>No customer to forward to.</p>}
             {shown.map(c => (
               <button key={c.id} type="button" onClick={() => { closeMenu(); m.forward!.send(c.id); }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: 0, borderTop: "1px solid #F3E9E1", background: "transparent", textAlign: "left", cursor: "pointer" }}>
-                <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "19px", background: "#FBE9DD", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: typePx(13), fontWeight: 700 }}>{c.name.split(/s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: 0, borderTop: "1px solid var(--crm-rule-soft)", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+                <span style={{ flex: "none", width: "38px", height: "38px", borderRadius: "19px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center", fontSize: typePx(13), fontWeight: 700 }}>{c.name.split(/s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()}</span>
                 <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: typePx(15), fontWeight: 600, color: "#3F2B22", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</strong>
-                  <small style={{ fontSize: typePx(12), color: "#806B60", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.sub}</small>
+                  <strong style={{ fontSize: typePx(15), fontWeight: 600, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</strong>
+                  <small style={{ fontSize: typePx(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.sub}</small>
                 </span>
               </button>
             ))}
@@ -198,13 +198,13 @@ export function MessageMenu() {
       <div onClick={closeMenu} role="dialog" aria-modal="true" aria-label="Message info" style={{ position: "fixed", inset: 0, zIndex: 2147481000, background: "rgba(40,30,25,.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 14px", fontFamily: "Inter, -apple-system, 'Segoe UI', sans-serif" }}>
         <div onClick={e => e.stopPropagation()} style={card}>
           <div style={{ display: "flex", alignItems: "center", padding: "14px 16px 6px" }}>
-            <strong style={{ flex: "1", fontSize: typePx(17), color: "#3F2B22" }}>Message info</strong>
-            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "#806B60", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Done</button>
+            <strong style={{ flex: "1", fontSize: typePx(17), color: "var(--crm-ink)" }}>Message info</strong>
+            <button type="button" onClick={closeMenu} style={{ border: 0, background: "transparent", color: "var(--crm-muted)", fontSize: typePx(15), fontWeight: 600, cursor: "pointer" }}>Done</button>
           </div>
-          {!!m.preview && <p style={{ margin: "4px 16px 10px", padding: "8px 10px", borderRadius: "10px", background: "#FBF7F3", color: "#3F2B22", fontSize: typePx(14), display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.preview}</p>}
+          {!!m.preview && <p style={{ margin: "4px 16px 10px", padding: "8px 10px", borderRadius: "10px", background: "var(--crm-page)", color: "var(--crm-ink)", fontSize: typePx(14), display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.preview}</p>}
           {m.info.map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "11px 16px", borderTop: "1px solid #F3E9E1", fontSize: typePx(14) }}>
-              <span style={{ color: "#806B60" }}>{k}</span><strong style={{ color: "#3F2B22", fontWeight: 600, textAlign: "right" }}>{v}</strong>
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "11px 16px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: typePx(14) }}>
+              <span style={{ color: "var(--crm-muted)" }}>{k}</span><strong style={{ color: "var(--crm-ink)", fontWeight: 600, textAlign: "right" }}>{v}</strong>
             </div>
           ))}
         </div>
@@ -218,16 +218,16 @@ export function MessageMenu() {
       <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: "2px", padding: "6px 8px", borderRadius: "30px", background: "#fff", boxShadow: "0 6px 24px rgba(0,0,0,.18)" }}>
         {REACTIONS.map(e => (
           <button key={e} type="button" onClick={() => { closeMenu(); m.react(m.reaction === e ? "" : e); }} aria-label={`React ${e}`}
-            style={{ width: "44px", height: "44px", borderRadius: "22px", border: 0, background: m.reaction === e ? "#F1E4DA" : "transparent", fontSize: typePx(28), cursor: "pointer", padding: 0 }}>{e}</button>
+            style={{ width: "44px", height: "44px", borderRadius: "22px", border: 0, background: m.reaction === e ? "var(--crm-rule-soft)" : "transparent", fontSize: typePx(28), cursor: "pointer", padding: 0 }}>{e}</button>
         ))}
       </div>
       {!!m.preview && (
-        <div onClick={e => e.stopPropagation()} style={{ maxWidth: "80%", padding: "10px 13px", borderRadius: m.mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: m.mine ? "#FCD6B8" : "#fff", color: "#3F2B22", fontSize: typePx(15), lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,.12)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.preview}</div>
+        <div onClick={e => e.stopPropagation()} style={{ maxWidth: "80%", padding: "10px 13px", borderRadius: m.mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: m.mine ? "var(--crm-tint-attention)" : "#fff", color: "var(--crm-ink)", fontSize: typePx(15), lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,.12)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.preview}</div>
       )}
       <div onClick={e => e.stopPropagation()} style={{ width: "240px", maxWidth: "80%", borderRadius: "16px", background: "rgba(255,255,255,.97)", boxShadow: "0 6px 24px rgba(0,0,0,.18)", overflow: "hidden" }}>
         {m.actions.map((a, i) => (
           <button key={a.label} type="button" onClick={() => { if (a.label === "Forward" && m.forward) { setView("forward"); return; } if (a.label === "Info" && m.info) { setView("info"); return; } closeMenu(); a.run(); }}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "13px 16px", border: 0, borderTop: i ? "1px solid #F0E6DE" : 0, background: "transparent", color: a.danger ? "#C0392B" : "#3F2B22", fontSize: typePx(16), textAlign: "left", cursor: "pointer" }}>
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "13px 16px", border: 0, borderTop: i ? "1px solid var(--crm-rule-soft)" : 0, background: "transparent", color: a.danger ? "var(--crm-oxblood)" : "var(--crm-ink)", fontSize: typePx(16), textAlign: "left", cursor: "pointer" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={a.icon} /></svg>
             {a.label}
           </button>

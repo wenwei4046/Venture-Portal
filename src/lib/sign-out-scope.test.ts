@@ -28,9 +28,10 @@ function sources(dir: string): string[] {
 const where = (path: string) => relative(ROOT, path).replace(/\\/g, '/')
 
 // Every `auth.signOut(…)` in the app, with what it is handed. The root
-// middleware.ts is not compiled today (the app lives in src/), but it is the
-// file that would run the moment it is moved, so it is held to the same rule.
-const calls = [...sources(resolve(ROOT, 'src')), resolve(ROOT, 'middleware.ts')].flatMap(path => {
+// session-middleware.ts is not compiled today (no-active-middleware.test.ts), but
+// it is the file that would run the moment it is switched on, so it is held to
+// the same rule.
+const calls = [...sources(resolve(ROOT, 'src')), resolve(ROOT, 'session-middleware.ts')].flatMap(path => {
   const text = readFileSync(path, 'utf8')
   return [...text.matchAll(/\bauth\s*\.\s*signOut\s*\(([^)]*)\)/g)].map(match => ({
     at: `${where(path)}:${text.slice(0, match.index).split('\n').length}`,
@@ -45,7 +46,7 @@ describe('sign out ends this device only', () => {
       'src/components/layout/MoreSheet.tsx',
       'src/app/(member)/member/signout/route.ts',
       'src/app/(auth)/login/page.tsx',
-      'middleware.ts',
+      'session-middleware.ts',
     ]))
   })
 

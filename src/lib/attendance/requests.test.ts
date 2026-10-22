@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountLabel, atLabel, bucketOf, flowNodes, kindLabel, rangeLabel, shownChanges, sinceLabel, statusOf, whenLabel } from './requests'
+import { amountLabel, atLabel, bucketOf, decidedToast, flowNodes, kindLabel, rangeLabel, shownChanges, sinceLabel, statusOf, waitsAtMe, whenLabel } from './requests'
 import type { AttLeaveType, AttRequest, AttStep } from './types'
 
 const step = (s: Partial<AttStep>): AttStep => ({
@@ -12,6 +12,21 @@ const req = (r: Partial<AttRequest>): AttRequest => ({
   by: 'Rajesh Kumar', sentAt: '2026-10-12T00:20:00Z', decidedAt: null, steps: [step({})], events: [], ...r,
 })
 const SL: AttLeaveType = { id: 't', code: 'SL', name: 'Sick leave', groups: [], rules: '', route: 'hr_only', counts: 'working', accrues: false, unpaid: false, drawsFrom: null }
+
+describe('a step at the viewer’s own upline seat (2026-10-17)', () => {
+  const people = [{ id: 'up', name: 'Daniel', hasLogin: true }, { id: 'p', name: 'Rajesh Kumar', hasLogin: true }]
+  const atUpline = req({ steps: [step({ role: 'upline', approverId: 'up', approver: 'Daniel' }), step({ seq: 2, state: 'queued' })] })
+  it('is theirs when they are that upline — Approve, not Approve on behalf', () => {
+    expect(waitsAtMe(atUpline, { me: 'Daniel', people })).toBe(true)
+  })
+  it('is somebody else’s for HR, for a step at HR, or once decided', () => {
+    expect(waitsAtMe(atUpline, { me: 'Siti', people })).toBe(false)
+    expect(waitsAtMe(req({}), { me: 'Daniel', people })).toBe(false)
+    expect(waitsAtMe({ ...atUpline, status: 'approved' }, { me: 'Daniel', people })).toBe(false)
+    // A namesake without a login is not the viewer.
+    expect(waitsAtMe(atUpline, { me: 'Daniel', people: [{ id: 'up', name: 'Daniel', hasLogin: false }] })).toBe(false)
+  })
+})
 
 describe('Attendance › Requests words', () => {
   it('buckets a request where it waits', () => {
@@ -43,6 +58,15 @@ describe('Attendance › Requests words', () => {
     expect(sinceLabel(r, new Date('2026-10-14T20:10:00Z'))).toBe('20 h')
     expect(sinceLabel(r, new Date('2026-10-16T01:00:00Z'))).toBe('2 d')
     expect(sinceLabel(req({ status: 'approved', steps: [step({ state: 'approved' })] }), new Date())).toBe('')
+  })
+
+  it('says what was decided, counting a profile change’s fields in good English', () => {
+    const one = req({ kind: 'profile', who: 'LOO WEN WEI', detail: { changes: [{ key: 'email', field: 'Email' }] } })
+    expect(decidedToast(one, true)).toBe("Approved · LOO WEN WEI's record updated · 1 field")
+    expect(decidedToast(req({ kind: 'profile', detail: { changes: [{ field: 'Phone' }, { field: 'Bank' }] } }), true))
+      .toBe("Approved · Rajesh Kumar's record updated · 2 fields")
+    expect(decidedToast(one, false)).toBe('Rejected · record unchanged · LOO WEN WEI told')
+    expect(decidedToast(req({}), true)).toBe('Approved · Rajesh Kumar told')
   })
 
   it('writes the office clock', () => {

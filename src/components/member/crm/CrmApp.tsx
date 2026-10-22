@@ -8,7 +8,7 @@
  * screens' markup is generated from the design (sales/Sales*.tsx); their
  * behaviour is sales/vm/*.ts; every change is saved first (sales/actions.ts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { fetchCrmData } from "@/app/(member)/member/crm-actions";
 import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
@@ -40,7 +40,11 @@ import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
 import { NotifSummaryHost } from "./shared/notif-summary";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
+import { paintStatusBar, topColorOf } from "@/components/pwa/status-bar";
 import { crmChatTag } from "@/lib/push/notices";
+import { setUrgencyThresholds } from "@/lib/member/crm";
+import { useNavHistory, type NavFrame } from "./shared/nav-history";
+import { CHAT_LEFT, LEAD_LEFT, navFrameOf, type NavSnap } from "./shared/nav-frame";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
@@ -59,8 +63,10 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
+  // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
+  setUrgencyThresholds(data?.settings);
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
   const [problem, setProblem] = useState("");
@@ -80,6 +86,24 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
+  // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
+  // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
+  // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).
+  const readyCall = useRef(onReady);
+  readyCall.current = onReady;
+  useEffect(() => {
+    if (data || problem) readyCall.current?.();
+  }, [data, problem]);
+
+  // The phone's status bar in this page's own top colour (2026-10-17, the owner: "for the top bar, should be same colour
+  // with the apps. with all tab as well"): the colour crm.module.css draws at .app's top for the page on screen — white
+  // (Mine, a chat), cream (the Team side), the glow's peach (either Profile) — written after every drawing.
+  const appRef = useRef<HTMLDivElement>(null);
+  const paintsBar = live && !desk;
+  useLayoutEffect(() => {
+    if (paintsBar && appRef.current) paintStatusBar(topColorOf(appRef.current));
+  });
+  useEffect(() => () => paintStatusBar(null), []);
 
   // The last answer is kept on the phone (2026-10-14, the owner: "當我進入時，我看到的還是上次的畫面，那你的後台系統可以再
   // 計算"): the CRM opens on it at once and the read below replaces it when it lands — the Revenue app's own store
@@ -92,10 +116,12 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     return () => { current = false; };
   }, [live, snapKey]);
   // Live: read once on opening, under the member's own session.
+  // `readFresh`: the network's answer has landed — the kept copy above may be older than a chat a tapped notice opens.
+  const readFresh = useRef(!live);
   useEffect(() => {
     if (!live) return;
     let current = true;
-    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) { setData(r.data); saveSnapshot(snapKey, r.data); } else setProblem(r.error); } });
+    void fetchCrmData({ journey: desk }).then(r => { if (current) { if (r.ok) { readFresh.current = true; setData(r.data); saveSnapshot(snapKey, r.data); } else setProblem(r.error); } });
     return () => { current = false; };
   }, [live, desk]);
   // Live: new messages arrive without a reload (user 2026-10-09: 我發送 receive 但是 crm inbox 收不到 —
@@ -115,6 +141,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
         // The desktop also reads every customer's journey (Chat progress, CRM Desktop rev 1).
         const r = await fetchCrmData({ journey: desk });
         if (!stopped && r.ok && started >= (refs.localAt ?? 0)) {
+          readFresh.current = true;
           const sig = JSON.stringify(r.data);
           if (sig === lastRead) return;
           lastRead = sig;
@@ -183,19 +210,25 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   }, [live, ui.chat, panelUi.lead, hodMode, viewing, teamAs]);
   // A tapped notice opens its place once the customers are read: one's own chat in Mine; a chat one may only watch
   // (CRM · View at All) on the Team side; an invitation, Mine's notifications.
+  // A chat the phone's kept copy does not have yet — a new lead's first message, a customer handed over since that
+  // copy (2026-10-17, the user: a tapped notice did not open the chat) — is looked for again in the network's answer.
   const opened = useRef(false);
   useEffect(() => {
     if (!data || !open || opened.current) return;
     const me = personOf(data.viewerId, data.people);
     if (!me) return;
-    opened.current = true;
     if ("notifs" in open) {
+      opened.current = true;
       setViewing(null); setTeamAs(null); setHodMode("crm");
       setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "profile", profSub: "notif", nTab: "unread" }));
       return;
     }
     const c = data.customers.find(x => x.id === open.chat);
-    if (!c) return;
+    if (!c) {
+      if (readFresh.current) opened.current = true;
+      return;
+    }
+    opened.current = true;
     if (c.assignedTo === me.id || data.shares.some(s => s.staffId === me.id && s.customerId === c.id)) {
       setViewing(null); setTeamAs(null); setHodMode("crm");
       setUi(u => ({ ...initialSalesUi(), toast: u.toast, tab: "inbox", chat: c.id }));
@@ -206,9 +239,18 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     }
   }, [data, open, act]);
 
+  // The phone's Back steps back through the CRM (2026-10-20, shared/nav-history.ts): every screen — the side, its tab,
+  // a chat, a sub-page, a sheet — is a step, and Back puts the one before it back. The desktop keeps desk/nav.ts.
+  const navFrame = useMemo<NavFrame<NavSnap> | null>(() => (desk ? null : navFrameOf(ui, panelUi, hodMode, viewing, teamAs)), [desk, ui, panelUi, hodMode, viewing, teamAs]);
+  useNavHistory(navFrame, snap => {
+    setHodMode(snap.hodMode); setViewing(snap.viewing); setTeamAs(snap.teamAs);
+    setUi(u => ({ ...u, ...snap.sales, ...(u.chat !== snap.sales.chat ? CHAT_LEFT : {}) }));
+    setPanelUi(u => ({ ...u, ...snap.panel, ...(u.lead !== snap.panel.lead ? LEAD_LEFT : {}) }));
+  });
+
   const shell = (body: React.ReactNode, extra = "") => (
     // data-revenue-app: the portal's display serif stays off the CRM's headings (globals.css).
-    <div className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
+    <div ref={appRef} className={extra ? `${H.app} ${extra}` : H.app} data-revenue-app="">
       <style>{KEYFRAMES}</style>
       {body}
       <MediaViewer />

@@ -1,17 +1,22 @@
 import type { MemberIncome, MemberMemo, MemberRequest, RequestKind } from "@/lib/member/types";
 import type { Notice } from "@/lib/push/notices";
+import { pctLabel, type ShareRequest } from "@/lib/member/share-requests";
 import { monthName, rm2, shortDay } from "../format";
 import { ICON } from "../icons";
 
 /** The bell: built from what already exists — memos, requests and the settled month. */
 export type NotifTab = "all" | "requests" | "memos" | "results" | "updates";
-export type NotifKind = "memo" | "res" | "pay" | "req" | "room" | "hire";
+export type NotifKind = "memo" | "res" | "pay" | "req" | "room" | "hire" | "it" | "share";
 export type NotifGo =
   | { to: "memo"; memoId: string }
   | { to: "requests"; requestId?: string; kind?: RequestKind }
   | { to: "income" }
   | { to: "arena" }
   | { to: "rooms" }
+  // IT support (2026-10-20): a request's status or IT's note — or, for the desk, a new one or a reply.
+  | { to: "it"; requestId: string }
+  // Share order (2026-10-21): a bill shared with them to accept, or news of one — its request's sheet.
+  | { to: "share"; requestId: string }
   | { to: "none" };
 
 export interface NotifItem {
@@ -58,6 +63,13 @@ export interface NotifyInput {
    * changed or cancelled; their manpower request's step. Shown under All, as UPDATES.
    */
   notices?: readonly Notice[];
+  /**
+   * Share order (2026-10-21): the share requests waiting for their answer — NEEDS YOU until they accept or decline. A
+   * notice about one of these is not listed beside it.
+   */
+  shares?: readonly ShareRequest[];
+  /** Whose part a waiting request names: the member's own staff id. */
+  staffId?: string;
 }
 
 const STATUS: Record<string, { text: string; tone: NonNullable<NotifItem["done"]>["tone"] }> = {
@@ -137,11 +149,39 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
     items.push({
       id: `pay-${settled.period}`, kind: "pay", tab: "results", icon: ICON.nCash, time: "",
       title: `${month} commission ${rm2(settled.total)}`,
-      sub: input.salary !== null ? `Goes to payroll with your fixed salary of ${rm2(input.salary)}.` : "Goes to payroll with your fixed salary.",
+      // A Revenue fixed salary is paid out of the commission (2026-10-20), never beside it.
+      sub: input.salary ? `Your fixed salary of ${rm2(input.salary)} is paid from it.` : "Goes to payroll.",
       open: false, unread: !input.readAll, big: null, link: "Open My income", done: null, go: { to: "income" },
     });
   }
+  const waiting = new Set<string>();
+  for (const r of input.shares ?? []) {
+    const mine = r.parts.find(p => p.id === input.staffId);
+    waiting.add(r.id);
+    items.push({
+      id: `sh-${r.id}`, kind: "share", tab: "requests", icon: ICON.share, time: ago(r.createdAt, input.now),
+      title: `${r.owner.name} shared ${r.orderNo} with you`,
+      sub: [mine ? `Your part ${pctLabel(mine.pct)}` : null, r.bill?.venue || null].filter(Boolean).join(" · "),
+      open: true, unread: true, big: null, link: "Accept or decline", done: { text: "Waiting for your answer", tone: "amber" },
+      go: { to: "share", requestId: r.id },
+    });
+  }
   for (const n of input.notices ?? []) {
+    if (n.refKind === "share_request") {
+      if (waiting.has(n.refId)) continue;
+      items.push({
+        id: `nt-${n.id}`, kind: "share", tab: "updates", icon: ICON.share, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
+        unread: !n.read, big: null, link: "Open share request", done: null, go: { to: "share", requestId: n.refId },
+      });
+      continue;
+    }
+    if (n.refKind === "it_request") {
+      items.push({
+        id: `nt-${n.id}`, kind: "it", tab: "updates", icon: ICON.help, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
+        unread: !n.read, big: null, link: "Open IT support", done: null, go: { to: "it", requestId: n.refId },
+      });
+      continue;
+    }
     const room = n.refKind === "booking";
     items.push({
       id: `nt-${n.id}`, kind: room ? "room" : "hire", tab: "updates", icon: room ? ICON.calendar : ICON.queue, time: ago(n.at, input.now),
@@ -158,7 +198,7 @@ export function notifGroups(items: NotifItem[], tab: NotifTab, settledMonth: str
   const need = visible.filter(n => n.open);
   const res = visible.filter(n => n.kind === "res" || n.kind === "pay");
   const upd = visible.filter(n => n.kind === "req" && !n.open);
-  const news = visible.filter(n => n.kind === "room" || n.kind === "hire");
+  const news = visible.filter(n => n.kind === "room" || n.kind === "hire" || n.kind === "it" || (n.kind === "share" && !n.open));
   const rest = visible.filter(n => !need.includes(n) && !res.includes(n) && !upd.includes(n) && !news.includes(n));
   const groups: [string, NotifItem[]][] = [
     ["NEEDS YOU", need],

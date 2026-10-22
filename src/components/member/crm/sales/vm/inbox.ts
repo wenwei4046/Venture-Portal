@@ -12,6 +12,8 @@ import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
 import { mediaWord } from "../../shared/chat-media";
 import { leaderAssignees } from "./chat";
+import { STATUS, avatarTint } from "../../shared/palette";
+import type { Icon4a } from "../../shared/icons4a";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -28,7 +30,7 @@ export const lastAt = (c: CrmCustomer) => {
   return m ? new Date(m.at).getTime() : new Date(c.createdAt).getTime();
 };
 
-const OWNER_COLORS = ["#2F6FB5", "#8E4B6E", "#A46312", "#387557", "#3E5C7A"];
+const OWNER_COLORS = ["var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-muted)"];
 
 export function inboxVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, mine, refs, act, owner, nameOf } = ctx;
@@ -49,16 +51,16 @@ export function inboxVM(ctx: SalesCtx) {
   const chipDefs: [string, NonNullable<InboxFilter>["type"] | null, string | null, number][] = [
     ["All", null, null, warm.length],
     // New (2026-10-13): not answered by them since it came or was handed to them — shared/new-chat.ts.
-    ["New", "new", "#7A4FB0", warm.filter(isNewChat).length],
-    ["Attention", "urgency", "#A3371A", warm.filter(c => urgencyOf(c, now).level !== "none").length],
-    ...([["Follow up", "#A46312"], ["Appointment", "#387557"], ["Won", "#2F6FB5"], ["Lost", "#806B60"]] as const)
+    ["New", "new", STATUS.New.dot, warm.filter(isNewChat).length],
+    ["Attention", "urgency", STATUS.Attention.dot, warm.filter(c => urgencyOf(c, now).level !== "none").length],
+    ...([["Follow up", STATUS["Follow up"].dot], ["Appointment", STATUS.Appointment.dot], ["Won", STATUS.Won.dot], ["Lost", STATUS.Lost.dot]] as const)
       .map(([s, dot]): [string, "status", string, number] => [s, "status", dot, warm.filter(c => STATUS_LABEL[c.status] === s).length]),
-    ["Cold leads", "cold", "#3E5C7A", mine.filter(c => isCold(c, now)).length],
+    ["Cold leads", "cold", STATUS["Cold leads"].dot, mine.filter(c => isCold(c, now)).length],
     ...usedLabels.map((l): [string, "label", string, number] => [l.name, "label", l.color, warm.filter(c => labelsOf(c).some(x => x.id === l.id)).length]),
   ];
   const chips3b = chipDefs.map(([label, type, dot, n]) => {
     const on = type ? !!f && f.type === type && f.v === label : !f;
-    return { label, n, dot, bg: on ? "#BD4A19" : "#fff", fg: on ? "#fff" : INK, border: on ? "#BD4A19" : BORDER, weight: on ? 650 : 500,
+    return { label, n, dot, on, bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : INK, border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500,
       pick: () => patch({ filter: type ? { type, v: label } : null }) };
   });
 
@@ -134,10 +136,14 @@ export function inboxVM(ctx: SalesCtx) {
     const firstMarked = ctx.data.visits.filter(v => v.customerId === c.id && (v.state === "attended" || v.state === "no_show")).sort((a, b) => a.start.localeCompare(b.start))[0];
     const open = () => { set(u2 => ({ ...u2, chat: c.id, swipe: null })); act.openChat(c.id); };
     return {
+      // 4a (M01): the customer's avatar tint, the name 600 and the time rust while unread, the urgency line's icon.
+      avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], nameW: c.unread || marked(c) ? 600 : 500, whenC: c.unread || marked(c) ? "var(--crm-rust)" : "var(--crm-faint)",
+      chanIc: (c.channel === "whatsapp" ? "phone" : "message-circle") as "phone" | "message-circle",
+      urgW: u.level === "soon" ? 500 : 600, urgIc: (u.level === "overdue" ? "triangle-alert" : "clock") as "triangle-alert" | "clock",
       name: c.name, ini: ini(c.name), ad: c.ad, preview: previewOf(c), when: lastChat(new Date(lastAt(c)).toISOString(), now),
       // A chat marked unread shows the badge as a dot, as WhatsApp's.
       unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, cold,
-      ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "#806B60",
+      ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "var(--crm-muted)",
       urgShow: !cold && u.level !== "none", urg: u.label, urg3b: u.color,
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
@@ -172,7 +178,23 @@ export function inboxVM(ctx: SalesCtx) {
   const ensure = async () => (data.labels.length ? data.labels : await act.saveLabels(labelList.map(l => ({ name: l.name, color: l.color }))));
   const togglePref = (k: "pinned" | "muted") => async () => { if (!ml) return; closeMore(); await act.setPref(ml.id, { [k]: !mp?.[k] }); };
 
+  // Frame M03: a filter (or a search) with nothing in it says what shows there and offers every chat again.
+  const EMPTY: Record<string, [Icon4a, string, string]> = {
+    New: ["inbox", "No new chats", "A chat shows here when it first comes to you, until you answer it."],
+    Attention: ["clock", "Nothing waiting", "A chat shows here when the customer has waited past your reply time."],
+    "Follow up": ["message-circle", "No follow-ups", "A chat moves here once you have answered it and are following up."],
+    Appointment: ["calendar-check", "No appointments yet", "A chat moves here when you book a showroom visit from it."],
+    Won: ["circle-check", "No won deals yet", "A chat moves here when you mark the customer Won."],
+    Lost: ["circle-x", "No lost chats", "A chat moves here when you mark the customer Lost."],
+    "Cold leads": ["lock", "No cold leads", "A chat moves here when its reply window shuts."],
+  };
+  const all = () => patch({ filter: null, q: "" });
+  const empty4 = leadsView.length ? null
+    : q ? { icon: "search" as Icon4a, title: "No chat matches", sub: `Nothing in this list matches “${ui.q.trim()}”.`, all }
+    : f ? (([icon, title, sub]) => ({ icon, title, sub, all }))(EMPTY[f.v] ?? ["inbox", `Nothing in ${f.v}`, "A chat shows here when it gets this label."])
+    : { icon: "inbox" as Icon4a, title: "No chats yet", sub: "A customer's first message to you shows here.", all: null };
   return {
+    empty4,
     q: ui.q, setQ: (e: ChangeEvent<HTMLInputElement>) => patch({ q: e.target.value }), clearQ: () => patch({ q: "" }),
     inboxToast: !ui.chat && ui.toast ? ui.toast : "",
     chips3b, leadsView, stop,
@@ -181,8 +203,8 @@ export function inboxVM(ctx: SalesCtx) {
     adClear: () => patch({ adSheet: { sel: [] } }),
     adList: ads.map((a, k) => {
       const on = draft.includes(a), first = mine.find(c => c.ad === a), cnt = mine.filter(c => c.ad === a && !isCold(c, now)).length, cc = mine.filter(c => c.ad === a && isCold(c, now)).length;
-      return { name: a, chan: first ? CHANNEL[first.channel].name : "", chanFg: first ? CHANNEL[first.channel].fg : "#806B60", n: cnt, s: cnt === 1 ? "" : "s", coldNote: cc ? ` · ${cc} cold` : "", on,
-        rule: k ? "1px solid #EBDDD2" : "0", ring: on ? "#BD4A19" : "#D9C7BA", fill: on ? "#BD4A19" : "transparent",
+      return { name: a, chan: first ? CHANNEL[first.channel].name : "", chanFg: first ? CHANNEL[first.channel].fg : "var(--crm-muted)", n: cnt, s: cnt === 1 ? "" : "s", coldNote: cc ? ` · ${cc} cold` : "", on,
+        rule: k ? "1px solid var(--crm-rule)" : "0", ring: on ? "var(--crm-rust)" : "var(--crm-line)", fill: on ? "var(--crm-rust)" : "transparent",
         toggle: () => patch({ adSheet: { sel: on ? draft.filter(x => x !== a) : [...draft, a] } }) };
     }),
     adSaveLabel: draft.length ? `Save · show ${nSel} lead${nSel === 1 ? "" : "s"}` : "Save · all ads",
@@ -199,13 +221,13 @@ export function inboxVM(ctx: SalesCtx) {
       // Assign to (user 2026-10-13): for whoever may assign (the Principal / Director in someone's CRM) — the chat's own
       // Assign to sheet, opened over the chat.
       ...(ml && canAssign(ml) ? [["Assign to", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => { if (!ml) return; set(u => ({ ...u, moreLead: null, moreView: "main", chat: ml.id, hm: { assign: true, sel: null } })); act.openChat(ml.id); }] as [string, string, () => void]] : []),
-    ] as [string, string, () => void][]).map(([label, icon, go], k) => ({ label, icon, go, rule: k ? "1px solid #EBDDD2" : "0" })),
+    ] as [string, string, () => void][]).map(([label, icon, go], k) => ({ label, icon, go, rule: k ? "1px solid var(--crm-rule)" : "0" })),
     // Block: off this person's Inbox and Contacts (the customer stays in the CRM; WhatsApp itself is not told).
     moreBlockLabel: ml ? `Block ${ml.name}` : "",
     moreBlock: async () => { if (!ml) return; const name = ml.name; closeMore(); await act.setPref(ml.id, { blocked: true, hidden: true }); act.toast(`${name} blocked · removed from your Inbox`); },
     labelItems: labelList.map((l, k) => {
       const on = mine2.includes(l.name);
-      return { label: l.name, dot: l.color, rule: k ? "1px solid #EBDDD2" : "0", on, ring: on ? "#BD4A19" : "#D9C7BA", fill: on ? "#BD4A19" : "transparent",
+      return { label: l.name, dot: l.color, rule: k ? "1px solid var(--crm-rule)" : "0", on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", fill: on ? "var(--crm-rust)" : "transparent",
         edit: (e: MouseEvent) => { e.stopPropagation(); patch({ moreView: "labelEdit", labelForm: { key: keyOf(l), name: l.name, color: l.color } }); },
         go: async () => {
           if (!ml) return;
@@ -220,7 +242,7 @@ export function inboxVM(ctx: SalesCtx) {
     labelFormName: fm.name, labelCanDelete: fm.key != null,
     labelSetName: (e: ChangeEvent<HTMLInputElement>) => patch({ labelForm: { ...fm, name: e.target.value } }),
     labelSwatches: LABEL_SWATCHES.map(c => ({ c, ring: c === fm.color ? "#fff" : c, pick: () => patch({ labelForm: { ...fm, color: c } }) })),
-    labelSaveBg: okName ? "#BD4A19" : "#D9C7BA", labelSaveCur: okName ? "pointer" : "default",
+    labelSaveBg: okName ? "var(--crm-rust)" : "var(--crm-line)", labelSaveCur: okName ? "pointer" : "default",
     labelSave: okName ? async () => {
       const nm = fm.name.trim();
       const next = fm.key == null ? [...labelList.map(l => ({ id: l.id, name: l.name, color: l.color })), { id: null, name: nm, color: fm.color }]

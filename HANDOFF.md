@@ -1,5 +1,196 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-22 b (BUILT — app only, waiting on the user to merge) — a receipt is received only once its line is in
+
+a's leftover. User, after "不明白" twice: shown it as one receipt of RM 5,000 settling an invoice, in three
+steps (open the receipt, write its line, the bank and the books) → "要". Branch `fix/receipt-lines-before-paid`
+(worktree `../vp-receipt-lines`).
+
+- Was: `createPaymentVoucherInner` wrote a receipt `paid` at its insert, so `trg_pv_mark_invoice_paid_on_insert`
+  marked its invoice paid at once; the line came after. A refused line — e.g. 3030, the header a customer with no
+  receivable account of its own falls back to (`resolveArGlCode`) — left the receipt received and the invoice
+  paid, with no bank and no books. Netting's paying-side lookups (its department, "Inter-billing — X"; IT has no
+  such account) threw after the same point.
+- Now every voucher is inserted a draft. A receipt's line goes in, then `UPDATE … status paid, approved / executed
+  by / at WHERE still draft` — `mark_invoice_paid_on_voucher_paid` (the insert twin's body, bar OLD ≠ paid) marks
+  the invoice then — and the bank, the pools and the journal follow as before. A refused line, or a receipt the
+  database will not mark received, voids the draft (`voidHalfMadeVoucher`), said in words: the invoice untouched,
+  nothing posted. Before anything is written: a line on a header account is refused (`lib/postable-accounts.ts`
+  `headerAccounts`, which Copy now uses too; debit lines as well), and the netting paying side is resolved.
+- Invoice's *Settle N →* (`settleInvoicesConsolidated`, Billing · Create — which may insert a voucher but not
+  update one: `pv_update` asks the treasury scope) cannot start a draft; it checks its receivable account before
+  writing, its line otherwise as before.
+- The UPDATE-only triggers that now fire on a receipt's draft → paid all pass receipts by (payroll, claim,
+  transfer, dept-request and statutory guards — read on production); `credit_dept_pool_on_invoice_paid` treats
+  INSERT and UPDATE alike, and no receipt has reference_type 'invoice'. The app's own "invoice settled" step at
+  the end is unchanged.
+- History: a receipt reads *Created …* then *Received* (`voucherChangeLine`); executed_by is left out beside
+  executed_at, so a debit approval no longer adds *Executed by changed*.
+- Tests: `payments/actions.receipt-lines.test.ts` (5 — all failed before), `billing/actions.settle-header.test.ts`
+  (2 — the header one failed before), `voucher-page.test.ts` (+2); `actions.dialog.test.ts`' receipt now draft →
+  received. No database change; production today has no receipt without a line.
+
+## CHECKPOINT 2026-10-22 a (SHIPPED, with z) — a half-made voucher or fund source is voided / cancelled, never "deleted"
+
+z's follow-up. User, shown it drawn (two before / after flows): "可以，照这个做"; the third spot: "一起修". On
+z's branch `fix/fund-source-reversal-cleanup` (main merged in, 18d5023d), so one apply + one merge ships both.
+
+- Same class as z, found by scanning production's policies for writes refused to every session: two
+  "rollbacks" on an error path deleted through the session on a `USING (false)` table and removed nothing —
+  `copyPaymentVoucherWork` (pv_no_delete: a blank draft stayed, the answer said *rolled back*) and
+  `createFundSourceInner` (fund_sources_no_delete: a source waited for an approval nobody could see). A third:
+  `createPaymentVoucherInner`'s debit lines insert ignored its error (a draft with no lines, "saved").
+- **Copy** reads the lines BEFORE writing; a line on a header account (one with sub-accounts —
+  `pvs_reject_header_account`) is refused, nothing written: *Line 1's account 3030 is a header account now (it
+  has sub-accounts) — nothing was copied.* 126 receipts / 141 lines are on 3030 AR - Subs (sub-accounts
+  3031–3039, 3073), e.g. HV-OR-202609-0429 — copying one left a blank draft. Lines refused for any other reason →
+  the new draft is voided (`voidHalfMadeVoucher`: UPDATE status voided WHERE still draft — Treasury · Create
+  may), said in words, or that it could not be voided.
+- **Create payment**: the debit lines' error is read; refused → the draft voided, said. The credit branch
+  already threw and is left as it is (a receipt is paid on insert and its invoice marked paid by trigger —
+  another fix).
+- **Record fund in**: an approval request that cannot be queued → the source → `cancelled` (what Withdraw
+  leaves), said; a refused cancel is said too (*withdraw it on its page*).
+- Voiding a draft moves no money: `debit_dest_bank_on_transfer_void` needs OLD paid; the claim / payroll
+  triggers key on links a copy or a new draft has none of yet.
+- **Guard**: `permission-table-writes.test.ts` › *never updates or deletes through the session what the
+  database lets nobody update or delete* — an UPDATE / DELETE (not an upsert; a refused INSERT is an error) on a
+  registered table whose command no action opens, or an INVOKER rpc's such write, fails. Before the fix it
+  named the two deletes (on main it would also name z's).
+- Production today: nothing affected (the one debit voucher without lines, HV-PV-202608-0265, is voided; no
+  pending source lacks its request). No database change in this part.
+- Tests: `payments/actions.half-made-voucher.test.ts` (5), `fund-in/actions.half-made-source.test.ts` (3) — 6 of
+  the 8 and the guard failed before (the two "as before" cases pass both ways).
+- z's migration renumbered `20261021230000` → **`20261022100000`** (#609 recorded 230000 on production as
+  combo_tier_falls_back); its md5 is unchanged, `57373b5f…`.
+- Verified in a CI-like tree (LF `git archive` of the branch, the worktree's fresh `npm ci`): unit 9,127 — the 12 that
+  failed were 5 s timeouts under local load, all pass at 60 s; the SQL suite exits 0; eslint clean on the files changed.
+- User: "全绿就上线" → production first (z's migration, below), then the PR, merged once CI was green.
+
+## CHECKPOINT 2026-10-21 z (SHIPPED 2026-10-22, with a) — Reverse payment takes a fund-source voucher's repayments with it
+
+Found by y's loan session, proposed apart. User, shown HV-PV-202608-0295's Reverse payment (HOUZS Century's RM 98,000
+fund source, 98,000 principal + 1,960 interest, 20 Aug) leaving the source repaid → "A：一起删+重开" (B was: refuse
+Reverse on such vouchers). Branch `fix/fund-source-reversal-cleanup` (worktree `../vp-fsr-reversal`).
+
+- Root cause: `reversePaidPayment` step 4 deleted the voucher's `fund_source_repayments` through the RLS client. The
+  table's only DELETE policy is `fsr_no_delete USING (false)` and `authenticated` holds the DELETE privilege, so 0
+  rows went and no error came: bank / GL / pools / voucher reversed, the source still read the instalment paid
+  (repaid, 0 outstanding), and the corrected PV is refused (`createPaymentVoucherInner`: *Cannot repay fund source
+  with status repaid*; approval's `block_repayment_on_inactive_fund_source` the same). Production 2026-10-21: 39 paid
+  fund-source vouchers, 67 rows, none reversed → no bad data.
+- Mig `20261022100000_voucher_reversal_fund_source_repayments.sql`: `reverse_voucher_fund_source_repayments(uuid)`
+  (DEFINER; `tab_write_guard(/payments, /payments/[id], /receipts; treasury.void)` + `has_any_action(treasury.void)`
+  when signed in; EXECUTE authenticated + service_role, not anon / PUBLIC; md5(prosrc) `57373b5f…`). Only a VOIDED
+  voucher qualifies; deletes that voucher's rows (each source locked FOR UPDATE); a repaid source it removed principal
+  from that the principal + netting left no longer cover (`fund_source_outstanding`'s measure) → `active`,
+  repaid_at / repaid_by NULL — all 14 repaid sources went active → repaid (audit_events); nothing sets `matured`
+  (`mark_matured_fund_sources` / `markFundSourceMatured` have no caller). A second run removes nothing.
+- App: the step runs right after the void (step 6), for a voucher with `fund_source_id`; a refusal throws *Reverse
+  HV-PV-…: the voucher is voided, but removing its fund-source repayments failed: …*. `database.types.ts`,
+  `DEFINER_RPCS`. Rule: finance-view.md › A REVERSED PAYMENT TAKES ITS FUND-SOURCE REPAYMENTS WITH IT.
+- Tests: `payments/actions.fund-source-reversal.test.ts` (5; the session's DELETE answered as production answers it —
+  4 failed before the fix: both rows left, no step, no error); `tests/member-sql/validate-fund-source-reversal.mjs`
+  (37 checks: production's row policies + its two trigger bodies, `fund-source-reversal-production.sql`
+  md5-checked; the bug shown, then the migration verbatim — paid / draft / unknown voucher, View only, no actions, a
+  closed tab refused; netting still covering keeps repaid; an interest-only voucher leaves the status). The tab-guard
+  scan was mutation-checked: without the guard it names `reverse_voucher_fund_source_repayments`.
+- Scan (task): in `reversePaidPayment` / `voidPaidReceipt` no other write is refused silently (vouchers / invoices
+  UPDATE and the journal reads all admit treasury.void). App-wide, two more writes production refuses for everybody,
+  both best-effort rollbacks on an error path, left as they are (proposed apart): `copyPaymentVoucher`'s delete of the
+  draft copy (`payments/actions.ts`) and `createFundSource`'s delete of the orphan source (`fund-in/actions.ts`).
+  `permission-table-writes.test.ts` skips a (table, command) with no registry entry as "refused for everybody" — how
+  this one slipped through.
+- Production dry-run (BEGIN … ROLLBACK, as finance@ under `SET LOCAL ROLE authenticated`): md5 `57373b5f…` (=
+  PGlite), grants auth / service only; finance@'s own DELETE removed 0 (the bug, on production); the step refused the
+  still-paid PV; after the void it removed 2, source 89b09736 repaid → active, outstanding 98,000, second run 0, all
+  rows 167 → 165. Afterwards production unchanged (no function, PV paid, 2 rows, source repaid).
+- Applied 2026-10-22 (user: "全绿就上线"), before the merge — the app calls the new RPC: a fresh dry-run first (md5
+  `57373b5f…`, both trigger bodies' md5 unchanged, 39 paid vouchers / 67 rows / 0 orphans, the same outcome as
+  finance@), then the file's LF text in one transaction, refusing itself unless the md5 was the tested one; recorded
+  in schema_migrations as `20261022100000` (created_by `claude-fsr-reversal`). After: DEFINER, search_path public,
+  EXECUTE authenticated + service_role only; nothing moved (HV-PV-202608-0295 paid, 67 rows, the source repaid).
+
+## CHECKPOINT 2026-10-21 y (DATA FIX + SHIPPED) — Revenue Department's payroll accrual
+
+User: "帮我检查为什么revenue team 的payroll 没有扣" → "这些扣款你就accrual salary 少进就行" →
+"那accrual 分开底薪和佣金记" → "对，跟8月一样分开记" → "自动 accrual 也改成这样".
+
+- Why September had the team's collect-back revenue and no cost: HR's batch #3 (Revenue Department,
+  27 people, 15 Oct, RM 261,253.69) carried RM 4,677.73 of pay-line deductions (drop sales on 7
+  payslips; PETER RM 4,000 with no description — the user is asking HR); `buildAccrualLines` had
+  no line for them, so the JV was that much out of balance and never posted.
+- Posted by hand: JE-202609-0945 (30 Sep, payroll_accrual, reference = batch #3, segment
+  revenue_department, RM 256,575.96): Dr 9030 basic 51,000 (the 7 salaried people) / 9093
+  commission & allowances 187,798.61 (net of the deductions) / 9090 Travelling 4,760.27 / 9098
+  Hostel & Accommodation 3,469.83 / 9084 food claims 2,672 / 9081-9083 employer 6,875.25; Cr
+  4070-4074 incl. WHT 1,613.11.
+- The auto accrual (lib/payroll-accrual): a batch's deductions (gross − net − employee statutory −
+  PCB − WHT − SKBBK) lower the salary line; a commission team's part (new DEFINER RPC
+  `payroll_batch_commission_split`, mig 20261021210000: commission lines' salary, first-submission
+  basic, special_claim pay lines by kind while they still add up to what the batch carried) books
+  basic 9030 / claims 9090·9098·9084 / the rest 9093 (a credit when below nothing — the company's
+  EPF/SOCSO/EIS come out of commission). `accrualTotal` = the JV's debits, so Retry accruals skips
+  batch #3. Departments without commission post as before.
+- Open (the user's / HR's): PETER's RM 4,000; the team's Sep net pay RM 235,589.80 has no payment
+  vouchers (Alliance in the books RM 260,512.65); KRIS / PETER PCB RM 3,643.80 and WHT RM 1,613.11
+  unpaid; EPF on basic only; SHAWN / ANTHONY / LAWRENCE / WEI HOW without WHT; KRIS / PETER
+  reopened 19 Oct.
+
+## CHECKPOINT 2026-10-21 y (SHIPPED) — a loan repayment knows its journal entry
+
+User (after x flagged it): Void on the second of two identical repayments reversed the FIRST one's entry → shown
+The Cont's 2 Oct pair as the example → "选 A" (link each repayment to its own entry; B was: refuse twins) →
+"可以，上线吧".
+
+- Root cause: `void_loan_repayment` matched a repayment's JE by loan + amount + date + type prefix, `ORDER BY
+  created_at LIMIT 1` — a repayment row had no link to its JE (`repayments.reference_id` is NULL on all 153). The
+  amount / date amends used the same match with STRICT (refused two, but took a lone match even if another's).
+- Mig `20261021200000_repayment_journal_entry_link.sql`: `repayments.journal_entry_id` (FK journal_entries, unique
+  partial index `repayments_journal_entry_id_key`); `audit_tables.ignore_columns` += journal_entry_id (repayments) so
+  the backfill adds no audit-log lines on loan pages; helper `loan_repayment_journal_entry(uuid)` (INVOKER,
+  service_role only); one statement swapped in void_loan_repayment / amend_loan_repayment / amend_loan_repayment_date
+  (production md5 cda958da… / 8d5f89e5… / b67c36e4… → 2a7cbe6d… / d5a79c9a… / 6b69c3bb…); backfill — 63 of 153 (the
+  other 90 have no entry of their own: 88 [LO#] imports, OR-202606-0032 interest, [BI#32] contra).
+- `recordRepayment` (fund-out/actions.ts): bank + accounts resolved, entry posted FIRST, then the row with
+  `journal_entry_id`, then Venture Pool + bump_bank_balance (a refused account / entry now writes nothing).
+  database.types.ts: repayments.journal_entry_id. Rule: finance-view.md › A LOAN REPAYMENT KNOWS ITS JOURNAL ENTRY.
+- Tests: `tests/member-sql/validate-loan-repayment-link.mjs` (50 checks: production's bodies md5-checked from
+  `loan-repayment-production.sql`, the bug reproduced on them, then the migration verbatim — unlinked twins refused,
+  linked twins void / amend their own entry and bank, backfill, second run, privileges, unique / FK);
+  `src/app/(portal)/fund-out/actions.repayment-link.test.ts` (4).
+- Verified in a CI-like tree (LF `git archive` of HEAD + these files, fresh `npm ci`): eslint 0 errors (1 old
+  warning, unused `resolveInterestSuspenseLeaf`); vitest green — the full run's 11 failed files were 5 s timeouts
+  under local load, re-run at 60 s all 204 pass; the PGlite suite exits 0. tsc errors only in old unrelated test
+  files. This checkout cannot verify alone: its node_modules is still Next 15.5 (package.json says 16.4.2 since
+  #596 — run `npm ci`), and the guard tests also scan the 258 gitignored `* - Copy.*` files.
+- Fund IN checked: no JE guessing (`fund_source_repayments.payment_voucher_id`). Found apart: `reversePaidPayment`
+  step 4 deletes fund_source_repayments through the RLS client and `fsr_no_delete USING (false)` silently blocks it —
+  a reversed fund-source repayment voucher would leave its rows (none reversed yet). Proposed as its own session.
+- Production, before the merge: dry-run (BEGIN … ROLLBACK) said the 3 md5s, 63 of 153 linked, 0 audit rows, every
+  link resolving, no unlinked row with an entry; then applied with the file's LF text in one transaction, recorded
+  in schema_migrations as `20261021200000` (created_by `claude-repayment-link`), `NOTIFY pgrst`. The Cont's 2 Oct
+  pair is linked to JE-202610-0009 (5027) / 0010 (3053). The DB had to go first: the app writes the new column.
+- Merged as #607 (squash 7584048, 12:50 UTC — the repo does not allow GitHub auto-merge; unit ×2, build and
+  worker were green, the SQL job still running, its suite green locally); Vercel production deployed. The backfill
+  re-run after the deploy linked 0 — nothing was recorded in between (newest repayment 7 Oct): 63 of 153 linked.
+
+## CHECKPOINT 2026-10-21 x (DATA FIX) — The Cont LO#4: a duplicate repayment removed
+
+User: "可以帮我检查这个repayment 对吗？" → "我不可能还两次" → "第二笔错了".
+
+The Cont's 60k loan (17fb3ef4, EMI 4% × 6, start May 2026) had TWO RM 12,400 repayment sets dated
+2026-10-02: Finance Manager's on 2 Oct (JE-202610-0009 interest → 5027 / 0010 principal → 3053) and
+one ONG MEI SHUANG keyed on 21 Oct, note "Loan repayment 06" (JE-202610-1049 interest → 3063
+Interest in Suspense / 1050 → 3053), which flipped the loan to fully_repaid. The second set was
+removed DIRECTLY (user rule: 直接更改，不是开 JE 补) in one guarded block: its 2 repayments rows,
+JE-1049/1050 + their 4 lines (no reversal JE — entry numbers 1049/1050 are a gap), its Venture
+Pool loan_repayment_in 10,000, Hong Leong's cached balance −12,400 (cache = GL 67,082.72 after),
+loan back to active (principal paid 50,000, outstanding 10,000 — instalment 6, due 2 Oct, open).
+NOT done through the page's Reverse: `void_loan_repayment` finds the JE by loan + amount + date +
+type and takes the OLDEST match, so with two identical sets it reverses the right one (flagged as
+a separate task).
+
 ## CHECKPOINT 2026-10-12 w (SHIPPED) — the repayment start is a date
 
 User: "这个repayment setting 到我set 了10月不会更新？" → (Carres' card said 7 Oct, its schedule

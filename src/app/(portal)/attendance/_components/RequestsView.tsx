@@ -11,7 +11,7 @@ import { Toast, useFlash } from '@/components/ds/Overlay'
 import { attendanceFileLink, decideRequest, saveRoute } from '@/lib/attendance/actions'
 import { balanceOf } from '@/lib/attendance/engine'
 import type { FileLink } from '@/lib/attendance/files'
-import { ROUTE_WORDS, amountLabel, bucketOf, flowNodes, kindLabel, sinceLabel, statusOf, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
+import { ROUTE_WORDS, amountLabel, bucketOf, decidedToast, flowNodes, kindLabel, sinceLabel, statusOf, waitingStep, waitsAtMe, whenLabel, type Bucket } from '@/lib/attendance/requests'
 import type { AttConfig, AttLedger, AttRequest, AttRoute, Route } from '@/lib/attendance/types'
 import { Avatar, HoverButton, NodeTrack, Pill } from './bits'
 import { downloadCsv } from './BalanceCsv'
@@ -80,12 +80,9 @@ export default function RequestsView({ config, requests, ledger }: { config: Att
     start(async () => {
       const res = await decideRequest(req.id, approve, note)
       if (!res.ok) return flash(res.reason)
-      const fields = Array.isArray(req.detail.changes) ? req.detail.changes.length : 0
       setNote('')
       setReqId(null)
-      flash(req.kind === 'profile'
-        ? approve ? `Approved · ${req.who}'s record updated · ${fields} fields` : `Rejected · record unchanged · ${req.who} told`
-        : `${approve ? 'Approved' : 'Rejected'} · ${req.who} told`)
+      flash(decidedToast(req, approve))
     })
   }
 
@@ -191,6 +188,8 @@ function RequestDetail({
   const [tone, label] = statusOf(req)
   const w = waitingStep(req)
   const hrW = w?.role === 'hr', upW = w?.role === 'upline'
+  // The viewer IS that upline (2026-10-17): their own step, not a decision on anybody's behalf.
+  const behalf = upW && !waitsAtMe(req, config)
   const canDecide = (hrW || upW) && config.canApprove
   const person = config.people.find(p => p.id === req.staffId)
   const own = !!person && person.hasLogin && person.name === config.me
@@ -263,7 +262,7 @@ function RequestDetail({
             }))}
           />
         </div>
-        {upW && config.canApprove ? (
+        {behalf && config.canApprove ? (
           <Banner tone="info" title="Waiting at the upline">{`You may decide on ${w?.approver}'s behalf if they are away. It is recorded as such.`}</Banner>
         ) : null}
         {canDecide ? (
@@ -276,7 +275,7 @@ function RequestDetail({
         {canDecide ? (
           <>
             <Button variant="secondary" disabled={busy || !note.trim()} onClick={() => onDecide(false)}>Reject</Button>
-            <Button disabled={busy || own} onClick={() => onDecide(true)}>{upW ? 'Approve on behalf' : 'Approve'}</Button>
+            <Button disabled={busy || own} onClick={() => onDecide(true)}>{behalf ? 'Approve on behalf' : 'Approve'}</Button>
           </>
         ) : (
           <Button variant="secondary" onClick={onClose}>Close</Button>

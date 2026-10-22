@@ -25,8 +25,8 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',
   mint_invoice_no:
-    'a number for an invoice made on any of five pages (Invoice, BA, Billing Allocator, the Invoice list, My Billing): ' +
-    'asking all five narrows nothing, and the invoice it numbers is written by the gated write that asked for it',
+    'a number for an invoice made on any of four pages (Invoice, BA, Billing Allocator, the Invoice list): ' +
+    'asking all four narrows nothing, and the invoice it numbers is written by the gated write that asked for it',
 }
 
 const PAGES = new Set(Object.keys(PAGE_TABS))

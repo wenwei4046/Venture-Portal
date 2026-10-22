@@ -12,8 +12,28 @@
    sets on the svg box itself goes back. */
 .root.root.root svg { display: revert; vertical-align: revert; box-sizing: revert; border: revert; }
 /* The prototype's canvas (CRM Desktop rev 1.dc.html) colours its links. */
-.root.root.root a { color: #BD4A19; }
-.root.root.root a:hover { color: #A3371A; }
+.root.root.root a { color: var(--crm-rust); }
+.root.root.root a:hover { color: var(--crm-oxblood); }
 
-/* The reply box's hint: the design draws it as text in #757575 — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
-.root.root.root ::placeholder { color: #757575; opacity: 1; }
+/* The reply box's hint: the design draws it as text in var(--crm-muted) — `all: revert` does not reach ::placeholder, where the portal's grey-blue would show. */
+.root.root.root ::placeholder { color: var(--crm-muted); opacity: 1; }
+
+/* 4a's states (2026-10-18, docs/design_handoff_crm_redesign › README › Interactions): a row under the pointer in pale cream,
+   an outline button tinted with the nav's cream, a primary button pressed darker, and the keyboard's focus ring in rust.
+   Desk4a.tsx marks its parts with these classes; !important — inline styles and the reset above would win otherwise. */
+.root.root.root :global(.crm4a-row):hover, .root.root.root :global(.crm4a-metric):hover { background: var(--crm-hover) !important; }
+.root.root.root :global(.crm4a-add)::placeholder { color: var(--crm-rust) !important; }
+.root.root.root :global(.crm4a-nav):hover:not([aria-current]) { background: var(--crm-cream-nav-active) !important; }
+.root.root.root :global(.crm4a-outline):hover { background: var(--crm-cream-nav) !important; }
+.root.root.root :global(.crm4a-primary):active { background: var(--crm-rust-press) !important; }
+.root.root.root [data-rev-side] button:hover:not([aria-current]) { background: rgba(255, 255, 255, .06) !important; }
+.root.root.root :global(.crm4a-row):focus-visible, .root.root.root :global(.crm4a-nav):focus-visible, .root.root.root :global(.crm4a-outline):focus-visible,
+.root.root.root :global(.crm4a-primary):focus-visible, .root.root.root :global(.crm4a-metric):focus-visible { outline: 2px solid var(--crm-rust) !important; outline-offset: 2px !important; }
+
+/* A Contacts column header shows its hide (×) only under the pointer (frame 03 draws none). */
+.root.root.root :global(.crm4a-th) :global(.crm4a-th-x) { opacity: 0 !important; }
+.root.root.root :global(.crm4a-th):hover :global(.crm4a-th-x) { opacity: 1 !important; }
+
+/* Ads Performance: a column head's resize grip — a thin rust line while hovered or dragged (the owner, 2026-10-18). */
+.root.root.root :global(.crm4a-colgrip)::after { content: ""; position: absolute; top: 8px; bottom: 8px; left: 4px; width: 2px; border-radius: 1px; background: transparent; }
+.root.root.root :global(.crm4a-colgrip):hover::after, .root.root.root :global(.crm4a-colgrip):active::after { background: var(--crm-rust) !important; }

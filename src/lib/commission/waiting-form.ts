@@ -307,7 +307,21 @@ export function templateObjectPath(name: string, id: string): string {
  */
 export type TemplateView = 'pdf' | 'image' | 'word' | 'html' | 'none'
 
-export function templateView(name: string): TemplateView {
+/**
+ * An applicant's signed form (2026-10-20) is named as its sender's file was, which may say nothing of its kind —
+ * or the wrong thing; the bucket kept the type the server found in its bytes, so the type decides when there is
+ * one: a PDF, a PNG or JPEG, a Word .docx (read here) or an old .doc (Download).
+ */
+const TYPE_VIEW: Readonly<Record<string, TemplateView>> = {
+  'application/pdf': 'pdf',
+  'image/png': 'image',
+  'image/jpeg': 'image',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'word',
+  'application/msword': 'none',
+}
+
+export function templateView(name: string, type?: string | null): TemplateView {
+  if (type && type in TYPE_VIEW) return TYPE_VIEW[type]
   const ext = name.toLowerCase().split('.').pop() ?? ''
   if (ext === 'pdf') return 'pdf'
   if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') return 'image'
@@ -323,7 +337,16 @@ export function templateView(name: string): TemplateView {
  */
 export type TemplateIcon = 'word' | 'pdf' | 'image' | 'html' | 'file'
 
-export function templateIcon(name: string): TemplateIcon {
+const TYPE_ICON: Readonly<Record<string, TemplateIcon>> = {
+  'application/pdf': 'pdf',
+  'image/png': 'image',
+  'image/jpeg': 'image',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'word',
+  'application/msword': 'word',
+}
+
+export function templateIcon(name: string, type?: string | null): TemplateIcon {
+  if (type && type in TYPE_ICON) return TYPE_ICON[type]
   const ext = name.toLowerCase().split('.').pop() ?? ''
   if (ext === 'doc' || ext === 'docx') return 'word'
   if (ext === 'pdf') return 'pdf'

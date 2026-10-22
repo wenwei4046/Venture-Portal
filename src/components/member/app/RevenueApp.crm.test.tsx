@@ -4,8 +4,8 @@ import { protoData, protoFixture } from "./fixtures/proto";
 import RevenueApp from "./RevenueApp";
 
 // Today's CRM chat button (2026-10-14 — the "Revenue app refresh" handoff §2; the user: the header stays Today's, its
-// number the customers' messages not read yet): it opens the CRM as Profile's My leads & appointments does, and the
-// CRM's way out leads back to Today.
+// number the customers' messages not read yet): it opens the CRM, and the CRM's way out leads back to Today. Profile's
+// My leads & appointments, a second way in until 2026-10-20, is gone (the user: "这个我们不用留了，帮我 delete 掉").
 vi.mock("next/navigation", () => ({
   usePathname: () => "/member/preview",
   useSearchParams: () => new URLSearchParams(window.location.search),
@@ -14,6 +14,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
+vi.mock("@/app/(member)/member/it-actions", () => ({}));
+vi.mock("@/app/(member)/member/share-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 vi.mock("../crm/CrmApp", () => ({ default: ({ onExit }: { onExit: () => void }) => <button onClick={onExit}>Leave the CRM</button> }));
@@ -45,14 +47,15 @@ describe("Today's CRM chat button", () => {
     expect(screen.getByRole("button", { name: "Open CRM" })).toBeInTheDocument();
   });
 
-  it("Profile's My leads & appointments stays a second way in — and goes back to Profile", async () => {
+  it("Profile has no My leads & appointments any more — and a CRM a tapped notice opened leads home", async () => {
     await open("?page=account");
-    fireEvent.click(screen.getByRole("button", { name: /My leads & appointments/ }));
-    await act(async () => {});
-    expect(view()).toBe("crm");
+    expect(screen.getByRole("button", { name: /Memos & notifications/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /My leads & appointments/ })).not.toBeInTheDocument();
+    cleanup();
+    await open("?page=account&view=crm");
     fireEvent.click(screen.getByRole("button", { name: "Leave the CRM" }));
     await act(async () => {});
-    expect([page(), view()]).toEqual(["account", null]);
+    expect([page(), view()]).toEqual([null, null]);
   });
 
   it("only in Today's header: not over the Quote's second step, the Arena, nor for an account outside the CRM", async () => {

@@ -32,10 +32,18 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['revenue.view:own'], text: 'canAccessRevenue(user) — the sidebar’s Revenue sub-departments (listSubDepartments)' },
   'src/components/layout/BottomTabBar.tsx#BottomTabBar':
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
+  // 2026-10-17 — the Principal's own view opens the Finance app with an Approvals tab: its badge is read only
+  // where the tab is drawn — the sidebar's Approvals row, `canApprove` and its page's tabs.
+  'src/app/(fin-app)/fin-app/layout.tsx#FinAppLayout':
+    { wants: ['approvals.view', ...APPROVE], text: 'hasApprovalsTab(user) — canApprove, the Principal’s Approvals tab badge' },
   'src/app/(portal)/payments/voucher-doc/route.tsx#readSubmissions':
     { wants: ['treasury.view'], text: 'can(user, treasury) — the voucher print’s approval requests, the treasury’s read only' },
   'src/lib/attendance/payroll-write.ts#payrollMarksFor':
     { wants: ['hr_costing.view:own'], text: 'can(user, hr_costing) with the Payroll tab open — Month close shows where each person’s payroll stands to a payroll reader only' },
+  // 2026-10-17 — HR Mobile: a person's Call and Message dial People's own mobile column, read only while People is
+  // open to them (appAccess(user).parts.people: can(team) || can(team_directory), with People's tab).
+  'src/lib/hr-app/server.ts#mobiles':
+    { wants: ['team.view:own'], text: 'appAccess(user).parts.people — People (team / team_directory) with its tab open' },
 }
 
 /**
@@ -54,8 +62,6 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
       'invoice_payout_pool', 'invoices', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'payment_vouchers',
       'repayments', 'treasury_terms_history', 'venture_pool',
     ],
-    // overviewFor → 'department': its pool, its requests, its invoices.
-    'dept_pool.view:dept': ['approval_requests', 'dept_pools', 'invoices'],
     // Finance's view (2026-10-14, the Finance revamp v2's Overview): this month's allocations not yet
     // billed — read only with the billing key, as the Invoice and allocator pages (canAccessBilling,
     // dashboard/_lib/finance-overview.ts).
@@ -65,19 +71,23 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
   },
   'src/app/(portal)/approvals/[id]/page.tsx#ApprovalDetailPage': {
     // The request is read first, and the page stops (notFound) unless a row
-    // policy shows it: the queue, an approver of its kind, the treasury, or
-    // the department that raised its own expense.
+    // policy shows it: the queue, an approver of its kind, or the treasury.
+    // (The department that raised its own expense went with the Dept
+    // Manager, 2026-10-17.)
     'treasury.view': ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts'],
     'approvals.view': ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts'],
     ...Object.fromEntries(APPROVE.map(a => [a, ['approval_requests', 'loans', 'payment_vouchers', 'payment_voucher_sources', 'payment_attachments', 'bank_accounts']])),
-    // A department sees only its own dept_expense requests: no loan, no voucher.
-    'dept_pool.view:dept': ['approval_requests'],
   },
   // The Finance phone app's Overview (2026-10-15, M01) — the desktop Overview's counts
   // (loadFinanceOverviewCounts): the vouchers only for the treasury, the invoices and
   // this month's allocations only for Billing (canAccessTreasury / canAccessBilling).
   'src/app/(fin-app)/fin-app/page.tsx#FinAppOverview': {
-    'treasury.view': ['payment_vouchers'],
+    // …and, for the Principal's own view with the treasury (2026-10-17, loadPrincipalOverview), what waits for
+    // its decision and the treasury dashboard's summary (dashboard_summary — the desktop Overview's own reads).
+    'treasury.view': [
+      'payment_vouchers', 'approval_requests', 'bank_accounts', 'base_rate_history', 'dept_pools', 'fund_source_repayments', 'fund_sources',
+      'invoice_payout_pool', 'journal_entries', 'journal_lines', 'loans', 'overdue_records', 'repayments', 'venture_pool',
+    ],
     'billing.view': ['alloc_txns', 'invoices'],
   },
 }
@@ -171,7 +181,6 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   // Transfer from the waiting list (mig 20261010150000): the roster row as the caller; the request through two DEFINER functions.
   member_transfer_waiting: ['hr_staff_costs', 'titles'],
   next_account_code: ['chart_of_accounts'],
-  recost_sales_order_lines: ['catalogue_combo_prices', 'catalogue_live_combos', 'catalogue_option_prices', 'catalogue_skus', 'comm_order_releases', 'comm_runs', 'erp_fabrics', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_dismiss_double_claim: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders', 'users'],
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders', 'users'],
@@ -196,6 +205,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
 export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // People › Invite user (mig 20261016170000): which logins have an invite link not used yet — auth.users, Logins & invites · View.
   'account_invite_states',
+  // …and the login itself (mig 20261020190000): the portal user, put on the person — Permissions · Create.
+  'account_attach_login',
   'adjust_revenue_payroll_commission', 'amend_fund_source', 'amend_fund_source_from', 'amend_issued_invoice', 'amend_loan',
   'amend_loan_from', 'amend_loan_repayment', 'amend_loan_repayment_date', 'amend_voucher_date', 'approve_dept_payment_expense',
   'approve_payroll_run', 'approve_single_voucher', 'approve_voucher_batch', 'approve_voucher_batch_partial', 'audit_changes', 'audit_overview',
@@ -209,9 +220,18 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_set_out_media',
   // CRM Desktop v2's Channels (mig 20261015100000): asks crm_manages().
   'crm_note_channel_save',
+  // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
+  'crm_settings_read',
+  // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
+  'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
+  // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
+  'crm_auto_reply_due', 'crm_auto_reply_claim', 'crm_auto_reply_done',
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
   // Product List · View, the cost setting Product List · Edit, both running as their owner.
   'revenue_costing_gaps', 'catalogue_save_cost_setting',
+  // Recost a month from the Product List (mig 20261021240000): Revenue · Edit and the Orders page's box — as the
+  // caller, every line's costing asked the permission helpers again (Fair · October, 1,282 lines: 56 s).
+  'recost_sales_order_lines',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',
@@ -231,6 +251,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
   // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.
   'member_admin_food_claim', 'member_admin_save_food_claim',
+  // Transport claim's ⋯ — who may claim it (mig 20261020220000).
+  'member_admin_transport_claim', 'member_admin_save_transport_claim',
   'member_capacity_of', 'member_process_all_queues',
   'member_sub_department_requests',
   // Sales Groups › Waiting list's flow (mig 20261010140000): each asks member_is_manager (the form also lets in member_requests).
@@ -239,6 +261,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'member_replacement_form', 'member_save_replacement_form',
   // The waiting list's "+" (mig 20261011230000): member.manage and member_is_manager, both.
   'member_waiting_add', 'member_waiting_add_form',
+  // …and an applicant's signed form uploaded in their drawer (mig 20261020130000): the same two.
+  'member_waiting_attach_form',
+  // …and the drawer's Edit (mig 20261020210000): the same two.
+  'member_waiting_edit',
   // Member services' readers (mig 20261010160000): member_requests_manage / member_memos_manage.
   'member_admin_request_facts', 'member_memo_reads',
   // People › Documentation (mig 20261011070000): each asks has_any_action for its Documentation cell; the
@@ -315,6 +341,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience',
   'lead_save_campaign', 'lead_send_campaign', 'lead_remove_campaign', 'lead_set_opt_in',
   'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
+  // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,
+  // record and paid payslips — and writes only one's own (the punch notice read, one's photo); one's punch and an MC
+  // filed on one's own request ask their own staff record (mig 20261015200000).
+  'att_me', 'att_me_today', 'att_my_team', 'att_my_org', 'my_record', 'my_payslips', 'att_punch_notice_ack', 'my_photo_set',
+  'att_punch', 'att_request_attach',
   // Admin › Guest Link (mig 20261011091000): each asks has_any_action(guest_link.* / rooms.view); the guest page's
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',
@@ -323,12 +354,31 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
   'my_login_is_personal',
-  // Edit profile (mig 20261014210000): the caller's own name, email and phone; the change asks a personal login first.
-  'my_profile', 'update_my_profile',
+  // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
+  // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
+  'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',
+  // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
+  // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
+  'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
+  // An exact request, including older than either list (mig 20261021030000): active sender or IT requests · View.
+  'it_request_get',
+  // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
+  // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
+  // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
+  'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
+  'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
-  'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_cancel_topup',
+  // A memo acknowledged with a signature (mig 20261021013000): one's own signature on a memo one acknowledged (a
+  // sign-in, their own receipt); a Data center letter's, to Documentation · View.
+  'my_memo_signature', 'hr_letter_signature',
+  // Sub-departments per person (mig 20261016180000): the caller's own reach; a person's, to whoever reads their
+  // boxes; their ticks, by whoever manages permissions.
+  'my_sub_department_reach', 'person_sub_department_reach', 'permission_user_reach_set',
+  // A person's own Salary / NRIC / Bank (mig 20261016210000): by whoever manages permissions.
+  'permission_user_sensitive_set',
+  'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_batch_commission_split', 'payroll_cancel_topup',
   'payroll_close_month', 'payroll_complete_rows', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status',
   'payroll_open_topup', 'payroll_reopen_month', 'payroll_send_back_batch', 'payroll_submit_batch', 'payroll_uncomplete_rows',
   'permission_history', 'permission_template_create', 'permission_template_save', 'permission_title_set_template',
@@ -336,10 +386,12 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'reassign_invoice_gl_account', 'reassign_voucher_gl_account', 'refresh_base_rate', 'reject_dept_payment_request',
   'reject_invoice_request', 'reject_payroll_run', 'rename_account_code', 'reopen_payroll_run', 'request_loan_cancel',
   'return_voucher_to_draft', 'revenue_pay_preview', 'revenue_payroll_adjustments', 'revenue_save_pay_lines',
+  // Reverse payment's step after the void (mig 20261022100000): the voucher's fund-source repayments — Treasury · Void.
+  'reverse_voucher_fund_source_repayments',
   'reverse_voucher_pool_rows', 'revert_terms_change', 'rnp_invoice_events', 'save_revenue_payroll_row',
   'set_fund_source_min_pay_interest', 'set_fund_source_notes', 'set_fund_source_repayment_start', 'set_loan_funding_source',
-  'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields', 'submit_dept_payment_request',
-  'submit_invoice_request', 'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
+  'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields',
+  'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
 ])
 
@@ -461,16 +513,35 @@ export const INVOKER_VIEWS: Readonly<Record<string, readonly string[]>> = {
 
 // ── Putting it together ──────────────────────────────────────────────────────
 
-/** Each function's least reach (permission_functions.scopes, from the migration that seeds it). */
-export function leastReach(): Record<string, string> {
+/**
+ * Each function's reaches (permission_functions.scopes): as the migration that
+ * seeds them wrote them, then as a later one narrowed them (`UPDATE
+ * public.permission_functions SET scopes = ARRAY[…] WHERE key IN (…);` — Dept
+ * Pool, OPEX and Department reports to All when the Dept Manager went,
+ * 20261017160000).
+ */
+export function functionScopes(): Record<string, string[]> {
   const dir = resolve(process.cwd(), 'supabase/migrations')
-  const sql = readFileSync(join(dir, readdirSync(dir).find(f => f.startsWith('20261008120000'))!), 'utf8').replace(/\r\n/g, '\n')
-  const out: Record<string, string> = {}
-  for (const m of sql.matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
-    const scopes = [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1])
-    out[m[1]] = ['own', 'dept', 'all'].find(s => scopes.includes(s)) ?? 'all'
+  const files = readdirSync(dir).filter(f => f.endsWith('.sql')).sort()
+  const sqlOf = (f: string) => readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n')
+  const seed = files.find(f => f.startsWith('20261008120000'))!
+  const out: Record<string, string[]> = {}
+  for (const m of sqlOf(seed).matchAll(/\('([a-z_]+)',\s+'[^']*',\s+'[A-Za-z]+',\s+ARRAY\[[^\]]*\], ARRAY\[([^\]]*)\]/g)) {
+    out[m[1]] = [...m[2].matchAll(/'([a-z]+)'/g)].map(s => s[1])
+  }
+  for (const f of files.filter(f => f > seed)) {
+    for (const m of sqlOf(f).matchAll(/UPDATE public\.permission_functions SET scopes = ARRAY\[([^\]]*)\] WHERE key IN \(([^)]*)\);/g)) {
+      const scopes = [...m[1].matchAll(/'([a-z]+)'/g)].map(s => s[1])
+      for (const k of m[2].matchAll(/'([a-z_]+)'/g)) out[k[1]] = scopes
+    }
   }
   return out
+}
+
+/** Each function's least reach (functionScopes). */
+export function leastReach(): Record<string, string> {
+  return Object.fromEntries(Object.entries(functionScopes()).map(([fn, scopes]) =>
+    [fn, ['own', 'dept', 'all'].find(s => scopes.includes(s)) ?? 'all']))
 }
 
 /** One way to a table read: the gates of one path (somebody who reads holds one action of one of them). */

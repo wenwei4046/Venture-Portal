@@ -16,7 +16,8 @@ export type Screen = "today" | "quote" | "calc" | "insight" | "arena" | "account
  */
 export const PRODUCTS_PATH = "/member/products";
 const PRODUCT_PARAMS = ["tab", "sub", "q"];
-export type ProfileView = "income" | "incOrders" | "honours" | "team" | "requests" | "track" | "rooms" | "docs" | "crm" | "memos" | "brandWeeks";
+/** `it`: IT support — one's own requests; `itdesk`: everybody's, for IT requests · View (2026-10-20). */
+export type ProfileView = "income" | "incOrders" | "honours" | "team" | "requests" | "track" | "rooms" | "docs" | "crm" | "memos" | "brandWeeks" | "it" | "itdesk";
 export type InsightView = "main" | "bills" | "kpi" | "brand";
 export type ArenaView = "hub" | "board" | "record";
 export type Board = "sales" | "margin" | "kpi" | "champ";
@@ -36,7 +37,7 @@ export interface Route {
 
 /** The app's screens an address can name, and Profile's pages — every one has a box in People › Permissions or a reason not to (permission-tabs-coverage.test). */
 export const SCREENS: Screen[] = ["today", "quote", "calc", "insight", "arena", "account"];
-export const PROFILE_VIEWS: ProfileView[] = ["income", "incOrders", "honours", "team", "requests", "track", "rooms", "docs", "crm", "memos", "brandWeeks"];
+export const PROFILE_VIEWS: ProfileView[] = ["income", "incOrders", "honours", "team", "requests", "track", "rooms", "docs", "crm", "memos", "brandWeeks", "it", "itdesk"];
 const PF = PROFILE_VIEWS;
 const INS: InsightView[] = ["bills", "kpi", "brand"];
 const BOARDS: Board[] = ["sales", "margin", "kpi", "champ"];
@@ -50,8 +51,10 @@ const LEGACY: Record<string, Partial<Route>> = {
 
 export function readRoute(search: string): Route {
   const q = new URLSearchParams(search);
-  const page = q.get("page") ?? "today";
-  const view = q.get("view") ?? "";
+  // A tapped memo's notice from before 2026-10-17 (`/member?memo=<id>`) names no page: its page is Profile › Memos.
+  const memoOnly = !q.get("page") && !!q.get("memo");
+  const page = memoOnly ? "account" : q.get("page") ?? "today";
+  const view = memoOnly ? "memos" : q.get("view") ?? "";
   const base: Route = { screen: "today", pf: null, ins: "main", arena: "hub", board: "sales", department: q.get("department") ?? "", staff: q.get("staff") ?? "" };
   if (LEGACY[page]) return { ...base, ...LEGACY[page] };
   const screen = (SCREENS as string[]).includes(page) ? (page as Screen) : "today";

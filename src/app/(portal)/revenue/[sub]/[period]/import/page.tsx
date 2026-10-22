@@ -28,7 +28,7 @@ export default async function SalesImportPage({ params }: PageProps) {
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const { staff, aliases } = await loadAgentMatchingData()
   const supabase = (await createClient()) as unknown as SupabaseClient
   // Whether THIS month pays Open Bill: its own setting, else Rules (2026-09-26).

@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
   foodMonthOver, foodOpenTo, isOutstation, monthOfWeek, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, stayProblem, stayWindow, tapStayDay,
-  type ClaimRates, type StayPick,
-} from "./claim-rules";
+  type ClaimRates, type StayPick, transportOpenTo } from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
@@ -334,5 +333,28 @@ describe("the food claim's month", () => {
       Array.from({ length: 7 }, (_, i) => ({ week: `2026-09-0${i + 1}`, days: [`2026-09-0${i + 1}`] }))]) {
       expect(readFoodWeeks(bad, "2026-09")).toBeNull();
     }
+  });
+});
+
+// Who may send a transport claim (2026-10-20): the titles HR ticked under Member services › Transport claim's ⋯.
+describe("transportOpenTo", () => {
+  it("is open to a title HR ticked, whatever its case or spaces", () => {
+    const rates = { transport: { titles: ["Team Leader", "Revenue Specialist"] } };
+    expect(transportOpenTo(rates, "Team Leader")).toBe(true);
+    expect(transportOpenTo(rates, "  revenue specialist ")).toBe(true);
+    expect(transportOpenTo(rates, "Team Assistant")).toBe(false);
+    expect(transportOpenTo(rates, null)).toBe(false);
+    expect(transportOpenTo({ transport: { titles: [] } }, "Team Leader")).toBe(false);
+  });
+
+  it("is open while the rates are not read, or were read before the list existed — the database asks again", () => {
+    expect(transportOpenTo(null, "Team Assistant")).toBe(true);
+    expect(transportOpenTo({}, "Team Assistant")).toBe(true);
+  });
+
+  it("is read from the database's answer, and absent from an older one", () => {
+    expect(readClaimRates({ transport: { titles: ["Team Leader", "", 3] } }).transport).toEqual({ titles: ["Team Leader"] });
+    expect(readClaimRates({}).transport).toBeUndefined();
+    expect(readClaimRates({ transport: "x" }).transport).toBeUndefined();
   });
 });

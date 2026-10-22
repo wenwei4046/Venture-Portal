@@ -151,7 +151,9 @@ const PATCHES = {
     // 2026-10-13: picked photos / videos wait on a preview with an HD switch (shared/pick.ts).
     ['{!!(v.hm.toast) && (<>', PICK_SHEET("v.pk") + '{!!(v.hm.toast) && (<>'],
     // 2026-10-13: a message that did not reach the customer says why under it (vm/chat.ts › failNote), not only a red tick.
-    [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/, '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#A3371A" }}>{m.failNote}</span>)}'],
+    // 2026-10-17: in white — only your own message is ever not delivered, and its bubble is orange since 2026-10-15,
+    // on which the old dark red could not be read.
+    [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/, '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#FFFFFF" }}>{m.failNote}</span>)}'],
     // 1.2 Every bubble lifts a little off the wallpaper.
     ["boxSizing: \"border-box\", borderRadius: m.radius, background: m.bg,", "boxSizing: \"border-box\", borderRadius: m.radius, boxShadow: \"0 1px 1px rgba(63,43,34,.10)\", background: m.bg,"]],
   // Switch to: a whole department's list scrolls inside the sheet instead of running off the screen (user 2026-10-09).
@@ -246,7 +248,11 @@ for (const [name, vm, frag, doc, vmOverride] of parts) {
   // match the prototype's px.
   body = require("./ad-link.cjs")(body);
   if (name === "SalesProfile") body = profileLikeApp(profileType(body, "{!!(v.profMain) && (<>"), "{!!(v.profMain) && (<>");
+  // 4a's palette (2026-10-18, palette-4a.cjs): every hex the patches left becomes its --crm-* token.
+  body = require("./palette-4a.cjs")(body, name);
   body = scaleType(body);
+  // 4a's phone parts (2026-10-18, phone-4a.cjs): what the frames redraw, restyled in place or by the hand-written components — last.
+  body = require("./phone-4a.cjs").sales(name, body);
   // Text with an apostrophe ("doesn't") renders as written; lint is told so on that file only.
   const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
   const usesFragment = body.includes("<Fragment");
@@ -257,7 +263,7 @@ ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the de
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in
 // ./vm/${vmFile}.ts. To change the look, change the design and regenerate.
-${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<ChatComposer") ? 'import ChatComposer from "./ChatComposer";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
+${usesFragment ? 'import { Fragment } from "react";\n' : ""}${usesH ? 'import H from "../crm.module.css";\n' : ""}${body.includes("<ChatComposer") ? 'import ChatComposer from "./ChatComposer";\n' : ""}${body.includes("<PickEditor") ? 'import { PickEditor } from "../shared/pick-editor";\n' : ""}${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}${body.includes("<MediaAlbum") ? 'import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";\n' : ""}${require("./phone-4a.cjs").IMPORT(body, "../shared/phone4a")}import type { ${vm} } from "./vm/${vmFile}";${extras ? '\nimport type { ShellExtras } from "./vm/header";' : ""}
 
 /** ${doc} */
 export default function ${name}({ v }: { v: ${vm}${extras ? " & ShellExtras" : ""} }) {

@@ -49,10 +49,10 @@ export function channelsVM(ctx: DeskCtx) {
   const setLink = (kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean, done: string) =>
     void ctx.deskAct.setChannel(kind, id, name, linked, isDefault).then(ok => { if (ok) { toast(done); meta.reload(); } });
   const GT: Record<string, [string, string, string, string, string]> = {
-    page: ["Facebook Pages", "Messages from these Pages come into Inbox", "#1877F2", "f", "Link a Page"],
-    wa: ["WhatsApp numbers", "Each number has its own chats and templates", "#25D366", "W", "Add a number"],
-    ig: ["Instagram", "Direct messages come into Inbox", "#C13584", "IG", "Link an account"],
-    ads: ["Ads accounts", "Ads Performance and Assignment read from here", "#BD4A19", "Ad", "Link an account"],
+    page: ["Facebook Pages", "Messages from these Pages come into Inbox", "var(--crm-messenger)", "f", "Link a Page"],
+    wa: ["WhatsApp numbers", "Each number has its own chats and templates", "var(--crm-whatsapp)", "W", "Add a number"],
+    ig: ["Instagram", "Direct messages come into Inbox", "var(--crm-brand-instagram)", "IG", "Link an account"],
+    ads: ["Ads accounts", "Ads Performance and Assignment read from here", "var(--crm-rust)", "Ad", "Link an account"],
   };
   type Row = { id: string; name: string; sub: string; on: boolean };
   const rowsOf: Record<string, Row[]> = {
@@ -63,8 +63,8 @@ export function channelsVM(ctx: DeskCtx) {
   const defs: Record<string, string | null> = { page: pageDef, wa: waDef, ig: null, ads: null };
   const chGroups = Object.entries(GT).map(([k, [title, desc, c, ini, addL]]) => ({ title, desc, c, ini, addL, n: `${rowsOf[k].filter(x => x.on).length} linked`,
     add: () => { if (can) patch({ chDlg: { kind: "link", id: k } }); },
-    rows: rowsOf[k].map((x, i) => ({ ...x, id: spaced(x.id), def: x.on && defs[k] === x.id, off: !x.on, notDef: x.on && defs[k] !== x.id, stL: x.on ? "Linked" : "Unlinked", stC: x.on ? "#387557" : "#A08E82",
-      bt: i ? "1px solid #F5EEE8" : "0", op: x.on ? 1 : 0.55,
+    rows: rowsOf[k].map((x, i) => ({ ...x, id: spaced(x.id), def: x.on && defs[k] === x.id, off: !x.on, notDef: x.on && defs[k] !== x.id, stL: x.on ? "Linked" : "Unlinked", stC: x.on ? "var(--crm-brown)" : "var(--crm-faint)",
+      bt: i ? "1px solid var(--crm-field)" : "0", op: x.on ? 1 : 0.55,
       setDef: () => { if (can && (k === "page" || k === "wa")) setLink(k, x.id, x.name, true, true, `${x.name} is the default`); },
       unlink: () => { if (can) patch({ chDlg: { kind: "unlink", id: `${k}:${x.id}` } }); },
       relink: () => { if (can && (k === "page" || k === "wa")) setLink(k, x.id, x.name, true, false, `${x.name} linked again`); } })) }));
@@ -75,8 +75,8 @@ export function channelsVM(ctx: DeskCtx) {
     ig: "Instagram messages stop coming into Inbox. Chats you already have stay.", ads: "Ads Performance and Assignment stop reading this account." };
   // One shape for every dialog the design draws (Add a number's two steps and Link's picker are Meta's now: never shown).
   const NODLG = { isUnlink: false, isLink1: false, isLink2: false, isWa1: false, isWa2: false, title: "", body: "", confirm: () => {}, next: () => {},
-    cands: [] as { n: string; sub: string; bd: string; chk: string; bg: string; toggle: () => void }[], linkBg: "#E2CFC1", num: "", setNum: () => {},
-    vias: [] as { v: string; bg: string; fg: string; sh: string; pick: () => void }[], nextBg: "#E2CFC1", sentTo: "", code: "", setCode: () => {}, resend: () => {} };
+    cands: [] as { n: string; sub: string; bd: string; chk: string; bg: string; toggle: () => void }[], linkBg: "var(--crm-line)", num: "", setNum: () => {},
+    vias: [] as { v: string; bg: string; fg: string; sh: string; pick: () => void }[], nextBg: "var(--crm-line)", sentTo: "", code: "", setCode: () => {}, resend: () => {} };
   const chDlg = !dlg ? NODLG : dlg.kind === "unlink" ? (() => { const [k, id] = dlg.id.split(":"); const x = rowsOf[k]?.find(r => r.id === id);
     return { ...NODLG, isUnlink: true, title: `Unlink ${x?.name ?? "this"}?`, body: UNLINK[k] ?? "",
       confirm: () => { patch({ chDlg: null }); if (x && (k === "page" || k === "wa")) setLink(k, x.id, x.name, false, false, `${x.name} unlinked`); } }; })()
@@ -85,10 +85,10 @@ export function channelsVM(ctx: DeskCtx) {
   // Facebook Page.
   const field = (k: string, label: string, d: string, opt: { max?: number; long?: boolean; ph?: string } = {}) => { const val = g(k, d);
     return { k, label, val, ph: opt.ph ?? "", max: opt.max ?? 0, count: opt.max ? `${val.length} / ${opt.max}` : "", long: !!opt.long, short: !opt.long, over: !!opt.max && val.length > opt.max,
-      cc: opt.max && val.length > opt.max ? "#B3261E" : "#A08E82", set: (e: { target: { value: string } }) => put(k, e.target.value), ro: !can }; };
+      cc: opt.max && val.length > opt.max ? "var(--crm-oxblood)" : "var(--crm-faint)", set: (e: { target: { value: string } }) => put(k, e.target.value), ro: !can }; };
   const hours0 = parseHours(page?.hours ?? null);
   const hours = DAYS.map((d, i) => { const v0 = g<{ open: boolean; from: string; to: string }>(`h${i}`, hours0[i]);
-    return { d, open: v0.open, closed: !v0.open, from: v0.from, to: v0.to, trk: v0.open ? "#387557" : "#E2D6CC", knob: v0.open ? "18px" : "2px",
+    return { d, open: v0.open, closed: !v0.open, from: v0.from, to: v0.to, trk: v0.open ? "var(--crm-brown)" : "var(--crm-rule)", knob: v0.open ? "18px" : "2px",
       toggle: () => { if (can) put(`h${i}`, { ...v0, open: !v0.open }); }, setFrom: (e: { target: { value: string } }) => put(`h${i}`, { ...v0, from: e.target.value }), setTo: (e: { target: { value: string } }) => put(`h${i}`, { ...v0, to: e.target.value }) }; });
   // Messenger.
   const msgr = page?.msgr;
@@ -101,11 +101,11 @@ export function channelsVM(ctx: DeskCtx) {
   const prof = wn?.profile;
   const wk = (k: string) => `wa:${wn?.id ?? ""}:${k}`;
   const wf = (k: string, label: string, d: string, max: number, opt: { long?: boolean; ph?: string } = {}) => { const val = g(wk(k), d);
-    return { label, opt: true, val, ph: opt.ph ?? "", count: `${val.length}/${max}`, cc: val.length > max ? "#B3261E" : "#A08E82", long: !!opt.long, short: !opt.long, set: (e: { target: { value: string } }) => put(wk(k), e.target.value) }; };
+    return { label, opt: true, val, ph: opt.ph ?? "", count: `${val.length}/${max}`, cc: val.length > max ? "var(--crm-oxblood)" : "var(--crm-faint)", long: !!opt.long, short: !opt.long, set: (e: { target: { value: string } }) => put(wk(k), e.target.value) }; };
   const vertical = g(wk("vertical"), prof?.vertical || "OTHER");
   const nameSt = (wn?.nameStatus ?? "").toUpperCase();
   const dnSt = nameSt === "APPROVED" || nameSt === "AVAILABLE_WITHOUT_REVIEW" ? "Approved" : nameSt.includes("PENDING") ? "In review" : nameSt === "DECLINED" || nameSt === "REJECTED" ? "Rejected" : nameSt ? "In review" : "Approved";
-  const DNC: Record<string, [string, string]> = { Approved: ["#E8F3ED", "#387557"], "In review": ["#FFF0CC", "#A46312"], Rejected: ["#F8E1D8", "#A3371A"] };
+  const DNC: Record<string, [string, string]> = { Approved: ["var(--crm-tint-follow)", "var(--crm-brown)"], "In review": ["var(--crm-tint-appt)", "var(--crm-brown)"], Rejected: ["var(--crm-tint-attention)", "var(--crm-oxblood)"] };
   // Insights: what the CRM itself knows of this number's last 30 days (Meta gives quality and the limit).
   const since = now.getTime() - 30 * 86_400_000;
   // (The CRM does not keep which of our numbers a chat came to, so these are every WhatsApp chat's.)
@@ -119,12 +119,12 @@ export function channelsVM(ctx: DeskCtx) {
   const linkMsg = g(wk("lmsg"), "Hi, I would like to book a showroom visit.");
   const waLink = wn ? `https://wa.me/${wn.number.replace(/\D/g, "")}` : "";
   // Templates.
-  const STC: Record<string, [string, string]> = { Approved: ["#E8F3ED", "#387557"], Pending: ["#FFF0CC", "#A46312"], Rejected: ["#F8E1D8", "#A3371A"] };
+  const STC: Record<string, [string, string]> = { Approved: ["var(--crm-tint-follow)", "var(--crm-brown)"], Pending: ["var(--crm-tint-appt)", "var(--crm-brown)"], Rejected: ["var(--crm-tint-attention)", "var(--crm-oxblood)"] };
   const stWord = (s: string) => (s === "APPROVED" ? "Approved" : s === "REJECTED" || s === "DISABLED" ? "Rejected" : "Pending");
   const nt = ui.chNew;
   // The ads (the CRM's, Meta's figures need ads_management).
   const ads = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))].map(id => { const cs = data.customers.filter(c => c.adId === id);
-    return { name: cs[0]?.ad ?? id, ch: cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", spend: "RM —", leads: cs.length, on: true, trk: "#E2D6CC", knob: "2px", stL: "—", stC: "#806B60", budget: "",
+    return { name: cs[0]?.ad ?? id, ch: cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", spend: "RM —", leads: cs.length, on: true, trk: "var(--crm-rule)", knob: "2px", stL: "—", stC: "var(--crm-muted)", budget: "",
       toggle: () => { toast("Pausing an ad needs Meta's ads_management approval — opened Ads Manager"); open(ADS_MANAGER); }, setBudget: () => toast("Budgets are changed in Ads Manager until Meta approves ads_management") }; });
 
   const save = () => {
@@ -145,23 +145,23 @@ export function channelsVM(ctx: DeskCtx) {
   };
   return {
     kCh: ui.tab === "channels",
-    chTabs: TABS.map(([k, label]) => ({ label, on: k === tab, off: k !== tab, dot: ui.chDirty[k] ? "#A46312" : "transparent", pick: () => patch({ chTab: k, chNew: null, chNewOpen: false }) })),
+    chTabs: TABS.map(([k, label]) => ({ label, on: k === tab, off: k !== tab, dot: ui.chDirty[k] ? "var(--crm-brown)" : "transparent", pick: () => patch({ chTab: k, chNew: null, chNewOpen: false }) })),
     chCan: can, chRo: !can,
     // The banner: Meta's state first (read, or why not), then read-only — the states the design did not draw.
     chNote: meta.error && !M ? `Could not read Meta: ${meta.error}. Try again from Refresh.` : meta.loading && !M ? "Reading Channels from Meta…" : !can ? "Only Principal and Director can change these. You can look." : "", chConn: tab === "conn", chPage: tab === "page", chMsgr: tab === "msgr", chWa: tab === "wa", chTpl: tab === "tpl", chAds: tab === "ads", chHasSave: tab !== "conn" && tab !== "tpl",
-    chDirtyNow: dirty, chSave: save, chSaveBg: dirty && can ? "#BD4A19" : "#E2CFC1",
+    chDirtyNow: dirty, chSave: save, chSaveBg: dirty && can ? "var(--crm-rust)" : "var(--crm-line)",
     chDiscard: () => set(u => ({ ...u, chDraft: Object.fromEntries(Object.entries(u.chDraft).filter(([k]) => !keysOf(u.chTab, k))), chDirty: { ...u.chDirty, [u.chTab]: false } })),
     chGroups, chDlgOpen: !!dlg, chDlg, chDlgClose: () => patch({ chDlg: null }),
     chRefresh: () => { meta.reload(); toast("Channels read again from Meta"); },
     chTestHook: () => { meta.reload(); toast(M?.lastEvent ? `Last event ${ago(M.lastEvent, now)}` : "No event received yet"); },
     chTokenLine: M ? (M.set.token ? "System user token · kept on the server" : "System user token · not set on this server") : meta.loading ? "Reading Meta…" : meta.error || "—",
     chTokenMask: M?.set.token ? "•••••••••••••••• (never shown)" : "—",
-    chHookLine: M?.lastEvent ? `Receiving · last event ${ago(M.lastEvent, now)}` : "No event received yet", chHookC: M?.lastEvent ? "#387557" : "#A08E82",
+    chHookLine: M?.lastEvent ? `Receiving · last event ${ago(M.lastEvent, now)}` : "No event received yet", chHookC: M?.lastEvent ? "var(--crm-brown)" : "var(--crm-faint)",
     chHookUrl: `${meta.origin}/api/{whatsapp,messenger}/v1/webhook`,
     chReconnect: () => open(META_SUITE), chOpenPage: () => open(page ? `https://www.facebook.com/${page.id}` : META_SUITE), chOpenWaManager: () => open(WA_MANAGER),
     chPerms: ([["Manage the Page", "pages_manage_metadata"], ["Send and read messages", "pages_messaging"], ["WhatsApp profile and templates", "whatsapp_business_management"], ["Pause ads and change budgets", "ads_management"]] as const)
       .map(([t, code]) => { const st = M?.perms?.find(p => p.permission === code)?.status; const ok = st === "granted";
-        return { t, code, stt: ok ? "Granted" : M?.perms ? "Needs Meta review" : "View in Meta", bg: ok ? "#E8F3ED" : "#FFF0CC", fg: ok ? "#387557" : "#A46312" }; }),
+        return { t, code, stt: ok ? "Granted" : M?.perms ? "Needs Meta review" : "View in Meta", bg: ok ? "var(--crm-tint-follow)" : "var(--crm-tint-appt)", fg: ok ? "var(--crm-brown)" : "var(--crm-brown)" }; }),
     chPageF: [field("pAbout", "About", page?.about ?? "", { max: 255, long: true }), field("pPhone", "Phone", page?.phone ?? ""), field("pWeb", "Website", page?.website ?? ""), field("pMail", "Email", page?.email ?? "")],
     chHours: hours, chPageName: page?.name ?? "Your Page", chPageIni: (page?.name ?? "H").trim().charAt(0).toUpperCase(),
     chGreetHint: "Shown before someone sends the first message. {{user_first_name}} becomes their first name.",
@@ -171,7 +171,7 @@ export function channelsVM(ctx: DeskCtx) {
     chMenu: menu.map((m, i) => ({ l: m.title, t: m.type, set: (e: { target: { value: string } }) => { const a = menu.map(x => ({ ...x })); a[i].title = e.target.value; put("menu", a); }, remove: () => { if (can) put("menu", menu.filter((_, j) => j !== i)); } })),
     chMenuAdd: () => { if (can && menu.length < 5) put("menu", [...menu, { title: "", type: "Reply" }]); },
     // WhatsApp.
-    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "#FFF5EC" : "#fff", bd: n.id === wn?.id ? "#BD4A19" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
+    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-cream)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
     waCount: live.length, waAdd: () => { if (can) { open(WA_MANAGER); toast("Opened WhatsApp Manager — add the number there, then Refresh here"); } },
     wn: { name: wn?.number ?? "—", disp: wn?.verifiedName || "—", id: wn?.id ?? "", cat: WA_VERTICALS.find(v => v[0] === vertical)?.[1] ?? "Other" }, waIni: (wn?.verifiedName || "W").charAt(0).toUpperCase(),
     waSubs: ([["insights", "Insights"], ["prof", "Profile"], ["auto", "Automations"], ["links", "Message links"], ["calls", "Call settings"], ["log", "Call log"]] as const)
@@ -180,7 +180,7 @@ export function channelsVM(ctx: DeskCtx) {
     // A display name is changed through Meta's review in WhatsApp Manager.
     waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: false, notEditing: true, edit: () => { if (can) open(WA_MANAGER); }, draft: wn?.verifiedName ?? "", setDraft: () => {}, cancel: () => {}, submit: () => {} },
     waCatOpen: ui.chDlg?.kind === "cat", waCatToggle: () => { if (can) patch({ chDlg: ui.chDlg?.kind === "cat" ? null : { kind: "cat", id: "" } }); },
-    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "#FFF5EC" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
+    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-cream)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
     waF: [wf("desc", "Description", prof?.description ?? "", 512, { long: true }), wf("addr", "Address", prof?.address ?? "", 256, { ph: "Business address" }), wf("mail", "Email", prof?.email ?? "", 128, { ph: "Business email" })],
     waWeb: [wf("web1", "Website", prof?.websites[0] ?? "", 256, { ph: "https://www.example.com" }), wf("web2", "", prof?.websites[1] ?? "", 256, { ph: "https://www.example.com" })],
     waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) open(META_SUITE); },
@@ -190,19 +190,47 @@ export function channelsVM(ctx: DeskCtx) {
       ["Messaging limit", limitWords(wn?.limit ?? "")], ["Blocked by customers", "View in Meta"]].map(([k, v]) => ({ k, v })),
     waAutoRows: ([["Welcome message", "Sent when someone messages for the first time", autoOn(wk("aw"), !!auto?.welcome), "aw"], ["Conversation starters", "Up to 4 questions people can tap", autoOn(wk("as"), !!auto?.prompts.length), "as"],
       ["Commands", "Shortcuts like /visit or /price", autoOn(wk("ac"), !!auto?.commands.length), "ac"]] as const)
-      .map(([t, sub, on, k]) => ({ t, sub, trk: on ? "#387557" : "#E2D6CC", knob: on ? "18px" : "2px", toggle: () => { if (can) put(wk(k), !on); } })),
+      .map(([t, sub, on, k]) => ({ t, sub, trk: on ? "var(--crm-brown)" : "var(--crm-rule)", knob: on ? "18px" : "2px", toggle: () => { if (can) put(wk(k), !on); } })),
     waLink, waLinkMsg: linkMsg, setWaLinkMsg: (e: { target: { value: string } }) => set(u => ({ ...u, chDraft: { ...u.chDraft, [wk("lmsg")]: e.target.value } })),
     waCopy: () => { void navigator.clipboard?.writeText(`${waLink}?text=${encodeURIComponent(linkMsg)}`).catch(() => {}); toast("Link copied"); },
     waCallRows: [["Allow voice calls", "Customers can call this number from WhatsApp"], ["Show call button", "A call icon in the chat header"]]
-      .map(([t, sub]) => ({ t, sub, trk: "#E2D6CC", knob: "2px", toggle: () => { open(WA_MANAGER); toast("Calls are set in WhatsApp Manager"); } })),
-    waCallLog: [{ n: "Call history", t: "Kept by WhatsApp — View in WhatsApp Manager", at: "", c: "#806B60" }],
+      .map(([t, sub]) => ({ t, sub, trk: "var(--crm-rule)", knob: "2px", toggle: () => { open(WA_MANAGER); toast("Calls are set in WhatsApp Manager"); } })),
+    waCallLog: [{ n: "Call history", t: "Kept by WhatsApp — View in WhatsApp Manager", at: "", c: "var(--crm-muted)" }],
     // Templates (WhatsApp's own list).
     chTplHint: "Message · use {{1}}, {{2}} for the customer's name, date…", chTplPh: "Hi {{1}}, your showroom visit is on {{2}}. See you there!",
+    // 4a's Connections (frame 09, the owner's choice 2026-10-18): grouped by phone number — each WhatsApp number with the
+    // Facebook Page whose listed phone is that number (Meta's own Page field; nothing new is stored), a Page listing none
+    // in a "No number" card — and the message templates beside them. Meta gives no expiry, so only Connected / Not linked.
+    ch4: (() => {
+      const digits = (s: string) => s.replace(/\D/g, "").replace(/^0+/, "");
+      const same = (a: string, b: string) => { const x = digits(a), y = digits(b); return !!x && !!y && (x.endsWith(y.slice(-8)) || y.endsWith(x.slice(-8))); };
+      const used = new Set<string>();
+      const pageRow = (p: (typeof pages)[number]) => ({ id: p.id, title: `Facebook · ${p.name}`, sub: `Messenger · Page ${p.id.length > 8 ? `${p.id.slice(0, 4)}…${p.id.slice(-4)}` : p.id}`, linked: p.on,
+        act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link" });
+      const cards = nums.map(n => {
+        // The Page whose listed phone is this number, else (it lists none, or another) the Page named as the number's
+        // verified business (the owner, 2026-10-18: "channel 一直保持这样" — Dream Crafter Design's Page lists no number,
+        // so it sat under No number beside its own WhatsApp).
+        const nm = (x: string) => x.trim().toLowerCase();
+        const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number))
+          ?? (n.verifiedName ? pages.find(p => !used.has(p.id) && nm(p.name) === nm(n.verifiedName!)) : undefined);
+        if (pg) used.add(pg.id);
+        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chTab: "wa" }),
+          wa: { title: "WhatsApp Business", sub: `${n.verifiedName ? "Verified · " : ""}message quality ${qualityWords(n.quality)}`, linked: n.on,
+            act: n.on ? () => patch({ chTab: "wa" }) : () => setLink("wa", n.id, n.number, true, false, `${n.number} linked · its chats come into Inbox`), actLabel: n.on ? "Manage" : "Link" },
+          page: pg ? pageRow(pg) : { id: "", title: "Facebook Page", sub: "Link a Page to receive its Messenger chats here", linked: false, act: () => open(META_SUITE), actLabel: "Link" } };
+      });
+      const loose = pages.filter(p => !used.has(p.id)).map(pageRow);
+      return { cards, loose, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
+        tpls: (M?.templates ?? []).map(t => { const st = stWord(t.status), mine = data.templates?.find(x => x.metaName === t.name);
+          return { name: t.name, body: mine?.body ?? "", cat: t.category.charAt(0) + t.category.slice(1).toLowerCase(), lang: LANG_WORDS[t.language] ?? t.language, st,
+            dot: st === "Approved" ? "var(--crm-brown)" : st === "Pending" ? "var(--crm-amber)" : "var(--crm-orange)", fg: st === "Rejected" ? "var(--crm-oxblood)" : "var(--crm-ink)" }; }) };
+    })(),
     chTpls: (M?.templates ?? []).map(t => { const st = stWord(t.status); return { n: t.name, c: t.category.charAt(0) + t.category.slice(1).toLowerCase(), l: LANG_WORDS[t.language] ?? t.language, stt: st, at: "—", bg: STC[st][0], fg: STC[st][1] }; }),
     chNewOpen: !!nt, chNewToggle: () => { if (can) patch({ chNew: nt ? null : { name: "", cat: "Marketing", lang: "English", body: "" } }); },
     chNewF: nt ? { name: nt.name, body: nt.body,
-      cats: ["Marketing", "Utility"].map(c => ({ c, on: c === nt.cat, bg: c === nt.cat ? "#fff" : "transparent", fg: c === nt.cat ? "#3F2B22" : "#806B60", sh: c === nt.cat ? "0 1px 2px rgba(63,43,34,.12)" : "none", pick: () => patch({ chNew: { ...nt, cat: c } }) })),
-      langs: ["English", "Bahasa Melayu", "Chinese"].map(c => ({ c, bg: c === nt.lang ? "#fff" : "transparent", fg: c === nt.lang ? "#3F2B22" : "#806B60", sh: c === nt.lang ? "0 1px 2px rgba(63,43,34,.12)" : "none", pick: () => patch({ chNew: { ...nt, lang: c } }) })),
+      cats: ["Marketing", "Utility"].map(c => ({ c, on: c === nt.cat, bg: c === nt.cat ? "#fff" : "transparent", fg: c === nt.cat ? "var(--crm-ink)" : "var(--crm-muted)", sh: c === nt.cat ? "0 1px 2px rgba(42,22,12,.12)" : "none", pick: () => patch({ chNew: { ...nt, cat: c } }) })),
+      langs: ["English", "Bahasa Melayu", "Chinese"].map(c => ({ c, bg: c === nt.lang ? "#fff" : "transparent", fg: c === nt.lang ? "var(--crm-ink)" : "var(--crm-muted)", sh: c === nt.lang ? "0 1px 2px rgba(42,22,12,.12)" : "none", pick: () => patch({ chNew: { ...nt, lang: c } }) })),
       setName: (e: { target: { value: string } }) => patch({ chNew: { ...nt, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") } }),
       setBody: (e: { target: { value: string } }) => patch({ chNew: { ...nt, body: e.target.value } }),
       submit: () => { if (!nt.name || !nt.body) return; void ctx.deskAct.saveMeta({ kind: "template", template: { name: nt.name, category: nt.cat, language: nt.lang, body: nt.body } })

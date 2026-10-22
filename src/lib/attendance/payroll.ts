@@ -1,6 +1,6 @@
-import { indexMonth, monthGrid, policyOn, toMin, type Ctx, type DayInfo, type OtHours } from './engine'
+import { indexMonth, monthGrid, policyOn, toMin, type Ctx, type DayInfo, type MonthIndex, type OtHours } from './engine'
 import { otRates } from './settings'
-import type { AttRequest, AttSchedule, OtEligibility } from './types'
+import type { AttRequest, AttSchedule, OtEligibility, ScheduleDay } from './types'
 import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/lib/payroll-period'
 
 /**
@@ -17,8 +17,17 @@ import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/l
  *   names — basic, or basic + the row's fixed (statutory) allowance.
  * - A full day's hours: the person's schedule's longest work day, 8 without
  *   one (the user: "时薪的小时数用那个人班表的一天工时，没有班表就用 8 小时").
+ * - The hours a line pays (2026-10-17 — the user, shown that Me's OT sheet
+ *   said one thing and payroll paid another: "我要跟着表格的pay"): the smaller
+ *   of the hours approved and the hours punched — past the schedule's end on a
+ *   work day (18:00 without one), IN to OUT on any other day — rounded down to
+ *   30 minutes. Fixed hours (No clock-in) have no punches to hold them to: the
+ *   approved hours stand.
  * - A line = its hours × HRP × its day type's multiplier, to the sen; HRP is
- *   kept to 4 decimals, so a line can be worked again from what is stored.
+ *   kept to 4 decimals, so a line can be worked again from what is stored. A
+ *   rest day pays as the Act and the sheet say: up to half a full day's hours,
+ *   half a day's ORP; up to a full day, one day's ORP; each hour beyond at the
+ *   rest-day multiplier.
  * - Unpaid days: days on an unpaid leave type, and absent / incomplete days
  *   Month close decided Unpaid. The payroll's own trigger takes them off the
  *   basic (× the days left ÷ the month's days) and works out the rest.
@@ -32,7 +41,6 @@ import { seedPayrollRows, type PayrollSeedRow, type PayrollSeedStaff } from '@/l
  */
 
 export type OtDayType = 'work' | 'off' | 'rest' | 'ph'
-const OT_DAY_TYPES: ReadonlySet<string> = new Set<OtDayType>(['work', 'off', 'rest', 'ph'])
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 const round4 = (n: number) => Math.round((n + Number.EPSILON) * 10000) / 10000
@@ -47,40 +55,49 @@ export function hoursADay(schedule: AttSchedule | null | undefined): number {
   return most > 0 ? most : 8
 }
 
-/** The rate an OT line is paid at: the day type on the request (HR picks it), else what the day is. */
-export function otDayType(r: Pick<AttRequest, 'detail'>, info: Pick<DayInfo, 'code' | 'sday'>): OtDayType {
-  const picked = typeof r.detail?.dayType === 'string' ? r.detail.dayType : ''
-  if (OT_DAY_TYPES.has(picked)) return picked as OtDayType
+/**
+ * The rate an OT line is paid at: what the day is on the person's schedule — a holiday that covers them a public
+ * holiday, a company holiday an off day, a whole day HR made a work day (`WD`) a work day, else the schedule's row.
+ * Never the weekday, never a pick on the request: no schedule, no rest day (2026-10-17, the user: "系统不可以默认哪一天
+ * 是休息日 … 如果今天我星期一到星期日全部放 work 的话，其实 by right 它就是没有休息日 … everythings go with this schedule").
+ */
+export function otDayType(info: Pick<DayInfo, 'code' | 'sday'>, override?: string | null): OtDayType {
   if (info.code === 'H') return 'ph'
   if (info.code === 'CH' || info.code === 'SO') return 'off'
+  if (override === 'WD') return 'work'
   if (info.sday?.type === 'rest') return 'rest'
   if (info.sday?.type === 'off') return 'off'
   return 'work'
 }
 
-/** One approved OT request, before it is priced. */
-export interface OtFact {
-  ref: string
-  day: string
-  hours: number
-  dayType: OtDayType
-  multiplier: number
-  hoursADay: number
-  base: 'basic' | 'fixed'
-  /** Who clocks › OT on that day is not "none". */
-  paid: boolean
-  /** Who clocks › OT on that day. */
-  eligibility: OtEligibility | null
-  /** The policy's wage line that day (Settings › Policy). */
-  wageCap: number | null
+// ── The hours a line pays: approved, held to the punches ────────────────────
+
+/** Where a work day's overtime starts: the schedule's end that day, 18:00 without one. */
+export const otEnd = (sday: ScheduleDay | null | undefined): string => (sday?.type === 'work' && sday.end ? sday.end : '18:00')
+
+/**
+ * A day's first IN and last OUT — HR's correction wins, as in the engine — whatever kind of day it is: the engine
+ * keeps the times only for a day it counts as worked, but a rest day's overtime is worked from its punches.
+ */
+export function clockOf(staffId: string, day: string, idx: MonthIndex): { in: string | null; out: string | null } {
+  const mark = idx.marks.get(idx.key(staffId, day))
+  if (mark) return { in: mark.in, out: mark.out }
+  const ps = idx.punches.get(idx.key(staffId, day)) ?? []
+  const ins = ps.filter(p => p.dir === 'in')
+  const outs = ps.filter(p => p.dir === 'out')
+  return { in: ins[0]?.time ?? null, out: outs[outs.length - 1]?.time ?? null }
 }
 
-/** A person of a closed month, as payroll will hear it. */
-export interface AttendanceFact {
-  staffId: string
-  name: string
-  ot: OtFact[]
-  unpaidDates: string[]
+/**
+ * The minutes the punches make overtime: on a work day, the OUT past the schedule's end; on any other day, IN to
+ * OUT. No OUT, nothing. An OUT before the IN is after midnight (the work day turns at the policy's cutover).
+ */
+export function punchedOtMin(dayType: OtDayType, clock: { in: string | null; out: string | null }, sday: ScheduleDay | null | undefined): number {
+  if (!clock.out) return 0
+  const inMin = clock.in ? toMin(clock.in) : null
+  const outMin = toMin(clock.out) + (inMin !== null && toMin(clock.out) < inMin ? 24 * 60 : 0)
+  if (dayType === 'work') return Math.max(0, outMin - toMin(otEnd(sday)))
+  return inMin === null ? 0 : outMin - inMin
 }
 
 /** Each counted person's approved OT requests of the month, oldest first, each with what its day is. */
@@ -103,15 +120,93 @@ function approvedOt(ctx: Ctx, requests: readonly AttRequest[]) {
   }
 }
 
-/** The register's overtime columns: approved hours on work and off days, on rest days, on public holidays. */
+/** One approved OT request of the month, and the hours it pays. */
+export interface OtPlan {
+  r: AttRequest
+  day: string
+  info: DayInfo
+  dayType: OtDayType
+  /** The hours approved. */
+  approved: number
+  /** What the punches make overtime that day, in minutes; null for fixed hours, who do not punch. */
+  punchedMin: number | null
+  /** The hours paid: the smaller of approved and punched, rounded down to 30 minutes (a day's punches cover its requests oldest first). */
+  hours: number
+  /** Hours paid on earlier lines of the same day and rate — where a rest day's half / whole day picks up. */
+  earlier: number
+}
+
+/** Each counted person's approved OT of the month, oldest first, with what each line pays. */
+export function otPlansOf(ctx: Ctx, requests: readonly AttRequest[]) {
+  const idx = indexMonth(ctx.month)
+  const { g, rows } = approvedOt(ctx, requests)
+  return {
+    g,
+    rows: rows.map(({ person, cells, ot }) => {
+      const left = new Map<string, number>()
+      const punched = new Map<string, number | null>()
+      const earlier = new Map<string, number>()
+      const plans = ot.map(({ r, day, info }): OtPlan => {
+        const dayType = otDayType(info, idx.overrides.get(day)?.code)
+        const approved = Number(r.hours)
+        if (!left.has(day)) {
+          const asked = ot.filter(o => o.day === day).reduce((a, o) => a + Math.round(Number(o.r.hours) * 60), 0)
+          const p = info.assignment?.mode === 'no_clock' ? null : punchedOtMin(dayType, clockOf(person.id, day, idx), info.sday)
+          punched.set(day, p)
+          left.set(day, Math.floor(Math.min(asked, p ?? asked) / 30) * 30)
+        }
+        const min = Math.min(Math.round(approved * 60), left.get(day) ?? 0)
+        left.set(day, (left.get(day) ?? 0) - min)
+        const k = `${day}|${dayType}`
+        const before = earlier.get(k) ?? 0
+        earlier.set(k, before + min / 60)
+        return { r, day, info, dayType, approved, punchedMin: punched.get(day) ?? null, hours: min / 60, earlier: before }
+      })
+      return { person, cells, plans }
+    }),
+  }
+}
+
+/** One approved OT request, before it is priced. */
+export interface OtFact {
+  ref: string
+  day: string
+  /** The hours paid: the smaller of approved and punched, rounded down to 30 minutes (2026-10-17). */
+  hours: number
+  /** The hours approved. */
+  approved: number
+  /** What the punches make overtime that day, in minutes; null for fixed hours. */
+  punchedMin: number | null
+  /** Hours paid on earlier lines of the same day and rate. */
+  earlier: number
+  dayType: OtDayType
+  multiplier: number
+  hoursADay: number
+  base: 'basic' | 'fixed'
+  /** Who clocks › OT on that day is not "none". */
+  paid: boolean
+  /** Who clocks › OT on that day. */
+  eligibility: OtEligibility | null
+  /** The policy's wage line that day (Settings › Policy). */
+  wageCap: number | null
+}
+
+/** A person of a closed month, as payroll will hear it. */
+export interface AttendanceFact {
+  staffId: string
+  name: string
+  ot: OtFact[]
+  unpaidDates: string[]
+}
+
+/** The register's overtime columns: the hours paid on work and off days, on rest days, on public holidays. */
 export function otHoursOf(ctx: Ctx, requests: readonly AttRequest[]): Map<string, OtHours> {
   const out = new Map<string, OtHours>()
-  for (const { person, ot } of approvedOt(ctx, requests).rows) {
+  for (const { person, plans } of otPlansOf(ctx, requests).rows) {
     const h: OtHours = { ot: 0, rest: 0, ph: 0 }
-    for (const { r, info } of ot) {
-      const t = otDayType(r, info)
-      const k = t === 'rest' ? 'rest' : t === 'ph' ? 'ph' : 'ot'
-      h[k] = round2(h[k] + Number(r.hours))
+    for (const p of plans) {
+      const k = p.dayType === 'rest' ? 'rest' : p.dayType === 'ph' ? 'ph' : 'ot'
+      h[k] = round2(h[k] + p.hours)
     }
     out.set(person.id, h)
   }
@@ -121,10 +216,10 @@ export function otHoursOf(ctx: Ctx, requests: readonly AttRequest[]): Map<string
 /** The month's facts for every person it counts (the register's people). Throws when an OT day type has no rate. */
 export function attendanceFacts(ctx: Ctx, requests: readonly AttRequest[]): AttendanceFact[] {
   const idx = indexMonth(ctx.month)
-  const { g, rows } = approvedOt(ctx, requests)
+  const { g, rows } = otPlansOf(ctx, requests)
   const unpaidCodes = new Set(ctx.config.leaveTypes.filter(t => t.unpaid).map(t => t.code))
   const multiplierOf = new Map(ctx.config.otRates.map(r => [r.dayType, r.multiplier]))
-  return rows.map(({ person, cells, ot }) => {
+  return rows.map(({ person, cells, plans }) => {
     const unpaidDates = g.days.filter((day, i) => {
       const code = cells[i].code
       if (unpaidCodes.has(code)) return true
@@ -134,14 +229,16 @@ export function attendanceFacts(ctx: Ctx, requests: readonly AttRequest[]): Atte
       staffId: person.id,
       name: person.name,
       unpaidDates,
-      ot: ot.map(({ r, day, info }): OtFact => {
-        const dayType = otDayType(r, info)
+      ot: plans.map(({ r, day, info, dayType, approved, punchedMin, hours, earlier }): OtFact => {
         const multiplier = multiplierOf.get(dayType)
         if (multiplier == null) throw new Error(`Settings › OT rules has no rate for ${dayType} days.`)
         return {
           ref: r.ref,
           day,
-          hours: Number(r.hours),
+          hours,
+          approved,
+          punchedMin,
+          earlier,
           dayType,
           multiplier,
           hoursADay: hoursADay(info.schedule),
@@ -185,14 +282,30 @@ export interface AttendancePay {
   lines: OtLine[]
 }
 
+/**
+ * A rest day's pay for its hours (Employment Act s.60(3), as Me's sheet says): up to half a full day's hours, half a
+ * day's ORP; up to a full day, one day's ORP; each hour beyond at the rest-day multiplier.
+ */
+export function restDayPay(hours: number, hoursADay: number, orp: number, hrp: number, multiplier: number): number {
+  if (hours <= 0) return 0
+  if (hours <= hoursADay / 2) return orp / 2
+  if (hours <= hoursADay) return orp
+  return orp + (hours - hoursADay) * hrp * multiplier
+}
+
 /** A person's facts, priced on a row's salary. */
 export function priceFact(month: string, closedAt: string, fact: AttendanceFact, salary: PaySalary): AttendancePay {
   const lines = fact.ot.map((o): OtLine => {
     const base = salary.basic + (o.base === 'fixed' ? salary.statutoryAllowance : 0)
     const { orp, hrp } = otRates(base, o.hoursADay)
+    const orp4 = round4(orp)
     const hrp4 = round4(hrp)
     const unpaid = !o.paid ? 'none' : overWageLine(o, salary) ? 'over_line' : null
-    return { ...o, paid: !unpaid, unpaid, orp: round4(orp), hrp: hrp4, amount: unpaid ? 0 : round2(o.hours * hrp4 * o.multiplier) }
+    // A rest day's line pays what its hours add to the day's earlier lines.
+    const pay = o.dayType === 'rest'
+      ? restDayPay(o.earlier + o.hours, o.hoursADay, orp4, hrp4, o.multiplier) - restDayPay(o.earlier, o.hoursADay, orp4, hrp4, o.multiplier)
+      : o.hours * hrp4 * o.multiplier
+    return { ...o, paid: !unpaid, unpaid, orp: orp4, hrp: hrp4, amount: unpaid ? 0 : round2(pay) }
   })
   const paid = lines.filter(l => l.paid)
   return {

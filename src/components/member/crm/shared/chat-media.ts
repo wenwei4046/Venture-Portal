@@ -42,6 +42,14 @@ export const INLINE_TIME = { tDisp: "inline-flex", tFloat: "right", tML: "12px",
 
 const visual = (m: Msg) => m.media?.kind === "image" || m.media?.kind === "video";
 
+/**
+ * A video's address that shows its first picture before it plays: an iPhone draws a paused video black until asked for a
+ * moment into it (`#t=0.1`). The phone's own copy too (2026-10-17 — the owner, a video just sent black in the chat on an
+ * iPhone: "all video after send, before press in the video play, is show black view"): a `blob:` address takes the same
+ * moment — it was left out, and what this phone sends shows from its own copy.
+ */
+export const firstFrameSrc = (url: string) => (!url || url.includes("#") ? url : `${url}#t=0.1`);
+
 /** The chat's photos and videos, oldest first: what left / right steps through in the viewer. */
 export function galleryOf(messages: Msg[]): ViewerItem[] {
   return messages.flatMap(m => (m.media && visual(m) ? [{ kind: m.media.kind as "image" | "video", url: m.media.url }] : []));
@@ -87,7 +95,7 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     img: k === "image" ? url : "",
     vid: k === "video" ? url : "",
     // iPhone draws a video's first frame only when asked for a moment into it.
-    vidSrc: k === "video" ? (url.startsWith("blob:") ? url : `${url}#t=0.1`) : "",
+    vidSrc: k === "video" ? firstFrameSrc(url) : "",
     aud: k === "audio" ? url : "",
     file: k === "file" ? url : "",
     mh: k === "image" || k === "video" ? mediaHeight(url) : "",
@@ -116,8 +124,20 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
  * as iMessage's blue): both chats, the salesperson's and the Control panel's. Its time is white, and its ticks are white
  * (delivered), light blue (read) or a pale red (not delivered) — the old blue and grey were lost on the orange.
  */
-export const MINE_BG = "#BD4A19";
+export const MINE_BG = "var(--crm-rust)";
 export const MINE_TIME = "rgba(255,255,255,.82)";
 export function tickColor(status: string | undefined): string {
-  return status === "read" ? "#A6DBFF" : status === "failed" ? "#FFD3C7" : "rgba(255,255,255,.82)";
+  return status === "read" ? "var(--crm-tick-read)" : status === "failed" ? "var(--crm-tint-attention)" : "rgba(255,255,255,.82)";
+}
+
+/**
+ * The mark after your own message's time, in its 16 × 11 box: a small clock while it is sent, a "!" in a circle when it
+ * did not reach the customer, else the two ticks. Not delivered drew the two ticks too, a pale red WhatsApp's "delivered"
+ * white could not be told from on the orange (the owner, 2026-10-17: the Team chat on Android showed two videos WhatsApp
+ * had refused as sent).
+ */
+export function tickPathOf(status: string | undefined): string {
+  return status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1"
+    : status === "failed" ? "M8 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9ZM8 3.2v2.7M8 7.9v.1"
+    : "M1 6l3 3 6-7M7 8.5l.5.5 6-7";
 }

@@ -5,20 +5,18 @@ import { fetchIncomeStatement } from '@/lib/cfo-reports'
 import { deptNameToPoolKey, splitPoolAccrual, type DeptPoolAccrual } from '@/lib/dept-pool-accrual'
 import { extraDeptNameToSegment, primedRegistryRows } from '@/lib/dept-registry'
 import { startRead } from '@/lib/start-read'
-import { ownDepartmentOnly } from '@/lib/surfaces'
+import { readsEveryPool } from '@/lib/surfaces'
 import type { User } from '@/types'
 
 // What Dept Pool reads (2026-10-15, lifted out of its page word for word so the
 // Finance phone app reads the very same): each department's accrual P&L to
 // date, or its cash — balance, in and out to date, the HR costing approved for
 // it and its latest submission — Venture (Office)'s three-way cash, and each
-// department's slice of each bank. Whoever reads only their own department
-// reads only it.
+// department's slice of each bank — for whoever reads every department's pool.
 
 type Client = Awaited<ReturnType<typeof createClient>>
 
-// dept_manager only owns their own dept pool. Skip the multi-dept list and
-// land them straight on their own detail page — same content as clicking View.
+// Each department's own pool page.
 export const DEPT_NAME_TO_SLUG: Record<string, string> = {
   Marketing: 'marketing',
   HR: 'hr',
@@ -38,11 +36,10 @@ export interface HRCostSubmissionRow {
   > | null
 }
 
-// Somebody whose Dept Pool reaches only their own department sees only it
-// (2026-10-09, Q7: by their cell, not the dept_manager kind).
+// Every department's pool is for whoever reads them all (Dept Pool · View at All). The own-department reader
+// (the Dept Manager's) went with the kind (2026-10-17): anybody short of All reads none — never more.
 export function visibleDepartments<D extends { id: string }>(user: User, departments: D[] | null): D[] {
-  const all = departments ?? []
-  return ownDepartmentOnly(user, 'dept_pool') ? all.filter((d) => d.id === user.department_id) : all
+  return readsEveryPool(user) ? departments ?? [] : []
 }
 
 export interface PoolAccrualRead {
@@ -88,7 +85,7 @@ export async function readPoolAccrual(supabase: Client, user: User, period: stri
   // Venture (= Office / corporate) shown as its own row for principal/finance.
   // Its P&L lives in the income statement's venture_pool bucket.
   const ventureAccrual =
-    !ownDepartmentOnly(user, 'dept_pool')
+    readsEveryPool(user)
       ? splitPoolAccrual(poolByKey.get('venture_pool') ?? null)
       : null
 
@@ -158,7 +155,7 @@ export async function readPoolCash(supabase: Client, user: User): Promise<PoolCa
   // were two reads of the same rows), and each journal_lines read starts the
   // moment they are in. null = no active bank has a GL code: nothing to read.
   const bankRowsRead =
-    !ownDepartmentOnly(user, 'dept_pool')
+    readsEveryPool(user)
       ? startRead(
           supabase
             .from('bank_accounts')
@@ -282,7 +279,7 @@ export async function readPoolCash(supabase: Client, user: User): Promise<PoolCa
   // the "Per-bank breakdown" Venture (Office) total therefore include the
   // pseudo-dept overlay.
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
-  if (!ownDepartmentOnly(user, 'dept_pool')) {
+  if (readsEveryPool(user)) {
     // The GL corporate/treasury lines on every active bank's code (item 2),
     // read above beside everything else; null = no bank code, nothing read.
     let vIn = 0
@@ -313,7 +310,7 @@ export async function readPoolCash(supabase: Client, user: User): Promise<PoolCa
   type BankInfo = { code: string; name: string; balance: number }
   type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
   let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
-  if (!ownDepartmentOnly(user, 'dept_pool')) {
+  if (readsEveryPool(user)) {
     const bankRows = await bankRowsRead
     const banks: BankInfo[] = (bankRows ?? [])
       .filter((b) => b.gl_account_code)

@@ -47,9 +47,12 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
   const money = (v: number) => (hidden ? "RM ••••" : rm2(v));
   const signed = (v: number) => (hidden ? "RM ••••" : v < 0 ? `−${rm2(-v)}` : rm2(v));
   const basic = m.basic ?? 0;
+  const pay = m.pay;
   const held = m.bills.filter(b => b.status === "deposit_pending");
-  // A month paid outside the portal keeps no salary here unless payroll did.
-  const rows: IncomeRowVM[] = [m.basic === null && m.state === "manual"
+  const minus = (label: string, sub: string, v: number): IncomeRowVM => ({ label, sub, amt: signed(-v), neg: true });
+  // HR's pay (2026-10-20): the fixed salary is paid OUT OF the commission, so it is no row added on top —
+  // Paid as shows it. Without the pay (a claim-form month payroll kept no row for), as before.
+  const rows: IncomeRowVM[] = pay ? [] : [m.basic === null && m.state === "manual"
     ? { label: "Fixed salary", sub: "Paid outside the portal", amt: "—" }
     : { label: "Fixed salary", sub: m.basic === null ? "Not set" : basic === 0 ? "Commission only" : "Monthly base", amt: money(basic) }];
   rows.push({ label: "Personal sales commission", sub: `${rm(m.countedSales)} counted sales${held.length ? ` · ${plural(held.length, "order")} held` : ""}`, amt: money(m.personal) });
@@ -62,18 +65,40 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
   if (m.switches.incentive || m.incentive !== 0) rows.push({ label: "Margin incentive", sub: incentiveSub(m), amt: money(m.incentive) });
   if (m.switches.group || m.group !== 0) rows.push({ label: "Group incentive", sub: "Your team's group reward", amt: money(m.group) });
   if (m.director !== 0) rows.push({ label: "Director pay", sub: "Fixed amount and incentive", amt: money(m.director) });
+  // The member's other sub-departments: payroll pays their commission in the same row, the salary out of all of it.
+  if (pay && pay.elsewhere !== 0) rows.push(pay.elsewhereFrom.length === 1
+    ? { label: `${pay.elsewhereFrom[0]} commission`, sub: "In the same payroll", amt: signed(pay.elsewhere), neg: pay.elsewhere < 0 }
+    : { label: "Other departments", sub: pay.elsewhereFrom.join(" · ") || "In the same payroll", amt: signed(pay.elsewhere), neg: pay.elsewhere < 0 });
+  if (pay && pay.adjustment !== 0) rows.push({ label: "Payroll adjustment", sub: "Set by HR", amt: signed(pay.adjustment), neg: pay.adjustment < 0 });
   for (const l of m.payLines) {
     const v = l.kind === "deduction" ? -Math.abs(l.amount) : l.amount;
     rows.push({ label: PAY_LINE[l.kind] ?? l.kind, sub: l.description || "Added by HR", amt: signed(v), neg: v < 0 });
   }
-  const total = Math.round((basic + m.commission + payLinesTotal(m.payLines)) * 100) / 100;
+  // Every figure below is payroll's own — on the payroll row, what HR set or typed (2026-10-20).
+  if (pay) {
+    if (pay.allowance !== 0) rows.push({ label: "Allowance", sub: "On payroll", amt: money(pay.allowance) });
+    if (pay.overtime !== 0) rows.push({ label: "Overtime", sub: "On payroll", amt: money(pay.overtime) });
+    if (pay.unpaid !== 0) rows.push(minus("Unpaid leave", "On payroll", pay.unpaid));
+    if (pay.employer !== 0) rows.push(minus("Employer EPF · SOCSO · EIS", "On your fixed salary, from commission", pay.employer));
+    if (pay.employee !== 0) rows.push(minus("Your EPF · SOCSO · EIS", "Off your fixed salary", pay.employee));
+    if (pay.pcb !== 0) rows.push(minus("PCB", "Off your fixed salary", pay.pcb));
+    if (pay.withholding !== 0) rows.push(minus("Withholding tax", "Off your pay", pay.withholding));
+    if (pay.skbbk !== 0) rows.push(minus("SKBBK", "Off your pay", pay.skbbk));
+  }
+  const total = pay ? pay.net : Math.round((basic + m.commission + payLinesTotal(m.payLines)) * 100) / 100;
+  // The two salary payments it reaches the bank as — HR's net basic and commission balance.
+  const paidAs: IncomeRowVM[] | null = pay && pay.fixed > 0 ? [
+    { label: "Net basic", sub: `Fixed salary ${money(pay.fixed)} less deductions`, amt: signed(pay.netBasic), neg: pay.netBasic < 0 },
+    { label: "Balance commission", sub: "What your commission leaves", amt: signed(pay.balance), neg: pay.balance < 0 },
+  ] : null;
   const hero = heroOf(m);
   const pending = m.brands.filter(b => b.marginPct === null).map(b => b.code);
   const past: IncomePastVM[] = data.past.filter(p => p.period !== m.period).map(p => ({
     period: p.period,
     month: `${monthName(p.period)} ${p.period.slice(0, 4)}`,
     paid: p.status === "paid" ? (p.paidOn ? `Paid ${shortDay(p.paidOn.slice(0, 10))}` : "Paid") : p.status === "submitted" ? "With Finance" : "Completed",
-    amt: money(p.gross || p.basic + p.commission),
+    // What reached the bank — the month's own Total (2026-10-20).
+    amt: signed(p.net),
     status: p.status === "paid" ? "Paid" : p.status === "submitted" ? "With Finance" : "Completed",
     settled: p.status === "paid",
   }));
@@ -81,10 +106,11 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
     period: m.period,
     periodLabel: monthShort(m.period),
     heroLabel: hero.label,
-    amount: hidden ? "RM ••••••" : rm2(total),
+    amount: hidden ? "RM ••••••" : signed(total),
     heroNote: hero.note,
     rows,
-    total: hidden ? "RM ••••••" : rm2(total),
+    total: hidden ? "RM ••••••" : signed(total),
+    paidAs,
     held: held.length
       ? { strong: `${plural(held.length, "order")} ${held.length === 1 ? "is" : "are"} waiting for a deposit.`, rest: "Their commission is added in the month the deposit clears." }
       : m.switches.incentive && pending.length
@@ -92,7 +118,9 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
         : null,
     past,
     hasOrders: m.bills.length > 0 || m.overrides.length > 0,
-    notice: m.state === "none" ? m.notice : null,
+    // With the pay worked out there is still a breakdown to show — the salary and what it costs, another
+    // sub-department's commission — and the hero's note says no bills have arrived here.
+    notice: m.state === "none" && !pay ? m.notice : null,
   };
 }
 

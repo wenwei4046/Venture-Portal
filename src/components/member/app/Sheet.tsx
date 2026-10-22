@@ -59,7 +59,9 @@ export default function Sheet({ open, onClose, z, dim = "a", height, maxHeight, 
     if (!peek || !open) return;
     let press: { inside: boolean; x: number; y: number } | null = null;
     const down = (e: PointerEvent) => {
-      press = { inside: !!panelRef.current?.contains(e.target as Node), x: e.clientX, y: e.clientY };
+      // A screenshot editor is portalled above its request sheet and owns its gesture.
+      const annotation = e.target instanceof Element && !!e.target.closest("[data-image-annotator]");
+      press = { inside: annotation || !!panelRef.current?.contains(e.target as Node), x: e.clientX, y: e.clientY };
     };
     const click = (e: MouseEvent) => {
       const pressed = press;
@@ -67,6 +69,7 @@ export default function Sheet({ open, onClose, z, dim = "a", height, maxHeight, 
       const panel = panelRef.current;
       const target = e.target as Node | null;
       if (!panel || !target || panel.contains(target) || dimRef.current?.contains(target) || pressed?.inside) return;
+      if (target instanceof Element && target.closest("[data-image-annotator]")) return;
       if (pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > DRAG_PX) return;
       // The next row opens at its top, not where this one was scrolled to.
       panel.scrollTop = 0;
@@ -123,8 +126,9 @@ export default function Sheet({ open, onClose, z, dim = "a", height, maxHeight, 
     const onStart = (e: TouchEvent) => {
       const target = e.target as Element | null;
       if (!target || e.touches.length !== 1 || panel.getBoundingClientRect().left > 0 || scrolledAbove(target, panel)) return;
-      // A field or a picker inside the sheet keeps its own touch.
-      if (target.closest("input, textarea, select, audio, video")) return;
+      // A field, a picker or a drawing surface inside the sheet keeps its own touch — a signature drawn downwards dragged
+      // the memo sheet with it (2026-10-21).
+      if (target.closest("input, textarea, select, audio, video, [data-image-annotator], [data-signature-pad]")) return;
       y0 = e.touches[0].clientY; dy = 0; live = false; active = true;
       document.addEventListener("touchmove", onMove, { passive: false });
       document.addEventListener("touchend", onEnd);

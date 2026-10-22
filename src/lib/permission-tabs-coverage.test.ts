@@ -38,6 +38,7 @@ const SOMEWHERE_ELSE: Readonly<Record<string, string>> = {
   'rev.leads': 'the CRM in the Revenue app — its own cell, CRM · View',
   'rev.crm_team': 'the CRM’s Control panel — CRM · View at All',
   'rev.product_list': '/member/products — the product_list key',
+  'rev.it_requests': 'the Revenue app’s IT requests (Profile › IT support › All, the sidebar’s row) — its own cells, IT requests · View / Edit',
   'pri.switch_views': 'the view switcher in the top bar',
 }
 
@@ -47,6 +48,8 @@ const OPEN_IN_THE_APP: Readonly<Record<string, string>> = {
   products: 'the Product List — rev.product_list, by its key',
   memos: 'Memos & notifications — every member reads and acknowledges HR’s memos (the user, 2026-10-11)',
   crm: 'My leads & appointments — the CRM’s own tabs (rev.leads, rev.crm_team), by their cells',
+  it: 'IT support — anybody may ask IT for help and follow their own requests (the user, 2026-10-20: "所有人都可以填")',
+  itdesk: 'IT requests — everybody’s, rev.it_requests, by its own cells',
 }
 
 describe('every tab of every view is in People › Permissions', () => {
@@ -79,6 +82,28 @@ describe('every tab of every view is in People › Permissions', () => {
       const own = item.permissionTabs
       const opens = own ? own.some(t => t.startsWith('fin.')) : TABS[route].some(t => t.startsWith('fin.'))
       return opens ? [] : [`${item.label} (${href}): no Finance view tab opens it`]
+    })
+    expect(bad).toEqual([])
+  })
+
+  it('the Principal’s own rows on Finance’s sidebar (2026-10-17): each opens from a tab of the Principal view', () => {
+    const finance = new Set([
+      ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }).flatMap(section => section.items).map(i => i.key),
+      ...finAccountMenu().flatMap(group => group.items).map(i => i.key),
+    ])
+    const items = [
+      ...finNavSections({ revenueSubDepts: [], deptPoolDepts: statementDepts([]) }, { principal: true }).flatMap(section => section.items),
+      ...finAccountMenu({ principal: true }).flatMap(group => group.items).filter(item => item.href !== undefined),
+    ].filter(item => !finance.has(item.key))
+    expect(items.map(i => i.key).sort()).toEqual(['access', 'it-requests', 'opex', 'settings'])
+    const bad = items.flatMap(item => {
+      const href = item.href as string
+      const route = known(href)
+      if (route === 'open') return []
+      if (route === null) return [`${item.label} (${href}): no page in PAGE_TABS`]
+      const own = item.permissionTabs
+      const opens = own ? own.some(t => t.startsWith('pri.')) : TABS[route].some(t => t.startsWith('pri.'))
+      return opens ? [] : [`${item.label} (${href}): no Principal view tab opens it`]
     })
     expect(bad).toEqual([])
   })
@@ -136,6 +161,8 @@ describe('every tab of every view is in People › Permissions', () => {
       // 2026-10-11: the rest of Profile (Memos & notifications stays open to all).
       'Profile · My honours', 'Profile · My brand weeks', 'Profile · Commission scheme',
       'Profile · My leads & appointments', 'CRM · Team', 'Product List',
+      // 2026-10-20: IT support's desk.
+      'IT requests',
     ])
   })
 })

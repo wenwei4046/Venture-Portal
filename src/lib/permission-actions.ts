@@ -21,7 +21,7 @@ import type { Action, Scope } from '@/lib/permission-matrix'
 export type FunctionKey =
   | 'dashboard' | 'approvals' | 'treasury' | 'billing' | 'categories' | 'hr_costing' | 'revenue' | 'product_list'
   | 'director_salary' | 'director_pool' | 'team' | 'accounts' | 'member' | 'revenue_app' | 'dept_pool'
-  | 'venture_pool' | 'opex' | 'my_billing' | 'claims' | 'reports' | 'dept_reports' | 'reconciliation'
+  | 'venture_pool' | 'opex' | 'claims' | 'reports' | 'dept_reports' | 'reconciliation'
   | 'audit_log' | 'settings' | 'view_switch' | 'crm'
   // HR revamp round 2 (mig 20261011060000).
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
@@ -29,6 +29,8 @@ export type FunctionKey =
   | 'attendance'
   // Lead View (mig 20261016300000).
   | 'leads'
+  // IT support's desk (mig 20261021020000).
+  | 'it_requests'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -86,7 +88,6 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   dept_pool: ['dept_pool.view', 'dept_pool.export'],
   venture_pool: ['venture_pool.view', 'venture_pool.create', 'venture_pool.edit', 'venture_pool.export'],
   opex: ['opex.view', 'opex.export'],
-  my_billing: ['my_billing.view', 'my_billing.create'],
   claims: ['claims.view', 'claims.create', 'claims.edit', 'claims.void'],
   claims_approve: ['claims.approve'],
   reports: ['reports.view', 'reports.export'],
@@ -117,6 +118,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
   // Lead View (20261016300000).
   leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
+  // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
+  it_requests: ['it_requests.view', 'it_requests.edit'],
 }
 
 /**
@@ -165,8 +168,8 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'crm.edit': 'own',
   'crm.manage': 'all',
   'crm.view': 'own',
-  'dept_pool.view': 'own',
-  'dept_reports.export': 'dept',
+  'dept_pool.view': 'all',
+  'dept_reports.export': 'all',
   'director_pool.edit': 'all',
   'documentation.create': 'all',
   'documentation.edit': 'all',
@@ -179,6 +182,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hr_costing.edit': 'all',
   'hr_costing.export': 'all',
   'hr_costing.view': 'all',
+  // IT support's desk (2026-10-20): the Revenue app's IT requests — read, and notes and statuses.
+  'it_requests.edit': 'all',
+  'it_requests.view': 'all',
   // Hiring (round 2, 2026-10-11).
   'hiring.approve': 'all',
   'hiring.create': 'all',
@@ -191,7 +197,6 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'leads.view': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',
-  'my_billing.create': 'dept',
   'opex.view': 'all',
   'product_list.edit': 'all',
   'reconciliation.approve': 'all',
@@ -218,20 +223,15 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'treasury.void': 'all',
 }
 
-/** A department manager's department pages are theirs at Dept. */
-const DEPARTMENT_FUNCTIONS = new Set<string>(['dept_pool', 'opex', 'my_billing', 'dept_reports', 'claims'])
-
 /**
  * Keys as actions, the way `current_actions()` reads an account with no
- * template — what a masked view (View as) holds.
+ * template — what a masked view (View as) holds: every one at All. (The Dept
+ * Manager's department pages at Dept went with the kind, 2026-10-17.)
  */
-export function actionsFromKeys(keys: readonly string[], role: string): Record<string, Scope> {
+export function actionsFromKeys(keys: readonly string[]): Record<string, Scope> {
   const out: Record<string, Scope> = {}
   for (const key of keys) {
-    for (const fa of KEY_ACTIONS[key] ?? []) {
-      const fn = fa.slice(0, fa.lastIndexOf('.'))
-      out[fa] = role === 'dept_manager' && DEPARTMENT_FUNCTIONS.has(fn) ? 'dept' : 'all'
-    }
+    for (const fa of KEY_ACTIONS[key] ?? []) out[fa] = 'all'
   }
   return out
 }

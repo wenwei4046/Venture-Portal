@@ -11,7 +11,7 @@ import { interTight } from "@/components/member/app/fonts";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { loadMyNotices } from "@/lib/push/notices-server";
 import { loginIsPersonal } from "@/lib/account/personal-login";
-import { changeMyPassword } from "@/lib/account/actions";
+import { changeMyPassword, loadMyEmailChange, requestEmailChange, withdrawEmailChange } from "@/lib/account/actions";
 import { loadMyMemos } from "@/lib/memos/server";
 import { toMemberMemo } from "@/lib/memos/model";
 
@@ -34,18 +34,26 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // The CRM's row under Profile: the ACCOUNT's CRM · View (2026-10-10, the permission matrix) — the CRM
   // is the signed-in account's own whatever view the portal was left in, as crm-actions.ts asks.
   // Their notifications (2026-10-11): the Principal, who opens the app to view members, gets none here.
-  // Profile › Change password (2026-10-12): a login of their own, never a shared one.
+  // Profile › Change password (2026-10-12): a login of their own, never a shared one — and Request to change email
+  // (2026-10-16) on the same terms.
   // The Principal's own memos (2026-10-12): their People record's, read and acknowledged here as in every view.
   const [data, products, account, notices, password, own] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user), getAccountUser(),
     isPrincipalAccount(user) ? Promise.resolve(undefined) : loadMyNotices(), loginIsPersonal(),
     isPrincipalAccount(user) && !user.viewingAs ? loadMyMemos() : Promise.resolve(null)]);
   const crm = canDo(account, "crm", "view", "own");
+  // IT requests (2026-10-20): the ACCOUNT's IT requests · View — everybody's requests and the sidebar's row, the Principal's
+  // and Ultimate full access's under PRINCIPAL, anybody raised on it alone under MANAGEMENT (the Product List's labels);
+  // Edit writes notes and statuses.
+  const itDesk = canDo(account, "it_requests", "view")
+    ? { group: isPrincipalAccount(user) ? "PRINCIPAL" : "MANAGEMENT", edit: canDo(account, "it_requests", "edit") }
+    : null;
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
   // The display face (2026-10-14): Inter Tight's variable on a wrapper that draws no box, so the
   // app and its loading frame read it and the portal never downloads the font.
   return <div className={interTight.variable} style={{ display: "contents" }}>
-    <RevenueApp initialData={data} productList={products} crm={crm} closed={appClosed(user.closed)} notices={notices}
+    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} closed={appClosed(user.closed)} notices={notices}
       changePassword={password ? changeMyPassword : undefined}
+      requestEmail={password ? { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange } : undefined}
       own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>
   </div>;
 }

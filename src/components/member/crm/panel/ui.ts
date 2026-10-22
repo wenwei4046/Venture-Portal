@@ -9,6 +9,8 @@ export interface FtDraft { tid: string; m: "cnt" | "pct"; on: number[]; v: Recor
 export interface RoomDraft {
   i: number; id: string | null; name: string; addr: string; slots: string[]; cap: number; weekly: number[]; blocks: { a: string; b: string; why: string }[];
   newT: string; newD: number[] | null; bA: string; bB: string; bWhy: string; bAll: boolean; bT1: string; bT2: string; bPick: "t1" | "t2" | null; calFor: "A" | "B" | null; calYM: [number, number] | null;
+  /** 4a (T07): a draft begun on the page itself — the page stays in place with a Save bar (the full editor is for closures). */
+  quick?: boolean;
 }
 
 export interface PanelUi {
@@ -23,6 +25,8 @@ export interface PanelUi {
   // Inbox
   inbTeam: string;
   inbWho: string;
+  /** 4a (T02): the status tab last tapped above the board, underlined. */
+  inbCol: number;
   pcOpen: boolean;
   pcQ: string;
   // One customer's chat (from Calendar / Awaiting reply)
@@ -35,7 +39,7 @@ export interface PanelUi {
   calInfo: string | null;
   cLs: "leads" | "up" | "came" | false;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
-  asSec: "Org" | "Ads" | "Aw" | "Ft" | null;
+  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
   ftx: { tid: string; v: Record<string, number[]> } | null;
   /** By team's inside-team draft for the ad being edited: modes, values, and who was typed in (for the auto-balance). */
@@ -44,6 +48,8 @@ export interface PanelUi {
   hlOpen: boolean;
   /** Profile › Member work type and Cold lead templates pages, and a template being edited. */
   ftsOpen: boolean;
+  /** Member work type's changes not saved yet (person → full time), the owner's Save (2026-10-18). */
+  ftsDraft: Record<string, boolean> | null;
   tplOpen: boolean;
   tplEd: { id: string | null; name: string; ch: "whatsapp" | "messenger"; body: string } | null;
   pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
@@ -91,6 +97,10 @@ export interface PanelUi {
   rmAt: number;
   /** The ad editor's name while it is typed (null = the ad's name as saved). */
   adNameDraft: string | null;
+  /** Assignment › Ads to teams: running ads or paused ones (2026-10-22; the desktop lists both). */
+  adTab: "running" | "paused";
+  /** Assignment › Active: switches not saved yet (id → locked), null = as saved. */
+  actDraft: Record<string, boolean> | null;
   // Calendar
   cView: "list" | "grid";
   cTeam: string;
@@ -104,9 +114,9 @@ export interface PanelUi {
 
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
-  inbTeam: "", inbWho: "", pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
+  inbTeam: "", inbWho: "", inbCol: 0, pcOpen: false, pcQ: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, ftsDraft: null, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
-  viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "all", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null, rmAt: 0, adNameDraft: null,
-  cView: "list", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,
+  viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "all", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null, rmAt: 0, adNameDraft: null, adTab: "running", actDraft: null,
+  cView: "grid", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,
 });

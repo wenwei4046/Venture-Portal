@@ -54,6 +54,8 @@ function database() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.requireSubDepartment.mockResolvedValue({ id:'sub-id',slug:'fair',name:'Fair',schemeId:null })
+  // The gate hands back the reader (2026-10-21): the month page's Requests tab asks whether they may decide.
+  mocks.requirePermission.mockResolvedValue({ id:'hr', role:'hr', permissions:['revenue'], actions:{ 'revenue.view':'all', 'revenue.edit':'all' }, closed:[] })
 })
 describe('Revenue pages preserve source commission while reading monthly payroll adjustments', () => {
   // *Payroll & source tools* went on 2026-09-27 — the saved run's hero, its

@@ -105,7 +105,7 @@ function income(hide: boolean): IncomeVM {
   return {
     period: "2026-09", periodLabel: "Sep 2026", heroLabel: "Estimated income · not settled", amount: total,
     heroNote: "Settles after month-end costing. Check your official payslip for payment.",
-    rows: rows.map(([label, sub, v]) => ({ label, sub, amt: amt(v) })), total,
+    rows: rows.map(([label, sub, v]) => ({ label, sub, amt: amt(v) })), total, paidAs: null,
     held: { strong: "2 Dunlopillo orders are held.", rest: "Their commission is added once supplier cost is in." },
     past: ([["2026-08", "August 2026", "Paid 7 Sep", 6120], ["2026-07", "July 2026", "Paid 7 Aug", 5890.4], ["2026-06", "June 2026", "Paid 7 Jul", 6402.1]] as const)
       .map(([period, month, paid, v]) => ({ period, month, paid, amt: amt(v), status: "Paid", settled: true })),

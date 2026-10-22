@@ -10,7 +10,22 @@ import { saveRecordAndLine } from '@/lib/person-line-save'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 import { isMasked, sees } from '@/lib/sensitive'
+import { addressRefusal } from '@/lib/address/address'
+import { addressFromForm, addressPatch } from '@/lib/address/address-form'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 import type { TablesUpdate } from '@/lib/supabase/database.types'
+
+/**
+ * The address a form sent (2026-10-20, its six parts — `lib/address`), checked against Malaysia's postcode list:
+ * the columns to write, or null when the form did not carry it. A refusal is a sentence for the screen.
+ */
+function addressColumns(formData: FormData): Record<string, string | null> | null {
+  const address = addressFromForm(formData)
+  if (!address) return null
+  const refused = addressRefusal(address, MALAYSIA_DATA)
+  if (refused) throw new Error(refused)
+  return addressPatch(address)
+}
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== 'string') return null
@@ -62,11 +77,13 @@ export async function addStaff(formData: FormData) {
     bankAccountNo2: str(formData, 'bank_account_no_2'),
     contactNumber: str(formData, 'contact_number'),
     email: str(formData, 'email'),
-    address: str(formData, 'address'),
     emergencyContactName: str(formData, 'emergency_contact_name'),
     emergencyContactPhone: str(formData, 'emergency_contact_phone'),
     emergencyContactRelationship: str(formData, 'emergency_contact_relationship'),
   })
+
+  // The address in its six parts (2026-10-20); the database puts the one-line `address` together from them.
+  const address = addressColumns(formData) ?? {}
 
   let designation: string | null = null
   if (form.titleId) {
@@ -108,7 +125,7 @@ export async function addStaff(formData: FormData) {
       : {}),
     contact_number: form.contactNumber,
     email: form.email,
-    address: form.address,
+    ...address,
     emergency_contact_name: form.emergencyContactName,
     emergency_contact_phone: form.emergencyContactPhone,
     emergency_contact_relationship: form.emergencyContactRelationship,
@@ -223,6 +240,10 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
     if (!name) throw new Error('A name is required')
     patch.employee_name = name
   }
+  // First and last name (2026-10-17): what the apps call them; blank leaves the full name's parts to answer.
+  // A full name changed alone carries them along in the database while they were its parts (hr_staff_costs_split_name).
+  if (sent('first_name')) patch.first_name = trimOrNull(formData.get('first_name'))
+  if (sent('last_name')) patch.last_name = trimOrNull(formData.get('last_name'))
 
   // The title dropdown. Department is fixed here, so the row says which
   // department a title has to fit. An unchanged title is left alone: a title
@@ -274,9 +295,12 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
   if (sent('hire_date')) patch.hire_date = text('hire_date') || null
   if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
   if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
-  for (const key of ['contact_number', 'email', 'address', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {
+  for (const key of ['contact_number', 'email', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {
     if (sent(key)) patch[key] = trimOrNull(formData.get(key))
   }
+  // The address, its six parts together (2026-10-20) — the one-line `address` is the database's to put together.
+  const address = addressColumns(formData)
+  if (address) Object.assign(patch, address)
 
   // A bank account is its bank and its number, sent together. Account 2,
   // when sent, is checked against Account 1 as the record will hold it —

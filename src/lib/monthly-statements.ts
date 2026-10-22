@@ -46,9 +46,8 @@ export async function loadMonthlyCashFlow(supabase: SupabaseClient, { year, thro
   // so the consolidated view must not carry it (same rule as the statement),
   // and there it is not read at all (2026-10-08).
   //
-  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
-  // which zeroed their Cash Flow) — codes only, no balances. Shared with the
-  // bridge, which starts beside the journal read instead of after it.
+  // bank GL codes via RPC — codes only, no balances. Shared with the bridge,
+  // which starts beside the journal read instead of after it.
   const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
     ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
   )

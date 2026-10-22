@@ -5,7 +5,12 @@ import { Button } from '@/components/ds/Button'
 import { DsSelect, Field, TextField, Textarea } from '@/components/ds/Field'
 import { SegmentedControl, Switch } from '@/components/ds/Controls'
 import { CenterWindow } from '@/components/ds/Overlay'
+import DsAddressFields from '@/components/address/DsAddressFields'
+import { addressFromJson, addressRefusal, isEmptyAddress, type Address } from '@/lib/address/address'
+import { addressJsonOf } from '@/lib/address/address-form'
+import { loadMalaysia } from '@/lib/address/malaysia'
 import { deleteSetting, saveSetting, type SettingKind } from '@/lib/attendance/actions'
+import { HOLIDAY_STATES, holidayStateOf } from '@/lib/attendance/holiday-states'
 import {
   DAY_NAMES, HALF_HOURS, MONTHS, blankWeek, derivedFlags, dmy, groupSummary, isWeekend, monthCells, multipliersFrom, nextFirsts, previewGroups, settledFlags,
   toggleAll, unitOf, weeklyHours, type LeaveFlags,
@@ -32,7 +37,7 @@ const SECTION: Record<Sm['kind'], [string, string]> = {
 }
 const LBL: CSSProperties = { fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--ds-ink-3)' }
 const two: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12 }
-const STATES = ['Federal Territory', 'Selangor', 'Penang', 'Johor', 'Perak', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perlis', 'Terengganu', 'Sabah', 'Sarawak']
+const STATES = [...HOLIDAY_STATES]
 
 type Props = { sm: Sm; config: AttConfig; close: () => void; flash: (m: string) => void; canEdit: boolean; onSchedule: (id: string) => void }
 
@@ -229,8 +234,18 @@ function ScheduleWindow(props: Props) {
 function LocationWindow(props: Props) {
   const { sm, config } = props
   const cur = config.locations.find(l => l.id === sm.id)
-  const [f, setF] = useState({ name: cur?.name ?? '', address: cur?.address ?? '', state: cur?.state || 'Selangor', radius: String(cur?.radius ?? 150), lat: cur?.lat != null ? String(cur.lat) : '', lng: cur?.lng != null ? String(cur.lng) : '' })
+  // The address in its six parts (2026-10-20, `lib/address`); a location saved before them keeps its one-box text,
+  // shown above the fields until it is written in parts.
+  const [was] = useState<Address>(() => addressFromJson(cur))
+  const [address, setAddress] = useState<Address>(was)
+  const [f, setF] = useState({ name: cur?.name ?? '', state: cur?.state || holidayStateOf(was.state) || 'Selangor', radius: String(cur?.radius ?? 150), lat: cur?.lat != null ? String(cur.lat) : '', lng: cur?.lng != null ? String(cur.lng) : '' })
   const set = (k: keyof typeof f, v: string) => setF(x => ({ ...x, [k]: v }))
+  // A new state on the address brings its public holidays with it (Pulau Pinang → Penang, W.P. … → Federal Territory).
+  const pickAddress = (next: Address) => {
+    const holidays = next.state !== address.state ? holidayStateOf(next.state) : null
+    if (holidays) set('state', holidays)
+    setAddress(next)
+  }
   const inUse = !!cur && config.assignments.some(a => a.locationId === cur.id)
   const num = (v: string) => (v.trim() === '' || Number.isNaN(Number(v)) ? null : Number(v))
   const badCoord = (f.lat.trim() !== '' && num(f.lat) === null) || (f.lng.trim() !== '' && num(f.lng) === null)
@@ -241,7 +256,12 @@ function LocationWindow(props: Props) {
       title={cur?.name ?? ''}
       canDelete={!inUse}
       blocked={!f.name.trim() || badCoord}
-      save={() => saveSetting('location', sm.id, { name: f.name.trim(), address: f.address.trim(), state: f.state, radius: Number(f.radius), lat: num(f.lat), lng: num(f.lng) })}
+      save={async () => {
+        // Checked against Malaysia's list here first, so the refusal reads at once (the server asks again).
+        const refused = addressRefusal(address, await loadMalaysia())
+        if (refused) return { ok: false as const, reason: refused }
+        return saveSetting('location', sm.id, { name: f.name.trim(), ...addressJsonOf(address), state: f.state, radius: Number(f.radius), lat: num(f.lat), lng: num(f.lng) })
+      }}
       body={
         <>
           <div style={{ position: 'relative', height: 150, borderRadius: 10, background: 'repeating-linear-gradient(135deg,var(--ds-surface-2) 0 8px,var(--ds-surface-3) 8px 9px)', display: 'grid', placeItems: 'center', border: '1px solid var(--ds-border)' }}>
@@ -249,9 +269,9 @@ function LocationWindow(props: Props) {
             <span style={{ position: 'absolute', left: 10, bottom: 8, fontSize: 11.5, color: 'var(--ds-ink-2)' }}>Map preview</span>
           </div>
           <Field label="Name"><TextField value={f.name} onChange={v => set('name', v)} placeholder="e.g. Penang branch" /></Field>
-          <Field label="Address"><TextField value={f.address} onChange={v => set('address', v)} placeholder="Street, postcode, city" /></Field>
+          <DsAddressFields value={address} onChange={pickAddress} onFile={isEmptyAddress(was) && cur?.address ? cur.address : null} />
           <div style={two}>
-            <Field label="State"><DsSelect value={f.state} onChange={v => set('state', v)} options={STATES} ariaLabel="State" /></Field>
+            <Field label="Public holidays"><DsSelect value={f.state} onChange={v => set('state', v)} options={STATES} ariaLabel="Public holidays" /></Field>
             <Field label="Fence radius"><DsSelect value={f.radius} onChange={v => set('radius', v)} options={['100', '150', '200', '300', '500'].map(v => ({ value: v, label: `${v} m` }))} ariaLabel="Fence radius" /></Field>
           </div>
           <div style={two}>

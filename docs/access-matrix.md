@@ -1,8 +1,21 @@
 HOUZS Venture Portal — Access Matrix
 Overview
-4 Roles: Principal, Finance, HR, Dept Manager
+3 Roles: Principal, Finance, HR (the Dept Manager went 2026-10-17 — below)
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
+---
+⚡ AMENDMENT 2026-10-17 — The Dept Manager is gone
+The user: "全删：连程序一起拿掉" — each department gets a view of its own later, as Finance
+and HR have. Nobody is of the kind any more: the Department head template is deleted
+(MARKETING MANAGER points at Staff · Basic), marketing@ is closed (kept for its history),
+and `users.role` / a template's base kind refuse `dept_manager`. What served it is removed:
+My Billing (its invoices, contracts and the two requests it raised — dept expense and
+invoice request), the department Overview, Dept Pool's own-department pages, the reports'
+own-segment mode, OPEX pinned to one's own department, and the ten row policies they read
+and wrote through. Dept Pool, OPEX and Department reports offer All only; a page of theirs
+reads every department or none (Department reports now opens its statements beside Reports
+· View). Finance's request inboxes stay. Every "Dept Manager" column and pattern below is
+history. Migs `20261017140000` / `20261017160000`.
 ---
 ⚡ AMENDMENT 2026-10-12 — Change password, a login of one's own only
 Not a cell of the matrix, and no template grants it: whoever signs in with a login a People
@@ -163,7 +176,9 @@ held. What each cell opens:
   Director Pool  Edit = the calculator
   Team & roster  Create = add people (by hand or InfoTech) · Edit = change a person,
                  the reporting line · Manage = titles and the ladder
-  Logins         Create = invite · Manage = templates, a person's cells, deleting a title
+  Logins         Create = invite (HR view › Permissions · Create; a full-access title —
+                 a Principal-kind template, or one with Manage — needs Manage too,
+                 2026-10-20) · Manage = templates, a person's cells, deleting a title
   My Billing     Create (Dept) = the department's invoices and requests
   Claims         Create (Own) = raise a claim · Approve = approve, reject, mark paid
   Reconciliation Create = upload a statement, a journal voucher · Edit = match,

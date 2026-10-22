@@ -17,15 +17,22 @@ describe("HR's sidebar", () => {
       [null, null, ['Overview']],
       ['I.', 'Attendance', ['Today', 'Records', 'Requests', 'Leave balances', 'Month close', 'Settings', 'Readiness']],
       ['II.', 'HR & Payroll', ['HR Costing', 'Payroll', 'Allocation', 'Payment']],
-      ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Claim rates', 'Food claim']],
+      ['III.', 'Revenue', ['Comm Cal', 'Sales chart', 'Members', 'Waiting list', 'Replacement list', 'Rules', 'Requests', 'Brand weeks', 'Transport claim', 'Food claim']],
       ['IV.', 'People Management', ['People', 'Permissions', 'Org chart', 'People & roles', 'Levels']],
-      ['V.', 'Admin', ['Audit Log']],
+      ['V.', 'Admin', ['Audit Log', 'IT support']],
       ['VI.', 'Directors', ['Director Salary', 'Director Pool']],
     ])
   })
 
   it('keeps the handoff’s eight sections: Hiring, Attendance, HR & Payroll, Revenue, People Management, Documentation, Admin, Directors', () => {
     expect(hrNavSections('fair').map(s => s.label)).toEqual([null, 'Hiring', 'Attendance', 'HR & Payroll', 'Revenue', 'People Management', 'Documentation', 'Admin', 'Directors'])
+  })
+
+  it('opens own IT support without a module permission, except while viewing as somebody', () => {
+    const own = { ...hr, permissions: [], actions: {}, tabs: [] }
+    const items = (viewer: NavViewer) => visibleHrNav(hrNavSections(null), viewer).flatMap(s => s.items)
+    expect(items(own).find(i => i.key === 'it-support')?.href).toBe('/it-support')
+    expect(items({ ...own, viewingAs: { id: 'other', name: 'Other' } }).map(i => i.key)).not.toContain('it-support')
   })
 
   it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {
@@ -45,9 +52,25 @@ describe("HR's sidebar", () => {
     expect(sections.find(s => s.label === 'Admin')?.roman).toBe('III.')
   })
 
+  // Sub-departments per person (2026-10-16): each Revenue page opens one the viewer reaches there; none, no rows.
+  it('opens each Revenue page on its own sub-department, and leaves out a page with none', () => {
+    const rev = visibleHrNav(hrNavSections({ cc: 'fair', sg: 'ir', rules: null }), hr).find(s => s.label === 'Revenue')!
+    expect(rev.items.map(i => [i.label, i.href])).toEqual([
+      ['Comm Cal', '/revenue/fair'],
+      ['Sales chart', '/revenue/ir/hierarchy'],
+      ['Members', '/revenue/ir/hierarchy?tab=members'],
+      ['Waiting list', '/revenue/ir/hierarchy?tab=waiting'],
+      ['Replacement list', '/revenue/ir/hierarchy?tab=replacement'],
+      ['Requests', '/member-admin'],
+      ['Brand weeks', '/member-admin?tab=weeks'],
+      ['Transport claim', '/member-admin?tab=claims'],
+      ['Food claim', '/member-admin?tab=food'],
+    ])
+  })
+
   it('has no Revenue rows while there is no sub-department, but Member Services’ rows stay', () => {
     const rev = visibleHrNav(hrNavSections(null), hr).find(s => s.label === 'Revenue')!
-    expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Claim rates', 'Food claim'])
+    expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Transport claim', 'Food claim'])
   })
 
   it.each([
@@ -79,6 +102,7 @@ describe("HR's sidebar", () => {
     ['/admin/rooms', 'tab=rooms', 'roomRooms'],
     ['/admin/rooms', '', 'roomSched'],
     ['/audit-log/access', '', 'audit'],
+    ['/it-support', '', 'it-support'],
     ['/claims', '', null],
     ['/revenue/department', '', null],
   ])('%s?%s lights %s', (path, search, key) => {

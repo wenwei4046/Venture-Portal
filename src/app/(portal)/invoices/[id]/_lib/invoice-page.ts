@@ -16,7 +16,7 @@ import { toHubInvoice, type HubCreditNoteLine, type HubInvoice, type InvoiceCont
 // the banks.
 
 const INVOICE_COLUMNS =
-  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, settlement_voucher_id, contract_id, created_by, created_at'
+  'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_address_parts, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, settlement_voucher_id, contract_id, created_by, created_at'
 
 const stamp = (at: string) => officeTime(at).format('DD MMM YYYY · HH:mm')
 

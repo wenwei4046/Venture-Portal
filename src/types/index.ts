@@ -1,9 +1,13 @@
+import type { Reach } from '@/lib/sub-department-reach'
+
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 // `staff` (2026-10-08): an account whose access is wholly its title's
 // permission template — the role every template that is not one of the old
 // four hands out. Never shown; see permission_templates.base_role.
-export type UserRole = 'principal' | 'finance' | 'hr' | 'dept_manager' | 'revenue_member' | 'staff'
+// `dept_manager` is gone (2026-10-17 — the user: "全删"; each department gets a
+// view of its own later): no account or template is of that kind.
+export type UserRole = 'principal' | 'finance' | 'hr' | 'revenue_member' | 'staff'
 
 export interface User {
   id: string
@@ -27,8 +31,8 @@ export interface User {
   canSwitchView?: boolean
   // Every permission key this account holds, resolved by the database from
   // their title (or their role, while no title says otherwise). This is what
-  // every gate in the portal reads; `role` survives only for the handful of
-  // dept_manager row policies no scope can express.
+  // every gate in the portal reads (lib/kind-checks.test.ts lists the few
+  // places the kind itself is still the point).
   permissions: string[]
   // What they may DO, and how far (2026-10-08, PR2): `fn.action` → own / dept
   // / all, from `current_actions()` — a titled person's template cells, an
@@ -51,6 +55,12 @@ export interface User {
   // `closedBoxes`): a page's writes follow its own tabs' boxes (`actionsOnPage`)
   // and the Revenue app hides the pages they close. Empty or absent: nothing.
   closed?: string[]
+  // The Revenue Department's sub-departments they reach, area by area — the
+  // CRM, Comm Cal, Sales Groups, Rules (2026-10-16, lib/sub-department-reach.ts):
+  // what they handle, every one when they handle none, their own ticks over it.
+  // Every sign-in carries it (NO_REACH when it could not be read); absent only
+  // on a value built without it, which narrows nothing.
+  reach?: Reach
   // Set while an account that may switch views sees the portal AS this person
   // (2026-10-11): everything above is theirs, `actualRole` the viewer's kind,
   // and the session reads only (lib/supabase/read-only.ts).

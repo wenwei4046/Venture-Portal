@@ -156,6 +156,71 @@
 .full a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .fail { margin-right: auto; padding: 8px 14px; }
 .transfer { padding: 8px 18px; }
+
+/* Edit (2026-10-20, the user: "要能够按 Edit … 让 HR 可以去改资料"): the head's button beside the ×, and the
+   fields "+" asks in the drawer's body — a changed one peach, as on a person's page. */
+.drawerHead { display: flex; align-items: flex-start; gap: 12px; }
+.drawerHeadText { flex: 1; min-width: 0; }
+.editButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.editButton svg { width: 13px; height: 13px; }
+.editFields { display: flex; flex-direction: column; gap: 14px; }
+.editFields input[data-dirty='true'],
+.editFields select[data-dirty='true'] {
+  border-color: rgb(var(--hv-accent));
+  background-color: rgb(var(--hv-peach));
+}
+.editFixed { font-size: 13.5px; color: rgb(var(--hv-ink)); }
+.editFoot { margin-right: auto; align-self: center; font-size: 12.5px; color: rgb(var(--hv-brown)); }
+
+/* Its signed form (2026-10-20, the user: "view for the letter they submit, then can be upload as well"): the
+   file as a framed row — its icon, its name over when and who, View, Replace — or, with none, a dashed drop. */
+.signed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 8px;
+  background: rgb(255 255 255);
+}
+.signed .fileIcon { flex: none; width: 30px; height: 30px; border-radius: 6px; }
+.signed .fileIcon[data-kind='word'] { font-size: 15px; }
+.signed .fileIcon[data-kind='pdf'] { font-size: 9.5px; }
+.signed .fileIcon svg { width: 16px; height: 16px; }
+.signedText { flex: 1; min-width: 0; }
+.signedName { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signedSub { font-size: 11.5px; color: rgb(var(--hv-brown)); margin-top: 2px; }
+.signedButton { flex: none; padding: 6px 11px; font-size: 12.5px; }
+.signedPick { position: relative; }
+.signedPick:focus-within, .signedDrop:focus-within { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 2px; }
+.signedPick[data-busy='true'], .signedDrop[data-busy='true'] { opacity: 0.6; cursor: progress; }
+.signedPick input, .signedDrop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.signedDrop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  border: 1px dashed rgb(var(--hv-frame));
+  border-radius: 8px;
+  background: rgb(255 255 255);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.signedDrop:hover, .signedDrop[data-over='true'] { border-color: rgb(var(--hv-accent)); background: rgb(var(--hv-panel-2)); }
+.signedDropTitle { font-size: 13px; font-weight: 500; color: rgb(var(--hv-ink)); }
+.signedDropHint { font-size: 11.5px; color: rgb(var(--hv-note)); }
+.signedNone { font-size: 12.5px; color: rgb(var(--hv-body-2)); }
 .confirm { margin-right: auto; align-self: center; font-size: 12.5px; color: rgb(var(--hv-danger)); }
 .failError {
   margin: 10px 0 0;

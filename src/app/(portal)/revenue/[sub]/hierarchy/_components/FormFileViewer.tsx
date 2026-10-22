@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CloseButton, Drawer } from '@/components/hrv/overlay'
 import { flash } from '@/components/hrv/toast'
-import { templateView, wordPage, type MemberFormKind } from '@/lib/commission/waiting-form'
-import { replacementFormTemplateLink, viewFormTemplate, waitingFormTemplateLink } from '../../../waiting-actions'
+import { templateView, wordPage } from '@/lib/commission/waiting-form'
+import type { FormFileLink } from '../../../waiting-actions'
 import w from './waiting.module.css'
 
-const LIST: Readonly<Record<MemberFormKind, string>> = { waiting: 'Waiting list', replacement: 'Replacement list' }
+/** A link to the file, and its type when the bucket knows it (an applicant's signed form). */
+type FileLink = FormFileLink & { type?: string }
 
 /**
  * View, on the uploaded form's right-click menu (2026-10-14, the user: "right
@@ -16,27 +17,47 @@ const LIST: Readonly<Record<MemberFormKind, string>> = { waiting: 'Waiting list'
  * .docx read here in the browser (mammoth) and an HTML form as its page, both
  * in a frame where nothing runs. An old .doc cannot be drawn: Download.
  *
+ * Since 2026-10-20 an applicant's signed form opens here too, from their
+ * drawer: `open` and `download` say whose file it is.
+ *
  * Mounted only while open; its link is made at the press and lives five minutes.
  */
-export default function FormFileViewer({ kind, name: shownName, onClose }: { kind: MemberFormKind; name: string; onClose: () => void }) {
-  const [file, setFile] = useState<{ url: string; name: string } | null>(null)
+export default function FormFileViewer({
+  kicker,
+  name: shownName,
+  open,
+  download,
+  onClose,
+}: {
+  /** What the file is, above its name ("Waiting list · Uploaded form"). */
+  kicker: string
+  name: string
+  /** The link that opens the file where it is. */
+  open: () => Promise<FileLink>
+  /** The link that hands it over under its name. */
+  download: () => Promise<FormFileLink>
+  onClose: () => void
+}) {
+  const [file, setFile] = useState<{ url: string; name: string; type?: string } | null>(null)
   const [page, setPage] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const name = file?.name ?? shownName
-  const view = templateView(name)
+  const view = templateView(name, file?.type)
+  // The link is asked for once, when the viewer opens.
+  const load = useRef(open)
 
   useEffect(() => {
     let live = true
     const stop = new AbortController()
     void (async () => {
-      const link = await viewFormTemplate(kind)
+      const link = await load.current()
       if (!live) return
       if (!link.ok) {
         setFailed(link.reason)
         return
       }
-      setFile({ url: link.url, name: link.name })
-      const drawn = templateView(link.name)
+      setFile({ url: link.url, name: link.name, type: link.type })
+      const drawn = templateView(link.name, link.type)
       if (drawn !== 'word' && drawn !== 'html') return
       try {
         const res = await fetch(link.url, { signal: stop.signal })
@@ -57,10 +78,10 @@ export default function FormFileViewer({ kind, name: shownName, onClose }: { kin
       live = false
       stop.abort()
     }
-  }, [kind])
+  }, [])
 
-  async function download() {
-    const link = kind === 'replacement' ? await replacementFormTemplateLink() : await waitingFormTemplateLink()
+  async function save() {
+    const link = await download()
     if (!link.ok) {
       flash(link.reason)
       return
@@ -75,10 +96,10 @@ export default function FormFileViewer({ kind, name: shownName, onClose }: { kin
     <Drawer open onClose={onClose} width={640} bare label={name}>
       <div className={w.viewHead}>
         <div className={w.viewWho}>
-          <div className={w.viewKicker}>{LIST[kind]} · Uploaded form</div>
+          <div className={w.viewKicker}>{kicker}</div>
           <div className={w.viewTitle}>{name}</div>
         </div>
-        <button type="button" className={w.viewDownload} onClick={() => void download()}>
+        <button type="button" className={w.viewDownload} onClick={() => void save()}>
           Download
         </button>
         <CloseButton onClick={onClose} />

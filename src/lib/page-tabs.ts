@@ -32,13 +32,13 @@ const INVOICE_FINANCING = ['fin.invoice_financing'] as const
 const RECONCILIATION = ['fin.reconciliation'] as const
 const JOURNAL = ['fin.journal_entries'] as const
 // Company reports are Finance's and the Principal's; the department reports (P&L,
-// Cash Flow, Receipt & Payment, Debtor Aging) are read company-wide too, and by a
-// department for its own.
+// Cash Flow, Receipt & Payment, Debtor Aging) are read company-wide too (a
+// department's own went with the Dept Manager, 2026-10-17).
 const REPORTS = ['fin.reports', 'pri.reports'] as const
-const DEPT_REPORTS = ['fin.dept_reports', 'dept.reports', 'fin.reports', 'pri.reports'] as const
-const DEPT_POOL = ['fin.dept_pool', 'pri.dept_pool', 'dept.dept_pool'] as const
-// A contract is billing's (Invoice, Billing Allocator) and a department's own (My Billing · New Contract).
-const CONTRACTS = ['fin.invoice', 'fin.billing_allocator', 'pri.my_billing', 'dept.my_billing'] as const
+const DEPT_REPORTS = ['fin.dept_reports', 'fin.reports', 'pri.reports'] as const
+const DEPT_POOL = ['fin.dept_pool', 'pri.dept_pool'] as const
+// A contract is billing's (Invoice, Billing Allocator); My Billing's New Contract went with the Dept Manager.
+const CONTRACTS = ['fin.invoice', 'fin.billing_allocator'] as const
 
 /**
  * Every page under `(portal)`, by its route as the folders spell it, and the
@@ -79,13 +79,13 @@ export const PAGE_TABS = {
   // The Revenue Department's sub-departments are set up where Rules are.
   '/revenue/department': ['hr.rules'],
   // People Management holds the Permissions tab; a department reads its own people.
-  '/team/people': ['hr.people', 'hr.permissions', 'dept.people'],
-  '/team/people/[id]': ['hr.people', 'hr.permissions', 'dept.people'],
+  '/team/people': ['hr.people', 'hr.permissions'],
+  '/team/people/[id]': ['hr.people', 'hr.permissions'],
   '/team/people/[id]/edit': PEOPLE,
   '/team/people/new': PEOPLE,
   '/team/people/import': PEOPLE,
   '/team/accounts/[id]': ['hr.permissions'],
-  '/team/hierarchy': ['hr.hierarchy', 'dept.people'],
+  '/team/hierarchy': ['hr.hierarchy'],
   '/member-admin': ['hr.member_services'],
   // HR revamp round 2: People › Documentation.
   '/team/documentation': ['hr.documentation'],
@@ -156,7 +156,7 @@ export const PAGE_TABS = {
   '/statements/[id]/print': STATEMENTS,
   '/statements/monthly': STATEMENTS,
   // The reports index also lists HR Costing's.
-  '/reports': ['fin.reports', 'pri.reports', 'fin.dept_reports', 'dept.reports', 'hr.hr_costing'],
+  '/reports': ['fin.reports', 'pri.reports', 'fin.dept_reports', 'hr.hr_costing'],
   '/reports/balance-sheet': REPORTS,
   '/reports/base-rate': REPORTS,
   '/reports/company-statement': REPORTS,
@@ -166,7 +166,7 @@ export const PAGE_TABS = {
   '/reports/trial-balance': REPORTS,
   '/reports/cash-flow/layout': REPORTS,
   '/reports/monthly-pnl/layout': REPORTS,
-  '/reports/claims': ['fin.reports', 'pri.reports', 'pri.claims', 'dept.claims'],
+  '/reports/claims': ['fin.reports', 'pri.reports', 'pri.claims'],
   '/reports/income-statement': DEPT_REPORTS,
   '/reports/cash-flow': DEPT_REPORTS,
   '/reports/receipt-payment': DEPT_REPORTS,
@@ -182,7 +182,7 @@ export const PAGE_TABS = {
   '/reconciliation/journal-entries/[id]': JOURNAL,
   '/reconciliation/journal-entries/[id]/edit': JOURNAL,
   '/reconciliation/journal-entries/new': JOURNAL,
-  '/claims': ['pri.claims', 'dept.claims', 'dept.my_claims'],
+  '/claims': ['pri.claims', 'dept.my_claims'],
   '/dept-pool': DEPT_POOL,
   '/dept-pool/[slug]': DEPT_POOL,
   '/dept-pool/marketing': DEPT_POOL,
@@ -195,8 +195,7 @@ export const PAGE_TABS = {
   '/settings': ['fin.chart_of_account', 'pri.settings'],
 
   // ── Principal and Department views ──
-  '/opex': ['pri.opex', 'dept.opex'],
-  '/my-billing': ['pri.my_billing', 'dept.my_billing'],
+  '/opex': ['pri.opex'],
 } as const satisfies Record<string, readonly string[]>
 
 export type PageRoute = keyof typeof PAGE_TABS
@@ -206,12 +205,16 @@ export type PageRoute = keyof typeof PAGE_TABS
  * own approval pages, opened by whoever it involves; the old addresses that
  * only send on to a page that asks for itself; and Admin › Change password,
  * every personal login's own (2026-10-12 — it asks for that itself), and its
- * neighbour Admin › My documents (2026-10-14, the same).
+ * neighbour Admin › My documents (2026-10-14, the same). IT support belongs
+ * to every active account: sending and following one's own asks no module cell.
+ * The separate IT requests desk asks the account's IT requests · View itself.
  */
 export const OPEN_PAGES: ReadonlySet<string> = new Set([
   '/dashboard',
   '/admin/documents',
   '/admin/password',
+  '/it-support',
+  '/it-requests',
   '/approvals/[id]',
   '/approvals/payroll-run/[id]',
   '/billing',

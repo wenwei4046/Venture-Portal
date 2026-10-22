@@ -20,7 +20,7 @@ const CS: Record<string, [string, string, string]> = {
   H: ['var(--ds-ink-2)', 'var(--ds-ink-3)', 'Public holiday'],
   CH: ['var(--ds-ink-2)', 'var(--ds-ink-3)', 'Company holiday'],
   SO: ['var(--ds-ink-2)', 'var(--ds-ink-3)', 'Special off'],
-  W: ['var(--ds-ink-3)', 'transparent', 'Weekend'],
+  W: ['var(--ds-ink-3)', 'transparent', 'Day off'],
   '·': ['var(--ds-ink-3)', 'transparent', 'Not in yet'],
   '': ['var(--ds-ink-3)', 'transparent', ''],
 }

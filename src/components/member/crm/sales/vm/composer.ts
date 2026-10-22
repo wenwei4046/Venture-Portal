@@ -39,7 +39,8 @@ export const ICON = {
   hand: "M7 10v10H4V10h3Zm0 0 4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7",
   home: "M4 11 12 4l8 7M6 9.5V20h12V9.5",
   heart: "M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10Z",
-  stk: "M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6l7-7Zm0 0h-4a3 3 0 0 0-3 3v4",
+  // The 4a frames (M04–M06) draw a smiley where the composer handoff drew a sticker (2026-10-18).
+  stk: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
   kb: "M3 6h18v12H3V6Zm4 3h.01M10 9h.01M13 9h.01M16 9h.01M7 12h.01M10 12h.01M13 12h.01M16 12h.01M8 15h8",
   send: "M4 12 20 4l-4 16-4-7-8-1Zm8 1 8-9",
   mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3",
@@ -62,10 +63,10 @@ export const TABS: readonly (readonly [string, string, string])[] = [["emoji", "
 
 /** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies, Auto replies. */
 export const TILES = [
-  ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "#2F8FD8"],
-  ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "#BD4A19"],
-  ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "#A46312"],
-  ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "#387557"],
+  ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
+  ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "var(--crm-rust)"],
+  ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "var(--crm-brown)"],
+  ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "var(--crm-brown)"],
 ] as const;
 export type TileLabel = (typeof TILES)[number][0];
 
@@ -76,11 +77,12 @@ export const PANEL_H = 280;
 /** The tallest the reply box grows before it scrolls (the handoff: 154px — six lines). */
 export const BOX_MAX = 154;
 /** One line of the reply box: 12px padding, a 22px line, 12px padding. */
-export const BOX_MIN = 46;
+/** The reply box's least height: the 4a frames' 52 px bar (it was the composer handoff's 46). */
+export const BOX_MIN = 52;
 /** What a tap on the mic says (the prototype's toast): it is held to record. */
 export const HOLD_HINT = "Hold to record a voice note";
 
-const RUST = "#BD4A19", SUB = "rgb(128 107 96)", MUTED = "#806B60";
+const RUST = "var(--crm-rust)", SUB = "rgb(128 107 96)", MUTED = "var(--crm-muted)";
 
 /** A string's user-perceived characters — a flag, a family or a skin tone is one (the prototype's split). */
 export function graphemes(s: string): string[] {
@@ -139,7 +141,7 @@ export const toggleSearch = (s: ComposerState): ComposerState => ({ ...s, search
 export const pickCat = (s: ComposerState, id: string): ComposerState => ({ ...s, ecat: id, searching: false, q: "" });
 
 /** The strip under the composer takes the colour of what sits above it. */
-export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : panel === "attach" ? "#FBF7F3" : "transparent");
+export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : panel === "attach" ? "var(--crm-page)" : "transparent");
 
 // ── The binding surface SalesComposer reads (every p.<name>; tools/crm-design/composer-bindings.txt) ──
 
@@ -162,6 +164,10 @@ export interface ComposerVM {
   replyText: string; replyWho: string; cancelReply: Click;
   slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit?: Click;
   openTpl: Click;
+  /** Settings › Suggest a template: the cold chat's template button, else the line saying the window is shut. */
+  tplOn: boolean; tplOff: boolean;
+  /** Frame M08: the cold card's line — who last wrote when, and what opens the chat again. */
+  coldSub: string;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
   /** Slide to cancel: the hint follows the finger (a transform), red near the line. */
   recSlide: string; recHintC: string;
@@ -182,6 +188,10 @@ export interface ComposerIn {
   send: () => void;
   warm: boolean;
   openTpl: () => void;
+  /** Settings › Suggest a template (on unless Settings turned it off). */
+  tplOn?: boolean;
+  /** The cold card's line (common.ts › coldLine). */
+  coldSub?: string;
   reply: { who: string; text: string } | null;
   cancelReply: () => void;
   slash: { q: string; empty: boolean; list: { title: string; text: string; rule: string; pick: () => void }[] } | null;
@@ -249,9 +259,9 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     mainDown: has ? noop : d.mainDown, noMenu, keep,
     sticker: shown === "sticker", attach: shown === "attach", panelH: `${d.panelH}px`,
     searching: s.searching, notSearching: !s.searching, q: s.q, onQ: e => set(x => ({ ...x, q: e.target.value })),
-    searchPh: "Search emoji", searchBg: s.searching ? "#FFE5CF" : "#F3EAE2", searchFg: s.searching ? RUST : "#3F2B22",
+    searchPh: "Search emoji", searchBg: s.searching ? "var(--crm-tint-attention)" : "var(--crm-rule-soft)", searchFg: s.searching ? RUST : "var(--crm-ink)",
     toggleSearch: () => set(toggleSearch),
-    tabs: TABS.map(([, label, icon]) => ({ label, icon, bg: "#fff", sh: "0 1px 3px rgba(63,43,34,.14)", fg: RUST, pick: noop })),
+    tabs: TABS.map(([, label, icon]) => ({ label, icon, bg: "#fff", sh: "0 1px 3px rgba(42,22,12,.14)", fg: RUST, pick: noop })),
     delKey: d.delKey,
     isEmoji: true, emoLabel: emo.label, emojis: emo.list.map(e => ({ e, pick: () => add(e) })),
     barIcons: true,
@@ -263,8 +273,8 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
-    openTpl: () => v.openTpl(),
+    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false, tplOff: v.tplOn === false, coldSub: v.coldSub ?? "",
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
-    recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "#A3371A" : "#806B60",
+    recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "var(--crm-oxblood)" : "var(--crm-muted)",
   };
 }

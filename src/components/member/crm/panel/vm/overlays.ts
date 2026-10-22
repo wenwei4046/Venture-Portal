@@ -47,7 +47,7 @@ export function overlaysVM(ctx: PanelCtx) {
   const sd = {
     sdOpen: !!w, sdClose: () => patch({ sendFor: null, sdSel: null }), sdName: w?.name ?? "",
     sdAd: w ? `${w.ad} · ${last ? lastChat(last.at, now) : lastChat(w.createdAt, now)}` : "",
-    sdBtnLabel: sdName ? `Confirm · send to ${sdName}` : "Choose a person", sdBtnBg: sdName ? "#BD4A19" : "#D9C7BA", sdBtnCur: sdName ? "pointer" : "default",
+    sdBtnLabel: sdName ? `Confirm · send to ${sdName}` : "Choose a person", sdBtnBg: sdName ? "var(--crm-rust)" : "var(--crm-line)", sdBtnCur: sdName ? "pointer" : "default",
     sdConfirm: w && ui.sdSel ? () => void reassign(ctx, w, ui.sdSel!, "send", { sendFor: null, sdSel: null }) : undefined,
     sdGroups: w ? pickGroups(ctx, { sel: ui.sdSel, pick: id => patch({ sdSel: id }) }) : [],
   };
@@ -58,16 +58,16 @@ export function overlaysVM(ctx: PanelCtx) {
   const mv = {
     mvOpen: !!L, mvClose: () => patch({ mvFor: null, mvSel: null }), mvName: L?.name ?? "", mvAd: L ? `${L.ad} · now with ${nameOf(L.assignedTo)}` : "",
     mvGroups: L ? pickGroups(ctx, { skip: L.assignedTo, sel: ui.mvSel, pick: id => patch({ mvSel: id }) }) : [],
-    mvBtnLabel: mvName ? `Confirm · move to ${mvName}` : "Choose a person", mvBtnBg: mvName ? "#BD4A19" : "#D9C7BA", mvBtnCur: mvName ? "pointer" : "default",
+    mvBtnLabel: mvName ? `Confirm · move to ${mvName}` : "Choose a person", mvBtnBg: mvName ? "var(--crm-rust)" : "var(--crm-line)", mvBtnCur: mvName ? "pointer" : "default",
     mvConfirm: L && ui.mvSel ? () => void reassign(ctx, L, ui.mvSel!, "move", { mvFor: null, mvSel: null }) : undefined,
   };
 
   // Awaiting reply: everyone's waiting customers; tap → their chat; Move hands one on.
   const by = waitingByLevel(ctx), af = ui.attF, tot = by.reduce((n, g) => n + g.items.length, 0);
-  const seg = (k: typeof af, label: string, dot: string, n: number) => ({ label, dot, n, pick: () => patch({ attF: k }), bg: af === k ? dot : "#fff", bd: af === k ? dot : "#EBDDD2", fg: af === k ? "#fff" : "#3F2B22", w: af === k ? 650 : 500, nBg: af === k ? "rgba(255,255,255,.22)" : dot, nFg: "#fff" });
+  const seg = (k: typeof af, label: string, dot: string, n: number) => ({ label, dot, n, pick: () => patch({ attF: k }), bg: af === k ? dot : "#fff", bd: af === k ? dot : "var(--crm-rule)", fg: af === k ? "#fff" : "var(--crm-ink)", w: af === k ? 650 : 500, nBg: af === k ? "rgba(255,255,255,.22)" : dot, nFg: "#fff" });
   const att = {
     attOpen: ui.att, closeAtt: () => patch({ att: false }),
-    attTabs: [seg("all", "All", "#3F2B22", tot), ...by.map(g => seg(g.k, g.name, g.c, g.items.length))],
+    attTabs: [seg("all", "All", "var(--crm-ink)", tot), ...by.map(g => seg(g.k, g.name, g.c, g.items.length))],
     attGroups: by.filter(g => (af === "all" || g.k === af) && g.items.length).map(g => ({ ...g, n: g.items.length,
       items: g.items.map(i => ({ ...i, open: () => patch({ att: false, tab: "overview", lead: i.id, pick: "", toast: "" }) })) })),
     attEmpty: !by.some(g => (af === "all" || g.k === af) && g.items.length),
@@ -80,7 +80,7 @@ export function overlaysVM(ctx: PanelCtx) {
     ...ctx.teams.map(t => ({ name: t.name, people: t.people })),
   ].map(g => {
     const ps = g.people.filter(p => !q || `${p.name} ${titleOf(p)}`.toLowerCase().includes(q));
-    return { name: g.name, n: ps.length, people: ps.map((p, k) => ({ name: p.name, ini: ini(p.name), title: titleOf(p), rule: k ? "1px solid #F3E9E1" : "0", pick: () => { patch({ viewAs: false, vaQ: "" }); ctx.openCrmOf(p.id); } })) };
+    return { name: g.name, n: ps.length, people: ps.map((p, k) => ({ name: p.name, ini: ini(p.name), title: titleOf(p), rule: k ? "1px solid var(--crm-rule-soft)" : "0", pick: () => { patch({ viewAs: false, vaQ: "" }); ctx.openCrmOf(p.id); } })) };
   }).filter(g => g.n);
   const va = { vaOpen: ui.viewAs, closeViewAs: () => patch({ viewAs: false }), vaQ: ui.vaQ, vaSetQ: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(x => ({ ...x, vaQ: v })); }, vaGroups, vaNone: !vaGroups.length };
 

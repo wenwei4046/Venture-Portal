@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { PNG } from '@/test/signature'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Documentation, Published } from '@/lib/documentation/model'
 
@@ -112,9 +113,9 @@ describe('Documentation › Publish › Preview', () => {
     id: 'p1', title: 'House rules', body: 'Please read the rules.\n\nThey start on Monday.', sender: 'People & Culture', kind: 'Memo',
     publishedAt: '2026-10-12T09:44:13Z', requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' }, withdrawnAt: null,
     people: [
-      { staffId: 'kris', name: 'KRIS', department: 'Revenue', hasLogin: true, readAt: '2026-10-12T09:44:39Z', acknowledgedAt: null },
-      { staffId: 'zack', name: 'Zack', department: 'Revenue', hasLogin: false, readAt: null, acknowledgedAt: null },
-      { staffId: 'loo', name: 'LOO WEN WEI', department: 'Director', hasLogin: true, readAt: '2026-10-12T09:50:00Z', acknowledgedAt: '2026-10-12T09:51:00Z' },
+      { staffId: 'kris', name: 'KRIS', department: 'Revenue', hasLogin: true, readAt: '2026-10-12T09:44:39Z', acknowledgedAt: null, signature: null },
+      { staffId: 'zack', name: 'Zack', department: 'Revenue', hasLogin: false, readAt: null, acknowledgedAt: null, signature: null },
+      { staffId: 'loo', name: 'LOO WEN WEI', department: 'Director', hasLogin: true, readAt: '2026-10-12T09:50:00Z', acknowledgedAt: '2026-10-12T09:51:00Z', signature: PNG },
     ],
   }
 
@@ -137,13 +138,18 @@ describe('Documentation › Publish › Preview', () => {
     expect(within(card).getByText('They start on Monday.')).toBeInTheDocument()
     expect(within(card).getByText('Rules.pdf')).toBeInTheDocument()
     expect(within(card).getByText('PDF')).toBeInTheDocument()
-    expect(within(card).getByText(/Each person taps Acknowledge once/)).toBeInTheDocument()
+    // 2026-10-20: each person signs before they acknowledge.
+    expect(within(card).getByText(/Each person signs and taps Acknowledge once/)).toBeInTheDocument()
+    expect(within(card).getByText(/their signature, name and time are recorded for HR/)).toBeInTheDocument()
 
     fireEvent.click(within(drawer).getByRole('tab', { name: /Who has it/ }))
     expect(within(drawer).getByText('1 of 3 acknowledged · 1 has no login yet')).toBeInTheDocument()
     expect(within(drawer).getByText('Acknowledged')).toBeInTheDocument()
     expect(within(drawer).getByText('Opened')).toBeInTheDocument()
     expect(within(drawer).getByText('No login yet')).toBeInTheDocument()
+    // …and the signature beside whoever acknowledged — nobody else's.
+    expect(within(drawer).getByRole('img', { name: "LOO WEN WEI's signature" })).toHaveAttribute('src', PNG)
+    expect(within(drawer).getAllByRole('img')).toHaveLength(1)
   })
 
   it('its file opens from the preview, a short link made at the press', async () => {

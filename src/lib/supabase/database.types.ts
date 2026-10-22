@@ -4395,6 +4395,12 @@ export type Database = {
       hr_staff_costs: {
         Row: {
           address: string | null
+          address_city: string | null
+          address_country: string | null
+          address_line1: string | null
+          address_line2: string | null
+          address_postcode: string | null
+          address_state: string | null
           allowances: number
           bank_account_no: string | null
           bank_name_2: string | null
@@ -4419,9 +4425,11 @@ export type Database = {
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
           epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
+          first_name: string | null
           hire_date: string | null
           id: string
           is_epf_exempt: boolean
+          last_name: string | null
           non_statutory_allowance: number
           nric: string | null
           pcb_category: Database["public"]["Enums"]["pcb_category"]
@@ -4439,6 +4447,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postcode?: string | null
+          address_state?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name_2?: string | null
@@ -4463,9 +4477,11 @@ export type Database = {
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          first_name?: string | null
           hire_date?: string | null
           id?: string
           is_epf_exempt?: boolean
+          last_name?: string | null
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
@@ -4483,6 +4499,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postcode?: string | null
+          address_state?: string | null
           allowances?: number
           bank_account_no?: string | null
           bank_name_2?: string | null
@@ -4507,9 +4529,11 @@ export type Database = {
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
+          first_name?: string | null
           hire_date?: string | null
           id?: string
           is_epf_exempt?: boolean
+          last_name?: string | null
           non_statutory_allowance?: number
           nric?: string | null
           pcb_category?: Database["public"]["Enums"]["pcb_category"]
@@ -4810,6 +4834,7 @@ export type Database = {
           base_amount: number | null
           billable_to_department_id: string | null
           billable_to_freetext_address: string | null
+          billable_to_freetext_address_parts: Json | null
           billable_to_freetext_email: string | null
           billable_to_freetext_name: string | null
           billable_to_freetext_phone: string | null
@@ -4838,6 +4863,7 @@ export type Database = {
           base_amount?: number | null
           billable_to_department_id?: string | null
           billable_to_freetext_address?: string | null
+          billable_to_freetext_address_parts?: Json | null
           billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
           billable_to_freetext_phone?: string | null
@@ -4866,6 +4892,7 @@ export type Database = {
           base_amount?: number | null
           billable_to_department_id?: string | null
           billable_to_freetext_address?: string | null
+          billable_to_freetext_address_parts?: Json | null
           billable_to_freetext_email?: string | null
           billable_to_freetext_name?: string | null
           billable_to_freetext_phone?: string | null
@@ -6390,6 +6417,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          journal_entry_id: string | null
           loan_id: string
           notes: string | null
           payment_date: string
@@ -6401,6 +6429,7 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          journal_entry_id?: string | null
           loan_id: string
           notes?: string | null
           payment_date: string
@@ -6412,6 +6441,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          journal_entry_id?: string | null
           loan_id?: string
           notes?: string | null
           payment_date?: string
@@ -6424,6 +6454,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repayments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
           {
@@ -8207,6 +8244,10 @@ export type Database = {
         Args: { p_period: string; p_user_id: string }
         Returns: number
       }
+      reverse_voucher_fund_source_repayments: {
+        Args: { p_voucher_id: string }
+        Returns: number
+      }
       reverse_voucher_pool_rows: {
         Args: { p_voucher_no: string }
         Returns: number
@@ -8267,29 +8308,8 @@ export type Database = {
         Args: { p_payment_date: string; p_voucher_id: string }
         Returns: undefined
       }
-      submit_dept_payment_request: {
-        Args: {
-          p_amount: number
-          p_category_code?: string
-          p_description: string
-          p_payee_company_id: string
-          p_payee_name: string
-        }
-        Returns: string
-      }
       submit_director_salary_to_finance: {
         Args: { p_period: string; p_user_id: string }
-        Returns: string
-      }
-      submit_invoice_request: {
-        Args: {
-          p_description: string
-          p_due_date: string
-          p_invoice_date: string
-          p_line_items: Json
-          p_period_month: string
-          p_reference_no: string
-        }
         Returns: string
       }
       director_payroll_complete: {

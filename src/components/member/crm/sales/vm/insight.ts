@@ -11,6 +11,7 @@ import type { CrmCustomer } from "@/lib/member/crm-data";
 import { downlineOf } from "../../shared/people";
 import { BORDER, gb, day0, DAY, ini, isCold, lastReal, stop, timeLabel, urgencyOf, type SalesCtx } from "./common";
 import { customerFormVM, infoRows, phoneLabel } from "./customer";
+import { STATUS } from "../../shared/palette";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -50,19 +51,43 @@ export function insightVM(ctx: SalesCtx) {
   const pct = (a: number, b: number) => b ? `${Math.round(a / b * 100)}%` : "—";
   const warm = leads.filter(c => !isCold(c, now));
   const status: [string, number, string][] = [
-    ["New", warm.filter(c => c.status === "new").length, "#2F8FD8"],
-    ["Attention", warm.filter(c => urgencyOf(c, now).level !== "none").length, "#A3371A"],
-    ["Appointment", warm.filter(c => c.status === "appointment").length, "#BD4A19"],
-    ["Cold leads", cold, "#3E5C7A"],
+    ["New", warm.filter(c => c.status === "new").length, STATUS.New.dot],
+    ["Attention", warm.filter(c => urgencyOf(c, now).level !== "none").length, STATUS.Attention.dot],
+    ["Appointment", warm.filter(c => c.status === "appointment").length, STATUS.Appointment.dot],
+    ["Cold leads", cold, STATUS["Cold leads"].dot],
   ];
   const tot = status.reduce((a, s) => a + s[1], 0);
+
+  // ── 4a (M11, change list 19): the rust hero's three rates with their change on the period before (in points), the
+  // counts as cards, and every status in the 2-column list.
+  const rates = (lo: number, hi: number) => {
+    const inP = (iso: string) => { const t = day0(new Date(iso)); return t >= lo && t <= hi; };
+    const ls = mine.filter(c => inP(c.createdAt)), vs = data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled" && inP(v.start));
+    const dueP = vs.filter(v => v.state !== "booked" || new Date(v.start) <= now), sh = vs.filter(v => v.state === "attended").length;
+    const bk = ls.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).length;
+    const r = (a: number, b: number) => (b ? (a / b) * 100 : null);
+    return [r(Math.min(bk, ls.length), ls.length), r(sh, dueP.length), r(vs.filter(v => v.state === "attended" && v.outcome === "won").length, sh)];
+  };
+  const len = R1 - R0 + DAY;
+  const [P0, P1] = per === "month" ? [new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth(), 0).getTime()] : [R0 - len, R0 - DAY];
+  const cur4 = rates(R0, R1), prev4 = rates(P0, P1);
+  const delta = (k: number) => { const a = cur4[k], b = prev4[k]; if (a == null || b == null) return { text: "", good: true };
+    const d = Math.round(a - b); return { text: d === 0 ? "±0 pts" : `${d > 0 ? "+" : "−"}${Math.abs(d)} pts`, good: d >= 0 }; };
+  const all7 = mine.filter(c => inR(c.createdAt));
+  const warm7 = all7.filter(c => !isCold(c, now)), att = (c: CrmCustomer) => urgencyOf(c, now).level !== "none";
+  const st7: [keyof typeof STATUS, number][] = [
+    ["New", warm7.filter(c => c.status === "new" && !att(c)).length], ["Attention", warm7.filter(att).length],
+    ["Follow up", warm7.filter(c => c.status === "follow_up" && !att(c)).length], ["Appointment", warm7.filter(c => c.status === "appointment" && !att(c)).length],
+    ["Won", all7.filter(c => c.status === "won").length], ["Lost", all7.filter(c => c.status === "lost").length], ["Cold leads", all7.filter(c => isCold(c, now) && c.status !== "won" && c.status !== "lost").length],
+  ];
+  const tot7 = st7.reduce((a, s) => a + s[1], 0);
 
   // Range sheet.
   const sh = ui.insSheet;
   const setS = (p: Partial<NonNullable<typeof ui.insSheet>>) => set(u => (u.insSheet ? { ...u, insSheet: { ...u.insSheet, ...p } } : u));
   const rg = ui.insPeriod === "range" && ui.insRange ? ui.insRange : null;
   let ir = { irTitle: "", irWk: [] as string[], irMonths: [] as { label: string; bg: string; fg: string; border: string; pick: () => void }[], irCells: [] as { t: number; n: number; cur: string; band: string; bandR: string; bg: string; fg: string; weight: number; ring: string; down?: (e: RPointerEvent<HTMLElement>) => void }[],
-    irMove: (_: RPointerEvent<HTMLElement>) => {}, irUp: () => {}, irPrev: () => {}, irNext: () => {}, irNextFg: "#806B60", irHint: "", irApplyLabel: "", irApplyBg: "#D9C7BA", irApply: undefined as undefined | (() => void) };
+    irMove: (_: RPointerEvent<HTMLElement>) => {}, irUp: () => {}, irPrev: () => {}, irNext: () => {}, irNextFg: "var(--crm-muted)", irHint: "", irApplyLabel: "", irApplyBg: "var(--crm-line)", irApply: undefined as undefined | (() => void) };
   if (sh) {
     const cm = sh.cm, lo = sh.a == null ? null : Math.min(sh.a, sh.b ?? sh.a), hi = sh.a == null ? null : Math.max(sh.a, sh.b ?? sh.a);
     const f1 = new Date(cm[0], cm[1], 1), lead0 = (f1.getDay() + 6) % 7, rows = Math.ceil((lead0 + new Date(cm[0], cm[1] + 1, 0).getDate()) / 7);
@@ -70,13 +95,13 @@ export function insightVM(ctx: SalesCtx) {
     const days = lo == null || hi == null ? 0 : Math.round((hi - lo) / DAY) + 1;
     ir = {
       irTitle: f1.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), irWk: ["M", "T", "W", "T", "F", "S", "S"],
-      irMonths: MON.slice(0, now.getMonth() + 1).map((n, m) => { const on = cm[1] === m && cm[0] === now.getFullYear(); return { label: n, bg: on ? "#4E2F20" : "#fff", fg: on ? "#fff" : "#3F2B22", border: on ? "#4E2F20" : "#EBDDD2", pick: () => setS({ cm: [now.getFullYear(), m] }) }; }),
+      irMonths: MON.slice(0, now.getMonth() + 1).map((n, m) => { const on = cm[1] === m && cm[0] === now.getFullYear(); return { label: n, bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", border: on ? "var(--crm-ink)" : "var(--crm-rule)", pick: () => setS({ cm: [now.getFullYear(), m] }) }; }),
       irCells: Array.from({ length: rows * 7 }, (_, k) => {
         const d = new Date(cm[0], cm[1], 1 - lead0 + k), t = d.getTime(), inM = d.getMonth() === cm[1], fut = t > T, inRg = lo != null && hi != null && t >= lo && t <= hi, end = t === lo || t === hi, col = k % 7;
-        return { t, n: d.getDate(), cur: fut ? "not-allowed" : "pointer", band: inRg && lo !== hi ? "#F5EBE3" : "transparent",
+        return { t, n: d.getDate(), cur: fut ? "not-allowed" : "pointer", band: inRg && lo !== hi ? "var(--crm-field)" : "transparent",
           bandR: !inRg || lo === hi ? "0" : t === lo || col === 0 ? (t === hi || col === 6 ? "20px" : "20px 0 0 20px") : t === hi || col === 6 ? "0 20px 20px 0" : "0",
-          bg: end ? "#4E2F20" : "transparent", fg: end ? "#fff" : fut ? "#D9C7BA" : inM ? "#3F2B22" : "#C9B5A8", weight: end || t === T ? 700 : 500,
-          ring: end && lo !== hi ? "0 0 0 3px #F6B48A" : t === T && !end ? "inset 0 0 0 1.5px #BD4A19" : "none",
+          bg: end ? "var(--crm-ink)" : "transparent", fg: end ? "#fff" : fut ? "var(--crm-line)" : inM ? "var(--crm-ink)" : "var(--crm-faint-2)", weight: end || t === T ? 700 : 500,
+          ring: end && lo !== hi ? "0 0 0 3px var(--crm-peach)" : t === T && !end ? "inset 0 0 0 1.5px var(--crm-rust)" : "none",
           down: fut ? undefined : (e: RPointerEvent<HTMLElement>) => {
             e.preventDefault(); refs.irDrag = true;
             if (lo != null && hi != null && lo !== hi && (t === lo || t === hi)) { setS({ a: t === lo ? hi : lo, b: t, dragged: true }); return; }
@@ -90,10 +115,10 @@ export function insightVM(ctx: SalesCtx) {
       },
       irUp: () => { refs.irDrag = false; },
       irPrev: () => setS({ cm: [cm[1] ? cm[0] : cm[0] - 1, (cm[1] + 11) % 12] }),
-      irNext: () => { if (!atMax) setS({ cm: [cm[1] === 11 ? cm[0] + 1 : cm[0], (cm[1] + 1) % 12] }); }, irNextFg: atMax ? "#D9C7BA" : "#806B60",
+      irNext: () => { if (!atMax) setS({ cm: [cm[1] === 11 ? cm[0] + 1 : cm[0], (cm[1] + 1) % 12] }); }, irNextFg: atMax ? "var(--crm-line)" : "var(--crm-muted)",
       irHint: lo == null ? "Tap a day, then another day, or drag across days." : days === 1 ? "Tap another day or drag to extend." : `${days} days · drag either end to adjust`,
       irApplyLabel: lo == null || hi == null ? "Pick dates" : "Show " + (lo === hi ? f(new Date(lo)) : `${f(new Date(lo))} – ${f(new Date(hi))}`),
-      irApplyBg: lo == null ? "#D9C7BA" : "#BD4A19",
+      irApplyBg: lo == null ? "var(--crm-line)" : "var(--crm-rust)",
       irApply: lo == null || hi == null ? undefined : () => patch({ insPeriod: "range", insRange: { a: lo, b: hi }, insSheet: null }),
     };
   }
@@ -115,7 +140,7 @@ export function insightVM(ctx: SalesCtx) {
     .sort((a, b) => kind === "up" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
   const byId = new Map(mine.map(c => [c.id, c]));
   const row = (c: CrmCustomer, at: Date, n: number) => ({ name: c.name, ini: ini(c.name), phone: phoneLabel(c.phone) || "—", owner: "", date: dOnly(at), time: timeLabel(at),
-    rule: n ? "1px solid #EBDDD2" : "0", open: () => patch({ insInfo: c.id }) });
+    rule: n ? "1px solid var(--crm-rule)" : "0", open: () => patch({ insInfo: c.id }) });
   const lsRows = kind === "leads"
     ? [...leads].sort((a, b) => lastAt(b).localeCompare(lastAt(a))).map((c, n) => row(c, new Date(lastAt(c)), n))
     : vList.flatMap((v, n) => { const c = byId.get(v.customerId); return c ? [row(c, new Date(v.start), n)] : []; });
@@ -143,17 +168,27 @@ export function insightVM(ctx: SalesCtx) {
         : per === "week" ? `This week · ${f(new Date(wk0))} – ${f(new Date(wk0 + 6 * DAY))}`
           : "This month · " + now.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
     rgLabel: rg ? (rg.a === rg.b ? f(new Date(rg.a)) : `${f(new Date(rg.a))} – ${f(new Date(rg.b))}`) : "Range",
-    rgBg: rg ? "#3F2B22" : "#fff", rgFg: rg ? "#fff" : "#3F2B22", rgBd: rg ? "#3F2B22" : "#EBDDD2",
+    rgBg: rg ? "var(--crm-ink)" : "#fff", rgFg: rg ? "#fff" : "var(--crm-ink)", rgBd: rg ? "var(--crm-ink)" : "var(--crm-rule)",
     openRange: () => patch({ insSheet: { cm: rg ? [new Date(rg.a).getFullYear(), new Date(rg.a).getMonth()] : [now.getFullYear(), now.getMonth()], a: rg ? rg.a : null, b: rg ? rg.b : null } }),
     pPeriods: ([["month", "Month"], ["week", "Week"], ["day", "Day"]] as const).map(([k, label]) => ({
-      label, pick: () => patch({ insPeriod: k }), bg: per === k ? "#fff" : "transparent", fg: per === k ? "#3F2B22" : "#806B60", weight: per === k ? 650 : 500, shadow: per === k ? "0 1px 3px rgba(63,43,34,.12)" : "none",
+      label, pick: () => patch({ insPeriod: k }), bg: per === k ? "#fff" : "transparent", fg: per === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: per === k ? 650 : 500, shadow: per === k ? "0 1px 3px rgba(42,22,12,.12)" : "none",
     })),
     pHero: {
       rate: pct(Math.min(bookedLeads, leads.length), leads.length), rateNote: `${Math.min(bookedLeads, leads.length)} of ${leads.length} leads booked`,
       show: pct(showed, due.length), showNote: due.length ? `${showed} of ${due.length} came${noshow ? ` · ${noshow} no show` : ""}` : "None due yet",
       won: pct(wonV, showed), wonNote: showed ? `${wonV} of ${showed} visits won` : "No visits yet",
       leads: leads.length, appts: visits.length, up: upcoming,
-      reply: fmtM(reply), replyNote: gaps.length ? `across ${gaps.length} replies` : "No replies yet", replyFg: reply != null && reply > 60 ? "#F6B48A" : "#FFFFFF",
+      reply: fmtM(reply), replyNote: gaps.length ? `across ${gaps.length} replies` : "No replies yet", replyFg: reply != null && reply > 60 ? "var(--crm-peach)" : "var(--crm-page)",
+    },
+    p4: {
+      periods: [...(["month", "week", "day"] as const).map(k => ({ label: k[0].toUpperCase() + k.slice(1), on: per === k, pick: () => patch({ insPeriod: k }) })),
+        { label: "Range", on: per === "range", pick: () => patch({ insSheet: { cm: rg ? [new Date(rg.a).getFullYear(), new Date(rg.a).getMonth()] : [now.getFullYear(), now.getMonth()], a: rg ? rg.a : null, b: rg ? rg.b : null } }) }],
+      range: per === "range" && rg ? (rg.a === rg.b ? f(new Date(rg.a)) : `${f(new Date(rg.a))} – ${f(new Date(rg.b))}`) : "",
+      hero: [["Appt rate", pct(Math.min(bookedLeads, leads.length), leads.length), delta(0)], ["Show-up", pct(showed, due.length), delta(1)], ["Won rate", pct(wonV, showed), delta(2)]]
+        .map(([label, value, d]) => ({ label: label as string, value: value as string, delta: (d as { text: string }).text, good: (d as { good: boolean }).good })),
+      counts: [["Leads", leads.length, "leads"], ["Appointments", visits.length, "appts"], ["Upcoming", upcoming, "up"]].map(([label, n, k]) => ({ label: label as string, n: n as number, open: openList(k as "leads" | "appts" | "up") })),
+      reply: reply == null ? { n: "—", unit: "" } : reply < 60 ? { n: String(reply), unit: "min" } : { n: `${Math.floor(reply / 60)}`, unit: reply % 60 ? `h ${reply % 60} min` : "h" },
+      status: st7.map(([label, n]) => ({ label, n, c: STATUS[label].dot, hot: label === "Attention" })), total: tot7,
     },
     pStatus: status.map(([label, n, c]) => ({ label, n, c, w: `${tot ? n / tot * 100 : 0}%` })),
     irOpen: !!sh, irClose: () => patch({ insSheet: null }),

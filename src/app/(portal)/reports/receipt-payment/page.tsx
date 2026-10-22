@@ -4,14 +4,13 @@
 // opening/closing, compare column — PLUS the block cash flow doesn't have:
 // 未收 To collect, every issued invoice's balance net of receipts/approved
 // CNs (dept_invoice_settlements RPC), because "类似cash flow但还需要include
-// 还没收回的钱". dept_manager is RLS-locked to their own segment;
-// finance/principal use the standard segment rail (未收 needs a specific
-// segment — the consolidated view leaves it out instead of guessing one).
+// 还没收回的钱". The standard segment rail (未收 needs a specific segment —
+// the consolidated view leaves it out instead of guessing one).
 
 import dayjs from 'dayjs'
+import { notFound } from 'next/navigation'
 import { canDo } from '@/lib/permission-actions'
 import { officeMonth } from '@/lib/office-time'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { listsPayrollByPerson } from '@/lib/roles'
@@ -33,12 +32,10 @@ import {
   payrollCustodyAccount,
 } from '@/lib/inter-billing-cash-flow'
 import { fetchDeptOutstanding } from '@/lib/dept-receipt-payment'
-import { deptNameToSegment } from '@/lib/billing'
 import GlReportView from '../_components/GlReportView'
 import ExportLinks from '../_components/ExportLinks'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
-import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import { formatMoney } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -55,21 +52,22 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 export default async function ReceiptPaymentPage({ searchParams }: Props) {
   await requirePage('/reports/receipt-payment')
   const user = await requirePermission('dept_reports')
+  // For whoever reads the reports company-wide (Reports · View at All); the
+  // Dept Manager's own-segment page went with the kind (2026-10-17).
+  if (!reportsCompanyWide(user)) notFound()
   // The files only for whoever may take them out — as the export route asks (2026-10-16).
-  const canExport = canDo(user, 'dept_reports', 'export', 'dept')
+  const canExport = canDo(user, 'dept_reports', 'export')
   const supabase = await createClient()
 
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   const compare = params.compare ?? ''
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : (params.segment ?? '')
-  const consolidated = !isDeptMgr && !segment
+  const segment = params.segment ?? ''
+  const consolidated = !segment
   // ── 未收 To collect — the block Cash Flow doesn't have ────────────────────
-  // dept_manager: RPC keys off their own segment. finance/principal: needs a
-  // concrete segment; the consolidated view has no 未收 block.
-  const arSegment = isDeptMgr ? null : segment || null
-  const showAr = isDeptMgr || !!arSegment
+  // It needs a concrete segment; the consolidated view has no 未收 block.
+  const arSegment = segment || null
+  const showAr = !!arSegment
 
   // Every read starts at once (2026-10-08) — the bridge, the layouts and the
   // 未收 reads each used to wait for the one before. The bridge is handed the
@@ -91,10 +89,6 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
       ? Promise.all([
           fetchDeptOutstanding(supabase as never, { segment: arSegment }),
           supabase.from('companies').select('id, name'),
-          // For dept_manager the txn segment tag is their own; resolve for display.
-          isDeptMgr && user.department_id
-            ? supabase.from('departments').select('name').eq('id', user.department_id).single()
-            : null,
         ])
       : null,
   ])
@@ -119,15 +113,10 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
 
   const arBlocks: ReportBlock[] = []
   if (arReads) {
-    const [outstanding, { data: companies }, deptRead] = arReads
+    const [outstanding, { data: companies }] = arReads
     const companyMap = new Map(
       ((companies ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]),
     )
-    let ownSeg = segment
-    if (isDeptMgr && user.department_id) {
-      const dept = deptRead?.data
-      ownSeg = deptNameToSegment(dept?.name) ?? ''
-    }
     const total = r2(outstanding.reduce((s, i) => s + i.outstanding, 0))
     const section: ReportSection = {
       key: 'to_collect',
@@ -148,7 +137,7 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
             description: `开单 ${dayjs(i.invoiceDate ?? i.periodMonth).format('DD MMM YYYY')} · 总额 ${i.totalAmount.toFixed(2)}${
               i.receipts > 0 ? ` · 已收 ${i.receipts.toFixed(2)}` : ''
             }${i.credits > 0 ? ` · CN −${i.credits.toFixed(2)}` : ''}`,
-            segment: ownSeg || arSegment || '',
+            segment,
             party: i.companyId ? companyMap.get(i.companyId) ?? null : i.partyFallback,
             amount: i.outstanding,
           },
@@ -173,93 +162,55 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
 
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
 
-  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
-  // Design handoff): the two views and the exports in the head, the cards,
-  // the controls on one row over the statement. A department manager keeps
-  // the page below, as it was.
-  if (!isDeptMgr) {
-    const segChoices = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
-    const segName = (segChoices.find((s) => s.value === segment) ?? segChoices[0]).label
-    const mon = dayjs(`${period}-01`).format('MMM')
-    return (
-      <div>
-        <div className="page-head">
-          <div className="min-w-0">
-            <div className="page-eyebrow">
-              <em>I.</em> REPORTS · RECEIPT &amp; PAYMENT · {periodLabel.toUpperCase()}
-            </div>
-            <h1 className="page-title">Receipt &amp; Payment</h1>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <ReportModeSwitch pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
-            {canExport ? (
-              <ExportLinks variant="sheet" basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
-            ) : null}
-          </div>
-        </div>
-
-        <StatCards label="Receipt and payment">
-          <StatCard label="Receipts" value={formatMoney(cf.inflow.current)} icon="inbox" tone="ledger" note={periodLabel} />
-          <StatCard label="Payments" value={formatMoney(cf.outflow.current)} icon="send" tone="danger" note={periodLabel} />
-          <StatCard label="Net" value={formatMoney(cf.netChange.current)} icon="swap" tone="primary" note="Receipts − payments" />
-        </StatCards>
-
-        <section className="mb-6">
-          <div className="sect-head">
-            <h2>Receipt &amp; payment</h2>
-            <span className="rule" aria-hidden />
-            <span className="count">
-              {segName.toUpperCase()} · {mon.toUpperCase()} {period.slice(0, 4)}
-            </span>
-          </div>
-          <GlReportView
-            basePath="/reports/receipt-payment"
-            period={period}
-            compare={compare}
-            segment={segment}
-            segments={segChoices}
-            blocks={[...blocks, ...arBlocks]}
-            // Each line as a % of the month's receipts (2026-10-10, the handoff).
-            pctBase={{ current: cf.inflow.current, previous: cf.inflow.previous }}
-            currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
-            compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
-            controls="row"
-          />
-        </section>
-      </div>
-    )
-  }
-
+  // The page (2026-10-09, the user's Claude Design handoff): the two views and
+  // the exports in the head, the cards, the controls on one row over the
+  // statement.
+  const segChoices = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+  const segName = (segChoices.find((s) => s.value === segment) ?? segChoices[0]).label
+  const mon = dayjs(`${period}-01`).format('MMM')
   return (
     <div>
-      <Link href="/reports" className="text-sm text-muted hover:text-accent font-sans transition-colors">
-        ← Back to Reports
-      </Link>
-
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>·</em> REPORTS · RECEIPT &amp; PAYMENT · {periodLabel.toUpperCase()}
+            <em>I.</em> REPORTS · RECEIPT &amp; PAYMENT · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Receipt &amp; Payment</h1>
         </div>
-        {canExport ? (
-          <ExportLinks basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
-        ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ReportModeSwitch pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
+          {canExport ? (
+            <ExportLinks variant="sheet" basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
+          ) : null}
+        </div>
       </div>
 
-      <ReportViewToggle pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
+      <StatCards label="Receipt and payment">
+        <StatCard label="Receipts" value={formatMoney(cf.inflow.current)} icon="inbox" tone="ledger" note={periodLabel} />
+        <StatCard label="Payments" value={formatMoney(cf.outflow.current)} icon="send" tone="danger" note={periodLabel} />
+        <StatCard label="Net" value={formatMoney(cf.netChange.current)} icon="swap" tone="primary" note="Receipts − payments" />
+      </StatCards>
 
-      <GlReportView
-        basePath="/reports/receipt-payment"
-        period={period}
-        compare={compare}
-        segment={segment}
-        segments={isDeptMgr ? [] : [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]}
-        blocks={[...blocks, ...arBlocks]}
-        currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
-        compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
-      />
+      <section className="mb-6">
+        <div className="sect-head">
+          <h2>Receipt &amp; payment</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">
+            {segName.toUpperCase()} · {mon.toUpperCase()} {period.slice(0, 4)}
+          </span>
+        </div>
+        <GlReportView
+          period={period}
+          compare={compare}
+          segment={segment}
+          segments={segChoices}
+          blocks={[...blocks, ...arBlocks]}
+          // Each line as a % of the month's receipts (2026-10-10, the handoff).
+          pctBase={{ current: cf.inflow.current, previous: cf.inflow.previous }}
+          currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
+          compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+        />
+      </section>
     </div>
   )
 }

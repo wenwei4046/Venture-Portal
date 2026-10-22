@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Field, Input } from '@/components/finv/Dialog'
+import AddressFields from '@/components/address/AddressFields'
+import { FIELD_LOOK, Field, Input } from '@/components/finv/Dialog'
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
+import { EMPTY_ADDRESS, addressText, cleanAddress, isEmptyAddress, type Address } from '@/lib/address/address'
 import type { DirectorCtcComponents } from '@/lib/director-ctc-lines'
 import { categoryGroups, hrSource, modeOptions, periodChoices, type BillKind, type InvoiceCategory } from '../_lib/invoice-form'
 import { hubHrFigures } from '../invoice-actions'
@@ -24,9 +26,23 @@ export interface DialogDepartment {
   name: string
 }
 export interface PartyContact {
-  address: string
+  /** The address in its six parts (2026-10-20): two lines, then State → City → Postcode picked from the list. */
+  address: Address
+  /** The one-box text an invoice billed before the parts keeps — shown On file, and sent as it was, until parts are picked. */
+  addressOnFile: string | null
   phone: string
   email: string
+}
+
+export const EMPTY_CONTACT: PartyContact = { address: EMPTY_ADDRESS, addressOnFile: null, phone: '', email: '' }
+
+/** What a dialog sends for a typed party's address: the parts when picked (their line put together), else the text on file. */
+export function contactAddressOut(c: PartyContact): { address: string; addressParts: Address | null } {
+  if (!isEmptyAddress(c.address)) {
+    const parts = cleanAddress(c.address)
+    return { address: addressText(parts) ?? '', addressParts: parts }
+  }
+  return { address: c.addressOnFile ?? '', addressParts: null }
 }
 
 /** "HOUZS Century (HC)" — the hub's way of naming a company. */
@@ -107,15 +123,17 @@ export function PartyFields({
       </Field>
       {kind === 'freetext' ? (
         <>
-          <Field label="Address" htmlFor={`${idPrefix}-address`}>
-            <Input
-              id={`${idPrefix}-address`}
-              value={contact.address}
-              maxLength={300}
-              onChange={(e) => onContact({ ...contact, address: e.target.value })}
-              placeholder="Street, city, postcode"
-            />
-          </Field>
+          {/* The address in six parts, State → City → Postcode picked from the list (2026-10-20). */}
+          <AddressFields
+            value={contact.address}
+            onChange={(address) => onContact({ ...contact, address })}
+            idPrefix={`${idPrefix}-address`}
+            onFile={contact.addressOnFile}
+            inputClassName={FIELD_LOOK.input}
+            labelClassName={FIELD_LOOK.label}
+            selectClassName={fm.select}
+            selectRound={12}
+          />
           <div className={fm.duo}>
             <Field label="Phone" htmlFor={`${idPrefix}-phone`}>
               <Input

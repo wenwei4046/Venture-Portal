@@ -1,5 +1,7 @@
 import type { MemberBand, MemberIncome, MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
+import type { MemberPay } from "@/lib/member/income-pay";
 import type { MemberOrderBook } from "@/lib/member/order-book";
+import type { ShareRequest } from "@/lib/member/share-requests";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
@@ -25,6 +27,15 @@ export interface TodayInput {
   /** The month's figure is still being worked out, or could not be. Absent: ready. */
   incomeStatus?: "loading" | "failed";
   salary: number | null;
+  /**
+   * What the month pays, as HR's payroll pays it (2026-10-20): the fixed
+   * salary is paid OUT OF the commission, with every EPF / SOCSO / EIS and the
+   * PCB — HR's figures (`lib/member/income-pay.ts`). The hero is the basic as
+   * it stands + the balance commission, the member's own EPF / SOCSO / EIS and
+   * PCB not yet off (My income takes them off). Absent (the demo): the salary
+   * and the commission as they are.
+   */
+  pay?: MemberPay | null;
   /**
    * A Principal viewing nobody: `income` is the whole sub-department's
    * commission, named so — it is nobody's income.
@@ -57,15 +68,19 @@ export interface TodayInput {
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
   requestCode: (request: MemberRequest) => string;
+  /** Share order (2026-10-21): bills shared with them, waiting for their answer. */
+  shares?: readonly ShareRequest[];
 }
 
 export type TodoTone = "memo" | "request" | "weeks";
 /** `brandWeeks` / `weeks`: the prototype's "Save … brand weeks" (its fixtures); the live app has had nothing to save since 2026-10-12. */
-export type TodoTarget = "memos" | "requests" | "brandWeeks";
+export type TodoTarget = "memos" | "requests" | "brandWeeks" | "share";
 export interface TodayTodo {
   key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget;
   /** A request's kind: where it is followed up depends on it (app-access.ts `requestPage`). */
   requestKind?: MemberRequest["kind"];
+  /** Share order (2026-10-21): the share request to answer. */
+  shareId?: string;
 }
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
@@ -203,6 +218,10 @@ function todos(input: TodayInput): TodayTodo[] {
     out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests", requestKind: request.kind,
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
+  for (const share of input.shares ?? []) {
+    out.push({ key: `sh-${share.id}`, tone: "request", icon: ICON.share, target: "share", shareId: share.id,
+      title: `Accept ${share.orderNo}?`, sub: `${share.owner.name} shared it with you` });
+  }
   return out;
 }
 
@@ -260,11 +279,22 @@ const LOADING_METRICS: TodayMetric[] = [
 const HIDDEN_AMOUNT = "RM ••••";
 const HIDDEN_SPLIT = "Amounts hidden";
 
-/** "RM 6,842.50" → the currency and the figure, drawn apart in Today's statement ("RM ••••" and "RM —" alike). */
+/** "RM 6,842.50" → the currency and the figure, drawn apart in Today's statement ("RM ••••", "RM —" and "−RM 697.70" alike). */
 export function amountParts(amount: string): { cur: string; num: string } {
-  const m = /^(RM)\s+(.*)$/.exec(amount);
-  return m ? { cur: m[1], num: m[2] } : { cur: "", num: amount };
+  const m = /^(−?)(RM)\s+(.*)$/.exec(amount);
+  return m ? { cur: m[2], num: m[1] + m[3] } : { cur: "", num: amount };
 }
+
+/** `−RM 697.70` — a month whose commission does not yet cover the fixed salary says so, never a floored zero. */
+const rmSigned = (n: number) => (n < 0 ? `−${rm2(-n)}` : rm2(n));
+
+/**
+ * The hero's figure (2026-10-20, the user: "i want his show gross basic, not
+ * net"): the basic as it stands + the balance commission — HR's gross, the
+ * member's own EPF / SOCSO / EIS and PCB not yet off. Without a fixed salary,
+ * what payroll pays.
+ */
+const heroPay = (pay: MemberPay) => (pay.fixed > 0 ? Math.round((pay.fixed + pay.balance) * 100) / 100 : pay.net);
 
 /**
  * The income card as the eye hides it — and as My income closed keeps it
@@ -283,16 +313,21 @@ export function todayModel(input: TodayInput, championRank: number | null = null
   const month = income ? monthName(income.period) : monthName(input.today.slice(0, 7));
   const dept = input.department;
   const pending = input.incomeStatus;
+  // HR's pay (2026-10-20): the fixed salary comes out of the commission, never on top of it — and is
+  // named as it stands, not net of the member's own deductions.
+  const pay = commission === null ? null : input.pay ?? null;
   return {
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
-    heroAmount: input.hidden ? HIDDEN_AMOUNT : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroAmount: input.hidden ? HIDDEN_AMOUNT : pending ? "RM —" : dept ? rm2(commission ?? 0)
+      : pay ? rmSigned(heroPay(pay)) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroLoading: !input.hidden && pending === "loading",
     heroSplit: input.hidden ? HIDDEN_SPLIT
       : pending === "loading" ? `Working out ${month}'s commission…`
       : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
+      : pay ? (pay.fixed > 0 ? `Basic ${rm2(pay.fixed)} + balance commission ${rmSigned(pay.balance)}` : "Commission only")
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
     metrics: input.metricsLoading && !input.insight ? LOADING_METRICS

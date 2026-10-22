@@ -10,18 +10,19 @@ import type { ProfileMainVM } from "./profile-vm";
 
 const vm: ProfileMainVM = { name: "ONG MEI SHUANG", ini: "OM", sub: "HOUZS Venture · Finance", title: "Accounts Executive", rank: "—", badges: {} };
 
-describe("Profile’s Account section", () => {
+// In Settings since 2026-10-16 (the user: Privacy, Account and Sign out "combine to one, name (settings)").
+describe("Profile’s Settings: the password", () => {
   it("offers Change password when it may", () => {
     const changePassword = vi.fn();
     render(<ProfileMain vm={vm} hidden={false} actions={{ open: vi.fn(), signOut: vi.fn(), changePassword }} />);
-    fireEvent.click(within(screen.getByRole("region", { name: "Account" })).getByRole("button", { name: "Change password" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Settings" })).getByRole("button", { name: "Change password" }));
     expect(changePassword).toHaveBeenCalled();
   });
 
   it("is not there for a shared login, nor while a member is viewed", () => {
     render(<ProfileMain vm={vm} hidden={false} actions={{ open: vi.fn(), signOut: vi.fn() }} />);
-    expect(screen.queryByRole("region", { name: "Account" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change password" })).toBeNull();
+    expect(within(screen.getByRole("region", { name: "Settings" })).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 });
 

@@ -23,6 +23,10 @@ const actions = vi.hoisted(() => ({
   replacementFormTemplateLink: vi.fn(),
   viewFormTemplate: vi.fn(),
   removeFormTemplate: vi.fn(),
+  uploadSignedForm: vi.fn(),
+  viewSignedForm: vi.fn(),
+  signedFormDownload: vi.fn(),
+  editWaitingApplicant: vi.fn(),
 }))
 vi.mock('../../../waiting-actions', () => actions)
 const convertToHtml = vi.hoisted(() => vi.fn())
@@ -268,6 +272,24 @@ describe('"+" — straight onto the list', () => {
     expect(flash).toHaveBeenCalledWith("Daniel Lee is on Fair's waiting list · RQ-2610-006")
   })
 
+  // 2026-10-20, the user: "want word file as well".
+  it('takes a Word file as the signed form too', async () => {
+    actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-007' })
+    show({ canAdd: true, subDepartmentId: SUB, submitters })
+    fireEvent.click(plus())
+    const win = screen.getByRole('dialog', { name: WINDOW })
+    expect(win).toHaveTextContent('PDF, Word, PNG or JPG, 3 MB or smaller.')
+    const input = within(win).getByLabelText('Attach the signed form')
+    expect(input.getAttribute('accept')).toContain('.docx')
+    fill(win)
+    const letter = new File(['PK'], 'Daniel letter.docx', { type: '' })
+    fireEvent.change(input, { target: { files: [letter] } })
+    await act(async () => {
+      fireEvent.click(within(win).getByRole('button', { name: 'Add to the list' }))
+    })
+    expect(sent().get('signedForm')).toBe(letter)
+  })
+
   // 2026-10-14, the user: some are ready any time — "just wait us to let them join".
   it('takes Any time ready instead of a day — the date then left empty', async () => {
     actions.addToWaitingList.mockResolvedValue({ ok: true, requestNo: 'RQ-2610-007' })
@@ -321,6 +343,322 @@ describe('"+" — straight onto the list', () => {
     expect(drawer).toHaveTextContent('Added to the waiting list')
     expect(drawer).not.toHaveTextContent('Signed by')
     expect(drawer).not.toHaveTextContent('Member services')
+  })
+})
+
+// 2026-10-20, the user, on JOAN QUEK XIAO's drawer: "i want here can be view for the letter they submit, then can
+// be upload as well, the file". The drawer holds the applicant's signed form: View, and Upload / Replace for
+// Member services · Edit.
+// 2026-10-20 — the user, circling the space beside the drawer's ×: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的";
+// and "submitted by … 应该要能选到 Revenue department 的全部人，不管什么 title".
+describe('Edit, in an applicant’s drawer', () => {
+  const SHAWN = '61b4c495-6b7d-442d-a391-31fe4cbe2d6a'
+  const KRIS = '7b6f1f0e-2a8d-4b1a-9a52-5c8a1e2b3c4d'
+  const submitters = [
+    { group: 'Fair', people: [{ id: SHAWN, name: 'SHAWN', title: 'Team Leader' }] },
+    { group: 'Revenue Department', people: [{ id: KRIS, name: 'KRIS', title: 'Revenue Director' }] },
+  ]
+  const joan = (over: Partial<SubDeptRequest> = {}) =>
+    req({
+      id: 'joan', requestNo: 'RQ-2610-002', newPerson: 'JOAN QUEK XIAO', contact: '018-776-0020', submittedBy: 'SHAWN', submittedById: SHAWN,
+      start: 'anytime', acceptedAt: '2026-10-20T04:41:25Z',
+      events: [{ to: 'waiting', at: '2026-10-20T04:41:25Z', note: 'Added on Sales Groups', by: 'LI SEAN' }],
+      ...over,
+    })
+  const open = (canAdd = true, row = joan()) => {
+    const view = show({ rows: [row], canAdd, submitters })
+    fireEvent.click(screen.getAllByRole('row')[1])
+    return { view, drawer: screen.getByRole('dialog') }
+  }
+  const save = (drawer: HTMLElement) => within(drawer).getByRole('button', { name: 'Save changes' })
+
+  it('is offered beside the × to whoever may use "+", and to nobody else', () => {
+    const { drawer } = open(false)
+    expect(within(drawer).queryByRole('button', { name: /Edit/ })).toBeNull()
+    cleanup()
+    const second = open(true).drawer
+    expect(within(second).getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+  })
+
+  it('opens the fields "+" asks, as the applicant is — Save waits for a change', () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    expect((within(drawer).getByLabelText('New member name') as HTMLInputElement).value).toBe('JOAN QUEK XIAO')
+    expect((within(drawer).getByLabelText('Mobile number') as HTMLInputElement).value).toBe('018-776-0020')
+    expect(within(drawer).getByLabelText('Joining date')).toBeDisabled()
+    expect(within(drawer).getByRole('checkbox', { name: 'Any time ready' })).toBeChecked()
+    expect((within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement).value).toBe(SHAWN)
+    expect(drawer).toHaveTextContent('Revenue · Fair')
+    expect(save(drawer)).toBeDisabled()
+    expect(drawer).toHaveTextContent('No changes yet')
+    expect(within(drawer).queryByRole('button', { name: 'Transfer' })).toBeNull()
+  })
+
+  it('offers the whole department for Submitted by — a Revenue Director too', () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    const by = within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement
+    expect([...by.querySelectorAll('optgroup')].map(g => g.label)).toEqual(['Fair', 'Revenue Department'])
+    expect([...by.options].map(o => o.textContent)).toEqual(['SHAWN · Team Leader', 'KRIS · Revenue Director'])
+  })
+
+  it('sends only what changed, says Saving… and closes once the fresh rows are in', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: true })
+    const { view, drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('Mobile number'), { target: { value: ' 018-776-0021 ' } })
+    fireEvent.change(within(drawer).getByRole('combobox', { name: /Submitted by/ }), { target: { value: KRIS } })
+    expect(within(drawer).getByLabelText('Mobile number').getAttribute('data-dirty')).toBe('true')
+    expect(within(drawer).getByLabelText('New member name').getAttribute('data-dirty')).toBeNull()
+    expect(drawer).toHaveTextContent('2 changes')
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).toHaveBeenCalledExactlyOnceWith('joan', { contact: '018-776-0021', submittedBy: KRIS })
+    expect(flash).toHaveBeenCalledWith('JOAN QUEK XIAO — details saved')
+    expect(within(drawer).getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    view.rerender(
+      <WaitingList
+        rows={[joan({ contact: '018-776-0021', submittedBy: 'KRIS', submittedById: KRIS })]}
+        subDeptName="Fair"
+        subSlug="fair"
+        form={{ ok: true, form: V1 }}
+        capacity={ROOM}
+        canTransfer
+        subOptions={['Fair', 'IR']}
+        canAdd
+        submitters={submitters}
+      />,
+    )
+    const fresh = screen.getByRole('dialog')
+    expect(within(fresh).queryByLabelText('Mobile number')).toBeNull()
+    expect(fresh).toHaveTextContent('018-776-0021')
+    expect(fresh).toHaveTextContent('KRIS')
+    expect(within(fresh).getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+  })
+
+  it('sends a day for Any time ready unticked, and back to Any time ready ticked', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: true })
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.click(within(drawer).getByRole('checkbox', { name: 'Any time ready' }))
+    expect(within(drawer).getByLabelText('Joining date')).not.toBeDisabled()
+    fireEvent.change(within(drawer).getByLabelText('Joining date'), { target: { value: '2026-12-01' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).toHaveBeenCalledExactlyOnceWith('joan', { start: '2026-12-01' })
+  })
+
+  it('keeps the edit open with the refusal in words, and Cancel puts the facts back', async () => {
+    actions.editWaitingApplicant.mockResolvedValue({ ok: false, reason: 'This phone number is already on the waiting list, or waiting for review in Member services' })
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('Mobile number'), { target: { value: '019-464-6349' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('already on the waiting list')
+    expect((within(drawer).getByLabelText('Mobile number') as HTMLInputElement).value).toBe('019-464-6349')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Cancel' }))
+    expect(within(drawer).queryByLabelText('Mobile number')).toBeNull()
+    expect(drawer).toHaveTextContent('018-776-0020')
+  })
+
+  it('refuses a blank name before anything is sent', async () => {
+    const { drawer } = open()
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    fireEvent.change(within(drawer).getByLabelText('New member name'), { target: { value: '  ' } })
+    await act(async () => {
+      fireEvent.click(save(drawer))
+    })
+    expect(actions.editWaitingApplicant).not.toHaveBeenCalled()
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('Fill in new member name.')
+  })
+
+  it('keeps a submitter no longer in the department among the choices, by name', () => {
+    const { drawer } = open(true, joan({ submittedBy: 'GONE', submittedById: '11111111-2222-4333-8444-555555555555' }))
+    fireEvent.click(within(drawer).getByRole('button', { name: /Edit/ }))
+    const by = within(drawer).getByRole('combobox', { name: /Submitted by/ }) as HTMLSelectElement
+    expect(by.value).toBe('11111111-2222-4333-8444-555555555555')
+    expect(by.options[0].textContent).toBe('GONE')
+  })
+})
+
+describe('an applicant’s signed form', () => {
+  const joan = (over: Partial<SubDeptRequest> = {}) =>
+    req({
+      id: 'joan', requestNo: 'RQ-2610-002', newPerson: 'JOAN QUEK XIAO', contact: '018-776-0020', submittedBy: 'SHAWN', start: 'anytime',
+      acceptedAt: '2026-10-20T04:41:25Z',
+      events: [{ to: 'waiting', at: '2026-10-20T04:41:25Z', note: 'Added on Sales Groups', by: 'LI SEAN' }],
+      ...over,
+    })
+  const ON_FILE = { name: 'Joan Quek application.pdf', type: 'application/pdf', at: '2026-10-20T06:00:00Z', by: 'LI SEAN' }
+  const open = (row = joan(), canAdd = true) => {
+    show({ rows: [row], canAdd })
+    fireEvent.click(screen.getAllByRole('row')[1])
+    return screen.getByRole('dialog')
+  }
+  const pdf = (name = 'Joan Quek application.pdf', size = 0) => {
+    const file = new File([new Uint8Array([37, 80, 68, 70, 45])], name, { type: 'application/pdf' })
+    if (size) Object.defineProperty(file, 'size', { value: size })
+    return file
+  }
+
+  it('shows the form on file — its icon, its name, when and who — and View draws it', async () => {
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'data:application/pdf;base64,JVBERi0xLjQK', name: ON_FILE.name, type: 'application/pdf' })
+    const drawer = open(joan({ signedForm: ON_FILE }))
+    expect(within(drawer).getByText('Signed form')).toBeInTheDocument()
+    expect(drawer).toHaveTextContent('Joan Quek application.pdf')
+    expect(drawer).toHaveTextContent('20 Oct 2026 · LI SEAN')
+    expect(drawer.querySelector('[data-kind="pdf"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    expect(actions.viewSignedForm).toHaveBeenCalledExactlyOnceWith('joan')
+    const viewer = screen.getByRole('dialog', { name: 'Joan Quek application.pdf' })
+    expect(viewer).toHaveTextContent('JOAN QUEK XIAO · Signed form')
+    expect(viewer.querySelector('iframe')).toHaveAttribute('src', 'data:application/pdf;base64,JVBERi0xLjQK')
+  })
+
+  // 2026-10-20, the user: "want word file as well".
+  it('shows a Word letter as Word, and View reads it here in a frame where nothing runs', async () => {
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan.docx?token=t', name: 'Joan letter.docx', type: DOCX })
+    const fetched = vi.fn(async () => new Response(new Uint8Array([80, 75, 3, 4, 1, 2])))
+    vi.stubGlobal('fetch', fetched)
+    convertToHtml.mockResolvedValue({ value: '<p>WAITING LIST APPLICATION — JOAN QUEK XIAO</p>', messages: [] })
+    const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan letter.docx', type: DOCX } }))
+    expect(drawer.querySelector('[data-kind="word"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    const viewer = screen.getByRole('dialog', { name: 'Joan letter.docx' })
+    await waitFor(() => expect(viewer.querySelector('iframe')).not.toBeNull())
+    expect(fetched).toHaveBeenCalledWith('https://files.test/sign/joan.docx?token=t', expect.anything())
+    const frame = viewer.querySelector('iframe')!
+    expect(frame).toHaveAttribute('sandbox', '')
+    expect(frame.getAttribute('srcdoc')).toContain('WAITING LIST APPLICATION — JOAN QUEK XIAO')
+  })
+
+  it('an old .doc is Download only', async () => {
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan.doc?token=t', name: 'Joan letter.doc', type: 'application/msword' })
+    const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan letter.doc', type: 'application/msword' } }))
+    expect(drawer.querySelector('[data-kind="word"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    const viewer = screen.getByRole('dialog', { name: 'Joan letter.doc' })
+    expect(viewer).toHaveTextContent('No preview for .doc files.Download it to open.')
+    expect(within(viewer).getByRole('button', { name: 'Download' })).toBeInTheDocument()
+  })
+
+  it('draws a picture whose name says nothing of its kind, by the type the bucket kept', async () => {
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'https://files.test/sign/joan?token=t', name: 'Joan', type: 'image/jpeg' })
+    const drawer = open(joan({ signedForm: { ...ON_FILE, name: 'Joan', type: 'image/jpeg' } }))
+    expect(drawer.querySelector('[data-kind="image"]')).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    expect(screen.getByRole('img', { name: 'Joan' })).toHaveAttribute('src', 'https://files.test/sign/joan?token=t')
+  })
+
+  it('Download hands the file over; a refusal says why', async () => {
+    actions.viewSignedForm.mockResolvedValue({ ok: true, url: 'data:application/pdf;base64,JVBERi0xLjQK', name: ON_FILE.name, type: 'application/pdf' })
+    actions.signedFormDownload.mockResolvedValue({ ok: false, reason: 'No signed form is on file for them.' })
+    const drawer = open(joan({ signedForm: ON_FILE }))
+    await act(async () => {
+      fireEvent.click(within(drawer).getByRole('button', { name: 'View' }))
+    })
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog', { name: ON_FILE.name })).getByRole('button', { name: 'Download' }))
+    })
+    expect(actions.signedFormDownload).toHaveBeenCalledExactlyOnceWith('joan')
+    expect(flash).toHaveBeenCalledWith('No signed form is on file for them.')
+  })
+
+  it('with none on file, uploads one — and the drawer shows it at once', async () => {
+    actions.uploadSignedForm.mockResolvedValue({ ok: true, form: ON_FILE })
+    const drawer = open()
+    expect(drawer).toHaveTextContent('Upload the signed form')
+    expect(drawer).toHaveTextContent('PDF, Word, PNG or JPG · 3 MB or smaller')
+    expect(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form").getAttribute('accept')).toBe('.pdf,.png,.jpg,.jpeg,.doc,.docx')
+    const file = pdf()
+    await act(async () => {
+      fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [file] } })
+    })
+    const sent = actions.uploadSignedForm.mock.calls[0][0] as FormData
+    expect([sent.get('requestId'), sent.get('file')]).toEqual(['joan', file])
+    expect(flash).toHaveBeenCalledWith('Signed form uploaded for JOAN QUEK XIAO')
+    expect(drawer).toHaveTextContent('Joan Quek application.pdf')
+    expect(drawer).toHaveTextContent('20 Oct 2026 · LI SEAN')
+    expect(within(drawer).getByRole('button', { name: 'View' })).toBeInTheDocument()
+    expect(within(drawer).getByLabelText("Replace JOAN QUEK XIAO's signed form")).toBeInTheDocument()
+  })
+
+  it('takes a file dropped on it', async () => {
+    actions.uploadSignedForm.mockResolvedValue({ ok: true, form: ON_FILE })
+    const drawer = open()
+    const file = pdf()
+    await act(async () => {
+      fireEvent.drop(within(drawer).getByText('Upload the signed form'), { dataTransfer: { files: [file] } })
+    })
+    expect((actions.uploadSignedForm.mock.calls[0][0] as FormData).get('file')).toBe(file)
+  })
+
+  it('Replace sends another in its place', async () => {
+    actions.uploadSignedForm.mockResolvedValue({ ok: true, form: { ...ON_FILE, name: 'Joan clearer.png', type: 'image/png', by: 'HR' } })
+    const drawer = open(joan({ signedForm: ON_FILE }))
+    await act(async () => {
+      fireEvent.change(within(drawer).getByLabelText("Replace JOAN QUEK XIAO's signed form"), { target: { files: [pdf('Joan clearer.png')] } })
+    })
+    expect(flash).toHaveBeenCalledWith("JOAN QUEK XIAO's signed form replaced — Joan clearer.png")
+    expect(drawer).toHaveTextContent('Joan clearer.png')
+    expect(drawer).toHaveTextContent('20 Oct 2026 · HR')
+  })
+
+  it('says what is wrong before sending, and keeps the database’s refusal in the drawer', async () => {
+    const drawer = open()
+    await act(async () => {
+      fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [pdf('Joan.pdf', 3 * 1024 * 1024 + 1)] } })
+    })
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('The signed form must be 3 MB or smaller.')
+    expect(actions.uploadSignedForm).not.toHaveBeenCalled()
+
+    actions.uploadSignedForm.mockResolvedValue({ ok: false, reason: 'This applicant is no longer on the waiting list. Reload the page.' })
+    await act(async () => {
+      fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [pdf()] } })
+    })
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('This applicant is no longer on the waiting list. Reload the page.')
+    expect(drawer).toHaveTextContent('Upload the signed form')
+    expect(flash).not.toHaveBeenCalled()
+  })
+
+  it('without Member services · Edit: View only, and none on file says so', () => {
+    let drawer = open(joan({ signedForm: ON_FILE }), false)
+    expect(within(drawer).getByRole('button', { name: 'View' })).toBeInTheDocument()
+    expect(within(drawer).queryByLabelText(/Replace/)).toBeNull()
+    cleanup()
+    drawer = open(joan(), false)
+    expect(drawer).toHaveTextContent('No signed form on file.')
+    expect(within(drawer).queryByLabelText(/Upload/)).toBeNull()
+  })
+
+  it('names the upload in the action history', () => {
+    const drawer = open(
+      joan({
+        signedForm: ON_FILE,
+        events: [
+          { to: 'waiting', at: '2026-10-20T04:41:25Z', note: 'Added on Sales Groups', by: 'LI SEAN' },
+          { to: 'waiting', at: '2026-10-20T06:00:00Z', note: 'Signed form uploaded · Joan Quek application.pdf', by: 'LI SEAN' },
+        ],
+      }),
+    )
+    expect(drawer).toHaveTextContent('Added to the waiting list')
+    expect(drawer).toHaveTextContent('Signed form uploaded20 OctLI SEANJoan Quek application.pdf')
+    // Still the one who added them, and accepted when they were.
+    expect(drawer).toHaveTextContent('Added byLI SEAN')
+    expect(drawer).toHaveTextContent('20 Oct 2026 · added here')
   })
 })
 

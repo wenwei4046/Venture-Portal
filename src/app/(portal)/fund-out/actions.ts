@@ -301,36 +301,14 @@ export async function recordRepayment(formData: FormData) {
     }
   }
 
-  const { error: insertError } = await supabase.from('repayments').insert({
-    loan_id: loanId,
-    amount,
-    payment_type: paymentType,
-    payment_date: paymentDate,
-    notes,
-    created_by: user.id,
-  })
-
-  if (insertError) {
-    throw new Error(`Failed to record repayment: ${insertError.message}`)
-  }
-
-  // Venture Pool cash ledger: only principal repayments return capital to HV
-  // (Phase 10 / mig 192, Q3=A). Interest/penalty/netting are revenue streams,
-  // not cash-back, and don't hit venture_pool.
-  if (paymentType === 'principal') {
-    const { error: vpError } = await supabase.from('venture_pool').insert({
-      transaction_type: 'loan_repayment_in',
-      amount,
-      description: `Loan principal repayment — ${loanId}`,
-      reference_id: loanId,
-      reference_table: 'loans',
-      created_by: user.id,
-    })
-    if (vpError) {
-      throw new Error(`Repayment recorded but venture_pool loan_repayment_in failed: ${vpError.message}`)
-    }
-  }
-
+  // The bank, the accounts and the journal entry come FIRST, the repayment row
+  // after — written with the entry it posted (2026-10-21, mig 20261021200000;
+  // the user: 选 A). A row that did not know its entry was matched to one by
+  // its loan, amount, day and type, and Void on the second of two identical
+  // repayments reversed the FIRST one's entry. Anything refused on the way —
+  // an account, the entry itself — now leaves nothing behind (it left the row
+  // recorded, the pool and the bank moved, and no entry).
+  //
   // Mig 197/P1-7: post matching GL journal for the direct recordRepayment
   // path. PV-driven repayments already write JE via approve_single_voucher;
   // this path only fires when Finance records a repayment outside the PV
@@ -349,22 +327,6 @@ export async function recordRepayment(formData: FormData) {
 
   const bankGl = primaryBank?.gl_account_code ?? '3000'
 
-  // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
-  // is posted below, but the cached current_balance must move too (it's not
-  // trigger-maintained), else the dashboard/settings bank figure understates.
-  // Via bump_bank_balance RPC (mig 20260610000000): the old direct
-  // bank_accounts.update was silently blocked by RLS for Finance (UPDATE policy
-  // is principal-only, PostgREST returns success with 0 rows) — cache drifted
-  // vs GL on every Finance-recorded repayment.
-  if (primaryBank?.id) {
-    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
-      p_bank_account_id: primaryBank.id,
-      p_delta: amount,
-    })
-    if (bumpErr) {
-      throw new Error(`Repayment recorded but bank balance update failed: ${bumpErr.message}`)
-    }
-  }
   // Mig 238 unified COA + 2026-05-15 fix:
   //   - principal → <borrower's leaf under 3020 Loans Receivable>. The user
   //     split 3020 into a header + per-borrower leaves (`3051 Amount Due
@@ -401,8 +363,9 @@ export async function recordRepayment(formData: FormData) {
     paymentType === 'penalty'   ? '7010' :
                                   interestCredit   // interest + netting
 
+  let journalEntryId: string
   try {
-    await postJournalEntry(supabase, {
+    journalEntryId = await postJournalEntry(supabase, {
       transactionDate: paymentDate,
       description: `Loan ${paymentType} repayment — ${loanId}`,
       referenceType: 'repayment',
@@ -415,7 +378,55 @@ export async function recordRepayment(formData: FormData) {
     })
   } catch (jeErr) {
     const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-    throw new Error(`Repayment recorded but JE post failed: ${msg}`)
+    throw new Error(`Repayment not recorded — its journal entry failed: ${msg}`)
+  }
+
+  const { error: insertError } = await supabase.from('repayments').insert({
+    loan_id: loanId,
+    amount,
+    payment_type: paymentType,
+    payment_date: paymentDate,
+    notes,
+    created_by: user.id,
+    journal_entry_id: journalEntryId,
+  })
+
+  if (insertError) {
+    throw new Error(`Its journal entry was posted, but the repayment was not recorded: ${insertError.message} — have that entry reversed before recording it again`)
+  }
+
+  // Venture Pool cash ledger: only principal repayments return capital to HV
+  // (Phase 10 / mig 192, Q3=A). Interest/penalty/netting are revenue streams,
+  // not cash-back, and don't hit venture_pool.
+  if (paymentType === 'principal') {
+    const { error: vpError } = await supabase.from('venture_pool').insert({
+      transaction_type: 'loan_repayment_in',
+      amount,
+      description: `Loan principal repayment — ${loanId}`,
+      reference_id: loanId,
+      reference_table: 'loans',
+      created_by: user.id,
+    })
+    if (vpError) {
+      throw new Error(`Repayment recorded but venture_pool loan_repayment_in failed: ${vpError.message}`)
+    }
+  }
+
+  // Bank cache: a repayment received increases the bank balance. The GL Dr Bank
+  // is posted above, but the cached current_balance must move too (it's not
+  // trigger-maintained), else the dashboard/settings bank figure understates.
+  // Via bump_bank_balance RPC (mig 20260610000000): the old direct
+  // bank_accounts.update was silently blocked by RLS for Finance (UPDATE policy
+  // is principal-only, PostgREST returns success with 0 rows) — cache drifted
+  // vs GL on every Finance-recorded repayment.
+  if (primaryBank?.id) {
+    const { error: bumpErr } = await supabase.rpc('bump_bank_balance', {
+      p_bank_account_id: primaryBank.id,
+      p_delta: amount,
+    })
+    if (bumpErr) {
+      throw new Error(`Repayment recorded but bank balance update failed: ${bumpErr.message}`)
+    }
   }
 
   revalidatePath(`/fund-out/${loanId}`)

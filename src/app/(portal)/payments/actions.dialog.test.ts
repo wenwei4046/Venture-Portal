@@ -180,6 +180,7 @@ describe('createReceiptFromDialog (Receipt’s dialog, D09)', () => {
     const db = recordingSupabase(
       (call) => {
         if (call.table === 'payment_vouchers' && call.op === 'insert') return { data: { id: 'or-new' } }
+        if (call.table === 'payment_vouchers' && call.op === 'update') return { data: [{ id: 'or-new' }] }
         if (call.table === 'payment_vouchers' && call.op === 'select') return { count: 521 }
         if (call.table === 'bank_accounts') return { data: { gl_account_code: '3000' } }
         return {}
@@ -191,7 +192,9 @@ describe('createReceiptFromDialog (Receipt’s dialog, D09)', () => {
     expect(res).toEqual({ ok: true, id: 'or-new', voucherNo: 'HV-OR-202610-0522', submitted: false })
     expect(mocks.redirect).not.toHaveBeenCalled()
     expect(mocks.requireActionOn.mock.calls[0]).toEqual(['/receipts', 'treasury', 'create'])
-    expect(db.writes('payment_vouchers')[0].values).toMatchObject({ voucher_no: 'HV-OR-202610-0522', direction: 'credit', status: 'paid', target_pool: 'venture_pool', voucher_type: 'receive_payment' })
+    // Written a draft, received once its line is in (2026-10-22 — actions.receipt-lines.test.ts).
+    expect(db.writes('payment_vouchers')[0].values).toMatchObject({ voucher_no: 'HV-OR-202610-0522', direction: 'credit', status: 'draft', target_pool: 'venture_pool', voucher_type: 'receive_payment' })
+    expect(db.writes('payment_vouchers')[1].values).toMatchObject({ status: 'paid', approved_by: 'carrie', executed_by: 'carrie' })
     expect(db.writes('payment_voucher_sources')[0].values).toEqual([expect.objectContaining({ pool: 'venture_pool', amount: 25768.1, account_code: '3031' })])
     expect(db.rpcs.map((r) => r.fn)).toContain('bump_bank_for_paid_credit')
   })

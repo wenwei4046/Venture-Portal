@@ -5,6 +5,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { memoPreviewFromRow, type MemoPreview } from '@/lib/memos/model'
+import { signatureOrNull } from '@/lib/memos/signature'
 import { pushSoon } from '@/lib/push/outbox'
 import { DOC_BUCKET, documentationFileLink, type FileLink } from './server'
 
@@ -283,4 +284,19 @@ export async function previewPublished(id: string): Promise<PreviewOutcome> {
   if (error) return { ok: false, reason: refusal(error, 'The memo could not be opened. Please try again.') }
   const preview = memoPreviewFromRow(data)
   return preview ? { ok: true, preview } : { ok: false, reason: 'The memo could not be opened. Please try again.' }
+}
+
+export type LetterSignatureOutcome = { ok: true; signature: string | null; acknowledgedAt: string | null } | { ok: false; reason: string }
+
+/**
+ * A Data center letter's signature (2026-10-20 — the user: a memo is acknowledged with the person's own hand-drawn
+ * signature): what its person signed when they acknowledged it, for the letter's preview (`hr_letter_signature`,
+ * Documentation · View). Null when it is not acknowledged, or was before signatures were asked for.
+ */
+export async function letterSignature(id: string): Promise<LetterSignatureOutcome> {
+  await requireActionOn('/team/documentation', 'documentation', 'view')
+  const { data, error } = await (await client()).rpc('hr_letter_signature', { p_letter: id })
+  if (error) return { ok: false, reason: refusal(error, 'The signature could not be read. Please try again.') }
+  const x = (data && typeof data === 'object' ? data : {}) as { signature?: unknown; acknowledgedAt?: unknown }
+  return { ok: true, signature: signatureOrNull(x.signature), acknowledgedAt: typeof x.acknowledgedAt === 'string' ? x.acknowledgedAt : null }
 }

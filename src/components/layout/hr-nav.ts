@@ -7,7 +7,7 @@
 //   II.   ATTENDANCE         Today · Records · Requests · Leave balances · Month close · Settings · Readiness
 //   III.  HR & PAYROLL       HR Costing · Payroll · Allocation · Payment
 //   IV.   REVENUE            Comm Cal · Sales chart · Members · Waiting list · Replacement list · Rules ·
-//                            Requests · Brand weeks · Claim rates · Food claim
+//                            Requests · Brand weeks · Transport claim · Food claim
 //   V.    PEOPLE MANAGEMENT  People · Permissions · Org chart · People & roles · Levels
 //   VI.   DOCUMENTATION      Documents · Data center · Letters · Publish
 //   VII.  ADMIN              Room schedule · Rooms · Guest Link · Audit Log · Change password
@@ -85,6 +85,9 @@ export function revenueView(pathname: string): 'cc' | 'sg' | 'rules' | null {
 
 const seesHrCosting = (v: NavViewer) => canAccessTeam(v)
 const seesRevenue = (sub: string | null) => (v: NavViewer) => sub !== null && canAccessRevenue(v)
+
+/** Revenue's three pages and the sub-department each opens (2026-10-16 — the viewer's reach, per page). */
+export type HrRevenueSubs = Readonly<Record<'cc' | 'sg' | 'rules', string | null>>
 const seesMemberServices = (v: NavViewer) => can(v, 'member_requests_manage') || can(v, 'member_memos_manage')
 
 const SG_TABS = ['chart', 'members', 'waiting', 'replacement'] as const
@@ -93,9 +96,17 @@ const HIER_TABS = ['chart', 'roles', 'levels'] as const
 const DOC_TABS = ['documents', 'data-center', 'letters', 'publish'] as const
 const ROOM_TABS = ['schedule', 'rooms'] as const
 
-/** HR's sections, with Revenue's links on `revenueSub` (null = none set up yet). */
-export function hrNavSections(revenueSub: string | null): HrNavSection[] {
-  const rev = (view?: 'hierarchy' | 'rules') => (revenueSub ? (view ? revenuePath(revenueSub, view) : revenuePath(revenueSub)) : '/revenue')
+/**
+ * HR's sections, with Revenue's links on `revenueSub` (null = none set up yet) —
+ * or, per page, on the sub-department each opens for this viewer (2026-10-16:
+ * what they reach there; null leaves that page's links out).
+ */
+export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavSection[] {
+  const subs: HrRevenueSubs = typeof revenueSub === 'object' && revenueSub !== null ? revenueSub : { cc: revenueSub, sg: revenueSub, rules: revenueSub }
+  const rev = (view?: 'hierarchy' | 'rules') => {
+    const sub = view === 'hierarchy' ? subs.sg : view === 'rules' ? subs.rules : subs.cc
+    return sub ? (view ? revenuePath(sub, view) : revenuePath(sub)) : '/revenue'
+  }
   const sg = (tab: (typeof SG_TABS)[number]) => (tab === 'chart' ? rev('hierarchy') : `${rev('hierarchy')}?tab=${tab}`)
   const sgOn = (tab: string) => (p: string, s?: URLSearchParams | null) => revenueView(p) === 'sg' && (SG_TABS.includes((s?.get('tab') ?? '') as never) ? s?.get('tab') : 'chart') === tab
   const mem = (tab: (typeof MEM_TABS)[number]) => (tab === 'requests' ? '/member-admin' : `/member-admin?tab=${tab}`)
@@ -157,16 +168,16 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
       label: 'Revenue',
       tone: 'slate',
       items: [
-        { key: 'cc', label: 'Comm Cal', icon: 'in', href: rev(), match: p => revenueView(p) === 'cc', visible: seesRevenue(revenueSub) },
-        { key: 'sgChart', label: 'Sales chart', icon: 'tree', href: sg('chart'), match: sgOn('chart'), visible: seesRevenue(revenueSub) },
-        { key: 'sgMembers', label: 'Members', icon: 'people', href: sg('members'), match: sgOn('members'), visible: seesRevenue(revenueSub) },
-        { key: 'sgWait', label: 'Waiting list', icon: 'calendar', href: sg('waiting'), match: sgOn('waiting'), visible: seesRevenue(revenueSub) },
-        { key: 'sgRepl', label: 'Replacement list', icon: 'staff', href: sg('replacement'), match: sgOn('replacement'), visible: seesRevenue(revenueSub) },
-        { key: 'rules', label: 'Rules', icon: 'invoice', href: rev('rules'), match: p => revenueView(p) === 'rules', visible: seesRevenue(revenueSub) },
+        { key: 'cc', label: 'Comm Cal', icon: 'in', href: rev(), match: p => revenueView(p) === 'cc', visible: seesRevenue(subs.cc) },
+        { key: 'sgChart', label: 'Sales chart', icon: 'tree', href: sg('chart'), match: sgOn('chart'), visible: seesRevenue(subs.sg) },
+        { key: 'sgMembers', label: 'Members', icon: 'people', href: sg('members'), match: sgOn('members'), visible: seesRevenue(subs.sg) },
+        { key: 'sgWait', label: 'Waiting list', icon: 'calendar', href: sg('waiting'), match: sgOn('waiting'), visible: seesRevenue(subs.sg) },
+        { key: 'sgRepl', label: 'Replacement list', icon: 'staff', href: sg('replacement'), match: sgOn('replacement'), visible: seesRevenue(subs.sg) },
+        { key: 'rules', label: 'Rules', icon: 'invoice', href: rev('rules'), match: p => revenueView(p) === 'rules', visible: seesRevenue(subs.rules) },
         // Member Services dissolved into Revenue (the handoff): its four tabs, "Request reviews" → Requests.
         { key: 'memReq', label: 'Requests', icon: 'approve', href: mem('requests'), match: memOn('requests'), visible: seesMemberServices },
         { key: 'memWeeks', label: 'Brand weeks', icon: 'calendar', href: mem('weeks'), match: memOn('weeks'), visible: seesMemberServices },
-        { key: 'memClaims', label: 'Claim rates', icon: 'receipt', href: mem('claims'), match: memOn('claims'), visible: seesMemberServices },
+        { key: 'memClaims', label: 'Transport claim', icon: 'receipt', href: mem('claims'), match: memOn('claims'), visible: seesMemberServices },
         { key: 'memFood', label: 'Food claim', icon: 'receipt', href: mem('food'), match: memOn('food'), visible: seesMemberServices },
       ],
     },
@@ -211,6 +222,7 @@ export function hrNavSections(revenueSub: string | null): HrNavSection[] {
         { key: 'audit', label: 'Audit Log', icon: 'report', href: '/audit-log', match: p => under(p, '/audit-log'), visible: canSeeAuditChanges },
         // Change password (2026-10-12): a person's own login only — never a shared one (principal@, hr@ …).
         { key: 'password', label: 'Change password', icon: 'lock', href: '/admin/password', match: p => under(p, '/admin/password'), visible: canChangePassword },
+        { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', match: p => under(p, '/it-support'), visible: viewer => !viewer.viewingAs },
       ],
     },
     {

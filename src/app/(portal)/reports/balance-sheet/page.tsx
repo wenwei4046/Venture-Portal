@@ -90,7 +90,6 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           </span>
         </div>
         <GlReportView
-          basePath="/reports/balance-sheet"
           period={period}
           compare={compare}
           segment={segment}
@@ -98,7 +97,6 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
           blocks={blocks}
           currentLabel={asAt(period)}
           compareLabel={compare ? asAt(compare) : ''}
-          controls="row"
           periodLabel="As at"
         />
       </section>

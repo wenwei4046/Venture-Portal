@@ -1,7 +1,6 @@
 import type { createClient } from '@/lib/supabase/server'
 import type { User } from '@/types'
 import { listsPayrollByPerson } from '@/lib/roles'
-import { reportsCompanyWide } from '@/lib/surfaces'
 import {
   applyGlRefs,
   buildBalanceSheet,
@@ -23,8 +22,9 @@ import { segmentFilterFor } from '../_components/report-segments'
 // Balance Sheet pages word for word, so the Finance phone app's Report tab
 // reads exactly what the pages read): the journal, the chart, the salary lines
 // by department for whoever reads payroll that way, the consolidation, the
-// statement and its blocks. A department manager reads only their own segment
-// (RLS) — the segment is forced empty and nothing is eliminated for them.
+// statement and its blocks. For whoever reads the reports company-wide
+// (Reports · View at All): every caller asks that first (the Dept Manager's
+// own-segment mode went with the kind, 2026-10-17).
 
 type Client = Awaited<ReturnType<typeof createClient>>
 
@@ -39,13 +39,10 @@ export interface StatementAsk {
 
 /** The P&L for a month (the income statement's read). */
 export async function readPnlStatement(supabase: Client, user: User, ask: StatementAsk) {
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : ask.segment
+  const segment = ask.segment
 
-  // Consolidated = the true all-segments view (finance/principal, no segment
-  // picked). Dept managers' empty segment is their OWN view via RLS — never
-  // eliminate for them.
-  const consolidated = !isDeptMgr && !segment
+  // Consolidated = the true all-segments view (no segment picked).
+  const consolidated = !segment
   const [rawLines, accounts, glRefs, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
@@ -61,20 +58,18 @@ export async function readPnlStatement(supabase: Client, user: User, ask: Statem
     previous: monthPeriod(ask.compare || ask.period),
     segment: segmentFilterFor(segment),
   })
-  return { pnl, blocks: pnlBlocks(pnl), isDeptMgr, segment }
+  return { pnl, blocks: pnlBlocks(pnl), segment }
 }
 
 /** The Cash Flow for a month (the statement's read — direct method, the user's sections per side). */
 export async function readCashFlowStatement(supabase: Client, user: User, ask: StatementAsk) {
-  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
-  const segment = isDeptMgr ? '' : ask.segment
+  const segment = ask.segment
   // The bridge lines are a pure INTERNAL reallocation (one dept −X, another +X)
   // that exists so a single segment's cash ties to its Dept Pool. Consolidated
   // = every segment at once, where they cancel — and the 收/出 gross split would
   // otherwise surface both halves as real money moving (user 2026-07-30:
-  // "inter billing 在 all segment 不应该出现"). Dept managers have no segment
-  // param but ARE a single segment (RLS), so they keep the bridge.
-  const consolidated = !isDeptMgr && !segment
+  // "inter billing 在 all segment 不应该出现").
+  const consolidated = !segment
 
   // Every read starts at once (2026-10-08). The bridge and the layouts used to
   // wait on the journal read and then on each other — eight round trips in a
@@ -82,8 +77,8 @@ export async function readCashFlowStatement(supabase: Client, user: User, ask: S
   // handed the pending read. Consolidated drops the bridge's lines and its two
   // accounts are constants, so there the bridge is not read at all.
   //
-  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts) —
-  // codes only, no balances. Promise.resolve: sent ONCE, awaited twice.
+  // bank GL codes via RPC — codes only, no balances. Promise.resolve: sent
+  // ONCE, awaited twice.
   const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
     ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
   )
@@ -118,7 +113,7 @@ export async function readCashFlowStatement(supabase: Client, user: User, ask: S
   const inflow = buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '现金流入 · Money in', 'in')
   const outflow = buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out', 'out')
   const blocks = cashFlowBlocks(cf, { inflow, outflow })
-  return { cf, blocks, inflow, outflow, isDeptMgr, segment }
+  return { cf, blocks, inflow, outflow, segment }
 }
 
 /** The Balance Sheet as at a month's end. With a segment it is not expected to balance. */

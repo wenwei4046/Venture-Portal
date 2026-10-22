@@ -33,7 +33,6 @@ export const PERMISSIONS = [
   'dept_pool',
   'venture_pool',
   'opex',
-  'my_billing',
   'claims',
   'claims_approve',
   'reports',
@@ -64,6 +63,8 @@ export const PERMISSIONS = [
   'attendance',
   // Lead View (2026-10-16, mig 20261016300000): Lead View · View opens it.
   'leads',
+  // IT support's desk (2026-10-20, mig 20261021020000): IT requests · View opens it — a Revenue app account may hold it.
+  'it_requests',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

@@ -64,7 +64,8 @@ export function protoData(options: { principal?: boolean } = {}): MemberData {
     demo: true,
     configured: true,
     refreshedAt: "2026-10-03T01:40:00Z",
-    profile: { id: "me", userId: "proto-user", name: "Jia Hui Tan", email: "jiahui@example.com", salary: 2500 },
+    // Written given name first, as the prototype writes it: People keeps "Jia Hui" as her first name.
+    profile: { id: "me", userId: "proto-user", name: "Jia Hui Tan", firstName: "Jia Hui", email: "jiahui@example.com", salary: 2500 },
     memberships: [membership("fair", "Fair", "FAIR", "Senior Executive", "Rank B", true), membership("ir", "IR", "IR", "Executive", "", false)],
     products: [],
     bands: [],
@@ -82,7 +83,7 @@ function protoPrincipalData(): MemberData {
   return {
     ...base,
     principalView: true,
-    profile: { ...base.profile, name: "Principal", salary: null },
+    profile: { ...base.profile, name: "Principal", firstName: undefined, salary: null },
     memberships: base.memberships.map(m => ({ ...m, title: "Principal", rank: "All access",
       people: va.filter(p => p.departmentId === m.id).map(p => ({ id: p.id, name: p.name, title: p.sub.split(" · ")[0], rank: p.sub.split(" · ")[1] ?? "", parentId: null })) })),
   };

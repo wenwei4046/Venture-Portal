@@ -1,9 +1,11 @@
+import { notFound } from 'next/navigation'
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import { debtorAgingView, invoicesAsAt, resolveAgingAsAt } from '@/lib/debtor-aging'
 import { readDebtorInvoices } from '@/app/(portal)/reports/debtor-aging/_lib/debtor-read'
+import { reportsCompanyWide } from '@/lib/surfaces'
 import { debtorModel } from '@/lib/fin-app/report-model'
 import { askedMonth, reportFiles, searchOf, type SearchParams } from '@/lib/fin-app/report-page'
 import ReportApp from '@/components/fin-app/ReportApp'
@@ -21,6 +23,9 @@ export const dynamic = 'force-dynamic'
 export default async function FinAppDebtorAging({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await requirePage('/reports/debtor-aging')
   const user = await requirePermission('dept_reports')
+  // For whoever reads the reports company-wide (Reports · View at All), as
+  // the page and its export (2026-10-17).
+  if (!reportsCompanyWide(user)) notFound()
   const sp = await searchParams
   const thisMonth = officeMonth()
   const ym = askedMonth(sp, thisMonth)
@@ -29,7 +34,7 @@ export default async function FinAppDebtorAging({ searchParams }: { searchParams
   const past = asAt !== today
   const supabase = await createClient()
   const raw = await readDebtorInvoices(supabase)
-  const view = debtorAgingView(invoicesAsAt(raw, asAt), asAt, 'days')
+  const view = debtorAgingView(invoicesAsAt(raw, asAt), asAt)
   const asAtQuery = { as_at: past ? asAt.slice(0, 7) : '' }
   return (
     <ReportApp
@@ -39,7 +44,7 @@ export default async function FinAppDebtorAging({ searchParams }: { searchParams
       month={{ ym, thisMonth }}
       segment={null}
       files={
-        canDo(user, 'dept_reports', 'export', 'dept')
+        canDo(user, 'dept_reports', 'export')
           ? reportFiles('/reports/debtor-aging/export', { view: 'detail', ...asAtQuery }, [{ key: 'summary', label: 'Summary', query: { view: 'summary' } }])
           : []
       }

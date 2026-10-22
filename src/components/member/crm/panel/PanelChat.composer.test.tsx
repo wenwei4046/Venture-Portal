@@ -45,16 +45,18 @@ async function type(text: string) {
 const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style*="repeat(8"] > span')];
 
 describe("the Team chat is Mine's", () => {
-  it("the header: back and ⋮ with no ring, the green dot, whose customer it is under the row — over the wallpaper", async () => {
+  it("the header (4a, M04): back and ⋮ with no ring, no dot on the avatar, whose customer it is under the row, the status strip", async () => {
     await openTeamChat();
     expect(head()).not.toBeNull();
     expect(head().textContent).toContain("Lim Wei Jie");
     expect(head().textContent).toContain("'s customer");
     const back = head().querySelector<HTMLElement>('[title="Back to Inbox"]')!;
     expect(back.style.border).toBe("");
-    expect(back.querySelector("svg")).toHaveAttribute("width", "22");
+    expect(back.querySelector("svg")).toHaveAttribute("width", "24");
     expect(head().querySelector<HTMLElement>('[title="More"]')!.style.border).toBe("");
-    expect(head().querySelector<HTMLElement>('[title="WhatsApp"] > span:last-child')).toHaveStyle({ background: "#387557" });
+    // 4a: the avatar has no channel dot (the channel is in the line under the name), and the status strip closes the header.
+    expect(head().querySelector('[title="WhatsApp"]')!.children.length).toBe(1);
+    expect(head().querySelector("[data-chat-strip]")).not.toBeNull();
     // The list runs under the header and the composer.
     expect(document.querySelector<HTMLElement>("main[data-chat-screen] [data-chat-list]")).toHaveStyle({ position: "absolute" });
   });
@@ -180,9 +182,12 @@ describe("the Team chat is Mine's", () => {
     expect(sheet.textContent).toContain("Hi Rajesh, this is HOUZS.");
   });
 
-  it("a cold chat: the cold-lead note in the header and Send template message in the bar's place, as Mine's", async () => {
+  it("a cold chat: frame M08's card in the bar's place — This chat is cold, who last wrote, Send template message — as Mine's", async () => {
     await openTeamChat("Rajesh Kumar");
-    expect(head().textContent).toContain("Cold lead · the 24 h WhatsApp window has closed");
+    expect(head().textContent).not.toContain("Cold lead ·");
+    const card = composer().querySelector("[data-cold-card]");
+    expect(card?.textContent).toContain("This chat is cold");
+    expect(card?.textContent).toMatch(/^.*Rajesh last wrote .* ago. WhatsApp only lets an approved template open the chat again./);
     expect(composer().querySelector("textarea")).toBeNull();
     await tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
     // The demo's templates are all off: the sheet says where they are switched on.

@@ -4,9 +4,10 @@ import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { changeMyPassword, loadMyProfile, updateMyProfile } from '@/lib/account/actions'
+import { changeMyPassword, loadMyEmailChange, requestEmailChange, withdrawEmailChange } from '@/lib/account/actions'
 import { MIN_PASSWORD_LENGTH, passwordChangeProblem } from '@/lib/account/password'
-import { profileProblem } from '@/lib/account/profile'
+import { EMAIL_WORDS } from '@/lib/account/email-change'
+import { useRequestEmail, type RequestEmailActions } from '@/components/account/use-request-email'
 import { HrIcon } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
 import { DialogButton, DialogConfirm, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
@@ -15,12 +16,13 @@ import type { AccountMenuGroup } from './fin-nav'
 import s from './HrSidebar.module.css'
 
 // The Finance view's account menu (2026-10-14, the Finance revamp v2 — the
-// design's D13): the sidebar's footer opens it. Account — Edit profile and
-// Change password, a login of one's own only — then Admin — Audit Log,
-// Departments, Meeting Rooms — then Sign out, which asks first. Edit profile
-// and Change password open the design's dialog; the pages open in place.
+// design's D13): the sidebar's footer opens it. Account — Change password, a
+// login of one's own only — then Admin — Audit Log, Departments, Meeting Rooms
+// — then Sign out, which asks first. Change password opens the design's
+// dialog; the pages open in place. Edit profile is gone (2026-10-17 — the
+// user: one's record changes through Me › Profile, which HR approves).
 
-export type AccountWindow = 'profile' | 'password' | 'signout'
+export type AccountWindow = 'password' | 'signout'
 
 export function AccountMenu({
   open,
@@ -93,7 +95,7 @@ export function AccountMenu({
 }
 
 /** "Sign out?" — then this device only (2026-10-08: the shared accounts are switched on the office PC). */
-export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SignOutDialog({ open, onClose, view = 'the Finance view' }: { open: boolean; onClose: () => void; /** What signing in again opens: "the Finance view", "the Principal view". */ view?: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const signOut = async () => {
@@ -106,7 +108,7 @@ export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <FinDialog open={open} onClose={onClose} title="Sign out?" locked={busy}>
       <DialogConfirm
-        text="You will need to sign in again to open the Finance view."
+        text={`You will need to sign in again to open ${view}.`}
         confirmLabel="Sign out"
         danger
         busy={busy}
@@ -117,89 +119,74 @@ export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () =>
   )
 }
 
-/** Edit profile: the name and the phone; the email is the sign-in and shows only (the user, 2026-10-14). */
-export function EditProfileDialog({
-  open,
-  onClose,
-  user,
-  onSaved,
-}: {
-  open: boolean
-  onClose: () => void
-  user: Pick<User, 'name' | 'email'>
-  /** After a save (the phone app's Profile reads the name and phone again). */
-  onSaved?: () => void
-}) {
-  const [name, setName] = useState(user.name ?? '')
-  const [email, setEmail] = useState(user.email ?? '')
-  const [phone, setPhone] = useState('')
-  const [refusal, setRefusal] = useState('')
-  const [pending, start] = useTransition()
-
-  // Each opening starts from what is saved: the name and email at once, the phone once read.
-  useEffect(() => {
-    if (!open) return
-    setName(user.name ?? '')
-    setEmail(user.email ?? '')
-    setPhone('')
-    setRefusal('')
-    let live = true
-    void loadMyProfile().then((p) => {
-      if (!live || !p) return
-      setName(p.name)
-      setEmail(p.email)
-      setPhone(p.phone)
-    })
-    return () => {
-      live = false
-    }
-  }, [open, user.name, user.email])
-
-  const ok = !!(name.trim() && email)
-  const save = () => {
-    if (!ok || pending) return
-    const problem = profileProblem({ name, phone })
-    if (problem) {
-      setRefusal(problem)
-      return
-    }
-    start(async () => {
-      const r = await updateMyProfile({ name, phone })
-      if (!r.ok) {
-        setRefusal(r.reason)
-        return
-      }
-      onClose()
-      onSaved?.()
-      flash('Profile saved')
-    })
-  }
-
+/**
+ * Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their own
+ * request; HR approves it on Attendance › Requests, which moves the sign-in too): the email they sign in with, their
+ * latest request — waiting, with Withdraw; declined, with HR's words; done — and the new email.
+ */
+export function RequestEmailDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // The portal's own actions (the hook keeps the last ones handed in, so a new object each render reads once).
+  const actions: RequestEmailActions = { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange }
+  const f = useRequestEmail(actions, open)
+  const W = EMAIL_WORDS
+  const current = f.mine?.email ?? ''
+  const st = f.state
+  const waiting = st?.kind === 'waiting'
   return (
-    <FinDialog open={open} onClose={onClose} title="Edit profile" sub="Shown on vouchers you create" locked={pending}>
+    <FinDialog open={open} onClose={onClose} title={W.title} sub="HR approves the new one" locked={f.busy}>
       <DialogForm
-        onSubmit={save}
+        onSubmit={waiting ? onClose : f.submit}
         buttons={
-          <>
-            <DialogButton onClick={onClose} disabled={pending}>
-              Cancel
-            </DialogButton>
-            <DialogButton type="submit" kind="primary" off={!ok || pending}>
-              Save
-            </DialogButton>
-          </>
+          waiting ? (
+            <>
+              <DialogButton onClick={f.withdraw} disabled={f.busy}>
+                {f.busy ? W.withdrawing : W.withdraw}
+              </DialogButton>
+              <DialogButton type="submit" kind="primary" off={f.busy}>
+                Done
+              </DialogButton>
+            </>
+          ) : (
+            <>
+              <DialogButton onClick={onClose} disabled={f.busy}>
+                Cancel
+              </DialogButton>
+              <DialogButton type="submit" kind="primary" off={!f.mine || f.busy}>
+                {f.busy ? W.sending : W.send}
+              </DialogButton>
+            </>
+          )
         }
       >
-        <Field label="Full name" htmlFor="fv-profile-name">
-          <Input id="fv-profile-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={80} />
+        <Field label={W.current} htmlFor="fv-email-now">
+          <Input id="fv-email-now" type="email" value={f.loading && !current ? '…' : current} readOnly disabled />
         </Field>
-        <Field label="Email" htmlFor="fv-profile-email">
-          <Input id="fv-profile-email" type="email" value={email} readOnly disabled title="Your sign-in email" />
-        </Field>
-        <Field label="Phone" htmlFor="fv-profile-phone">
-          <Input id="fv-profile-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" maxLength={30} />
-        </Field>
-        {refusal ? <Hint danger>{refusal}</Hint> : null}
+        {st ? (
+          <div className="flex flex-col items-start gap-1.5">
+            <span className={`chip ${st.kind === 'waiting' ? 'alert' : st.kind === 'approved' ? 'ledger' : 'danger'}`}>
+              {st.kind === 'waiting' ? W.waiting : st.kind === 'approved' ? W.approved : W.declined}
+            </span>
+            <span className="text-sm text-ink break-all">{st.kind === 'approved' ? W.approvedLine(st.to) : `${W.next} · ${st.to}`}</span>
+            {st.kind === 'waiting' && st.ref ? <Hint>{st.ref}</Hint> : null}
+            {st.kind === 'declined' && st.note ? <Hint>“{st.note}”</Hint> : null}
+          </div>
+        ) : null}
+        {waiting ? null : (
+          <Field label={W.next} htmlFor="fv-email-new">
+            <Input
+              id="fv-email-new"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={f.next}
+              onChange={(e) => f.setNext(e.target.value)}
+              disabled={!f.mine}
+            />
+          </Field>
+        )}
+        {f.error ? <Hint danger>{f.error}</Hint> : f.sent && waiting ? <Hint>{W.sent(current)}</Hint> : null}
       </DialogForm>
     </FinDialog>
   )

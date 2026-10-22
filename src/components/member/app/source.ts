@@ -8,7 +8,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
-  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberMemoSignature, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
   type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
@@ -19,6 +19,10 @@ import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-ac
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
 import { openMemberDoc, openMemberPersonal, type fetchMemberDocuments, type fetchMemberPersonal } from "@/app/(member)/member/docs-actions";
+import { fetchItRequest, noteItRequest, openItFile, signItFiles, submitItRequest, type ItNoteInput, type ItSubmitInput, type fetchItDesk, type fetchMyItRequests } from "@/app/(member)/member/it-actions";
+import type { ItRequest } from "@/lib/it-requests/model";
+import { answerShareRequest, cancelShareRequest, fetchShareContext, sendShareRequest, type fetchShareRequests } from "@/app/(member)/member/share-actions";
+import type { ShareContext, ShareRequest, ShareSendInput } from "@/lib/member/share-requests";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
@@ -76,6 +80,9 @@ export const ask = {
   crmUnread: (): MemberRead => ({ kind: "crmUnread" }),
   notices: (): MemberRead => ({ kind: "notices" }),
   personal: (context?: { staffId: string }): MemberRead => (context ? { kind: "personal", staffId: context.staffId } : { kind: "personal" }),
+  itMine: (): MemberRead => ({ kind: "itMine" }),
+  itDesk: (): MemberRead => ({ kind: "itDesk" }),
+  shareRequests: (context?: MemberReadContext): MemberRead => ({ kind: "shareRequests", context }),
 };
 
 /**
@@ -98,7 +105,9 @@ export interface RevenueSource {
   /** A cart's margin at a price — priced on the server; no cost ever comes back. */
   quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
   /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
-  memo(id: string, ack: boolean): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  memo(id: string, ack: boolean, signature?: string | null): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  /** One's own signature on a memo one acknowledged (2026-10-20), drawn back in it — read at the open, never kept. */
+  memoSignature?(id: string): Promise<Outcome<string | null>>;
   /** A memo's file (2026-10-12): a short link made at the tap (never kept). */
   memoFile?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
   /** Who moved a request, when, and why. */
@@ -146,11 +155,44 @@ export interface RevenueSource {
   personal?(context?: { staffId: string }): Promise<Outcome<Personal>>;
   /** One of Personal: a file of theirs, or a letter — its short link made at the tap. */
   openPersonal?(kind: "drive" | "letter", id: string, context?: { staffId: string }): Promise<Outcome<{ url: string; fileName: string }>>;
+  /** IT support (2026-10-20): one's own requests — read fresh each time, never kept on the phone. */
+  itMine?(): Promise<Outcome<ItRequest[]>>;
+  /** …everybody's, for IT requests · View. */
+  itDesk?(): Promise<Outcome<ItRequest[]>>;
+  /** A tapped notice's request, including one older than the list's limit. Never kept on the phone. */
+  itGet?(id: string): Promise<Outcome<ItRequest | null>>;
+  /** Send one (its files already in the bucket). */
+  itSubmit?(input: ItSubmitInput): Promise<Outcome<ItRequest>>;
+  /** A reply, IT's note, a status. */
+  itNote?(input: ItNoteInput): Promise<Outcome<ItRequest>>;
+  /** Short links to some of a request's files (its pictures' previews). */
+  itSign?(ids: string[]): Promise<Outcome<Record<string, string>>>;
+  /** One file's short link, made at the tap. */
+  itOpen?(id: string, mode: "view" | "download"): Promise<Outcome<{ url: string; fileName: string }>>;
+  /**
+   * Share order (2026-10-21): the share requests one sent and was sent (View as: the viewed member's) — read fresh, never
+   * kept on the phone: a colleague's answer must not wait for a pull.
+   */
+  shareRequests?(context?: MemberReadContext): Promise<Outcome<ShareRequest[]>>;
+  /** A bill's share sheet: whom it may go to, who holds it, its open request — or why it cannot be shared now. */
+  shareContext?(orderId: string, context?: MemberReadContext): Promise<Outcome<ShareContext>>;
+  /** Send a share request to the colleagues named. */
+  shareSend?(input: ShareSendInput): Promise<Outcome<ShareRequest>>;
+  /** A colleague named accepts their part, or declines it. */
+  shareAnswer?(id: string, accept: boolean, note: string | null): Promise<Outcome<ShareRequest>>;
+  /** The salesperson withdraws their request before HR decides. */
+  shareCancel?(id: string): Promise<Outcome<ShareRequest>>;
   /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
    */
   peek?<T>(read: MemberRead): T | undefined;
+  /**
+   * Put what the screen now shows in place of the phone's kept answer to a read (2026-10-20): a file the member just
+   * opened stays opened on the next open too, instead of showing New — and Profile's count — until the list is read
+   * again. Nothing is sent.
+   */
+  keep?(read: MemberRead, value: unknown): void;
   /** Settles once the phone's answers are loaded — the app asks for nothing before, or the first screen would miss them. */
   ready?: Promise<void>;
   /** How many answers the phone kept from before this open. */
@@ -202,11 +244,12 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     insightRange: (subDepartmentId, from, until, context) =>
       go<Answer<typeof fetchMemberInsightRange>>(ask.insightRange(subDepartmentId, from, until, context)),
     quote: input => calculateMemberQuote(input),
-    async memo(id, ack) {
-      const result = await acknowledgeMemberMemo(id, ack);
+    async memo(id, ack, signature) {
+      const result = await acknowledgeMemberMemo(id, ack, signature);
       return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
     },
     memoFile: (id, mode) => openMemberMemoFile(id, mode),
+    memoSignature: id => fetchMemberMemoSignature(id),
     requestHistory: id => go<Answer<typeof fetchMemberRequestHistory>>(ask.requestHistory(id)),
     submitRequest: form => submitMemberRequest(form),
     cancelRequest: id => cancelMemberRequest(id),
@@ -235,8 +278,23 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     notices: () => read<Answer<typeof fetchMemberNotices>>(ask.notices()),
     personal: context => go<Answer<typeof fetchMemberPersonal>>(ask.personal(context)),
     openPersonal: (kind, id, context) => openMemberPersonal(kind, id, context?.staffId),
+    // IT support (2026-10-20): read fresh, never kept — a status IT set an hour ago must not wait for a pull.
+    itMine: () => read<Answer<typeof fetchMyItRequests>>(ask.itMine()),
+    itDesk: () => read<Answer<typeof fetchItDesk>>(ask.itDesk()),
+    itGet: id => fetchItRequest(id),
+    itSubmit: input => submitItRequest(input),
+    itNote: input => noteItRequest(input),
+    itSign: ids => signItFiles(ids),
+    itOpen: (id, mode) => openItFile(id, mode),
+    // Share order (2026-10-21): read fresh, never kept, as IT's.
+    shareRequests: context => read<Answer<typeof fetchShareRequests>>(ask.shareRequests(context)),
+    shareContext: (orderId, context) => fetchShareContext(orderId, context),
+    shareSend: input => sendShareRequest(input),
+    shareAnswer: (id, accept, note) => answerShareRequest(id, accept, note),
+    shareCancel: id => cancelShareRequest(id),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
+      keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),
       ready: memory.ready,
       kept: () => memory.kept(),
     } : {}),

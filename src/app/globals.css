@@ -64,6 +64,11 @@
   --walnut: 90 62 43;
   --scrim: 90 62 43;
 
+  /* A hand-drawn signature (2026-10-20, components/memos/SignaturePad): dark ink on white paper in EVERY theme —
+     the picture is kept as drawn and read back by somebody else, in their own theme, so neither ever inverts. */
+  --signature-ink: 43 31 23;
+  --signature-paper: 255 255 255;
+
   /* Band — walnut lifted a step, for the one dark object that REPEATS: the
      department divider in a grouped table. Full walnut is right for a hero
      card you meet once on a page; six of them down a roster is a lot of ink,
@@ -277,6 +282,8 @@
   --rv-hero-grad: linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%);
   --rv-hero-sub: #FFE6D6;
   --rv-hero-good: #DDF5E7;
+  /* the inner edge of a peach panel: the switch to the CRM's curtain (2026-10-17, handoff "Peach · Context") */
+  --rv-hero-edge: inset 0 0 0 1px rgba(255,255,255,.25);
   /* Profile (2026-10-05): the peach glow, My honours' walnut card and metal
      medals, the family chart, a request's audit notes */
   --rv-profile-glow: linear-gradient(180deg,#F6B48A 0%,#FFD9BC 70%,#FFFFFF 100%);
@@ -360,6 +367,81 @@
 }
 /* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
 html:has([data-revenue-app]) { overscroll-behavior-y: none; }
+
+/* ─── The CRM, 4a "Espresso & White" (2026-10-18) ───
+   docs/design_handoff_crm_redesign/README.md › Design tokens, named as its table
+   names them, plus the few values its prototypes draw that the table leaves out.
+   Every colour of the CRM's screens (crm/sales, crm/panel, crm/desk, crm/shared)
+   reads one of these — generated screens through tools/crm-design/palette-4a.cjs,
+   hand-written ones through crm/shared/palette.ts. The rest of the Revenue app
+   keeps its own --rv-* palette. Light only, as the app. */
+:root {
+  /* text and lines */
+  --crm-ink: #422315;
+  --crm-ink-soft: #5A4034;
+  --crm-muted: #7A6255;
+  --crm-faint: #A8968B;
+  --crm-faint-2: #CDBFB5;
+  --crm-line: #E2D8D0;
+  --crm-rule: #EEE8E3;
+  --crm-rule-soft: #F4F0EC;
+  /* surfaces */
+  --crm-page: #FFFFFF;
+  --crm-field: #F7F3EF;
+  --crm-cream: #FCEEE2;
+  --crm-cream-nav: #FBF4EC;
+  --crm-cream-nav-active: #F3DFCC;
+  --crm-nav-line: #F0E2D4;
+  --crm-hover: #FBF7F3;
+  --crm-audit: #F6E7D8;
+  --crm-audit-line: #E3CDB8;
+  /* accents */
+  --crm-rust: #BD4A19;
+  --crm-rust-press: #A33F14;
+  --crm-rust-meta: #F3CDBB;
+  --crm-orange: #EE5E08;
+  --crm-amber: #FFA91F;
+  --crm-amber-line: #FFC75A;
+  --crm-oxblood: #8A1F0A;
+  --crm-brown: #6F402C;
+  --crm-deep: #2A160C;
+  --crm-on-light: #FFF8F1;
+  --crm-sidebar-text: #CDB7A8;
+  --crm-delta-good: #FBE6DC;
+  --crm-delta-bad: #FFD9A0;
+  --crm-peach: #F4A877;
+  --crm-peach-soft: #F9D3BA;
+  --crm-hero-line: #EBD6C3;
+  --crm-track: #EFE7E1;
+  /* channels — these two appear nowhere else */
+  --crm-whatsapp: #25D366;
+  --crm-messenger: #0A7CFF;
+  /* status ramp: dot, tint, text */
+  --crm-st-new: #422315;
+  --crm-st-attention: #EE5E08;
+  --crm-st-follow: #6F402C;
+  --crm-st-appt: #FFA91F;
+  --crm-st-won: #C29C88;
+  --crm-st-lost: #DCC6B8;
+  --crm-st-cold: #EEE2D8;
+  --crm-tint-attention: #FDE3D2;
+  --crm-tint-appt: #FFF0D1;
+  --crm-tint-follow: #F1E3DA;
+  --crm-tint-new: #EFE5DE;
+  --crm-tint-won: #F3EBE5;
+  --crm-tint-lost: #F2EEEB;
+  --crm-tint-cold: #F1EEEC;
+  --crm-text-appt: #7A4E00;
+  /* teams after the design's five */
+  --crm-team-6: #C29C88;
+  --crm-team-7: #9A6B55;
+  /* outside the palette, kept for what they are: the read ticks on the orange bubble, a photo's black, brand logos */
+  --crm-tick-read: #A6DBFF;
+  --crm-black: #000000;
+  --crm-brand-waze: #33CCFF;
+  --crm-brand-maps: #34A853;
+  --crm-brand-instagram: #C13584;
+}
 
 /* ─── The design system's tokens (2026-10-14) ───
    The Claude Design project "HOUZS Venture Design System" (DESIGN.md › The
@@ -1385,61 +1467,28 @@ table.ledger-table tbody tr:last-child { border-bottom: 0; }
 table.ledger-table tbody tr:nth-child(even) { background: rgb(var(--surface-2) / 0.35); }
 table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
 
-/* GL statements (P&L / BS / CF): role-based row colouring replaces zebra
-   striping — section title / group / leaf / transaction detail / summary each
-   get their own band so the hierarchy reads at a glance (user 2026-06-11). */
-table.ledger-table.gl-report tbody tr:nth-child(even) { background: transparent; }
-table.ledger-table.gl-report tbody tr.row-sect { background: rgb(var(--surface-2) / 0.7); }
-table.ledger-table.gl-report tbody tr.row-cat { background: rgb(var(--surface-2) / 0.7); } /* headed layout section — its own totals */
-table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)); }
-table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
-table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
-table.ledger-table.gl-report tbody tr.row-summary { background: rgb(var(--surface)); }
-/* Headline totals (流入/流出合计, net change, closing cash) must out-shout the
-   section-title band above them — user 2026-07-30: the totals were quieter than
-   the group headers. Full accent wash + accent rules + a size bump. */
-table.ledger-table.gl-report tbody tr.row-summary-strong {
-  background: rgb(var(--accent-bg));
-  border-top: 2px solid rgb(var(--accent-border));
-  border-bottom: 2px solid rgb(var(--accent-border));
-}
-table.ledger-table.gl-report tbody tr.row-summary-strong td {
-  padding-top: 18px;
-  padding-bottom: 18px;
-  font-size: 1.0625rem;
-  letter-spacing: 0.01em;
-}
-/* Keep the wash on hover instead of swapping to the (identical) hover tint. */
-table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
-table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb(var(--accent-bg)); }
-
 /* ── Cash Flow skin (user 2026-09-18: "以蓝色为主的不错" — navy structure, gold
    accents, flat detail rows) ──────────────────────────────────────────────
-   Scoped to `.cf-report`, which the Cash Flow statement (GlReportView) and the
-   Monthly Cash Flow matrix (MonthlyMatrix) opt into; every other report keeps
-   Walnut / Harbour. Three bands, each with one job, on flat white:
-     navy      header row + headline totals (流入/流出合计, net change, closing)
-     pale navy a layout category's own row, with a gold rule on its left edge
-     pale gold the "this month" column (matrix only)
-   Detail rows have NO zebra — "一行一个 colour 看了会 misleading" — and zero
-   renders as a dash so the few real figures stand out. */
-.cf-report, .cf-scope {
+   The tokens live on `.cf-scope` — the wrapper every page under /reports sits
+   in (reports/layout.tsx), and the navy side panels of the deal forms and a
+   payment; every other page keeps Walnut / Harbour. On a report: the navy
+   header band with a gold rule under it, flat white rows with NO zebra —
+   "一行一个 colour 看了会 misleading". */
+.cf-scope {
   --cf-navy: 27 42 68;        /* #1B2A44 */
-  --cf-navy-2: 42 59 92;      /* #2A3B5C — "now" cell on a navy band */
+  --cf-navy-2: 42 59 92;      /* #2A3B5C — a second navy, inside a navy panel */
   --cf-navy-ink: 246 241 228; /* cream text on navy */
   --cf-gold: 201 162 75;      /* #C9A24B */
   --cf-gold-deep: 158 126 51; /* #9E7E33 — rules */
   --cf-gold-ink: 227 195 106; /* #E3C36A — gold figures on navy */
-  --cf-band: 231 236 244;     /* #E7ECF4 — category row */
-  --cf-band-now: 217 225 238; /* #D9E1EE */
-  --cf-now: 251 243 221;      /* #FBF3DD — this-month column */
+  --cf-band: 231 236 244;     /* #E7ECF4 — a row's hover band */
   --cf-surface: 255 255 255;
   --cf-hairline: 221 225 233; /* #DDE1E9 */
   --cf-ink: 27 42 68;
   --cf-graphite: 75 86 112;
   --cf-muted: 139 147 166;
 }
-[data-theme="dark"] .cf-report, [data-theme="dark"] .cf-scope {
+[data-theme="dark"] .cf-scope {
   --cf-navy: 38 54 90;
   --cf-navy-2: 47 66 112;
   --cf-navy-ink: 243 238 224;
@@ -1447,8 +1496,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-gold-deep: 227 195 106;
   --cf-gold-ink: 227 195 106;
   --cf-band: 31 42 64;
-  --cf-band-now: 38 51 77;
-  --cf-now: 42 39 22;
   --cf-surface: 26 30 39;
   --cf-hairline: 50 58 75;
   --cf-ink: 237 231 216;
@@ -1456,7 +1503,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-muted: 114 122 141;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .cf-report, :root:not([data-theme="light"]) .cf-scope {
+  :root:not([data-theme="light"]) .cf-scope {
     --cf-navy: 38 54 90;
     --cf-navy-2: 47 66 112;
     --cf-navy-ink: 243 238 224;
@@ -1464,8 +1511,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
     --cf-gold-deep: 227 195 106;
     --cf-gold-ink: 227 195 106;
     --cf-band: 31 42 64;
-    --cf-band-now: 38 51 77;
-    --cf-now: 42 39 22;
     --cf-surface: 26 30 39;
     --cf-hairline: 50 58 75;
     --cf-ink: 237 231 216;
@@ -1475,8 +1520,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
 }
 
 /* Every ledger table under /reports (the `.cf-scope` wrapper in
-   reports/layout.tsx): navy header, flat white rows, no zebra. The GL
-   statements and month matrices add their own row bands below. */
+   reports/layout.tsx): navy header, flat white rows, no zebra. */
 .cf-scope table.ledger-table {
   background: rgb(var(--cf-surface));
   border-color: rgb(var(--cf-hairline));
@@ -1506,120 +1550,6 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   border-bottom: 2px solid rgb(var(--cf-gold-deep));
 }
 .cf-scope table.cf-plain tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
-
-/* Statement (GlReportView) */
-table.ledger-table.cf-report {
-  background: rgb(var(--cf-surface));
-  border-color: rgb(var(--cf-hairline));
-}
-/* Unheaded section eyebrows (P&L / Balance Sheet / R&P) sit on the pale band
-   with the gold rule, same as a headed category row. */
-table.ledger-table.cf-report tbody tr.row-sect { background: rgb(var(--cf-band)); }
-table.ledger-table.cf-report tbody tr.row-sect > td { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-table.ledger-table.cf-report tbody tr.row-sect .text-accent { color: rgb(var(--cf-gold-deep)); }
-table.ledger-table.cf-report thead th {
-  background: rgb(var(--cf-navy));
-  color: rgb(var(--cf-navy-ink));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 10.5px;
-}
-table.ledger-table.cf-report tbody tr { border-bottom: 1px solid rgb(var(--cf-hairline)); }
-table.ledger-table.cf-report tbody tr.row-group,
-table.ledger-table.cf-report tbody tr.row-leaf,
-table.ledger-table.cf-report tbody tr.row-summary { background: rgb(var(--cf-surface)); }
-table.ledger-table.cf-report td { color: rgb(var(--cf-ink)); }
-table.ledger-table.cf-report tbody tr.row-cat { background: rgb(var(--cf-band)); }
-table.ledger-table.cf-report tbody tr.row-cat > td:first-child { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong {
-  background: rgb(var(--cf-navy));
-  border-top: 2px solid rgb(var(--cf-gold-deep));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-}
-table.ledger-table.cf-report tbody tr.row-summary-strong td,
-table.ledger-table.cf-report tbody tr.row-summary-strong td.num,
-table.ledger-table.cf-report tbody tr.row-summary-strong .text-ledger,
-table.ledger-table.cf-report tbody tr.row-summary-strong .text-danger { color: rgb(var(--cf-gold-ink)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong .neg { color: rgb(var(--cf-navy-ink)); }
-table.ledger-table.cf-report tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
-table.ledger-table.cf-report tbody tr.row-cat:hover { background: rgb(var(--cf-band-now)); }
-table.ledger-table.cf-report tbody tr.row-summary-strong:hover { background: rgb(var(--cf-navy-2)); }
-table.ledger-table.cf-report tbody tr.search-row-hit,
-table.ledger-table.cf-report tbody tr.search-row-active,
-table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(var(--cf-now)); }
-
-/* Month matrix (MonthlyMatrix) — utility-style classes the component switches in. */
-.cf-matrix { border-color: rgb(var(--cf-hairline)); background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-th {
-  background: rgb(var(--cf-navy));
-  color: rgb(var(--cf-navy-ink));
-  border-bottom: 2px solid rgb(var(--cf-gold-deep));
-}
-.cf-matrix .cf-th-now { background: rgb(var(--cf-navy-2)); }
-/* Two-row header (P&L: RM / %): the gold rule sits under the LAST row only. */
-.cf-matrix thead tr:not(:last-child) th.cf-th { border-bottom: 0; }
-.cf-matrix .cf-th-sub { color: rgb(var(--cf-navy-ink) / 0.75); font-weight: 400; }
-.cf-matrix .cf-hairline-row { border-color: rgb(var(--cf-hairline)); }
-.cf-matrix .cf-row { background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-sub { background: rgb(var(--cf-surface)); }
-.cf-matrix .cf-cat { background: rgb(var(--cf-band)); }
-.cf-matrix .cf-cat-label { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
-.cf-matrix .cf-cat.cf-now { background: rgb(var(--cf-band-now)); }
-.cf-matrix .cf-row.cf-now, .cf-matrix .cf-sub.cf-now { background: rgb(var(--cf-now)); }
-.cf-matrix .cf-strong { background: rgb(var(--cf-navy)); color: rgb(var(--cf-gold-ink)) !important; }
-.cf-matrix .cf-strong.cf-now { background: rgb(var(--cf-navy-2)); }
-.cf-matrix .cf-strong .neg { color: rgb(var(--cf-navy-ink)); }
-.cf-matrix .cf-strong-row { border-top: 2px solid rgb(var(--cf-gold-deep)); border-bottom: 2px solid rgb(var(--cf-gold-deep)); }
-.cf-matrix .cf-arrow { color: rgb(var(--cf-gold-deep)); }
-.cf-matrix .cf-dash { color: rgb(var(--cf-muted)); }
-.cf-matrix .cf-strong .cf-dash { color: rgb(var(--cf-gold-ink)); opacity: 0.55; }
-.cf-matrix td.text-ink, .cf-matrix td .text-ink { color: rgb(var(--cf-ink)); }
-.cf-matrix td.text-graphite { color: rgb(var(--cf-graphite)); }
-.cf-matrix tr.search-row-hit > td, .cf-matrix tr.search-row-active > td { background: rgb(var(--cf-now)); }
-.cf-pill-on { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-color: rgb(var(--cf-navy)); }
-
-/* ── The rules under the label column (2026-09-29, user: "这个线条不见了") ──
-   The first column is `position: sticky`, which makes it a positioned element
-   painted ABOVE the table's collapsed borders — so every row rule and the
-   column's own right edge disappeared under it while showing fine across the
-   figures. Redraw both on the cell itself, where the sticky paint can't cover
-   them. The cf skin keeps its gold category edge by stacking the shadows. */
-.mx-matrix tbody tr > td:first-child,
-.mx-matrix thead th:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--hairline));
-}
-.mx-matrix tbody tr:not(:last-child) > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--hairline)), inset 0 -1px 0 rgb(var(--hairline));
-}
-.cf-matrix tbody tr > td:first-child,
-.cf-matrix thead th:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr:not(:last-child) > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 -1px 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr > td.cf-cat-label {
-  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline));
-}
-.cf-matrix tbody tr:not(:last-child) > td.cf-cat-label {
-  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline)),
-    inset 0 -1px 0 rgb(var(--cf-hairline));
-}
-/* Headline rows (流入合计 / net change) carry a 2px gold rule top and bottom. */
-.cf-matrix tbody tr.cf-strong-row > td:first-child {
-  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 2px 0 rgb(var(--cf-gold-deep)),
-    inset 0 -2px 0 rgb(var(--cf-gold-deep));
-}
-
-/* Row labels stay on one line — wrapped names made the reports hard to scan
-   (user 2026-09-29: "可以不要给他 wrap text 吗？其他的 report 也是一样"). The
-   column grows to the longest label and the figures scroll beside it. */
-.gl-report td:first-child,
-.gl-report th:first-child {
-  white-space: nowrap;
-}
 
 /* ── Deal form preview (2026-09-22, New loan / New fund source): the right-hand
    panel borrows the Cash Flow navy + gold so the live figures read as "the
@@ -1927,11 +1857,10 @@ h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title
 .chip.danger { background: rgb(var(--danger-bg)); color: rgb(var(--danger)); border-color: rgb(var(--danger) / 0.4); }
 .chip.info   { background: rgb(var(--info-bg));   color: rgb(var(--info));   border-color: rgb(var(--info) / 0.4); }
 
-/* ── Account search on the reports (P&L / Cash Flow + their monthly matrices).
-   Highlight only — a search never hides a row, so a subtotal is never read as
-   if it covered just what's on screen (user 2026-07-31). Three cues, weakest
-   to strongest: the matched substring, the matching row, the row you're
-   currently jumped to. */
+/* ── Account search on the reports: highlight only — a search never hides a
+   row, so a subtotal is never read as if it covered just what's on screen
+   (user 2026-07-31). Two cues: the matched substring and the matching row;
+   the reports' sheet (.sheet-rpt) marks its own rows. */
 .search-hit {
   background: rgb(var(--accent) / 0.28);
   color: inherit;
@@ -1940,16 +1869,6 @@ h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title
 }
 tr.search-row-hit > td,
 tr.search-row-hit > th { background: rgb(var(--accent-bg)); }
-tr.search-row-active > td,
-tr.search-row-active > th {
-  background: rgb(var(--accent-bg));
-  box-shadow: inset 0 1px 0 rgb(var(--accent)), inset 0 -1px 0 rgb(var(--accent));
-}
-/* The matrix pins its first column; keep the cue visible there too. */
-tr.search-row-hit > td.sticky,
-tr.search-row-active > td.sticky { background: rgb(var(--accent-bg)); }
-/* gl-report sets a blanket hover wash — don't let it erase the active cue. */
-table.ledger-table.gl-report tbody tr.search-row-active:hover { background: rgb(var(--accent-bg)); }
 
 /* These search boxes ship their own × button, so suppress the browser's native
    one — Chrome was rendering two clear icons side by side (user 2026-07-31).
@@ -5331,7 +5250,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
    (.design/finance-revamp, README "Global rules"). Finance's pages as
    Finance or the Principal sees them (lib/finance-view.ts); PortalFrame sets
    `.fin-view` on the sheet frame and everything below hangs off it, so HR's
-   and a department manager's pages keep the sheet exactly as it was.
+   pages keep the sheet exactly as it was.
    ═══════════════════════════════════════════════════════════════════════ */
 .fin-view { font-variant-numeric: tabular-nums lining-nums; }
 .fin-view .sheet-theme { --accent-hover: 201 116 31; }
@@ -5948,8 +5867,6 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .rpt-levels button { min-width: 34px; height: 32px; padding: 0 8px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; font-weight: 500; letter-spacing: normal; text-transform: none; }
 .rpt-levels button[aria-pressed='true'] { background: #E99A53; border-color: #E99A53; }
 .rpt-modes { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-/* Month columns separated: a rule before each column’s figures. */
-.mx-sep .mx-col-start { border-left: 1px solid rgb(207 197 183); }
 /* The aging reports’ closing row: the handoff’s navy "All". */
 .ledger-table tr.rpt-all > td { background: rgb(221 229 240); color: rgb(29 43 74); font-weight: 700; box-shadow: inset 0 2px 0 rgb(29 43 74); }
 @media (max-width: 767px) {
@@ -7159,3 +7076,94 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .page-search input:focus { border-color: #E99A53; }
 .page-search button { height: 34px; padding: 0 12px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .page-search button:hover { background: rgb(247 247 245); }
+
+/* ─── The HR app, HR Mobile (2026-10-17) ───
+   The Claude Design handoff `design_handoff_hr_mobile`: the HR theme's own
+   section tones (as the shell's, `.hrv-shell` above) and the handoff's few
+   colours of its own — the app's ground, the accent that marks, a picked
+   pill and tile, the In / Late chips, the waiting node's halo, the scrim,
+   the sheet's, toast's and frame's shadows, and the one curve. */
+[data-hr-app] {
+  --tone-walnut: 239 228 217;
+  --tone-walnut-deep: 75 48 36;
+  --tone-clay: 249 231 216;
+  --tone-clay-deep: 163 78 37;
+  --tone-gold: 246 237 213;
+  --tone-gold-deep: 125 91 32;
+  --tone-slate: 230 237 241;
+  --tone-slate-deep: 78 101 116;
+  --tone-olive: 238 240 226;
+  --tone-olive-deep: 88 98 68;
+  --hr2-ground: rgb(247 244 240);
+  --hr2-accent: rgb(233 154 83);
+  --hr2-on-accent: rgb(255 255 255);
+  --hr2-pill-on: rgb(255 240 228);
+  --hr2-tile-on: rgb(255 248 240);
+  --hr2-in-bg: rgb(225 240 230);
+  --hr2-late-bg: rgb(255 236 220);
+  --hr2-halo: 0 0 0 4px rgb(232 150 80 / .18), inset 0 0 0 5px var(--ds-surface), inset 0 0 0 13px var(--hr2-accent);
+  --hr2-scrim: rgb(43 31 23 / .35);
+  --hr2-sheet-shadow: 0 -10px 40px rgb(43 31 23 / .2);
+  --hr2-toast-shadow: 0 10px 30px rgb(0 0 0 / .2);
+  --hr2-frame-shadow: 0 0 0 1px var(--ds-border), 0 20px 50px rgb(63 43 34 / .12);
+  --hr2-ease: cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes hrIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hrFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes hrUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes hrDim { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hrToast { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ─── Me (2026-10-17) ───
+   One's own attendance, leave, payslips, record and line — the Claude Design
+   handoff `design_handoff_staff_app` (Staff App v2), in the HR theme, on Me's
+   root (`[data-me]`, components/me). Its own colours, value for value: the
+   hub's tiles (Vivid, in order — Attendance, Leave, Payslip, Profile,
+   Hierarchy, Submit request, Documents, My team; Submit request's three
+   glyphs wear the first three), Correct a punch's quota card, the leave
+   cards (Ledger, one per tab), the hierarchy's level tones, the camera and
+   the letter page. */
+[data-me] {
+  --me-tile-1-bg: #FFE3CC; --me-tile-1: #E0661F;
+  --me-tile-2-bg: #DCE8FB; --me-tile-2: #2F64C8;
+  --me-tile-3-bg: #D9F2E2; --me-tile-3: #1F8A4C;
+  --me-tile-4-bg: #ECE2FA; --me-tile-4: #6B44C2;
+  --me-tile-5-bg: #FBDDDD; --me-tile-5: #C23B3B;
+  --me-tile-6-bg: #D5F1F0; --me-tile-6: #11807B;
+  --me-tile-7-bg: #FBEFC9; --me-tile-7: #A87A00;
+  --me-tile-8-bg: #E6E1F7; --me-tile-8: #4F46B5;
+  --me-quota-ink: #1E3F7A;
+  --me-quota-open: rgb(47 100 200 / .22);
+  --me-ledger-1: #6E4A3A;
+  --me-ledger-2: #2A221D;
+  --me-ledger-3: #A9491F;
+  --me-ledger-4: #6B7A50;
+  --me-ledger-5: #8C7B6E;
+  --me-ledger-6: #8E6A50;
+  --me-ledger-7: #ECE6DD;
+  --me-ledger-ink: #3F2B22;
+  --me-ledger-fill: #A9491F;
+  --me-tone-principal: #ECE7E2; --me-tone-principal-edge: #DCD3CB; --me-tone-principal-av: #5A4A40;
+  --me-tone-head: #F2E8E0; --me-tone-head-edge: #E3D3C6; --me-tone-head-av: #8C6A55;
+  --me-tone-upline: #FAEADF; --me-tone-upline-edge: #EED3C1; --me-tone-upline-av: #C8754A;
+  --me-tone-ink: #3F2B22;
+  --me-cam: #0E0C0B;
+  --me-cam-frame: #1E1A17;
+  --me-cam-ok: rgb(120 190 140);
+  --me-cam-warn: rgb(255 214 170);
+  --me-letter-ink: #1a1a1a;
+  --me-letter-sub: #666;
+  --me-slate: rgb(230 237 241);
+  --me-slate-deep: rgb(78 101 116);
+  --me-ease: cubic-bezier(.2, .8, .2, 1);
+}
+[data-me] .me-scroll { scrollbar-width: none; }
+[data-me] .me-scroll::-webkit-scrollbar { display: none; }
+[data-me] .me-tile { transition: border-color .2s var(--me-ease); }
+[data-me] .me-tile:hover { border-color: var(--ds-accent) !important; }
+[data-me] .me-hover:hover { background: var(--ds-surface-2) !important; }
+@keyframes meSheetIn { from { transform: translateY(105%); } to { transform: translateY(0); } }
+@keyframes meFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-me] *, [data-me] *::before, [data-me] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

@@ -151,7 +151,7 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(win.getByText('There is already a template called that')).toBeInTheDocument()
     fireEvent.change(win.getByPlaceholderText('e.g. Area Manager'), { target: { value: 'Area Manager' } })
     // Each view with how many tabs it has.
-    expect(win.getByText('Department view').closest('label')).toHaveTextContent('Department view9 tabs')
+    expect(win.getByText('Department view').closest('label')).toHaveTextContent('Department view3 tabs')
     fireEvent.click(win.getByRole('checkbox', { name: /Department view/ }))
     fireEvent.click(win.getByRole('checkbox', { name: /Salary amounts/ }))
     expect(win.getByText('Its holders sign in to the portal.')).toBeInTheDocument()

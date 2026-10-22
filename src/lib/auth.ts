@@ -11,6 +11,7 @@ import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import { isSensitiveField, type Action, type Scope } from '@/lib/permission-matrix'
 import { sensitiveFromKeys } from '@/lib/sensitive'
 import { actionsOnPage, actionsOnPages, closedBoxes, opensPage, storedTabsFrom, userTabs, type PageRoute } from '@/lib/page-tabs'
+import { reachFromJson } from '@/lib/sub-department-reach'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -47,7 +48,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // the function refuses an account that may not switch views.
   const person = surface === 'portal' ? viewAsPersonId(jar.get(VIEW_AS_PERSON_COOKIE)?.value) : null
 
-  const [{ data }, { data: perms }, { data: acts }, { data: fields }, { data: stored }, masked, viewed] = await Promise.all([
+  const [{ data }, { data: perms }, { data: acts }, { data: fields }, { data: stored }, { data: reached }, masked, viewed] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
@@ -64,6 +65,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     // Which tabs their template ticks, and their own boxes (2026-10-11, 8b) —
     // null without a template: then their cells and keys give their tabs.
     (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_tabs'),
+    // Which of the Revenue Department's sub-departments they reach, area by area (2026-10-16) —
+    // what they handle, every one when they handle none, their own ticks over it; the CRM asks the same.
+    (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('my_sub_department_reach'),
     // Only the member app's Revenue View still borrows a role's keys; HR's and
     // Finance's views are lenses over the account's own (below).
     viewAs === 'revenue_member'
@@ -85,6 +89,8 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
     permissions: (perms as string[] | null) ?? [],
     actions: actionsFromJson(acts),
     sensitive: (Array.isArray(fields) ? fields : []).filter(isSensitiveField),
+    // Not read (an error) → no sub-department at all: fail closed.
+    reach: reachFromJson(reached),
   }
   user.tabs = userTabs(storedTabsFrom(stored), user.actions, user.permissions)
   user.closed = closedBoxes(storedTabsFrom(stored))
@@ -99,7 +105,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   if (canSwitchView && viewed && !viewed.error && viewed.data) {
     const them = viewed.data as {
       id: string; name: string; email: string; role: UserRole; department_id: string | null
-      permissions: string[] | null; actions: unknown; sensitive: string[] | null; tabs: unknown
+      permissions: string[] | null; actions: unknown; sensitive: string[] | null; tabs: unknown; reach?: unknown
     }
     const permissions = them.permissions ?? []
     const actions = actionsFromJson(them.actions)
@@ -115,6 +121,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
       sensitive: (them.sensitive ?? []).filter(isSensitiveField),
       tabs: userTabs(storedTabsFrom(them.tabs), actions, permissions),
       closed: closedBoxes(storedTabsFrom(them.tabs)),
+      reach: reachFromJson(them.reach),
       actualRole: user.role,
       canSwitchView,
       viewingAs: { id: them.id, name: them.name },
@@ -132,7 +139,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
 
   if (canSwitchView && viewAs && masked) {
     const maskedKeys = (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key)
-    const maskedActions = actionsFromKeys(maskedKeys, viewAs)
+    const maskedActions = actionsFromKeys(maskedKeys)
     return {
       ...user,
       role: viewAs,
@@ -328,19 +335,6 @@ export async function requirePayrollPayoutsActionOn(
 ): Promise<User> {
   const user = await requireAnyActionOn(page, ...wants)
   if (!canSeePayrollPayouts(user)) {
-    redirect('/dashboard')
-  }
-  return user
-}
-
-/**
- * The old role gate. Still here for the dept_manager row policies no scope can
- * express — see the policies_on_permissions migration. Everything else moved
- * to requirePermission.
- */
-export async function requireRole(roles: UserRole[]): Promise<User> {
-  const user = await requireAuth()
-  if (!roles.includes(user.role)) {
     redirect('/dashboard')
   }
   return user

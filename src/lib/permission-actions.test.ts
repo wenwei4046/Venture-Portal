@@ -15,12 +15,11 @@ const ROLE_DEFAULTS = {
     'reports', 'treasury', 'venture_pool'],
   hr: ['claims', 'claims_approve', 'dashboard', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage',
     'member_requests_manage', 'revenue', 'salary_individual', 'team'],
-  dept_manager: ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'my_billing', 'opex'],
 }
 
 const holder = (role: keyof typeof ROLE_DEFAULTS) => {
   const permissions = ROLE_DEFAULTS[role]
-  return { permissions, actions: actionsFromKeys(permissions, role) }
+  return { permissions, actions: actionsFromKeys(permissions) }
 }
 
 describe('KEY_ACTIONS', () => {
@@ -33,12 +32,16 @@ describe('KEY_ACTIONS', () => {
       return [...sql.matchAll(/INSERT INTO public\.permission_key_actions[^;]*;/g)].flatMap(m =>
         [...m[0].matchAll(/\('([a-z_]+)', '([a-z_]+)', '([a-z]+)'\)/g)].map(r => `${r[1]} ${r[2]}.${r[3]}`))
     })
-    // …then every row a later migration moved to another key.
+    // …then every row a later migration moved to another key, and every key
+    // a later migration retired whole (my_billing, 20261017160000).
     for (const file of readdirSync(dir).sort()) {
       const sql = readFileSync(join(dir, file), 'utf8')
       for (const m of sql.matchAll(/UPDATE public\.permission_key_actions SET legacy_key = '([a-z_]+)' WHERE legacy_key = '([a-z_]+)' AND function_key = '([a-z_]+)' AND action = '([a-z]+)';/g)) {
         const at = rows.indexOf(`${m[2]} ${m[3]}.${m[4]}`)
         if (at >= 0) rows[at] = `${m[1]} ${m[3]}.${m[4]}`
+      }
+      for (const m of sql.matchAll(/DELETE FROM public\.permission_key_actions WHERE legacy_key = '([a-z_]+)';/g)) {
+        for (let at = rows.length - 1; at >= 0; at--) if (rows[at].startsWith(`${m[1]} `)) rows.splice(at, 1)
       }
     }
     const twin = Object.entries(KEY_ACTIONS).flatMap(([key, list]) => list.map(fa => `${key} ${fa}`))
@@ -69,8 +72,8 @@ describe('the CRM (20261010020000)', () => {
     expect(canDo({ permissions: [], actions: { 'crm.view': 'all' } }, 'crm', 'view')).toBe(false)
   })
 
-  it('HR, Finance and a department manager have no CRM', () => {
-    for (const role of ['hr', 'finance', 'dept_manager'] as const) expect(canDo(holder(role), 'crm', 'view', 'own'), role).toBe(false)
+  it('HR and Finance have no CRM', () => {
+    for (const role of ['hr', 'finance'] as const) expect(canDo(holder(role), 'crm', 'view', 'own'), role).toBe(false)
   })
 })
 
@@ -102,14 +105,6 @@ describe('the shared accounts keep exactly what they had', () => {
     expect(canDo(h, 'member', 'manage')).toBe(true)
     expect(canDo(h, 'team', 'manage')).toBe(true)
     expect(canDo(h, 'accounts', 'create')).toBe(false)
-  })
-
-  it('a department manager reaches their department, never the company', () => {
-    const d = holder('dept_manager')
-    expect(canDo(d, 'dept_pool', 'view', 'dept')).toBe(true)
-    expect(canDo(d, 'dept_pool', 'view')).toBe(false)
-    expect(canDo(d, 'my_billing', 'create', 'dept')).toBe(true)
-    expect(canDo(d, 'claims', 'approve', 'dept')).toBe(false)
   })
 })
 
@@ -173,7 +168,7 @@ describe('viewKeysOf', () => {
   })
 
   it('a function’s actions need one of them — Department mode alone manages no Settings page', () => {
-    const modeOnly = { permissions: ['department_mode'], actions: actionsFromKeys(['department_mode'], 'staff') }
+    const modeOnly = { permissions: ['department_mode'], actions: actionsFromKeys(['department_mode']) }
     expect(modeOnly.actions).toEqual({ 'settings.manage': 'all' })
     expect(canDo(modeOnly, 'settings', 'manage')).toBe(false)
   })

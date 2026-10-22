@@ -5,7 +5,16 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { signedFormKind, signedFormRefusal, waitingAddDetail, waitingAddInputFrom, waitingAddRefusal } from '@/lib/commission/waiting-add'
+import {
+  letterFile,
+  signedFormRefusal,
+  waitingAddDetail,
+  waitingAddInputFrom,
+  waitingAddRefusal,
+  waitingEditChangesFrom,
+  waitingEditPayload,
+  waitingEditRefusal,
+} from '@/lib/commission/waiting-add'
 import {
   FORM_KINDS,
   cleanedFields,
@@ -18,6 +27,7 @@ import {
   type WaitingField,
   type WaitingForm,
 } from '@/lib/commission/waiting-form'
+import type { SignedForm } from '@/lib/commission/sales-group-requests'
 import { loadMemberForm } from './_lib/waiting-form'
 
 /**
@@ -40,6 +50,13 @@ import { loadMemberForm } from './_lib/waiting-form'
  * and Remove (`removeFormTemplate` — the next version without the file, then
  * the file out of the bucket), under the same key as Upload form.
  *
+ * An applicant's signed form, in their drawer (2026-10-20): View and Download
+ * (`viewSignedForm`, `signedFormDownload` — the key, as the list is read) and
+ * Upload (`uploadSignedForm` — Member services · Edit and the key, as "+").
+ *
+ * The drawer's Edit (2026-10-20): `editWaitingApplicant` — the same gate as
+ * "+", only the fields that changed.
+ *
  * Refusals come back as `{ ok: false, reason }`: a thrown message never
  * reaches the browser in production.
  */
@@ -48,6 +65,7 @@ export type WaitingFormOutcome = { ok: true; form: WaitingForm } | { ok: false; 
 export type WaitingOutcome = { ok: true } | { ok: false; reason: string }
 
 const BUCKET = 'member-forms'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NO_ACCESS = 'The waiting list needs HR request management access.'
 const NO_ACCESS_REPLACEMENT = 'The replacement list needs HR request management access.'
 
@@ -246,7 +264,8 @@ export type WaitingAddOutcome = { ok: true; requestNo: string | null } | { ok: f
  *
  * `formData`: `input` (the window's fields as JSON) and, when attached,
  * `signedForm`. A signed form is looked at byte by byte (the member app's
- * rule) and goes where a member's does: the add keeps the request a draft,
+ * rule, and a Word file too since 2026-10-20 — `letterFile`) and goes where a
+ * member's does: the add keeps the request a draft,
  * the file is uploaded into the adder's own folder of it under this session
  * (the bucket's own policy), and `member_waiting_add_form` finds it there,
  * attests it and puts the request on the list. Each press is its own add.
@@ -276,8 +295,10 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
     const tooBig = signedFormRefusal(file)
     if (tooBig) return { ok: false, reason: tooBig }
     const bytes = new Uint8Array(await file.arrayBuffer())
-    const kind = signedFormKind(bytes, file.type)
-    if (!kind) return { ok: false, reason: 'The signed form must be a PDF, PNG or JPG file.' }
+    // A Word file too since 2026-10-20 (`letterFile`); `member_waiting_add_form` takes it (mig 20261020160000).
+    const read = letterFile(bytes, file.type)
+    if (!read.ok) return read
+    const kind = read.kind
     signed = { name: file.name.trim() || `Signed form.${kind.extension}`, hash: createHash('sha256').update(bytes).digest('hex'), bytes, ...kind }
   }
 
@@ -309,6 +330,129 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
 
   revalidateWaiting()
   return { ok: true, requestNo }
+}
+
+const SIGNED_BUCKET = 'member-invoices'
+const NO_SIGNED_FORM = 'No signed form is on file for them.'
+
+/**
+ * The file an applicant's request names as their signed form (the attestation whose hash the request holds — as
+ * Member services' View ↗ finds it), as a link: one that opens it where it is for five minutes, or one that hands
+ * it over under its name for a minute. Read under the viewer's own session: the request and its attestations by
+ * their row policies, the file by the bucket's (`member_invoice_read` — a manager reads every attested one).
+ */
+async function signedFormLink(requestId: string, view: boolean): Promise<FormFileLink & { type?: string }> {
+  if (typeof requestId !== 'string' || !UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
+  if (!(await manages())) return { ok: false, reason: NO_ACCESS }
+  const supabase = await client()
+  const { data: request, error } = await supabase.from('member_requests').select('kind, detail').eq('id', requestId).maybeSingle()
+  if (error) return { ok: false, reason: 'The signed form could not be opened. Please try again.' }
+  const detail = (request?.detail ?? {}) as Record<string, unknown>
+  const name = typeof detail.signedFormName === 'string' ? detail.signedFormName.trim() : ''
+  const hash = typeof detail.signedFormHash === 'string' ? detail.signedFormHash : ''
+  if (request?.kind !== 'waiting' || !name || !/^[0-9a-f]{64}$/.test(hash)) return { ok: false, reason: NO_SIGNED_FORM }
+  const { data: file } = await supabase
+    .from('member_request_attachments')
+    .select('object_path, mime_type')
+    .eq('request_id', requestId)
+    .eq('content_sha256', hash)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const found = (file ?? null) as { object_path?: unknown; mime_type?: unknown } | null
+  if (typeof found?.object_path !== 'string') return { ok: false, reason: NO_SIGNED_FORM }
+  const { data, error: signError } = await supabase.storage
+    .from(SIGNED_BUCKET)
+    .createSignedUrl(found.object_path, view ? 300 : 60, view ? undefined : { download: name })
+  if (signError || !data) return { ok: false, reason: 'The signed form could not be opened. Please try again.' }
+  return { ok: true, url: data.signedUrl, name, type: typeof found.mime_type === 'string' ? found.mime_type : undefined }
+}
+
+/** View, in an applicant's drawer (2026-10-20): their signed form, drawn where it is. */
+export async function viewSignedForm(requestId: string): Promise<FormFileLink & { type?: string }> {
+  return signedFormLink(requestId, true)
+}
+
+/** …and its Download: a link that works for a minute, under the file's own name. */
+export async function signedFormDownload(requestId: string): Promise<FormFileLink> {
+  return signedFormLink(requestId, false)
+}
+
+export type SignedFormOutcome = { ok: true; form: SignedForm } | { ok: false; reason: string }
+
+/**
+ * Upload, in an applicant's drawer (2026-10-20, the user: "i want here can be view for the letter they submit,
+ * then can be upload as well, the file"): the signed form for somebody already on the list — added with "+" and
+ * no form, or a better copy of a member's (it replaces the one on file; that one stays, attested). "+"'s rule: a
+ * PDF, PNG or JPG — or, since 2026-10-20 ("want word file as well"), a Word .docx / .doc without macros — of 3 MB
+ * or less, looked at byte by byte (`letterFile`). The file goes into the
+ * uploader's own folder of the request under this session (`member_invoice_waiting_form_insert`), then
+ * `member_waiting_attach_form` (mig 20261020130000) finds it, attests it and makes it the request's signed form;
+ * refused, the file is removed again (`member_invoice_unattested_manager_delete`).
+ *
+ * `formData`: `requestId`, `file`.
+ */
+export async function uploadSignedForm(formData: FormData): Promise<SignedFormOutcome> {
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'member', 'manage')
+  if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
+  const requestId = String(formData.get('requestId') ?? '')
+  if (!UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
+  const file = formData.get('file')
+  if (!(file instanceof File)) return { ok: false, reason: 'Choose the signed form to upload.' }
+  const refused = signedFormRefusal(file)
+  if (refused) return { ok: false, reason: refused }
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const read = letterFile(bytes, file.type)
+  if (!read.ok) return read
+  const kind = read.kind
+  const name = (file.name.trim() || `Signed form.${kind.extension}`).slice(0, 200)
+
+  const supabase = await client()
+  const path = `${user.id}/${requestId}/${randomUUID()}.${kind.extension}`
+  const upload = await supabase.storage.from(SIGNED_BUCKET).upload(path, bytes, { contentType: kind.mime, upsert: false })
+  if (upload.error) return { ok: false, reason: `The signed form could not be uploaded: ${upload.error.message}` }
+  const { data, error } = await supabase.rpc('member_waiting_attach_form', {
+    p_request: requestId,
+    p_path: path,
+    p_name: name,
+    p_hash: createHash('sha256').update(bytes).digest('hex'),
+  })
+  if (error) {
+    await supabase.storage.from(SIGNED_BUCKET).remove([path]).then(() => undefined, () => undefined)
+    return { ok: false, reason: refusal(error, 'The signed form could not be kept. Please try again.') }
+  }
+  const kept = (data ?? {}) as { name?: unknown; type?: unknown; at?: unknown; by?: unknown }
+  revalidateWaiting()
+  return {
+    ok: true,
+    form: {
+      name: typeof kept.name === 'string' ? kept.name : name,
+      type: typeof kept.type === 'string' ? kept.type : kind.mime,
+      at: typeof kept.at === 'string' ? kept.at : new Date().toISOString(),
+      by: typeof kept.by === 'string' ? kept.by : null,
+    },
+  }
+}
+
+/**
+ * Edit, in an applicant's drawer (2026-10-20, the user: "要能够按 Edit：这个 Edit 本身是让 HR 可以去改资料的"): their
+ * name, mobile number, joining date and who brought them in — only the fields the drawer changed (the logins are
+ * shared: a save never writes back what nobody touched). `member_waiting_edit` (mig 20261020210000) asks "+"'s
+ * two doors again, refuses somebody no longer on the list, a phone number already on it and a submitter from
+ * outside the department, and writes the step "Details edited · …" in the history.
+ */
+export async function editWaitingApplicant(requestId: string, raw: unknown): Promise<WaitingOutcome> {
+  const user = await requireActionOn('/revenue/[sub]/hierarchy', 'member', 'manage')
+  if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
+  if (typeof requestId !== 'string' || !UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
+  const changes = waitingEditChangesFrom(raw)
+  if (!changes) return { ok: false, reason: 'Reload the page and try again.' }
+  const refused = waitingEditRefusal(changes)
+  if (refused) return { ok: false, reason: refused }
+  const { error } = await (await client()).rpc('member_waiting_edit', { p_request: requestId, p_changes: waitingEditPayload(changes) })
+  if (error) return { ok: false, reason: refusal(error, 'Their details could not be saved. Please try again.') }
+  revalidateWaiting()
+  return { ok: true }
 }
 
 /** Fail: they didn't come when called — off the waiting list, and the next moves up. */

@@ -6,12 +6,12 @@ import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
-import { isFinanceDetailRoute, isFinanceShell, isFinanceView } from '@/lib/finance-view'
+import { isFinanceDetailRoute, isFinanceShell, isFinanceView, isPrincipalView } from '@/lib/finance-view'
 import { FinViewProvider } from './fin-view'
 import FinSwipeBack from './FinSwipeBack'
 import FinScrollMemory from './FinScrollMemory'
 import { useViewAsSync } from './useViewAsSync'
-import { navRootPaths, withPathRevenueSub, type NavData } from './nav-config'
+import { navRootPaths, revenueSubsOf, withPathRevenueSub, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
@@ -28,6 +28,7 @@ import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
 import { ToastHost } from '@/components/hrv/toast'
 import { FinToastHost } from '@/components/finv/Toast'
+import PortalPushAsk from '@/components/pwa/PortalPushAsk'
 
 // Portal shell.
 //
@@ -78,11 +79,16 @@ export default function PortalFrame({
   const fin = isFinanceView(pathname, user.role)
   // Finance's own shell (2026-10-14, the Finance revamp v2): HR's square
   // sidebar and greeting bar, drawn with Finance's categories — for the
-  // finance kind and the Principal's Finance lens, on a computer (a phone keeps
-  // the portal's phone shell until Finance's phone app takes it over).
-  const finShell = !hr && !lead && isFinanceShell(user.role) && !phone
+  // finance kind, the Principal's Finance lens and, since 2026-10-17, the
+  // Principal's own view (its few rows added), on a computer (a phone opens
+  // the Finance app — the layout sends it there).
+  const finShell = !hr && !lead && isFinanceShell(user) && !phone
+  const principalShell = finShell && isPrincipalView(user)
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
+  // This phone's notifications (2026-10-16 — the user's iPhone opened here and was never asked): the first open's
+  // question and More's switch, on a phone, never while viewing as a person (read-only).
+  const push = phone && !user.viewingAs
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -128,15 +134,15 @@ export default function PortalFrame({
             {lead ? (
               <LeadSidebar user={user} initialCollapsed={hrNavCollapsed} />
             ) : finShell ? (
-              <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} />
+              <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} principal={principalShell} />
             ) : (
-              <HrSidebar user={navUser} revenueSub={navData.revenueSub ?? null} initialCollapsed={hrNavCollapsed} />
+              <HrSidebar user={navUser} revenueSub={revenueSubsOf(navData)} initialCollapsed={hrNavCollapsed} />
             )}
           </div>
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
               {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
-              <HrTopBar user={user} viewLabel={lead ? 'Lead View' : finShell ? 'Finance view' : 'HR view'} viewValue={lead ? 'lead' : undefined} />
+              <HrTopBar user={user} viewLabel={lead ? 'Lead View' : principalShell ? 'Principal view' : finShell ? 'Finance view' : 'HR view'} viewValue={lead ? 'lead' : undefined} />
               <div className="md:hidden">
                 <TopBar user={user} fin={finPage} />
               </div>
@@ -156,8 +162,9 @@ export default function PortalFrame({
             onMoreClick={() => setMoreOpen((o) => !o)}
             fin={finPage}
           />
-          <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} />
+          <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} push={push} />
           {finShell ? <FinToastHost /> : null}
+          {push ? <PortalPushAsk /> : null}
           <Suspense fallback={null}>
             <RouteFreshener />
           </Suspense>
@@ -209,7 +216,9 @@ export default function PortalFrame({
         navData={navData}
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
+        push={push}
       />
+      {push ? <PortalPushAsk /> : null}
 
       <BackToTop />
       {/* The revamped pages flash a line after a save wherever they are opened. */}

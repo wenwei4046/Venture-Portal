@@ -17,8 +17,8 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
   // The HR revamp's second package (2026-10-11, README 18.4): the meeting rooms, booked from the phone.
   { key: "rooms", label: "Book a room", sub: "See free meeting rooms and book a slot", d: ICON.room, tone: s.toneRooms },
   { key: "docs", label: "Documentation", sub: "Handbook, price list and files from HR", d: ICON.doc, tone: s.toneDocs },
-  // The CRM (2026-10-09, prototype 2a: Profile › My leads & appointments).
-  { key: "crm", label: "My leads & appointments", sub: "Manage your leads and appointments", d: ICON.chat, tone: s.toneLeads },
+  // My leads & appointments (the CRM, 2026-10-09) is no row of Profile's since 2026-10-20 — the user: "这个我们不用留了，
+  // 帮我 delete 掉，因为左边那个基本上已经有 CRM 了": Today's chat button and the desktop sidebar's CRM row open it.
   { key: "memos", label: "Memos & notifications", sub: "Read published team updates", d: ICON.bell, tone: s.toneMemos },
 ];
 
@@ -27,7 +27,7 @@ export interface ProfileMainActions {
   /** Absent while their ticks close the page (2026-10-11, People › Permissions › Revenue app): no chip. */
   scheme?: () => void;
   brandWeeks?: () => void;
-  /** Absent while My income is closed (2026-10-11): the income stays hidden, so Privacy has nothing to show. */
+  /** Absent while My income is closed (2026-10-11): the income stays hidden, so Settings draws no eye. */
   toggleHide?: () => void;
   signOut: () => void;
   /** A Principal not viewing anybody yet: the way into View as. */
@@ -37,6 +37,15 @@ export interface ProfileMainActions {
    * login of their own, never a shared one, never while viewing a member, never on the preview's demo.
    */
   changePassword?: () => void;
+  /**
+   * Request to change email (2026-10-16 — the user: their email is the one they sign in with, changed only by their
+   * own request): beside Change password, on the same terms.
+   */
+  changeEmail?: () => void;
+  /**
+   * IT support: the account's own, in Your workspace right under Memos & notifications.
+   */
+  itSupport?: () => void;
 }
 
 const NO_ROWS: readonly WorkKey[] = [];
@@ -50,12 +59,18 @@ const VIEWS: { id: ModuleId; where: string }[] = [
 ];
 
 /**
- * Profile — the peach card, Your workspace, Privacy and Sign out (lines 1132–1187).
+ * Profile — the peach card, Your workspace, and Settings (lines 1132–1187: Privacy and Sign out, one section since
+ * 2026-10-16).
  * `closedRows`: the workspace's pages their ticks close (2026-10-11) — not listed.
  */
-export default function ProfileMain({ vm, hidden, actions, crm = true, closedRows = NO_ROWS, push = false, views = null }: {
-  vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean; closedRows?: readonly WorkKey[];
-  /** This phone's notifications row (2026-10-11): their own app only — never while the Principal views a member. */
+export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS, push = false, views = null, itReadOnly = false }: {
+  vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; closedRows?: readonly WorkKey[];
+  /** Show where employees find support while viewing them, without opening or submitting their private requests. */
+  itReadOnly?: boolean;
+  /**
+   * Settings › Notifications (2026-10-11; in Settings since 2026-10-16): their own app only — the Principal's too,
+   * never while the Principal views a member.
+   */
   push?: boolean;
   /**
    * Switch view (2026-10-11 — the user: "do a switch button for me to switch to hr and other view, in revenue view
@@ -128,40 +143,53 @@ export default function ProfileMain({ vm, hidden, actions, crm = true, closedRow
         ) : null}
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
-          {/* My leads & appointments: only for an account the CRM is open to (CRM · View, 2026-10-10). */}
-          {ROWS.filter(r => (r.key !== "crm" || crm) && !closedRows.includes(r.key)).map(r => (
-            <button key={r.key} className={r.key === "crm" && vm.badges.crm ? `${s.workRow} ${s.workRowCount}` : s.workRow} onClick={() => actions.open(r.key)}>
+          {ROWS.filter(r => !closedRows.includes(r.key)).map(r => (
+            <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{r.key !== "crm" && vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
-              {/* The chats' unread sits at the row's end, before its arrow (the owner, 2026-10-14). */}
-              {r.key === "crm" && vm.badges.crm && <span className={`${s.workCount} ${s.workCountEnd}`}>{vm.badges.crm}</span>}
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           ))}
+          {/* Under Memos & notifications (2026-10-21 — the user, an arrow at Memos: "move the it support to below memo &
+              notifications"); Memos has no box, so it is always the row above. */}
+          {actions.itSupport || itReadOnly ? (
+            <button className={s.workRow} onClick={actions.itSupport} disabled={itReadOnly} aria-label="IT support">
+              <span className={`${s.workIcon} ${s.toneRequests}`}><Svg d={ICON.help} size={22} sw={1.8} /></span>
+              <span className={s.workText}>
+                <span className={s.workLabel}>IT support</span>
+                <span className={s.workSub}>{itReadOnly ? "Exit View as to send your own request" : "Send a request and track its status"}</span>
+              </span>
+              <Svg d={itReadOnly ? ICON.lock : ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+            </button>
+          ) : null}
           <InstallRow />
-          {push ? <PushRow /> : null}
         </section>
-        {actions.toggleHide ? (
-          <section className={s.privacy}>
-            <h2 className={s.h2}>Privacy</h2>
+        {/* Settings (2026-10-16 — the user, Privacy, Account and Sign out circled: "combine to one, name (settings),
+            then add on one function is notification on"): this phone's notifications first, Sign out last. */}
+        <section className={s.settings} aria-label="Settings">
+          <h2 className={s.h2}>Settings</h2>
+          {push ? <PushRow /> : null}
+          {actions.toggleHide ? (
             <button className={s.hideBtn} onClick={actions.toggleHide}>
               {hidden ? "Show income amounts" : "Hide income amounts"}<Svg d={hidden ? ICON.eyeOff : ICON.eye} size={20} sw={1.7} />
             </button>
-          </section>
-        ) : null}
-        {/* Not in the prototype (2026-10-12): the login's own password, drawn as Privacy's button. */}
-        {actions.changePassword ? (
-          <section className={s.privacy} aria-label="Account">
-            <h2 className={s.h2}>Account</h2>
+          ) : null}
+          {/* Not in the prototype (2026-10-12): the login's own password and email, drawn as the eye's button. */}
+          {actions.changePassword ? (
             <button className={s.hideBtn} onClick={actions.changePassword}>
               Change password<Svg d={ICON.lock} size={20} sw={1.7} />
             </button>
-          </section>
-        ) : null}
-        <button className={s.signOut} onClick={actions.signOut}>Sign out</button>
+          ) : null}
+          {actions.changeEmail ? (
+            <button className={s.hideBtn} onClick={actions.changeEmail}>
+              Request to change email<Svg d={ICON.mail} size={20} sw={1.7} />
+            </button>
+          ) : null}
+          <button className={s.signOut} onClick={actions.signOut}>Sign out</button>
+        </section>
       </div>
     </div>
   );

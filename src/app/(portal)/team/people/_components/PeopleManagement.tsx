@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { HvPage, PageHead, btn } from '@/components/hrv/kit'
 import { Tabs } from '@/components/hrv/tabs'
+import { flash } from '@/components/hrv/toast'
 import type { PermissionsData } from '../../_lib/permission-templates'
 import PeopleDirectory, { type AccountRow, type PersonRow } from './PeopleDirectory'
 import PermissionTemplates from './PermissionTemplates'
@@ -34,6 +35,8 @@ interface Props {
   candidates: InviteCandidate[]
   /** Sent an invite link they never used (2026-10-16): Invite user asks them again. */
   pendingInvites: PendingInvite[]
+  /** Who this reader may not give a login, and why: a full-access title, for whoever does not manage permissions (2026-10-20). */
+  inviteHeld: Readonly<Record<string, string>>
   /** `?template=` — the template a Hierarchy › Roles link opens on. */
   initialTemplateId: string | null
   /** `?invite=` — the invite window opens on load, with that person picked if one was named. */
@@ -59,17 +62,27 @@ export default function PeopleManagement({
   canAddPeople,
   candidates,
   pendingInvites,
+  inviteHeld,
   initialTemplateId,
   initialInvite,
 }: Props) {
   const searchParams = useSearchParams()
   const tab = showPermissions ? peopleTab(searchParams.get('tab')) : 'people'
   const [notice, setNotice] = useState<InviteNotice | null>(null)
-  const [invite, setInvite] = useState<{ staffId: string | null } | null>(canInvite ? initialInvite : null)
+  const heldAtFirst = initialInvite?.staffId ? (inviteHeld[initialInvite.staffId] ?? null) : null
+  const [invite, setInvite] = useState<{ staffId: string | null } | null>(canInvite && !heldAtFirst ? initialInvite : null)
+
+  /** Invite user for somebody, from any door (a row, their window, their page) — or why not, for a full-access title. */
+  function openInvite(staffId: string) {
+    const held = inviteHeld[staffId]
+    if (held) return flash(held)
+    setInvite({ staffId })
+  }
 
   // A deep link opens the window once; it should not reopen it on every refresh.
   useEffect(() => {
     if (!searchParams.get('invite')) return
+    if (canInvite && heldAtFirst) flash(heldAtFirst)
     const params = new URLSearchParams(searchParams.toString())
     params.delete('invite')
     const qs = params.toString()
@@ -154,7 +167,7 @@ export default function PeopleManagement({
           people={people}
           unattachedAccounts={unattachedAccounts}
           canSeeActivity={canSeeActivity}
-          onInvite={canInvite ? staffId => setInvite({ staffId }) : undefined}
+          onInvite={canInvite ? openInvite : undefined}
         />
       )}
 

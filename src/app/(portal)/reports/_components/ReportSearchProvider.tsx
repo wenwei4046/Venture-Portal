@@ -2,19 +2,18 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
-// Monthly P&L / Monthly Cash Flow keep their controls in a left rail that is a
-// SIBLING of the matrix, so the search box (in the rail) and the rows it
-// searches (in the matrix) can't share component state. This tiny client
-// context bridges them.
+// The reports keep their controls in a row (ReportToolbar) that is a SIBLING
+// of the sheet (SheetReport), so the Find box and the detail level (in the
+// row) and the rows they act on (in the sheet) can't share component state.
+// This tiny client context bridges them.
 //
 // Deliberately NOT the URL: a ?q= would round-trip the server on every
-// keystroke. The GL statements need none of this — GlReportView owns its own
-// rail, so its search is plain local state.
+// keystroke.
 
 interface ReportSearchValue {
   search: string
   setSearch: (s: string) => void
-  /** Published by the matrix once it knows how many rows matched. */
+  /** Published by the sheet once it knows how many rows matched. */
   hitCount: number
   setHitCount: (n: number) => void
   activeHit: number
@@ -24,7 +23,7 @@ interface ReportSearchValue {
    *  watching this too makes every Enter jump, however many matches there are. */
   jump: number
   /** The detail level, when the page's control row holds it (2026-10-09, the
-   *  Finance revamp handoff); null = the matrix keeps its own. */
+   *  Finance revamp handoff); null = no level buttons, the sheet opens at L3. */
   level: 1 | 2 | 3 | null
   setLevel: (level: 1 | 2 | 3) => void
 }

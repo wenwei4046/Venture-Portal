@@ -62,7 +62,7 @@ describe('WarmLink', () => {
       vi.advanceTimersByTime(INTENT_MS)
     })
 
-    expect(prefetch.mock.calls).toEqual([[JULY]])
+    expect(prefetch.mock.calls).toEqual([[JULY, { kind: 'full' }]])
   })
 
   it('warms nothing the pointer only passes over', () => {

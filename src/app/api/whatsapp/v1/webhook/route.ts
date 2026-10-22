@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
 import { pushSoon } from '@/lib/push/outbox'
+import { adIdsOf, nameAdsFromMeta } from '@/lib/member/crm-ad-names-meta'
+import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
 import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 
 /**
@@ -18,7 +20,9 @@ import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/w
  *     a query param. Unset secret or wrong signature → refused and logged.
  *   - the service-role client is used for ONE thing: the ingest RPC
  *     `crm_ingest_whatsapp`, which owns every write (and the delivery log);
- *     a refused delivery is logged straight to crm_channel_events.
+ *     a refused delivery is logged straight to crm_channel_events; after the answer, an ad with no name yet is
+ *     named from Ads Manager through crm_ads_unnamed / crm_meta_name_ad (service role only, mig 20261019100000), and
+ *     the chat's person's auto-replies go through crm_auto_reply_due / _claim / _done (mig 20261019120000).
  *   - the path is excluded from the session middleware.
  *   - a delivery that brought customers' messages is pushed to the phones of whoever has those chats once Meta has
  *     its answer (`pushSoon`, mig 20261014030000 wrote the notices beside the messages) — through the outbox's own
@@ -80,5 +84,11 @@ export async function POST(request: Request) {
   }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
+  // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).
+  const ads = adIdsOf(delivery.messages)
+  if (ads.length) after(() => nameAdsFromMeta(client(), ads, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+  // The auto-replies of whoever the chat is given to (lib/member/crm-auto-reply.ts), once Meta has its answer.
+  const said = delivery.messages.map(m => m.externalId)
+  if (said.length) after(() => sendAutoReplies(client(), 'whatsapp', said, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
   return NextResponse.json({ ok: true, result: data })
 }

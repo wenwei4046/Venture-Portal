@@ -77,11 +77,15 @@ export function voucherChangeLine(c: Pick<AuditChange, 'table_name' | 'op' | 'ol
         ? 'Submitted for approval'
         : to === 'draft'
           ? 'Returned to draft'
-          : to === 'paid'
-            ? 'Approved and paid'
-            : to === 'voided'
-              ? 'Voided — entries reversed'
-              : `Status ${STATUS[from] ?? from} → ${STATUS[to] ?? to}`,
+          : to === 'paid' && from === 'draft' && after.direction === 'credit'
+            // A receipt is written a draft and received once its line is in
+            // (2026-10-22) — nobody approves it.
+            ? 'Received'
+            : to === 'paid'
+              ? 'Approved and paid'
+              : to === 'voided'
+                ? 'Voided — entries reversed'
+                : `Status ${STATUS[from] ?? from} → ${STATUS[to] ?? to}`,
     )
   }
   for (const key of changed) {
@@ -93,7 +97,7 @@ export function voucherChangeLine(c: Pick<AuditChange, 'table_name' | 'op' | 'ol
     else if (key === 'description') parts.push('Description changed')
     else if (key === 'bank_account_id') parts.push('Bank changed')
     else if (key === 'notes') parts.push('Notes changed')
-    else if (key === 'approved_by' || key === 'approved_at' || key === 'executed_at' || key === 'journal_entry_id' || key === 'approval_request_id') continue
+    else if (key === 'approved_by' || key === 'approved_at' || key === 'executed_by' || key === 'executed_at' || key === 'journal_entry_id' || key === 'approval_request_id') continue
     else parts.push(`${key.replace(/_id$/, '').replace(/_/g, ' ')} changed`.replace(/^./, (ch) => ch.toUpperCase()))
   }
   for (const key of changed) if (masked.has(key)) parts.push(`${key.replace(/_/g, ' ')} changed`.replace(/^./, (ch) => ch.toUpperCase()))

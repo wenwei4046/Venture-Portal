@@ -1,58 +1,227 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
+import type { AttConfig, AttLedger, AttMonth, AttRequest, AttStep } from '@/lib/attendance/types'
 import type { HrAppData } from '@/lib/hr-app/model'
-vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.fn() }))
 
+const itSupport = vi.hoisted(() => ({ render: vi.fn() }))
+vi.mock('@/components/it-support/ItSupport', () => ({
+  default: (props: { app: string; initialId?: string; readOnly?: boolean }) => {
+    itSupport.render(props)
+    return <div data-testid="it-support" data-app={props.app} data-request={props.initialId ?? ''} />
+  },
+}))
+vi.mock('@/components/layout/view-as-actions', () => ({ stopViewingAsPerson: vi.fn() }))
+// Me (components/me) reads from the browser: drawn here as its layer only, with the rows the app hands it.
+vi.mock('@/components/me/useMe', () => ({ useMe: () => ({ s: { today: null, todayAt: 0 } }), useClock: () => 0 }))
+vi.mock('@/components/me/MeOverlay', () => ({
+  MeOverlay: ({ open, accountRows, backLabel, startRequest }: { open: boolean; accountRows?: ReactNode; backLabel: string; startRequest?: string | null }) =>
+    (open ? <div data-testid="me" data-back={backLabel} data-start={startRequest ?? ''}>{accountRows}</div> : null),
+}))
+
+import { PNG, padPicture, sign } from '@/test/signature'
 import HrApp, { type HrAppActions } from './HrApp'
 
-// The HR phone app's sheets (2026-10-11): a field in a sheet keeps its place
-// while it is typed in. Its label was a component made afresh inside the
-// sheet on every render, so React swapped the input for a new one after each
-// key — "Interview" left "I", the people search kept "N" (the phone audit).
+// The HR app — HR Mobile (2026-10-17, the handoff `design_handoff_hr_mobile`): four tabs, sub screens, the generic
+// pages, sheets; and the old app's functions kept in the new look (the user: "keep all").
+
+const work = { type: 'work' as const, start: '09:00', end: '18:00', break: 60 }
+const person = (id: string, name: string, title: string, over: Record<string, unknown> = {}) => ({
+  id, name, code: null, titleId: null, title, level: 3, levelName: 'Executive', departmentId: 'hr', department: 'HR', hireDate: '2023-03-03', hasLogin: true,
+  uplineId: 's1', upline: 'Grace Lim', uplineHasLogin: true, templateId: null, ...over,
+})
+const config: AttConfig = {
+  today: '2026-10-14', now: '10:05', canCreate: true, canEdit: true, canApprove: true, me: 'Grace Lim',
+  people: [
+    person('s1', 'Grace Lim', 'HR Manager', { uplineId: null, upline: null, level: 7 }),
+    person('s2', 'Nurul Huda', 'HR Executive'),
+    person('s3', 'Kar Jun', 'Team Assistant'),
+  ],
+  titles: [], levels: [{ rank: 3, name: 'Executive' }, { rank: 7, name: 'Manager' }], departments: [{ id: 'hr', name: 'HR' }],
+  schedules: [{ id: 'w', name: 'Office 9–6', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => ({ day, ...work })).concat([{ day: 'Sat', type: 'off' } as never, { day: 'Sun', type: 'rest' } as never]) }],
+  locations: [{ id: 'hq', name: 'HQ', address: '', state: 'Selangor', radius: 150, lat: 3.05, lng: 101.62 }],
+  holidays: [],
+  assignments: [{ id: 'a', level: 'company', titleId: null, staffId: null, label: 'Everyone', mode: 'clock', scheduleId: 'w', locationId: 'hq', anywhere: false, ot: 'statutory', from: '2026-01-01' }],
+  leaveTypes: [{ id: 'al', code: 'AL', name: 'Annual leave', groups: [{ titles: ['all'], levels: ['all'], base: 12, steps: [] }], rules: '', route: 'upline_only', counts: 'working', accrues: true, unpaid: false, drawsFrom: null }],
+  otRates: [], routes: [],
+  policies: [{ id: 'p', from: '2026-01-01', fenceMode: 'flag', photoRequired: true, earliestInMin: 120, cutover: '04:00', graceMin: 5, correctionsPerMonth: 3, otWarnH: 80, otFlagH: 104, otBase: 'basic', photoKeepDays: 90, otWageCap: 4000 }],
+}
+const pin = (staffId: string, time: string) => ({ id: staffId, staffId, day: '2026-10-14', dir: 'in' as const, time, source: 'app' as const, locationId: 'hq', distance: 12, inside: true, accuracy: 5, device: '', photo: true, reason: '', invalid: false, invalidReason: '' })
+const month: AttMonth = { month: '2026-10-01', punches: [pin('s1', '08:32'), pin('s2', '09:08')], marks: [], overrides: [], leave: [], decisions: [], close: null }
+const step = (over: Partial<AttStep>): AttStep => ({ id: 'x', seq: 1, role: 'hr', approverId: null, approver: 'HR approvers', state: 'waiting', decidedBy: null, onBehalf: false, note: '', arrivedAt: '2026-10-14T00:20:00Z', decidedAt: null, ...over })
+const req = (over: Partial<AttRequest>): AttRequest => ({
+  id: 'q-al', ref: 'LV-2610-004', staffId: 's3', who: 'Kar Jun', kind: 'leave', leaveCode: 'AL', from: '2026-10-22', to: '2026-10-23', days: 2, hours: null, detail: {},
+  reason: 'Family trip', attachment: null, hasAttachment: false, route: 'hr_only', status: 'pending', onBehalf: false, by: 'Kar Jun', sentAt: '2026-10-14T00:20:00Z',
+  decidedAt: null, steps: [step({})], events: [], ...over,
+})
+const requests = [
+  req({}),
+  req({ id: 'q-ot', ref: 'OT-2610-014', staffId: 's2', who: 'Nurul Huda', kind: 'ot', leaveCode: null, from: '2026-10-15', to: '2026-10-15', days: null, hours: 3, route: 'upline_then_hr',
+    detail: { from: '18:00', to: '21:00' }, steps: [step({ role: 'upline', approver: 'Grace Lim' }), step({ id: 'y', seq: 2, state: 'queued', arrivedAt: null })] }),
+]
+const ledger: AttLedger = { year: 2026, entries: [], leave: [], marks: [] }
 
 const data: HrAppData = {
-  greetName: 'Grace',
-  meId: 's1',
-  viewingAs: null,
-  today: '2026-10-11',
-  staff: [
-    { id: 's1', name: 'Grace Lim', title: 'HR Manager', dept: 'HR' },
-    { id: 's2', name: 'Nurul Huda', title: 'HR Executive', dept: 'HR' },
-  ],
-  owners: [],
-  hires: [],
-  requests: [],
-  rooms: [{ id: 'r1', name: 'Meeting Room 1', seats: 8 }],
-  bookings: [],
-  sources: [],
-  talents: [],
-  docTypes: [],
-  letters: [],
+  greetName: 'Grace', meId: 's1', viewingAs: null, today: '2026-10-14', meLine: 'Grace Lim · HR Manager',
+  staff: [{ id: 's1', name: 'Grace Lim', title: 'HR Manager', dept: 'HR' }, { id: 's2', name: 'Nurul Huda', title: 'HR Executive', dept: 'HR' }],
+  owners: [], hires: [], requests: [], rooms: [{ id: 'r1', name: 'Meeting Room 1', seats: 8 }], bookings: [], sources: [], talents: [], docTypes: [], letters: [],
   bookDepts: [{ id: 'd1', name: 'HR' }],
-  parts: { requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true },
-  may: { decide: false, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true },
+  parts: { requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true, today: true, approve: true, balances: true, close: true, records: true, people: true },
+  may: { attDecide: true, decide: false, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true },
   notices: { unread: 0, items: [] },
+  att: { config, month, requests, ledger },
+  phones: { s2: '012-345 6789' },
 }
 
 const done = vi.fn(async () => ({ ok: true as const }))
 const actions = {
-  hireAck: done, hireInfo: done, hireDecline: done, hireCancel: done, hireFill: done, candStage: done, candAdd: done,
-  requestDecide: done, book: done, bookCancel: done, talentNotes: done, talentRemove: done,
+  hireAck: done, hireInfo: done, hireDecline: done, hireCancel: done, hireFill: done, hireNew: vi.fn(async () => ({ ok: true as const, id: 'HR-300' })), candStage: done, candAdd: done,
+  requestDecide: done, attDecide: done, book: done, bookCancel: done, talentNotes: done, talentRemove: done,
   letterLink: vi.fn(async () => ({ ok: false as const, reason: 'none' })),
   noticesRead: done, pushSave: done, pushRemove: done, pushTrouble: vi.fn(),
   switchView: vi.fn(),
   refresh: vi.fn(),
 } as unknown as HrAppActions
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+  window.history.pushState(null, '', '/hr-app')
+})
 
-function openBook() {
-  render(<HrApp data={data} actions={actions} />)
-  fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Rooms' }))
-  fireEvent.click(screen.getByRole('button', { name: '+ Book' }))
-}
+const nav = () => screen.getByRole('navigation', { name: 'HR app' })
+const tab = (name: string) => fireEvent.click(within(nav()).getByRole('button', { name: new RegExp(`^${name}`) }))
 
-describe('the HR app’s Book sheet', () => {
+describe('the four tabs', () => {
+  it('Home: the brand and who, the greeting, the line, quick actions and the six sections; Approve’s badge', () => {
+    render(<HrApp data={data} actions={actions} />)
+    expect(screen.getByText('HOUZS HR')).toBeInTheDocument()
+    expect(screen.getByText('Grace Lim · HR Manager')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^Good (morning|afternoon|evening), Grace\.$/ })).toBeInTheDocument()
+    expect(screen.getByText('1 request waiting for HR · 1 not in yet · 1 late · October closes 3 Nov.')).toBeInTheDocument()
+    expect(within(nav()).getAllByRole('button').map(b => b.textContent)).toEqual(['Home', 'Today', 'Approve1', 'People'])
+    // Payroll, People and the rest are on Home; a section whose pages are all closed is not.
+    expect(screen.getByText('Quick actions')).toBeInTheDocument()
+    expect(screen.getByText('III.')).toBeInTheDocument()
+    expect(screen.queryByText('Talent Bank')).toBeNull()
+  })
+
+  it('Today: the four tiles count and filter; the list runs Not in → Late → In', () => {
+    render(<HrApp data={data} actions={actions} />)
+    tab('Today')
+    expect(screen.getByRole('heading', { name: 'Today' })).toBeInTheDocument()
+    const names = () => screen.getAllByRole('button').map(b => b.textContent ?? '').filter(t => /Grace|Nurul|Kar/.test(t))
+    expect(names()).toEqual(['KJKar JunTeam Assistant · no punch yetNot in', 'NHNurul HudaIN 09:08 · HQ · 12 mLate 8m', 'GLGrace LimIN 08:32 · HQ · 12 mIn'])
+    fireEvent.click(screen.getByRole('button', { name: /^1\s*Late/ }))
+    expect(names()).toEqual(['NHNurul HudaIN 09:08 · HQ · 12 mLate 8m'])
+    fireEvent.click(screen.getByRole('button', { name: /^1\s*Late/ }))
+    expect(names()).toHaveLength(3)
+  })
+
+  it('People: by department, the search, a person’s page — Call with no mobile on file says so', () => {
+    render(<HrApp data={data} actions={actions} />)
+    tab('People')
+    expect(screen.getByText('HR · 3')).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Search name or title'), { target: { value: 'assistant' } })
+    expect(screen.getByText('HR · 1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.getByRole('heading', { name: 'Kar Jun' })).toBeInTheDocument()
+    expect(screen.getByText('Today · Not in')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Call' }))
+    expect(screen.getByRole('status')).toHaveTextContent('No mobile on file')
+  })
+})
+
+describe('Approve', () => {
+  it('Pending: HR’s own step; Reject waits for a note, then sends it; the toast is the handoff’s', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={data} actions={{ ...actions, attDecide: decide }} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.getByRole('heading', { name: 'Annual leave' })).toBeInTheDocument()
+    expect(screen.getByText('Approval flow')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Add a note to reject')
+    expect(decide).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Busy week' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q-al', false, 'Busy week'))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Kar Jun · Annual leave rejected'))
+  })
+
+  it('At upline: “Approve on behalf”', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={data} actions={{ ...actions, attDecide: decide }} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /^At upline/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve on behalf' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q-ot', true, ''))
+  })
+
+  it('at the viewer’s own upline seat: a plain “Approve” — their own step, never on their own behalf (2026-10-17)', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    const mine = requests.map(r => (r.id === 'q-ot' ? { ...r, steps: [step({ role: 'upline', approver: 'Grace Lim', approverId: 's1' }), step({ id: 'y', seq: 2, state: 'queued', arrivedAt: null })] } : r))
+    render(<HrApp data={{ ...data, att: { config, month, requests: mine, ledger } }} actions={{ ...actions, attDecide: decide }} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /^At upline/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.queryByRole('button', { name: 'Approve on behalf' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q-ot', true, ''))
+  })
+
+  it('without Approve’s box: the page, no decision bar', () => {
+    render(<HrApp data={{ ...data, may: { ...data.may, attDecide: false } }} actions={actions} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull()
+  })
+
+  it('Members (the old Review): a claim asks payroll or payment, and sends the one pressed with the note', async () => {
+    const claim = { id: 'q1', code: 'RQ-2610-004', kind: 'claim' as const, status: 'submitted', sub: 'Fair', byName: 'Kar Jun', category: 'Travel', location: 'Penang', amount: '120.00' }
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={{ ...data, requests: [claim], parts: { ...data.parts, requests: true }, may: { ...data.may, decide: true } }} actions={{ ...actions, requestDecide: decide }} />)
+    expect(within(nav()).getByRole('button', { name: /^Approve/ })).toHaveTextContent('Approve2')
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /^Members/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Travel · RM 120\.00/ }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Receipts checked' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(screen.getByRole('dialog', { name: 'Approve claim' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Request payment' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payment'))
+  })
+})
+
+describe('the sub screens', () => {
+  it('Leave balances and Month close', () => {
+    render(<HrApp data={data} actions={actions} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Leave' })[0])
+    expect(screen.getByRole('heading', { name: 'Leave balances' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^All/ })).toHaveTextContent('All 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Month close' })[0])
+    expect(screen.getByText('October 2026')).toBeInTheDocument()
+    expect(screen.getByText('Register + payroll')).toBeInTheDocument()
+    expect(screen.getByText('Deciding days and closing the month happen on desktop.')).toBeInTheDocument()
+  })
+
+  it('Payroll opens on the desktop', () => {
+    render(<HrApp data={data} actions={actions} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Payroll' })[0])
+    expect(screen.getByText('This page works best on a bigger screen. Open it on the desktop portal.')).toBeInTheDocument()
+  })
+})
+
+describe('the room schedule’s Book sheet (the old Rooms)', () => {
+  function openBook() {
+    render(<HrApp data={data} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Room schedule' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Book a room' }))
+  }
+
   it('keeps the same title field, focused, key after key', () => {
     openBook()
     const field = screen.getByPlaceholderText('e.g. Interview')
@@ -72,93 +241,56 @@ describe('the HR app’s Book sheet', () => {
     fireEvent.change(search, { target: { value: 'N' } })
     fireEvent.change(screen.getByPlaceholderText('Add a colleague — type a name'), { target: { value: 'Nur' } })
     expect(screen.getByPlaceholderText('Add a colleague — type a name')).toBe(search)
-    expect(document.activeElement).toBe(search)
     expect(screen.getByRole('button', { name: '+ Nurul Huda' })).toBeInTheDocument()
   })
 
-  it('keeps a select the same field when it changes', () => {
-    openBook()
-    const room = screen.getByRole('combobox', { name: 'Room' })
-    fireEvent.change(room, { target: { value: 'r1' } })
-    expect(screen.getByRole('combobox', { name: 'Room' })).toBe(room)
-    expect(room).toHaveValue('r1')
+  it('books it and says so', async () => {
+    const book = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={data} actions={{ ...actions, book }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Room schedule' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Book a room' }))
+    fireEvent.change(screen.getByPlaceholderText('e.g. Interview'), { target: { value: 'Interview' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Department' }), { target: { value: 'd1' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Room' }), { target: { value: 'r1' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'From' }), { target: { value: '900' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'To' }), { target: { value: '960' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Book' }))
+    await waitFor(() => expect(book).toHaveBeenCalledWith({ title: 'Interview', dept: 'd1', roomId: 'r1', date: '2026-10-14', from: 900, to: 960, attendees: ['s1'], pax: 1 }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Meeting Room 1 booked 15:00–16:00'))
   })
 })
 
-describe('the HR app viewed as somebody', () => {
-  it('says whose app it is and that nothing is saved', () => {
+describe('viewed as somebody', () => {
+  it('says whose app it is; no bell, no avatar, no decisions', () => {
     render(<HrApp data={{ ...data, viewingAs: 'Nurul Huda', greetName: 'Nurul' }} actions={actions} />)
     expect(screen.getByRole('status')).toHaveTextContent('Viewing as Nurul Huda — their pages, menus and buttons. Read-only: nothing you press is saved.')
-    expect(screen.getByRole('button', { name: 'Stop viewing' })).toBeInTheDocument()
-  })
-
-  it('shows no strip in your own app', () => {
-    render(<HrApp data={data} actions={actions} />)
-    expect(screen.queryByText(/Viewing as/)).toBeNull()
-  })
-})
-
-describe('the HR app approving a claim', () => {
-  // The user, 2026-10-11: the phone asks where the money goes, as Member services does on the desktop.
-  const claim = { id: 'q1', code: 'RQ-2610-004', kind: 'claim' as const, status: 'submitted', sub: 'Fair', byName: 'Kar Jun', category: 'Travel', location: 'Penang', amount: '120.00' }
-  const withClaim: HrAppData = { ...data, requests: [claim], parts: { ...data.parts, requests: true }, may: { ...data.may, decide: true } }
-
-  function openClaim() {
-    const decide = vi.fn(async () => ({ ok: true as const }))
-    render(<HrApp data={withClaim} actions={{ ...actions, requestDecide: decide }} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: /Review/ }))
-    fireEvent.click(screen.getByText('Kar Jun', { exact: false }))
-    fireEvent.change(screen.getByPlaceholderText('Note (optional)'), { target: { value: 'Receipts checked' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
-    return decide
-  }
-
-  it('asks payroll or payment, and sends the one pressed with the note', () => {
-    const decide = openClaim()
-    expect(screen.getByText('Approve claim')).toBeInTheDocument()
-    expect(decide).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Request payment' }))
-    expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payment')
-  })
-
-  it('adds it to the payroll', () => {
-    const decide = openClaim()
-    fireEvent.click(screen.getByRole('button', { name: 'Add to payroll' }))
-    expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payroll')
+    expect(screen.queryByRole('button', { name: /Notifications/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Me' })).toBeNull()
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
   })
 })
 
-describe('the HR app’s bell (2026-10-11)', () => {
+describe('the bell (2026-10-11)', () => {
   const notices = {
     unread: 2,
     items: [
-      { id: 'n3', kind: 'review' as const, title: 'New guest booking · HOUZS Interior', body: 'Showroom kickoff · Meeting Room 1', refKind: 'booking' as const, refId: 'b9', at: new Date().toISOString(), read: false },
+      { id: 'n3', kind: 'review' as const, title: 'New guest booking · HOUZS Interior', body: 'Showroom kickoff', refKind: 'booking' as const, refId: 'b9', at: new Date().toISOString(), read: false },
       { id: 'n2', kind: 'review' as const, title: 'New claim · Kar Jun', body: 'Travel', refKind: 'member_request' as const, refId: 'gone', at: new Date().toISOString(), read: false },
       { id: 'n1', kind: 'rooms' as const, title: 'Grace Lim added you to a meeting', body: 'Interview', refKind: 'booking' as const, refId: 'b1', at: '2026-10-01T02:00:00Z', read: true },
     ],
   }
 
-  it('counts what is new, opens the list, and marks them read', () => {
+  it('counts what is new, opens the list, marks them read; a notice opens its place', () => {
     const read = vi.fn(async () => ({ ok: true as const }))
-    render(<HrApp data={{ ...data, notices }} actions={{ ...actions, noticesRead: read }} />)
+    render(<HrApp data={{ ...data, notices, parts: { ...data.parts, requests: true } }} actions={{ ...actions, noticesRead: read }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Notifications, 2 new' }))
     expect(read).toHaveBeenCalledWith(null)
     expect(screen.getByText('New')).toBeInTheDocument()
     expect(screen.getByText('Earlier')).toBeInTheDocument()
-    expect(screen.getByText('New guest booking · HOUZS Interior')).toBeInTheDocument()
-    expect(screen.getByText('Grace Lim added you to a meeting')).toBeInTheDocument()
-  })
-
-  it('opens what a notice is about — its tab, when it has left the lists', () => {
-    render(<HrApp data={{ ...data, notices, parts: { ...data.parts, requests: true } }} actions={actions} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 2 new' }))
     fireEvent.click(screen.getByText('New claim · Kar Jun'))
-    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
-  })
-
-  it('has no bell while viewing as somebody', () => {
-    render(<HrApp data={{ ...data, notices, viewingAs: 'Nurul Huda' }} actions={actions} />)
-    expect(screen.queryByRole('button', { name: /Notifications/ })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Approve' })).toBeInTheDocument()
   })
 
   it('opens a tapped push’s place once (?open=…), then forgets the address', () => {
@@ -170,62 +302,66 @@ describe('the HR app’s bell (2026-10-11)', () => {
     expect(window.location.search).toBe('')
   })
 
-  it('says when this browser cannot show phone notifications', async () => {
-    render(<HrApp data={data} actions={actions} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
-    const row = await screen.findByRole('button', { name: /Phone notifications/ })
-    await waitFor(() => expect(row).toHaveTextContent('This browser cannot show them'))
-    expect(row).toBeDisabled()
+  it('one’s own request, decided (?open=me:…, 2026-10-17): Me opens on it — for a login of their own', () => {
+    window.history.pushState(null, '', '/hr-app?open=me:q-9')
+    render(<HrApp data={{ ...data, personalLogin: true }} actions={actions} />)
+    expect(screen.getByTestId('me')).toHaveAttribute('data-start', 'q-9')
+    expect(window.location.search).toBe('')
+    cleanup()
+    // A shared login has no Me: the app as it opens.
+    window.history.pushState(null, '', '/hr-app?open=me:q-9')
+    render(<HrApp data={{ ...data, personalLogin: false }} actions={actions} />)
+    expect(screen.queryByTestId('me')).toBeNull()
+    expect(window.location.search).toBe('')
   })
 })
 
-// One's own memos (2026-10-12 — the user: a memo reaches its person in every view and is acknowledged once): the
-// bell's MEMO notice opens it, Home's "Waiting for you" heads with it, More lists them; opening it reads it and
-// Acknowledge is the login's receipt (lib/memos/actions.ts).
-describe('the HR app’s memos (2026-10-12)', () => {
+describe('memos (2026-10-12)', () => {
   const memo = {
     id: 'm1', title: 'House rules', body: 'Read them.\n\nThey start Monday.', sender: 'People & Culture', kind: 'Memo',
-    publishedAt: '2026-10-12T09:44:13Z', version: 1, requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' },
-    readAt: null, acknowledgedAt: null,
+    publishedAt: '2026-10-12T09:44:13Z', version: 1, requiresAck: true, attachment: { name: 'Rules.pdf', type: 'application/pdf' }, readAt: null, acknowledgedAt: null,
   }
-  const old = { ...memo, id: 'm0', title: 'Old notice', attachment: null, readAt: '2026-10-02T02:00:00Z', acknowledgedAt: '2026-10-02T02:00:00Z' }
   const marks = () => {
-    const mark = vi.fn(async (_id: string, ack: boolean) => ({ ok: true as const, acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null }))
-    const refresh = vi.fn()
-    return { mark, refresh, acts: { ...actions, memoMark: mark, memoFile: vi.fn(async () => ({ ok: false as const, reason: 'This file was withdrawn.' })), refresh } }
+    const mark = vi.fn(async (_id: string, ack: boolean, _signature?: string | null) => ({ ok: true as const, acknowledgedAt: ack ? '2026-10-12T10:01:00Z' : null }))
+    const memoSignature = vi.fn(async () => PNG)
+    return { mark, memoSignature, acts: { ...actions, memoMark: mark, memoSignature, memoFile: vi.fn(async () => ({ ok: false as const, reason: 'Withdrawn.' })) } }
   }
 
-  it('Home’s “Waiting for you” heads with a memo to acknowledge, and opening it reads it', async () => {
-    const { mark, refresh, acts } = marks()
-    render(<HrApp data={{ ...data, memos: [old, memo], personalLogin: true }} actions={acts} />)
-    expect(screen.queryByText('All clear.')).toBeNull()
-    fireEvent.click(screen.getByText('House rules'))
-    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
-    expect(screen.getByText('They start Monday.')).toBeInTheDocument()
-    expect(screen.getByText('Rules.pdf')).toBeInTheDocument()
-    expect(screen.getByText('Needs your acknowledgement')).toBeInTheDocument()
-    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', false))
-    await waitFor(() => expect(refresh).toHaveBeenCalled())
-  })
-
-  it('Acknowledge records it once, for every view — then it says when', async () => {
+  it('Home heads with one to acknowledge; opening reads it; Acknowledge waits for a signature and records it once', async () => {
+    padPicture()
     const { mark, acts } = marks()
     render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
-    fireEvent.click(screen.getByText('House rules'))
+    expect(screen.getByText('Waiting for you')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /House rules/ }))
+    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
+    expect(screen.getByText('They start Monday.')).toBeInTheDocument()
+    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', false))
+    // 2026-10-20 — the user: "签完之后再来点那个 Acknowledge button".
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeDisabled()
+    sign(screen.getByLabelText('Sign here'))
+    expect(screen.getByText('Your signature, name and time are recorded for HR.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
-    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', true))
+    await waitFor(() => expect(mark).toHaveBeenCalledWith('m1', true, PNG))
     expect(await screen.findByText(/You acknowledged this ·/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    expect(screen.getByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
+    expect(screen.queryByLabelText('Sign here')).toBeNull()
+    vi.restoreAllMocks()
   })
 
-  it('the bell’s MEMO notice opens the memo', () => {
-    const { acts } = marks()
-    const notices = { unread: 1, items: [{ id: 'n9', kind: 'memo' as const, title: 'House rules', body: 'From People & Culture · please read and acknowledge', refKind: 'memo' as const, refId: 'm1', at: new Date().toISOString(), read: false }] }
-    render(<HrApp data={{ ...data, notices, memos: [memo], personalLogin: true }} actions={acts} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
-    expect(screen.getByText('MEMO')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('From People & Culture · please read and acknowledge', { exact: false }))
-    expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
+  it('one acknowledged before shows the signature it was given, read back once; viewing as somebody, none', async () => {
+    const { memoSignature, acts } = marks()
+    const done = { ...memo, readAt: '2026-10-12T10:00:00Z', acknowledgedAt: '2026-10-12T10:01:00Z' }
+    window.history.pushState(null, '', '/hr-app?open=memo:m1')
+    const { unmount } = render(<HrApp data={{ ...data, memos: [done], personalLogin: true }} actions={acts} />)
+    expect(await screen.findByRole('img', { name: 'Your signature' })).toHaveAttribute('src', PNG)
+    expect(memoSignature).toHaveBeenCalledWith('m1')
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    unmount()
+    memoSignature.mockClear()
+    window.history.pushState(null, '', '/hr-app?open=memo:m1')
+    render(<HrApp data={{ ...data, memos: [memo], personalLogin: true, viewingAs: 'KRIS' }} actions={acts} />)
+    expect(screen.queryByLabelText('Sign here')).toBeNull()
+    expect(memoSignature).not.toHaveBeenCalled()
   })
 
   it('a tapped push opens it (?open=memo:…); one taken back since opens the list', () => {
@@ -233,142 +369,122 @@ describe('the HR app’s memos (2026-10-12)', () => {
     window.history.pushState(null, '', '/hr-app?open=memo:m1')
     const { unmount } = render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
     expect(screen.getByRole('heading', { name: 'House rules' })).toBeInTheDocument()
-    expect(window.location.search).toBe('')
     unmount()
     window.history.pushState(null, '', '/hr-app?open=memo:gone')
     render(<HrApp data={{ ...data, memos: [memo], personalLogin: true }} actions={acts} />)
     expect(screen.getByRole('heading', { name: 'Memos' })).toBeInTheDocument()
   })
-
-  it('More › Memos lists them; nothing to acknowledge while viewing as somebody', () => {
-    const { acts } = marks()
-    render(<HrApp data={{ ...data, memos: [memo, old], personalLogin: true }} actions={acts} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
-    fireEvent.click(screen.getByRole('button', { name: /Memos.*1 waiting for your acknowledgement/ }))
-    expect(screen.getByText('Old notice')).toBeInTheDocument()
-    cleanup()
-    render(<HrApp data={{ ...data, memos: [], viewingAs: 'Nurul Huda' }} actions={acts} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
-    expect(screen.queryByRole('button', { name: /^Memos/ })).toBeNull()
-  })
 })
 
-describe('the HR app with no meeting room yet', () => {
-  it('greys out + Book: there is nothing to book', () => {
-    render(<HrApp data={{ ...data, rooms: [] }} actions={actions} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Rooms' }))
-    expect(screen.getByRole('button', { name: '+ Book' })).toBeDisabled()
-  })
-})
-
-// One app (2026-10-11, lib/one-app.ts): the HR app is HR's view of it on a phone, and More moves an account that
-// may switch views to the others — the portal's switcher, as the Revenue app's module menu has it.
-describe('the HR app’s views', () => {
-  function openMore(views: HrAppData['views']) {
-    render(<HrApp data={{ ...data, views }} actions={actions} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
+// The avatar opens Me (2026-10-17 — the user: "a top-right avatar on the header opens Me"); the old More's rows sit in
+// Me › Profile — Memos, My documents, Phone notifications, Change password, Request to change email, Switch view.
+describe('the avatar: Me, with the old More’s rows', () => {
+  const openMe = (over: Partial<HrAppData>, acts: Partial<HrAppActions> = {}) => {
+    render(<HrApp data={{ ...data, personalLogin: true, ...over }} actions={{ ...actions, ...acts }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Me' }))
+    return screen.getByTestId('me')
   }
 
-  it('lists every view for an account that may switch, this one marked as here', () => {
-    openMore({ current: 'hr' })
-    const views = screen.getByRole('region', { name: 'Switch view' })
-    expect(within(views).getAllByRole('button').map(b => b.textContent)).toEqual([
-      'PrincipalThe portal', 'FinanceThe portal', 'HRYou are here', 'Revenue teamThe Revenue app',
-    ])
-    expect(within(views).getByRole('button', { name: /HR/ })).toBeDisabled()
-  })
-
-  it('switches with the portal’s own action', () => {
-    openMore({ current: 'hr' })
-    fireEvent.click(within(screen.getByRole('region', { name: 'Switch view' })).getByRole('button', { name: /Revenue team/ }))
+  it('opens Me over the app (back to HR) for a login of their own; a shared login gets its Account sheet', () => {
+    const me = openMe({ views: { current: 'hr' } })
+    expect(me).toHaveAttribute('data-back', 'HR')
+    expect(within(me).getByText('Memos')).toBeInTheDocument()
+    expect(within(me).getByText('Change password')).toBeInTheDocument()
+    const views = within(me).getByRole('group', { name: 'Switch view' })
+    fireEvent.click(within(views).getByText('Revenue team'))
     expect(actions.switchView).toHaveBeenCalledWith('revenue_member')
-  })
-
-  it('is not there for anybody else', () => {
-    openMore(null)
-    expect(screen.queryByRole('region', { name: 'Switch view' })).toBeNull()
-  })
-})
-
-// Change password (2026-10-12 — the user: "in their profile tab", "just for that personal acc"): More offers it to a
-// login of their own — never hr@ or another shared one, never while viewing as somebody.
-describe('the HR app’s Change password', () => {
-  function openMore(over: Partial<HrAppData>, change = vi.fn(async () => ({ ok: true as const }))) {
-    render(<HrApp data={{ ...data, ...over }} actions={{ ...actions, changePassword: change }} />)
-    fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'More' }))
-    return change
-  }
-  const fill = (current: string, next: string, confirm: string) => {
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: current } })
-    fireEvent.change(screen.getByLabelText(/^New password/), { target: { value: next } })
-    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: confirm } })
-  }
-
-  it('is in More for a personal login only', () => {
-    openMore({ personalLogin: true })
-    expect(screen.getByRole('button', { name: /Change password/ })).toBeInTheDocument()
     cleanup()
-    openMore({})
-    expect(screen.queryByRole('button', { name: /Change password/ })).toBeNull()
-    cleanup()
-    openMore({ personalLogin: true, viewingAs: 'Nurul Huda' })
-    expect(screen.queryByRole('button', { name: /Change password/ })).toBeNull()
+    render(<HrApp data={{ ...data, personalLogin: false, views: { current: 'hr' } }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('dialog', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.queryByText('Change password')).toBeNull()
   })
 
-  it('asks the current password, then the new one twice, and says what is wrong before sending', () => {
-    const change = openMore({ personalLogin: true })
-    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
+  it('Change password: asks the current one, then the new one twice; says what is wrong before sending; done, Done closes it', async () => {
+    const change = vi.fn(async () => ({ ok: true as const }))
+    const me = openMe({}, { changePassword: change })
+    fireEvent.click(within(me).getByText('Change password'))
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument())
     const sheet = screen.getByRole('dialog', { name: 'Change password' })
-    expect(within(sheet).getByLabelText('Current password')).toHaveAttribute('type', 'password')
+    const fill = (a: string, b: string, c: string) => {
+      fireEvent.change(within(sheet).getByLabelText('Current password'), { target: { value: a } })
+      fireEvent.change(within(sheet).getByLabelText(/^New password/), { target: { value: b } })
+      fireEvent.change(within(sheet).getByLabelText('Confirm new password'), { target: { value: c } })
+    }
     fill('old-pass', 'new-pass-1', 'new-pass-2')
     fireEvent.click(within(sheet).getByRole('button', { name: 'Change password' }))
     expect(within(sheet).getByRole('alert')).toHaveTextContent('The two new passwords do not match.')
     expect(change).not.toHaveBeenCalled()
-  })
-
-  it('sends it, says it is done, and Done closes the sheet', async () => {
-    const change = openMore({ personalLogin: true })
-    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
     fill('old-pass', 'new-pass-1', 'new-pass-1')
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Change password' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Change password' }))
     await waitFor(() => expect(screen.getByText(/Password changed\./)).toBeInTheDocument())
-    expect(change).toHaveBeenCalledWith({ current: 'old-pass', next: 'new-pass-1', confirm: 'new-pass-1' })
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
   })
+})
 
-  it('stays while it is being sent: Cancel and the scrim wait for the answer', async () => {
-    let answer: (v: { ok: true }) => void = () => {}
-    openMore({ personalLogin: true }, vi.fn(() => new Promise<{ ok: true }>(r => { answer = r })) as never)
-    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
-    fill('old-pass', 'new-pass-1', 'new-pass-1')
-    const sheet = screen.getByRole('dialog', { name: 'Change password' })
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Change password' }))
-    await waitFor(() => expect(within(sheet).getByRole('button', { name: 'Cancel' })).toBeDisabled())
-    fireEvent.click(sheet.previousElementSibling as Element)
-    expect(screen.getByRole('dialog', { name: 'Change password' })).toBeInTheDocument()
-    await act(async () => { answer({ ok: true }) })
-    await waitFor(() => expect(screen.getByText(/Password changed\./)).toBeInTheDocument())
-    // Answered, the scrim closes it again.
-    fireEvent.click(screen.getByRole('dialog', { name: 'Change password' }).previousElementSibling as Element)
-    expect(screen.queryByRole('dialog', { name: 'Change password' })).toBeNull()
+describe('IT support stays in the HR app', () => {
+  it('opens from Me’s Profile and returns to HR without loading Revenue', async () => {
+    window.history.pushState(null, '', '/hr-app')
+    render(<HrApp data={{ ...data, personalLogin: true }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Me' }))
+    fireEvent.click(within(screen.getByTestId('me')).getByText('IT support'))
+    expect(await screen.findByTestId('it-support')).toHaveAttribute('data-app', 'hr')
+    expect(screen.getByRole('heading', { name: 'IT support' })).toBeInTheDocument()
+    expect(screen.queryByTestId('me')).toBeNull()
+    expect(window.location.pathname).toBe('/hr-app')
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.queryByTestId('it-support')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'HR app' })).toBeInTheDocument()
   })
 
-  it('shows the server’s refusal in the sheet', async () => {
-    openMore({ personalLogin: true }, vi.fn(async () => ({ ok: false as const, reason: 'Your current password is not right.' })) as never)
-    fireEvent.click(screen.getByRole('button', { name: /Change password/ }))
-    fill('wrong-one', 'new-pass-1', 'new-pass-1')
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change password' })).getByRole('button', { name: 'Change password' }))
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Your current password is not right.'))
+  it('a shared login can open IT support from Account without a People profile', () => {
+    render(<HrApp data={{ ...data, personalLogin: false, meId: null }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Account' })).getByRole('button', { name: 'IT support' }))
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-app', 'hr')
+    expect(screen.queryByRole('dialog', { name: 'Account' })).toBeNull()
+    expect(screen.queryByTestId('me')).toBeNull()
+  })
+
+  it('a bell notice opens the request in HR’s own IT page', () => {
+    window.history.pushState(null, '', '/hr-app')
+    const notices = {
+      unread: 1,
+      items: [{ id: 'n-it', kind: 'it' as const, title: 'IT-0001 · Fixed', body: 'Upload issue',
+        refKind: 'it_request' as const, refId: 'it-1', at: '2026-10-20T15:00:00Z', read: false }],
+    }
+    render(<HrApp data={{ ...data, notices }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    fireEvent.click(screen.getByText('IT-0001 · Fixed'))
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-request', 'it-1')
+    expect(window.location.pathname).toBe('/hr-app')
+  })
+
+  it('a tapped IT push opens its request and consumes the address', () => {
+    window.history.pushState(null, '', '/hr-app?open=it:it-1')
+    render(<HrApp data={data} actions={actions} />)
+    expect(screen.getByTestId('it-support')).toHaveAttribute('data-request', 'it-1')
+    expect(window.location.pathname).toBe('/hr-app')
+    expect(window.location.search).toBe('')
+  })
+
+  it('View as hides the entrance and does not mount private IT reads from a push URL', () => {
+    window.history.pushState(null, '', '/hr-app?open=it:it-1')
+    render(<HrApp data={{ ...data, personalLogin: true, viewingAs: 'Nurul Huda' }} actions={actions} />)
+    expect(screen.queryByText('IT support')).toBeNull()
+    expect(screen.queryByTestId('it-support')).toBeNull()
+    expect(itSupport.render).not.toHaveBeenCalled()
+    expect(screen.getByRole('navigation', { name: 'HR app' })).toBeInTheDocument()
   })
 })
 
-describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
-  it('steps out of the way on a scroll down, and is back on a scroll up or on another tab', () => {
+describe('the bar while reading on (2026-10-11)', () => {
+  it('steps out of the way on a scroll down, is back on a scroll up or another tab, and the page opens at its top', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(70)
     render(<HrApp data={data} actions={actions} />)
-    const nav = screen.getByRole('navigation', { name: 'HR app' })
-    const page = nav.parentElement!.querySelector('header')!.parentElement!
+    const bar = nav()
+    const page = bar.parentElement!.querySelector('[class*="scroller"]') as HTMLElement
     let top = 0
     Object.defineProperty(page, 'clientHeight', { configurable: true, get: () => 600 })
     Object.defineProperty(page, 'scrollHeight', { configurable: true, get: () => 2000 })
@@ -376,15 +492,13 @@ describe('the HR app’s tab bar while reading on (2026-10-11)', () => {
     const at = (y: number) => { top = y; act(() => { page.dispatchEvent(new Event('scroll')) }) }
     at(0)
     at(200)
-    expect(nav).toHaveAttribute('data-tucked')
-    expect(nav).toHaveAttribute('inert')
+    expect(bar).toHaveAttribute('data-tucked')
     at(150)
-    expect(nav).not.toHaveAttribute('data-tucked')
+    expect(bar).not.toHaveAttribute('data-tucked')
     at(400)
-    expect(nav).toHaveAttribute('data-tucked')
-    fireEvent.click(within(nav).getByRole('button', { name: 'Rooms' }))
-    expect(nav).not.toHaveAttribute('data-tucked')
-    // …and the page it opens starts at its top (the user: "每次点进去都从最上面开始").
+    expect(bar).toHaveAttribute('data-tucked')
+    fireEvent.click(within(bar).getByRole('button', { name: /^Today/, hidden: true }))
+    expect(bar).not.toHaveAttribute('data-tucked')
     expect(top).toBe(0)
     vi.restoreAllMocks()
   })

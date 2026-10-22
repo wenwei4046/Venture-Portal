@@ -64,7 +64,7 @@ export function sideTitle(totalLabel: string): string | null {
 
 const title = (key: string, label: string): SheetRow => ({ key: `title:${key}`, label, kind: 'title', depth: 0, values: [] })
 
-/** The month-by-month reports' rows (MonthlyMatrix's), in the handoff's shape. */
+/** The month-by-month reports' matrix rows, in the handoff's shape. */
 export function sheetFromMatrix(rows: MatrixRow[]): SheetRow[] {
   const out: SheetRow[] = []
   // Where the open block's first row sits (its title goes there), or -1.

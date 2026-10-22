@@ -6,6 +6,87 @@ history (`git log -p -- TODOS.md`).
 
 ---
 
+## Owed — the React Compiler's lint rules (2026-10-21)
+
+The move to Next 16 brought eslint-plugin-react-hooks 7, whose recommended set
+adds the React Compiler's checks as errors: 1,157 on the day (`refs` 849,
+`set-state-in-effect` 193, `preserve-manual-memoization` 46, `immutability` 26,
+`static-components` 17, `purity` 11, `error-boundaries` 10, `globals` 5), and
+not one from a rule Next 15's lint asked. They are off in `eslint.config.mjs`,
+so lint asks what it asked before. Some may name real bugs (a setState in an
+effect re-renders twice; a ref read during render shows a stale value). Take
+them on rule by rule, smallest first, only if the React Compiler is wanted —
+it is not on (`reactCompiler` unset).
+
+## Owed — Dependabot alerts (2026-10-21)
+
+GitHub's Dependabot alerts are off on the repo (`vulnerability-alerts`
+answers 404), so nothing names a published hole in a dependency — `next`
+included. The user, asked the same day: not now. Until then, `npm audit
+--omit=dev` is the check (only what the site runs; 2026-10-21 after the
+fixes: 0 critical — what is left is listed in the items below and mammoth's
+CLI-only argparse / sprintf-js, never reached by the browser-side previews).
+- **xlsx comes from SheetJS's CDN** (#604) and npm audit still checks it: it
+  matches by name and version, wherever the tarball came from — checked the
+  same day, a CDN-installed 0.20.1 is reported (GHSA-5pgg-2g8v-p4x9, high),
+  0.20.3 is not. What npm cannot do is move it: `npm audit fix` and
+  `npm update` never pick a newer CDN release. When an advisory names it, find
+  the fixed release at cdn.sheetjs.com and change the URL in package.json
+  (`src/lib/xlsx-version.test.ts` keeps it on the CDN). The same answer
+  without npm: `gh api "/advisories?ecosystem=npm&affects=xlsx@0.20.3"`.
+
+## Owed — pdf2json 3.2 (2026-10-21)
+
+`pdf2json` is pinned at exactly 3.1.5 (`src/lib/pdf2json-version.test.ts`):
+3.2 changed the coordinates it reports without a major version — on our own
+PDFs the topmost line read y=874.89 where 3.1.5 reads 33.01, while the page
+Height stayed in the old units. Until it moves, its bundled
+`@xmldom/xmldom` 0.9.6 stays (npm audit: high), reachable only through a
+bank statement PDF a signed-in Finance user uploads to Reconciliation.
+- Moving it: re-derive `lib/bank-recon-pdf.ts` (rows grouped by y within a
+  fixed tolerance, columns by x), the PDF layout tests (`lib/export/pdf.test.ts`,
+  the invoice / voucher / credit note document tests) and the worker smoke
+  (`tools/smoke-worker-pdf.mjs`) on 3.2's coordinates — and check real HLB
+  statements, which the bank-recon tests (synthetic items) never parse.
+- Or read statements with `pdfjs-dist`, already a dependency.
+
+## Found — dates that follow the server's locale and time zone (2026-10-21)
+
+Both seen while checking xlsx 0.20.3 (neither comes from it; production is
+right today only because Vercel runs in UTC with a US locale):
+- **Fund Summary's Excel prints a maturity date the US way**:
+  `reports/fund-summary/export/_format/xlsx.ts:37` writes
+  `new Date(…).toLocaleDateString()` with no locale, so production's file reads
+  `6/15/2030` for 15 June (`15/06/2030` on a Malaysian PC). The portal's own
+  format (DESIGN.md › Date format) would say `15 Jun 2030`.
+- **Reconciliation reads an Excel statement's dates by the server's clock**:
+  with `cellDates: true` xlsx builds each date at the server's local midnight
+  and `lib/bank-recon.ts › parseDate` takes its UTC parts — right on a UTC
+  server, a day early on a UTC+8 one (1 Oct read as 30 Sep, xlsx 0.18.5 and
+  0.20.3 alike). Only a server run in Malaysian time is hit (local dev); reading
+  the serials with `cellDates: false`, as the InfoTech and ERP imports do,
+  would end it.
+
+## Owed — sub-departments per person (2026-10-16)
+
+The owner: permission ticked "按 sub-department" on the CRM and the Revenue
+team's tabs; default = what a person handles. Shipped: the reach, the CRM (in
+the database), the Revenue pages and sidebars (in the app), the person window's
+pills (`.claude/rules/portal-wide/permissions.md` › SUB-DEPARTMENTS PER PERSON).
+The owner, asked about the first two below: "4 先不做" (2026-10-16) — not now.
+Build the data's before anybody is narrowed on a Revenue page.
+- **The Revenue pages' data in the database.** `comm_*` / `sales_*` rows are
+  still opened by the Revenue cells alone: somebody narrowed to Fair is kept
+  off IR's pages but could read IR's rows through the API. Needs a RESTRICTIVE
+  policy per table keyed by its sub-department (scheme → sub, batch → sub,
+  order → batch, run → sub) asking the `comm_cal` / `sales_groups` / `rules`
+  reach, without slowing the month's runs. Nobody is narrowed today.
+- **The Revenue app's director scope** (`member_director_scheme` and the
+  `member_*` readers that call it) follows `comm_sub_department_directors`, not
+  the ticks: ticking IR for KRIS opens IR's CRM, not IR's team in his app.
+- **Others' lists in the CRM** (`crm_role_of`) still read the structure: an IR
+  salesperson held back from IR is out of the CRM but still assignable.
+
 ## Owed — Revenue Director (2026-09-11)
 
 - **The CEO above the directors.** The user: "Revenue Director 上面就是

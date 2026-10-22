@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { StaffRow, TitleRow } from '@/lib/staff-form'
 
 // A person's full page, edited where it stands (2026-10-14, the user: "when i
@@ -16,6 +16,8 @@ import type { UplineGroup } from '@/lib/upline-choices'
 
 const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   name: 'TEST STAFF',
+  firstName: 'TEST',
+  lastName: 'STAFF',
   department: 'Marketing',
   code: 'HV042',
   title: 'Executive',
@@ -39,7 +41,7 @@ const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
 })
 
 const staff = (over: Partial<StaffRow> = {}): StaffRow => ({
-  id: 'staff-1', employee_name: 'TEST STAFF', designation: 'Executive', department_id: 'd-marketing',
+  id: 'staff-1', employee_name: 'TEST STAFF', first_name: 'TEST', last_name: 'STAFF', designation: 'Executive', department_id: 'd-marketing',
   department_name: 'Marketing', commission_dept: false, director_dept: false, title_id: 't-exec',
   basic_salary: 2500, allowances: 0, non_statutory_allowance: 0, employee_code: 'HV042', infotech_code: null,
   hire_date: '2026-01-05', resignation_date: null, epf_category: 'A', socso_category: 'first',
@@ -204,6 +206,32 @@ describe('Reports to', () => {
 
 // 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change email"
 // — somebody who signs in signs in with their Contact email.
+// The user, 2026-10-17: "大家的名字需要拆分为 first name 和 last name" — the Revenue app greets by the first; "full name =
+// loo wen wei, wen wei ( first name ) , loo ( last name )".
+describe('First Name and Last Name', () => {
+  it('read in Identity — the full name stays the page’s title', () => {
+    render(<PersonRecord view={view({ name: 'LOO WEN WEI', firstName: 'WEN WEI', lastName: 'LOO' })} editor={null} inviteHref={null} />)
+    const identity = screen.getByRole('heading', { level: 2, name: 'Identity' }).closest('section') ?? document.body
+    expect(within(identity as HTMLElement).getByText('WEN WEI')).toBeInTheDocument()
+    expect(within(identity as HTMLElement).getByText('LOO')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'LOO WEN WEI' })).toBeInTheDocument()
+  })
+  it('edited, each is a field holding what the record keeps, and only a changed one is sent', async () => {
+    openEditor(view({ name: 'GOH JOEY', firstName: 'JOEY', lastName: 'GOH' }), editor({ employee_name: 'GOH JOEY', first_name: 'JOEY', last_name: 'GOH' }))
+    expect(screen.getByLabelText('First Name')).toHaveValue('JOEY')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('GOH')
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Joey' } })
+    expect(screen.getByLabelText('First Name')).toHaveAttribute('data-dirty', 'true')
+    expect(await save()).toEqual({ first_name: 'Joey' })
+  })
+  it('a record read before they were filled starts from the full name’s parts — their own name first', () => {
+    openEditor(view({ name: 'LOO WEN WEI' }), editor({ employee_name: 'LOO WEN WEI', first_name: null, last_name: null }))
+    expect(screen.getByLabelText('First Name')).toHaveValue('WEN WEI')
+    expect(screen.getByLabelText('Last Name')).toHaveValue('LOO')
+    expect(within(bar()).getByText(/No changes/)).toBeInTheDocument()
+  })
+})
+
 describe('Email follows the login', () => {
   const withLogin = view({ login: 'active', contact: { phone: '012-345 6789', email: 'staff@login.example', address: null } })
 
@@ -225,6 +253,57 @@ describe('Email follows the login', () => {
   it('without a login it is HR’s to edit', () => {
     openEditor()
     expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+  })
+})
+
+describe('Address — six parts, State → City → Postcode from Malaysia’s list (2026-10-20)', () => {
+  const parts = {
+    address_line1: 'No 83, Jalan Jambu 3', address_line2: 'Machang Bubok', address_postcode: '14000',
+    address_city: 'Bukit Mertajam', address_state: 'Pulau Pinang', address_country: 'Malaysia',
+  }
+  const field = (key: string) => document.getElementById(`person-address-${key}`) as HTMLInputElement | HTMLSelectElement
+  const listed = () => waitFor(() => expect(field('state')).not.toBeDisabled())
+
+  it('edited, each part is its field holding what the record keeps; the old one-box address shows until it is in parts', async () => {
+    openEditor(view(), editor(parts))
+    await listed()
+    expect(field('line1')).toHaveValue('No 83, Jalan Jambu 3')
+    expect(field('state')).toHaveValue('Pulau Pinang')
+    expect(field('city')).toHaveValue('Bukit Mertajam')
+    expect(field('postcode')).toHaveValue('14000')
+    expect(screen.queryByText('On file')).toBeNull()
+    cleanup()
+
+    openEditor(view(), editor({ address: '83 Jalan Jambu 3, 14000 BM, Penang' }))
+    expect(screen.getByText('On file')).toBeInTheDocument()
+    expect(screen.getByText('83 Jalan Jambu 3, 14000 BM, Penang')).toBeInTheDocument()
+  })
+
+  it('a new postcode is one change, and the address goes whole — its six parts, nothing else', async () => {
+    openEditor(view(), editor(parts))
+    await listed()
+    fireEvent.change(field('postcode'), { target: { value: '14020' } })
+    expect(field('postcode')).toHaveAttribute('data-dirty', 'true')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    mocks.updateStaff.mockResolvedValue({ ok: true })
+    await act(async () => {
+      fireEvent.submit(form())
+    })
+    // The address is checked against Malaysia's list first (its own chunk, read as the save starts).
+    await waitFor(() => expect(mocks.updateStaff).toHaveBeenCalledTimes(1))
+    const [, data] = mocks.updateStaff.mock.calls[0] as [string, FormData]
+    expect(Object.fromEntries(data.entries())).toEqual({ ...parts, address_postcode: '14020' })
+  })
+
+  it('refuses in the bar, before sending, three that are not one place on the list', async () => {
+    openEditor(view(), editor({ ...parts, address_postcode: '11060' }))
+    await listed()
+    fireEvent.change(field('line1'), { target: { value: 'No 85, Jalan Jambu 3' } })
+    await act(async () => {
+      fireEvent.submit(form())
+    })
+    await waitFor(() => expect(within(bar()).getByRole('alert')).toHaveTextContent('11060 is not a postcode of Bukit Mertajam, Pulau Pinang'))
+    expect(mocks.updateStaff).not.toHaveBeenCalled()
   })
 })
 

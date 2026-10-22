@@ -62,7 +62,7 @@ export function navVM(ctx: SalesCtx) {
   const badges: Record<SalesTab, number> = { inbox: mine.reduce((n, c) => n + (c.unread || 0), 0), contacts: 0, calendar: todayAppts, insight: 0, profile: unread };
   return {
     nav3b: NAV.map(([id, label, icon]) => ({
-      label, icon, badge: badges[id], color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
+      label, icon, badge: badges[id], on: ui.tab === id, color: ui.tab === id ? RUST : SUB, weight: ui.tab === id ? 600 : 500,
       // Insight opens on Me, with no list or info sheet left open (rev 1010 §5.2).
       go: () => { if (ui.tab !== id) set(u => ({ ...u, tab: id, profSub: null, hist: [...u.hist, u.tab].slice(-20), ...(id === "insight" ? { insList: null, insInfo: null } : {}) })); },
     })),
@@ -85,8 +85,8 @@ export function shellVM(ctx: SalesCtx) {
     // Grouped as the list comes (team order): a heading over each group — Director, each team, Others (user 2026-10-09).
     swList: list.map((p, k) => {
       const cur = p.id === owner.id, group = groupOf(p), first = !k || groupOf(list[k - 1]) !== group;
-      return { name: p.name, title: titleOf(p), ini: ini(p.name), act: cur ? "Viewing" : "View", fg: cur ? "#387557" : "#BD4A19",
-        head: first ? `${group} · ${list.filter(x => groupOf(x) === group).length}` : "", hasHead: first, rule: first ? "0" : "1px solid #F5EEE9",
+      return { name: p.name, title: titleOf(p), ini: ini(p.name), act: cur ? "Viewing" : "View", fg: cur ? "var(--crm-brown)" : "var(--crm-rust)",
+        head: first ? `${group} · ${list.filter(x => groupOf(x) === group).length}` : "", hasHead: first, rule: first ? "0" : "1px solid var(--crm-field)",
         go: cur ? () => set(u => ({ ...u, swOpen: false })) : () => { set(u => ({ ...u, swOpen: false, chat: null, filter: null })); embedded?.onSwitch?.(p.id); } };
     }),
     exitAsX: () => { set(u => ({ ...u, chat: null, tab: "inbox", filter: null })); embedded?.exitAs?.(); },

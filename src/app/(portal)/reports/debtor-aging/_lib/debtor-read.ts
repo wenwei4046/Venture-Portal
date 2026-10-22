@@ -7,7 +7,7 @@ import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 // word for word, so the Finance phone app's Debtor aging reads the same): every
 // issued invoice, its payer by name, what is still unpaid on it — a part-paid
 // one at its remainder, its part payment said in its description — and none
-// that is settled. A department manager reads only their own segment's (RLS).
+// that is settled.
 
 type Client = Awaited<ReturnType<typeof createClient>>
 

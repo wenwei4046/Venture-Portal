@@ -31,10 +31,26 @@ export interface OverviewCategory {
   tiles: OverviewTile[]
 }
 
+/** The Principal's own view's figures (2026-10-17): the treasury's, each opening its screen. */
+export interface OverviewFigure {
+  key: string
+  label: string
+  value: number
+  sub: string
+  href: string
+  how: 'tab' | 'push'
+}
+
+const money = (n: number) => {
+  const v = Math.abs(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return n < 0 ? `RM (${v})` : `RM ${v}`
+}
+
 export default function OverviewScreen({
   date,
   greeting,
   summary,
+  figures = [],
   quick,
   quickTone,
   categories,
@@ -44,6 +60,7 @@ export default function OverviewScreen({
   /** "Good afternoon, Aina." */
   greeting: string
   summary: string
+  figures?: OverviewFigure[]
   quick: OverviewTile[]
   /** Each quick action's own tone (Daily's clay, Fund's olive, the Ledger's slate). */
   quickTone: Record<string, HrNavTone>
@@ -61,6 +78,20 @@ export default function OverviewScreen({
         <div className={s.rule48} aria-hidden="true" />
         {summary ? <p className={s.homeSummary}>{summary}</p> : null}
       </div>
+
+      {figures.length > 0 ? (
+        <div className={s.figs} aria-label="Treasury today">
+          {figures.map((f) => (
+            <Link key={f.key} href={f.href} className={s.fig} onClick={() => (f.how === 'push' ? pushIntent() : setIntent('tab'))}>
+              <span className={s.figLabel}>{f.label}</span>
+              <span className={s.figValue} data-neg={f.value < 0 ? 'true' : undefined}>
+                {money(f.value)}
+              </span>
+              <span className={s.figSub}>{f.sub}</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       {quick.length > 0 ? (
         <>

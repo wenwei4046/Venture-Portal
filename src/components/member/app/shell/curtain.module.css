@@ -1,0 +1,102 @@
+/*
+ * The switch to the CRM (2026-10-17 — the Claude Design handoff "Revenue → CRM switch view motion", design 2c "Peach ·
+ * Context", `.design/revenue-app/design_handoff_revenue_crm_switch`): a peach curtain over the whole phone, "Now
+ * opening", the word rolling from Revenue to CRM (and back, mirrored), three dots. Its motion is ViewSwitchCurtain's (Web
+ * Animations); here is how it looks, value for value — on a phone, so the type takes the phone's .92 as the rest of the
+ * app does.
+ */
+
+.curtain {
+  --rv-type: .92;
+  position: fixed;
+  inset: 0;
+  /* Over everything the app draws, the CRM's own layer (z 40) and the sheets included: nothing is pressed under it. */
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  overflow: hidden;
+  background: var(--rv-peach-bg);
+  box-shadow: var(--rv-hero-edge);
+  /* Below the screen until its motion starts. */
+  transform: translateY(100%);
+  will-change: transform;
+}
+/* The way back (2026-10-17) is the mirror image: above the screen until it starts, the new word waiting above the box. */
+.back { transform: translateY(-100%); }
+.back .wordNext { transform: translateY(-100%); }
+
+/* The way back's press: the ripple laid over the button the CRM draws (its house), clipped to it, under the curtain. */
+.press {
+  position: fixed;
+  z-index: 89;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pressRipple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  background: var(--rv-accent);
+  opacity: 0;
+}
+
+.caption {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: calc(12px * var(--rv-type));
+  font-weight: 400;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--rv-sub);
+  opacity: 0;
+}
+
+/* The word rolls inside a box one line high: the old one up and out, the new one up and in. */
+.roll {
+  position: relative;
+  width: calc(260px * var(--rv-type));
+  height: calc(56px * var(--rv-type));
+  overflow: hidden;
+  text-align: center;
+  font-family: var(--font-display-rv);
+  font-size: calc(46px * var(--rv-type));
+  line-height: calc(56px * var(--rv-type));
+  font-weight: 800;
+  letter-spacing: -.04em;
+  color: var(--rv-accent);
+}
+.word {
+  position: absolute;
+  inset: 0 0 auto;
+}
+.wordNext { transform: translateY(100%); }
+
+.dots {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--rv-accent);
+  animation: rvDot 1005ms linear infinite;
+}
+.dot:nth-child(2) { animation-delay: 176ms; }
+.dot:nth-child(3) { animation-delay: 352ms; }
+@keyframes rvDot {
+  0%, 100% { opacity: .3; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}

@@ -67,6 +67,17 @@ export function IncomePage({ vm, hidden, message, onBack, onPeriod, onToggleHide
               <div className={s.total}><span>Total</span><span className={s.tabular}>{vm.total}</span></div>
             </section>
           )}
+          {!vm.notice && vm.paidAs && (
+            <section>
+              <div className={s.sectHead}><h2 className={s.h2}>Paid as</h2></div>
+              {vm.paidAs.map(r => (
+                <div key={r.label} className={s.row}>
+                  <span className={s.sheetMinW}><span className={s.rowLabel}>{r.label}</span><span className={s.rowSub}>{r.sub}</span></span>
+                  <span className={`${s.rowAmt} ${r.neg ? s.rowNeg : ""}`}>{r.amt}</span>
+                </div>
+              ))}
+            </section>
+          )}
           {vm.hasOrders && (
             <button className={s.linkCard} onClick={onOrders}>
               <span className={s.linkIcon}><Svg d={ICON.receipt} size={20} sw={1.8} /></span>

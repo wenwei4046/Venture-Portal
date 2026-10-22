@@ -27,15 +27,20 @@ export function calendarVM(ctx: DeskCtx) {
   const teamColour = (name: string | null): [string, string] => {
     if (name === DIRECTOR_TEAM) return DIRECTOR_C;
     const k = teams.findIndex(t => t.name === name);
-    return k < 0 ? ["#806B60", "#F5EBE3"] : teamColours(k);
+    return k < 0 ? ["var(--crm-muted)", "var(--crm-field)"] : teamColours(k);
   };
   const all = visitRows(ctx);
   const vs = all.filter(v => team === "all" || v.team === team)
     .filter(v => ui.calShowroom === "all" || v.v.showroomId === ui.calShowroom)
     .filter(v => !ui.calWho.length || (!!v.repId && ui.calWho.includes(v.repId)))
     .filter(v => { const d = day0(v.at); return d >= r[0] && d <= r[1]; });
+  // 4a's visit blocks (change list 14): Came filled ink, Booked amber on its tint, No-show a dashed outline — told apart in greyscale.
+  const lookOf = (s: VisitRow["status"]) => s === "No show" ? { bg: "transparent", fg: "var(--crm-faint)", bd: "var(--crm-faint)", bs: "dashed" }
+    : s === "Booked" || s === "To mark" ? { bg: "var(--crm-tint-appt)", fg: "var(--crm-ink)", bd: "var(--crm-amber-line)", bs: "solid" }
+      : { bg: "var(--crm-ink)", fg: "#fff", bd: "var(--crm-ink)", bs: "solid" };
   const item = (v: VisitRow) => { const st = ST[v.status] ?? ST.Booked, [ink, tint] = teamColour(v.team);
-    return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint,
+    return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, room: v.room, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint, look: lookOf(v.status),
+      hour: v.at.getHours() + v.at.getMinutes() / 60, mins: v.v.minutes || 60,
       open: () => patch({ pane: "docked", kind: "info", visit: v.id, infoId: null }) }; };
 
   // The month on screen: the range's month (the prototype: October with 28–30 Sep and 1 Nov around it).
@@ -43,11 +48,11 @@ export function calendarVM(ctx: DeskCtx) {
   const rows = Math.ceil((lead + days) / 7);
   const monthCells = Array.from({ length: rows * 7 }, (_, k) => {
     const d = new Date(mA.getFullYear(), mA.getMonth(), 1 - lead + k), t = d.getTime(), muted = d.getMonth() !== mA.getMonth();
-    return { num: d.getDate(), bg: muted ? "#FAF7F4" : "#fff", numBg: !muted && t === T ? "#BD4A19" : "transparent", numFg: muted ? "#C9B8AC" : t === T ? "#fff" : "#3F2B22",
+    return { num: d.getDate(), bg: muted ? "var(--crm-page)" : "#fff", numBg: !muted && t === T ? "var(--crm-rust)" : "transparent", numFg: muted ? "var(--crm-faint-2)" : t === T ? "#fff" : "var(--crm-ink)",
       visits: muted ? [] : vs.filter(v => day0(v.at) === t).map(item) };
   });
   const weekCols = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((dow, k) => { const t = wkA + k * DAY, n = new Date(t).getDate();
-    return { dow, num: n, fg: t === T ? "#BD4A19" : "#3F2B22", bd: t === T ? "#BD4A19" : "#EBDDD2", visits: vs.filter(v => day0(v.at) === t).map(item) }; });
+    return { dow, num: n, fg: t === T ? "var(--crm-rust)" : "var(--crm-ink)", bd: t === T ? "var(--crm-rust)" : "var(--crm-rule)", visits: vs.filter(v => day0(v.at) === t).map(item) }; });
   // Day: the showrooms' own times today (the prototype: 11 am – 7 pm), each free or with its visits.
   const room = ui.calShowroom === "all" ? undefined : data.rooms.find(x => x.id === ui.calShowroom);
   const dow = (now.getDay() + 6) % 7;
@@ -60,7 +65,7 @@ export function calendarVM(ctx: DeskCtx) {
   const upcoming = vs.filter(v => view === "today" ? day0(v.at) === T : day0(v.at) >= T);
   const dayKeys = [...new Set(upcoming.map(v => day0(v.at)))];
   const upDays = dayKeys.map(t => ({ label: (t === T ? "Today · " : "") + new Date(t).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" }),
-    fg: t === T ? "#BD4A19" : "#806B60", visits: upcoming.filter(v => day0(v.at) === t).map(item) }));
+    fg: t === T ? "var(--crm-rust)" : "var(--crm-muted)", visits: upcoming.filter(v => day0(v.at) === t).map(item) }));
   const teamsList: [string, string, string | null][] = [["all", "All teams", null], ...(ctx.directors.length ? [[DIRECTOR_TEAM, DIRECTOR_TEAM, DIRECTOR_C[0]] as [string, string, string]] : []),
     ...teams.map((t, k) => [t.name, t.name, teamColours(k)[0]] as [string, string, string])];
   const due = vs.filter(v => v.at <= now), showed = vs.filter(v => v.v.state === "attended").length, noShow = vs.filter(v => v.v.state === "no_show").length;
@@ -80,7 +85,7 @@ export function calendarVM(ctx: DeskCtx) {
     return { head: false, color: "", sel: on, unsel: !on, label, ini: val ? initials(label) : "ALL", avBg: av[0], avFg: av[1],
       pick: () => set(u => ({ ...u, calWho: !val ? [] : u.calWho.includes(val) ? u.calWho.filter(x => x !== val) : [...u.calWho, val] })) }; };
   type O = ReturnType<typeof opt> | { head: true; sel: false; unsel: false; label: string; color: string };
-  const calWhoOpts: O[] = [opt("Everyone", null, ["#F5EBE3", "#806B60"])];
+  const calWhoOpts: O[] = [opt("Everyone", null, ["var(--crm-field)", "var(--crm-muted)"])];
   if (ctx.directors.length) { calWhoOpts.push({ head: true, sel: false, unsel: false, label: DIRECTOR_TEAM.toUpperCase(), color: DIRECTOR_C[0] }); ctx.directors.forEach(d => calWhoOpts.push(opt(d.name, d.id, [DIRECTOR_C[1], DIRECTOR_C[0]]))); }
   teams.forEach((t, k) => { const [ink, tint] = teamColours(k); calWhoOpts.push({ head: true, sel: false, unsel: false, label: t.name.toUpperCase(), color: ink });
     t.people.forEach(p => calWhoOpts.push(opt(p.name, p.id, [tint, ink]))); });
@@ -89,7 +94,7 @@ export function calendarVM(ctx: DeskCtx) {
   return {
     kCal: ui.tab === "calendar",
     rangeLabel: r[0] === r[1] ? fmt(r[0]) : `${fmt(r[0])} – ${fmt(r[1])}`, rangeOpen: ui.rangeOpen, toggleRange: () => set(u => ({ ...u, rangeOpen: !u.rangeOpen })),
-    rangeOpts: P.map(([l, rr, hint]) => ({ label: l, hint, bg: same(rr) ? "#FFF1E6" : "transparent", fg: same(rr) ? "#BD4A19" : "#3F2B22", pick: () => patch({ calRange: rr, rangeOpen: false }) })),
+    rangeOpts: P.map(([l, rr, hint]) => ({ label: l, hint, bg: same(rr) ? "var(--crm-tint-attention)" : "transparent", fg: same(rr) ? "var(--crm-rust)" : "var(--crm-ink)", pick: () => patch({ calRange: rr, rangeOpen: false }) })),
     rangeFrom: iso(r[0]), rangeTo: iso(r[1]),
     setFrom: (e: { target: { value: string } }) => { const t = fromIso(e.target.value); if (t != null) patch({ calRange: [t, Math.max(t, r[1])] }); },
     setTo: (e: { target: { value: string } }) => { const t = fromIso(e.target.value); if (t != null) patch({ calRange: [Math.min(r[0], t), t] }); },
@@ -97,31 +102,67 @@ export function calendarVM(ctx: DeskCtx) {
     calWhoLabel: !sel.length ? "Everyone" : sel.length === 1 ? n0 : `${n0} +${sel.length - 1}`,
     calShowroom: ui.calShowroom, pickShowroom: (e: { target: { value: string } }) => patch({ calShowroom: e.target.value }),
     showroomOpts: [{ v: "all", label: "All showrooms" }, ...data.rooms.filter(x => x.active).map(x => ({ v: x.id, label: x.name }))],
-    calTeams: teamsList.map(([k, l, dot]) => ({ label: l, dot, bg: k === team ? "#3F2B22" : "#fff", fg: k === team ? "#fff" : "#3F2B22", bd: k === team ? "#3F2B22" : "#EBDDD2", pick: () => patch({ calTeam: k }) })),
+    calTeams: teamsList.map(([k, l, dot]) => ({ label: l, dot, bg: k === team ? "var(--crm-ink)" : "#fff", fg: k === team ? "#fff" : "var(--crm-ink)", bd: k === team ? "var(--crm-ink)" : "var(--crm-rule)", pick: () => patch({ calTeam: k }) })),
     calViews: ([["month", "Month"], ["week", "Week"], ["day", "Day"], ["upcoming", "Upcoming"]] as const).map(([k, l]) => ({ label: l, on: k === view, off: k !== view,
       pick: () => patch({ calView: k, calRange: k === "month" ? [monthA, monthB] : k === "week" ? [wkA, wkB] : k === "day" ? [T, T] : [T, monthB] }) })),
     goToday: () => patch({ calView: "today", calRange: [T, T] }), todayN: all.filter(v => day0(v.at) === T).length,
-    todayBg: view === "today" ? "#FFF1E6" : "#fff", todayBd: view === "today" ? "#BD4A19" : "#E2CFC1",
+    todayBg: view === "today" ? "var(--crm-tint-attention)" : "#fff", todayBd: view === "today" ? "var(--crm-rust)" : "var(--crm-line)",
     calMonth: view === "month", calWeek: view === "week", calDay: view === "day", calUp: view === "upcoming" || view === "today",
     calTitle: view === "month" ? `${MON[mA.getMonth()]} ${mA.getFullYear()}` : view === "week" ? `${label(wkA)} – ${label(wkB)}` : view === "day" ? `Today · ${new Date(T).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}` : view === "today" ? "Today's appt" : "Upcoming",
     calSub: `${vs.length} visits · ${upcoming.length} upcoming`,
     // The analysis card over the calendar (the owner, 2026-10-15), folded until opened.
     calAn: calendarAnalysisVM(ctx, vs),
-    calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "#F6B48A", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
+    calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "var(--crm-peach)", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
       [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"],
       // v2: No show (past visits not showed up) and Not reminded (tomorrow's visits with no reminder sent).
-      [String(vs.filter(v => day0(v.at) < T && v.v.state !== "attended").length), "No show", "#F2A08A", "No show"],
-      [String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "Not reminded", "#F6D58A", "Not reminded"]] as const)
+      [String(vs.filter(v => day0(v.at) < T && v.v.state !== "attended").length), "No show", "var(--crm-rust-meta)", "No show"],
+      [String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "Not reminded", "var(--crm-amber-line)", "Not reminded"]] as const)
       .map(([value, l, color, k]) => ({ value, label: l, color, open: () => patch({ pane: "overlay", kind: "clist", clist: k, infoId: null, visit: null }) })),
     // v2: the bars By team or By showroom.
     calBarBy: ([["team", "By team"], ["room", "By showroom"]] as const).map(([k, l]) => ({ l, bg: ui.calBy === k ? "rgba(255,255,255,.2)" : "transparent", op: ui.calBy === k ? 1 : 0.7, pick: () => patch({ calBy: k }) })),
     calTeamBars: ui.calBy === "room"
       ? data.rooms.filter(x => x.active).map((x, k) => { const n = all.filter(v => v.v.showroomId === x.id).length;
-        return { name: x.name.replace(/ showroom$/i, ""), color: ["#F6B48A", "#8FB8E8", "#C9A2D8", "#9FD1B4", "#E9D49A"][k % 5], pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; })
+        return { name: x.name.replace(/ showroom$/i, ""), color: ["var(--crm-peach)", "var(--crm-faint-2)", "var(--crm-faint-2)", "var(--crm-st-won)", "var(--crm-amber-line)"][k % 5], pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; })
       : teamsList.slice(1).filter(([k]) => team === "all" || k === team).map(([k, l, color]) => { const n = all.filter(v => v.team === k).length;
-        return { name: l.replace(/^Team /, ""), color: color ?? "#806B60", pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; }),
+        return { name: l.replace(/^Team /, ""), color: color ?? "var(--crm-muted)", pct: all.length ? Math.round((n / all.length) * 100) : 0, label: `${n} visits` }; }),
     dow: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(l => ({ l })), monthCells, weekCols, daySlots, upDays,
     freeLabel: `Free · ${cap} per slot`, dueN: due.length,
+    // 4a's rail (frame 04): the visits on screen — Visits, Came, No-show (oxblood), Still to come, then Show-up and Not
+    // reminded (production's) — By showroom (or By team) bars, and today's visits with Send reminder (the customer's
+    // Reminder card, the phone's own — "Reminder sent · Send again" once it went).
+    // 4a's toolbar and week (frame 04): ‹ › step the period, Today goes to the one with today; the week a time grid.
+    calStep: (dir: 1 | -1) => () => {
+      if (view === "month") { const m = new Date(new Date(r[0]).getFullYear(), new Date(r[0]).getMonth() + dir, 1); patch({ calRange: [m.getTime(), new Date(m.getFullYear(), m.getMonth() + 1, 0).getTime()] }); }
+      else { const n = view === "week" ? 7 : 1; patch({ calRange: [r[0] + dir * n * DAY, r[1] + dir * n * DAY] }); }
+    },
+    calToday: () => patch({ calRange: view === "month" ? [monthA, monthB] : view === "week" ? [wkA, wkB] : view === "day" ? [T, T] : [T, monthB] }),
+    week4: (() => {
+      const a = view === "week" ? r[0] : wkA;
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dow, k) => { const t = a + k * DAY; return { dow, num: new Date(t).getDate(), today: t === T, visits: vs.filter(v => day0(v.at) === t).map(item) }; });
+      const hs = days.flatMap(d => d.visits.map(x => x.hour));
+      const h0 = Math.min(10, ...hs.map(Math.floor)), h1 = Math.max(20, ...hs.map(h => Math.ceil(h + 1)));
+      return { days, h0, hours: Array.from({ length: h1 - h0 + 1 }, (_, i) => { const h = h0 + i; return `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`; }) };
+    })(),
+    cal4: (() => {
+      const past = vs.filter(v => v.at < now), came = vs.filter(v => v.v.state === "attended").length;
+      const noShowN = past.filter(v => v.v.state !== "attended").length, toCome = vs.filter(v => v.at >= now && v.v.state === "booked").length;
+      const open = (k: string) => () => patch({ pane: "overlay", kind: "clist", clist: k, infoId: null, visit: null });
+      const byRoom = ui.calBy === "room" || !ui.calBy;
+      const groups = byRoom ? data.rooms.filter(x => x.active).map(x => ({ name: x.name.replace(/ showroom$/i, ""), n: vs.filter(v => v.v.showroomId === x.id).length }))
+        : teamsList.slice(1).map(([k, l]) => ({ name: l.replace(/^Team /, ""), n: vs.filter(v => v.team === k).length }));
+      const max = Math.max(1, ...groups.map(g => g.n));
+      return {
+        stats: [["Visits", String(vs.length), "var(--crm-ink)", "Leads"], ["Came", String(came), "var(--crm-ink)", "Showed up"], ["No-show", String(noShowN), "var(--crm-oxblood)", "No show"],
+          ["Still to come", String(toCome), "var(--crm-ink)", "Upcoming"], ["Show-up", came + noShowN ? `${Math.round((came / (came + noShowN)) * 100)}%` : "—", "var(--crm-ink)", "Show-up"],
+          ["Not reminded", String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "var(--crm-ink)", "Not reminded"]]
+          .map(([k, val, c, list]) => ({ k, v: val, c, open: open(list) })),
+        byLabel: byRoom ? "By showroom" : "By team", flip: () => patch({ calBy: byRoom ? "team" : "room" }), flipTo: byRoom ? "By team" : "By showroom",
+        groups: groups.map(g => ({ ...g, w: `${Math.round((g.n / max) * 100)}%` })),
+        today: all.filter(v => day0(v.at) === T && v.at >= now && v.v.state === "booked").sort((a, b) => a.at.getTime() - b.at.getTime()).map(v => ({
+          id: v.id, name: v.name, time: timeOf(v.at), room: v.room, owner: v.rep, sent: !!v.v.remindedAt,
+          remind: () => { void ctx.act.remind(v.id).then(ok => { if (ok) patch({ toast: `Reminder sent to ${v.name}` }); }); } })),
+      };
+    })(),
   };
 }
 

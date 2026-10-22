@@ -46,7 +46,30 @@ self.addEventListener('activate', (event) => {
  * image's alpha and paints it white: the mark's tile with its H cut out
  * (badge-tile-96.png). The opaque tile there showed as a solid white square,
  * and a bare H looked plain to the user.
+ *
+ * `navigate` (2026-10-17 — the user: "when i press the pop up notification, it
+ * wont jump direct to the chat screen", an iPhone on iOS 18.7): the notice's
+ * place, whole, for iOS 18.4+ to open by itself. Such a notice never reaches
+ * `notificationclick` there — WebKit hands the tap and the address to the Home
+ * Screen app (WKWebsiteDataStore _processWebCorePersistentNotificationClick),
+ * which is what goes wrong on an iPhone: a tap reaches a worker only while the
+ * app's page is alive, and `openWindow` then brought the app forward where it
+ * was. Chrome reads no `navigate` and keeps `notificationclick` below.
+ *
+ * `placeOf` never throws (2026-10-17 review of #520): it runs before the
+ * notice is shown, and `new URL('//', origin)` throws — a push that shows
+ * nothing is one an iPhone may take the app's notifications away for.
  */
+function placeOf(url) {
+  const start = new URL('/', self.location.origin).href
+  try {
+    const place = new URL(typeof url === 'string' && url.startsWith('/') ? url : '/', self.location.origin)
+    return place.origin === self.location.origin ? place.href : start
+  } catch {
+    return start
+  }
+}
+
 self.addEventListener('push', (event) => {
   let msg = {}
   try {
@@ -65,6 +88,7 @@ self.addEventListener('push', (event) => {
       tag: typeof msg.tag === 'string' ? msg.tag : undefined,
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-tile-96.png',
+      navigate: placeOf(msg.url),
       data: { url: typeof msg.url === 'string' && msg.url.startsWith('/') ? msg.url : '/' },
     }),
   )
@@ -86,8 +110,8 @@ self.addEventListener('push', (event) => {
  */
 const BADGE = '/icons/badge-tile-96.png'
 const CHANNELS = {
-  whatsapp: { fg: '#1F7A4D', icon: 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.2 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .2-3.3-.7-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4Z' },
-  messenger: { fg: '#2F6FB5', icon: 'M12 2C6.5 2 2 6.2 2 11.4c0 2.9 1.4 5.5 3.6 7.2V22l3.3-1.8c1 .3 2 .4 3.1.4 5.5 0 10-4.2 10-9.4S17.5 2 12 2Zm1 12.6-2.5-2.7-4.9 2.7 5.4-5.7 2.6 2.7 4.8-2.7-5.4 5.7Z' },
+  whatsapp: { fg: '#25D366', icon: 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.2 14c-.2.6-1.2 1.2-1.7 1.2-.5.1-1 .2-3.3-.7-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4Z' },
+  messenger: { fg: '#0A7CFF', icon: 'M12 2C6.5 2 2 6.2 2 11.4c0 2.9 1.4 5.5 3.6 7.2V22l3.3-1.8c1 .3 2 .4 3.1.4 5.5 0 10-4.2 10-9.4S17.5 2 12 2Zm1 12.6-2.5-2.7-4.9 2.7 5.4-5.7 2.6 2.7 4.8-2.7-5.4 5.7Z' },
 }
 const text = (v) => (typeof v === 'string' ? v : '')
 
@@ -215,6 +239,7 @@ async function showCrm(msg) {
     icon: (await crmAvatar(name, crm.ch)) || '/icons/icon-192.png',
     badge: BADGE,
     timestamp: at,
+    navigate: placeOf(msg.url),
     data: { url: text(msg.url).startsWith('/') ? msg.url : '/', lines },
   }
   const title = one ? text(msg.title) || name : name
@@ -246,23 +271,59 @@ self.addEventListener('message', (event) => {
 })
 
 /*
- * A tap opens the notice's place in the installed app (2026-10-11), always
- * through openWindow: Chrome on Android hands a url inside an installed app's
+ * A tap opens the notice's place in the installed app (2026-10-11), on Android
+ * always through openWindow: Chrome hands a url inside an installed app's
  * scope to that app and makes it go there even when it is already open
- * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true); an
- * iPhone opens it in the Home Screen app, the only place its pushes arrive.
+ * (ServiceTabLauncher: findFirstWebApkPackage, forceNavigation = true). An
+ * iPhone on iOS 18.4+ never comes here — it opens `navigate` itself (above).
  *
  * Twice the same day a tap went wrong by reusing an open window instead:
  * loading the page before focusing it let the moment a tap allows for focusing
  * pass (the tap seemed to do nothing), and focusing the most recently used
  * window brought a Chrome TAB forward — clients.matchAll lists the browser's
  * tabs of this site too, and nothing tells a tab from the installed app.
+ *
+ * An iPhone before iOS 18.4 (no `navigate`, above) is the other way round
+ * (2026-10-17, WebKit bug 263687): `openWindow` brings the open Home Screen app
+ * forward where it was, or a closed one at its start, while the open app's own
+ * window does go where it is sent. Its worker sees that app's windows alone —
+ * Safari's tabs keep their own — so the window is focused, then sent; with no
+ * window, or one that cannot be sent, `openWindow`.
  */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href
-  event.waitUntil(self.clients.openWindow(url))
+  const url = placeOf(event.notification.data && event.notification.data.url)
+  event.waitUntil(onAnIphone() ? intoTheOpenApp(url) : self.clients.openWindow(url))
 })
+
+/** Safari's engine on an iPhone or an iPad (which may call itself a Mac) — never Chrome, wherever it runs. */
+function onAnIphone() {
+  const ua = (self.navigator && self.navigator.userAgent) || ''
+  return /iPhone|iPad|iPod|Macintosh/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS|Android/.test(ua)
+}
+
+async function intoTheOpenApp(url) {
+  let windows = []
+  try {
+    windows = await self.clients.matchAll({ type: 'window' })
+  } catch {
+    windows = []
+  }
+  for (const w of windows) {
+    try {
+      await w.focus()
+    } catch {
+      // Already in front, or the tap's moment has passed: sent all the same.
+    }
+    try {
+      await w.navigate(url)
+      return
+    } catch {
+      // Not this window's to be sent (WebKit bug 252544): the next, or a new one.
+    }
+  }
+  await self.clients.openWindow(url)
+}
 
 self.addEventListener('fetch', (event) => {
   // Only page loads. Server Actions, RSC payloads, Supabase calls and assets go

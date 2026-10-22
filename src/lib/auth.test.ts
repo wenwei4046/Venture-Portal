@@ -160,7 +160,7 @@ describe('requirePayrollPayouts', () => {
   })
 
   it('asks for the page permission first: Payroll payouts by itself opens nothing', async () => {
-    signedInAs('dept_manager', ['payroll_payouts'])
+    signedInAs('staff', ['payroll_payouts'])
     await requirePayrollPayouts('treasury')
     expect(redirect).toHaveBeenCalledWith('/dashboard')
   })

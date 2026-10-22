@@ -8,6 +8,7 @@ import {
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
+  tidyModelName,
   type ComboPriceEdit,
   type ModelEdit,
   type SkuPriceEdit,
@@ -305,6 +306,29 @@ describe('validateModelEdit', () => {
 
   it('refuses a SKU tick that names no SKU', () => {
     expect(() => validateModelEdit(edit({ skuOffered: { 'mfg 1': true } }))).toThrow('A SKU tick names no SKU')
+  })
+
+  // 2026-10-19: a sofa's name of the portal's own — sent only when it changed, kept in capitals ("aaaa" reads "AAAA").
+  it('carries a model name only when the edit names one: tidied, in capitals, and blank is none', () => {
+    expect(validateModelEdit(edit()).model).not.toHaveProperty('model_name')
+    expect(validateModelEdit(edit({ modelName: '  Roma   Grande ' })).model.model_name).toBe('ROMA GRANDE')
+    expect(validateModelEdit(edit({ modelName: 'aaaa' })).model.model_name).toBe('AAAA')
+    expect(validateModelEdit(edit({ modelName: 'NOVA' })).model.model_name).toBe('NOVA')
+    expect(validateModelEdit(edit({ modelName: ' \t ' })).model.model_name).toBeNull()
+    expect(validateModelEdit(edit({ modelName: null })).model.model_name).toBeNull()
+    expect(validateModelEdit(edit({ modelName: 'x'.repeat(80) })).model.model_name).toBe('X'.repeat(80))
+  })
+
+  it('tidies a typed name the way the window compares it: capitals, one space, none around', () => {
+    expect(tidyModelName('  roma   grande ')).toBe('ROMA GRANDE')
+    expect(tidyModelName('Roma Grande')).toBe(tidyModelName('ROMA  GRANDE'))
+    expect(tidyModelName(null)).toBe('')
+    expect(tidyModelName(undefined)).toBe('')
+  })
+
+  it('refuses a model name past 80 characters, or one that is not text', () => {
+    expect(() => validateModelEdit(edit({ modelName: 'x'.repeat(81) }))).toThrow('A model name is at most 80 characters')
+    expect(() => validateModelEdit(edit({ modelName: 5066 as unknown as string }))).toThrow('A model name is text')
   })
 
   it('no enabled lists and no ticks is a valid save', () => {

@@ -25,7 +25,6 @@ const ok: RawStaffForm = {
   bankAccountNo: '1234 5678 90',
   contactNumber: '012-345 6789',
   email: 'mei@example.com',
-  address: 'Street, city',
   emergencyContactName: 'Lim Ah Kow',
   emergencyContactPhone: '019-000 0000',
   emergencyContactRelationship: 'Parent',
@@ -49,7 +48,6 @@ describe('validateStaffForm', () => {
       bankAccountNo2: null,
       contactNumber: '012-345 6789',
       email: 'mei@example.com',
-      address: 'Street, city',
       emergencyContactName: 'Lim Ah Kow',
       emergencyContactPhone: '019-000 0000',
       emergencyContactRelationship: 'Parent',
@@ -64,7 +62,6 @@ describe('validateStaffForm', () => {
       bankAccountNo: null,
       contactNumber: undefined,
       email: ' ',
-      address: '',
       emergencyContactName: '',
       emergencyContactPhone: '',
       emergencyContactRelationship: '',
@@ -74,7 +71,6 @@ describe('validateStaffForm', () => {
     expect(out.bankAccountNo).toBeNull()
     expect(out.contactNumber).toBeNull()
     expect(out.email).toBeNull()
-    expect(out.address).toBeNull()
     expect(out.emergencyContactName).toBeNull()
     expect(out.emergencyContactPhone).toBeNull()
     expect(out.emergencyContactRelationship).toBeNull()

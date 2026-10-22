@@ -163,7 +163,9 @@ export function formatSourcesLabel(
   fallbackSourcePool: string | null | undefined,
 ): string | null {
   if (sources.length > 0) {
-    return sources.map((s) => formatPoolLabel(s.pool) ?? s.pool).join(' + ')
+    // Each pool once: a loan repayment's principal and its interest both from the Venture Pool read
+    // "Venture Pool", not "Venture Pool + Venture Pool" (2026-10-17, seen on Approvals' drawer).
+    return [...new Set(sources.map((s) => formatPoolLabel(s.pool) ?? s.pool))].join(' + ')
   }
   return formatPoolLabel(fallbackSourcePool ?? null)
 }

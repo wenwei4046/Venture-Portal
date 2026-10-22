@@ -31,6 +31,15 @@ function outboxClient(): SupabaseClient {
   }) as unknown as SupabaseClient
 }
 
+/** A push service by its host — web.push.apple.com, fcm.googleapis.com — never a device's address. */
+const hostOf = (endpoint: string) => {
+  try {
+    return new URL(endpoint).host
+  } catch {
+    return 'unknown'
+  }
+}
+
 /** The outbox's secret, made from the private key (so one secret is set, not two). */
 export async function outboxSecret(privateKey: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', fromB64url(privateKey) as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
@@ -83,8 +92,13 @@ export async function flushPush(opts: { client?: SupabaseClient; fetcher?: typeo
         const urgency = n.kind === 'crm' ? 'high' : 'normal'
         const outcomes: SendOutcome[] = await Promise.all(n.subs.map(s =>
           sendPush(s, pushMessageOf(n, s.app), keys, VAPID_SUBJECT, { fetcher: opts.fetcher, urgency })
-            .catch((): SendOutcome => ({ ok: false, gone: false, status: 0 }))))
-        outcomes.forEach((o, i) => { if (!o.ok && o.gone) goneEndpoints.push(n.subs[i].endpoint) })
+            .catch((error): SendOutcome => ({ ok: false, gone: false, status: 0, reason: error instanceof Error ? error.name : 'unknown' }))))
+        outcomes.forEach((o, i) => {
+          if (o.ok) return
+          if (o.gone) goneEndpoints.push(n.subs[i].endpoint)
+          // Said even when another device took the notice (2026-10-16): an iPhone's refusals hid behind the Android's 201.
+          else console.error('[push] refused', JSON.stringify({ host: hostOf(n.subs[i].endpoint), status: o.status, reason: o.reason ?? '' }))
+        })
         if (outcomes.some(o => o.ok) || outcomes.every(o => !o.ok && o.gone)) done.push(n.id)
       }))
       const fin = await db.rpc('push_outbox_done', { p_secret: secret, p_sent: done, p_gone: goneEndpoints })

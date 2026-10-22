@@ -77,8 +77,17 @@ const ABOVE = [
   '      </>)}',
   // After WhatsApp's 24 h (Messenger's window), approved templates only: the bar's place holds the CRM's template button.
   '      {!!(p.chatCold) && (<>',
-  '        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" }}>',
-  '          <span onClick={p.openTpl} style={{ flex: "1", height: "48px", borderRadius: "24px", background: "#3E5C7A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>',
+  // The 4a frame M08 (2026-10-18): a white card at the foot — the lock, "This chat is cold", who last wrote when and what
+  // opens the chat again, and the template button inside it (Settings › Suggest a template off: the card without it).
+  '        <div data-cold-card="" style={{ flex: "none", margin: "8px 12px 10px", padding: "16px", borderRadius: "20px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.10), 0 8px 22px rgba(63,43,34,.08)", display: "flex", flexDirection: "column", gap: "14px" }}>',
+  '          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>',
+  '            <svg style={{ flex: "none", marginTop: "2px", color: "#3F2B22" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+  '            <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "0" }}>',
+  '              <strong style={{ fontSize: "16px", fontWeight: "600", color: "#3F2B22" }}>This chat is cold</strong>',
+  '              <span style={{ fontSize: "15px", lineHeight: "1.45", color: "#806B60" }}>{p.coldSub}</span>',
+  '            </div>',
+  '          </div>',
+  '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ height: "46px", borderRadius: "23px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
   '        </div>',
   '      </>)}',
   '      ',
@@ -142,6 +151,24 @@ for (const [from, to, why] of ICONS) {
   if (n !== 1) throw new Error(`SalesComposer: icon size (${why}) matched ${n} times`);
   body = body.replace(from, to);
 }
+// The 4a redesign's frames M04–M08 (2026-10-18, docs/design_handoff_crm_redesign — that folder wins on size): the bar's
+// pill and the round buttons beside it are 52 px (the composer handoff's 46), the recording row with them.
+const SIZES_4A = [
+  ['width: "46px", height: "46px", boxSizing: "border-box", borderRadius: "50%"', 'width: "52px", height: "52px", boxSizing: "border-box", borderRadius: "50%"', "the recording row's bin"],
+  ['minWidth: "0", height: "46px", boxSizing: "border-box", borderRadius: "23px"', 'minWidth: "0", height: "52px", boxSizing: "border-box", borderRadius: "26px"', "the recording row"],
+  ['alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px"', 'alignItems: "flex-end", minHeight: "52px", boxSizing: "border-box", padding: "0 4px", borderRadius: "26px"', "the pill"],
+  ['title="Sticker" style={{ flex: "none", width: "38px", height: "46px"', 'title="Sticker" style={{ flex: "none", width: "38px", height: "52px"', "Sticker's height"],
+  ['title="Attach" style={{ flex: "none", width: "40px", height: "46px"', 'title="Attach" style={{ flex: "none", width: "40px", height: "52px"', "Attach's height"],
+  ['title="Camera" style={{ flex: "none", width: "40px", height: "46px"', 'title="Camera" style={{ flex: "none", width: "40px", height: "52px"', "Camera's height"],
+  ['maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "12px 2px"', 'maxHeight: "154px", boxSizing: "border-box", margin: "0", padding: "15px 2px"', "the reply box centred in 52 px"],
+  ['title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px"', 'title={p.mainTitle} style={{ flex: "none", width: "52px", height: "52px"', "the main button"],
+];
+for (const [from, to, why] of SIZES_4A) {
+  const n = body.split(from).length - 1;
+  if (n !== 1) throw new Error(`SalesComposer: 4a size (${why}) matched ${n} times`);
+  body = body.replace(from, to);
+}
+body = require("./palette-4a.cjs")(body, "SalesComposer");
 body = scaleType(body);
 
 const code = `"use client";
@@ -162,7 +189,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
 `;
 fs.writeFileSync(path.join(out, "SalesComposer.tsx"), code);
 fs.writeFileSync(path.join(out, "composer-press.module.css"),
-  "/* GENERATED by tools/crm-design/gen-composer.cjs from the chat composer design's style-active (a key's press). Do not edit. */\n" + dc.autoCss());
+  "/* GENERATED by tools/crm-design/gen-composer.cjs from the chat composer design's style-active (a key's press). Do not edit. */\n" + require("./palette-4a.cjs")(dc.autoCss(), "composer-press"));
 // The binding surface: every p.<name> the markup reads (vm/composer.ts › ComposerVM must give each).
 const names = [...new Set([...body.matchAll(/\bp\.([A-Za-z_$][\w$]*)/g)].map(m => m[1]))].sort();
 fs.writeFileSync(path.join(__dirname, "composer-bindings.txt"), names.join("\n") + "\n");

@@ -6,10 +6,11 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { officeTime } from '@/lib/office-time'
 import { Card, Cards, Chip, GridHead, GridRow, GridTable, hv } from '@/components/hrv/kit'
+import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { ratePct } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
-import { initialsOf, rosterCounts, rosterGroups, rosterMatches, type RosterStatus } from '@/lib/people-roster'
+import { initialsOf, rosterCounts, rosterDepartments, rosterGroups, rosterMatches, type RosterStatus } from '@/lib/people-roster'
 import PersonWindow from './PersonWindow'
 import s from './people.module.css'
 
@@ -17,7 +18,10 @@ dayjs.extend(relativeTime)
 
 export interface PersonRow {
   id: string
+  /** Their full name — last name, then first (`fullNameOf`, 2026-10-20); the person's page shows the two apart. */
   name: string
+  /** The full name on their IC — what the search also finds them by. */
+  icName?: string | null
   code: string | null
   title: string | null
   /** Where their title stands on the ladder; null when it is not placed. */
@@ -43,6 +47,8 @@ export interface PersonRow {
   lastSeenAt: string | null
   /** Sent an invite link not used yet (2026-10-16) — read only for whoever may invite. */
   invitePending?: boolean
+  /** Why this reader may not give them a login: a full-access title, for whoever does not manage permissions (2026-10-20). */
+  inviteHeld?: string
   /** Fields whose absence breaks payroll or the import, computed server-side. */
   missing: string[]
 }
@@ -73,23 +79,30 @@ const COLS = 'minmax(0,1.7fr) minmax(0,1.4fr) 130px 80px minmax(0,1.3fr) 100px 4
 
 /**
  * The roster as the HR revamp draws it (2026-10-10, the handoff's variant A):
- * five cards over the whole roster, the search and Active · Inactive · All,
+ * five cards over the whole roster, the search, the department filter
+ * (2026-10-20, the user: "要多加一个 filter：这个 filter 是 drop down 来的，可以选
+ * department") and Active · Inactive · All — their counts the department's —
  * then one grid — a walnut-ruled band per department (folds), a row per
- * person in ladder order. Click a row for their window; right-click for
- * Invite user · Open card.
+ * person in ladder order, by their full name (last name, then first —
+ * 2026-10-20). Click a row for their window; right-click for Invite user ·
+ * Open card.
  */
 export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity, onInvite }: Props) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<RosterStatus>('active')
+  const [dept, setDept] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   const counts = useMemo(() => rosterCounts(people), [people])
+  const departments = useMemo(() => rosterDepartments(people.filter(p => rosterMatches(p, '', status))), [people, status])
+  // The pills count the department on show (every one when none is picked).
+  const inDept = useMemo(() => rosterCounts(people.filter(p => rosterMatches(p, '', 'all', dept))), [people, dept])
   const searching = query.trim() !== ''
   const groups = useMemo(
-    () => rosterGroups(people.filter(p => rosterMatches(p, query, status)), compareByLadder),
-    [people, query, status],
+    () => rosterGroups(people.filter(p => rosterMatches(p, query, status, dept)), compareByLadder),
+    [people, query, status, dept],
   )
 
   // A click anywhere else, or Escape, puts the menu away.
@@ -127,7 +140,8 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
     if (!p.active) return flash(`${p.name} is not active`)
     // An invite link never used is invited again (2026-10-16); any other login is theirs already.
     if (p.accountEmail && !p.invitePending) return flash(`${p.name} already has a login`)
-    if (!onInvite) return flash('Inviting needs Logins & invites · Create')
+    if (!onInvite) return flash('Inviting needs HR view › Permissions · Create')
+    if (p.inviteHeld) return flash(p.inviteHeld)
     onInvite(p.id)
   }
 
@@ -174,12 +188,22 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
           className={`${hv.input} ${s.search}`}
           aria-label="Search people"
         />
+        <Select value={dept} onChange={e => setDept(e.target.value)} aria-label="Department" className={s.deptFilter} data-picked={dept ? 'true' : undefined}>
+          <option value="">All departments</option>
+          {/* The one picked stays a choice when the employment filter leaves nobody in it. */}
+          {dept && !departments.some(d => d.dept === dept) ? <option value={dept}>{dept} · 0</option> : null}
+          {departments.map(d => (
+            <option key={d.dept} value={d.dept}>
+              {d.dept} · {d.count}
+            </option>
+          ))}
+        </Select>
         <div className={s.pills} role="group" aria-label="Employment status">
           {(
             [
-              ['active', 'Active', counts.active],
-              ['inactive', 'Inactive', counts.inactive],
-              ['all', 'All', counts.total],
+              ['active', 'Active', inDept.active],
+              ['inactive', 'Inactive', inDept.inactive],
+              ['all', 'All', inDept.total],
             ] as const
           ).map(([key, label, n]) => (
             <button key={key} type="button" className={hv.pill} aria-pressed={status === key} onClick={() => setStatus(key)}>
@@ -282,7 +306,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               type="button"
                               role="menuitem"
                               className={s.menuItem}
-                              data-quiet={!p.active || (p.accountEmail && !p.invitePending) || !onInvite ? 'true' : undefined}
+                              data-quiet={!p.active || (p.accountEmail && !p.invitePending) || !onInvite || p.inviteHeld ? 'true' : undefined}
                               onClick={() => inviteFrom(p)}
                             >
                               {p.invitePending ? 'Invite again' : 'Invite user'}

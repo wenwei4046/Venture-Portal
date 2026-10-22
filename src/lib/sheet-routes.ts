@@ -10,13 +10,13 @@
 // so a page's detail routes, print previews and loading skeleton land on it
 // too, and the sheet stays put while one of these pages replaces another.
 //
-// The Overview is one route for every role — Principal, Finance, HR and a
-// department manager each get their own dashboard under `/dashboard` — so all
-// four moved onto the sheet together.
+// The Overview is one route for every role — Principal, Finance and HR each
+// get their own dashboard under `/dashboard` — so they moved onto the sheet
+// together.
 //
 // 2026-10-07 — Finance's view followed (user: "finance 的整体 background 可以换成
 // 和 principal 和 hr 一样", option A, "做 A 先"): every page Finance reads, and
-// the department manager's My Billing and OPEX, are listed too. Only the
+// OPEX, are listed too (the Dept Manager's My Billing went 2026-10-17). Only the
 // route moved — the sheet, its lettering, buttons and tables apply through the
 // `:where(.sheet-theme)` overrides; a page's own anatomy (a walnut hero, a
 // figure strip) is not yet rebuilt into summary cards, so it stays as it was
@@ -58,7 +58,6 @@ export const SHEET_ROUTE_PREFIXES = [
   '/dept-pool',
   '/venture-pool',
   '/opex',
-  '/my-billing',
   '/reports',
   '/reconciliation',
   '/audit-log',
@@ -66,6 +65,8 @@ export const SHEET_ROUTE_PREFIXES = [
   // Admin (2026-10-11, the HR revamp's second package): Meeting Rooms — every
   // view books a room — and the Guest Link.
   '/admin',
+  '/it-support',
+  '/it-requests',
 ] as const
 
 function under(pathname: string, prefix: string): boolean {

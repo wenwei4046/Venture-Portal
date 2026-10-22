@@ -1,9 +1,8 @@
 import { requireAuth } from '@/lib/auth'
-import { loadMyProfile } from '@/lib/account/actions'
+import { isPrincipalView } from '@/lib/finance-view'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { readRooms } from '@/lib/rooms/read'
-import { startRead } from '@/lib/start-read'
 import { appHref } from '@/lib/fin-app/routes'
 import { finAccountMenu, visibleAccountMenu } from '@/components/layout/fin-nav'
 import ProfileScreen from '@/components/fin-app/ProfileScreen'
@@ -13,17 +12,16 @@ export const dynamic = 'force-dynamic'
 /**
  * `/fin-app/profile` — the Finance app's Profile (2026-10-15, M17): the
  * desktop account menu's rows (`finAccountMenu` — Account for a login of one's
- * own, Admin for whoever opens each page), the profile read only for a
- * personal login, the rooms counted only for whoever may read them.
+ * own, Admin for whoever opens each page), the rooms counted only for whoever
+ * may read them. One's record (name, phone …) changes through Me › Profile,
+ * which HR approves (2026-10-17).
  */
 export default async function FinAppProfile() {
   const user = await requireAuth()
   const personal = (await loginIsPersonal()) === true
   const groups = visibleAccountMenu(finAccountMenu(), { ...user, personalLogin: personal })
   const admin = groups.find((g) => g.title === 'Admin')?.items ?? []
-  const roomsRead = admin.some((a) => a.key === 'rooms') ? startRead(readRooms()) : null
-  const profile = personal ? await loadMyProfile() : null
-  const rooms = roomsRead ? await roomsRead : null
+  const rooms = admin.some((a) => a.key === 'rooms') ? await readRooms() : null
   const departments = primedRegistryRows().length
 
   const sub: Record<string, string> = {
@@ -34,13 +32,18 @@ export default async function FinAppProfile() {
 
   return (
     <ProfileScreen
-      name={profile?.name ?? user.name ?? 'Finance'}
-      email={profile?.email ?? user.email ?? ''}
-      phone={profile?.phone ?? ''}
+      view={isPrincipalView(user) ? 'principal' : 'finance'}
+      name={user.name ?? (isPrincipalView(user) ? 'Principal' : 'Finance')}
+      email={user.email ?? ''}
       personal={personal}
       admin={admin.map((a) => ({ key: a.key, label: a.label, icon: a.icon, sub: sub[a.key] ?? '', href: appHref(a.key) }))}
       // The views of the one app, for an account that may switch them (as the HR app's More) — never while viewing as a person.
       canSwitch={!!user.canSwitchView && !user.viewingAs}
+      // This phone's notifications (2026-10-17 — the Principal's own view lands here now, not on the portal's phone face).
+      push={!user.viewingAs}
+      // Me (2026-10-17): one's own punch, leave and payslips — a login a People record can name, never while viewing as a person.
+      me={personal && !user.viewingAs}
+      itSupport={!user.viewingAs}
     />
   )
 }

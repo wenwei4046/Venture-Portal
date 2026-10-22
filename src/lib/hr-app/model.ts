@@ -9,6 +9,8 @@ import { formatIntlDate } from '@/lib/utils'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
+import type { AttConfig, AttLedger, AttMonth, AttRequest } from '@/lib/attendance/types'
+import type { HiringField } from '@/lib/hiring/types'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -135,6 +137,11 @@ export interface HrLetter {
   typeId: string
   typeName: string
   file: string
+  /** HR Mobile's Letters (2026-10-17): whose, when filed, and where it stands with them. */
+  staffName?: string
+  filedAt?: string
+  readAt?: string | null
+  ackAt?: string | null
 }
 
 export interface HrAppData {
@@ -159,9 +166,32 @@ export interface HrAppData {
   /** Department choices for a booking: its id and name. */
   bookDepts: Array<{ id: string; name: string }>
   /** The parts their tabs open — each the portal page it stands for (`PART_PAGE`, server.ts). */
-  parts: { requests: boolean; hiring: boolean; insights: boolean; talent: boolean; docs: boolean; rooms: boolean }
+  parts: {
+    requests: boolean; hiring: boolean; insights: boolean; talent: boolean; docs: boolean; rooms: boolean
+    /** HR Mobile (2026-10-17): HR › Attendance's Today, Requests, Leave balances, Month close, Records; People. */
+    today: boolean; approve: boolean; balances: boolean; close: boolean; records: boolean; people: boolean
+  }
   /** The writes behind its buttons, by their page's boxes and the cells: a button they may not use is not drawn. */
-  may: { decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
+  may: { attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
+  /**
+   * HR › Attendance as its own readers answer it (2026-10-17, HR Mobile — Today, Approve, a person, Leave balances,
+   * Month close, Records): null while none of those pages is open to them. Absent reads as none.
+   */
+  att?: { config: AttConfig; month: AttMonth; requests: AttRequest[]; ledger: AttLedger | null } | null
+  /** Why Attendance could not be read (its own words); null when it was, or was not asked. */
+  attError?: string | null
+  /** Everybody's mobile by their People record, for Call and Message — only while People is open to them. */
+  phones?: Record<string, string>
+  /** Home's second line: "Siti Nurhaliza · HR Manager". */
+  meLine?: string
+  /** Hiring's requester form (Form settings), for "+ New hiring request" — the desktop drawer's fields, in its order. */
+  hireFields?: HiringField[]
+  /** Who may be "Requested by": everybody working here today. */
+  hirePeople?: Array<{ id: string; name: string; dept: string }>
+  /** The reader's own roster row in Hiring (Requested by defaults to them). */
+  hireMe?: string | null
+  /** Documentation's company documents (Documents › Company): each shared with its departments. */
+  documents?: HrDocument[]
   /** Their notifications (mig 20261011180000): none while viewing as somebody. */
   notices: Notices
   /**
@@ -187,6 +217,16 @@ export interface HrAppData {
    * login's nothing, while viewing as somebody, or when it could not be read. Absent reads as none.
    */
   myDocs?: MyDocuments | null
+}
+
+/** A company document (Documentation), as HR Mobile's Documents › Company lists it (2026-10-17). */
+export interface HrDocument {
+  id: string
+  name: string
+  file: string
+  size: number | null
+  depts: string[]
+  at: string
 }
 
 /** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */
@@ -399,6 +439,8 @@ export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string
   if (n.refKind === 'hiring_request') return { tag: 'HIRE', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   if (n.refKind === 'booking') return { tag: 'ROOM', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
   if (n.refKind === 'memo') return { ...MEMO_TAG }
+  // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
+  if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
   return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
 }
 

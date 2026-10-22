@@ -121,7 +121,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
   const { sub, period, staffId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const { data: runData } = await supabase

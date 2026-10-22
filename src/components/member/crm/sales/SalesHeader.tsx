@@ -11,7 +11,7 @@ export default function SalesHeader({ v }: { v: HeaderVM }) {
     {!!(v.showTopBar) && (<>
               
       <header style={{ flex: "0 0 auto", display: "flex", alignItems: "center", padding: "4px 20px 0", background: "#fff" }}>
-        <span onClick={v.crmBack} title="Back to Revenue app" style={{ visibility: v.backVis, display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "#BD4A19", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <span onClick={v.crmBack} title="Back to Revenue app" style={{ visibility: v.backVis, display: "flex", alignItems: "center", gap: "4px", height: "44px", color: "var(--crm-rust)", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "600", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 6-6 6 6 6">
             </path>
           </svg>{v.backLabel}</span>

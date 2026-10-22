@@ -30,7 +30,7 @@ export function calendarListVM(ctx: PanelCtx, cal: ReturnType<typeof calendarVM>
     emptyText: k === "up" ? "No upcoming visits in this period." : k === "came" ? "Nobody showed up in this period yet." : "No leads in this period.",
     rows: items.map(({ c, at }, n) => ({
       name: c.name, ini: ini(c.name), phone: phoneLabel(c.phone) || "—", owner: c.assignedTo ? nameOf(c.assignedTo) : "Not sent yet",
-      date: dOnly(new Date(at)), time: timeLabel(new Date(at)), rule: n ? "1px solid #EBDDD2" : "0", open: () => patch({ calInfo: c.id }),
+      date: dOnly(new Date(at)), time: timeLabel(new Date(at)), rule: n ? "1px solid var(--crm-rule)" : "0", open: () => patch({ calInfo: c.id }),
     })),
   };
 }

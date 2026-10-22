@@ -11,7 +11,8 @@ import { loadPermissionsData, type PermissionsData } from '../_lib/permission-te
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
 import type { InviteCandidate, PendingInvite } from './_components/InviteDialog'
 import PeopleManagement from './_components/PeopleManagement'
-import { pendingLogins } from '@/lib/invite'
+import { fullAccessHeld, fullAccessTemplate, pendingLogins } from '@/lib/invite'
+import { fullNameOf } from '@/lib/person-name'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -45,6 +46,9 @@ interface OpenPosition {
 interface RosterRow {
   id: string
   employee_name: string
+  /** The two the apps call them by (2026-10-17) — the roster lists them as one full name. The directory has neither. */
+  first_name?: string | null
+  last_name?: string | null
   employee_code: string | null
   designation: string | null
   user_id: string | null
@@ -93,7 +97,7 @@ export default async function PeopleManagementPage({
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -166,10 +170,27 @@ export default async function PeopleManagementPage({
     p_metadata: { staff_count: staff?.length ?? 0 },
   })
 
-  const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r => ({
-    ...personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
-    invitePending: !!r.user_id && pending.has(r.user_id),
-  }))
+  // A full-access title (a Principal-kind template, or one that manages permissions) is given a login only by
+  // whoever manages permissions (2026-10-20): for anybody else such a person is not offered, and says why.
+  const managesPermissions = canDo(user, 'accounts', 'manage')
+  const fullAccess = new Map(
+    permissions.templates.filter(t => fullAccessTemplate(t.baseRole, !!t.grants.accounts?.manage)).map(t => [t.id, t.name]),
+  )
+  const heldFrom = (title: { name: string; template_id: string | null } | null): string | null => {
+    const template = !managesPermissions && title?.template_id ? fullAccess.get(title.template_id) : undefined
+    return template ? fullAccessHeld(title?.name, template) : null
+  }
+  const inviteHeld: Record<string, string> = {}
+
+  const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r => {
+    const held = canInvite ? heldFrom(r.titles) : null
+    if (held) inviteHeld[r.id] = held
+    return {
+      ...personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
+      invitePending: !!r.user_id && pending.has(r.user_id),
+      ...(held ? { inviteHeld: held } : {}),
+    }
+  })
 
   const attached = new Set(rows.map(r => r.accountEmail).filter(Boolean))
   const unattached: AccountRow[] = (accounts ?? [])
@@ -192,7 +213,7 @@ export default async function PeopleManagementPage({
   }>
   const byId = new Map(staffRows.map(s => [s.id, s]))
   const candidates: InviteCandidate[] = staffRows
-    .filter(s => s.status !== 'inactive' && !s.user_id)
+    .filter(s => s.status !== 'inactive' && !s.user_id && !inviteHeld[s.id])
     .map(s => {
       const manager = s.reports_to ? byId.get(s.reports_to) : undefined
       const rung = s.titles?.level_id ? rungs.get(s.titles.level_id) : undefined
@@ -210,7 +231,7 @@ export default async function PeopleManagementPage({
 
   // …and who may be invited again: a link sent and never used (2026-10-16).
   const pendingInvites: PendingInvite[] = staffRows
-    .filter(s => s.status !== 'inactive' && s.user_id && pending.has(s.user_id) && s.users?.email)
+    .filter(s => s.status !== 'inactive' && s.user_id && pending.has(s.user_id) && s.users?.email && !inviteHeld[s.id])
     .map(s => ({ staffId: s.id, name: s.employee_name, email: s.users!.email, templateId: s.titles?.template_id ?? null }))
 
   const invite = params.invite
@@ -232,6 +253,7 @@ export default async function PeopleManagementPage({
       canAddPeople={canDo(user, 'team', 'create')}
       candidates={candidates}
       pendingInvites={pendingInvites}
+      inviteHeld={inviteHeld}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
       initialInvite={invite}
     />
@@ -277,6 +299,7 @@ async function DirectoryPeople({
       canAddPeople={false}
       candidates={[]}
       pendingInvites={[]}
+      inviteHeld={{}}
       initialTemplateId={null}
       initialInvite={null}
     />
@@ -294,7 +317,9 @@ function personRow(
   const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
   return {
     id: r.id,
-    name: r.employee_name,
+    // Their full name, last name then first (2026-10-20); the full name on their IC is searched too.
+    name: fullNameOf(r),
+    icName: r.employee_name,
     code: r.employee_code ?? null,
     // title_id is authoritative; designation is the free text it was
     // backfilled from and still what the InfoTech import writes.

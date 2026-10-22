@@ -68,6 +68,8 @@ export interface PermissionTab {
   page?: string
   /** Its page opens with its own View cell, not a module key (the CRM's Control panel: CRM · View at All) — never "not open yet". */
   cellGated?: boolean
+  /** What a box does where it is not plain from the tab's name — the box's tooltip (Permissions · Create = Invite user, 2026-10-20). */
+  hints?: Readonly<Partial<Record<TabAction, string>>>
 }
 
 type Opens = PermissionTab['opens']
@@ -85,7 +87,6 @@ const VENTURE_POOL: Opens = { view: ['venture_pool.view', 'venture_pool.export']
 const REPORTS: Opens = { view: ['reports.view', 'reports.export'] }
 const DEPT_REPORTS: Opens = { view: ['dept_reports.view', 'dept_reports.export'] }
 const OPEX: Opens = { view: ['opex.view', 'opex.export'] }
-const MY_BILLING: Opens = { view: ['my_billing.view'], create: ['my_billing.create'] }
 const REVENUE_APP: Opens = { view: ['revenue_app.view'] }
 const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue_app.create'] }
 // HR revamp round 2 (mig 20261011060000).
@@ -125,7 +126,11 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('hr', 'rules', 'Rules', ['revenue'], { ...REVENUE, edit: ['revenue.edit', 'revenue.manage'] }),
   tab('hr', 'people', 'People Management', ['team', 'team_directory'], { view: ['team.view'], create: ['team.create'], edit: ['team.edit'] }),
   // Logins and who may do what — never implied by People Management (an editor of people is not a granter of rights).
-  tab('hr', 'permissions', 'Permissions', ['team'], { view: ['accounts.view'], create: ['accounts.create'], edit: ['accounts.manage'] }),
+  // Its Create is People's Invite user — HR's too since 2026-10-20 (a full-access title stays with its Edit).
+  {
+    ...tab('hr', 'permissions', 'Permissions', ['team'], { view: ['accounts.view'], create: ['accounts.create'], edit: ['accounts.manage'] }),
+    hints: { create: 'Invite user — give somebody on the roster a login', edit: 'Change what a title or a person may do' },
+  },
   // Titles and the ladder are managed on Hierarchy.
   tab('hr', 'hierarchy', 'Hierarchy', ['team', 'team_directory'], { view: ['team.view'], edit: ['team.edit', 'team.manage'] }),
   tab('hr', 'member_services', 'Member Services', ['member_requests_manage', 'member_memos_manage'], { view: ['member.view'], edit: ['member.manage'] }),
@@ -182,7 +187,6 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   shared('dept_pool', tab('pri', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL)),
   shared('venture_pool', tab('pri', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('pri', 'opex', 'OPEX', ['opex'], OPEX),
-  tab('pri', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
   // Every department's claims (2026-10-16): Finance view › Claims was deleted (the user: "i will build
   // another tab for it. so delete this version first"); the Principal's sidebar keeps Claims under
   // Departments, so the company-wide box stands here until that tab is built — the full-access
@@ -194,16 +198,12 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('pri', 'settings', 'Settings', ['settings'], { view: ['settings.view'], edit: ['settings.manage'] }),
   tab('pri', 'switch_views', 'Switch views', ['view_switch'], { view: ['view_switch.view'] }),
 
-  // ── Department view (the holder's own department) ──
+  // ── Department view ── Staff · Basic's: the Overview, one's own claims, the rooms. The Dept Manager's
+  // own-department boxes (Dept Pool, OPEX, My Billing, Claims, Reports, People at Dept) went with the kind
+  // (2026-10-17 — the user: "全删"; each department gets a view of its own later).
   tab('dept', 'overview', 'Overview', [], OVERVIEW),
-  tab('dept', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL),
-  tab('dept', 'opex', 'OPEX', ['opex'], OPEX),
-  tab('dept', 'my_billing', 'My Billing', ['my_billing'], MY_BILLING),
-  tab('dept', 'claims', 'Claims', ['claims'], { view: ['claims.view'], approve: ['claims.approve', 'claims.void'] }),
   // Raising one's own claims — every member of staff's (Staff · Basic).
   tab('dept', 'my_claims', 'My claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }, 'own'),
-  tab('dept', 'reports', 'Reports', ['dept_reports'], DEPT_REPORTS),
-  tab('dept', 'people', 'People', ['team', 'team_directory'], { view: ['team.view'] }),
   // The rooms are the company's: booked at the company's reach from the Department view too.
   shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 
@@ -231,6 +231,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // The Director and the CEO run the CRM for the whole team (PR #253); its Control panel opens with CRM · View at All.
   { ...tab('rev', 'crm_team', 'CRM · Team', ['crm_manage'], { view: ['crm.view'], edit: ['crm.edit', 'crm.manage'] }, 'all'), cellGated: true },
   tab('rev', 'product_list', 'Product List', ['product_list'], { view: ['product_list.view'], edit: ['product_list.edit'] }, 'all'),
+  // IT support's desk (2026-10-20, mig 20261021020000): everybody's IT requests — read them; write notes, set their status.
+  // Sending one and following one's own need no box (open to all, as Memos).
+  tab('rev', 'it_requests', 'IT requests', ['it_requests'], { view: ['it_requests.view'], edit: ['it_requests.edit'] }, 'all'),
 
   // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
   tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),

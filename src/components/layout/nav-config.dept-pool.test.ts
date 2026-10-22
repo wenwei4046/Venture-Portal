@@ -7,7 +7,8 @@ import { withActions } from '@/test/with-actions'
 // 2026-10-09 — the user: 我要把每个 department 的 cash flow, P&L 放过来.
 // For whoever reads every department and the reports company-wide, Dept Pool
 // opens on its overview and lists each department, each with its own P&L and
-// Cash Flow; a department manager keeps Cash / Accrual P&L.
+// Cash Flow; whoever reaches the pool without the reports keeps the overview.
+// (A department manager's Cash / Accrual P&L went with the kind, 2026-10-17.)
 
 const extra = (name: string, segmentKey: string): DeptRegistryRow => ({
   id: segmentKey, name, segmentKey, poolGlCode: '1100', billingModeKey: `${segmentKey}_attribution`, isInternal: false,
@@ -21,7 +22,7 @@ function deptPool(viewer: NavViewer, data: NavData = DATA): NavItem[] {
 }
 
 const FINANCE = withActions({ role: 'finance', permissions: ['dept_pool', 'reports', 'dept_reports'] }) as NavViewer
-const MANAGER = withActions({ role: 'dept_manager', permissions: ['dept_pool', 'dept_reports'] }) as NavViewer
+const POOL_ONLY = withActions({ role: 'staff', permissions: ['dept_pool', 'dept_reports'] }) as NavViewer
 
 describe('Dept Pool in the sidebar', () => {
   it('lists the overview, then each department, for whoever reads them all', () => {
@@ -41,8 +42,8 @@ describe('Dept Pool in the sidebar', () => {
     expect(deptPool(FINANCE, emptyNavData).map((c) => c.label)).toEqual(['Overview', 'Venture', 'Marketing', 'Finance', 'HR', 'Director Office'])
   })
 
-  it('keeps Cash and Accrual P&L for a department manager', () => {
-    expect(deptPool(MANAGER).map((c) => c.label)).toEqual(['Cash', 'Accrual P&L'])
+  it('keeps the overview alone for whoever does not read the reports', () => {
+    expect(deptPool(POOL_ONLY).map((c) => [c.label, c.href])).toEqual([['Overview', '/dept-pool']])
   })
 
   it('lights the overview on both bases and on the pages it opens', () => {
@@ -65,7 +66,6 @@ describe('Dept Pool in the sidebar', () => {
 
   it('names a department’s page in the activity log', () => {
     expect(navLabelByPath(DATA).get('/dept-pool/statements/it')).toBe('Dept Pool · IT')
-    // The overview keeps the name its visits were logged under.
-    expect(navLabelByPath(DATA).get('/dept-pool')).toBe('Dept Pool · Cash')
+    expect(navLabelByPath(DATA).get('/dept-pool')).toBe('Dept Pool · Overview')
   })
 })

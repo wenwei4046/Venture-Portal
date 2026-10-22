@@ -53,6 +53,11 @@ export interface IncomeVM {
   heroNote: string;
   rows: IncomeRowVM[];
   total: string;
+  /**
+   * The two salary payments the total reaches the bank as — Net basic and
+   * Balance commission, HR's payout (2026-10-20); null without a fixed salary.
+   */
+  paidAs: IncomeRowVM[] | null;
   /** `2 orders are waiting for a deposit.` + why — absent when nothing is held. */
   held: { strong: string; rest: string } | null;
   past: IncomePastVM[];

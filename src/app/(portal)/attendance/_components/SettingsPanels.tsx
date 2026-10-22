@@ -213,7 +213,7 @@ export function LocationsPanel({ config, open, canEdit }: PanelProps) {
                 <span style={{ fontSize: 12, color: 'var(--ds-ink-2)' }}>{n} {n === 1 ? 'person' : 'people'}</span>
               </div>
               <span style={{ fontSize: 12, color: 'var(--ds-ink-2)' }}>{l.address || '—'}</span>
-              <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>{l.state || '—'}</span>
+              <span style={{ fontSize: 11.5, color: 'var(--ds-ink-3)' }}>{l.state ? `Holidays · ${l.state}` : '—'}</span>
             </div>
           </HoverDiv>
         )
@@ -547,7 +547,7 @@ export function exportRows(tab: string, config: AttConfig): { name: string; line
     case 'sched':
       return { name: 'schedules.csv', lines: [csvLine(['Schedule', 'Day', 'Type', 'Start', 'End', 'Break']), ...config.schedules.flatMap(s => s.days.map(d => csvLine([s.name, d.day, d.type, d.start ?? '', d.end ?? '', d.break ?? ''])))] }
     case 'loc':
-      return { name: 'locations.csv', lines: [csvLine(['Name', 'Address', 'State', 'Radius m', 'Lat', 'Lng']), ...config.locations.map(l => csvLine([l.name, l.address, l.state, l.radius, l.lat, l.lng]))] }
+      return { name: 'locations.csv', lines: [csvLine(['Name', 'Address', 'Public holidays', 'Radius m', 'Lat', 'Lng']), ...config.locations.map(l => csvLine([l.name, l.address, l.state, l.radius, l.lat, l.lng]))] }
     case 'hol':
       return { name: 'holidays.csv', lines: [csvLine(['Date', 'Holiday', 'Kind', 'States']), ...config.holidays.map(h => csvLine([h.day, h.name, h.kind, h.states]))] }
     case 'leave':

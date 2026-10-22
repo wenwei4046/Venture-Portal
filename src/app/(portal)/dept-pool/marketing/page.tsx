@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { listsPayrollByPerson } from '@/lib/roles'
@@ -9,11 +8,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
 import HistoryTable from '../_components/HistoryTable'
 import MarketingPnlView from '../_components/MarketingPnlView'
-import RequestPaymentForm from '../_components/RequestPaymentForm'
-import RequestCreditForm from '../_components/RequestCreditForm'
-import StageBadge from '../_components/StageBadge'
-import LedgerRow from '@/components/LedgerRow'
-import { ownDepartmentOnly, raisesDepartmentRequests } from '@/lib/surfaces'
+import { readsEveryPool } from '@/lib/surfaces'
 
 interface Props {
   searchParams: Promise<{ tab?: string; filter?: string }>
@@ -25,16 +20,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const { tab: rawTab, filter: rawFilter } = await searchParams
-  const activeTab =
-    rawTab === 'history'
-      ? 'history'
-      : rawTab === 'pnl'
-        ? 'pnl'
-        : rawTab === 'request-payment'
-          ? 'request-payment'
-          : rawTab === 'request-credit'
-            ? 'request-credit'
-            : 'overview'
+  const activeTab = rawTab === 'history' ? 'history' : rawTab === 'pnl' ? 'pnl' : 'overview'
   const historyFilter =
     rawFilter === 'in' ? 'in' : rawFilter === 'out' ? 'out' : 'all'
 
@@ -47,13 +33,11 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
 
   if (!marketing) notFound()
 
-  // Dept Manager restriction: must be Marketing's manager
-  if (ownDepartmentOnly(user, 'dept_pool') && user.department_id !== marketing.id) {
-    notFound()
-  }
+  // Whoever reads every department's pool (Marketing's own manager and their requests went with the Dept Manager,
+  // 2026-10-17).
+  if (!readsEveryPool(user)) notFound()
 
   const period = getPeriodMonth()
-  const isOwnDept = user.department_id === marketing.id
 
   // ── Overview-only data ─────────────────────────────────────────────────────
   // Compute NP (calculate_dept_np returns a single-row set)
@@ -85,7 +69,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
     .maybeSingle()
 
   const balance = Number(balanceRow?.balance ?? 0)
-  const canSubmitExpense = raisesDepartmentRequests(user) && user.department_id === marketing.id
 
   return (
     <div>
@@ -106,12 +89,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <DeptPoolTabs
-        basePath="/dept-pool/marketing"
-        raisesRequests={raisesDepartmentRequests(user)}
-        isOwnDept={isOwnDept}
-        extraTabs={[{ key: 'pnl', label: 'P&L' }]}
-      />
+      <DeptPoolTabs basePath="/dept-pool/marketing" extraTabs={[{ key: 'pnl', label: 'P&L' }]} />
 
       {activeTab === 'overview' ? (
         <>
@@ -158,218 +136,6 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       {activeTab === 'pnl' ? (
         <MarketingPnlView deptId={marketing.id} period={period} seesPayroll={listsPayrollByPerson(user)} />
       ) : null}
-
-      {activeTab === 'request-payment' && canSubmitExpense ? (
-        <RequestPaymentTabContent deptId={marketing.id} balance={balance} />
-      ) : null}
-
-      {activeTab === 'request-credit' && canSubmitExpense ? (
-        <RequestCreditTabContent deptId={marketing.id} />
-      ) : null}
-    </div>
-  )
-}
-
-async function RequestCreditTabContent({ deptId }: { deptId: string }) {
-  const supabase = await createClient()
-  const [{ data: subsidiaries }, { data: requests }] = await Promise.all([
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
-    supabase
-      .from('invoice_submission_requests')
-      .select('id, requested_at, period_month, description, line_items, status, generated_invoice_ids')
-      .eq('department_id', deptId)
-      .in('status', ['pending', 'rejected'])
-      .order('requested_at', { ascending: false })
-      .limit(20),
-  ])
-
-  const STATUS_LABEL: Record<string, string> = {
-    pending: 'Awaiting Finance',
-    rejected: 'Rejected — re-submit',
-    generated: 'Generated',
-  }
-
-  return (
-    <div className="space-y-10">
-      <section>
-        <div className="sect-head">
-          <h2>New invoice request</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">DRAFT · ONE ROW PER SUBSIDIARY</span>
-        </div>
-        <RequestCreditForm subsidiaries={subsidiaries ?? []} />
-      </section>
-
-      <section>
-        <div className="sect-head">
-          <h2>Recent requests</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{(requests ?? []).length} REQUEST{(requests ?? []).length === 1 ? '' : 'S'} · LATEST 20</span>
-        </div>
-        {(requests ?? []).length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">No invoice requests yet.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Submitted</th>
-                  <th className="m-hide">Period</th>
-                  <th className="m-hide">Description</th>
-                  <th className="right m-hide">Lines</th>
-                  <th>Status</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {(requests ?? []).map((r) => {
-                  const lineCount = Array.isArray(r.line_items) ? r.line_items.length : 0
-                  return (
-                    <LedgerRow key={r.id}>
-                      <td>
-                        <div className="font-mono text-xs text-muted">
-                          {officeTime(r.requested_at).format('D MMM HH:mm')}
-                        </div>
-                      </td>
-                      <td className="m-hide" data-label="Period">
-                        <div className="font-mono text-xs text-graphite">
-                          {dayjs(r.period_month).format('MMM YYYY')}
-                        </div>
-                      </td>
-                      <td className="m-hide" data-label="Description">
-                        <div className="font-serif italic text-graphite">{r.description}</div>
-                      </td>
-                      <td className="num text-graphite m-hide" data-label="Lines">{lineCount}</td>
-                      <td>
-                        <span
-                          className={
-                            r.status === 'rejected'
-                              ? 'text-xs font-serif italic text-danger'
-                              : 'text-xs font-serif italic text-accent'
-                          }
-                        >
-                          {STATUS_LABEL[r.status] ?? r.status}
-                        </span>
-                      </td>
-                    </LedgerRow>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </div>
-  )
-}
-
-async function RequestPaymentTabContent({
-  deptId,
-  balance,
-}: {
-  deptId: string
-  balance: number
-}) {
-  const supabase = await createClient()
-  const [{ data: companies }, { data: coaRows }, { data: requests }, { data: inflightRows }] = await Promise.all([
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
-    // Post-mig 238: payment_categories is gone. Pull expense/cost accounts
-    // from chart_of_accounts for the dept-pool payment-request category picker.
-    supabase
-      .from('chart_of_accounts')
-      .select('code, name, type')
-      .in('type', ['expense', 'cost'])
-      .eq('is_active', true)
-      .order('code'),
-    supabase
-      .from('dept_payment_requests')
-      .select('id, amount, payee_name, description, status, requested_at, pv_id')
-      .eq('department_id', deptId)
-      .in('status', [
-        'pending_principal_expense',
-        'pending_finance_pv',
-        'pending_principal_pv',
-      ])
-      .order('requested_at', { ascending: false }),
-    // P0-3: compute in-flight total to mirror what the RPC uses for available balance.
-    supabase
-      .from('dept_payment_requests')
-      .select('amount')
-      .eq('department_id', deptId)
-      .eq('status', 'pending_principal_expense'),
-  ])
-
-  const inflight = (inflightRows ?? []).reduce(
-    (sum, r) => sum + Number(r.amount ?? 0),
-    0,
-  )
-  const available = balance - inflight
-
-  return (
-    <div className="space-y-10">
-      <section>
-        <div className="sect-head">
-          <h2>New request</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">PRINCIPAL → FINANCE → PRINCIPAL · 3-STAGE FLOW</span>
-        </div>
-        <RequestPaymentForm
-          companies={companies ?? []}
-          categories={(coaRows ?? []).map((c) => ({ code: c.code, label: c.name }))}
-          availableBalance={available}
-        />
-      </section>
-
-      <section>
-        <div className="sect-head">
-          <h2>In flight</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{(requests ?? []).length} REQUEST{(requests ?? []).length === 1 ? '' : 'S'} · NOT YET COMPLETED</span>
-        </div>
-        {(requests ?? []).length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">No requests in flight.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Submitted</th>
-                  <th className="m-hide">Payee</th>
-                  <th className="m-hide">Description</th>
-                  <th className="m-hide">Stage</th>
-                  <th className="right">Amount</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {(requests ?? []).map((r) => (
-                  <LedgerRow key={r.id}>
-                    <td>
-                      <div className="font-mono text-xs text-muted">
-                        {officeTime(r.requested_at).format('D MMM HH:mm')}
-                      </div>
-                    </td>
-                    <td className="m-hide" data-label="Payee">
-                      <div className="font-serif italic text-graphite">{r.payee_name}</div>
-                    </td>
-                    <td className="m-hide" data-label="Description">
-                      <div className="font-serif italic text-graphite">{r.description}</div>
-                    </td>
-                    <td className="m-hide" data-label="Stage">
-                      <StageBadge status={r.status} />
-                    </td>
-                    <td className="num">{formatMoney(Number(r.amount))}</td>
-                  </LedgerRow>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   )
 }

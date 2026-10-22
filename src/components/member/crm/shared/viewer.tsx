@@ -6,6 +6,8 @@ import { PdfPages } from "./pdf-pages";
 import { FilePreview, previewKind } from "./file-preview";
 import { typePx } from "./type";
 import { keepImage, keptSrc, readyPhotos } from "./media-cache";
+import { dropStep, pushStep } from "./back";
+import { useStatusBarHold } from "@/components/pwa/status-bar";
 
 /**
  * A chat's photos, videos and documents open INSIDE the app (the owner, 2026-10-14: "打開圖片後，沒有返回鍵能回到聊天室
@@ -153,11 +155,9 @@ export function MediaViewer() {
   // The phone's Back closes the viewer: one history step while it is open (Next's own state kept, as desk/nav.ts does).
   useEffect(() => {
     if (!open) return;
-    if (!pushed.current) {
-      pushed.current = true;
-      try { history.pushState({ ...(history.state ?? {}), crmViewer: 1 }, ""); } catch { pushed.current = false; }
-    }
-    const onPop = () => { pushed.current = false; closeViewer(); };
+    // Pushed with the chat's own key kept under it (shared/back.ts › pushStep).
+    if (!pushed.current) pushed.current = pushStep("crmViewer");
+    const onPop = () => { pushed.current = false; dropStep("crmViewer"); closeViewer(); };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
       else if (e.key === "ArrowLeft") goRef.current(-1);
@@ -189,12 +189,15 @@ export function MediaViewer() {
     void fileOf(cur).then(f => { if (live) setReady(r => ({ ...r, [cur.url]: f })); });
     return () => { live = false; };
   }, [cur]);
+  // The phone's status bar in the viewer's own colour while it is open, as WhatsApp's (the owner, 2026-10-18: "when open
+  // pic and video, top bar didnt same colour or full screen") — the chat's white went on above the black.
+  useStatusBarHold(cur ? (cur.kind === "file" ? "#201814" : "#000000") : null);
 
   if (!s || !cur || typeof document === "undefined") return null;
   const it = cur, many = s.items.length > 1;
   const zoomable = it.kind === "image";
   function close() {
-    if (pushed.current) { pushed.current = false; closeViewer(); try { history.back(); } catch { /* closed already */ } }
+    if (pushed.current) { pushed.current = false; dropStep("crmViewer"); closeViewer(); try { history.back(); } catch { /* closed already */ } }
     else closeViewer();
   }
   const clamp = (z: Zoom): Zoom => (z.s <= 1.02 ? Z0 : z);

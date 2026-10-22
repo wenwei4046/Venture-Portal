@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addDays, daysInMonth, isoOf, monAbbr, shortDay, weekday } from '@/lib/attendance/engine'
+import { daysInMonth, isoOf, monAbbr, shortDay, weekday } from '@/lib/attendance/engine'
 
 /**
  * The From / To range calendar of Leave balances › Use leave (the handoff's
@@ -105,15 +105,4 @@ export function RangeCalendar({
       </div>
     </div>
   )
-}
-
-/** Working days (Mon–Fri) in a picked range. */
-export function workingDaysIn(from: string, to: string): number {
-  if (!from) return 0
-  let n = 0
-  for (let d = from; d <= (to || from); d = addDays(d, 1)) {
-    const w = weekday(d)
-    if (w !== 0 && w !== 6) n++
-  }
-  return n
 }

@@ -3,7 +3,12 @@ import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
 import { pickHomeSubDepartments, subDeptSlug } from '@/lib/revenue'
+import { reachesSub, subsInReach, type ReachArea } from '@/lib/sub-department-reach'
+
+/** The Revenue pages' areas: Comm Cal (and its months), Sales Groups, Rules. The CRM is the fourth. */
+export type RevenuePageArea = Exclude<ReachArea, 'crm'>
 
 /**
  * Reading the Revenue Department's sub-departments.
@@ -98,14 +103,23 @@ export const listSubDepartments = cache(async (): Promise<SubDepartment[]> => {
 })
 
 /**
- * The sub-department a `/revenue/[sub]` page is about, or a 404.
+ * The sub-department a `/revenue/[sub]` page is about, or a 404 — also when the
+ * viewer does not reach it in the page's area (2026-10-16: what they handle,
+ * every one when they handle none, their own ticks over it).
  *
  * Matching is done in TypeScript rather than SQL because the slug is derived
  * from the name — there is no column to filter on, and the table holds a
  * handful of rows.
  */
-export async function requireSubDepartment(slug: string): Promise<SubDepartment> {
-  const found = (await listSubDepartments()).find(s => s.slug === slug)
-  if (!found) notFound()
+export async function requireSubDepartment(slug: string, area: RevenuePageArea): Promise<SubDepartment> {
+  const [subs, user] = await Promise.all([listSubDepartments(), getUser()])
+  const found = subs.find(s => s.slug === slug)
+  if (!found || !reachesSub(user?.reach, area, found.id)) notFound()
   return found
+}
+
+/** The sub-departments the viewer reaches in an area, alphabetical — the switcher, the sidebar, an overview. */
+export async function listReachedSubDepartments(area: RevenuePageArea): Promise<SubDepartment[]> {
+  const [subs, user] = await Promise.all([listSubDepartments(), getUser()])
+  return subsInReach(subs, user?.reach, area)
 }

@@ -1,6 +1,6 @@
 // Lead View › an ad's name, where it ran and its link (2026-10-18 — the user: "我要看到廣告名稱，來源，鏈接"). Meta's
 // message carries an ad's id and headline only; its name, campaign and ad set come from Ads Manager with the
-// system user's ads_read (mig 20261018100000). This file is the shapes, the Graph request and the reading of its
+// system user's ads_read (mig 20261018110000). This file is the shapes, the Graph request and the reading of its
 // answer — pure, tested in ads.test.ts; the fetch itself is in ads-server.ts.
 
 import { GRAPH_VERSION } from '@/lib/whatsapp/send'

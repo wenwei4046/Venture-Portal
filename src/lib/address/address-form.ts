@@ -1,0 +1,91 @@
+import {
+  ADDRESS_COLUMNS,
+  ADDRESS_JSON_KEYS,
+  ADDRESS_KEYS,
+  addressFromParts,
+  addressRefusal,
+  addressText,
+  cleanAddress,
+  isEmptyAddress,
+  type Address,
+} from './address'
+import type { PostcodeData } from './malaysia'
+
+/**
+ * An address as a form carries it and a record keeps it (2026-10-20): the six parts under their columns' names —
+ * `address_line1` … `address_country` (`ADDRESS_COLUMNS`) — always sent together, so the record never holds half of
+ * one address and half of another. Pure.
+ */
+
+/** The six parts a form sent, or null when it sent none of them (the address was not edited). */
+export function addressFromForm(formData: FormData): Address | null {
+  const sent = ADDRESS_KEYS.filter(key => formData.has(ADDRESS_COLUMNS[key]))
+  if (sent.length === 0) return null
+  const part = (key: keyof Address) => {
+    const v = formData.get(ADDRESS_COLUMNS[key])
+    return typeof v === 'string' ? v : ''
+  }
+  return { line1: part('line1'), line2: part('line2'), postcode: part('postcode'), city: part('city'), state: part('state'), country: part('country') }
+}
+
+/**
+ * The address a profile change names — Me's Edit profile sends a changed address as all six parts, `{ key, to }` by
+ * their columns (`lib/me/profile.ts`) — or null when it names none of them.
+ */
+export function addressFromChanges(changes: unknown): Address | null {
+  if (!Array.isArray(changes)) return null
+  const byKey = new Map<string, string>()
+  for (const c of changes) {
+    if (c && typeof c === 'object' && typeof (c as { key?: unknown }).key === 'string') {
+      const to = (c as { to?: unknown }).to
+      byKey.set((c as { key: string }).key, typeof to === 'string' ? to : '')
+    }
+  }
+  if (!ADDRESS_KEYS.some(key => byKey.has(ADDRESS_COLUMNS[key]))) return null
+  const part = (key: keyof Address) => byKey.get(ADDRESS_COLUMNS[key]) ?? ''
+  return { line1: part('line1'), line2: part('line2'), postcode: part('postcode'), city: part('city'), state: part('state'), country: part('country') }
+}
+
+/** The six parts on a form, by their columns' names — every one, a blank as ''. */
+export function addressFormEntries(a: Address): Array<[string, string]> {
+  return ADDRESS_KEYS.map(key => [ADDRESS_COLUMNS[key], a[key]])
+}
+
+/**
+ * The columns to write: each part trimmed, a blank one NULL, the country Malaysia unless another — and for no
+ * address at all, every part NULL (the record's one-line `address` follows in the database).
+ */
+export function addressPatch(a: Address): Record<string, string | null> {
+  const out: Record<string, string | null> = {}
+  if (isEmptyAddress(a)) {
+    for (const key of ADDRESS_KEYS) out[ADDRESS_COLUMNS[key]] = null
+    return out
+  }
+  const x = cleanAddress(a)
+  for (const key of ADDRESS_KEYS) out[ADDRESS_COLUMNS[key]] = x[key] || null
+  return out
+}
+
+/** The same parts under the keys a database function takes them by (`addressLine1` …, att_save_setting). */
+export function addressJsonOf(a: Address): Record<string, string | null> {
+  const patch = addressPatch(a)
+  return Object.fromEntries(ADDRESS_KEYS.map(key => [ADDRESS_JSON_KEYS[key], patch[ADDRESS_COLUMNS[key]]]))
+}
+
+/**
+ * A typed party's address as a form sends it — an invoice's bill-to (2026-10-20): its six parts when they were picked,
+ * the one line then put together from them (`addressText`) and never taken as sent; else the one-box text it had (an
+ * invoice billed before the parts keeps its words); null for none. Parts that are not one place on Malaysia's list
+ * throw the refusal in words.
+ */
+export function partyAddress(text: unknown, parts: unknown, data: PostcodeData): { line: string | null; parts: Address | null } {
+  const picked = addressFromParts(parts)
+  if (picked && !isEmptyAddress(picked)) {
+    const refused = addressRefusal(picked, data)
+    if (refused) throw new Error(refused)
+    const clean = cleanAddress(picked)
+    return { line: addressText(clean), parts: clean }
+  }
+  const typed = typeof text === 'string' ? text.trim() : ''
+  return { line: typed || null, parts: null }
+}

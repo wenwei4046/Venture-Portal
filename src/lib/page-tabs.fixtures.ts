@@ -1,10 +1,11 @@
-// The five logins production has (2026-10-11), as current_permissions() and
+// The logins production has (2026-10-11), as current_permissions() and
 // current_actions() answer for each — read on production with auth.uid() set
 // to each account, inside a block that rolled back. page-tabs.test.ts holds
 // every page each opens today to staying open once pages also ask the tabs.
 // Round 2 (mig 20261011060000, read the same way after it was applied): the
 // Principal and HR gained Documentation, Hiring, both Meeting rooms keys and the
-// Guest link; Finance, carrie and Marketing the Meeting rooms key (book a room).
+// Guest link; Finance and carrie the Meeting rooms key (book a room). Marketing,
+// the Dept Manager, went with the kind (2026-10-17).
 
 import type { Scope } from './permission-matrix'
 
@@ -51,16 +52,6 @@ export const PROD_LOGINS: LoginFixture[] = [
       'documentation.view documentation.create documentation.edit hiring.view hiring.create hiring.edit hiring.approve rooms.view rooms.create rooms.edit ' +
       'guest_link.view guest_link.edit',
     ),
-  },
-  {
-    email: 'marketing@venture.my',
-    role: 'dept_manager',
-    keys: ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'meeting_rooms', 'my_billing', 'opex'],
-    actions: {
-      'opex.view': 'dept', 'claims.edit': 'dept', 'claims.view': 'dept', 'claims.void': 'dept', 'opex.export': 'dept', 'claims.create': 'dept',
-      'dashboard.view': 'all', 'dept_pool.view': 'dept', 'my_billing.view': 'dept', 'dept_pool.export': 'dept', 'dept_reports.view': 'dept',
-      'my_billing.create': 'dept', 'dept_reports.export': 'dept', 'rooms.view': 'all', 'rooms.create': 'all',
-    },
   },
   {
     email: 'principal@venture.my',

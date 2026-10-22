@@ -81,6 +81,19 @@ describe('Modular settings ownership validation', () => {
     expect(mocks.refresh.mock.calls).toEqual(REFRESHED)
   })
 
+  // 2026-10-19: a sofa's name is written only when the window sends one (it sends one only when it changed).
+  it('writes a model name only when the edit carries one, tidied into capitals, blank as none', async () => {
+    await saveModelSettings({ ...edit({}), modelName: '  Roma   Grande ' })
+    expect(mocks.modelUpsert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ erp_model_id: MODEL, model_name: 'ROMA GRANDE' }), { onConflict: 'erp_model_id' })
+    mocks.modelUpsert.mockClear()
+    await saveModelSettings({ ...edit({}), modelName: '' })
+    expect(mocks.modelUpsert.mock.calls[0][0]).toMatchObject({ model_name: null })
+    mocks.modelUpsert.mockClear()
+    await saveModelSettings(edit({}))
+    expect(mocks.modelUpsert.mock.calls[0][0]).not.toHaveProperty('model_name')
+    await expect(saveModelSettings({ ...edit({}), modelName: 'x'.repeat(81) })).rejects.toThrow('A model name is at most 80 characters')
+  })
+
   it('retains the permission gate before any database access', async () => {
     mocks.permission.mockRejectedValueOnce(new Error('Permission denied'))
     await expect(saveModelSettings(edit())).rejects.toThrow('Permission denied')

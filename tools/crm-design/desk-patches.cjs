@@ -2,7 +2,7 @@
 // must match exactly once in the generated markup, so a regenerated design that moved it fails loudly here.
 // Every one is listed for the owner in docs/design/crm-desktop-rev1/BUILD-NOTES.md.
 module.exports = [
-  [`Not assigned yet · leads wait in Inbox unassigned</span>`, `Not assigned yet · dealt evenly across teams</span>`,
+  [`Not assigned yet · leads wait in Inbox unassigned</span>`, `Not assigned yet · goes to the Revenue Director</span>`,
     "No Organic Leads (the owner, 2026-10-13): an ad nobody set is dealt evenly across the teams — no lead waits unassigned; an enquiry from no ad goes to the Revenue Director."],
   // ── v2's sidebar: Sign out signs out; CRM alerts counts the alerts (the design writes a sample 7).
   [/(<button type="button" onClick=)\{v\.closeMeMenu\}( style=\{\{[^\n]*?\}\} className=\{DH\.h\d+\}><svg[\s\S]*?<\/svg>Sign out<\/button>)/, "$1{v.signOutMe}$2",

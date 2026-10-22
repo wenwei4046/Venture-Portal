@@ -20,6 +20,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
+vi.mock("@/app/(member)/member/it-actions", () => ({}));
+vi.mock("@/app/(member)/member/share-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 
@@ -194,14 +196,14 @@ describe("a page their ticks close is neither shown nor reachable", () => {
 describe("a page whose Create their ticks close sends nothing", () => {
   it("Requests offers a claim only when Waiting list & replacements’ Create is closed", async () => {
     await open("?page=account&view=requests&department=fair", { pages: [], sends: ["track"] });
-    expect(screen.getByRole("button", { name: /Submit claim/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Submit transport claim/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Submit replacement/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Submit waiting list/ })).not.toBeInTheDocument();
   });
 
   it("and no claim when its own Create is", async () => {
     await open("?page=account&view=requests&department=fair", { pages: [], sends: ["requests"] });
-    expect(screen.queryByRole("button", { name: /Submit claim/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Submit transport claim/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Submit waiting list/ })).toBeInTheDocument();
   });
 

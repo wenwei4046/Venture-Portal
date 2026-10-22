@@ -2,12 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { officeClock } from '@/lib/office-clock'
-import { firstName } from '@/lib/finance-view'
+import { officeTime } from '@/lib/office-time'
+import { startRead } from '@/lib/start-read'
+import { firstName, isPrincipalView } from '@/lib/finance-view'
+import { canAccessTreasury } from '@/lib/roles'
 import { appHref, hubOfRow } from '@/lib/fin-app/routes'
-import { finAppSections } from '@/lib/fin-app/server'
+import { finAppSections, hasApprovalsTab } from '@/lib/fin-app/server'
 import { financeSummary, loadFinanceOverviewCounts } from '@/app/(portal)/dashboard/_lib/finance-overview'
+import { loadPrincipalOverview } from '@/app/(portal)/dashboard/_lib/principal-overview'
 import { QUICK } from '@/app/(portal)/dashboard/_components/FinanceOverview'
-import OverviewScreen from '@/components/fin-app/OverviewScreen'
+import OverviewScreen, { type OverviewFigure } from '@/components/fin-app/OverviewScreen'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +20,20 @@ export const dynamic = 'force-dynamic'
  * phone — M01): the desktop Overview's reads (`loadFinanceOverviewCounts` —
  * each part only for whoever opens its page) and its sidebar's categories,
  * each tile a screen of the app.
+ *
+ * The Principal's own view (2026-10-17) reads as its desktop Overview does:
+ * the line leads with what waits for its decision, and the treasury's four
+ * figures stand under it (the user kept them, "留一排金额卡"), each opening its
+ * screen; Approvals is its own tab, so it takes no quick action here.
  */
 export default async function FinAppOverview() {
   const user = await requireAuth()
   const supabase = await createClient()
+  const principal = isPrincipalView(user)
+  // The treasury's figures and its queue, for the Principal's own view that reads the treasury (the desktop's branch).
+  const principalRead = principal && canAccessTreasury(user) ? startRead(loadPrincipalOverview(supabase as unknown as SupabaseClient, user)) : null
   const counts = await loadFinanceOverviewCounts(supabase as unknown as SupabaseClient, user)
+  const extras = principalRead ? await principalRead : null
   const sections = finAppSections(user)
   const rows = new Set(sections.flatMap((sec) => sec.items.map((i) => i.key)))
   const badge = {
@@ -29,19 +42,35 @@ export default async function FinAppOverview() {
     billing: counts.toBill ?? 0,
   }
   const clock = officeClock()
-  const how = (key: string) => (hubOfRow(key) ? ('tab' as const) : ('push' as const))
+  const approvalsTab = hasApprovalsTab(user)
+  const how = (key: string) => (hubOfRow(key) || (approvalsTab && key === 'approvals') ? ('tab' as const) : ('push' as const))
+  const href = (key: string) => appHref(key, { approvalsTab })
+
+  const f = extras?.figures ?? null
+  const bare = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const figures: OverviewFigure[] = f
+    ? [
+        { key: 'venture', row: 'venture-pool', label: 'Venture Pool', value: f.venturePool, sub: 'Live ledger' },
+        { key: 'pool', row: 'dp', label: 'Pool', value: f.pool, sub: 'Dept + Venture' },
+        { key: 'lent', row: 'fund-out', label: 'Lent out', value: f.lentOut, sub: 'Loans outstanding' },
+        { key: 'interest', row: 'pnl', label: `Interest · ${officeTime().format('MMM')}`, value: f.interest.net, sub: `In ${bare(f.interest.income)}` },
+      ]
+        .filter((c) => rows.has(c.row))
+        .map((c) => ({ key: c.key, label: c.label, value: c.value, sub: c.sub, href: href(c.row), how: how(c.row) }))
+    : []
 
   return (
     <OverviewScreen
       date={`${clock.date} · ${clock.quarter}`}
-      greeting={`${clock.greeting}, ${firstName(user.name, 'Finance')}.`}
-      summary={financeSummary(counts)}
+      greeting={`${clock.greeting}, ${firstName(user.name, principal ? 'Principal' : 'Finance')}.`}
+      summary={financeSummary(counts, extras ? { waiting: extras.waiting } : {})}
+      figures={figures}
       quick={QUICK.filter((q) => rows.has(q.key)).map((q) => ({
         key: q.key,
         label: q.label,
         icon: q.icon,
-        href: appHref(q.key),
-        badge: q.badge ? badge[q.badge] : undefined,
+        href: href(q.key),
+        badge: q.badge && q.badge !== 'approvals' ? badge[q.badge] : undefined,
         how: how(q.key),
       }))}
       quickTone={Object.fromEntries(QUICK.map((q) => [q.key, q.tone]))}
@@ -51,7 +80,7 @@ export default async function FinAppOverview() {
           roman: sec.roman ?? '',
           label: sec.label as string,
           tone: sec.tone,
-          tiles: sec.items.map((i) => ({ key: i.key, label: i.label, icon: i.icon, href: appHref(i.key), how: how(i.key) })),
+          tiles: sec.items.map((i) => ({ key: i.key, label: i.label, icon: i.icon, href: href(i.key), how: how(i.key) })),
         }))}
     />
   )

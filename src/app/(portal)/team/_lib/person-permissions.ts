@@ -16,6 +16,8 @@ import {
 } from '@/lib/permission-matrix'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
 import type { PersonBox, TabAction } from '@/lib/permission-tabs'
+import { personReachFromJson, type PersonReach } from '@/lib/sub-department-reach'
+import { sensitiveTicksFromRows, type SensitiveTick } from '@/lib/person-sensitive'
 
 /**
  * What one account's permissions actually resolve to, and why.
@@ -94,6 +96,10 @@ export type PersonAccessData =
       boxes: PersonBox[]
       /** Old per-key exceptions, still applied on top until cleared. */
       legacy: Array<{ key: string; label: string; granted: boolean }>
+      /** Their sub-departments on the Revenue tabs (2026-10-16); null when the reader may not see them. */
+      reach: PersonReach | null
+      /** Their own Salary / NRIC / Bank ticks over the template's (2026-10-16). */
+      ownSensitive: SensitiveTick[]
       functions: PermFunction[]
       cellKeys: CellKey[]
     }
@@ -110,7 +116,7 @@ export async function loadPersonAccess(
   }
   // The permission tables postdate database.types.ts.
   const db = supabase as unknown as SupabaseClient
-  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes] = await Promise.all([
+  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes, reach, ownSens] = await Promise.all([
     db.from('permission_templates').select('id, name, base_role').eq('id', title.templateId).maybeSingle(),
     db.from('permission_template_grants').select('function_key, action, scope').eq('template_id', title.templateId),
     db.from('permission_template_sensitive').select('field').eq('template_id', title.templateId),
@@ -121,6 +127,10 @@ export async function loadPersonAccess(
     db.from('permission_defs').select('key, label'),
     db.from('permission_template_tabs').select('tab_id, action').eq('template_id', title.templateId),
     db.from('user_permission_tabs').select('tab_id, action, granted').eq('user_id', account.id),
+    // Their sub-departments (2026-10-16): the active ones, what they handle, their own ticks.
+    db.rpc('person_sub_department_reach', { p_user: account.id }),
+    // Their own Salary / NRIC / Bank ticks (2026-10-16).
+    db.from('user_permission_sensitive').select('field, granted').eq('user_id', account.id),
   ])
   for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells], ['its boxes', tabs], ['their own boxes', boxes]] as const) {
     if (res.error) throw new Error(`Could not load ${label}: ${res.error.message}`)
@@ -150,6 +160,8 @@ export async function loadPersonAccess(
       label: labels.get(l.permission_key) ?? l.permission_key,
       granted: l.granted,
     })),
+    reach: reach.error ? null : personReachFromJson(reach.data),
+    ownSensitive: sensitiveTicksFromRows((ownSens.data ?? []) as Array<{ field: string; granted: boolean }>),
     functions: functionsFromRows(
       (fns.data ?? []) as Array<{ key: string; label: string; section: string; actions: string[]; scopes: string[]; description: string | null }>,
     ),

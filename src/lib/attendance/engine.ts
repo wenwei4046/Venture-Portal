@@ -367,16 +367,26 @@ export function completedMonths(year: number, on: string, hireDate: string | nul
   return done
 }
 
-/** Working days (Mon–Fri) from a to b, inclusive, clipped to one year. */
-export function workingDays(from: string, to: string, year?: number): number {
+/**
+ * The days a leave takes from a to b, inclusive: the days the person's schedule works, less the holidays that cover
+ * their fence — every day for a type counted in calendar days; `year` keeps one year's (a leave across 1 January).
+ * The schedule says which day is off, never the weekday: no schedule, no day off (2026-10-17, the user: "系统不可以默认
+ * 哪一天是休息日，而是要跟着这个 schedule 去确定几时才是休息日、几时是工作日 … everythings go with this schedule").
+ */
+export function leaveDaysFor(
+  person: AttPerson, from: string, to: string,
+  config: Pick<AttConfig, 'assignments' | 'schedules' | 'locations' | 'holidays'>, opts: { calendar?: boolean; year?: number } = {},
+): number {
   let n = 0
-  let d = from
-  while (d <= to) {
-    if (!year || Number(d.slice(0, 4)) === year) {
-      const w = weekday(d)
-      if (w !== 0 && w !== 6) n++
-    }
-    d = addDays(d, 1)
+  for (let day = from; from && day <= to; day = addDays(day, 1)) {
+    if (opts.year && Number(day.slice(0, 4)) !== opts.year) continue
+    if (opts.calendar) { n++; continue }
+    const a = assignmentFor(person, day, config.assignments)
+    const row = scheduleDay(a?.scheduleId ? config.schedules.find(s => s.id === a.scheduleId) ?? null : null, day)
+    if (row && row.type !== 'work') continue
+    const state = a?.locationId ? config.locations.find(l => l.id === a.locationId)?.state : null
+    if (config.holidays.some(h => h.day === day && statesCover(h.states, state))) continue
+    n++
   }
   return n
 }
@@ -441,7 +451,8 @@ export function balanceOf(person: AttPerson, type: AttLeaveType, config: AttConf
   let used = 0
   let pending = 0
   for (const r of ledger.leave.filter(x => x.staffId === person.id && codes.has(x.code))) {
-    const n = r.days != null && r.from.slice(0, 4) === r.to.slice(0, 4) ? Number(r.days) : workingDays(r.from, r.to, year)
+    const n = r.days != null && r.from.slice(0, 4) === r.to.slice(0, 4) ? Number(r.days)
+      : leaveDaysFor(person, r.from, r.to, config, { calendar: config.leaveTypes.find(t => t.code === r.code)?.counts === 'calendar', year })
     const label = r.from === r.to ? dayMon(r.from) : `${dayMon(r.from)} – ${dayMon(r.to)}`
     if (r.status === 'pending') {
       pending += n

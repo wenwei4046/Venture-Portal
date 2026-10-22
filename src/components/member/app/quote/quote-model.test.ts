@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
-  EMPTY_MEMORY, NO_SOFA_BUILD, accOrder, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
-  moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
+  EMPTY_MEMORY, NO_SOFA_BUILD, accOrder, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
+  modelMatches, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
   type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
@@ -96,6 +96,23 @@ describe("catalogFromProducts", () => {
     expect(c.models[0].modules.map(x => x.code)).toEqual(["L(LHF)", "2S", "Console"]);
   });
 
+  // 2026-10-20, the user: "quote show aaaa enought, not need the code" — member_catalogue names a named sofa by its name alone.
+  it("shows a named sofa by its name, keeps two sofas named alike apart, and still finds one by its code", () => {
+    const sofa = (id: string, name: string, baseModel: string, modelId: string) =>
+      product({ id, name, baseModel, modelId, brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "1S", moduleCode: "1S" });
+    const c = catalogFromProducts([
+      sofa("5071-1s", "AAAA", "5071", "m-5071"), sofa("5066-1s", "5066", "5066", "m-5066"),
+      sofa("8030-1s", "SOFFIO", "8030", "m-8030"), sofa("9999-1s", "SOFFIO", "9999", "m-9999"),
+    ], "ZANOTTI", "Zanotti");
+    expect(c.models.map(m => [m.name, m.desc])).toEqual([["5066", "5066"], ["AAAA", "5071"], ["SOFFIO", "8030"], ["SOFFIO", "9999"]]);
+    const find = (q: string) => c.models.filter(m => modelMatches(m, q)).map(m => m.name);
+    expect(find("5071")).toEqual(["AAAA"]);
+    expect(find("aaaa")).toEqual(["AAAA"]);
+    expect(find("soffio")).toEqual(["SOFFIO", "SOFFIO"]);
+    expect(find("9999")).toEqual(["SOFFIO"]);
+    expect(find("")).toHaveLength(4);
+  });
+
   it("reads the size words the Product List writes", () => {
     expect(sizeKeyOf("Super Single")).toBe("SS");
     expect(sizeKeyOf("super  king")).toBe("SK");
@@ -120,9 +137,35 @@ describe("sheetLines — what a sheet adds", () => {
     ]);
   });
 
-  it("a fitted accessory the size does not come in is left out", () => {
-    const sh: SheetState = { mode: "acc", size: "S", accAll: false, acc: { "AERO-MP": 1, "AK- LTX CLS PIL": 1 } };
-    expect(sheetLines(sh, akemi()).map(l => l.productId)).toEqual(["pil"]);
+  it("a fitted accessory that does not match the mattress size is left out", () => {
+    const sh: SheetState = {
+      mode: "model", key: "m-aristoi", size: "S", qty: 1, bfs: [], fx: null, accAll: false,
+      acc: { "AERO-MP": 1, "AK- LTX CLS PIL": 1 },
+    };
+    expect(sheetLines(sh, akemi()).map(l => l.productId)).toEqual(["aristoi-s", "pil"]);
+  });
+
+  it("buys standalone accessories in several sizes together, with each SKU's own quantity", () => {
+    const sh: SheetState = { mode: "acc", accAll: false, acc: { "mp-q": 2, "mp-k": 3, pil: 4, "not-in-catalogue": 1 } };
+    const lines = sheetLines(sh, akemi());
+    expect(lines.map(l => [l.id, l.productId, l.size, l.qty])).toEqual([
+      ["a-AERO-MP-Q", "mp-q", "Queen", 2],
+      ["a-AERO-MP-K", "mp-k", "King", 3],
+      ["a-AK- LTX CLS PIL-", "pil", "", 4],
+    ]);
+    const mattress: SheetState = {
+      mode: "model", key: "m-apex", size: "Q", qty: 1, bfs: [], fx: null, accAll: false, acc: { "AERO-MP": 1 },
+    };
+    expect(addLines(sheetLines(mattress, akemi()), lines).filter(l => l.kind === "acc").map(l => [l.productId, l.qty]))
+      .toEqual([["mp-q", 3], ["mp-k", 3], ["pil", 4]]);
+  });
+
+  it("lists every standalone SKU, one-size first and fitted sizes smallest first", () => {
+    expect(accVariants({ key: "protector", name: "Protector", any: "any", sizes: { SK: "sk", K: "k", Q: "q", SS: "ss", S: "s" } }))
+      .toEqual([
+        { productId: "any", size: null }, { productId: "s", size: "S" }, { productId: "ss", size: "SS" },
+        { productId: "q", size: "Q" }, { productId: "k", size: "K" }, { productId: "sk", size: "SK" },
+      ]);
   });
 
   it("a sofa: each module times its count times the sets", () => {
@@ -158,11 +201,11 @@ describe("last used", () => {
   it("remembers a mattress set and a sofa layout, newest first, three at most", () => {
     let m = EMPTY_MEMORY;
     for (const size of ["S", "SS", "Q", "K"] as const) {
-      m = remember(m, { mode: "model", key: "m-apex", size, qty: 1, acc: {}, bfs: [], fx: null, accAll: false }, "AKEMI");
+      m = remember(m, { mode: "model", key: "m-apex", size, qty: 1, acc: {}, bfs: [], fx: null, accAll: false }, akemi());
     }
     expect(m.sets.AKEMI.map(r => (r.kind === "mattress" ? r.size : ""))).toEqual(["K", "Q", "SS"]);
-    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "2S": 1, "L(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, "ZANOTTI");
-    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, "ZANOTTI");
+    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "2S": 1, "L(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, zanotti());
+    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, zanotti());
     expect(m.layouts.ZANOTTI).toHaveLength(1);
     expect(m.sets.ZANOTTI).toHaveLength(1);
   });
@@ -185,6 +228,15 @@ describe("last used", () => {
     const c = akemi();
     expect(accOrder(c, EMPTY_MEMORY, {}).map(a => a.name)).toEqual(["AERO-MP", "AK- LTX CLS PIL"]);
     expect(accOrder(c, { ...EMPTY_MEMORY, accs: { AKEMI: ["AK- LTX CLS PIL"] } }, {}).map(a => a.name)).toEqual(["AK- LTX CLS PIL", "AERO-MP"]);
+  });
+
+  it("remembers standalone SKU selections once per accessory name, preserving previous recents", () => {
+    const c = akemi();
+    const memory = { ...EMPTY_MEMORY, accs: { AKEMI: ["AK- LTX CLS PIL", "AERO-MP"], ZANOTTI: ["other"] } };
+    const next = remember(memory, { mode: "acc", accAll: false, acc: { "mp-q": 1, "mp-k": 2, pil: 0, missing: 1 } }, c);
+    expect(next.accs).toEqual({ AKEMI: ["AERO-MP", "AK- LTX CLS PIL"], ZANOTTI: ["other"] });
+    expect(memory.accs.AKEMI).toEqual(["AK- LTX CLS PIL", "AERO-MP"]);
+    expect(accOrder(c, next, {}).map(acc => acc.name)).toEqual(["AERO-MP", "AK- LTX CLS PIL"]);
   });
 });
 

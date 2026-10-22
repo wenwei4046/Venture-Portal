@@ -8,16 +8,17 @@
  */
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
-import { DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
-import { roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
-import { infoRows } from "../../sales/vm/customer";
+import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
+import { avatarTint } from "../../shared/palette";
+import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
+import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
 import { pickedOf, pickVM } from "../../shared/pick";
-import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, tickColor } from "../../shared/chat-media";
+import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, tickColor, tickPathOf } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
@@ -54,7 +55,7 @@ export function leadVM(ctx: PanelCtx) {
     return { ev: card && cd ? {
       kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
       time: timeLabel(cd), room: card.room, addr: card.addr,
-      bg: card.kind === "Cancelled" ? "#F5EBE3" : "#FFF0E4", fg: card.kind === "Cancelled" ? "#806B60" : "#BD4A19", deco: card.kind === "Cancelled" ? "line-through" : "none",
+      bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ lead: null, tab: "calendar", cView: "grid", cDay: day0(cd), cGM: [cd.getFullYear(), cd.getMonth()] }),
     } : null };
   };
@@ -85,9 +86,11 @@ export function leadVM(ctx: PanelCtx) {
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
       }), () => { patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
-      tickC: tickColor(m.status),
-      tickPath: m.status === "sending" ? "M8 1.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6ZM8 3.3v2.4l1.6 1" : "M1 6l3 3 6-7M7 8.5l.5.5 6-7",
-      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "#3F2B22", timeC: mine ? MINE_TIME : "#806B60", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+      tickC: tickColor(m.status), tickPath: tickPathOf(m.status),
+      // Not delivered says why under it, as in Mine's chat (2026-10-17 — the owner: two videos WhatsApp refused showed
+      // in the Team chat as sent; only Mine's said so).
+      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
+      by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "var(--crm-ink)", timeC: mine ? MINE_TIME : "var(--crm-muted)", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
       ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
@@ -95,6 +98,9 @@ export function leadVM(ctx: PanelCtx) {
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
+      // 4a (M04 / change list 18): the customer's tint, "ad · channel", the status strip.
+      avBg: avatarTint(c?.name ?? "")[0], avFg: avatarTint(c?.name ?? "")[1], sub: [c?.ad, c ? (c.channel === "messenger" ? "Messenger" : "WhatsApp") : ""].filter(Boolean).join(" · "),
+      strip: c ? chatStripOf(c, now) : { cold: false, left: "", right: "", dot: "transparent" },
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
       windowNote: "",
@@ -102,7 +108,7 @@ export function leadVM(ctx: PanelCtx) {
       movedTo: c && rec ? `${c.name} moved from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
       // Assign to (⋮) moves at once, as the design's inbox mode does.
       groups: c ? pickGroups(ctx, { skip: ow, sel: ui.pick, pick: id => void reassign(ctx, c, id, "move", { reSheet: false }) }) : [],
-      pickLabel: ui.pick ? nameOf(ui.pick) : "Choose a person", moveBg: ui.pick ? "#BD4A19" : "#D9C7BA",
+      pickLabel: ui.pick ? nameOf(ui.pick) : "Choose a person", moveBg: ui.pick ? "var(--crm-rust)" : "var(--crm-line)",
       sheetOpen: on && ui.reSheet, openSheet: () => patch({ reSheet: true }), closeSheet: () => patch({ reSheet: false }),
       move: c && ui.pick ? () => void reassign(ctx, c, ui.pick, "move", { reSheet: false }) : undefined,
     },
@@ -123,8 +129,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const B = c && ui.pBook && ui.pBook.customerId === c.id ? ui.pBook : null;
   const T = day0(now);
   const toBook = (id: string) => patch({ pMenu: false, pInfo: false, pForm: null, pBook: { customerId: id, room: 0, day: T + DAY, slot: null, view: "month" } });
-  // A first booking asks for the customer's details first (step 1 of 2), as the salesperson's does.
-  const openBook = () => { if (!c) return; if (c.detailsSaved) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
+  // Booking asks for the customer's details first (step 1 of 2) until they are complete, as the salesperson's does.
+  const openBook = () => { if (!c) return; if (bookingSkipsForm(c, data)) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
   // ⋮ › Appointment with a visit booked (2026-10-14, "成功 book visit 之後 … 無法修改 & cancel 預約"): the visit with
   // Change (the booking sheet on its showroom, day and time; Book moves it — crm_move_appointment) and Cancel visit
   // (asked again; crm_set_appointment_state), as Mine's chat. No visit booked: Book visit, as before.
@@ -212,9 +218,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const cmp: ComposerIn = {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
-    warm: !shut, openTpl: () => void openTpl(),
+    warm: !shut, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
-    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0", pick: () => setDraft(q.message) })) } : null,
+    slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
     voiceStart, voiceStop: sendIt => void recStop(sendIt),
     camera: () => openCamera("crm-panel-camera", act.toast),
@@ -228,16 +234,16 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const cell = (d: Date): Cell => {
     const t = day0(d), past = t < T, blk = !past && roomClosed(room, t), sel = !!B && B.day === t && !blk, ok = !past && !blk;
     return { n: d.getDate(), pick: ok ? () => setB({ day: t, slot: null }) : undefined, cur: ok ? "pointer" : "default", deco: blk ? "line-through" : "none", w: sel || t === T ? 700 : 500,
-      bg: sel ? "#BD4A19" : blk ? "#F5F0EC" : "transparent", fg: sel ? "#fff" : past || blk ? "#C9B8AC" : "#3F2B22" };
+      bg: sel ? "var(--crm-rust)" : blk ? "var(--crm-field)" : "transparent", fg: sel ? "#fff" : past || blk ? "var(--crm-faint-2)" : "var(--crm-ink)" };
   };
   const book = B ? (() => {
     const sd = new Date(B.day), ym = B.ym ?? [sd.getFullYear(), sd.getMonth()], firstD = new Date(ym[0], ym[1], 1), lead = (firstD.getDay() + 6) % 7, dim = new Date(ym[0], ym[1] + 1, 0).getDate();
     const wS = new Date(sd); wS.setDate(sd.getDate() - ((sd.getDay() + 6) % 7));
     const open = roomSlots(room, B.day), cap = room?.cap ?? 2;
     return {
-      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "#BD4A19" : "#EBDDD2", bg: B.room === i ? "#FFF8F2" : "#fff", dot: B.room === i ? "#BD4A19" : "transparent", ring: B.room === i ? "#BD4A19" : "#D9C7BA" })),
+      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "var(--crm-rust)" : "var(--crm-rule)", bg: B.room === i ? "var(--crm-cream)" : "#fff", dot: B.room === i ? "var(--crm-rust)" : "transparent", ring: B.room === i ? "var(--crm-rust)" : "var(--crm-line)" })),
       isMonth: B.view !== "week", isWeek: B.view === "week", vMonth: () => setB({ view: "month" }), vWeek: () => setB({ view: "week" }),
-      vMonthBg: B.view !== "week" ? "#fff" : "transparent", vWeekBg: B.view === "week" ? "#fff" : "transparent", vMonthFg: B.view !== "week" ? "#3F2B22" : "#806B60", vWeekFg: B.view === "week" ? "#3F2B22" : "#806B60",
+      vMonthBg: B.view !== "week" ? "#fff" : "transparent", vWeekBg: B.view === "week" ? "#fff" : "transparent", vMonthFg: B.view !== "week" ? "var(--crm-ink)" : "var(--crm-muted)", vWeekFg: B.view === "week" ? "var(--crm-ink)" : "var(--crm-muted)",
       monthLbl: firstD.toLocaleDateString("en-GB", { month: "short", year: "numeric" }).replace("Sept", "Sep"),
       mPrev: () => setB({ ym: [ym[1] ? ym[0] : ym[0] - 1, (ym[1] + 11) % 12] }), mNext: () => setB({ ym: [ym[1] === 11 ? ym[0] + 1 : ym[0], (ym[1] + 1) % 12] }),
       cells: [...Array.from({ length: lead }, (): Cell => ({ n: "", bg: "transparent", fg: "transparent", cur: "default", deco: "none", w: 500 })), ...Array.from({ length: dim }, (_, k) => cell(new Date(ym[0], ym[1], k + 1)))],
@@ -247,9 +253,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
         // A block with set hours closes the slots inside it (round 2), struck through as Closed.
         const at = slotAt(B.day, t), past = at <= now, shut = !past && slotBlocked(room, B.day, t), n = taken(at), full = !past && !shut && n >= cap, ok = !past && !shut && !full, sel = B.slot === t && ok;
         return { t, left: past ? "Passed" : shut ? "Closed" : full ? "Full" : `${cap - n} left`, hasLeft: true, pick: ok ? () => setB({ slot: t }) : undefined, cur: ok ? "pointer" : "not-allowed", deco: ok ? "none" : "line-through",
-          bg: sel ? "#BD4A19" : ok ? "#fff" : "#F8F3EF", fg: sel ? "#fff" : ok ? "#3F2B22" : "#C9B8AC", bd: sel ? "#BD4A19" : ok ? "#EBDDD2" : "#F8F3EF" };
+          bg: sel ? "var(--crm-rust)" : ok ? "#fff" : "var(--crm-field)", fg: sel ? "#fff" : ok ? "var(--crm-ink)" : "var(--crm-faint-2)", bd: sel ? "var(--crm-rust)" : ok ? "var(--crm-rule)" : "var(--crm-field)" };
       }),
-      bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "#BD4A19" : "#D9C7BA",
+      bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "var(--crm-rust)" : "var(--crm-line)",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
         const at = slotAt(B.day, B.slot!).toISOString(), moving = B.visitId;
@@ -260,7 +266,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const info = c ? (() => {
     const rows = infoRows(c, data);
     // Owner right after Status (the shared rows gained Last chat, rev 1010 §4).
-    rows.splice(rows.findIndex(r => r.k === "Status") + 1, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid #EBDDD2", vFg: c.assignedTo ? "#3F2B22" : "#B5A398", href: null });
+    rows.splice(rows.findIndex(r => r.k === "Status") + 1, 0, { k: "Owner", v: c.assignedTo ? nameOf(c.assignedTo) : "No one yet", rule: "1px solid var(--crm-rule)", vFg: c.assignedTo ? "var(--crm-ink)" : "var(--crm-faint)", href: null });
     return rows;
   })() : [];
   return {
@@ -296,24 +302,24 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     },
     // The header, as Mine's: the avatar's title names the channel; ⋮ tints while its menu is open.
     chanName: c?.channel === "messenger" ? "Messenger" : "WhatsApp",
-    menuOpen: on && ui.pMenu, menuBg: on && ui.pMenu ? "#F5EBE3" : "transparent", toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
+    menuOpen: on && ui.pMenu, menuBg: on && ui.pMenu ? "var(--crm-field)" : "transparent", toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
     // The reply window closed: the cold-lead note in the header, and the composer's template button (Mine's words).
     cold: on && shut,
     coldMsg: c?.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     menu: [
-      { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "#E4EDF8", fg: "#2F6FB5", go: () => patch({ pMenu: false, reSheet: true }) },
-      { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "#E4F1E8", fg: "#387557", go: () => patch({ pMenu: false, pInfo: true }) },
-      { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "#F3E8EF", fg: "#8E4B6E", go: appointment },
+      { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) },
+      { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "var(--crm-tint-follow)", fg: "var(--crm-brown)", go: () => patch({ pMenu: false, pInfo: true }) },
+      { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
       // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
-      { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "#FBF1D9", fg: "#A46312", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
+      { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "var(--crm-tint-appt)", fg: "var(--crm-brown)", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
     ],
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
     editInfo: () => { if (c) patch({ pInfo: false, pForm: { customerId: c.id, edit: true } }); },
     bookOpen: on && !!B, closeBook: () => patch({ pBook: null }),
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
-    vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "#3F2B22", vWeekFg: book?.vWeekFg ?? "#806B60",
+    vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
-    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "#D9C7BA", confirm: book?.confirm,
+    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm,
   };
 }

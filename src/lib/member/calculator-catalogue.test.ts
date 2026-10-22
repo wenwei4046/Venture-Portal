@@ -189,6 +189,15 @@ describe("sofa combos — exactly the set, at the portal's price", () => {
     expect(alone.error).toMatch(/cost is pending/);
   });
 
+  // 2026-10-21 (user: 0 = 还没定价): a module whose cell at the seat is 0 is not costed at RM 0 — the Quote refuses the
+  // seat, as it refuses one the grid does not carry (member_catalogue no longer offers it either).
+  it("never costs a module at a cell priced 0", () => {
+    const zero = { ...module_("z", "1A(LHF)", 0, "35"), costGrid: [{ height: "35", tier: "PRICE_2", cost: 0 }], options: [{ height: "35", tier: "PRICE_2" }] };
+    const r = calculateQuote(quote([one("z")], { height: "35", tier: "PRICE_2" }), [zero], bands, undefined, pricing());
+    expect(r.valid).toBe(false);
+    expect(r.error).toMatch(/seat height is not available/);
+  });
+
   it("is no combo at a seat height the portal did not price it at", () => {
     const at24 = { ...lShape, priceByHeight: { "24": 2000 } };
     const r = calculateQuote(quote([one("a"), one("b")], sofa), products, bands, undefined, pricing({ combos: [at24] }));
@@ -205,6 +214,37 @@ describe("sofa combos — exactly the set, at the portal's price", () => {
     const r = calculateQuote(quote([one("a"), one("b")], sofa), products, bands, { costDivisor: 0.7 }, pricing({ combos: [lShape] }));
     // Each line's team cost is rounded to the cent (800 → 1,142.86; 1,200 → 1,714.29).
     expect(r.margin).toBeCloseTo(margin(1142.86 + 1714.29), 10);
+  });
+
+  // 2026-10-21, production's Product List: a SOFFIO quote of 1A(LHF) + 1A(RHF) + Console at seat 35, fabric 1, sold at
+  // RM 4,490, read 19.8% — the modules at their own 910 + 910 + 700 — though the set is priced RM 2,140 at 35. The set
+  // was made on the retired 8030-CONSOLE's module code; the Quote sells 8030-Console.
+  it("costs a 1A(LHF) + 1A(RHF) + Console cart as its CONSOLE set, whatever the case", () => {
+    const at35 = (id: string, module: string, price: number) => ({
+      ...module_(id, module, price, "35"),
+      costGrid: [{ height: "35", tier: "PRICE_1", cost: price }],
+      options: [{ height: "35", tier: "PRICE_1" }],
+    });
+    const soffio = [at35("l", "1A(LHF)", 910), at35("r", "1A(RHF)", 910), at35("k", "Console", 700)];
+    const set = {
+      erpId: "portal:13d48e86-ba6e-46b9-b867-33231919bf2a",
+      baseModel: "8030",
+      modules: [["1A(LHF)"], ["1A(RHF)"], ["CONSOLE"]],
+      tier: "PRICE_1",
+      label: "1A(LHF) + 1A(RHF) + CONSOLE",
+      effectiveFrom: "2026-10-21",
+      createdAt: "2026-10-21T06:35:18.719825+00:00",
+      priceByHeight: { "24": 1744, "26": 1744, "28": 1744, "30": 1744, "35": 2140 },
+    };
+    const pair = { ...set, erpId: "portal:aad8c7ba", modules: [["1A(LHF)"], ["1A(RHF)"]], label: "1A(LHF) + 1A(RHF)", priceByHeight: { "35": 1720 } };
+    const cart = quote([one("l"), one("r"), one("k")], { height: "35", tier: "PRICE_1" }, "4490");
+    const r = calculateQuote(cart, soffio, bands, { costDivisor: 0.7 }, pricing({ combos: [set, pair] }));
+    expect(r.valid).toBe(true);
+    // 2,140 spread 772.79 / 772.77 / 594.44 by the modules' own costs, each ÷ 0.7 to the cent: 3,057.15.
+    expect(r.margin).toBeCloseTo(margin(1103.99 + 1103.96 + 849.2, 4490), 10);
+    expect(r.margin).toBeCloseTo(31.91, 2);
+    const own = calculateQuote(cart, soffio, bands, { costDivisor: 0.7 }, pricing({ combos: [pair] }));
+    expect(own.margin).toBeCloseTo(margin(1300 + 1300 + 1000, 4490), 10); // 19.82%: what the screen said
   });
 });
 

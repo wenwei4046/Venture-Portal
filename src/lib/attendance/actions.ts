@@ -4,12 +4,15 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { moveBackUnlessApproved, moveLoginForApproval } from '@/lib/account/login-email'
 import { registerOf } from './engine'
 import { pushSoon } from '@/lib/push/outbox'
 import { ATT_BUCKET, previewOf, type FileLink, type RemindOutcome } from './files'
 import { attendanceFacts, otHoursOf } from './payroll'
 import { sendToPayroll, type PayrollSend } from './payroll-write'
 import { loadBoard, loadMonth, loadRequests } from './server'
+import { addressFromJson, addressRefusal } from '@/lib/address/address'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 
 /**
  * HR › Attendance's writes (2026-10-15). Each stands behind the Attendance
@@ -117,10 +120,28 @@ export async function createRequestOnBehalf(r: NewRequest) {
   }, 'The request could not be sent.')
 }
 
-/** Decide the waiting step (HR's, or the upline's on their behalf). */
+/**
+ * Decide the waiting step (HR's, or the upline's on their behalf). HR's last approval of a login's email
+ * (2026-10-16, Request to change email) moves the login first — the database writes the record only once the login
+ * signs in with the new email — and moves it back when the decision did not go through (lib/account/login-email.ts).
+ */
 export async function decideRequest(id: string, approve: boolean, note: string) {
   await requireActionOn('/attendance/requests', 'attendance', 'approve')
-  return call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+  const decide = async () => {
+    const res = await call<{ id: string; ref: string; status: string }>('att_decide', { p_request: id, p_approve: approve, p_note: note }, 'The request could not be decided.')
+    // Decided (mig 20261017120000): the database told its person; their phone hears once the answer has gone back.
+    if (res.ok && res.data.status !== 'pending') pushSoon()
+    return res
+  }
+  if (!approve) return decide()
+  const move = await moveLoginForApproval(id)
+  if (move.kind === 'refused') return { ok: false as const, reason: move.reason }
+  const res = await decide()
+  if (!res.ok && move.kind === 'moved') {
+    const stuck = await moveBackUnlessApproved(move)
+    if (stuck) return { ok: false as const, reason: `${res.reason} ${stuck}` }
+  }
+  return res
 }
 
 // ── Leave balances ──────────────────────────────────────────────────────────
@@ -194,8 +215,11 @@ export async function reopenMonth(month: string, reason: string) {
 
 export type SettingKind = 'schedule' | 'location' | 'holiday' | 'assignment' | 'leave' | 'ot' | 'policy' | 'route'
 
-export async function saveSetting(kind: SettingKind, id: string | null, row: Record<string, unknown>) {
+export async function saveSetting(kind: SettingKind, id: string | null, row: Record<string, unknown>): Promise<AttOutcome<{ id: string; label: string }>> {
   await requireActionOn('/attendance/settings', 'attendance', 'edit')
+  // A location's address is six parts, State → City → Postcode one place on Malaysia's list (2026-10-20).
+  const refused = kind === 'location' ? addressRefusal(addressFromJson(row), MALAYSIA_DATA) : null
+  if (refused) return { ok: false, reason: refused }
   return call<{ id: string; label: string }>('att_save_setting', { p_kind: kind, p_id: id, p_row: row }, 'The setting could not be saved.')
 }
 

@@ -1,0 +1,149 @@
+/* Share order (2026-10-21 — not in the prototype): what the order sheet and Profile's request sheets do not draw already —
+   the bill's ⋯ menu, its share line, the colleague to pick — one, half each (2026-10-21). Every size × --rv-type, colours through
+   the app's tokens only. */
+
+/* The bill's ⋯: beside its deposit chip, and the menu it opens under it. */
+.headEnd { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; position: relative; }
+.more {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  display: grid;
+  place-items: center;
+}
+.more[aria-expanded="true"] { background: var(--rv-sand); }
+.menu {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 2;
+  min-width: 210px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  box-shadow: 0 10px 28px var(--rv-black-15);
+  display: flex;
+  flex-direction: column;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--rv-ink);
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+  text-align: left;
+}
+.menuItem:hover, .menuItem:focus-visible { background: var(--rv-sand); outline: none; }
+.menuItem:disabled { color: var(--rv-muted); }
+.menuText { display: flex; flex-direction: column; min-width: 0; }
+.menuSub { font-size: calc(12px * var(--rv-type)); font-weight: 500; color: var(--rv-sub); }
+
+/* The bill's holders, on its sheet: who holds what, and — a bill shared with them — whose it is. */
+.shareRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  text-align: left;
+  width: 100%;
+  /* Its border and padding inside the sheet's width (it ran past the right edge), and its height kept in a scrolling sheet. */
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+/* The share sheets scroll as one column: nothing in it shrinks to fit — the buttons were squeezed thin (2026-10-21, prod). */
+.body > * { flex-shrink: 0; }
+.shareIcon { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--rv-sand); color: var(--rv-brown); display: grid; place-items: center; }
+.shareText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shareLabel { font-size: calc(12px * var(--rv-type)); font-weight: 650; letter-spacing: .06em; color: var(--rv-sub); }
+.shareLine { font-size: calc(14px * var(--rv-type)); font-weight: 600; line-height: 1.35; }
+.shareSub { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); line-height: 1.4; }
+.shareWait { font-size: calc(12.5px * var(--rv-type)); color: var(--rv-amber); font-weight: 600; }
+
+/* The share sheet: the bill, the split, whom to pick. */
+.title { margin: 0; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.ctx { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.section { margin: 0 0 8px; font-size: calc(12px * var(--rv-type)); font-weight: 650; letter-spacing: .06em; color: var(--rv-sub); }
+.blocked { margin: 0; font-size: calc(13px * var(--rv-type)); line-height: 1.5; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 12px; padding: 10px 12px; }
+
+.split { display: flex; flex-direction: column; border: 1px solid var(--rv-line); border-radius: 16px; padding: 2px 14px; }
+.part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rv-rule);
+}
+.part:last-child { border-bottom-color: transparent; }
+.partName { font-size: calc(14.5px * var(--rv-type)); font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.partYou { font-weight: 500; color: var(--rv-sub); }
+.partAmt { grid-column: 1; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); font-variant-numeric: tabular-nums; }
+.partPct { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 6px; }
+.pct { min-width: 54px; text-align: center; font-size: calc(16px * var(--rv-type)); font-weight: 750; font-variant-numeric: tabular-nums; }
+.search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 42px;
+  padding: 0 14px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-handle);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  font-size: calc(15px * var(--rv-type));
+  font-family: inherit;
+  outline: none;
+}
+.team { display: flex; flex-direction: column; border: 1px solid var(--rv-line); border-radius: 16px; overflow: hidden; }
+.member {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--rv-rule);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  text-align: left;
+}
+.member:last-child { border-bottom: 0; }
+.member:disabled { color: var(--rv-muted); }
+.memberOn { background: var(--rv-accent-12); }
+.tick {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rv-handle);
+  background: var(--rv-white);
+  color: var(--rv-white);
+  display: grid;
+  place-items: center;
+}
+.tickOn { border-color: var(--rv-accent); background: var(--rv-accent); }
+.memberText { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.memberName { font-size: calc(14.5px * var(--rv-type)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memberSub { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.none { margin: 0; padding: 14px; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
+
+/* A request's colleagues and their answers. */
+.answer { font-size: calc(12px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

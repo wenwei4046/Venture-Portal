@@ -66,6 +66,10 @@ module.exports = [
   ['<nav style={{ flex: "none", display: "flex", alignItems: "flex-end", height: "62px"', '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"'],
   [/(\{m\.time\}\{!!\(m\.mine\) && \(<>\s*<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke=)"#2F8FD8"( strokeWidth="1\.6" strokeLinecap="round" strokeLinejoin="round">\s*<path d=)"M1 6l3 3 6-7M7 8\.5l\.5\.5 6-7"/,
     '$1{m.tickC}$2{m.tickPath}'],
+  // 2026-10-17 (the owner: two videos WhatsApp refused showed in the Team chat as sent, only Mine's said so): a message
+  // that did not reach the customer says why under its time, as Mine's (gen-sales.cjs; panel/vm/lead.ts › failNote).
+  [/(<path d=\{m\.tickPath\}>\s*<\/path>\s*<\/svg>\s*<\/>\)\}<\/span>)/,
+    '$1{!!(m.failNote) && (<span style={{ display: "block", marginTop: "3px", fontSize: "11px", lineHeight: "1.35", color: "#FFFFFF" }}>{m.failNote}</span>)}'],
   // …and with nothing typed the round button records a voice note; while recording the composer is the recording bar.
   ['<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>\n              <span onClick={v.ld.lx.attach}',
     "{!!(v.ld.lx.rec) && (<div style={{ flex: \"none\", display: \"flex\", alignItems: \"center\", gap: \"6px\" }}>\n              <span onClick={v.ld.lx.rec?.cancel} title=\"Cancel\" style={{ flex: \"none\", width: \"44px\", height: \"44px\", boxSizing: \"border-box\", borderRadius: \"50%\", border: \"1px solid #EBDDD2\", display: \"grid\", placeItems: \"center\", color: \"#A3371A\", cursor: \"pointer\" }}><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\"><path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13\"></path></svg></span>\n              <span style={{ flex: \"1\", minWidth: \"0\", height: \"44px\", boxSizing: \"border-box\", borderRadius: \"22px\", background: \"#FBF1EC\", display: \"flex\", alignItems: \"center\", gap: \"10px\", padding: \"0 16px\", fontSize: \"15px\", fontWeight: \"600\", color: \"#3F2B22\", fontVariantNumeric: \"tabular-nums\" }}><span style={{ flex: \"none\", width: \"10px\", height: \"10px\", borderRadius: \"50%\", background: \"#D93025\", animation: \"fadeIn 700ms ease-in-out infinite alternate\" }}></span>{v.ld.lx.rec?.time} · Recording…</span>\n              <span onClick={v.ld.lx.rec?.send} title=\"Send voice note\" style={{ flex: \"none\", width: \"44px\", height: \"44px\", borderRadius: \"50%\", background: \"#BD4A19\", color: \"#fff\", display: \"grid\", placeItems: \"center\", cursor: \"pointer\" }}><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.8\" strokeLinecap=\"round\" strokeLinejoin=\"round\"><path d=\"M5 12h14m-6-6 6 6-6 6\"></path></svg></span>\n            </div>)}\n            " + '<div style={{ flex: "none", display: v.ld.lx.rec ? "none" : "flex", alignItems: "center", gap: "6px" }}>\n              <span onClick={v.ld.lx.attach}'],
@@ -84,7 +88,7 @@ module.exports = [
   // nobody set says what really happens to its leads.
   [/<h2 style=\{\{[^}]*\}\}>Needs your action<\/h2>\s*<section[\s\S]*?<\/section>\s*/, ""],
   // The Team inbox's "Needs a reply" column is Attention, as everybody's Mine inbox calls it (vm/inbox.ts).
-  ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · dealt evenly across teams"],
+  ["Not assigned yet · leads wait in Organic Leads", "Not assigned yet · goes to the Revenue Director"],
   // Team inbox (the owner, 2026-10-14: "我不知道哪一個應該先處理，沒有數字提示"; "只要在 mine 有的，team 也要有"): a row of the
   // same categories as Mine, each with its count, above the board — a tap slides the board to that column.
   ['<div data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "10px", overflowX: "auto", overflowY: "hidden",',

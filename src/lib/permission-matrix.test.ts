@@ -28,7 +28,9 @@ import {
   sodWarnings,
 } from './permission-matrix'
 
-// The catalog as migration 20261008120000 seeds it.
+// The catalog as migration 20261008120000 seeds it — less My Billing, and Dept
+// Pool, OPEX and Department reports at All only (both 20261017160000, when the
+// Dept Manager went).
 const F = (key: string, label: string, section: string, actions: string, scopes: string): PermFunction => ({
   key, label, section, actions: actions.split(' ') as Action[], scopes: scopes.split(' ') as Scope[], description: null,
 })
@@ -49,13 +51,12 @@ const FUNCTIONS: PermFunction[] = [
   F('revenue_app', 'Revenue app', 'People', 'view create', 'own'),
   // 20261010020000: the CRM joins the matrix.
   F('crm', 'CRM', 'People', 'view edit manage', 'own all'),
-  F('dept_pool', 'Dept Pool', 'Departments', 'view export', 'dept all'),
+  F('dept_pool', 'Dept Pool', 'Departments', 'view export', 'all'),
   F('venture_pool', 'Venture Pool', 'Departments', 'view create edit export', 'all'),
-  F('opex', 'OPEX', 'Departments', 'view export', 'dept all'),
-  F('my_billing', 'My Billing', 'Departments', 'view create', 'dept all'),
+  F('opex', 'OPEX', 'Departments', 'view export', 'all'),
   F('claims', 'Claims', 'Departments', 'view create edit approve void', 'own dept all'),
   F('reports', 'Reports', 'Reports', 'view export', 'all'),
-  F('dept_reports', 'Department reports', 'Reports', 'view export', 'dept all'),
+  F('dept_reports', 'Department reports', 'Reports', 'view export', 'all'),
   F('reconciliation', 'Reconciliation', 'Reports', 'view create edit approve', 'all'),
   F('audit_log', 'Audit log', 'Admin', 'view export', 'all'),
   F('settings', 'Settings', 'Admin', 'view manage', 'all'),
@@ -91,7 +92,6 @@ const CELL_KEYS: CellKey[] = [
   K('dept_pool', 'view', 'dept_pool', 'own'),
   K('venture_pool', 'view', 'venture_pool', 'all', 'treasury'),
   K('opex', 'view', 'opex', 'own'),
-  K('my_billing', 'view', 'my_billing', 'own'),
   K('claims', 'view', 'claims', 'own'),
   K('claims', 'approve', 'claims_approve', 'all'),
   K('reports', 'view', 'reports', 'all', 'treasury'),
@@ -138,7 +138,6 @@ const T: Record<string, { grants: Grants; sensitive: SensitiveField[]; baseRole:
   fin_checker: { sensitive: ['bank'], baseRole: 'finance', grants: parse({ dashboard: 'view:all', treasury: 'view:all approve:all export:all', billing: 'view:all export:all', categories: 'view:all manage:all', dept_pool: 'view:all', venture_pool: 'view:all export:all', reports: 'view:all export:all', dept_reports: 'view:all export:all', reconciliation: 'view:all approve:all', claims: 'view:all approve:all' }) },
   fin_maker: { sensitive: ['bank'], baseRole: 'finance', grants: parse({ dashboard: 'view:all', treasury: 'view:all create:all edit:all', billing: 'view:all create:all edit:all', venture_pool: 'view:all create:all', reconciliation: 'view:all create:all edit:all', claims: 'view:own create:own' }) },
   hr: { sensitive: ['salary', 'nric', 'bank'], baseRole: 'hr', grants: parse({ dashboard: 'view:all', hr_costing: 'view:all create:all edit:all export:all', revenue: 'view:all edit:all', director_salary: 'view:all edit:all', director_pool: 'view:all', team: 'view:all create:all edit:all', accounts: 'view:all', claims: 'view:own create:own', member: 'view:all manage:all' }) },
-  dept_head: { sensitive: [], baseRole: 'dept_manager', grants: parse({ dashboard: 'view:all', dept_pool: 'view:dept export:dept', opex: 'view:dept', my_billing: 'view:dept create:dept', claims: 'view:dept create:own approve:dept', dept_reports: 'view:dept export:dept', team: 'view:dept' }) },
   staff: { sensitive: [], baseRole: 'staff', grants: parse({ dashboard: 'view:all', claims: 'view:own create:own edit:own' }) },
   revenue_team: { sensitive: [], baseRole: 'revenue_member', grants: parse({ revenue_app: 'view:own create:own', crm: 'view:own edit:own' }) },
   revenue_director: { sensitive: [], baseRole: 'revenue_member', grants: parse({ revenue_app: 'view:own create:own', crm: 'view:all edit:all manage:all' }) },
@@ -151,7 +150,6 @@ const PRINCIPAL = ['approvals', 'audit_log', 'billing', 'categories', 'claims', 
   'salary_individual', 'settings', 'team', 'team_invite', 'treasury', 'venture_pool', 'crm_manage']
 const FINANCE = ['billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'dept_pool', 'dept_reports', 'reconciliation',
   'reports', 'treasury', 'venture_pool']
-const DEPT_MANAGER = ['claims', 'dashboard', 'dept_pool', 'dept_reports', 'my_billing', 'opex']
 const REVENUE_MEMBER = ['member_insight', 'member_memos', 'member_portal', 'member_quote', 'member_requests']
 /** What a Revenue Team title opens since 20261010020000: the member app's keys and its own CRM. */
 const REVENUE_TEAM = [...REVENUE_MEMBER, 'member_crm'].sort()
@@ -161,7 +159,8 @@ describe('cycling a cell', () => {
     const claims = fn('claims')
     expect([cycleNext(claims, 'none'), cycleNext(claims, 'own'), cycleNext(claims, 'dept'), cycleNext(claims, 'all')])
       .toEqual(['own', 'dept', 'all', 'none'])
-    expect(cycleNext(fn('dept_pool'), 'none')).toBe('dept')
+    // Dept Pool offers All only since the Dept Manager went (20261017160000).
+    expect(cycleNext(fn('dept_pool'), 'none')).toBe('all')
     expect(cycleNext(fn('treasury'), 'none')).toBe('all')
     expect(cycleNext(fn('treasury'), 'all')).toBe('none')
   })
@@ -201,7 +200,7 @@ describe('maker and checker', () => {
   })
 
   it('raising your own claim and approving wider is ordinary practice', () => {
-    expect(sodWarnings(T.dept_head.grants, FUNCTIONS)).toEqual([])
+    expect(sodWarnings({ claims: { view: 'dept', create: 'own', approve: 'dept' } }, FUNCTIONS)).toEqual([])
     expect(sodWarnings({ claims: { view: 'all', create: 'own', approve: 'own' } }, FUNCTIONS)).toHaveLength(1)
   })
 
@@ -233,7 +232,7 @@ describe('the keys list and the tallies', () => {
   })
 
   it('names exactly the cells a draft changes', () => {
-    const draft = setCell(T.staff.grants, fn('dept_reports'), 'view', 'dept')
+    const draft = setCell(T.staff.grants, fn('dept_reports'), 'view', 'all')
     expect(changedCells(T.staff.grants, draft, FUNCTIONS)).toEqual(['dept_reports.view'])
     expect(changedCells(T.staff.grants, T.staff.grants, FUNCTIONS)).toEqual([])
   })
@@ -252,11 +251,13 @@ describe('one person', () => {
   })
 
   it('cycling back to the template drops the exception instead of storing a copy', () => {
-    let own = cyclePersonCell(T.staff.grants, {}, fn('dept_reports'), 'view')
-    expect(own).toEqual({ 'dept_reports.view': 'dept' })
-    own = cyclePersonCell(T.staff.grants, own, fn('dept_reports'), 'view')
-    expect(own).toEqual({ 'dept_reports.view': 'all' })
-    own = cyclePersonCell(T.staff.grants, own, fn('dept_reports'), 'view')
+    let own = cyclePersonCell(T.staff.grants, {}, fn('hr_costing'), 'view')
+    expect(own).toEqual({ 'hr_costing.view': 'own' })
+    own = cyclePersonCell(T.staff.grants, own, fn('hr_costing'), 'view')
+    expect(own).toEqual({ 'hr_costing.view': 'dept' })
+    own = cyclePersonCell(T.staff.grants, own, fn('hr_costing'), 'view')
+    expect(own).toEqual({ 'hr_costing.view': 'all' })
+    own = cyclePersonCell(T.staff.grants, own, fn('hr_costing'), 'view')
     expect(own).toEqual({})
     expect(cyclePersonCell(T.staff.grants, {}, fn('claims'), 'view')).toEqual({ 'claims.view': 'dept' })
   })
@@ -292,17 +293,18 @@ describe('one person', () => {
 describe('what a template opens today — the database rule, in TypeScript', () => {
   const opens = (key: keyof typeof T) => openedKeys(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS)
 
-  it('Ultimate and Full are the Principal role (and My Billing, the queue and the directory); only Ultimate switches views', () => {
-    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'my_billing', 'team_directory', 'view_switch'].sort())
-    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'my_billing', 'team_directory'].sort())
+  it('Ultimate and Full are the Principal role (and the queue and the directory); only Ultimate switches views', () => {
+    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'team_directory', 'view_switch'].sort())
+    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'member_crm', 'team_directory'].sort())
   })
 
-  it('the checker and the Revenue team are their old roles exactly; the department head also reads People', () => {
+  it('the checker and the Revenue team are their old roles exactly', () => {
     expect(opens('fin_checker')).toEqual(FINANCE)
-    // PR4b (2026-10-10): Team · View at Dept opens the directory — its own
-    // department's roster and the company chart, never the staff table.
-    expect(opens('dept_head')).toEqual([...DEPT_MANAGER, 'team_directory'].sort())
     expect(opens('revenue_team')).toEqual(REVENUE_TEAM)
+  })
+
+  it('Team · View at Dept opens the directory (PR4b, 2026-10-10) — its own department’s roster and the company chart, never the staff table', () => {
+    expect(openedKeys(parse({ team: 'view:dept' }), [], 'staff', CELL_KEYS)).toEqual(['team_directory'])
   })
 
   // 20261010020000 (2026-10-10): the CRM in the matrix — a Revenue app account
@@ -351,8 +353,9 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     // Team · View is in force without Salary amounts since PR4b (the directory).
     expect(held('office').map(h => h.key)).toEqual(['reports.view'])
     expect(held('office').find(h => h.key === 'reports.view')?.reason).toMatch(/Treasury · View/)
-    expect(held('dept_head').map(h => h.key)).toEqual(['claims.approve'])
-    expect(held('dept_head')[0].reason).toMatch(/^Dept is not enforced/)
+    const deptApprover = heldCells(setCell(T.staff.grants, fn('claims'), 'approve', 'dept'), [], 'staff', CELL_KEYS, FUNCTIONS)
+    expect(deptApprover.map(h => h.key)).toEqual(['claims.approve'])
+    expect(deptApprover[0].reason).toMatch(/^Dept is not enforced/)
     // Since PR2 a write asks for its cell: Treasury · Approve (amending a booked
     // loan) is in force wherever Treasury opens, and since approvals go by
     // domain the queue opens on its own key — a Director's Approve is in force.

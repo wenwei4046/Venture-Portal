@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HUB_HREF, TAB_HUBS, appHref, hubOf, hubOfRow, tabHubs, tabOf } from './routes'
+import { APPROVALS_TAB_HREF, HUB_HREF, TAB_HUBS, appHref, hubOf, hubOfRow, tabHubs, tabOf } from './routes'
 
 // The Finance phone app's addresses (2026-10-15): every sidebar row lands on a
 // screen of the app — its hub, or a page of its own — and a tab shows the hubs
@@ -18,6 +18,7 @@ describe('the Finance app’s addresses', () => {
     expect(appHref('pnl-month')).toBe('/fin-app/report/pnl')
     expect(appHref('overview')).toBe('/fin-app')
     expect(appHref('daily-bank')).toBe('/fin-app/page/daily-bank')
+    expect(appHref('it-support')).toBe('/fin-app/it-support')
     expect(appHref('dp-revenue_department')).toBe('/fin-app/page/dp-revenue_department')
     expect(hubOfRow('ledger')).toBeNull()
   })
@@ -47,6 +48,18 @@ describe('the Finance app’s addresses', () => {
     expect(tabOf('/fin-app/fund/out')).toBe('fund')
     expect(tabOf('/fin-app/report/bs')).toBe('report')
     expect(tabOf('/fin-app/profile')).toBe('profile')
+    expect(tabOf('/fin-app/it-support')).toBe('profile')
     expect(tabOf('/fin-app/page/daily-bank')).toBe('home')
+  })
+
+  // 2026-10-17 — the Principal's own view on a phone: "just add on then tab for approval tab".
+  it('gives the Principal’s Approvals a tab of its own, and its row lands there for a reader who has it', () => {
+    expect(APPROVALS_TAB_HREF).toBe('/fin-app/approvals')
+    expect(tabOf('/fin-app/approvals')).toBe('approvals')
+    // Daily › Approvals stays a page of its own (Finance's view, a link from Fund).
+    expect(tabOf('/fin-app/page/approvals')).toBe('home')
+    expect(appHref('approvals')).toBe('/fin-app/page/approvals')
+    expect(appHref('approvals', { approvalsTab: true })).toBe('/fin-app/approvals')
+    expect(appHref('payments', { approvalsTab: true })).toBe('/fin-app/daily/payments')
   })
 })

@@ -81,7 +81,7 @@ describe('the tab catalog (HR revamp 8)', () => {
   })
 })
 
-describe('moving the eleven templates onto tabs loses nothing', () => {
+describe('moving the templates onto tabs loses nothing', () => {
   it.each(Object.keys(PROD))('%s keeps every cell it held', key => {
     expect(lossesOf(held(key), moved(key))).toEqual([])
   })
@@ -91,7 +91,6 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
   it('gains only the merges the user chose', () => {
     const gains = Object.fromEntries(Object.keys(PROD).map(k => [k, gainsOf(cellsOf(PROD[k].cells), moved(k))]))
     expect(gains).toEqual({
-      dept_head: ['claims.void:dept', 'opex.export:dept'],
       director: ['dept_reports.export:all', 'treasury.void:all', 'venture_pool.export:all'],
       fin_checker: ['dept_pool.export:all', 'treasury.void:all'],
       fin_maker: ['billing.export:all', 'treasury.export:all', 'venture_pool.export:all'],
@@ -115,7 +114,6 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
     // Full access holds Lead View whole (mig 20261016300000).
     expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'rev', 'lead'])
     expect(views(moved('fin_maker'))).toEqual(['fin', 'dept'])
-    expect(views(moved('dept_head'))).toEqual(['dept'])
     expect(views(moved('staff'))).toEqual(['dept'])
     expect(views(moved('hr'))).toEqual(['hr', 'dept'])
     expect(views(moved('revenue_team'))).toEqual(['rev'])
@@ -127,8 +125,9 @@ describe('moving the eleven templates onto tabs loses nothing', () => {
 })
 
 it('counts a view the way the rail does', () => {
-  // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme).
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 16 })
+  // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme); seventeen
+  // since 2026-10-20 (IT requests — the desk of IT support).
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 17 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {
@@ -280,11 +279,11 @@ describe('Select all, the New template window and the boxes that open nothing ye
     const other = new Set(['hr.payroll.view'])
     const every = toggleView(other, 'dept')
     expect(viewTally(every, 'dept')).toBe('all')
-    expect(viewCount('dept', every)).toEqual({ seen: 9, of: 9 })
+    expect(viewCount('dept', every)).toEqual({ seen: 3, of: 3 })
     expect(every.has('dept.my_claims.edit')).toBe(true)
     expect(every.has('hr.payroll.view')).toBe(true)
     expect([...toggleView(every, 'dept')]).toEqual(['hr.payroll.view'])
-    expect(viewTally(new Set(['dept.opex.view']), 'dept')).toBe('some')
+    expect(viewTally(new Set(['dept.overview.view']), 'dept')).toBe('some')
   })
 
   it('a new template’s ticks: View on every tab of the views picked, nothing else', () => {
@@ -308,8 +307,9 @@ describe('Select all, the New template window and the boxes that open nothing ye
     // The ledgers want a treasury tab's View.
     expect(held(['fin.invoice.view'], [])).toEqual({ 'fin.invoice': 'Not open yet — it needs the View of a treasury tab too (Payments, Receipt, Fund IN …)' })
     expect(held(['fin.invoice.view', 'fin.payments.view'], [])).toEqual({})
-    // The Principal's own pages want a full-access template.
-    expect(held(['pri.settings.view'], [])).toEqual({ 'pri.settings': 'Does not open — only a full-access template opens it' })
+    // The Principal's own pages open for a tick, whatever the template's kind (2026-10-16, mig 20261016210000:
+    // no key waits for the kind — the owner: "Edit Permission 的优先级是高于 Title 和 Template 的").
+    expect(held(['pri.settings.view'], [])).toEqual({})
     expect(held(['pri.settings.view'], [], 'principal')).toEqual({})
     // A Revenue app account opens no portal page — said before the salary, which would not help.
     expect(held(['hr.payroll.view', 'rev.today.view'], [], 'revenue_member')).toEqual({ 'hr.payroll': 'Does not open — a Revenue app account opens only the Revenue app' })

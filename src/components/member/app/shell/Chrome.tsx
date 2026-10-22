@@ -6,6 +6,7 @@ import tuck from "@/components/pwa/tuck.module.css";
 import { ICON, Svg } from "../icons";
 import type { Screen } from "../route";
 import s from "../shell.module.css";
+import { pressFeedback } from "./ViewSwitchCurtain";
 
 export interface Me {
   name: string;
@@ -37,6 +38,7 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
   onBell: () => void;
   onProfile: () => void;
 }) {
+  const ripple = useRef<HTMLSpanElement>(null);
   return (
     <header className={`${s.header} ${ruled ? s.headerRuled : ""}`}>
       {back ? (
@@ -53,7 +55,8 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
         </button>
         <span className={s.capsuleRule} />
         {crm && (
-          <button className={s.capsuleCrm} onClick={crm.onOpen} aria-label="Open CRM">
+          <button className={s.capsuleCrm} onClick={e => { pressFeedback(e.currentTarget, ripple.current); crm.onOpen(); }} aria-label="Open CRM">
+            <span className={s.capsuleRippleClip} aria-hidden="true"><span ref={ripple} className={s.capsuleRipple} /></span>
             <Svg d={ICON.chat} size={21} sw={1.8} />
             {crm.unread > 0 && <span className={s.capsuleBadge}>{badgeCount(crm.unread)}</span>}
           </button>
@@ -184,7 +187,7 @@ function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: M
 }
 
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, products, modules, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, it, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
   /** Screens their ticks close: not listed (2026-10-11). */
   hidden?: readonly Screen[];
@@ -196,8 +199,16 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
   me?: Me;
   /** The Product List row under its group label — only for an account holding `product_list`. */
   products?: { group: string; onOpen: () => void } | null;
+  /**
+   * IT requests (2026-10-20 — the user: "log in 进去的时候，左边这里 category 就会多一个 IT request" … "just principal or
+   * ulitmate full access"): everybody's, for IT requests · View — under the Product List's group label, its New ones
+   * counted.
+   */
+  it?: { group: string; count: number; on: boolean; onOpen: () => void } | null;
   /** The module switcher — a Principal's, who can open the other modules. */
   modules?: { current: ModuleId; onPick: (id: ModuleId) => void } | null;
+  /** The CRM, a row under Arena with its unread messages — for an account the CRM is open to (the owner, 2026-10-16). */
+  crm?: { unread: number; onOpen: () => void } | null;
   onGo: (screen: Screen) => void;
   onQuote: () => void;
   onNotif: () => void;
@@ -211,13 +222,23 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
         <span className={s.asideWord}>HOUZS VENTURE</span>
         <span className={s.asideDept}>Revenue</span>
       </button>
-      {DESK_NAV.filter(n => !hidden.includes(n.id)).map(n => {
+      {DESK_NAV.filter(n => !hidden.includes(n.id)).map((n, i, shown) => {
         const on = tab === n.id;
-        return (
+        // The CRM sits right under Arena (the owner, 2026-10-16: "把 crm 的入口拉出來，加到 Revenue app, arena 的下面"),
+        // or before Profile when their ticks close Arena.
+        const crmHere = !!crm && (n.id === "arena" || (n.id === "account" && !shown.some(x => x.id === "arena")));
+        const crmRow = crmHere && crm ? (
+          <button key="crm" className={`${s.asideNav} ${s.asideNotif}`} onClick={crm.onOpen}>
+            <Svg d={ICON.chat} size={20} sw={1.8} /><span className={s.asideNotifLabel}>CRM</span>
+            {crm.unread > 0 && <span className={s.asideCount}>{crm.unread > 99 ? "99+" : crm.unread}</span>}
+          </button>
+        ) : null;
+        const row = (
           <button key={n.id} className={`${s.asideNav} ${on ? s.asideNavOn : ""}`} onClick={() => (n.id === "quote" ? onQuote() : onGo(n.id))} aria-current={on ? "page" : undefined}>
             <Svg d={n.d} size={20} sw={1.8} />{n.label}
           </button>
         );
+        return n.id === "arena" ? [row, crmRow] : [crmRow, row];
       })}
       <button className={`${s.asideNav} ${s.asideNotif} ${notifOpen ? s.asideNotifOn : ""}`} onClick={onNotif}>
         <Svg d={ICON.bell} size={20} sw={1.8} /><span className={s.asideNotifLabel}>Notifications</span>
@@ -228,6 +249,15 @@ export function DeskAside({ active, count, notifOpen, me, products, modules, hid
           <span className={s.asideGroup}>{products.group}</span>
           <button className={`${s.asideNav} ${productsOn ? s.asideNavOn : ""}`} onClick={products.onOpen} aria-current={productsOn ? "page" : undefined}>
             <Svg d={ICON.cube} size={20} sw={1.8} />Product List
+          </button>
+        </>
+      )}
+      {it && (
+        <>
+          {products?.group === it.group ? null : <span className={s.asideGroup}>{it.group}</span>}
+          <button className={`${s.asideNav} ${s.asideNotif} ${it.on ? s.asideNavOn : ""}`} onClick={it.onOpen} aria-current={it.on ? "page" : undefined}>
+            <Svg d={ICON.help} size={20} sw={1.8} /><span className={s.asideNotifLabel}>IT requests</span>
+            {it.count > 0 && <span className={s.asideCount}>{badgeCount(it.count)}</span>}
           </button>
         </>
       )}

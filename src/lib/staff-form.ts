@@ -45,7 +45,6 @@ export interface RawStaffForm {
   bankAccountNo2?: string | null
   contactNumber?: string | null
   email?: string | null
-  address?: string | null
   emergencyContactName?: string | null
   emergencyContactPhone?: string | null
   emergencyContactRelationship?: string | null
@@ -67,7 +66,6 @@ export interface ValidStaffForm {
   bankAccountNo2: string | null
   contactNumber: string | null
   email: string | null
-  address: string | null
   emergencyContactName: string | null
   emergencyContactPhone: string | null
   emergencyContactRelationship: string | null
@@ -135,7 +133,6 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     ...validateSecondaryStaffBankAccount(raw),
     contactNumber: clean(raw.contactNumber),
     email: clean(raw.email),
-    address: clean(raw.address),
     emergencyContactName: clean(raw.emergencyContactName),
     emergencyContactPhone: clean(raw.emergencyContactPhone),
     emergencyContactRelationship: clean(raw.emergencyContactRelationship),
@@ -239,6 +236,9 @@ export interface TitleRow extends TitleOption {
 export interface StaffRow {
   id: string
   employee_name: string
+  /** What the apps call them (2026-10-17): filled from the full name's first word and the rest, HR's to change. */
+  first_name?: string | null
+  last_name?: string | null
   designation: string | null
   department_id: string
   department_name: string
@@ -270,7 +270,14 @@ export interface StaffRow {
   nric: string | null
   contact_number: string | null
   email: string | null
+  /** The one line the database puts together from the six parts below (2026-10-20), or an older record's own. */
   address: string | null
+  address_line1?: string | null
+  address_line2?: string | null
+  address_postcode?: string | null
+  address_city?: string | null
+  address_state?: string | null
+  address_country?: string | null
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
   emergency_contact_relationship: string | null

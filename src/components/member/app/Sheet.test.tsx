@@ -10,6 +10,7 @@ import { HonourSheet } from "./profile/HonoursPage";
 import { PersonSheet } from "./profile/TeamPage";
 import { RequestSheet } from "./profile/RequestsPage";
 import { MemoSheet } from "./profile/MemosPage";
+import SignaturePad from "@/components/memos/SignaturePad";
 
 afterEach(cleanup);
 
@@ -71,6 +72,23 @@ describe("Sheet › peek (a row of the page beside it)", () => {
     expect(isOpen()).toBe(false);
   });
 
+  it("drawing or clicking a portalled screenshot editor keeps its parent peek open", () => {
+    const onClose = vi.fn();
+    const onTool = vi.fn();
+    render(<><Bills onClose={onClose} /><div data-image-annotator><button onClick={onTool}>Circle tool</button></div></>);
+    fireEvent.click(screen.getByText("HC-SO-2610-042"));
+    const tool = screen.getByText("Circle tool");
+    fireEvent.click(tool);
+    fireEvent.pointerDown(tool, { clientX: 100, clientY: 100 });
+    fireEvent.click(tool, { clientX: 100, clientY: 100 });
+    expect(onTool).toHaveBeenCalledTimes(2);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(isOpen()).toBe(true);
+    fireEvent.pointerDown(screen.getByText("Waiting for deposit"));
+    fireEvent.click(screen.getByText("Waiting for deposit"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("selecting text out of the panel, or dragging across the page, is not a click outside", () => {
     const onClose = vi.fn();
     render(<Bills onClose={onClose} />);
@@ -130,7 +148,7 @@ const ROW_SHEETS: [string, (onClose: () => void) => ReactNode][] = [
   ["My honours › a finish", onClose => <HonourSheet open place={null} vm={null} periodLabel="" onClose={onClose} />],
   ["Team & capacity › a person", onClose => <PersonSheet open vm={null} onClose={onClose} />],
   ["Requests › a request", onClose => <RequestSheet open vm={null} busy={false} error={null} onCancel={() => {}} onUpdate={() => {}} onClose={onClose} />],
-  ["Memos › a memo", onClose => <MemoSheet open memo={null} busy={false} readOnly={false} error={null} onAck={() => {}} onClose={onClose} />],
+  ["Memos › a memo", onClose => <MemoSheet open memo={null} busy={false} readOnly={false} error={null} signature={null} onSign={() => {}} onAck={() => {}} onClose={onClose} />],
 ];
 
 describe.each(ROW_SHEETS)("%s is a peek", (_, sheet) => {
@@ -173,5 +191,27 @@ describe("Sheet › pulled down", () => {
     render(<Pulled onClose={onClose} />);
     drag(screen.getByLabelText("Notes"), SWIPE_CLOSE_PX + 60);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("an embedded screenshot editor keeps its own touch without pulling the host sheet", () => {
+    const onClose = vi.fn();
+    render(<Sheet open onClose={onClose} z={22} label="IT request"><div data-image-annotator><canvas aria-label="Mark screenshot" /></div></Sheet>);
+    drag(screen.getByLabelText("Mark screenshot"), SWIPE_CLOSE_PX + 60);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(panel().style.transform).toBe("");
+  });
+
+  // 2026-10-21 — the user, signing a memo on an Android phone: a stroke drawn downwards dragged the memo sheet with it.
+  it("a memo's signature pad keeps its own touch: a stroke never drags the sheet", () => {
+    const onClose = vi.fn();
+    render(<Sheet open onClose={onClose} z={22} label="Memo"><SignaturePad value={null} onChange={() => {}} /></Sheet>);
+    const pad = screen.getByLabelText("Sign here");
+    fireEvent.touchStart(pad, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(document, { touches: [{ clientY: 140 }] });
+    expect(panel().style.transform).toBe("");
+    fireEvent.touchEnd(document, { touches: [] });
+    drag(pad, SWIPE_CLOSE_PX + 60);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(isOpen()).toBe(true);
   });
 });

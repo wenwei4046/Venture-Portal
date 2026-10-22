@@ -3,6 +3,7 @@
 import { useMemo, useReducer, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { compareHeights, heightKey } from '@/lib/catalogue/keys'
+import { leadNameOf, modelLabelOf, takesModelName } from '@/lib/catalogue/options'
 import { TIERS, type PriceCell } from '@/lib/catalogue/pricing'
 import { saveSkuPrices } from '../actions'
 import type { CatalogueSku } from '../load'
@@ -67,9 +68,11 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '', colum
   const models = useMemo(() => {
     if (category === null || !MODEL_FILTER_CATEGORIES.has(category)) return []
     const options = new Map<string, string>()
+    // A sofa reads with its name, "5066 · ROMA" (2026-10-19); a mattress's or a bed frame's model is its name already.
+    const label = (s: CatalogueSku) => s.modelCode && takesModelName(category) ? modelLabelOf(s.modelCode, s.modelName) : s.modelCode ?? s.modelName
     for (const s of live) {
       const key = modelKey(s)
-      if ((s.category ?? '').toUpperCase() === category && key) options.set(key, s.modelCode ?? s.modelName ?? key)
+      if ((s.category ?? '').toUpperCase() === category && key) options.set(key, label(s) ?? key)
     }
     return options.size < 2 ? [] : [...options].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }))
   }, [live, category])
@@ -203,10 +206,15 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '', colum
     { key: 'description', label: 'DESCRIPTION', className: c.strong, defaultWidth: 260, cell: s => s.description ?? '—' },
     {
       key: 'model', label: 'MODEL', defaultWidth: 120,
-      cell: s => <>
-        {s.modelCode ?? '—'}
-        {s.modelName && s.modelName !== s.modelCode ? <div className={c.sub}>{s.modelName}</div> : null}
-      </>,
+      cell: s => {
+        // A named sofa leads with its name, its code under it (2026-10-19); everything else leads with its code.
+        const lead = leadNameOf(s.category, s.modelCode, s.modelName)
+        const second = lead ? s.modelCode : s.modelName && s.modelName !== s.modelCode ? s.modelName : null
+        return <>
+          {lead ?? s.modelCode ?? '—'}
+          {second ? <div className={c.sub}>{second}</div> : null}
+        </>
+      },
     },
   ]
   if (sofaView) {

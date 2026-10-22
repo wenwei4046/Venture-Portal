@@ -45,6 +45,8 @@ export interface DeskUi {
   insPer: "day" | "week" | "month" | "custom";
   insRange: { a: number; b: number } | null;
   insOpen: boolean;
+  /** 4a's Insight: the team opened in place to its people (frame 01). */
+  insTeam: string | null;
   /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
   insCards: string[] | null;
   /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
@@ -53,6 +55,10 @@ export interface DeskUi {
   whoSel: string[];
   whoOpen: boolean;
   inbF: string;
+  /** 4a's Inbox search (frame 02): a name, a message or an ad. */
+  ibQ: string;
+  /** 4a Calendar's Book a visit: its customer picker (open, the search). */
+  bookPick: boolean; bookQ: string;
   // Assignment
   sendFor: string | null;
   awChat: string | null;
@@ -90,6 +96,8 @@ export interface DeskUi {
   dp: { open: boolean; from: string; to: string; cf: string; ct: string; preset: string; cmp: boolean; days: number; step: number; target: "main" | "cmp"; month: number; year: number; txt: Record<string, string> } | null;
   // Showrooms
   srEdit: string | null;
+  /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
+  srAt: number;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
   srBlkOpen: boolean;
@@ -100,6 +108,8 @@ export interface DeskUi {
   srNewD: number[] | null;
   // Settings
   mwt: Record<string, boolean> | null;
+  /** Assignment › Active members: switches not saved yet (id → locked), null = as saved. */
+  actDraft: Record<string, boolean> | null;
   mwtSaved: boolean;
   cltF: string; cltFOpen: boolean; cltEdit: string | null; cltDraft: string | null; cltDN: string | null; cltDC: "WhatsApp" | "Messenger" | null; cltIsNew: boolean; cltAsk: string | null; cltMore: boolean; cltVars: string[];
   frmOpen: boolean; frmCur: string | null; frmDraft: FormSection[] | null; frmName: string | null; frmIsNew: boolean; frmExp: string | null; frmOptIn: Record<string, string>;
@@ -114,8 +124,11 @@ export interface DeskUi {
   adLog: boolean; mwtLog: boolean;
   /** Assignment's Ad performance folded to its strip (the owner, 2026-10-15). */
   adPerfShut: boolean;
+  /** 4a Assignment's editor tab (frame 06): Split · Ad performance · Audit log. */
+  adTab: "split" | "perf" | "audit";
   /** Inbox's Customer info column folded to its strip (the owner, 2026-10-16; open at first). */
-  ibInfoShut: boolean;
+  /** null = as the width decides (open, unless the chat would fall under 300 px — a 1280 screen). */
+  ibInfoShut: boolean | null;
   meMenu: boolean;
   // The chat: + menu, the message menu (the message's id), the message under the pointer, the reply's quote.
   attachOpen: boolean; attachView: "" | "quick" | "auto"; msgMenu: string | null; msgHov: string | null; replyTo: string | null;
@@ -141,7 +154,7 @@ export interface DeskUi {
   ppF: Record<string, string | null>; ppBy: string; ppQ: string; ppOpen: string | null; ppVis: string[] | null;
   ppSort: { k: string | null; dir: 1 | -1 }; ppCW: Record<string, number>; ppAdd: boolean;
   // Audit log
-  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null;
+  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
   // Customer form (the page): its draft, the preview's device
   cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
@@ -169,26 +182,26 @@ export type FormSection = CrmForm["sections"][number];
 export const initialDeskUi = (): DeskUi => ({
   tab: "insight", pane: "closed", kind: "chat", collapsed: false, fold: {}, stage: "menu", pick: null, menu: false, toast: "", undo: null,
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
-  insPer: "month", insRange: null, insOpen: false, insCards: null, mFor: "ads",
-  whoSel: [], whoOpen: false, inbF: "All",
+  insPer: "month", insRange: null, insOpen: false, insTeam: null, insCards: null, mFor: "ads",
+  whoSel: [], whoOpen: false, inbF: "All", ibQ: "", bookPick: false, bookQ: "",
   sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "all", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
   calView: "month", // the owner, 2026-10-15: "default month" (the prototype opens on Upcoming)
   calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
-  srEdit: null, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false,
+  srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
+  mwt: null, mwtSaved: false, actDraft: null,
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},
   book: null, cform: null, history: null, histF: "all",
   ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, paneW: null, sheetW: null, menuW: null, perfW: null, mwtLogW: null, auditW: null,
-  adLog: false, adPerfShut: false, ibInfoShut: false, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
+  adLog: false, adPerfShut: true, adTab: "split", ibInfoShut: null, mwtLog: false, meMenu: false, attachOpen: false, attachView: "", msgMenu: null, msgHov: null, replyTo: null, emo: null, recents: null, alR: "all", ppSel: null, ppChart: false, ppPer: 10, ppPg: 0, calAn: false, calAnBy: "rep", rail: false, cfPv: null,
   applyChk: false, ftApplyChk: false, evOpen: {}, adPer: "This month", adPerOpen: false, adCal: false, adCust: null, adCustT: null,
-  calBy: "team",
-  ppF: {}, ppBy: "type", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
-  auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null,
+  calBy: "room",
+  ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
+  auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
   cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
@@ -205,6 +218,14 @@ export interface DeskApp {
   openSubDept(): void;
   openBell(): void;
   signOut(): void;
+  /** 4a's Revenue sidebar (2026-10-18), as the Revenue app's own desktop sidebar has them: the screens their ticks close, */
+  hidden?: readonly string[];
+  /** the CRM's unread (its row's count), */
+  crmUnread?: number;
+  /** the Product List row (an account holding product_list), */
+  products?: { group: string; onOpen: () => void } | null;
+  /** and the module switcher (a Principal's). */
+  modules?: { current: string; onPick: (id: string) => void } | null;
 }
 
 /**

@@ -42,12 +42,11 @@ const ROLE_DEFAULTS: Record<UserRole, string[]> = {
     'dashboard', 'hr_costing', 'revenue', 'director_salary', 'director_pool',
     'team', 'salary_individual', 'claims', 'claims_approve',
   ],
-  dept_manager: ['dashboard', 'dept_pool', 'opex', 'my_billing', 'claims', 'dept_reports'],
 }
 
-const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member']
+const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'revenue_member']
 // As loadUser() answers an account with no template: its keys, and the actions they allow.
-const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role], actions: actionsFromKeys(ROLE_DEFAULTS[role], role) })
+const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role], actions: actionsFromKeys(ROLE_DEFAULTS[role]) })
 
 /** Assert exactly which roles a gate lets through, so a widening is a failure. */
 function allows(gate: (u: { permissions: string[] }) => boolean, expected: UserRole[]) {
@@ -68,8 +67,8 @@ describe('the gates, on the seeded role defaults', () => {
     allows(canAccessBilling, ['principal', 'finance'])
   })
 
-  it('canAccessDeptPool: principal + finance + dept manager', () => {
-    allows(canAccessDeptPool, ['principal', 'finance', 'dept_manager'])
+  it('canAccessDeptPool: principal + finance', () => {
+    allows(canAccessDeptPool, ['principal', 'finance'])
   })
 
   it('canAccessHRCosting: principal + hr', () => {
