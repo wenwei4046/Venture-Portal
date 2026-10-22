@@ -273,7 +273,7 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
     startSending(async () => {
       const r = await replyToLead(contact.id, body)
       if (!r.ok) { setError(r.reason); return }
-      if (used) void setDraftOutcome(used.id, outcomeOf(used.reply, body))
+      if (used) void setDraftOutcome(used.id, outcomeOf(used.reply, body), body)
       setUsed(null)
       setText('')
       onSent()

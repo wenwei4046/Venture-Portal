@@ -634,4 +634,74 @@ await as(CS_USER, ALL)
 check((await q(`select count(*)::int n from information_schema.role_table_grants
   where table_name in ('lead_reply_rules','lead_reply_pages','lead_step_library') and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on the new tables')
 
+// ── AI Agent v2, AI corrections and the Data Center's files (mig 20261023200000; storage is a stand-in here) ──
+await db.exec(`create schema if not exists storage;
+  create table if not exists storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
+  create table if not exists storage.objects (bucket_id text, name text, owner_id uuid);
+  create or replace function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+  do $$ begin if not exists (select 1 from pg_proc where proname = 'has_any_action') then
+    create function public.has_any_action(p text[]) returns boolean language sql as 'select true'; end if; end $$;`)
+const aiV2 = (await readFile(new URL('../../supabase/migrations/20261023200000_lead_ai_v2.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(aiV2.slice(0, aiV2.indexOf('-- ── The new page, by name')))
+await db.exec((await readFile(new URL('../../supabase/migrations/20261023200100_lead_ai_v2_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+await as(CS_USER, ALL)
+check((await q(`select public, file_size_limit from storage.buckets where id = 'lead-data'`))[0], { public: false, file_size_limit: 52428800 }, 'a private bucket, 50 MB a file')
+// Files and links.
+const saveFile = async (id, data) => (await q('select public.lead_save_data_file($1, $2::jsonb) i', [id, JSON.stringify(data)]))[0].i
+await refuses(`select public.lead_save_data_file(null, $1::jsonb)`, [JSON.stringify({ kind: 'file', name: 'x.pdf', path: 'files/00000000-0000-4000-8000-000000000001/x.pdf' })], /did not finish uploading/, 'a file not in the bucket')
+await refuses(`select public.lead_save_data_file(null, $1::jsonb)`, [JSON.stringify({ kind: 'link', name: 'FAQ', url: 'http://x' })], /https address/, 'a link is https')
+const objPath = 'files/00000000-0000-4000-8000-000000000001/Catalogue.pdf'
+await db.exec(`insert into storage.objects (bucket_id, name) values ('lead-data', '${objPath}')`)
+const catalogue = await saveFile(null, { kind: 'file', name: 'Catalogue.pdf', path: objPath, mime: 'application/pdf', sizeBytes: 4200000, brandId: b2990, category: 'Catalogues', validUntil: '2026-10-31' })
+const faqLink = await saveFile(null, { kind: 'link', name: '2990s FAQ', url: 'https://2990s.com.my/faq', category: 'After-sales' })
+const carressFile = await saveFile(null, { kind: 'link', name: 'Carress trial', url: 'https://carress.com.my/trial', brandId: bCarress })
+let dataFiles = (await q('select public.lead_data_files() f'))[0].f
+check(dataFiles.map(f => [f.name, f.kind, f.ver, f.brandId === null]).sort(), [['2990s FAQ', 'link', 1, true], ['Carress trial', 'link', 1, false], ['Catalogue.pdf', 'file', 1, false]], 'two links and a file')
+// A new upload on an old file is its next version.
+const objPath2 = 'files/00000000-0000-4000-8000-000000000002/Catalogue Nov.pdf'
+await db.exec(`insert into storage.objects (bucket_id, name) values ('lead-data', '${objPath2}')`)
+await saveFile(catalogue, { kind: 'file', name: 'Catalogue.pdf', path: objPath2, mime: 'application/pdf', sizeBytes: 1000, brandId: b2990, category: 'Catalogues' })
+check((await q('select ver, path from public.lead_data_files where id = $1', [catalogue]))[0], { ver: 2, path: objPath2 }, 'a new upload is v2')
+// The agent: settings, fixed answers, playbook, sources.
+const saveAi = async (brand, data) => q('select public.lead_save_ai($1, $2::jsonb)', [brand, JSON.stringify(data)])
+const aiSettings = { goal: 'Get the mobile number.', tone: 'Friendly', toneNote: 'Warm', length: 'Short', rules: ['Customer’s language'], phone: { on: true, after: 2 } }
+await refuses(`select public.lead_save_ai($1, $2::jsonb)`, [b2990, JSON.stringify({ settings: aiSettings, answers: [], playbook: [], sources: [{ fileId: carressFile }] })], /brand''s folder or Shared|brand's folder or Shared/, 'another brand’s file')
+await saveAi(b2990, { settings: aiSettings, answers: [{ question: 'Penang?', answer: 'Klang Valley only.' }], playbook: [{ name: 'Too expensive', words: 'mahal, 太贵', approaches: ['Mention instalments'], reply: 'We have 0% instalments.' }],
+  sources: [{ fileId: catalogue }, { fileId: faqLink, paused: true }] })
+let aiMore = (await q('select public.lead_ai_more($1) m', [b2990]))[0].m
+check([aiMore.settings.tone, aiMore.answers.map(a => [a.question, a.source]), aiMore.playbook[0].approaches, aiMore.sources.map(s => [s.file.name, s.paused]).sort()],
+  ['Friendly', [['Penang?', 'Added by Mei Ling']], ['Mention instalments'], [['2990s FAQ', true], ['Catalogue.pdf', false]]], 'the agent reads back')
+check((await q('select goal from public.lead_personas where brand_id = $1', [b2990]))[0].goal, 'Get the mobile number.', 'the soul’s goal follows the settings')
+check((await q('select public.lead_data_files() f'))[0].f.find(f => f.id === catalogue).usedBy, [{ brandId: b2990, paused: false }], 'the Data Center says which agent reads it')
+// A correction: a corrDraft CS changed, then saved as a fixed answer and edited.
+const corrDraft = (await q(`select public.lead_ai_log_draft($1, 'Yes we deliver anywhere.', '[]'::jsonb, false, '', 'test') d`, [aisyah]))[0].d
+await q(`select public.lead_ai_draft_kept($1, 'edited', 'Only within the Klang Valley for now.')`, [corrDraft])
+let corrList = (await q('select public.lead_ai_corrections($1, 30) c', [b2990]))[0].c
+check([corrList.length, corrList[0].wrong, corrList[0].right, corrList[0].answerId, typeof corrList[0].question], [1, 'Yes we deliver anywhere.', 'Only within the Klang Valley for now.', null, 'string'], 'the correction, with the customer’s message')
+aiMore = (await q('select public.lead_ai_more($1) m', [b2990]))[0].m
+await saveAi(b2990, { settings: aiSettings, answers: [...aiMore.answers, { question: corrList[0].question, answer: corrList[0].right, draftId: String(corrDraft) }], playbook: aiMore.playbook, sources: aiMore.sources.map(s => ({ fileId: s.fileId, paused: s.paused })) })
+corrList = (await q('select public.lead_ai_corrections($1, null) c', [b2990]))[0].c
+aiMore = (await q('select public.lead_ai_more($1) m', [b2990]))[0].m
+const fromCorr = aiMore.answers.find(a => a.draftId === corrDraft)
+check([corrList[0].answerId === fromCorr.id, fromCorr.source.startsWith('From a correction'), fromCorr.editedAt], [true, true, null], 'saved as a fixed answer, linked to its correction')
+await saveAi(b2990, { settings: aiSettings, answers: aiMore.answers.map(a => (a.id === fromCorr.id ? { ...a, answer: 'Klang Valley and Seremban.' } : a)), playbook: aiMore.playbook, sources: aiMore.sources.map(s => ({ fileId: s.fileId, paused: s.paused })) })
+aiMore = (await q('select public.lead_ai_more($1) m', [b2990]))[0].m
+check([aiMore.answers.find(a => a.id === fromCorr.id).answer, !!aiMore.answers.find(a => a.id === fromCorr.id).editedAt, corrList[0].right], ['Klang Valley and Seremban.', true, 'Only within the Klang Valley for now.'], 'edited later: stamped; the correction keeps what CS sent')
+// A dismissed corrDraft keeps no text; removing a file takes it off every agent.
+const corrDraft2 = (await q(`select public.lead_ai_log_draft($1, 'x', '[]'::jsonb, false, '', 'test') d`, [aisyah]))[0].d
+await q(`select public.lead_ai_draft_kept($1, 'dismissed', 'ignored')`, [corrDraft2])
+check((await q('select sent_text from public.lead_ai_drafts where id = $1', [corrDraft2]))[0].sent_text, null, 'a dismissed corrDraft keeps no text')
+await q('select public.lead_remove_data_file($1)', [faqLink])
+check((await q('select public.lead_ai_more($1) m', [b2990]))[0].m.sources.map(s => s.file.name), ['Catalogue.pdf'], 'a removed file leaves every agent')
+for (const [fn, pages, want] of [['lead_save_ai', "'/leads/ai', '/leads/corrections'", 'leads.manage'], ['lead_save_data_file', "'/leads/knowledge'", 'leads.manage'], ['lead_remove_data_file', "'/leads/knowledge'", 'leads.manage'], ['lead_ai_draft_kept', "'/leads'", 'leads.create']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY[${pages}], ARRAY['${want}']);`), true, `${fn} asks ${pages}`)
+}
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_save_ai($1, '{"settings":{},"answers":[],"playbook":[],"sources":[]}'::jsonb)`, [b2990], /Lead View · Manage/, 'the agent needs Manage')
+await refuses(`select public.lead_remove_data_file($1)`, [catalogue], /Lead View · Manage/, 'the Data Center needs Manage')
+await as(CS_USER, ALL)
+check((await q(`select count(*)::int n from information_schema.role_table_grants
+  where table_name in ('lead_ai_answers','lead_ai_playbook','lead_data_files','lead_ai_sources') and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on the new tables')
+
 console.log(`validate-leads: ${checks} checks passed`)

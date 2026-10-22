@@ -5,7 +5,8 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
-import { askModel } from './ai-model'
+import { askModel, type AgentDocument } from './ai-model'
+import { agentCards, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
@@ -135,6 +136,41 @@ export async function removeLibraryItem(itemId: string) {
   return call<null>('lead_remove_library_item', { p_id: itemId }, 'The library item was not removed.')
 }
 
+/** AI Agent's Save for one brand (also AI corrections' "Save as fixed answer"): settings, fixed answers, playbook, sources. */
+export async function saveAgent(brandId: string, data: { settings: unknown; answers: FixedAnswer[]; playbook: PlaySituation[]; sources: Array<{ fileId: string; paused: boolean }> }) {
+  await requireActionOn(['/leads/ai', '/leads/corrections'], 'leads', 'manage')
+  return call<null>('lead_save_ai', {
+    p_brand: brandId,
+    p_data: {
+      settings: data.settings,
+      answers: data.answers.map(a => ({ id: a.id.startsWith('new-') ? '' : a.id, question: a.question, answer: a.answer, draftId: a.draftId ?? null })),
+      playbook: data.playbook.map(p => ({ ...p, id: p.id.startsWith('new-') ? '' : p.id })),
+      sources: data.sources,
+    },
+  }, 'The AI agent was not saved.')
+}
+
+/** The Data Center: a file (uploaded first, by the browser, under files/<uuid>/) or a link, new or changed. Returns its id. */
+export async function saveDataFile(fileId: string | null, data: Partial<DataFile> & { kind: 'file' | 'link'; name: string }) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<string>('lead_save_data_file', { p_id: fileId, p_data: data }, 'The file was not saved.')
+}
+
+/** The Data Center: a file or link gone, and from every agent. */
+export async function removeDataFile(fileId: string) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<null>('lead_remove_data_file', { p_id: fileId }, 'The file was not removed.')
+}
+
+/** The Data Center: a short-lived link to open a file (the session's own storage access). */
+export async function openDataFile(path: string): Promise<LeadOutcome<string>> {
+  await requireActionOn('/leads/knowledge', 'leads', 'view')
+  if (!/^files\/[0-9a-f-]{36}\//.test(path)) return { ok: false, reason: 'That file is not in the Data Center.' }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.storage.from('lead-data').createSignedUrl(path, 120)
+  return error || !data ? { ok: false, reason: 'The file could not be opened.' } : { ok: true, data: data.signedUrl }
+}
+
 // ── Settings ────────────────────────────────────────────────────────────────
 
 /** Settings › Test: a customer's message as if it came from Meta. */
@@ -243,9 +279,12 @@ export async function draftLeadReply(contactId: string): Promise<LeadOutcome<Dra
   }>('lead_ai_context', { p_contact: contactId }, 'The conversation could not be read for a draft.')
   if (!ctx.ok) return ctx
   const { persona, knowledge, contact, messages, today } = ctx.data
-  const answer = await askModel(systemPrompt(persona, knowledge, today), conversationPrompt(contact, turnsOf(messages)))
+  // AI Agent v2 (mig 20261023200000): the settings, fixed answers, playbook, General info and files — when there.
+  const more = await agentMore(contact.brandId, today)
+  const cards = more ? more.cards(knowledge) : knowledge
+  const answer = await askModel(systemPrompt(persona, cards, today), conversationPrompt(contact, turnsOf(messages)), more?.ask)
   if (!answer.ok) return answer
-  const draft = readDraft(answer.text, knowledge)
+  const draft = readDraft(answer.text, cards)
   if (!draft) return { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
   const saved = await quiet<number>('lead_ai_log_draft', {
     p_contact: contactId, p_draft: draft.reply, p_used: draft.used, p_handoff: draft.handoff, p_note: draft.note, p_model: answer.model,
@@ -254,26 +293,74 @@ export async function draftLeadReply(contactId: string): Promise<LeadOutcome<Dra
   return { ok: true, data: { ...draft, id: saved.data } }
 }
 
-/** What became of a draft: sent as written, edited then sent, or dismissed. */
-export async function setDraftOutcome(draftId: number, outcome: DraftOutcome) {
+/**
+ * What became of a draft: sent as written, edited then sent, or dismissed — with what was sent (AI Agent v2: an edited
+ * one is an AI correction). Before mig 20261023200000, the outcome alone.
+ */
+export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, sent = '') {
   await requireActionOn('/leads', 'leads', 'create')
+  const kept = await quiet<null>('lead_ai_draft_kept', { p_id: draftId, p_outcome: outcome, p_sent: sent.slice(0, 2000) }, 'The draft’s outcome was not kept.')
+  if (kept.ok || !kept.reason.includes('not set up')) return kept
   return quiet<null>('lead_ai_draft_outcome', { p_id: draftId, p_outcome: outcome }, 'The draft’s outcome was not kept.')
+}
+
+/**
+ * The agent's v2 knowledge for a brand: its settings and answers as a second instruction block, the cards it may cite
+ * (General info, fixed answers, files) and the files it reads attached — PDFs, pictures and text, at most six and
+ * 24 MB, read with the session's own storage access. Null before mig 20261023200000 (the draft runs as before).
+ */
+async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook'>) {
+  const [more, info] = await Promise.all([
+    quiet<AgentMore>('lead_ai_more', { p_brand: brandId }, ''),
+    quiet<LeadInfo>('lead_info', {}, ''),
+  ])
+  if (!more.ok) return null
+  const m = { ...more.data, ...(override ?? {}) }
+  const files: DataFile[] = more.data.sources.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
+  const documents: AgentDocument[] = []
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  let total = 0
+  for (const f of files) {
+    const how = readable(f)
+    if (!f.path || !how || how === 'link' || documents.length >= 6 || f.sizeBytes > 10_000_000 || total + f.sizeBytes > 24_000_000) continue
+    const { data } = await supabase.storage.from('lead-data').download(f.path)
+    if (!data) continue
+    total += f.sizeBytes
+    const buf = Buffer.from(await data.arrayBuffer())
+    if (how === 'pdf') documents.push({ kind: 'pdf', title: f.name, base64: buf.toString('base64') })
+    else if (how === 'text') documents.push({ kind: 'text', title: f.name, text: buf.toString('utf8').slice(0, 200_000) })
+    else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
+  }
+  const links = files.filter(f => f.kind === 'link').map(f => `- ${f.name}: ${f.url}`)
+  const system = [
+    settingsPrompt(settingsOf(m.settings)),
+    answersPrompt(m.answers, m.playbook),
+    documents.length ? `# Files you read\nThe documents attached before the conversation are the brand's files; cite one by its card id (file-…).` : '',
+    links.length ? `# Web pages (you see the address, not the page)\n${links.join('\n')}` : '',
+  ].filter(Boolean).join('\n\n')
+  return {
+    ask: { system, documents },
+    cards: (old: KnowledgeCard[]) => agentCards(old, info.ok ? info.data : null, brandId, today, m.answers, files),
+  }
 }
 
 /**
  * AI Agent › Try it: a brand's cards for today and the soul as the form holds it (saved or not), on a pretend
  * conversation. Nothing is kept and nothing reaches a customer.
  */
-export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[]): Promise<LeadOutcome<AgentDraft>> {
+export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[], v2?: Pick<AgentMore, 'settings' | 'answers' | 'playbook'>): Promise<LeadOutcome<AgentDraft>> {
   await requireActionOn('/leads/ai', 'leads', 'manage')
   const ctx = await quiet<{ persona: Persona; knowledge: KnowledgeCard[]; today: string }>(
     'lead_ai_try_context', { p_brand: brandId }, 'The brand could not be read.')
   if (!ctx.ok) return ctx
   const { persona, knowledge, today } = ctx.data
   const clean = turns.filter(t => t.text.trim()).slice(-30).map(t => ({ who: t.who, by: t.who === 'us' ? 'customer service' : undefined, text: t.text.slice(0, 2000) }))
-  const answer = await askModel(systemPrompt({ ...persona, ...fields }, knowledge, today), conversationPrompt(null, clean))
+  // AI Agent v2: the page's settings, answers and playbook as they stand (saved or not).
+  const more = await agentMore(brandId, today, v2)
+  const cards = more ? more.cards(knowledge) : knowledge
+  const answer = await askModel(systemPrompt({ ...persona, ...fields }, cards, today), conversationPrompt(null, clean), more?.ask)
   if (!answer.ok) return answer
-  const draft = readDraft(answer.text, knowledge)
+  const draft = readDraft(answer.text, cards)
   return draft ? { ok: true, data: draft } : { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
 }
 

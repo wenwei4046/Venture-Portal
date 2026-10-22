@@ -18,7 +18,17 @@ export const AI_NOT_CONNECTED =
 
 export type ModelAnswer = { ok: true; text: string; model: string } | { ok: false; reason: string }
 
-export async function askModel(system: string, user: string): Promise<ModelAnswer> {
+/** A file the agent reads (AI Agent v2, mig 20261023200000): a PDF, a picture or plain text from the Data Center. */
+export type AgentDocument =
+  | { kind: 'pdf'; title: string; base64: string }
+  | { kind: 'image'; title: string; base64: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' }
+  | { kind: 'text'; title: string; text: string }
+
+/**
+ * Ask the model for a draft. `more` (AI Agent v2) is the settings, fixed answers and playbook — a second system block —
+ * and the Data Center files the agent reads, put before the conversation; both are cached with the soul.
+ */
+export async function askModel(system: string, user: string, more?: { system?: string; documents?: AgentDocument[] }): Promise<ModelAnswer> {
   if (!process.env.ANTHROPIC_API_KEY) return { ok: false, reason: AI_NOT_CONNECTED }
   const client = new Anthropic()
   try {
@@ -30,8 +40,11 @@ export async function askModel(system: string, user: string): Promise<ModelAnswe
       thinking: { type: 'adaptive' },
       output_config: { effort: 'low', format: { type: 'json_schema', schema: DRAFT_SCHEMA } },
       // The soul and the cards change rarely: cached across the day's drafts.
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: user }],
+      system: [
+        { type: 'text', text: system, ...(more?.system ? {} : { cache_control: { type: 'ephemeral' as const } }) },
+        ...(more?.system ? [{ type: 'text' as const, text: more.system, cache_control: { type: 'ephemeral' as const } }] : []),
+      ],
+      messages: [{ role: 'user', content: [...documentBlocks(more?.documents ?? []), { type: 'text' as const, text: user }] }],
     })
     if (res.stop_reason === 'refusal') return { ok: false, reason: 'The AI agent would not draft this one — please reply yourself.' }
     if (res.stop_reason === 'max_tokens') return { ok: false, reason: 'The draft ran too long — please try again.' }
@@ -47,4 +60,14 @@ export async function askModel(system: string, user: string): Promise<ModelAnswe
     }
     return { ok: false, reason: 'The AI agent could not draft a reply — please try again.' }
   }
+}
+
+/** The files as the API takes them: a PDF and a text file as documents (titled, so the agent can name them), a picture as an image; the last one cached. */
+function documentBlocks(docs: AgentDocument[]): Anthropic.Beta.Messages.BetaContentBlockParam[] {
+  return docs.map((d, i): Anthropic.Beta.Messages.BetaContentBlockParam => {
+    const cache = i === docs.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}
+    if (d.kind === 'pdf') return { type: 'document', title: d.title, source: { type: 'base64', media_type: 'application/pdf', data: d.base64 }, ...cache }
+    if (d.kind === 'text') return { type: 'document', title: d.title, source: { type: 'text', media_type: 'text/plain', data: d.text }, ...cache }
+    return { type: 'image', source: { type: 'base64', media_type: d.mediaType, data: d.base64 }, ...cache }
+  })
 }

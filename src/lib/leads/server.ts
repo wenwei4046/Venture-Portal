@@ -7,6 +7,7 @@ import type { Campaign } from './campaign'
 import type { LeadFlow } from './flow'
 import type { BusinessHours, LeadInfo } from './info'
 import type { LibraryItem, ReplyRules } from './template'
+import type { AgentMore, Correction, DataFile } from './agent'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -83,6 +84,21 @@ export function loadReplyRules(): Promise<Read<ReplyRules>> {
 /** The Step library, with where each item is used. */
 export function loadLibrary(): Promise<Read<LibraryItem[]>> {
   return rpc<LibraryItem[]>('lead_library', undefined, 'The step library')
+}
+
+/** A brand's agent beyond its soul: settings, fixed answers, playbook, sources (mig 20261023200000). */
+export function loadAiMore(brandId: string): Promise<Read<AgentMore>> {
+  return rpc<AgentMore>('lead_ai_more', { p_brand: brandId }, 'The AI agent')
+}
+
+/** The Data Center's files and links. */
+export function loadDataFiles(): Promise<Read<DataFile[]>> {
+  return rpc<DataFile[]>('lead_data_files', undefined, 'The Data Center')
+}
+
+/** A brand's AI corrections, the last `days` days (null = all). */
+export function loadCorrections(brandId: string, days: number | null): Promise<Read<Correction[]>> {
+  return rpc<Correction[]>('lead_ai_corrections', { p_brand: brandId, p_days: days }, 'The corrections')
 }
 
 /** Every flow, with what each started this week. */

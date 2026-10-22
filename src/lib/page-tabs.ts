@@ -113,6 +113,7 @@ export const PAGE_TABS = {
   '/leads/library': ['lead.library'],
   '/leads/ai': ['lead.ai'],
   '/leads/knowledge': ['lead.knowledge'],
+  '/leads/corrections': ['lead.corrections'],
   '/leads/info': ['lead.info'],
   '/leads/hours': ['lead.hours'],
   '/leads/settings': ['lead.settings'],

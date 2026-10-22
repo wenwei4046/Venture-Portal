@@ -62,7 +62,7 @@ export function leadNavSections(): LeadNavSection[] {
       items: [
         link('leads-info', 'General info', 'bookOpen', '/leads/info'),
         link('leads-knowledge', 'Data Center', 'library', '/leads/knowledge'),
-        soon('leads-corrections', 'AI corrections', 'history'),
+        link('leads-corrections', 'AI corrections', 'history', '/leads/corrections'),
       ],
     },
     {
