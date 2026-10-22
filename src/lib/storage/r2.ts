@@ -49,7 +49,8 @@ let client: { key: string; aws: AwsClient } | null = null
 
 function aws(s: R2Settings): AwsClient {
   const key = `${s.accessKeyId}:${s.secretAccessKey}`
-  if (client?.key !== key) client = { key, aws: new AwsClient({ accessKeyId: s.accessKeyId, secretAccessKey: s.secretAccessKey, service: 's3', region: 'auto' }) }
+  // Three tries on an R2 hiccup (5xx / 429), not aws4fetch's ten — somebody is waiting for the answer.
+  if (client?.key !== key) client = { key, aws: new AwsClient({ accessKeyId: s.accessKeyId, secretAccessKey: s.secretAccessKey, service: 's3', region: 'auto', retries: 3 }) }
   return client.aws
 }
 
