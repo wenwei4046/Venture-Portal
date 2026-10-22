@@ -349,7 +349,6 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
 export function Phone4aActive({ groups }: { groups: ActiveGroup[] }) {
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-muted)" }}>Locked members take no new leads; their share goes to the rest of their team.</span>
       {groups.map(g => (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>

@@ -545,7 +545,6 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
 export function DeskActive({ groups }: { groups: ActiveGroup[] }) {
   return (
     <>
-      <span style={{ marginTop: "-10px", fontSize: "14px", color: "var(--crm-muted)" }}>Locked members take no new leads and leave Assignment&apos;s lists; their share goes to the rest of their team. Turn them back on any time.</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
         {groups.map(g => (
           <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
