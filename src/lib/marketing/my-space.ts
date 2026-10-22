@@ -189,7 +189,7 @@ export function plateLine(turn: number): string {
   return turn > 0 ? `you have ${plural(turn, 'thing')} on your plate` : 'your plate is clear'
 }
 
-/** The project a card opens. */
+/** The task a card opens: its page, by its Track ID. */
 export function cardHref(c: Pick<PlateCard, 'trackId'>): string {
-  return `/marketing/projects?q=${encodeURIComponent(c.trackId)}`
+  return `/marketing/projects/${encodeURIComponent(c.trackId)}`
 }

@@ -63,6 +63,9 @@ describe("Marketing's shell", () => {
     expect(mktNavActive('/admin/rooms', null)).toBe('rooms')
     expect(mktCrumb('/marketing/tracking')).toEqual({ emoji: '📊', label: 'Tracking Dashboard' })
     expect(mktCrumb('/it-support')).toEqual({ emoji: '🛟', label: 'IT support' })
+    expect(mktNavActive('/marketing/new', null)).toBe('projects')
+    expect(mktCrumb('/marketing/new')).toEqual({ emoji: '📁', label: 'Projects / New project' })
+    expect(mktNavActive('/marketing/projects/TSK-CAR-2610-001', null)).toBe('projects')
   })
 
   it('is worn by the Principal’s lens and by a template that opens it — never by HR, Finance or a plain staff', () => {

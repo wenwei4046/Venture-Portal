@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
 import { mktNoticesFromRow, type MktNotice } from './shell'
+import { taskFromRow, type MktTaskPage } from './task'
 
 // Marketing's reads on the page's own session (the DEFINER functions of mig 20261023214100 ask Marketing · View
 // themselves). A refusal throws — the page's error boundary answers it.
@@ -24,4 +25,12 @@ export async function readNotices(limit = 30): Promise<MktNotice[]> {
   const { data, error } = await db.rpc('mkt_notices', { p_limit: limit })
   if (error) throw new Error(error.message)
   return mktNoticesFromRow(data)
+}
+
+/** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */
+export async function readTask(key: string): Promise<MktTaskPage | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_project', { p_key: key })
+  if (error) throw new Error(error.message)
+  return taskFromRow(data)
 }

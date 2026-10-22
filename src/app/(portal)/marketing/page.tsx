@@ -1,5 +1,6 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { officeClock } from '@/lib/office-clock'
+import { canDo } from '@/lib/permission-actions'
 import { startRead } from '@/lib/start-read'
 import { indexBoard } from '@/lib/marketing/board'
 import { plateColumns, plateLine, weekRows } from '@/lib/marketing/my-space'
@@ -43,6 +44,7 @@ export default async function MarketingMySpacePage() {
       columns={columns}
       week={weekRows(columns, board.today)}
       plans={plans}
+      canAccept={canDo(user, 'marketing', 'edit')}
     />
   )
 }

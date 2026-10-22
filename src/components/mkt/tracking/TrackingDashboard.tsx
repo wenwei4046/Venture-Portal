@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { MktBoard } from '@/lib/marketing/board'
+import { nudgeMkt } from '@/lib/marketing/actions'
 import {
   NO_FILTER, countPool, dueLabel, filterTasks, flowLanes, flowOptions, peopleCards, trackCounts,
   type TrackFilter, type TrackPeriod, type TrackStatus, type TrackTask, type TrackTone,
@@ -11,7 +12,7 @@ import s from './tracking.module.css'
 
 // The Tracking Dashboard (`Tracking Dashboard.dc.html`): By people / By workflow; This week · This month · Custom
 // (the figures of what was finished), a subsidiary, a workflow, a person; five cards that filter by state. A task opens
-// its project.
+// its project. Nudge tells a person about the task of theirs that waits on them most.
 
 const TONE: Record<TrackTone, { box: string; fg: string; slot: string }> = {
   red: { box: s.tRed, fg: s.fgRed, slot: s.sRed },
@@ -38,6 +39,23 @@ export default function TrackingDashboard({ board, tasks }: { board: MktBoard; t
   const [f, setF] = useState<TrackFilter>(NO_FILTER)
   const [range, setRange] = useState({ from: board.today, to: board.today })
   const set = (patch: Partial<TrackFilter>) => setF(x => ({ ...x, ...patch }))
+  const [nudging, startNudge] = useTransition()
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+  }, [])
+  const say = (t: string) => {
+    setToast(t)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2600)
+  }
+  const nudge = (task: TrackTask, name: string) =>
+    startNudge(async () => {
+      const r = await nudgeMkt(task.projectId)
+      if (!r.ok) return say(r.reason)
+      say(r.already ? `${name} was nudged this hour already` : `Nudged ${name} · ${task.stageName}`)
+    })
   const pool = useMemo(() => countPool(tasks, f), [tasks, f])
   const shown = useMemo(() => filterTasks(tasks, f), [tasks, f])
   const counts = trackCounts(pool)
@@ -186,6 +204,11 @@ export default function TrackingDashboard({ board, tasks }: { board: MktBoard; t
                       <span>·</span>
                       <span>Avg {p.avgDays === null ? '—' : p.avgDays} d/stage</span>
                       <span className={s.grow} />
+                      {p.load.some(t => t.waitsOn === p.id) ? (
+                        <button type="button" className={s.pBtn} disabled={nudging} onClick={() => nudge(p.load.find(t => t.waitsOn === p.id) as TrackTask, p.name)}>
+                          Nudge
+                        </button>
+                      ) : null}
                       <button type="button" className={s.pBtn} onClick={() => set({ person: f.person === p.id ? 'All' : p.id })}>
                         {f.person === p.id ? 'Show everyone' : `Only ${p.name}`}
                       </button>
@@ -270,6 +293,7 @@ export default function TrackingDashboard({ board, tasks }: { board: MktBoard; t
           )}
         </div>
       )}
+      {toast ? <div className={s.toast} role="status">{toast}</div> : null}
     </div>
   )
 }

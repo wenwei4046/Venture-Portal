@@ -115,6 +115,8 @@
   cursor: pointer; font-family: inherit; font-size: 1em;
 }
 .pBtn:hover { background: rgb(var(--mk-surface)); }
+.pBtn:disabled { cursor: wait; opacity: .6; }
+.toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); font-size: 13px; animation: mkIn .2s ease-out; }
 .none { padding: 40px; text-align: center; color: rgb(var(--mk-muted)); border: 1px dashed rgb(var(--mk-line)); border-radius: 14px; }
 
 .flowWrap { display: flex; flex-direction: column; gap: 18px; margin-top: 28px; }

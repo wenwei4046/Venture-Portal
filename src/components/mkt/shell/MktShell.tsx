@@ -4,6 +4,8 @@ import { Suspense, useEffect, useMemo, useState, type CSSProperties, type ReactN
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { User } from '@/types'
 import { writeCookie } from '@/lib/hr-view'
+import { actionsOnPage, opensPath } from '@/lib/page-tabs'
+import { canDo } from '@/lib/permission-actions'
 import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE } from '@/lib/marketing-view'
 import { densityOf, lookToCookie, LOOK_SIZES, type Look } from '@/lib/marketing/look'
 import { mktCrumb, mktNavActive, mktNavRows, type MktNavKey } from '@/lib/marketing/nav'
@@ -68,6 +70,12 @@ export default function MktShell({
   }, [pathname, query])
 
   const rows = useMemo(() => mktNavRows(navUser.tabs), [navUser.tabs])
+  // + New Project: Marketing · Create as New Project's page keeps it — never while viewing as somebody.
+  const newProject = useMemo(() => {
+    if (user.viewingAs || !opensPath(navUser.tabs, '/marketing/new')) return false
+    const acting = user.closed?.length ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, '/marketing/new') } : user
+    return canDo(acting, 'marketing', 'create')
+  }, [user, navUser.tabs])
   const active = pending ?? mktNavActive(pathname, search)
   const own = pathname === '/marketing' || pathname.startsWith('/marketing/')
   const personal = user.personalLogin === true && !user.viewingAs
@@ -134,6 +142,7 @@ export default function MktShell({
             unread={shell?.notices ?? 0}
             bellOn={panel === 'notifications'}
             onBell={() => toggle('notifications')}
+            newProject={newProject}
           />
         </div>
         <div className={s.frame} data-hrv-overlay="">

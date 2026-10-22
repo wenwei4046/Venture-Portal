@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRef, useState } from 'react'
 import type { User } from '@/types'
 import { setViewAs } from '@/components/layout/view-as-actions'
@@ -9,8 +10,9 @@ import { MeDesktop } from '@/components/me/MeDesktop'
 import MktSearch from './MktSearch'
 import s from './shell.module.css'
 
-// Marketing's top bar (`Marketing Shell.dc.html`): the page's crumb, the search, then on the right — for a login of
-// one's own, Me (today's punch, one's leave and payslips) and one's memos, as in every view — the bell. An account
+// Marketing's top bar (`Marketing Shell.dc.html`): the page's crumb, the search, then on the right — + New Project for
+// whoever may start one, for a login of one's own Me (today's punch, one's leave and payslips) and one's memos, as in
+// every view — the bell. An account
 // that may switch views (the Principal's) picks the view here, as on HR's and Finance's bars.
 
 const VIEWING = '__viewing'
@@ -22,6 +24,7 @@ export default function MktTopBar({
   unread,
   bellOn,
   onBell,
+  newProject,
 }: {
   user: User
   crumb: { emoji: string; label: string }
@@ -29,6 +32,8 @@ export default function MktTopBar({
   unread: number
   bellOn: boolean
   onBell: () => void
+  /** Marketing · Create on New Project's page: its button. */
+  newProject: boolean
 }) {
   return (
     <div className={s.top} data-mkt-own="">
@@ -40,6 +45,12 @@ export default function MktTopBar({
       <div className={s.grow} />
       <div className={s.right}>
         {user.canSwitchView ? <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} /> : null}
+        {newProject ? (
+          <Link href="/marketing/new" className={s.newBtn}>
+            <span className={s.newPlus} aria-hidden="true">+</span>
+            <span>New Project</span>
+          </Link>
+        ) : null}
         {personal ? <MeDesktop hostLabel="Marketing" /> : null}
         {personal ? <MemoBell /> : null}
         <button

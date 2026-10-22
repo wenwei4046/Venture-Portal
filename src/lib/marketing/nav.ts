@@ -57,6 +57,8 @@ const under = (path: string, prefix: string) => path === prefix || path.startsWi
 export function mktNavActive(pathname: string, search: URLSearchParams | null): MktNavKey | `sub:${string}` | null {
   const path = pathname.split('?')[0]
   if (path === '/marketing/projects' && search?.get('sub')) return `sub:${search.get('sub')}`
+  // New Project is the Projects tab's page.
+  if (path === '/marketing/new') return 'projects'
   let best: MktNavRow | null = null
   for (const r of MKT_NAV) {
     if (!r.href || !under(path, r.href)) continue
@@ -68,6 +70,7 @@ export function mktNavActive(pathname: string, search: URLSearchParams | null): 
 /** The top bar's crumb for a page: its row's emoji and words, or the page's own. */
 export function mktCrumb(pathname: string): { emoji: string; label: string } {
   const path = pathname.split('?')[0]
+  if (path === '/marketing/new') return { emoji: '📁', label: 'Projects / New project' }
   const row = MKT_NAV.filter(r => r.href && under(path, r.href)).sort((a, b) => (b.href ?? '').length - (a.href ?? '').length)[0]
   if (row) return { emoji: row.emoji, label: row.label }
   const other: Record<string, { emoji: string; label: string }> = {

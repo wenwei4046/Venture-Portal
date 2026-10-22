@@ -191,6 +191,7 @@ export const PAGE_TABS = {
   // ── Marketing view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup") ──
   '/marketing': ['mkt.overview'],
   '/marketing/calendar': ['mkt.calendar'],
+  '/marketing/new': ['mkt.projects'],
   '/marketing/projects': ['mkt.projects'],
   '/marketing/projects/[id]': ['mkt.projects'],
   '/marketing/tracking': ['mkt.tracking'],
