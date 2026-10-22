@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261022150000_people_edit_login_email.sql
+-- 20261022150100_people_edit_login_email.sql
 -- HR edits a login's email on the person's page (2026-10-22 — the user, circling Contact › Email on CHEA HUAN's page,
 -- locked behind its padlock and Login chip: "i want the email can be editable, for hr").
 -- ============================================================================

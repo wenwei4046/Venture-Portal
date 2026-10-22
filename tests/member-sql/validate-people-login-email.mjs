@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261022150000 (HR edits a login's email on the person's page, 2026-10-22 — the user:
+// Local PostgreSQL regression for 20261022150100 (HR edits a login's email on the person's page, 2026-10-22 — the user:
 // "i want the email can be editable, for hr"). The portal asks person_login_email_move(staff, email) under the
 // editor's session, moves the login in the auth server (the service role — not here), then person_login_email_set
 // writes the login row and the People record, only once the login already signs in with the new email. Both ask
@@ -146,7 +146,7 @@ $function$;
     P_OLD_PRINCIPAL, OLD_PRINCIPAL_LOGIN, TITLE_NONE, P_NO_LOGIN])
 
   // ── The migration, verbatim — twice: the second run changes nothing ───────────────────────────────
-  const sql = (await readFile(new URL('20261022150000_people_edit_login_email.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const sql = (await readFile(new URL('20261022150100_people_edit_login_email.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(sql)
   const bodies = async () => q("SELECT proname, md5(prosrc) FROM pg_proc WHERE proname LIKE 'person_login_email_%' ORDER BY 1")
   const first = await bodies()

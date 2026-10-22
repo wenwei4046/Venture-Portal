@@ -43,7 +43,7 @@ export async function moveLoginForApproval(requestId: string): Promise<LoginMove
 /**
  * The same job when HR changes a login's email on the person's page (2026-10-22, the user: "i want the email can be
  * editable, for hr"), asked in the same order: never while viewing as somebody; the database, under the editor's own
- * session — may this editor move this person's login to that email (`person_login_email_move()`, mig 20261022150000:
+ * session — may this editor move this person's login to that email (`person_login_email_move()`, mig 20261022150100:
  * People · Edit on their page, a full-access title only by whoever manages permissions, never another login's
  * email)? — then the auth server, unless the login signs in with it already. `none`: they have no login, and the
  * email is the record's own. The record and the login row take it afterwards (`person_login_email_set()`, only once
