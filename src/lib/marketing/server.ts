@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
 import { mktNoticesFromRow, type MktNotice } from './shell'
+import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
@@ -34,6 +35,14 @@ export async function readWorkflows(): Promise<WfTemplate[]> {
   const { data, error } = await db.rpc('mkt_workflows')
   if (error) throw new Error(error.message)
   return workflowsFromRow(data)
+}
+
+/** The Minutes Builder's templates with their drafts (mig 20261023235800) — Marketing · Manage. */
+export async function readMinutesTemplates(): Promise<MinutesTemplate[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_templates')
+  if (error) throw new Error(error.message)
+  return minutesTemplatesFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

@@ -7,14 +7,15 @@ import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
+import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
 /**
- * Marketing's writes (2026-10-23, migs 20261023234000 and 20261023235500) — New Project's quick and recurring tasks, a
- * stage accepted, worked, handed on, approved or sent back, Nudge, a series paused or ended, the Free space; the
- * Workflow Builder's templates saved, published and cloned. Each asks its gate here and its cell again in the
- * database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production masks
- * a thrown message).
+ * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500 and 20261023235800) — New Project's quick and
+ * recurring tasks, a stage accepted, worked, handed on, approved or sent back, Nudge, a series paused or ended, the
+ * Free space; the Workflow Builder's and the Minutes Builder's templates saved, published (and a workflow cloned).
+ * Each asks its gate here and its cell again in the database, which also decides whose stage it is. A refusal answers
+ * `{ ok: false, reason }` in words (production masks a thrown message).
  */
 export type Done<T = object> = ({ ok: true } & T) | { ok: false; reason: string }
 
@@ -180,6 +181,39 @@ export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; t
   revalidatePath('/marketing', 'layout')
   const r = (data ?? {}) as { id?: string; tname?: string }
   return { ok: true, id: String(r.id ?? ''), tname: String(r.tname ?? ''), workflows: await freshWorkflows(db) }
+}
+
+/** The Minutes Builder's templates as they now stand (mig 20261023235800); null when they cannot be read. */
+async function freshMinutes(db: SupabaseClient): Promise<MinutesTemplate[] | null> {
+  const { data, error } = await db.rpc('mkt_minutes_templates')
+  return error ? null : minutesTemplatesFromRow(data)
+}
+
+/** A minutes template made (`id` null: its name, first fields and rules), or what changed of its draft saved — `rev`,
+ * the draft the builder last saw; a draft somebody saved since is not written over. */
+export async function saveMktMinutes(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; rev: number; templates: MinutesTemplate[] | null }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (id !== null && !isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (id !== null && !Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_save', { p_id: id, p_rev: id === null ? null : rev, p_patch: patch })
+  if (error) return { ok: false, reason: words(error, 'The template could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; rev?: number }
+  // A new template: the list again, so the builder shows it where it belongs.
+  return { ok: true, id: String(r.id ?? ''), rev: Number(r.rev ?? 1), templates: id === null ? await freshMinutes(db) : null }
+}
+
+/** The minutes template's draft, as its publisher saw it, published as its next version. */
+export async function publishMktMinutes(id: string, rev: number): Promise<Done<{ version: number }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const { data, error } = await (await client()).rpc('mkt_minutes_publish', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The template could not be published. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, version: Number((data as { version?: number } | null)?.version ?? 0) }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */
