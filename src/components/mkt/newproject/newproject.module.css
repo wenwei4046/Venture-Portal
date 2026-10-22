@@ -89,3 +89,16 @@
   .page { padding: 20px 16px 56px; }
   .steps { overflow-x: auto; }
 }
+
+/* 📦 Product project: the products on sale (the handoff's product grid). */
+.products { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.productCard {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border-radius: 10px; border: 1.5px solid rgb(var(--mk-line-2));
+  background: rgb(var(--mk-white)); cursor: pointer; text-align: left; font: inherit; color: inherit; transition: border-color .15s, background-color .15s;
+}
+.productCard:hover { border-color: rgb(var(--mk-hover-line)); }
+.productTop { display: flex; align-items: center; gap: 8px; width: 100%; }
+.grow { flex: 1; }
+.kindChip { font-size: .74em; padding: 2px 8px; border-radius: 5px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); white-space: nowrap; }
+.productMeta { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 2px; }
+.noProducts { display: flex; align-items: center; gap: 12px; padding: 18px; border-radius: 12px; border: 1.5px dashed rgb(var(--mk-dash)); color: rgb(var(--mk-muted)); font-size: .92em; }

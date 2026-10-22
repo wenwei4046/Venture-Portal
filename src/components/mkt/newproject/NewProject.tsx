@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { longDay, type MktSub } from '@/lib/marketing/board'
-import { createMktTask } from '@/lib/marketing/actions'
+import { createMktTask, startMktProduct } from '@/lib/marketing/actions'
+import type { ProductPick } from '@/lib/marketing/project'
 import {
   defaultRule, DAY_NAMES, ENDS, FREQS, INTERVALS, MONTH_DAYS, periodText, recurPreview, rulePayload, ruleText, type RecurRule,
 } from '@/lib/marketing/recur'
@@ -14,8 +15,8 @@ import s from './newproject.module.css'
 
 // New Project (`New Project.dc.html`): pick who it is for, then what is being started — a ⚡ Quick task or a 🔁
 // Recurring task (its Repeat: every day / week / month, from a start, until a day, for so many runs or for good), its
-// title, type and what needs to be done, and its stages (the quick Workflow Builder). 📦 Product projects come with the
-// builders (Products, Workflows, Minutes). Created, the task opens.
+// title, type and what needs to be done, and its stages (the quick Workflow Builder) — or a 📦 Product project (the
+// manager's): a product on sale, whose intake meeting minutes open next. Created, the task (or the project) opens.
 
 type Mode = 'product' | 'task' | 'recurring'
 
@@ -34,6 +35,7 @@ export default function NewProject({
   approvers,
   holidays,
   firstSub,
+  products,
 }: {
   today: string
   me: string | null
@@ -43,11 +45,14 @@ export default function NewProject({
   holidays: string[]
   /** A subsidiary to start on (?sub=CODE). */
   firstSub: string | null
+  /** The products on sale — null when the viewer may not start a product project (the manager's). */
+  products: ProductPick[] | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [sub, setSub] = useState(firstSub ?? subs[0]?.id ?? '')
   const [mode, setMode] = useState<Mode>('task')
+  const [product, setProduct] = useState(products?.[0]?.id ?? '')
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TaskType>('social')
   const [brief, setBrief] = useState('')
@@ -58,16 +63,19 @@ export default function NewProject({
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
+  const isProduct = mode === 'product'
+  const picked = products?.find(p => p.id === product) ?? null
   const subName = subs.find(x => x.id === sub)?.name ?? ''
   const base = isRec ? rule.start : today
   const dates = stageDates(base, stages.map(x => x.sla), hol)
   const problems = stageProblems(stages)
   const preview = recurPreview(rule)
   const titleOk = !!title.trim()
-  const ready = titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok)
+  const ready = isProduct ? !!sub && !!picked : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok)
 
   let hint = ''
-  if (!titleOk) hint = 'Add a task title'
+  if (isProduct) hint = picked ? `${subName} · ${picked.name} · ${picked.intake.name} minutes` : 'Pick a product'
+  else if (!titleOk) hint = 'Add a task title'
   else if (problems.length) hint = problems[0] === 'A stage has no person' ? 'Every stage needs a name and a person' : problems[0]
   else if (isRec && !preview.ok) hint = 'Pick at least one day inside the period'
   else if (isRec) hint = `${subName} · Recurring · ${ruleText(rule)} · ${preview.count.toLowerCase()}`
@@ -78,6 +86,17 @@ export default function NewProject({
   const create = () => {
     if (!ready || pending) return
     setError(null)
+    if (isProduct) {
+      start(async () => {
+        const r = await startMktProduct(sub, product)
+        if (!r.ok) {
+          setError(r.reason)
+          return
+        }
+        router.push(`/marketing/projects/${r.track}`)
+      })
+      return
+    }
     start(async () => {
       const r = await createMktTask({
         sub,
@@ -133,7 +152,7 @@ export default function NewProject({
       <div className={s.label}>What are you starting?</div>
       <div className={s.modes} role="radiogroup" aria-label="What are you starting">
         {MODES.map(m => {
-          const off = m.key === 'product'
+          const off = m.key === 'product' && products === null
           return (
             <button
               key={m.key}
@@ -147,7 +166,7 @@ export default function NewProject({
               <span className={s.modeIcon}>{m.icon}</span>
               <span className={s.cardText}>
                 <span className={s.modeName} style={{ display: 'block' }}>{m.name}</span>
-                {off ? <span className={s.soon}>Not built yet</span> : null}
+                {off ? <span className={s.soon}>Manager only</span> : null}
               </span>
               <span className={`${s.radio}${mode === m.key ? ` ${s.radioOn}` : ''}`} style={{ marginTop: 2 }} />
             </button>
@@ -155,6 +174,33 @@ export default function NewProject({
         })}
       </div>
 
+      {isProduct ? (
+        <>
+          <div className={s.label}>Product</div>
+          {products?.length ? (
+            <div className={s.products} role="radiogroup" aria-label="Product">
+              {products.map(p => (
+                <button key={p.id} type="button" role="radio" aria-checked={product === p.id} className={`${s.productCard}${product === p.id ? ` ${s.cardOn}` : ''}`} onClick={() => setProduct(p.id)}>
+                  <span className={s.productTop}>
+                    <span className={s.kindChip}>{p.kind === 'recurring' ? 'Recurring monthly' : 'One-time project'}</span>
+                    <span className={s.grow} />
+                    <span className={`${s.radio}${product === p.id ? ` ${s.radioOn}` : ''}`} />
+                  </span>
+                  <span className={s.cardName}>{p.name}</span>
+                  {p.note ? <span className={s.cardSub}>{p.note}</span> : null}
+                  <span className={s.productMeta}>{p.intake.fields} intake field{p.intake.fields === 1 ? '' : 's'} · {p.actions} action{p.actions === 1 ? '' : 's'}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={s.noProducts}>
+              <span>No products on sale</span>
+              <Link href="/marketing/products" className={s.crumbLink}>Product Builder →</Link>
+            </div>
+          )}
+        </>
+      ) : (
+      <>
       <div className={s.box}>
         <label className={s.field}>
           <span className={s.fieldLabel}>Task title</span>
@@ -275,11 +321,13 @@ export default function NewProject({
       ) : null}
 
       <StageBuilder stages={stages} onChange={setStages} people={people} approvers={approvers} me={me} start={base} holidays={hol} />
+      </>
+      )}
 
       <div className={s.footer}>
         {error ? <span className={`${s.hint} ${s.hintRed}`} role="alert">{error}</span> : <span className={`${s.hint}${ready ? '' : ` ${s.hintRed}`}`}>{hint}</span>}
         <button type="button" className={s.primary} disabled={!ready || pending} onClick={create}>
-          {pending ? 'Creating…' : isRec ? 'Create recurring task →' : 'Create task & open →'}
+          {pending ? (isProduct ? 'Opening…' : 'Creating…') : isProduct ? 'Open meeting minutes →' : isRec ? 'Create recurring task →' : 'Create task & open →'}
         </button>
       </div>
     </div>

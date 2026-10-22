@@ -373,6 +373,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Product Builder (mig 20261023235900): the products — and their prices — read, saved, published, retired
   // and reactivated, all by Marketing · Manage.
   'mkt_products', 'mkt_product_save', 'mkt_product_publish', 'mkt_product_status',
+  // Marketing's product projects (mig 20261024002000): the products on sale and a project started by Marketing · Manage;
+  // its page read by View; its intake minutes written and sent, started before approval, resent by Manage; signed by an
+  // attendee (Edit).
+  'mkt_product_picker', 'mkt_product_start', 'mkt_product_project', 'mkt_minutes_fill', 'mkt_minutes_sign', 'mkt_minutes_send',
+  'mkt_project_override', 'mkt_project_resend',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

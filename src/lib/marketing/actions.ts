@@ -9,13 +9,15 @@ import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPa
 import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
+import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
 /**
- * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800 and 20261023235900) — New
+ * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900 and 20261024002000) — New
  * Project's quick and recurring tasks, a stage accepted, worked, handed on, approved or sent back, Nudge, a series
  * paused or ended, the Free space; the Workflow Builder's, the Minutes Builder's and the Product Builder's drafts saved
- * and published (a workflow cloned, a product retired or reactivated). Each asks its gate here and its cell again in
+ * and published (a workflow cloned, a product retired or reactivated); a 📦 product project started, its intake minutes
+ * written, signed, sent to the PIC, started before approval, resent. Each asks its gate here and its cell again in
  * the database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production
  * masks a thrown message).
  */
@@ -265,6 +267,83 @@ export async function setMktProductStatus(id: string, to: 'retire' | 'reactivate
   revalidatePath('/marketing', 'layout')
   const r = (data ?? {}) as { status?: string; retiredOn?: string; live?: number }
   return { ok: true, status: r.status === 'retired' ? 'retired' : 'active', retiredOn: r.retiredOn ? String(r.retiredOn) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
+}
+
+/** A product project's page as it now stands, for the page that wrote it. */
+async function freshProject(db: SupabaseClient, project: string): Promise<ProductProjectPage | null> {
+  const { data, error } = await db.rpc('mkt_product_project', { p_key: project })
+  return error ? null : productProjectFromRow(data)
+}
+
+/** New Project › 📦 Product project: made on the product's version in effect, its intake minutes ready to fill in. */
+export async function startMktProduct(sub: string, product: string): Promise<Done<{ id: string; track: string }>> {
+  await requireActionOn('/marketing/new', 'marketing', 'manage')
+  if (!isId(sub)) return { ok: false, reason: 'Pick who the project is for.' }
+  if (!isId(product)) return { ok: false, reason: 'Pick a product.' }
+  const { data, error } = await (await client()).rpc('mkt_product_start', { p_sub: sub, p_product: product })
+  if (error) return { ok: false, reason: words(error, 'The project could not be started. Please try again.') }
+  freshen()
+  const r = (data ?? {}) as { id?: string; track?: string }
+  return { ok: true, id: String(r.id ?? ''), track: String(r.track ?? '') }
+}
+
+/** Minutes written: only what changed, on the minutes the page last saw. A change the PIC sees after they approved sends
+ * the project back to them — the page then comes back as it now stands. */
+export async function fillMktMinutes(minutes: string, project: string, rev: number, patch: Record<string, unknown>): Promise<Done<{ rev: number; reapproval: boolean; page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_fill', { p_minutes: minutes, p_rev: rev, p_patch: patch })
+  if (error) return { ok: false, reason: words(error, 'The minutes could not be saved. Please try again.') }
+  const r = (data ?? {}) as { rev?: number; reapproval?: boolean }
+  if (r.reapproval) freshen()
+  return { ok: true, rev: Number(r.rev ?? rev + 1), reapproval: r.reapproval === true, page: r.reapproval ? await freshProject(db, project) : null }
+}
+
+/** An attendee signs the minutes, as themselves. */
+export async function signMktMinutes(minutes: string, project: string): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_minutes_sign', { p_minutes: minutes })
+  if (error) return { ok: false, reason: words(error, 'The minutes could not be signed. Please try again.') }
+  return { ok: true, page: await freshProject(db, project) }
+}
+
+/** The intake minutes sent: the tracking link made, the project waits for the PIC (or, with no PIC sign-off, is approved). */
+export async function sendMktMinutes(minutes: string, project: string, rev: number): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_minutes_send', { p_minutes: minutes, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The minutes could not be sent. Please try again.') }
+  freshen()
+  return { ok: true, page: await freshProject(db, project) }
+}
+
+/** Started before the PIC approves — the reason kept in the trail. */
+export async function overrideMktProject(project: string, reason: string): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_project_override', { p_project: project, p_reason: String(reason ?? '') })
+  if (error) return { ok: false, reason: words(error, 'It could not be started. Please try again.') }
+  freshen()
+  return { ok: true, page: await freshProject(db, project) }
+}
+
+/** Sent to the PIC again, after the changes they asked for. */
+export async function resendMktProject(project: string): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_project_resend', { p_project: project })
+  if (error) return { ok: false, reason: words(error, 'It could not be resent. Please try again.') }
+  freshen()
+  return { ok: true, page: await freshProject(db, project) }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */
