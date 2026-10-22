@@ -6,6 +6,7 @@ import { boardFromRow, type MktBoard } from './board'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
+import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
@@ -53,6 +54,22 @@ export async function readProducts(): Promise<ProductBook> {
   const { data, error } = await db.rpc('mkt_products')
   if (error) throw new Error(error.message)
   return productBookFromRow(data)
+}
+
+/** New Project's products on sale, each at its version in effect (mig 20261024002000) — Marketing · Manage. */
+export async function readProductPicks(): Promise<ProductPick[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_picker')
+  if (error) throw new Error(error.message)
+  return productPicksFromRow(data)
+}
+
+/** A product project's page — its product, its minutes, its trail (mig 20261024002000); null when none. */
+export async function readProductProject(key: string): Promise<ProductProjectPage | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_project', { p_key: key })
+  if (error) throw new Error(error.message)
+  return productProjectFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

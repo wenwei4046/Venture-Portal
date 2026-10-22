@@ -156,7 +156,7 @@ export function personFromRow(p: Record<string, unknown>): MktPerson {
     id: str(p.id),
     user: strOrNull(p.user),
     full: str(p.full),
-    first: str(p.first) || str(p.full).split(/s+/)[0] || '',
+    first: str(p.first) || str(p.full).trim().split(/\s+/)[0] || '',
     title: strOrNull(p.title),
     team: TEAMS.includes(p.team as MktTeam) ? (p.team as MktTeam) : null,
     role: strOrNull(p.role),
