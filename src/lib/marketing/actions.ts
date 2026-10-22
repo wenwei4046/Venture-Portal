@@ -8,14 +8,16 @@ import { createClient } from '@/lib/supabase/server'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
+import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
 /**
- * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500 and 20261023235800) — New Project's quick and
- * recurring tasks, a stage accepted, worked, handed on, approved or sent back, Nudge, a series paused or ended, the
- * Free space; the Workflow Builder's and the Minutes Builder's templates saved, published (and a workflow cloned).
- * Each asks its gate here and its cell again in the database, which also decides whose stage it is. A refusal answers
- * `{ ok: false, reason }` in words (production masks a thrown message).
+ * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800 and 20261023235900) — New
+ * Project's quick and recurring tasks, a stage accepted, worked, handed on, approved or sent back, Nudge, a series
+ * paused or ended, the Free space; the Workflow Builder's, the Minutes Builder's and the Product Builder's drafts saved
+ * and published (a workflow cloned, a product retired or reactivated). Each asks its gate here and its cell again in
+ * the database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production
+ * masks a thrown message).
  */
 export type Done<T = object> = ({ ok: true } & T) | { ok: false; reason: string }
 
@@ -146,7 +148,8 @@ async function freshWorkflows(db: SupabaseClient): Promise<WfTemplate[] | null> 
 /** A template made (`id` null: its action, name and first stages), or what changed of its draft saved — `rev`, the draft
  * the builder last saw; a draft somebody saved since is not written over. */
 export async function saveMktWorkflow(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; rev: number; workflows: WfTemplate[] | null }>> {
-  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  // The Product Builder makes an action's Standard template too (+ New action workflow).
+  await requireActionOn(['/marketing/workflows', '/marketing/products'], 'marketing', 'manage')
   if (id !== null && !isId(id)) return { ok: false, reason: 'That template is not there any more.' }
   if (id !== null && !Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
@@ -214,6 +217,54 @@ export async function publishMktMinutes(id: string, rev: number): Promise<Done<{
   if (error) return { ok: false, reason: words(error, 'The template could not be published. Please try again.') }
   revalidatePath('/marketing', 'layout')
   return { ok: true, version: Number((data as { version?: number } | null)?.version ?? 0) }
+}
+
+/** The Product Builder's book as it now stands (mig 20261023235900); null when it cannot be read. */
+async function freshProducts(db: SupabaseClient): Promise<ProductBook | null> {
+  const { data, error } = await db.rpc('mkt_products')
+  return error ? null : productBookFromRow(data)
+}
+
+/** A product made (`id` null — its code made too), or what changed of its draft saved — `rev`, the draft the builder
+ * last saw; a draft somebody saved since is not written over; a retired product is read-only. */
+export async function saveMktProduct(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; code: string; rev: number; book: ProductBook | null }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (id !== null && !isId(id)) return { ok: false, reason: 'That product is not there any more.' }
+  if (id !== null && !Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_save', { p_id: id, p_rev: id === null ? null : rev, p_patch: patch })
+  if (error) return { ok: false, reason: words(error, 'The product could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; code?: string; rev?: number }
+  // A new product: the book again, so the builder shows it where it belongs.
+  return { ok: true, id: String(r.id ?? ''), code: String(r.code ?? ''), rev: Number(r.rev ?? 1), book: id === null ? await freshProducts(db) : null }
+}
+
+/** The product's draft, as its publisher saw it, published as its next version — on sale from the day it takes effect. */
+export async function publishMktProduct(id: string, rev: number): Promise<Done<{ version: number; effectiveFrom: string | null; live: number; book: ProductBook | null }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That product is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_publish', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The product could not be published. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { version?: number; effectiveFrom?: string; live?: number }
+  return { ok: true, version: Number(r.version ?? 0), effectiveFrom: r.effectiveFrom ? String(r.effectiveFrom) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
+}
+
+/** A product retired (picked for no new project; those running keep their version) or reactivated. */
+export async function setMktProductStatus(id: string, to: 'retire' | 'reactivate'): Promise<Done<{ status: ProductStatus; retiredOn: string | null; live: number; book: ProductBook | null }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That product is not there any more.' }
+  if (to !== 'retire' && to !== 'reactivate') return { ok: false, reason: 'Retire or reactivate.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_status', { p_id: id, p_to: to })
+  if (error) return { ok: false, reason: words(error, 'The product could not be changed. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { status?: string; retiredOn?: string; live?: number }
+  return { ok: true, status: r.status === 'retired' ? 'retired' : 'active', retiredOn: r.retiredOn ? String(r.retiredOn) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */
