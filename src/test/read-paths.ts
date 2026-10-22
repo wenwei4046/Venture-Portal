@@ -367,6 +367,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Workflow Builder (mig 20261023235500): the templates read, saved, published and cloned — all by
   // Marketing · Manage.
   'mkt_workflows', 'mkt_workflow_save', 'mkt_workflow_publish', 'mkt_workflow_clone',
+  // Marketing's Minutes Builder (mig 20261023235800): the minutes templates read, saved and published — all by
+  // Marketing · Manage.
+  'mkt_minutes_templates', 'mkt_minutes_save', 'mkt_minutes_publish',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
