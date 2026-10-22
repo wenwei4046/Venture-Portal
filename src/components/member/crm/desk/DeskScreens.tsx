@@ -8,7 +8,7 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
 import { fetchCrmChannels, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
@@ -239,6 +239,24 @@ export default function DeskScreens(p: DeskScreensProps) {
     synced.current = Date.now();
     void act.metaAds(true).then(rows => { if (rows) patch({ addAdList: rows }); });
   }, [ui.tab, live, data.can.manage, act, patch]);
+
+  // Ads Performance reads Ads Manager's figures for the range on screen (and the compare range) — spend, cost per lead …
+  // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
+  const apNeedKey = JSON.stringify(v.apNeed ?? []);
+  const asked = useRef(new Set<string>());
+  useEffect(() => {
+    if (ui.tab !== "adsperf" || !live || !data.can.manage) return;
+    for (const n of (v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]) {
+      const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
+      if (!ids.length) continue;
+      ids.forEach(id => asked.current.add(`${n.key}|${id}`));
+      void fetchAdInsights(ids, n.since, n.until).then(r => {
+        const figs = r.ok ? r.figs : Object.fromEntries(ids.map(id => [id, null]));
+        setUi(u => ({ ...u, apMeta: { ...u.apMeta, [n.key]: { ...(u.apMeta[n.key] ?? {}), ...figs } } }));
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.tab, live, data.can.manage, apNeedKey]);
 
   // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
   const seeded = useRef("");
