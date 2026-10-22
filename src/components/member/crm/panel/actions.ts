@@ -21,6 +21,8 @@ export interface PanelActions extends SalesActions {
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
+  /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
+  setLocked(staffId: string, on: boolean): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
@@ -78,6 +80,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
       setData(d => ({ ...d, ftRules: [...d.ftRules.filter(r => r.tlId !== tlId), { tlId, mode, days, vals }] }));
+      return true;
+    },
+    async setLocked(staffId, on) {
+      if (!(await write("crm_set_locked", { p_staff: staffId, p_locked: on }))) return false;
+      setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
       return true;
     },
     async setFullTime(staffId, on) {

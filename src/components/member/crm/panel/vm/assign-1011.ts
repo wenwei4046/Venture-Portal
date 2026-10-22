@@ -9,6 +9,8 @@ import type { CrmAdRule, CrmCustomer } from "@/lib/member/crm-data";
 import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
+import { lockedOf, sharedOut } from "../../shared/locked";
+import { DIRECTOR_SPLIT_KEY } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
@@ -22,12 +24,13 @@ function ticks(ctx: PanelCtx, tid: string): Record<string, number[]> {
   return v;
 }
 /** Full time people: anyone switched to full time in Member work type (any role, rev 1011 Profile). */
-export const ftPeople = (t: Team) => t.people.filter(p => p.fullTime);
+export const ftPeople = (t: Team, locked?: Set<string>) => t.people.filter(p => p.fullTime && !locked?.has(p.id));
 const who = (ps: Team["people"], v: Record<string, number[]>, d: number) => ps.filter(p => (v[p.id] ?? []).includes(d)).map(p => p.name);
 const lineOf = (names: string[]) => !names.length ? "" : names.length === 1 ? names[0] + " only" : names.join(", ") + " take turns";
 
 export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | undefined) {
   const { ui, patch, data, now, teams, act, nameOf } = ctx;
+  const lk = lockedOf(data);
   // 4a (T03): the sections are tabs under the title — Ads to teams first; Work type opens Profile's Member work type.
   const sec = ui.asSec ?? "Ads", go = (k: NonNullable<typeof ui.asSec>) => () => patch({ asSec: k });
   const urgent = (c: CrmCustomer) => {
@@ -79,14 +82,14 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     // Round 2 (rev 1011 §8): "Save and apply to all N teams" — off until somebody here has a day ticked.
     applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-follow)", applyCur: "default", applyAll: undefined as (() => void) | undefined,
     sum: teams.map(t => {
-      const v = ticks(ctx, t.id), ps = ftPeople(t), on = A7.filter(d => who(ps, v, d).length);
+      const v = ticks(ctx, t.id), ps = ftPeople(t, lk), on = A7.filter(d => who(ps, v, d).length);
       return { name: t.name, mode: on.length ? on.map(d => WKL[d]).join(", ") : "Off · follows Ads to teams", open: () => patch({ ftx: { tid: t.id, v: JSON.parse(JSON.stringify(v)) } }),
         rs: ps.map(p => ({ name: p.name, label: "", tagBg: "transparent", tagFg: "transparent",
           days: A7.map(d => { const o = (v[p.id] ?? []).includes(d); return { t: WK[d], bg: o ? "var(--crm-brown)" : "var(--crm-tint-follow)", fg: o ? "#fff" : "var(--crm-faint-2)" }; }) })) };
     }),
   };
   if (ft && fx) {
-    const ps = ftPeople(ft), v = fx.v, setV = (nv: Record<string, number[]>) => patch({ ftx: { ...fx, v: nv } });
+    const ps = ftPeople(ft, lk), v = fx.v, setV = (nv: Record<string, number[]>) => patch({ ftx: { ...fx, v: nv } });
     ftx.people = ps.map(p => ({ name: p.name, sub: `${jobTitle(p)} · Full time`, days: A7.map(d => {
       const o = (v[p.id] ?? []).includes(d);
       return { title: WKL[d], icon: o ? "m5 12 5 5 9-10" : "", bg: o ? "var(--crm-brown)" : "#fff", fg: "#fff", bd: o ? "var(--crm-brown)" : "var(--crm-line)",
@@ -106,7 +109,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     ftx.applyFg = pat.length ? "var(--crm-brown)" : "var(--crm-faint-2)"; ftx.applyBd = pat.length ? "var(--crm-brown)" : "var(--crm-tint-follow)"; ftx.applyCur = pat.length ? "pointer" : "default";
     ftx.applyAll = pat.length ? () => void (async () => {
       for (const t of teams) {
-        const tps = ftPeople(t);
+        const tps = ftPeople(t, lk);
         if (!tps.length) continue;
         const vv: Record<string, number[]> = {};
         tps.forEach(p => { vv[p.id] = t.id === ft.id ? (v[p.id] ?? []) : [...pat]; });
@@ -132,8 +135,10 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     // A % saved for the team as it was (somebody since joined or left) no longer adds up: it opens as an even share, as
     // a team never set does — it was Save's silent block (the owner, 2026-10-18: "为什么我调整后，save处于灰色？").
     const stored = ps.reduce((x, p) => x + (B0.pv[p.id] ?? 0), 0), touched = (B0.touch[t.id] ?? []).length > 0;
-    const stale = mode === "pct" && !touched && ps.some(p => B0.pv[p.id] != null) && stored !== 100;
-    const val = (p: Team["people"][number], k: number) => (stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
+    const whole = t.id === DIRECTOR_SPLIT_KEY ? data.people.filter(p => p.role === "hod") : (teams.find(x => x.id === t.id)?.people ?? []);
+    const lockedHere = whole.filter(p => lk.has(p.id)), scaled = mode === "pct" && !touched ? sharedOut(B0.pv, ps.map(p => p.id), lockedHere.length > 0) : null;
+    const stale = !scaled && mode === "pct" && !touched && ps.some(p => B0.pv[p.id] != null) && stored !== 100;
+    const val = (p: Team["people"][number], k: number) => (scaled ? scaled[p.id] ?? 0 : stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
     const sum = ps.reduce((x, p, k) => x + val(p, k), 0);
     // A team with nobody in it has nothing to split.
     const ok = !ps.length || mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
@@ -171,6 +176,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       }),
       sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
       sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
+      locked: lockedHere.length ? lockedHere.map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
     };
   }
   if (B && E && asv?.ae) {
@@ -187,6 +193,8 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       const shown = bp.inner.find(x => x.name === t.name);
       const es = evenShare(t.people.length || 1); t.people.forEach((p, k) => { pv[p.id] = shown ? Number(shown.people[k]?.v ?? 0) : B.pv[p.id] ?? (m === "pct" ? es(k) : 0); });
     });
+    // A locked member keeps their saved value for when they are unlocked (the dealer skips them meanwhile).
+    lk.forEach(id => { if (pv[id] == null && B.pv[id] != null) pv[id] = B.pv[id]; });
     if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
     const why = tot !== 100 ? "The teams add up to " + tot + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
     aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {

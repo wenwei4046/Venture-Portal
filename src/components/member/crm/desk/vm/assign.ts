@@ -12,6 +12,7 @@ import { first, initials, shortName, teamNameOf } from "./data";
 import { sendTo } from "./inbox";
 import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META, teamColours } from "./tokens";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
+import { lockedOf, sharedOut } from "../../shared/locked";
 
 const ago = (iso: string, now: Date) => { const m = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
   return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
@@ -23,10 +24,12 @@ const fromDb = (m: "even" | "pct" | "cnt" | undefined): InMode => (m === "even" 
 export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const { ui, set, patch, data, now, teams } = ctx;
   const sheetOpen = ui.stage !== "menu";
-  const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: t.people }));
+  // A member locked for now is on none of Assignment's lists — the split, Full time (2026-10-22, shared/locked.ts).
+  const lk = lockedOf(data), live = <P extends { id: string }>(ps: P[]) => ps.filter(p => !lk.has(p.id));
+  const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: live(t.people), all: t.people }));
   // An ad's split has one more row, the Revenue Director, its people the directors (the owner, 2026-10-16; mig 20261016010000).
   // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
-  const TA = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: ctx.directors }] : []), ...T];
+  const TA = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: live(ctx.directors), all: ctx.directors }] : []), ...T];
 
   // ── Organic Leads and Awaiting reply: the rows, Send to / Assign, Remind (D1 / D4).
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -50,7 +53,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const sf = ui.sendFor ? data.customers.find(c => c.id === ui.sendFor) : undefined;
   const sendGroups = [
     ...(ctx.directors.length ? [{ label: DIRECTOR_TEAM.toUpperCase(), color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: ctx.directors }] : []),
-    ...T.map(t => ({ label: t.name.toUpperCase(), color: t.color, tint: t.tint, people: t.people })),
+    ...T.map(t => ({ label: t.name.toUpperCase(), color: t.color, tint: t.tint, people: t.all })),
   ].map(g => ({ label: g.label, color: g.color, people: g.people.map((p, i) => ({ name: p.name, ini: initials(p.name), sub: g.label.charAt(0) + g.label.slice(1).toLowerCase(),
     bg: i === 0 ? g.color : g.tint, fg: i === 0 ? "#fff" : g.color,
     pick: () => { if (sf) void sendTo(ctx, sf.id, p.id, opItem === "Awaiting reply" ? "Moved" : "Sent").then(ok => { if (ok) patch({ sendFor: null, awChat: null }); }); } })) }));
@@ -81,8 +84,11 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   // split into the editor (the owner, 2026-10-16: Revenue Director set to 100% came back as 25% each — the automatic
   // first-ad open set only `ad`, so the editor drew the default split).
   const openAdById = (id: string) => { const rule = ruleOf(id);
+    // A By % team with somebody locked opens on what the others really get: their saved % scaled to 100.
+    const mv0: Record<string, number> = rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {};
+    if (rule) TA.forEach(t => { if (fromDb(rule.tm?.[t.id]) !== "pct") return; const s = sharedOut(rule.pp, t.people.map(p => p.id), t.all.some(p => lk.has(p.id))); if (s) Object.assign(mv0, s); });
     set(u => ({ ...u, ad: id, stage: "op", adLog: false, adMode: rule?.mode === "even" ? "evenly" : "team",
-      tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {},
+      tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: mv0,
       split: rule && rule.mode !== "even" ? { ...rule.split } : null })); };
   const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
     const m = fromDb(r.tm?.[t.id]), mem = t.people, val = (pid: string) => r.pp[pid] ?? 0;
@@ -134,6 +140,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     return { name: t.name, color: t.color, share: `${pctDefault[t.id] ?? 0}%`, field: m !== "evenly", unit: m === "pct" ? "%" : "max",
       note: m === "max" ? `Up to ${totalMax} leads in this team` : m === "pct" ? (totalPct === 100 ? "Adds up to 100%" : `Adds up to ${totalPct}% · needs 100%`) : `Shared evenly among ${mem.length} people`,
       noteColor: m === "pct" && totalPct !== 100 ? "var(--crm-oxblood)" : "var(--crm-brown)",
+      lockedNote: t.all.some(p => lk.has(p.id)) ? t.all.filter(p => lk.has(p.id)).map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
       members: mem.map((p, k) => { const key = `${t.id}|${m}|${p.id}`, val = valOf(t, m, p.id, k), taken = takenOf(p.id);
         return { name: p.name, value: val, valueStr: String(val),
           onVal: (e: { target: { value: string } }) => { const nv = Math.min(m === "pct" ? 100 : 999, parseInt(String(e.target.value).replace(/\D/g, ""), 10) || 0); set(u => ({ ...u, mv: { ...u.mv, [key]: nv } })); },
@@ -144,6 +151,9 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     if (mode === "evenly") return { mode: "even" as const, split: {}, pm: "pct" as const, pp: {}, tm: undefined };
     const pp: Record<string, number> = {}, tmo: Record<string, "even" | "pct" | "cnt"> = {};
     TA.forEach(t => { const m = inModeOf(t.id); tmo[t.id] = toDb(m); t.people.forEach((p, k) => { pp[p.id] = valOf(t, m, p.id, k); }); });
+    // A locked member keeps their saved value for when they are unlocked.
+    const saved = ad ? ruleOf(ad.id)?.pp ?? {} : {};
+    lk.forEach(id => { if (pp[id] == null && saved[id] != null) pp[id] = saved[id]; });
     return { mode: "split" as const, split: { ...pctDefault }, pm: "pct" as const, pp, tm: tmo };
   };
   const draftOk = mode === "evenly" || (Object.values(pctDefault).reduce((a2, n) => a2 + n, 0) === 100

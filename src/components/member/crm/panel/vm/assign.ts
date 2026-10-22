@@ -13,6 +13,7 @@ import { waitingByLevel } from "./overlays";
 import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 import { adRunning } from "@/lib/member/crm-ad-running";
+import { lockedOf } from "../../shared/locked";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Revenue Director" };
@@ -109,9 +110,11 @@ export function assignVM(ctx: PanelCtx) {
   const month = periodRange("month", null, now);
   // An ad's split has one more row, the Revenue Director, its people the directors — as the desktop's (the owner, 2026-10-16:
   // "新增了 revenue director 也加入可以获得广告名单"; mig 20261016010000, crm_director_key() = DIRECTOR_SPLIT_KEY).
-  const directors = data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name));
+  // A member locked for now is on none of Assignment's lists (2026-10-22, shared/locked.ts).
+  const lk = lockedOf(data);
+  const directors = data.people.filter(p => p.role === "hod" && !lk.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
   // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
-  const adTeams: Team[] = [...(directors.length ? [{ id: DIRECTOR_SPLIT_KEY, tl: directors[0], name: DIRECTOR_TEAM, who: directors.map(d => d.name).join(", "), c: DIRECTOR_C[0], tint: DIRECTOR_C[1], own: DIRECTOR_C[1], people: directors }] : []), ...teams];
+  const adTeams: Team[] = [...(directors.length ? [{ id: DIRECTOR_SPLIT_KEY, tl: directors[0], name: DIRECTOR_TEAM, who: directors.map(d => d.name).join(", "), c: DIRECTOR_C[0], tint: DIRECTOR_C[1], own: DIRECTOR_C[1], people: directors }] : []), ...teams.map(t => ({ ...t, people: t.people.filter(p => !lk.has(p.id)) }))];
 
   // Organic Leads: no rule placed them, so somebody has to.
   // Organic Leads: no team and not held Over the limit (a held lead keeps its team).
@@ -186,7 +189,7 @@ export function assignVM(ctx: PanelCtx) {
     .map((i, k) => ({ ...i, rule: k ? "1px solid var(--crm-tint-new)" : "0", open: () => patch({ lead: i.id, pick: "", toast: "" }) }));
 
   // Full time: per team, on chosen weekdays.
-  const rsOf = (t: Team) => t.people.filter(p => p.role === "rs" && p.fullTime);
+  const rsOf = (t: Team) => t.people.filter(p => p.role === "rs" && p.fullTime && !lk.has(p.id));
   const zeros = (t: Team) => Object.fromEntries(rsOf(t).map(p => [p.id, Object.fromEntries(ALL7.map(d => [d, 0]))])) as Record<string, Record<number, number>>;
   const cfgOf = (t: Team) => {
     const r = data.ftRules.find(x => x.tlId === t.id);

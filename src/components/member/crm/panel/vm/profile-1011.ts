@@ -10,12 +10,14 @@
  */
 import type { ChangeEvent, MouseEvent } from "react";
 import { jobTitle } from "../../shared/people";
+import { lockedOf } from "../../shared/locked";
 import { ini, stop, type PanelCtx } from "./common";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 
 
 export function memberWorkTypeVM(ctx: PanelCtx) {
   const { ui, patch, teams } = ctx;
+  const lk = lockedOf(ctx.data);
   // A switch changes the draft; Save writes what changed, Cancel drops it (the owner, 2026-10-18: "新加save按钮" — each
   // switch used to save itself the moment it was tapped).
   const draft = ui.ftsDraft ?? {}, cur = (p: { id: string; fullTime: boolean }) => draft[p.id] ?? p.fullTime;
@@ -35,6 +37,9 @@ export function memberWorkTypeVM(ctx: PanelCtx) {
         name: p.name, ini: ini(p.name), title: jobTitle(p), rule: k ? "1px solid var(--crm-rule-soft)" : "0",
         swBg: cur(p) ? "var(--crm-brown)" : "var(--crm-line)", swX: cur(p) ? "21px" : "3px",
         toggle: () => patch({ ftsDraft: { ...draft, [p.id]: !cur(p) } }),
+        // Lock: its own setting, saved at once (2026-10-22) — off Assignment's lists, the dealer skips them.
+        locked: lk.has(p.id),
+        lockToggle: (e: MouseEvent) => { e.stopPropagation(); const on = !lk.has(p.id); void ctx.act.setLocked(p.id, on).then(ok => { if (ok) patch({ toast: p.name + (on ? " locked · no new leads for now" : " unlocked") }); }); },
       })),
     })),
   };

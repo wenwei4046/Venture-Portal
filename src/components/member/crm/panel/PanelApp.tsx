@@ -1127,7 +1127,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                             <span style={{ width: "30px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{g.unit}</span>
                           </div>
                         </Fragment>))}
-                        <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>
+                        <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>{!!(g.locked) && (<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{g.locked}</span>)}
                       </>)}
                     </div>
                   </Fragment>))}
@@ -2325,7 +2325,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
                     <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{p.title}</small>
                   </span>
-                  <span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg, transition: "background 160ms" }}>
+                  <span role="button" onClick={p.lockToggle} aria-pressed={p.locked} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 9px", borderRadius: "13px", border: p.locked ? "1px solid var(--crm-oxblood)" : "1px solid var(--crm-line)", background: p.locked ? "var(--crm-tint-attention)" : "#fff", color: p.locked ? "var(--crm-oxblood)" : "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", cursor: "pointer" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d={p.locked ? "M7 11V7a5 5 0 0 1 10 0v4" : "M7 11V7a5 5 0 0 1 9.9-1"}></path></svg>{p.locked ? "Locked" : "Lock"}</span><span style={{ flex: "none", position: "relative", width: "44px", height: "26px", borderRadius: "13px", background: p.swBg, transition: "background 160ms" }}>
                     <span style={{ position: "absolute", top: "3px", left: p.swX, width: "20px", height: "20px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left 160ms" }}>
                     </span>
                   </span>
