@@ -53,8 +53,46 @@ export const PAYROLL_XFER_CODE = 'PY-XFER'
  *  吗?"; it previously landed on 9030 Salary Expense, splitting the report
  *  into two salary blocks). Note the funding drain is the dept's FULL CTC
  *  contribution (salary + statutory), so from July the 4070 row carries the
- *  whole packet while the 4071-4074 component rows simply end. */
+ *  whole packet while the 4071-4074 component rows simply end. Revenue's
+ *  rounds are split by account instead (below, 2026-10-22). */
 export const PAYROLL_EXPENSE_CODE = '4070'
+
+/** The department whose rounds to HR show by account (2026-10-22 — the user:
+ *  "我从revenue 的pool 交给hr 不能让他也跟着科目分开?" → "可以，只改 Revenue"):
+ *  its months before HR paid them (Aug, Sep) were Finance's own vouchers, by
+ *  account; every other department keeps the one 4070 row. */
+const SPLIT_PAYROLL_SEGMENT = 'revenue_department'
+/** Commission & Allowances takes what the accrual books net — the pay-line
+ *  deductions (the user: "那就remain 扣在commission & allowance") — and the cents. */
+const PAYROLL_REST_CODE = '9093'
+const MONTH_NO: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
+
+/** The month a round to HR pays for, off its pool row ("PV HV-PV-…: Payroll bank transfer — Sep 2026"): `2026-09`. */
+export function payrollMonthOf(description: string | null | undefined): string | null {
+  const m = /—\s*([A-Z][a-z]{2})[a-z]*\s+(\d{4})/.exec(description ?? '')
+  const mm = m ? MONTH_NO[m[1]] : undefined
+  return m && mm ? `${m[2]}-${mm}` : null
+}
+
+/**
+ * A round to HR split the way its month's accrual splits the pay: each account
+ * but Commission & Allowances takes its share — its accrual figure × the round
+ * ÷ what the month's rounds come to — and Commission & Allowances the rest.
+ * Null (one 4070 line, as before) without an accrual, or when the shares would
+ * come to more than the round.
+ */
+export function splitPayrollDrain(
+  drain: number,
+  funded: number,
+  accrual: Readonly<Record<string, number>>,
+): { code: string; amount: number }[] | null {
+  const codes = Object.keys(accrual).filter((c) => (accrual[c] ?? 0) > 0).sort()
+  if (codes.length === 0 || !(drain > 0) || !(funded > 0)) return null
+  const parts = codes.filter((c) => c !== PAYROLL_REST_CODE).map((code) => ({ code, amount: round2((accrual[code] * drain) / funded) }))
+  const rest = round2(drain - parts.reduce((s, p) => s + p.amount, 0))
+  if (rest < 0) return null
+  return [...parts, { code: PAYROLL_REST_CODE, amount: rest }].filter((p) => p.amount > 0).sort((a, b) => a.code.localeCompare(b.code))
+}
 
 export const payrollCustodyAccount: CoaAccount = {
   code: PAYROLL_XFER_CODE,
@@ -229,7 +267,7 @@ export async function fetchInterBillingCashFlow(
 ): Promise<{ lines: GlLine[]; account: CoaAccount; payrollAccount: CoaAccount }> {
   try {
     const POOL_COLUMNS = 'amount, created_at, description, departments!inner(name)'
-    const [payRead, recRead, custodyRead, fundRead, voidedRows, flagsRes, mirrorRes] = await Promise.all([
+    const [payRead, recRead, custodyRead, fundRead, voidedRows, flagsRes, mirrorRes, accrualRead] = await Promise.all([
       fetchAllRowsAsWritten((page) => {
         const q = supabase.from('dept_pools').select(POOL_COLUMNS).eq('transaction_type', 'inter_billing_out')
         return page ? q.order('created_at').order('id').range(page.from, page.to) : q
@@ -291,6 +329,19 @@ export async function fetchInterBillingCashFlow(
       // (In this batch since 2026-10-08 — it needs nothing from the reads
       // above; awaited after them it was one more round trip in a row.)
       supabase.rpc('bridge_mirror_slices' as never),
+      // Revenue's payroll accruals (2026-10-22): what each of its rounds to HR
+      // paid for. A read that fails leaves its rounds on one 4070 line — never
+      // the whole bridge.
+      fetchAllRows((from, to) =>
+        supabase
+          .from('journal_entries')
+          .select('transaction_date, journal_lines(account_code, debit)')
+          .eq('reference_type', 'payroll_accrual')
+          .eq('segment', SPLIT_PAYROLL_SEGMENT)
+          .eq('is_reversed', false)
+          .order('id')
+          .range(from, to),
+      ).catch(() => []),
     ])
     const banks = await bankCodes
     const bankCode = banks.has('3000') ? '3000' : (banks.values().next().value ?? '3000')
@@ -393,20 +444,49 @@ export async function fetchInterBillingCashFlow(
         .map((r) => pvrefPv(r.description))
         .filter((ref) => ref && !voided.has(ref)) as string[],
     )
+    // Revenue's rounds by account: its months' accruals (debits by account) and
+    // what its rounds for each month come to.
+    const accrualByMonth = new Map<string, Record<string, number>>()
+    for (const e of accrualRead as unknown as Array<{ transaction_date: string | null; journal_lines: Array<{ account_code: string | null; debit: number | string | null }> | null }>) {
+      const month = String(e.transaction_date ?? '').slice(0, 7)
+      if (!month) continue
+      const sums = accrualByMonth.get(month) ?? {}
+      for (const l of e.journal_lines ?? []) {
+        const amt = Number(l.debit ?? 0)
+        if (l.account_code && amt > 0) sums[l.account_code] = round2((sums[l.account_code] ?? 0) + amt)
+      }
+      accrualByMonth.set(month, sums)
+    }
+    const segmentOf = (deptName: string) => DEPT_TO_SEGMENT[deptName] ?? primedNameToSegment()[deptName]
+    const splitMonthOf = (r: PoolRow) =>
+      segmentOf((r.departments?.name as string) ?? '') === SPLIT_PAYROLL_SEGMENT ? payrollMonthOf(r.description) : null
+    const fundedByMonth = new Map<string, number>()
+    for (const r of fundRows) {
+      const ref = pvrefPv(r.description)
+      const month = splitMonthOf(r)
+      if (ref && custodyRefs.has(ref) && month) fundedByMonth.set(month, round2((fundedByMonth.get(month) ?? 0) + Number(r.amount ?? 0)))
+    }
+
     for (const r of fundRows) {
       const ref = pvrefPv(r.description)
       if (ref && custodyRefs.has(ref)) {
-        sides.push({
+        const side = {
           deptName: (r.departments?.name as string) ?? '',
-          amount: Number(r.amount ?? 0),
           date: String(r.created_at ?? '').slice(0, 10),
-          direction: 'out',
-          kind: 'payroll',
-          // Cash actually left this dept to fund payroll — direct-method cash
-          // flow calls that salary, so show it on 9030 rather than PY-XFER.
-          natureCode: PAYROLL_EXPENSE_CODE,
+          direction: 'out' as const,
+          kind: 'payroll' as const,
           sourceDesc: r.description,
-        })
+        }
+        const amount = round2(Number(r.amount ?? 0))
+        const month = splitMonthOf(r)
+        const parts = month ? splitPayrollDrain(amount, fundedByMonth.get(month) ?? 0, accrualByMonth.get(month) ?? {}) : null
+        if (parts) {
+          for (const p of parts) sides.push({ ...side, amount: p.amount, natureCode: p.code })
+        } else {
+          // Cash actually left this dept to fund payroll — direct-method cash
+          // flow calls that salary, so show it on 4070 rather than PY-XFER.
+          sides.push({ ...side, amount, natureCode: PAYROLL_EXPENSE_CODE })
+        }
       }
     }
     for (const r of custodyRows) {
