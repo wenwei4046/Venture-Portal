@@ -181,3 +181,59 @@ describe('the department filter and the full name', () => {
     expect(screen.getByText('LOO WEN WEI')).toBeInTheDocument()
   })
 })
+
+// 2026-10-22 — the user, circling the heads: "like press name, will be follow by alpahabe 排法， title will be follow
+// title 高到低 按多一次就低到高". Each band is sorted by the head pressed; pressed again, the other way.
+describe('a column head sorts each band', () => {
+  const roster: PersonRow[] = [
+    row({ id: 'c', name: 'Cara', code: 'HV008', title: 'Team Leader', levelRank: 7, levelName: 'L7' }),
+    row({ id: 'w', name: 'Wendy', code: 'HV009', title: 'Team Leader', levelRank: 7, levelName: 'L7' }),
+    row({ id: 'a', name: 'Ann', code: 'HV012', title: 'Revenue Specialist', levelRank: 3, levelName: 'L3' }),
+    row({ id: 'b', name: 'bella', code: 'HV030', title: 'Revenue Specialist', levelRank: 3, levelName: 'L3' }),
+    row({ id: 'l', name: 'LOO WEN WEI', code: 'HV001', title: 'CHIEF EXECUTIVE OFFICER', levelRank: 10, levelName: 'L10', department: 'Director' }),
+  ]
+  const draw = () => render(<PeopleDirectory people={roster} unattachedAccounts={[]} canSeeActivity={false} />)
+  /** The names on show, top to bottom. */
+  const order = () => {
+    const names = ['Cara', 'Wendy', 'Ann', 'bella', 'LOO WEN WEI'].map(n => screen.getByText(n))
+    return names.sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)).map(e => e.textContent)
+  }
+  const head = (label: string) => screen.getByRole('button', { name: label })
+  const sortOf = () => Object.fromEntries(screen.getAllByRole('columnheader').slice(0, 6).map(h => [h.textContent, h.getAttribute('aria-sort')]))
+
+  it('reads in the ladder’s order with no head sorting, every head a button', () => {
+    draw()
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    expect(sortOf()).toEqual({ Name: 'none', Title: 'none', Rank: 'none', Code: 'none', Employment: 'none', 'Last seen': 'none' })
+    expect(screen.getAllByRole('columnheader')[6]).not.toHaveAttribute('aria-sort')
+  })
+
+  it('Name: A→Z inside each band, case aside — pressed again, Z→A', () => {
+    draw()
+    fireEvent.click(head('Name'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Ann', 'bella', 'Cara', 'Wendy'])
+    expect(sortOf()).toMatchObject({ Name: 'ascending', Title: 'none' })
+    fireEvent.click(head('Name'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Wendy', 'Cara', 'bella', 'Ann'])
+    expect(sortOf()).toMatchObject({ Name: 'descending' })
+  })
+
+  it('Title: the most senior first — pressed again, the least senior first', () => {
+    draw()
+    fireEvent.click(head('Name'))
+    fireEvent.click(head('Title'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    expect(sortOf()).toMatchObject({ Name: 'none', Title: 'descending' })
+    fireEvent.click(head('Title'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Ann', 'bella', 'Cara', 'Wendy'])
+    expect(sortOf()).toMatchObject({ Title: 'ascending' })
+  })
+
+  it('Code: from HV001 up — pressed again, down', () => {
+    draw()
+    fireEvent.click(head('Code'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    fireEvent.click(head('Code'))
+    expect(order()).toEqual(['LOO WEN WEI', 'bella', 'Ann', 'Wendy', 'Cara'])
+  })
+})

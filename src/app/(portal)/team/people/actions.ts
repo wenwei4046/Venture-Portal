@@ -1,10 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payPatchForUpdate } from '@/lib/staff-form'
-import { LOGIN_EMAIL_LOCKED, asksPay, payModeOf } from '@/lib/person-record'
+import { asksPay, payModeOf } from '@/lib/person-record'
+import { moveBackUnlessWritten, moveLoginForPerson } from '@/lib/account/login-email'
 import { moveReportingLine } from '@/lib/hierarchy-writes'
 import { saveRecordAndLine } from '@/lib/person-line-save'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -229,9 +231,11 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
-  // Somebody who signs in signs in with this email: it is theirs to change,
-  // by a request from their app, never HR's here (2026-10-16).
-  if (sent('email') && current.user_id) throw new Error(LOGIN_EMAIL_LOCKED)
+  // Somebody who signs in signs in with this email. HR changes it here since
+  // 2026-10-22 ("i want the email can be editable, for hr") — and their login
+  // with it, below, never in the record's own update: the record, the login
+  // row and the auth server must never part.
+  const loginEmail = sent('email') && current.user_id ? text('email') : null
 
   const patch: TablesUpdate<'hr_staff_costs'> = {}
 
@@ -296,6 +300,7 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
   if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
   if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
   for (const key of ['contact_number', 'email', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {
+    if (key === 'email' && loginEmail !== null) continue
     if (sent(key)) patch[key] = trimOrNull(formData.get(key))
   }
   // The address, its six parts together (2026-10-20) — the one-line `address` is the database's to put together.
@@ -322,25 +327,53 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
     Object.assign(patch, { bank_name_2: second.bankName2, bank_account_no_2: second.bankAccountNo2 })
   }
 
+  // Every check above has passed: the login's email goes first, whole — so a
+  // refusal of it leaves the record as it was.
+  if (loginEmail !== null && (await saveLoginEmail(supabase, id, loginEmail)) === 'record') {
+    patch.email = trimOrNull(loginEmail)
+  }
+
   if (Object.keys(patch).length === 0) return
 
   const { error } = await supabase.from('hr_staff_costs').update(patch).eq('id', id)
 
   if (error) {
-    if (error.code === '23505') {
-      throw new Error(
-        error.message.includes('infotech')
+    const reason =
+      error.code === '23505'
+        ? error.message.includes('infotech')
           ? 'That InfoTech No already belongs to somebody else on the roster'
-          : 'Employee code already used by another active staff',
-      )
-    }
-    throw new Error(`Failed to update: ${error.message}`)
+          : 'Employee code already used by another active staff'
+        : `Failed to update: ${error.message}`
+    // Their email stands on its own: the login already signs in with it.
+    throw new Error(loginEmail !== null && !('email' in patch) ? `Their email is saved; the rest is not. ${reason}` : reason)
   }
 
   // A title assigns the rank (user, 2026-09-07), and since 2026-09-10 the
   // database does the assigning: `hr_staff_costs_one_line_sync` raises the
   // commission rank to the new title's floor (never lowers it) in the same
   // statement as the title write. Nothing to call, nothing to report.
+}
+
+/**
+ * A login's email, changed on the person's page (2026-10-22): the login moves
+ * first — the service role's one job (lib/account/login-email.ts), asked of the
+ * database under this editor's session — then the record and the login row
+ * take it together, only because the login signs in with it already; when they
+ * do not, the login moves back. `record`: they have no login after all, so the
+ * email is the record's own and goes with the rest.
+ */
+async function saveLoginEmail(supabase: Awaited<ReturnType<typeof createClient>>, id: string, email: string): Promise<'login' | 'record'> {
+  const move = await moveLoginForPerson(id, email)
+  if (move.kind === 'refused') throw new Error(move.reason)
+  if (move.kind === 'none') return 'record'
+  // The function postdates database.types.ts.
+  const { error } = await (supabase as unknown as SupabaseClient).rpc('person_login_email_set', { p_staff: id, p_email: move.to })
+  if (error) {
+    const stuck = await moveBackUnlessWritten(move, 'Save changes')
+    const reason = (error.code === '42501' || error.code === '22023') && error.message ? error.message : 'Their email could not be saved. Please try again.'
+    throw new Error(stuck ? `${reason} ${stuck}` : reason)
+  }
+  return 'login'
 }
 
 /**

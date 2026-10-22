@@ -185,6 +185,19 @@
   font-size: 13.5px;
 }
 
+/* A login's email, edited (2026-10-22): the field, and its Login word inside
+   it at the right — where the locked box wore it. */
+.tagged { position: relative; display: block; min-width: 0; }
+.tagged .input { padding-right: 78px; }
+.fieldTag {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 /* EPF: the part and the Exempt tick on one line. */
 .pair { display: flex; align-items: center; gap: 12px; }
 .pair .select { flex: 1 1 auto; min-width: 0; }

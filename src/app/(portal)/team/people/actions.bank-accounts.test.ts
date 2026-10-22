@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { insert, update, query, createClient } = vi.hoisted(() => {
+const { insert, update, query, rpc, createClient } = vi.hoisted(() => {
   const insert = vi.fn().mockResolvedValue({ error: null })
   const update = vi.fn()
+  const rpc = vi.fn().mockResolvedValue({ data: null, error: null })
   const query = {
     insert, update, error: null,
     select: vi.fn(), eq: vi.fn(),
@@ -11,9 +12,12 @@ const { insert, update, query, createClient } = vi.hoisted(() => {
   query.select.mockReturnValue(query)
   query.eq.mockReturnValue(query)
   update.mockReturnValue(query)
-  return { insert, update, query, createClient: vi.fn().mockResolvedValue({ from: vi.fn().mockReturnValue(query) }) }
+  return { insert, update, query, rpc, createClient: vi.fn().mockResolvedValue({ from: vi.fn().mockReturnValue(query), rpc }) }
 })
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
+// A login's email moves the login first (2026-10-22) — the service role's one job, which is server-only.
+const { moveLoginForPerson, moveBackUnlessWritten } = vi.hoisted(() => ({ moveLoginForPerson: vi.fn(), moveBackUnlessWritten: vi.fn() }))
+vi.mock('@/lib/account/login-email', () => ({ moveLoginForPerson, moveBackUnlessWritten }))
 const { gate } = vi.hoisted(() => ({ gate: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: gate, requireActionOn: gate, requireAnyActionOn: gate, requirePayrollPayoutsActionOn: gate }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -26,7 +30,6 @@ vi.mock('@/lib/hierarchy-writes', () => ({ moveReportingLine }))
 // Malaysia's postcode list, which the address is checked against (2026-10-20), is server-only.
 vi.mock('server-only', () => ({}))
 import { addStaff, updateStaff } from './actions'
-import { LOGIN_EMAIL_LOCKED } from '@/lib/person-record'
 
 // HR's title ticks all three (2026-10-09, PR4). The Director template ticks
 // Salary amounts only — the case the masking is for; with no tick at all the
@@ -206,15 +209,96 @@ describe('a person is saved from their own page (2026-10-14, edited where it sta
     }
   })
 
-  // 2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change
-  // email" — somebody with a login signs in with their Contact email.
-  it('refuses an email for somebody who signs in, writing nothing', async () => {
-    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, user_id: 'login-1' }, error: null })
-    const form = new FormData()
-    form.set('email', 'new@example.com')
-    form.set('contact_number', '012-999 0000')
-    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: LOGIN_EMAIL_LOCKED })
-    expect(update).not.toHaveBeenCalled()
+  // 2026-10-22, the user: "i want the email can be editable, for hr" — somebody
+  // with a login signs in with their Contact email, so the login moves with it.
+  describe('a login’s email', () => {
+    const withLogin = () => query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, user_id: 'login-1' }, error: null })
+    const moved = { kind: 'moved' as const, userId: 'login-1', from: 'old@example.com', to: 'new@example.com' }
+    const emailForm = () => {
+      const form = new FormData()
+      form.set('email', 'New@Example.com')
+      form.set('contact_number', '012-999 0000')
+      return form
+    }
+
+    it('moves the login first, then the record and the login row take it — never the record’s own update', async () => {
+      withLogin()
+      moveLoginForPerson.mockResolvedValueOnce(moved)
+      await expect(updateStaff('staff', emailForm())).resolves.toEqual({ ok: true })
+      expect(moveLoginForPerson).toHaveBeenCalledWith('staff', 'New@Example.com')
+      expect(rpc).toHaveBeenCalledWith('person_login_email_set', { p_staff: 'staff', p_email: 'new@example.com' })
+      // The rest of the record as before, without the email.
+      expect(update).toHaveBeenCalledWith({ contact_number: '012-999 0000' })
+      expect(moveBackUnlessWritten).not.toHaveBeenCalled()
+    })
+
+    it('answers the refusal in its own words, and writes nothing — a full-access title for one', async () => {
+      withLogin()
+      const held = 'DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions changes its login\'s email.'
+      moveLoginForPerson.mockResolvedValueOnce({ kind: 'refused', reason: held })
+      await expect(updateStaff('staff', emailForm())).resolves.toEqual({ ok: false, reason: held })
+      expect(rpc).not.toHaveBeenCalled()
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('asks nothing of the login before the rest of the form is checked', async () => {
+      withLogin()
+      const form = emailForm()
+      form.set('name', '  ')
+      await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A name is required' })
+      expect(moveLoginForPerson).not.toHaveBeenCalled()
+    })
+
+    it('moves the login back when the record would not take it', async () => {
+      withLogin()
+      moveLoginForPerson.mockResolvedValueOnce(moved)
+      rpc.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'Not open to you on this page — a box in your permissions is unticked' } })
+      moveBackUnlessWritten.mockResolvedValueOnce(null)
+      await expect(updateStaff('staff', emailForm())).resolves.toEqual({ ok: false, reason: 'Not open to you on this page — a box in your permissions is unticked' })
+      expect(moveBackUnlessWritten).toHaveBeenCalledWith(moved, 'Save changes')
+      expect(update).not.toHaveBeenCalled()
+
+      // …and says so when the login could not be put back.
+      withLogin()
+      moveLoginForPerson.mockResolvedValueOnce(moved)
+      rpc.mockResolvedValueOnce({ data: null, error: { code: 'XX000', message: 'internal' } })
+      moveBackUnlessWritten.mockResolvedValueOnce('Their login could not be moved back — they sign in with new@example.com until it is. Try Save changes again.')
+      await expect(updateStaff('staff', emailForm())).resolves.toEqual({
+        ok: false,
+        reason: 'Their email could not be saved. Please try again. Their login could not be moved back — they sign in with new@example.com until it is. Try Save changes again.',
+      })
+    })
+
+    it('says the email stands when the rest of the record is refused after it', async () => {
+      withLogin()
+      moveLoginForPerson.mockResolvedValueOnce(moved)
+      const q = query as { error: unknown }
+      q.error = { code: '23505', message: 'duplicate key value violates unique constraint "idx_hr_staff_employee_code_active"' }
+      try {
+        await expect(updateStaff('staff', emailForm())).resolves.toEqual({
+          ok: false,
+          reason: 'Their email is saved; the rest is not. Employee code already used by another active staff',
+        })
+      } finally {
+        q.error = null
+      }
+    })
+
+    it('no login after all: the email is the record’s own, written with the rest', async () => {
+      withLogin()
+      moveLoginForPerson.mockResolvedValueOnce({ kind: 'none' })
+      await expect(updateStaff('staff', emailForm())).resolves.toEqual({ ok: true })
+      expect(rpc).not.toHaveBeenCalled()
+      expect(update).toHaveBeenCalledWith({ contact_number: '012-999 0000', email: 'New@Example.com' })
+    })
+
+    it('somebody without a login keeps the record’s own email — no login is asked about', async () => {
+      const form = new FormData()
+      form.set('email', ' plain@example.com ')
+      await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+      expect(moveLoginForPerson).not.toHaveBeenCalled()
+      expect(update).toHaveBeenCalledWith({ email: 'plain@example.com' })
+    })
   })
 
   // 2026-10-16, the user: "it needs to be able to set report to an upline".

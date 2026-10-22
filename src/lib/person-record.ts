@@ -83,12 +83,18 @@ export function payModeFields(mode: PayMode): Record<string, string> {
 }
 
 /**
- * Somebody with a login signs in with their Contact email, so it is theirs to
- * change — by a request from their app — and never HR's on this page
- * (2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change
- * email"). The page shows it locked; `updateStaff` refuses it with this.
+ * Somebody with a login signs in with their Contact email. From 2026-10-16 it
+ * changed only by their own request; since 2026-10-22 HR changes it on this
+ * page too (the user: "i want the email can be editable, for hr") — and their
+ * login with it (`lib/account/login-email.ts`). Except a FULL-ACCESS title's,
+ * for whoever does not manage permissions: the editor would choose where that
+ * login's mail goes, as Invite user keeps it (`fullAccessTemplate`). The
+ * page shows such an email locked with this; the database refuses it in the
+ * same words (`person_login_email_move`).
  */
-export const LOGIN_EMAIL_LOCKED = 'Their email is the one they sign in with — it changes only by their own request.'
+export function loginEmailHeld(title: string | null | undefined, template: string | null | undefined): string {
+  return `${title || 'Their title'} is a full-access title (${template || 'a Principal login'}): only whoever manages permissions changes its login's email.`
+}
 
 /**
  * How long somebody has been with the company — their hire date against the
