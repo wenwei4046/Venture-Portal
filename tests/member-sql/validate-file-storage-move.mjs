@@ -1,7 +1,8 @@
 // Local PostgreSQL regression for the buckets' moves to R2 (2026-10-23; the runbook: .claude/rules/portal-wide/
-// storage.md › MOVING A BUCKET). Each move migration copies its bucket's rows from storage.objects, flips its backend
-// and points the functions that asked storage.objects at public.file_objects — production's own bodies with that one
-// name swapped. Here: the foundation (20261023150000) and each move run VERBATIM over a stand-in storage schema and
+// storage.md › MOVING A BUCKET). Each move migration copies its buckets' rows from storage.objects, flips their
+// backends and points the functions that asked storage.objects at public.file_objects — production's own bodies with
+// that one name swapped — and the public bucket's saved links at its custom domain. Here: the foundation
+// (20261023150000) and each move run VERBATIM over a stand-in storage schema and
 // PRODUCTION's bodies of the 17 functions (storage-functions-production.json, read off production with their md5 on
 // 2026-10-23). No live I/O.
 import assert from 'node:assert/strict'
@@ -56,14 +57,19 @@ async function fresh({ drift = null } = {}) {
     CREATE TABLE public.member_requests (id uuid PRIMARY KEY, created_by uuid, status text, kind text);
     CREATE TABLE public.member_request_attachments (request_id uuid, object_path text);
     -- What the it-requests functions write and read.
+    -- The guest link a guest's upload asks for (open, the code given).
+    CREATE FUNCTION public.guest_link_open(p_code text, p_part text) RETURNS TABLE (code text) LANGUAGE sql STABLE AS
+      $$ SELECT p_code WHERE p_code = 'hv-ABCDEFGH' AND p_part = 'hiring' $$;
     CREATE TABLE public.it_request_files (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), request_id uuid, note_id uuid, path text,
       name text, content_type text, size bigint, uploaded_by uuid);
+    -- Where the auto-reply pictures' public links are saved.
+    CREATE TABLE public.crm_auto_replies (staff_id uuid PRIMARY KEY, settings jsonb, updated_at timestamptz);
   `)
   await db.exec((await readFile(new URL('20261023150000_file_storage_r2.sql', migrations), 'utf8')).replace(/\r\n/g, '\n'))
   // Production's 17 bodies (their tables are not here: nothing checks a body's names until it runs).
   await db.exec('SET check_function_bodies = off')
   for (const f of PRODUCTION) {
-    const def = drift && f.name === drift ? f.definition.replace('RETURN;', 'RETURN; -- changed on production') : f.definition
+    const def = drift && f.name === drift ? f.definition.replace('BEGIN', 'BEGIN -- changed on production') : f.definition
     await db.exec(def)
   }
   await db.exec('SET check_function_bodies = on')
@@ -87,7 +93,26 @@ await q(db, `INSERT INTO storage.objects (id, bucket_id, name, owner, owner_id, 
   ($1, 'it-requests', $2, $3, $4, '{"size":42,"mimetype":"image/png","eTag":"\\"e\\""}', '2026-10-20T08:00:00Z'),
   ($5, 'hr-documents', 'documents/a/x.pdf', $3, $4, '{"size":7,"mimetype":"application/pdf"}', '2026-10-11T08:00:00Z')`,
   [id(11), `${U}/c1/shot.png`, U, U, id(12)])
+// One file in each of the other buckets, as Storage keeps them.
+const OTHERS = { attendance: `punch/${U}/a.jpg`, 'crm-auto-reply': `${U}/1-a.png`, 'crm-media': `${id(80)}/a.jpg`, 'crm-showrooms': 'r1/1.jpg',
+  'hiring-files': 'files/f1/cv.pdf', 'member-forms': 'templates/f.pdf', 'member-invoices': `${U}/${id(60)}/${id(70)}.pdf`, 'payment-attachments': `${id(50)}/slip.pdf` }
+let seq = 20
+for (const [bucket, name] of Object.entries(OTHERS)) {
+  await q(db, `INSERT INTO storage.objects (id, bucket_id, name, owner, owner_id, metadata) VALUES ($1, $2, $3, $4, $5, '{"size":5,"mimetype":"application/pdf"}')`,
+    [id(++seq), bucket, name, U, U])
+}
+// Auto-reply settings as the CRM saves them: a picture's link is Storage's public address of the file.
+const STORAGE_PUBLIC = 'https://gixpptmfuryskbwkmiwz.supabase.co/storage/v1/object/public'
+const SAVED = { welcome: { on: true, text: 'Hi', image: `${STORAGE_PUBLIC}/crm-auto-reply/${U}/1-a.png` },
+  kws: [{ words: 'sofa', text: 'Our sofas', image: `${STORAGE_PUBLIC}/crm-auto-reply/${U}/2-b.png` }],
+  site: 'https://example.com/crm-auto-reply/x.png', elsewhere: `${STORAGE_PUBLIC}/another-bucket/x.png` }
+const PLAIN = { welcome: { on: false, text: 'Hello' } }
+await q(db, `INSERT INTO public.crm_auto_replies (staff_id, settings, updated_at) VALUES ($1, $2, '2026-10-21T15:23:32Z'), ($3, $4, '2026-10-21T15:23:32Z')`,
+  [U, JSON.stringify(SAVED), id(2), JSON.stringify(PLAIN)])
 const before = Object.fromEntries(await Promise.all(PRODUCTION.map(async f => [f.signature, await src(db, `public.${f.signature}`)])))
+// The bodies name tables this stand-in does not hold (att_policy, hr_documents …): as pg_dump does, a body is not
+// compiled against them when it is created — production, which holds them all, compiles each swapped body for real.
+await db.exec('SET check_function_bodies = off')
 const moved = new Set()
 for (const file of MOVES) {
   const sql = (await readFile(new URL(file, migrations), 'utf8')).replace(/\r\n/g, '\n')
@@ -120,7 +145,46 @@ if (moved.has('it-requests')) {
   check((await q(db, `SELECT public.it_request_file_in($1, NULL, $2::jsonb) AS n`, [id(90), JSON.stringify([{ path: `${U}/c1/shot.png`, name: 'shot.png', size: 999, contentType: 'image/gif' }])]))[0].n, 1, 'filed')
   check((await q(db, `SELECT size::int, content_type FROM public.it_request_files`))[0], { size: 42, content_type: 'image/png' }, 'what the bucket says it is, before what the browser said — read off file_objects')
 }
-check((await q(db, `SELECT count(*)::int AS n FROM public.file_objects WHERE bucket_id = 'hr-documents'`))[0].n, moved.has('hr-documents') ? 1 : 0, 'a bucket not moved keeps its rows in Storage only')
+// Every bucket: a moved one has Storage's rows (same ids), one still in Storage has none here.
+for (const bucket of ['it-requests', 'hr-documents', ...Object.keys(OTHERS)]) {
+  const want = (await q(db, `SELECT id::text FROM storage.objects WHERE bucket_id = $1 ORDER BY id`, [bucket])).map(r => r.id)
+  const have = (await q(db, `SELECT id::text FROM public.file_objects WHERE bucket_id = $1 ORDER BY id`, [bucket])).map(r => r.id)
+  check(have, moved.has(bucket) ? want : [], `${bucket}: ${moved.has(bucket) ? 'its rows are Storage’s, every one' : 'not moved — no rows here'}`)
+}
+if (moved.has('hr-documents')) {
+  check((await q(db, `SELECT public.hr_doc_file_present('documents/a/x.pdf', 'documents') AS ok`))[0].ok, true, 'hr_doc_file_present: a filed document is there')
+  check((await q(db, `SELECT public.hr_doc_file_present('documents/a/none.pdf', 'documents') AS ok`))[0].ok, false, 'hr_doc_file_present: one with no row is not')
+}
+if (moved.has('hiring-files')) {
+  check((await q(db, `SELECT public.guest_link_may_upload('hv-ABCDEFGH') AS ok`))[0].ok, true, 'guest_link_may_upload: an open link under its hourly cap')
+  for (let i = 0; i < 40; i++) {
+    await q(db, `INSERT INTO public.file_objects (bucket_id, name, metadata) VALUES ('hiring-files', $1, '{"size":1,"mimetype":"application/pdf"}')`, [`guest/hv-ABCDEFGH/${id(500 + i)}.pdf`])
+  }
+  check((await q(db, `SELECT public.guest_link_may_upload('hv-ABCDEFGH') AS ok`))[0].ok, false, 'guest_link_may_upload: 40 an hour, counted in file_objects')
+  check((await q(db, `SELECT public.guest_link_may_upload('hv-ZZZZZZZZ') AS ok`))[0].ok, false, 'guest_link_may_upload: a closed link')
+}
+const autoReplies = async () => Object.fromEntries((await q(db, `SELECT staff_id::text AS who, settings, updated_at = '2026-10-21T15:23:32Z' AS kept FROM public.crm_auto_replies`))
+  .map(r => [r.who, { settings: r.settings, kept: r.kept }]))
+if (moved.has('crm-auto-reply')) {
+  check((await q(db, `SELECT public, public_url FROM public.file_buckets WHERE id = 'crm-auto-reply'`))[0],
+    { public: true, public_url: 'https://cdn.houzsventure.com/crm-auto-reply' }, 'crm-auto-reply: public, at the custom domain')
+  const saved = await autoReplies()
+  check(saved[U], { settings: { ...SAVED, welcome: { ...SAVED.welcome, image: `https://cdn.houzsventure.com/crm-auto-reply/${U}/1-a.png` },
+    kws: [{ ...SAVED.kws[0], image: `https://cdn.houzsventure.com/crm-auto-reply/${U}/2-b.png` }] }, kept: true },
+    'crm_auto_replies: every saved picture link now the custom domain’s, the same name — nothing else in it touched')
+  check(saved[id(2)], { settings: PLAIN, kept: true }, 'crm_auto_replies: settings with no picture are left as they were')
+} else {
+  check((await autoReplies())[U].settings, SAVED, 'crm_auto_replies: untouched while crm-auto-reply is in Storage')
+}
+const privateBuckets = ['attendance', 'crm-media', 'crm-showrooms', 'hiring-files', 'hr-documents', 'it-requests', 'member-forms', 'member-invoices', 'payment-attachments']
+if (privateBuckets.every(b => moved.has(b))) {
+  const left = []
+  for (const f of PRODUCTION) if ((await src(db, `public.${f.signature}`)).includes('storage.objects')) left.push(f.name)
+  check(left, [], 'every private bucket moved: no function reads storage.objects any more')
+}
+if (moved.has('crm-auto-reply') && privateBuckets.every(b => moved.has(b))) {
+  check((await q(db, `SELECT id FROM public.file_buckets WHERE backend <> 'r2' ORDER BY id`)).map(r => r.id), [], 'every bucket is in R2')
+}
 
 // ── A body changed on production since: the move refuses it, and nothing of it holds ──────────────────────────
 for (const file of MOVES) {
@@ -128,6 +192,7 @@ for (const file of MOVES) {
   const names = [...sql.matchAll(/pg_temp\.repoint\('public\.([a-z_]+)\(/g)].map(m => m[1])
   if (!names.length) continue
   const drifted = await fresh({ drift: names[0] })
+  await drifted.exec('SET check_function_bodies = off')
   await drifted.exec('BEGIN')
   await assert.rejects(drifted.exec(sql), e => /not the body this migration was written against/.test(String(e.message)), `${file}: refuses a drifted ${names[0]}`)
   await drifted.exec('ROLLBACK')
