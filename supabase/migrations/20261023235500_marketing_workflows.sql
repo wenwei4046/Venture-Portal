@@ -79,8 +79,9 @@ SELECT public.audit_register('mkt_workflow_versions', 'Marketing workflow versio
   p_reason => 'Each version published, written once and never changed — a record already');
 
 -- ── A template's stages, checked (nobody's to call but the functions below) ─
--- As a draft (p_publish false): the shapes and limits; each stage kept as typed. As published: every stage named,
--- each 🔓 stage with its candidates and a stage before it — and the lock applied (no 🔓 hand-offs, no subtasks).
+-- As a draft (p_publish false): the shapes and limits; each stage kept as typed, names half-typed included. As
+-- published: every stage, field and column named, each field once; each 🔓 stage with its candidates and a stage
+-- before it; everybody named on Marketing's team — and the lock applied (no 🔓 hand-offs, no subtasks).
 -- Answers the stages written clean.
 CREATE OR REPLACE FUNCTION public.mkt_workflow_check(p_stages jsonb, p_publish boolean, p_locked boolean)
 RETURNS jsonb
@@ -217,7 +218,8 @@ BEGIN
            OR (p_publish AND v_label = '') THEN
           RAISE EXCEPTION 'Stage %: name each field (a note at most 300 characters, a field 60).', i + 1 USING ERRCODE = '22023';
         END IF;
-        IF v_f ->> 'type' <> 'Note' AND v_label <> '' THEN
+        -- A draft may hold two fields of one name while they are typed; a version may not.
+        IF p_publish AND v_f ->> 'type' <> 'Note' THEN
           IF v_label = ANY (v_labels) THEN
             RAISE EXCEPTION 'Stage %: two fields called "%".', i + 1, v_label USING ERRCODE = '22023';
           END IF;
@@ -229,7 +231,7 @@ BEGIN
           END IF;
           v_cols := '[]'::jsonb;
           FOR j IN 0 .. jsonb_array_length(v_f -> 'cols') - 1 LOOP
-            IF length(btrim(coalesce(v_f -> 'cols' -> j ->> 'name', ''))) NOT BETWEEN 1 AND 40
+            IF length(btrim(coalesce(v_f -> 'cols' -> j ->> 'name', ''))) NOT BETWEEN (CASE WHEN p_publish THEN 1 ELSE 0 END) AND 40
                OR coalesce(v_f -> 'cols' -> j ->> 'type', '') NOT IN ('Text', 'Number', 'Checkbox', 'Date', 'Person') THEN
               RAISE EXCEPTION 'Stage %: name each column of a table (at most 40 characters).', i + 1 USING ERRCODE = '22023';
             END IF;

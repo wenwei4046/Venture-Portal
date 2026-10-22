@@ -228,6 +228,10 @@ await tryPublish([st(), st({ who: { mode: 'prev', cands: [S.outsider] } })], /St
 await tryPublish([st({ appr: [{ kind: 'person', staff: S.outsider }] })], /Stage 1: an approval nobody on the team can give/,
   'an approver off the team: the same')
 await tryPublish([st({ form: [{ label: ' ', type: 'Text' }] })], /Stage 1: name each field/, 'every field named')
+await tryPublish([st({ form: [{ label: 'A', type: 'Text' }, { label: 'A', type: 'Date' }] })], /Stage 1: two fields called "A"/,
+  'a draft may hold two fields of one name while typed; a version may not')
+await tryPublish([st({ form: [{ label: 'T', type: 'Table', cols: [{ name: ' ', type: 'Text' }] }] })], /Stage 1: name each column/,
+  'a column half-typed is kept in the draft, refused on publishing')
 check((await row(brand.id)).version, 0, 'nothing refused was published')
 rev = (await save(brand.id, rev, { locked: true, stages: [st(), st({ who: { mode: 'prev', cands: [] } })] })).rev
 check((await publish(brand.id, rev)).version, 1, 'locked, a 🔓 stage with no candidates is the manager’s to assign: published')
@@ -253,13 +257,12 @@ await bad([st({ appr: [{ kind: 'person', staff: 'josiah' }] })], /an approval no
 await bad([st({ who: { mode: 'prev', cands: ['abc'] } })], /a candidate is not on Marketing's team/, 'a candidate is somebody')
 await bad([st({ who: { mode: 'prev', cands: Array.from({ length: 21 }, (_, i) => id(900 + i)) } })], /at most 20 candidates/, 'twenty candidates at most')
 await bad([st({ form: [{ label: 'A', type: 'Video' }] })], /a field of a kind it cannot hold/, 'only the builder’s field kinds')
-await bad([st({ form: [{ label: 'A', type: 'Text' }, { label: 'A', type: 'Date' }] })], /two fields called "A"/, 'field names are a stage’s own')
 await bad([st({ form: Array.from({ length: 21 }, (_, i) => ({ label: `F${i}`, type: 'Text' })) })], /at most 20 fields/, 'twenty fields at most')
 await bad([st({ form: [{ label: 'x'.repeat(301), type: 'Note' }] })], /name each field/, 'a note of 300 characters at most')
 await bad([st({ form: [{ label: 'T', type: 'Table', cols: [] }] })], /a table has 1 to 8 columns/, 'a table has columns')
 await bad([st({ form: [{ label: 'T', type: 'Table', cols: Array.from({ length: 9 }, (_, i) => ({ name: `C${i}`, type: 'Text' })) }] })],
   /a table has 1 to 8 columns/, 'eight columns at most')
-await bad([st({ form: [{ label: 'T', type: 'Table', cols: [{ name: ' ', type: 'Text' }] }] })], /name each column/, 'each column named')
+await bad([st({ form: [{ label: 'T', type: 'Table', cols: [{ name: 'x'.repeat(41), type: 'Text' }] }] })], /name each column/, 'a short column name')
 await bad([st({ form: [{ label: 'T', type: 'Table', cols: [{ name: 'C', type: 'File' }] }] })], /name each column/, 'only the builder’s column kinds')
 await bad([st({ form: [{ ...SHOT_LIST, rows: [['Only one cell']] }] })], /a preset row is one short line per column/, 'a preset row fills each column')
 await bad([st({ form: [{ ...SHOT_LIST, rows: [['A', 5]] }] })], /a preset row is one short line per column/, 'a preset cell is words')

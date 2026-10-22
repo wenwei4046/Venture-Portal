@@ -73,6 +73,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
   // Marketing's task page (mig 20261023234000): one project, its stages' work and trail — STABLE.
   'mkt_project',
+  // Marketing's Workflow Builder (mig 20261023235500): the templates, their drafts and versions — STABLE.
+  'mkt_workflows',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

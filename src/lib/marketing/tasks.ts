@@ -31,6 +31,8 @@ export interface FormField {
   type: FieldType
   /** A table's columns. */
   cols?: { name: string; type: ColType }[]
+  /** A workflow table's preset rows, a cell per column: one filled in is fixed for the team, a blank one is theirs. */
+  rows?: string[][]
 }
 
 export interface WorkLink {
@@ -114,7 +116,10 @@ export function formFromRow(v: unknown): FormField[] {
     const cols = Array.isArray(f.cols)
       ? f.cols.filter(isObj).map(c => ({ name: String(c.name ?? ''), type: COL_TYPES.find(t => t === c.type) ?? 'Text' }))
       : undefined
-    return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [] } : {}) }]
+    const rows = Array.isArray(f.rows)
+      ? f.rows.filter(Array.isArray).map(r => (cols ?? []).map((_, i) => (typeof r[i] === 'string' ? r[i] : '')))
+      : []
+    return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}) }]
   })
 }
 
@@ -151,8 +156,14 @@ export function newStage(after: DraftStage | undefined): DraftStage {
   return { key: stageKey(), name: 'New stage', dept: after?.dept ?? 'content', who: null, sla: 1, appr: [], form: [], back: null }
 }
 
+/** A stage on a builder: its key on the form and the earlier stage changes go back to. */
+interface Placed {
+  key: string
+  back: number | null
+}
+
 /** Moved from one place to another; where changes go back to follows the stages it names. */
-export function moveStage(stages: readonly DraftStage[], from: number, to: number): DraftStage[] {
+export function moveStage<T extends Placed>(stages: readonly T[], from: number, to: number): T[] {
   if (from === to || from < 0 || from >= stages.length) return [...stages]
   const keys = stages.map(s => s.key)
   const arr = [...stages]
@@ -166,7 +177,7 @@ export function moveStage(stages: readonly DraftStage[], from: number, to: numbe
 }
 
 /** One taken out; where changes go back to forgets it. */
-export function removeStage(stages: readonly DraftStage[], at: number): DraftStage[] {
+export function removeStage<T extends Placed>(stages: readonly T[], at: number): T[] {
   const keys = stages.map(s => s.key)
   const arr = stages.filter((_, i) => i !== at)
   return arr.map((s, i) => {
