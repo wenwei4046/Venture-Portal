@@ -162,4 +162,5 @@
   .grid { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; }
   .meeting { grid-template-columns: minmax(0, 1fr); }
+  .stepLabel:not(.stepLabelCur) { display: none; }
 }
