@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>
+@keyframes tdIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:none}}
+a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}
+</style></helmet>
+<div style="padding:32px 36px 64px;box-sizing:border-box;color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:22px">📊</span>
+    <span style="font-size:1.7em;font-weight:600;letter-spacing:-0.01em">Tracking Dashboard</span>
+    <span style="flex:1"></span>
+    <span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Layout</span>
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 244 240);border-radius:9px">
+      <sc-for list="{{ layouts }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:30px;padding:0 14px;border-radius:7px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.92em;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for>
+    </div>
+  </div>
+  <div style="font-size:0.94em;color:rgb(117 100 86);margin-top:6px">{{ subline }}</div>
+
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px">
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 244 240);border-radius:9px">
+      <sc-for list="{{ periods }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="height:30px;padding:0 12px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.9em;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for>
+    </div>
+    <sc-for list="{{ selects }}" as="s" hint-placeholder-count="3">
+      <select value="{{ s.value }}" onChange="{{ s.onChange }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:0.92em;background:#fff;color:rgb(51 36 27);outline:none;cursor:pointer">
+        <sc-for list="{{ s.opts }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+      </select>
+    </sc-for>
+    <sc-if value="{{ hasFilters }}"><span onClick="{{ clearFilters }}" style="font-size:0.88em;color:rgb(117 100 86);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0 4px">Clear filters</span></sc-if>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:16px">
+    <sc-for list="{{ stats }}" as="s" hint-placeholder-count="5">
+      <div onClick="{{ s.onClick }}" style="padding:12px 14px;border-radius:12px;border:1.5px solid {{ s.border }};background:{{ s.bg }};cursor:pointer;display:flex;flex-direction:column;gap:4px;min-width:0" style-hover="border-color:rgb(176 140 104)">
+        <div style="display:flex;align-items:center;gap:6px;font-size:0.82em;color:rgb(74 64 58);white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:{{ s.dot }};flex:none"></span>{{ s.label }}</div>
+        <div style="font-size:1.8em;font-weight:600;line-height:1.1;color:{{ s.fg }}">{{ s.n }}</div>
+        <div style="font-size:0.78em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.hint }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ isPeople }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:baseline;gap:10px;margin:28px 0 12px">
+      <span style="font-size:1.15em;font-weight:600">People</span>
+      <span style="font-size:0.88em;color:rgb(117 100 86)">What each person is on right now. Overdue first.</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start">
+      <sc-for list="{{ people }}" as="p" hint-placeholder-count="6">
+        <div style="border:1px solid {{ p.border }};background:#fff;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;animation:tdIn .2s ease-out">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:38px;height:38px;border-radius:50%;flex:none;background:{{ p.av }};display:flex;align-items:center;justify-content:center;font-weight:600">{{ p.initial }}</span>
+            <div style="flex:1;min-width:0"><div style="font-weight:600">{{ p.name }}</div><div style="font-size:0.82em;color:rgb(117 100 86)">{{ p.role }}</div></div>
+            <sc-for list="{{ p.pills }}" as="x" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:5px;font-size:0.8em;font-weight:600;padding:3px 8px;border-radius:999px;background:{{ x.bg }};color:{{ x.fg }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ x.dot }}"></span>{{ x.n }}</span></sc-for>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:0.8em;color:rgb(117 100 86);margin-bottom:5px"><span>Load</span><span style="color:{{ p.loadFg }};font-weight:500">{{ p.loadLabel }}</span></div>
+            <div style="display:flex;gap:3px;height:8px">
+              <sc-for list="{{ p.slots }}" as="s" hint-placeholder-count="5"><span style="flex:1;border-radius:3px;background:{{ s.bg }}"></span></sc-for>
+            </div>
+          </div>
+          <sc-if value="{{ p.hasNow }}">
+            <div onClick="{{ p.now.onOpen }}" style="padding:11px 12px;border-radius:11px;background:{{ p.now.bg }};border:1px solid {{ p.now.border }};cursor:pointer;display:flex;flex-direction:column;gap:7px" style-hover="filter:brightness(0.985)">
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Now on</span><span style="flex:1"></span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ p.now.id }}</span></div>
+              <div style="font-weight:600;font-size:1.02em;line-height:1.3">{{ p.now.title }}</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:0.82em;color:rgb(74 64 58);flex-wrap:wrap"><span style="width:7px;height:7px;border-radius:50%;background:{{ p.now.subDot }}"></span>{{ p.now.sub }} · {{ p.now.wfName }}</div>
+              <div style="display:flex;gap:3px"><sc-for list="{{ p.now.segs }}" as="s" hint-placeholder-count="5"><span title="{{ s.name }}" style="flex:1;height:5px;border-radius:3px;background:{{ s.bg }}"></span></sc-for></div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:0.84em;flex-wrap:wrap"><span style="font-weight:500">{{ p.now.stageLine }}</span><span style="color:rgb(117 100 86)">· {{ p.now.daysLine }}</span></div>
+              <sc-if value="{{ p.now.hasWhy }}"><div style="font-size:0.84em;color:{{ p.now.fg }};font-weight:500">{{ p.now.why }}</div></sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ p.isFree }}"><div style="padding:14px;border-radius:11px;border:1px dashed rgb(190 222 199);background:rgb(244 250 245);font-size:0.9em;color:rgb(40 110 64);text-align:center">Free · can take new work</div></sc-if>
+          <sc-if value="{{ p.hasRest }}">
+            <div style="display:flex;flex-direction:column">
+              <div style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:4px">Also on · {{ p.restCount }}</div>
+              <sc-for list="{{ p.rest }}" as="r" hint-placeholder-count="2">
+                <div onClick="{{ r.onOpen }}" style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 4px;border-top:1px solid rgb(244 241 236);cursor:pointer;font-size:0.88em" style-hover="background:rgb(250 248 244)">
+                  <span style="width:7px;height:7px;border-radius:50%;background:{{ r.dot }}"></span>
+                  <div style="min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</div><div style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.stageShort }}</div></div>
+                  <span style="font-size:0.84em;color:{{ r.dueFg }};white-space:nowrap">{{ r.due }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="display:flex;align-items:center;gap:8px;border-top:1px solid rgb(244 241 236);padding-top:10px;font-size:0.82em;color:rgb(117 100 86)">
+            <span>On time {{ p.onTime }}%</span><span>·</span><span>Avg {{ p.avg }} d/stage</span><span style="flex:1"></span>
+            <span onClick="{{ p.onNudge }}" style="padding:5px 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;color:rgb(51 36 27);cursor:pointer" style-hover="background:rgb(250 248 244)">Nudge</span>
+            <span onClick="{{ p.onFocus }}" style="padding:5px 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;color:rgb(51 36 27);cursor:pointer" style-hover="background:rgb(250 248 244)">{{ p.focusLabel }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <sc-if value="{{ peopleEmpty }}"><div style="padding:40px;text-align:center;color:rgb(117 100 86);border:1px dashed rgb(229 222 211);border-radius:14px">Nobody matches these filters.</div></sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isFlow }}">
+    <div style="display:flex;flex-direction:column;gap:18px;margin-top:28px">
+      <div style="border:1px solid rgb(236 231 224);border-radius:14px;background:#fff;padding:12px 14px">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap"><span style="font-weight:600">People load</span><span style="font-size:0.82em;color:rgb(117 100 86)">Tap someone to show only their tasks.</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px">
+          <sc-for list="{{ sidePeople }}" as="p" hint-placeholder-count="8">
+            <div onClick="{{ p.onFocus }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 6px;border-radius:9px;cursor:pointer;background:{{ p.rowBg }}" style-hover="background:rgb(250 248 244)">
+              <span style="width:28px;height:28px;border-radius:50%;background:{{ p.av }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">{{ p.initial }}</span>
+              <div style="min-width:0">
+                <div style="font-size:0.88em;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                <div style="display:flex;gap:2px;height:5px;margin-top:4px"><sc-for list="{{ p.slots }}" as="s" hint-placeholder-count="5"><span style="flex:1;border-radius:2px;background:{{ s.bg }}"></span></sc-for></div>
+              </div>
+              <span style="font-size:0.8em;font-weight:600;color:{{ p.loadFg }};white-space:nowrap">{{ p.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap"><span style="font-size:1.15em;font-weight:600;white-space:nowrap">Ongoing workflows</span><span style="font-size:0.88em;color:rgb(117 100 86)">Every task sits in its current stage. The slowest stage is flagged.</span></div>
+        <sc-for list="{{ flows }}" as="f" hint-placeholder-count="3">
+          <div style="border:1px solid rgb(236 231 224);border-radius:14px;background:#fff;overflow:hidden;animation:tdIn .2s ease-out">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgb(240 236 230);background:rgb(252 251 249);flex-wrap:wrap">
+              <span style="font-size:15px">{{ f.icon }}</span><span style="font-weight:600">{{ f.name }}</span>
+              <span style="font-size:0.84em;color:rgb(117 100 86)">{{ f.meta }}</span>
+              <span style="flex:1"></span>
+              <div style="width:140px;height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden" title="Average progress"><div style="height:100%;width:{{ f.pct }}%;background:rgb(90 62 43)"></div></div>
+              <span style="font-size:0.82em;color:rgb(74 64 58);width:34px">{{ f.pct }}%</span>
+            </div>
+            <div style="overflow-x:auto;overflow-y:hidden"><div style="display:grid;grid-template-columns:{{ f.cols }};min-height:96px">
+              <sc-for list="{{ f.stages }}" as="s" hint-placeholder-count="4">
+                <div style="border-right:{{ s.br }};padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;background:{{ s.bg }}">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                    <span style="font-size:0.82em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+                    <span style="font-size:0.74em;color:rgb(117 100 86);flex:none">{{ s.count }}</span>
+                    <span style="flex:1"></span>
+                    <sc-if value="{{ s.slow }}"><span title="Slowest stage" style="font-size:0.7em;font-weight:600;padding:1px 6px;border-radius:999px;background:rgb(252 236 233);color:rgb(160 36 30);white-space:nowrap">🐢 {{ s.avg }}d</span></sc-if>
+                    <sc-if value="{{ s.notSlow }}"><span style="font-size:0.7em;color:rgb(117 100 86);white-space:nowrap">{{ s.avgLabel }}</span></sc-if>
+                  </div>
+                  <sc-for list="{{ s.tasks }}" as="t" hint-placeholder-count="1">
+                    <div onClick="{{ t.onOpen }}" title="{{ t.title }}" style="padding:8px 9px;border-radius:9px;background:{{ t.bg }};border:1px solid {{ t.border }};cursor:pointer;display:flex;flex-direction:column;gap:5px;min-width:0" style-hover="filter:brightness(0.98)">
+                      <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ t.dot }}"></span><span style="font-size:0.86em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:0.76em;color:rgb(74 64 58);min-width:0">
+                        <span style="width:18px;height:18px;border-radius:50%;flex:none;background:{{ t.av }};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600">{{ t.initial }}</span>
+                        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.owner }}</span><span style="flex:1"></span><span style="white-space:nowrap;color:{{ t.daysFg }}">{{ t.days }}</span>
+                      </div>
+                      <sc-if value="{{ t.hasWhy }}"><div style="font-size:0.74em;color:{{ t.fg }};font-weight:500;line-height:1.3">{{ t.why }}</div></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ flowsEmpty }}"><div style="padding:40px;text-align:center;color:rgb(117 100 86);border:1px dashed rgb(229 222 211);border-radius:14px">No ongoing tasks match these filters.</div></sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}"><div style="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:9000;padding:8px 16px;border-radius:999px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:0.9em;font-weight:500;box-shadow:0 8px 24px rgb(51 36 27 / 0.25);animation:tdIn .2s ease-out">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:1400},&quot;layout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;people&quot;,&quot;flow&quot;],&quot;default&quot;:&quot;people&quot;,&quot;tsType&quot;:&quot;'people'|'flow'&quot;},&quot;onOpenTask&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;}}">
+const ST = {
+  red: { bg: 'rgb(255 245 243)', border: 'rgb(236 190 184)', fg: 'rgb(160 36 30)', dot: 'rgb(200 52 42)', label: 'Overdue' },
+  waiting: { bg: 'rgb(255 250 238)', border: 'rgb(236 214 164)', fg: 'rgb(122 82 8)', dot: 'rgb(214 152 30)', label: 'Waiting for approval' },
+  risk: { bg: 'rgb(255 250 238)', border: 'rgb(236 214 164)', fg: 'rgb(150 96 10)', dot: 'rgb(230 170 60)', label: 'At risk' },
+  ok: { bg: '#fff', border: 'rgb(236 231 224)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)', label: 'On track' },
+};
+const SUBDOT = { Carres: 'oklch(0.70 0.12 235)', '2990 Home': 'oklch(0.64 0.15 295)', 'Houzs Century': 'oklch(0.52 0.06 55)', Hookka: 'oklch(0.70 0.13 345)', Colive: 'oklch(0.66 0.10 195)', Dreamcrafter: 'oklch(0.56 0.15 270)', CMI: 'oklch(0.60 0.03 250)', 'The Conts': 'oklch(0.62 0.12 320)' };
+const WF = {
+  reels: { name: 'Reels Video', icon: '🎬', stages: ['Script', 'Shoot', 'Raw upload', 'Edit', 'Final'] },
+  smm: { name: 'Social Media Monthly', icon: '📱', stages: ['Content plan', 'Design graphics', 'Schedule & post'] },
+  mb: { name: 'Media Buying Campaign', icon: '📣', stages: ['Direction', 'Creative', 'Compile & review', 'Go live', 'Report'] },
+  quick: { name: 'Quick tasks', icon: '⚡', stages: ['Do the change', 'Review'] },
+  rec: { name: 'Recurring tasks', icon: '🔁', stages: ['Prepare', 'Send'] },
+};
+const PEOPLE = [
+  ['Mei', 'Director · Video', 'oklch(0.90 0.05 295)', 72, 3.8], ['Ali', 'Editor', 'oklch(0.90 0.05 270)', 78, 1.2], ['Siti', 'Graphic Designer', 'oklch(0.92 0.04 350)', 70, 2.4],
+  ['Aina', 'Graphic Designer', 'oklch(0.92 0.04 20)', 85, 1.6], ['Hafiz', 'Graphic Designer', 'oklch(0.92 0.04 140)', 92, 0.9], ['Ah Kit', 'Videographer', 'oklch(0.90 0.05 195)', 95, 0.7],
+  ['Jason', 'Social Media', 'oklch(0.90 0.05 235)', 88, 1.1], ['Wei Lun', 'Ads', 'oklch(0.90 0.05 60)', 90, 0.8], ['Daniel', 'Content Writer', 'oklch(0.92 0.04 100)', 94, 0.6],
+];
+const T = (id, title, sub, wf, cur, owner, st, why, due, days) => ({ id, title, sub, wf, cur, owner, st, why, due, days });
+const TASKS = [
+  T('MKT-CAR-2610-007', 'Carres Year-End Video', 'Carres', 'reels', 0, 'Mei', 'red', 'Script overdue 1 day', '4 Dec', 3.5),
+  T('MKT-HC-2610-011', 'Raya Reels', 'Houzs Century', 'reels', 0, 'Mei', 'red', 'Not accepted · 5 working hours', '20 Nov', 0.6),
+  T('MKT-COL-2610-003', 'Colive Room Tour', 'Colive', 'reels', 0, 'Mei', 'risk', '7 SLA days left, 5 working days to deadline', '6 Nov', 2.1),
+  T('MKT-CAR-2610-013', 'Showroom walk-through', 'Carres', 'reels', 1, 'Ah Kit', 'ok', '', '4 Nov', 0.8),
+  T('MKT-2990-2610-018', 'Red Truck Reels', '2990 Home', 'reels', 3, 'Ali', 'red', 'Delivery returned 3 times', '25 Oct', 5.5),
+  T('MKT-HC-2610-009', 'Century lounge teaser', 'Houzs Century', 'reels', 3, 'Ali', 'ok', '', '28 Oct', 4.8),
+  T('MKT-DC-2610-004', 'Kids room makeover', 'Dreamcrafter', 'reels', 3, 'Ali', 'ok', '', '29 Oct', 4.1),
+  T('MKT-CMI-2610-003', 'Behind the factory', 'CMI', 'reels', 3, 'Ali', 'ok', '', '30 Oct', 3.9),
+  T('MKT-2990-2610-019', 'Red Truck Reels ep.2', '2990 Home', 'reels', 4, 'Jason', 'waiting', 'Waiting for Daniel’s approval · 1 hour', '31 Oct', 0.3),
+  T('MKT-COL-2610-009', 'Resident story: Aisyah', 'Colive', 'smm', 0, 'Jason', 'ok', '', '27 Oct', 1.2),
+  T('MKT-HK-2610-005', 'Hookka 12.12 Banner Set', 'Hookka', 'smm', 1, 'Siti', 'red', 'Design overdue 2 days', '25 Oct', 5.1),
+  T('MKT-CAR-2610-014', 'Carres Nov posts', 'Carres', 'smm', 1, 'Aina', 'ok', '', '30 Oct', 3.8),
+  T('MKT-COL-2610-010', 'Colive Nov posts', 'Colive', 'smm', 1, 'Hafiz', 'ok', '', '31 Oct', 3.4),
+  T('MKT-2990-2610-021', 'Deepavali early-bird', '2990 Home', 'smm', 2, 'Jason', 'red', 'Waiting for PIC (Carmen) · 6 working hours', '21 Oct', 1.4),
+  T('MKT-CAR-2610-011', 'Year-end sale countdown', 'Carres', 'smm', 2, 'Jason', 'waiting', 'Waiting for Rachel’s approval · 3 hours', '23 Oct', 0.4),
+  T('MKT-HK-2610-008', 'Hookka 12.12 ads', 'Hookka', 'mb', 1, 'Siti', 'ok', '', '8 Nov', 2.0),
+  T('MKT-CAR-2610-012', 'Carres 11.11 Rental Deal', 'Carres', 'mb', 3, 'Wei Lun', 'ok', '', '12 Nov', 0.4),
+  T('MKT-2990-2610-016', '2990 Raya promo', '2990 Home', 'mb', 4, 'Wei Lun', 'ok', '', '28 Oct', 0.9),
+  T('TSK-CAR-2610-031', 'Fix FB cover price', 'Carres', 'quick', 0, 'Jason', 'risk', 'Due today', '22 Oct', 0.5),
+  T('TSK-HK-2610-032', 'Amend Hookka ad copy', 'Hookka', 'quick', 1, 'Wei Lun', 'waiting', 'Waiting for Rachel’s review', '24 Oct', 0.2),
+  T('RCR-HK-2610-002', 'Weekly ad report · run 8', 'Hookka', 'rec', 0, 'Wei Lun', 'ok', '', '26 Oct', 0.3),
+  T('RCR-CAR-2610-001', 'Monday content check · run 12', 'Carres', 'rec', 0, 'Daniel', 'ok', '', '26 Oct', 0.1),
+];
+const CAP = 5;
+const RANK = { red: 0, waiting: 1, risk: 2, ok: 3 };
+const DUE_N = d => parseInt(d, 10) + (/Nov/.test(d) ? 31 : /Dec/.test(d) ? 61 : 0);
+
+class Component extends DCLogic {
+  state = { layout: this.props.layout ?? 'people', period: 'month', sub: 'All', wf: 'All', person: 'All', status: 'All', toast: '' };
+  componentDidUpdate(prev) { if (prev.layout !== this.props.layout && this.props.layout) this.setState({ layout: this.props.layout }); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  say(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2200); }
+  renderVals() {
+    const { layout, period, sub, wf, person, status } = this.state;
+    const open = id => () => (this.props.onOpenTask ? this.props.onOpenTask(id) : this.say(`Opens ${id}`));
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const base = TASKS.filter(t => (sub === 'All' || t.sub === sub) && (wf === 'All' || t.wf === wf));
+    const matchSt = t => status === 'All' || (status === 'attention' ? t.st === 'red' || t.st === 'waiting' : t.st === status);
+    const tasks = base.filter(t => (person === 'All' || t.owner === person) && matchSt(t));
+    const statPool = base.filter(t => person === 'All' || t.owner === person);
+    const cnt = k => statPool.filter(t => (k === 'attention' ? t.st === 'red' || t.st === 'waiting' : t.st === k)).length;
+    const stat = (k, label, n, hint, dot, fg) => ({ label, n, hint, dot, fg, border: status === k ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: status === k ? 'rgb(250 246 240)' : '#fff', onClick: () => this.setState({ status: status === k ? 'All' : k }) });
+    const dec = t => {
+      const w = WF[t.wf], s = ST[t.st], p = PEOPLE.find(x => x[0] === t.owner) || [t.owner, '', 'oklch(0.9 0.02 60)'];
+      return { ...t, ...s, wfName: w.name, stageName: w.stages[t.cur], stageLine: `Stage ${t.cur + 1}/${w.stages.length} · ${w.stages[t.cur]}`, stageShort: `${w.name} · ${w.stages[t.cur]}`,
+        daysLine: `${t.days} days on this stage`, days: `${t.days}d`, daysFg: t.days >= 4 ? 'rgb(160 36 30)' : 'rgb(117 100 86)', hasWhy: !!t.why, subDot: SUBDOT[t.sub], av: p[2], initial: t.owner[0],
+        segs: w.stages.map((n, i) => ({ name: n, bg: i < t.cur ? 'rgb(90 62 43)' : i === t.cur ? s.dot : 'rgb(232 225 216)' })),
+        due: `Due ${t.due}`, dueFg: t.st === 'red' ? 'rgb(160 36 30)' : 'rgb(117 100 86)', onOpen: open(t.id) };
+    };
+    const slotsFor = list => Array.from({ length: Math.max(CAP, list.length) }, (_, i) => ({ bg: list[i] ? ST[list[i].st].dot : 'rgb(236 231 224)' }));
+    const loadOf = n => (n > CAP ? ['Over capacity', 'rgb(160 36 30)'] : n === CAP ? ['Full', 'rgb(150 96 10)'] : n === 0 ? ['Free', 'rgb(40 110 64)'] : [`${n} of ${CAP} slots`, 'rgb(74 64 58)']);
+
+    const peopleRows = PEOPLE.filter(p => person === 'All' || p[0] === person).map(([name, role, av, onTime, avg]) => {
+      const mine = tasks.filter(t => t.owner === name).sort((a, b) => RANK[a.st] - RANK[b.st] || DUE_N(a.due) - DUE_N(b.due)).map(dec);
+      const all = statPool.filter(t => t.owner === name);
+      const red = all.filter(t => t.st === 'red').length, wait = all.filter(t => t.st === 'waiting' || t.st === 'risk').length, [loadLabel, loadFg] = loadOf(all.length);
+      return { name, role, av, onTime, avg, initial: name[0], _red: red, _n: mine.length, _all: all.length,
+        border: red ? 'rgb(236 190 184)' : 'rgb(236 231 224)',
+        pills: [red ? { n: `${red} overdue`, bg: 'rgb(252 236 233)', fg: 'rgb(160 36 30)', dot: 'rgb(200 52 42)' } : null, wait ? { n: `${wait} waiting`, bg: 'rgb(251 243 225)', fg: 'rgb(122 82 8)', dot: 'rgb(214 152 30)' } : null].filter(Boolean),
+        loadLabel, loadFg, slots: slotsFor(all.slice().sort((a, b) => RANK[a.st] - RANK[b.st])),
+        hasNow: mine.length > 0, now: mine[0] || { segs: [], onOpen: null }, isFree: all.length === 0,
+        hasRest: mine.length > 1, rest: mine.slice(1), restCount: mine.length - 1,
+        onNudge: () => this.say(`Nudged ${name} on WhatsApp`),
+        focusLabel: person === name ? 'Show everyone' : 'Only ' + name, onFocus: () => this.setState({ person: person === name ? 'All' : name }) };
+    }).filter(p => status === 'All' ? true : p._n > 0).sort((a, b) => b._red - a._red || b._all - a._all);
+
+    const flows = Object.keys(WF).filter(k => wf === 'All' || wf === k).map(k => {
+      const w = WF[k], list = tasks.filter(t => t.wf === k);
+      if (!list.length) return null;
+      const avgs = w.stages.map((_, i) => { const xs = list.filter(t => t.cur === i); return xs.length ? xs.reduce((a, t) => a + t.days, 0) / xs.length : 0; });
+      const slowI = avgs.indexOf(Math.max(...avgs));
+      const red = list.filter(t => t.st === 'red').length;
+      return { name: w.name, icon: w.icon, meta: `${list.length} ongoing${red ? ` · ${red} overdue` : ''}`, cols: `repeat(${w.stages.length}, minmax(140px,1fr))`,
+        pct: Math.round((list.reduce((a, t) => a + (t.cur + 0.5) / w.stages.length, 0) / list.length) * 100),
+        stages: w.stages.map((name, i) => {
+          const xs = list.filter(t => t.cur === i).sort((a, b) => RANK[a.st] - RANK[b.st]).map(dec), slow = i === slowI && avgs[i] >= 2;
+          return { name, count: xs.length, avg: avgs[i].toFixed(1), avgLabel: xs.length ? `${avgs[i].toFixed(1)}d avg` : '', slow, notSlow: !slow, br: i < w.stages.length - 1 ? '1px solid rgb(244 241 236)' : 'none', bg: slow ? 'rgb(255 250 248)' : '#fff', tasks: xs };
+        }) };
+    }).filter(Boolean);
+
+    const sidePeople = PEOPLE.map(([name, , av]) => {
+      const all = base.filter(t => t.owner === name && matchSt(t)), [, loadFg] = loadOf(all.length);
+      return { name, av, initial: name[0], count: all.length, loadFg, slots: slotsFor(all.slice().sort((a, b) => RANK[a.st] - RANK[b.st])), rowBg: person === name ? 'rgb(246 240 232)' : 'transparent', onFocus: () => this.setState({ person: person === name ? 'All' : name }) };
+    }).sort((a, b) => b.count - a.count);
+
+    const opt = (v, label) => ({ v, label });
+    const filterBits = [sub !== 'All' && sub, wf !== 'All' && WF[wf].name, person !== 'All' && person, status !== 'All' && (status === 'attention' ? 'needs you' : ST[status].label.toLowerCase())].filter(Boolean);
+    return {
+      layouts: [['people', '👥 By people'], ['flow', '🔀 By workflow']].map(([k, label]) => ({ label, ...seg(layout === k), onClick: () => this.setState({ layout: k }) })),
+      isPeople: layout === 'people', isFlow: layout === 'flow',
+      subline: `${statPool.length} ongoing tasks · ${period === 'week' ? 'This week' : period === 'month' ? 'October 2026' : 'Custom range'}${filterBits.length ? ' · ' + filterBits.join(' · ') : ''}`,
+      periods: [['week', 'This week'], ['month', 'This month'], ['custom', 'Custom']].map(([k, label]) => ({ label, ...seg(period === k), onClick: () => this.setState({ period: k }) })),
+      selects: [
+        { value: sub, onChange: e => this.setState({ sub: e.target.value }), opts: [opt('All', 'All subsidiaries'), ...Object.keys(SUBDOT).map(s => opt(s, s))] },
+        { value: wf, onChange: e => this.setState({ wf: e.target.value }), opts: [opt('All', 'All workflows'), ...Object.keys(WF).map(k => opt(k, WF[k].name))] },
+        { value: person, onChange: e => this.setState({ person: e.target.value }), opts: [opt('All', 'All people'), ...PEOPLE.map(p => opt(p[0], p[0]))] },
+      ],
+      hasFilters: filterBits.length > 0, clearFilters: () => this.setState({ sub: 'All', wf: 'All', person: 'All', status: 'All' }),
+      stats: [
+        stat('All', 'Ongoing', statPool.length, 'All active tasks', 'rgb(90 62 43)', 'rgb(51 36 27)'),
+        stat('attention', 'Needs you', cnt('attention'), 'Overdue or awaiting OK', 'rgb(200 52 42)', 'rgb(160 36 30)'),
+        stat('red', 'Overdue', cnt('red'), 'Past due or stuck', 'rgb(200 52 42)', 'rgb(160 36 30)'),
+        stat('risk', 'At risk', cnt('risk'), 'Likely to slip', 'rgb(230 170 60)', 'rgb(150 96 10)'),
+        stat('ok', 'On track', cnt('ok'), 'Moving as planned', 'rgb(60 150 90)', 'rgb(40 110 64)'),
+      ],
+      people: peopleRows, peopleEmpty: !peopleRows.length,
+      flows, flowsEmpty: !flows.length, sidePeople,
+      hasToast: !!this.state.toast, toast: this.state.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

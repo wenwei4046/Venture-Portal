@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>html,body{margin:0;height:100%;overflow:hidden}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="position:relative;width:100vw;height:100vh;min-width:1200px;font-family:'Inter',system-ui,sans-serif">
+  <sc-if value="{{ notPic }}" hint-placeholder-val="{{ true }}">
+    <sc-for list="{{ shells }}" as="s" hint-placeholder-count="1">
+      <dc-import name="Marketing Shell" role="{{ s.role }}" empty="{{ s.empty }}" task-scenario="{{ s.scenario }}" page="myspace" hint-size="100%,100%" style="position:absolute;inset:0"></dc-import>
+    </sc-for>
+  </sc-if>
+  <sc-if value="{{ isPic }}">
+    <div style="position:absolute;inset:0;background:rgb(226 223 218);overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:{{ picPad }}">
+      <div style="width:{{ picW }};height:{{ picH }};border-radius:{{ picR }};overflow:auto;background:rgb(246 245 242);box-shadow:{{ picShadow }};border:{{ picBorder }};flex:none">
+        <sc-if value="{{ picMobile }}" hint-placeholder-val="{{ true }}">
+          <div style="height:44px;background:rgb(18 140 126);color:#fff;display:flex;align-items:center;gap:10px;padding:0 14px;font-size:13px;position:sticky;top:0;z-index:5">
+            <span style="font-size:16px">←</span><span style="font-weight:600;flex:1">{{ picUrl }}</span><span style="opacity:0.8">⋮</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showTrack }}" hint-placeholder-val="{{ true }}">
+          <dc-import name="PIC Link" state="{{ picState }}" desktop="{{ picDesktop }}" hint-size="100%,1400px"></dc-import>
+        </sc-if>
+        <sc-if value="{{ showCal }}">
+          <dc-import name="PIC Calendar" desktop="{{ picDesktop }}" on-open="{{ openTrack }}" on-open-store="{{ openKelvinTask }}" hint-size="100%,1300px"></dc-import>
+        </sc-if>
+        <sc-if value="{{ showKelvinTask }}">
+          <dc-import name="PIC Task Link" desktop="{{ picDesktop }}" hint-size="100%,1200px"></dc-import>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+  <div style="position:fixed;right:20px;bottom:20px;z-index:100;display:flex;align-items:center;gap:6px;padding:6px 6px 6px 14px;border-radius:999px;background:rgb(51 36 27);color:rgb(246 238 230);box-shadow:0 10px 30px rgb(51 36 27 / 0.3);font-size:12px">
+    <span style="opacity:0.7;margin-right:4px;white-space:nowrap">View as</span>
+    <select value="{{ role }}" onChange="{{ onRole }}" style="height:28px;border-radius:999px;border:0;background:rgb(246 238 230);color:rgb(51 36 27);font:inherit;font-weight:600;padding:0 10px;cursor:pointer">
+      <sc-for list="{{ roles }}" as="r" hint-placeholder-count="8"><option value="{{ r.v }}" selected="{{ r.sel }}">{{ r.label }}</option></sc-for>
+    </select>
+    <div style="width:1px;height:18px;background:rgb(246 238 230 / 0.25);margin:0 4px"></div>
+    <sc-if value="{{ notPic }}" hint-placeholder-val="{{ true }}">
+      <select value="{{ scenario }}" onChange="{{ onScenario }}" title="Task page state" style="height:28px;border-radius:999px;border:1px solid rgb(246 238 230 / 0.3);background:rgb(51 36 27);color:rgb(246 238 230);font:inherit;padding:0 8px;cursor:pointer">
+        <sc-for list="{{ scenarios }}" as="o" hint-placeholder-count="6"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for>
+      </select>
+      <div onClick="{{ toggleEmpty }}" style="height:28px;padding:0 12px;border-radius:999px;display:flex;align-items:center;cursor:pointer;white-space:nowrap;background:{{ emptyBg }};color:{{ emptyFg }}">Empty data</div>
+    </sc-if>
+    <sc-if value="{{ isPic }}">
+      <select value="{{ picState }}" onChange="{{ onPicState }}" title="Link state" style="height:28px;border-radius:999px;border:1px solid rgb(246 238 230 / 0.3);background:rgb(51 36 27);color:rgb(246 238 230);font:inherit;padding:0 8px;cursor:pointer">
+        <sc-for list="{{ picStates }}" as="o" hint-placeholder-count="6"><option value="{{ o.v }}" selected="{{ o.sel }}">{{ o.l }}</option></sc-for>
+      </select>
+      <sc-for list="{{ devices }}" as="d" hint-placeholder-count="2">
+        <div onClick="{{ d.onClick }}" style="height:28px;padding:0 12px;border-radius:999px;display:flex;align-items:center;cursor:pointer;white-space:nowrap;background:{{ d.bg }};color:{{ d.fg }}">{{ d.label }}</div>
+      </sc-for>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mm&quot;,&quot;director&quot;,&quot;editor&quot;,&quot;staff&quot;,&quot;designer&quot;,&quot;ads&quot;,&quot;pic&quot;,&quot;pic2&quot;],&quot;default&quot;:&quot;director&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { role: this.props.role ?? 'director', empty: false, scenario: 'normal', picState: 'approval', kState: 'task', device: 'mobile' };
+  renderVals() {
+    const { role, empty, scenario, picState, kState, device } = this.state;
+    const opts = [['mm', 'Rachel · MM'], ['director', 'Mei · Director'], ['editor', 'Ali · Editor'], ['staff', 'Jason · Social Media'], ['designer', 'Siti · Designer'], ['ads', 'Wei Lun · Ads'], ['pic', 'Carmen · PIC link (2990 Home)'], ['pic2', 'Kelvin · PIC link (Carres)']];
+    const isPic = role === 'pic' || role === 'pic2', kelvin = role === 'pic2', mobile = device === 'mobile';
+    const on = v => ({ bg: v ? 'rgb(246 238 230)' : 'transparent', fg: v ? 'rgb(51 36 27)' : 'rgb(246 238 230)' });
+    const curState = kelvin ? kState : picState;
+    return {
+      shells: [{ role, empty, scenario }], role,
+      onRole: e => this.setState({ role: e.target.value }),
+      isPic, notPic: !isPic,
+      scenario, onScenario: e => this.setState({ scenario: e.target.value }),
+      scenarios: [['normal', 'Task: Normal (overdue)'], ['submitted', 'Task: Submitted'], ['changes', 'Task: Changes requested'], ['required', 'Task: Required missing'], ['editing', 'Task: Mei is editing'], ['returned', 'Task: Returned 3×']].map(([v, l]) => ({ v, l, sel: v === scenario })),
+      roles: opts.map(([v, label]) => ({ v, label, sel: v === role })),
+      toggleEmpty: () => this.setState(s => ({ empty: !s.empty })),
+      emptyBg: empty ? 'rgb(246 238 230)' : 'transparent', emptyFg: empty ? 'rgb(51 36 27)' : 'rgb(246 238 230)',
+      showTrack: !kelvin && picState !== 'calendar', showCal: (kelvin && kState === 'calendar') || (!kelvin && picState === 'calendar'), showKelvinTask: kelvin && kState === 'task',
+      picUrl: (kelvin && kState === 'calendar') || (!kelvin && picState === 'calendar') ? 'houzs.link/cal/carres' : kelvin ? 'houzs.link/t/car-2611-r01' : 'houzs.link/t/2990-2610-018',
+      openTrack: () => this.setState(kelvin ? { kState: 'task' } : { picState: 'approval' }),
+      openKelvinTask: () => this.setState({ kState: 'task' }),
+      picState: curState, onPicState: e => this.setState(kelvin ? { kState: e.target.value } : { picState: e.target.value }),
+      picStates: (kelvin ? [['task', 'Link: Carres Social Media Monthly'], ['calendar', 'Link: Carres calendar']] : [['calendar', 'Calendar link (Carres · Kelvin)'], ['approval', 'Link: Waiting for your approval'], ['overdue', 'Link: Overdue (4+ working hrs)'], ['updated', 'Link: Updated after approval'], ['working', 'Link: Marketing is working'], ['allApproved', 'Link: All approved'], ['ads', 'Link: Ads project · reports']]).map(([v, l]) => ({ v, l, sel: v === curState })),
+      devices: [['mobile', 'Mobile 390'], ['desktop', 'Desktop']].map(([k, label]) => ({ label, ...on(device === k), onClick: () => this.setState({ device: k }) })),
+      picMobile: mobile, picDesktop: !mobile,
+      picW: mobile ? '390px' : '100%', picH: mobile ? '844px' : '100%', picR: mobile ? '28px' : '0',
+      picPad: mobile ? '28px 0 90px' : '0', picShadow: mobile ? '0 30px 80px rgb(0 0 0 / 0.25)' : 'none', picBorder: mobile ? '8px solid rgb(30 28 26)' : 'none',
+    };
+  }
+}
+</script>
+</body>
+</html>

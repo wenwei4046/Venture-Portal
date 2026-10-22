@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Nunito:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap">
+<style>body{margin:0}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="position:relative;width:100%;height:100%;display:flex;background:rgb(243 243 241);font-family:{{ fontFamily }};font-size:{{ basePx }}px;color:rgb(51 36 27);overflow:hidden;line-height:normal">
+
+  <aside style="box-sizing:content-box;width:{{ sideW }}px;flex:none;display:flex;flex-direction:column;background:rgb(248 245 240);border-right:1px solid rgb(229 222 211);overflow:hidden;transition:width .28s cubic-bezier(0.2,0.8,0.2,1)">
+    <div style="padding:20px 8px 22px 16px;display:flex;align-items:center;gap:8px">
+      <div onClick="{{ toggleCollapse }}" title="{{ tileTitle }}" style="width:32px;height:32px;flex:none;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.06)">H</div>
+      <sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden">
+          <div style="font-size:1.04em;font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis">HOUZS Marketing</div>
+          <div style="font-size:0.85em;color:rgb(117 100 86);line-height:1.4">8 subsidiaries</div>
+        </div>
+        <div title="{{ userTitle }}" style="width:28px;height:28px;flex:none;border-radius:50%;background:{{ avatarBg }};color:rgb(51 36 27);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">{{ initials }}</div>
+        <div onClick="{{ toggleCollapse }}" title="Collapse sidebar" style="width:20px;height:24px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);font-size:14px;cursor:pointer" style-hover="background:rgb(241 236 228)">«</div>
+      </sc-if>
+    </div>
+
+    <div style="flex:1;padding:2px 10px 12px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+        <sc-if value="{{ r.isNav }}">
+          <div onClick="{{ r.onClick }}" title="{{ r.label }}" style="position:relative;flex:none;height:{{ rowH }}px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;background:{{ r.bg }};color:{{ r.color }};font-weight:{{ r.weight }};font-size:1.04em;white-space:nowrap;transition:background-color .15s" style-hover="background:rgb(241 236 228)">
+            <sc-if value="{{ r.active }}"><div style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:rgb(90 62 43)"></div></sc-if>
+            <div style="position:relative;width:{{ tileS }}px;height:{{ tileS }}px;flex:none;border-radius:8px;background:{{ r.tone }};display:flex;align-items:center;justify-content:center;font-size:15px;transform:{{ r.tileT }};transition:transform .25s cubic-bezier(0.2,0.8,0.2,1)">
+              {{ r.emoji }}
+              <sc-if value="{{ r.showDot }}"><div style="position:absolute;top:-5px;right:-7px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid rgb(248 245 240)">{{ r.count }}</div></sc-if>
+            </div>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:{{ labelOp }};transition:opacity .2s">{{ r.label }}</span>
+            <sc-if value="{{ r.showChev }}"><span style="width:16px;height:16px;flex:none;display:flex;align-items:center;justify-content:center;transform:{{ r.chevT }};transition:transform .2s"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgb(117 100 86)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,3.5 5,6.5 8,3.5"></polyline></svg></span></sc-if>
+            <sc-if value="{{ r.showPill }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.isSub }}">
+          <div onClick="{{ r.onClick }}" title="{{ r.label }}" style="flex:none;height:{{ subH }}px;display:flex;align-items:center;gap:8px;padding:0 8px 0 16px;border-radius:6px;cursor:pointer;font-size:0.96em;color:rgb(74 64 58);font-weight:{{ r.weight }};background:{{ r.bg }};white-space:nowrap" style-hover="background:rgb(241 236 228)">
+            <span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ r.dot }}"></span>
+            <span style="font-size:13px;width:18px;text-align:center;flex:none">{{ r.emoji }}</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+            <sc-if value="{{ r.showPill }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.isAdd }}">
+          <div style="flex:none;height:{{ subH }}px;display:flex;align-items:center;gap:8px;padding:0 8px 0 15px;border-radius:6px;cursor:pointer;font-size:0.96em;color:rgb(117 100 86);white-space:nowrap" style-hover="background:rgb(241 236 228);color:rgb(51 36 27)">
+            <span style="width:9px;flex:none;text-align:center;font-size:13px">+</span>
+            <span>Add subsidiary</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.isDivider }}"><div style="flex:none;height:1px;margin:10px 6px 4px;background:rgb(229 222 211)"></div></sc-if>
+        <sc-if value="{{ r.isSection }}"><div style="flex:none;padding:8px 10px 6px;font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86);white-space:nowrap">Manager tools</div></sc-if>
+      </sc-for>
+    </div>
+
+    <div style="border-top:1px solid rgb(229 222 211);padding:10px">
+      <sc-for list="{{ footRows }}" as="r" hint-placeholder-count="1">
+        <div onClick="{{ r.onClick }}" title="{{ r.label }}" style="position:relative;height:{{ rowH }}px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;background:{{ r.bg }};color:{{ r.color }};font-weight:{{ r.weight }};font-size:1.04em;white-space:nowrap" style-hover="background:rgb(241 236 228)">
+          <sc-if value="{{ r.active }}"><div style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:rgb(90 62 43)"></div></sc-if>
+          <div style="width:{{ tileS }}px;height:{{ tileS }}px;flex:none;border-radius:8px;background:{{ r.tone }};display:flex;align-items:center;justify-content:center;font-size:15px;transform:{{ r.tileT }}">{{ r.emoji }}</div>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:{{ labelOp }};transition:opacity .2s">{{ r.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:60px;flex:none;box-sizing:border-box;background:#fff;margin:10px 10px 0;border-radius:16px;border:1px solid rgb(229 228 223);padding:0 12px 0 22px;display:flex;align-items:center;gap:20px">
+      <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;color:rgb(43 31 23)">
+        <span style="font-size:15px">{{ crumbEmoji }}</span>
+        <span style="font-size:1.04em;font-weight:500">{{ crumbLabel }}</span>
+      </div>
+      <div style="width:440px;max-width:100%;height:36px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;background:rgb(246 246 244);border:1px solid rgb(232 225 216);border-radius:8px;color:rgb(117 100 86);cursor:text" style-hover="border-color:rgb(214 204 190)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="4.5"></circle><line x1="9.4" y1="9.4" x2="13" y2="13"></line></svg>
+        <span style="flex:1;font-size:0.96em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Search Track ID, task or person</span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;border:1px solid rgb(229 222 211);background:#fff;border-radius:4px;padding:2px 5px">⌘K</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div onClick="{{ onNew }}" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);font-size:1em;font-weight:500;cursor:pointer;white-space:nowrap;transition:background-color .15s" style-hover="background:#E0893F">
+          <span style="font-size:15px;line-height:1">+</span><span>{{ newLabel }}</span>
+        </div>
+        <div onClick="{{ toggleNotif }}" title="Notifications" style="position:relative;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:{{ bellBg }}" style-hover="background:rgb(241 236 228)">
+          🔔
+          <sc-if value="{{ hasNotif }}"><div style="position:absolute;top:3px;right:2px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">1</div></sc-if>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;margin:10px;background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);overflow:auto">
+      <sc-if value="{{ isOther }}">
+        <div style="max-width:880px;margin:0 auto;padding:56px 48px;box-sizing:border-box">
+          <div style="font-size:40px;line-height:1">{{ crumbEmoji }}</div>
+          <div style="font-size:2.3em;font-weight:600;letter-spacing:-0.01em;margin-top:14px">{{ crumbLabel }}</div>
+          <div style="margin-top:36px;height:420px;border-radius:12px;border:1px dashed rgb(229 222 211);background:repeating-linear-gradient(135deg, rgb(248 246 242) 0 10px, rgb(252 251 249) 10px 20px);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);background:#fff;padding:4px 8px;border-radius:4px;border:1px solid rgb(229 222 211)">{{ crumbLabel }} — designed in a later module</span>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ hasCalendar }}">
+        <dc-import name="Calendar" viewer="{{ viewerName }}" empty="{{ pageEmpty }}" on-open-task="{{ openTask }}" hint-size="100%,1000px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasPage }}">
+        <dc-import name="My Space" user="{{ pageUser }}" tab="{{ pageTab }}" view="{{ pageView }}" empty="{{ pageEmpty }}" on-open-task="{{ openTask }}" hint-size="100%,900px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasTask }}">
+<sc-if value="{{ isStoreTask }}"><dc-import name="New Task Page" task-id="{{ taskId }}" viewer="{{ viewerName }}" on-back="{{ closeTask }}" hint-size="100%,1200px"></dc-import></sc-if>
+        <sc-if value="{{ notStoreTask }}">        <dc-import name="Task Page" viewer="{{ pageUser }}" scenario="{{ taskScenario }}" back-label="{{ backLabel }}" on-back="{{ closeTask }}" on-reassign="{{ openPlanMid }}" hint-size="100%,1400px"></dc-import></sc-if>
+      </sc-if>
+      <sc-if value="{{ hasNewProject }}">
+        <dc-import name="New Project" on-cancel="{{ closeNew }}" on-open-task="{{ openTaskNew }}" on-plan="{{ openPlanNew }}" hint-size="100%,1400px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasPlan }}">
+        <dc-import name="Assignment Plan" scenario="{{ planScenario }}" on-back="{{ closePlan }}" hint-size="100%,1300px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasLibrary }}">
+        <dc-import name="Library" hint-size="100%,1100px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasDashboard }}">
+        <dc-import name="Tracking Dashboard" on-open-task="{{ openTask }}" hint-size="100%,1400px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasReplace }}">
+        <dc-import name="Replace Person" hint-size="100%,1100px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasMinutes }}">
+        <dc-import name="Minutes Builder" hint-size="100%,1000px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasProduct }}">
+        <dc-import name="Product Builder" on-open-workflow="{{ openWorkflow }}" hint-size="100%,1300px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasWorkflow }}">
+        <dc-import name="Workflow Builder" new-name="{{ wfNewName }}" new-tpl="{{ wfNewTpl }}" new-sub="{{ wfNewSub }}" hint-size="100%,900px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ hasSubPage }}">
+        <dc-import name="Subsidiary Page" on-open-task="{{ openTask }}" hint-size="100%,1500px"></dc-import>
+      </sc-if>
+      <sc-if value="{{ noPage }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:880px;margin:0 auto;padding:56px 48px;box-sizing:border-box">
+        <div style="font-size:40px;line-height:1">🏠</div>
+        <div style="font-size:2.3em;font-weight:600;letter-spacing:-0.01em;margin-top:14px">My Space</div>
+        <div style="font-size:1.08em;color:rgb(90 78 68);margin-top:6px">Good afternoon, <span style="color:rgb(46 92 138)">{{ firstName }}</span>.</div>
+        <sc-if value="{{ notEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:36px;height:440px;border-radius:12px;border:1px dashed rgb(229 222 211);background:repeating-linear-gradient(135deg, rgb(248 246 242) 0 10px, rgb(252 251 249) 10px 20px);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);background:#fff;padding:4px 8px;border-radius:4px;border:1px solid rgb(229 222 211)">My Space content — Module 2</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ empty }}">
+          <div style="margin-top:72px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px">
+            <div style="width:112px;height:112px;border-radius:50%;background:oklch(0.95 0.03 235);display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:10px">☕</div>
+            <div style="font-size:1.25em;font-weight:600">Nothing on your plate yet</div>
+            <div style="font-size:1em;color:rgb(117 100 86);max-width:340px;text-wrap:pretty">When Rachel or Daniel puts you on an Assignment plan, your tasks land here.</div>
+          </div>
+        </sc-if>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ showNotif }}">
+    <div style="position:absolute;top:76px;right:20px;width:380px;z-index:20;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.18), 0 2px 6px rgb(51 36 27 / 0.06);padding:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 10px 8px">
+        <span style="font-size:1.08em;font-weight:600">Notifications</span>
+        <sc-if value="{{ hasNotif }}"><span style="font-size:0.92em;color:rgb(117 100 86);cursor:pointer">Mark all as read</span></sc-if>
+      </div>
+      <sc-if value="{{ hasNotif }}">
+        <div style="display:flex;gap:12px;padding:10px;border-radius:8px;background:rgb(250 248 244);cursor:pointer" style-hover="background:rgb(241 236 228)">
+          <div style="width:34px;height:34px;flex:none;border-radius:8px;background:oklch(0.94 0.04 295);display:flex;align-items:center;justify-content:center;font-size:16px">🎬</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:1em;line-height:1.45;color:rgb(51 36 27);text-wrap:pretty">You're on the plan for "Carres Year-End Video" — Stage 3, starts 12 Nov</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.85em;color:rgb(117 100 86);white-space:nowrap">
+              <span>Assignment plan</span><span>·</span><span>2h ago</span>
+            </div>
+          </div>
+          <div style="width:7px;height:7px;border-radius:50%;background:rgb(90 62 43);margin-top:6px;flex:none"></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noNotif }}">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:24px 20px 28px">
+          <div style="width:64px;height:64px;border-radius:50%;background:oklch(0.95 0.03 295);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:6px">🎈</div>
+          <div style="font-size:1.04em;font-weight:600">You're all caught up</div>
+          <div style="font-size:0.92em;color:rgb(117 100 86)">New plans and approvals will show up here.</div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showAppearance }}">
+    <div style="position:absolute;left:{{ panelLeft }}px;bottom:66px;width:320px;z-index:20;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.18), 0 2px 6px rgb(51 36 27 / 0.06);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1.08em;font-weight:600">Appearance</span>
+        <span onClick="{{ closePanel }}" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;font-size:16px" style-hover="background:rgb(241 236 228)">×</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Font size</span>
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ basePx }}px</span>
+        </div>
+        <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+          <sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="4">
+            <div onClick="{{ o.onClick }}" style="flex:1;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:{{ o.px }}px;color:rgb(51 36 27)">{{ o.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Font</span>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <sc-for list="{{ fontOpts }}" as="o" hint-placeholder-count="3">
+            <div onClick="{{ o.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px 8px;border-radius:8px;cursor:pointer;border:{{ o.border }};background:{{ o.bg }}">
+              <span style="font-family:{{ o.family }};font-size:22px;font-weight:500;color:rgb(51 36 27)">Aa</span>
+              <span style="font-size:11px;color:rgb(90 78 68);white-space:nowrap">{{ o.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Density</span>
+        <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+          <sc-for list="{{ densityOpts }}" as="o" hint-placeholder-count="2">
+            <div onClick="{{ o.onClick }}" style="flex:1;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.96em;color:rgb(51 36 27)">{{ o.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgb(240 236 230);padding-top:12px;font-size:0.88em;color:rgb(117 100 86)">
+        <span>Changes apply instantly</span>
+        <span onClick="{{ resetAppearance }}" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px">Reset</span>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mm&quot;,&quot;staff&quot;,&quot;director&quot;],&quot;default&quot;:&quot;mm&quot;,&quot;tsType&quot;:&quot;'mm'|'staff'|'director'&quot;},&quot;collapsed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;panel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;notifications&quot;,&quot;appearance&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;page&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;myspace&quot;,&quot;calendar&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;month&quot;,&quot;list&quot;],&quot;default&quot;:&quot;month&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const SIZES = { S: 12, M: 13, L: 14.5, XL: 16 };
+const FONTS = [
+  { name: 'Inter', family: "'Inter', system-ui, sans-serif" },
+  { name: 'Nunito', family: "'Nunito', system-ui, sans-serif" },
+  { name: 'IBM Plex', family: "'IBM Plex Sans', system-ui, sans-serif" },
+];
+const SUBS = [
+  { name: 'Carres', emoji: '🛋️', dot: 'oklch(0.70 0.12 235)' },
+  { name: '2990 Home', emoji: '🏡', dot: 'oklch(0.64 0.15 295)' },
+  { name: 'Houzs Century', emoji: '🏛️', dot: 'oklch(0.52 0.06 55)' },
+  { name: 'Hookka', emoji: '🪴', dot: 'oklch(0.70 0.13 345)' },
+  { name: 'Colive', emoji: '🛏️', dot: 'oklch(0.66 0.10 195)' },
+  { name: 'Dreamcrafter', emoji: '✨', dot: 'oklch(0.56 0.15 270)' },
+  { name: 'CMI', emoji: '🔩', dot: 'oklch(0.60 0.03 250)' },
+  { name: 'The Conts', emoji: '🚚', dot: 'oklch(0.62 0.12 320)' },
+];
+const COUNTS = {
+  mm: { myspace: 2, calendar: 1, projects: 3, subs: { '2990 Home': 2, Carres: 1 } },
+  staff: { myspace: 1, calendar: 1, projects: 0, subs: { '2990 Home': 1 } },
+  empty: { myspace: 0, calendar: 0, projects: 0, subs: {} },
+  director: { myspace: 2, calendar: 0, projects: 0, subs: { Carres: 1, 'Houzs Century': 1 } },
+  editor: { myspace: 1, calendar: 0, projects: 0, subs: { '2990 Home': 1 } },
+  designer: { myspace: 0, calendar: 0, projects: 0, subs: {} },
+  ads: { myspace: 0, calendar: 0, projects: 0, subs: {} },
+};
+const USERS = {
+  mm: { first: 'Rachel', initials: 'R', title: 'Rachel · Marketing Manager', bg: 'oklch(0.90 0.05 195)' },
+  staff: { first: 'Jason', initials: 'J', title: 'Jason · Social Media', bg: 'oklch(0.90 0.05 235)' },
+  director: { first: 'Mei', initials: 'M', title: 'Mei · Director', bg: 'oklch(0.90 0.05 295)' },
+  editor: { first: 'Ali', initials: 'A', title: 'Ali · Editor', bg: 'oklch(0.90 0.05 270)' },
+  designer: { first: 'Siti', initials: 'S', title: 'Siti · Graphic Designer', bg: 'oklch(0.92 0.04 350)' },
+  ads: { first: 'Wei Lun', initials: 'W', title: 'Wei Lun · Ads', bg: 'oklch(0.90 0.05 270)' },
+};
+const CRUMB = { myspace: ['🏠', 'My Space'], settings: ['⚙️', 'Settings'], calendar: ['📅', 'Calendar'], subs: ['🏢', 'Subsidiaries'], projects: ['📁', 'Projects'], workflow: ['🧩', 'Workflow Builder'], product: ['📦', 'Product Builder'], minutes: ['📝', 'Minutes Builder'], replace: ['🔁', 'Replace Person'], dashboard: ['📊', 'Tracking Dashboard'], library: ['📚', 'Library'] };
+
+class Component extends DCLogic {
+  state = {
+    collapsed: this.props.collapsed ?? false,
+    panel: this.props.panel ?? 'none',
+    subsOpen: true, active: 'myspace',
+    size: 'M', font: 'Inter', density: 'comfortable',
+  };
+  componentDidUpdate(prev) {
+    if (prev.role !== this.props.role) this.setState({ active: 'myspace', task: null, plan: null, newProject: false, panel: 'none' });
+  }
+  setPanel(p) { this.setState(s => ({ panel: s.panel === p ? 'none' : p })); }
+  renderVals() {
+    const role = this.props.role ?? 'mm';
+    const isEmpty = !!this.props.empty;
+    const mm = role === 'mm';
+    const c = isEmpty ? COUNTS.empty : COUNTS[role];
+    const u = USERS[role];
+    const { collapsed, panel, subsOpen, size, font, density } = this.state;
+    const compact = density === 'compact';
+    const active = panel === 'appearance' ? 'settings' : this.state.active;
+    const go = key => () => this.setState({ active: key, panel: 'none', task: null, newProject: false, plan: null, wfNew: null });
+    const nav = (key, emoji, label, tone, count, extra = {}) => {
+      const on = active === key;
+      return {
+        isNav: true, key, emoji, label, tone, count, active: on,
+        bg: on ? 'rgb(236 229 219)' : 'transparent',
+        color: on ? 'rgb(51 36 27)' : 'rgb(74 64 58)',
+        weight: on ? 500 : 400,
+        tileT: on ? 'scale(1.06)' : 'scale(1)',
+        showPill: !collapsed && count > 0,
+        showDot: collapsed && count > 0,
+        showChev: false, chevT: 'rotate(0deg)',
+        onClick: go(key),
+        ...extra,
+      };
+    };
+    const subTotal = Object.values(c.subs).reduce((a, b) => a + b, 0);
+    const rows = [
+      nav('myspace', '🏠', 'My Space', 'rgb(239 228 217)', c.myspace),
+      nav('calendar', '📅', 'Calendar', 'rgb(230 237 241)', c.calendar),
+      nav('subs', '🏢', 'Subsidiaries', 'rgb(249 231 216)', subsOpen && !collapsed ? 0 : subTotal, {
+        showChev: !collapsed, chevT: subsOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+        onClick: () => this.setState(s => ({ subsOpen: !s.subsOpen })),
+      }),
+    ];
+    if (subsOpen && !collapsed) {
+      const subs = SUBS.map((s, i) => ({ ...s, count: c.subs[s.name] || 0, i }))
+        .sort((a, b) => (b.count > 0) - (a.count > 0) || b.count - a.count || a.i - b.i);
+      subs.forEach(s => {
+        const on = active === 'sub:' + s.name;
+        rows.push({ isSub: true, label: s.name, emoji: s.emoji, dot: s.dot, count: s.count, showPill: s.count > 0, bg: on ? 'rgb(236 229 219)' : 'transparent', weight: on ? 500 : 400, onClick: go('sub:' + s.name) });
+      });
+      if (mm) rows.push({ isAdd: true });
+    }
+    rows.push(nav('projects', '📁', 'Projects', 'rgb(239 228 217)', c.projects));
+    rows.push(nav('library', '📚', 'Library', 'rgb(230 237 241)', 0));
+    if (mm) {
+      rows.push({ isDivider: true });
+      if (!collapsed) rows.push({ isSection: true });
+      rows.push(nav('dashboard', '📊', 'Tracking Dashboard', 'rgb(239 228 217)', isEmpty ? 0 : 5));
+      rows.push(nav('workflow', '🧩', 'Workflow Builder', 'rgb(230 237 241)', 0));
+      rows.push(nav('product', '📦', 'Product Builder', 'rgb(249 231 216)', 0));
+      rows.push(nav('minutes', '📝', 'Minutes Builder', 'rgb(246 238 222)', 0));
+      rows.push(nav('replace', '🔁', 'Replace Person', 'rgb(230 237 241)', 0));
+    }
+    const footRows = [nav('settings', '⚙️', 'Settings', 'rgb(239 228 217)', 0, { onClick: () => this.setPanel('appearance') })];
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const hasNotif = !isEmpty;
+    const subHit = active.startsWith('sub:') ? SUBS.find(s => 'sub:' + s.name === active) : null;
+    const base = subHit ? [subHit.emoji, subHit.name] : (CRUMB[active] || CRUMB.myspace);
+    const crumb = this.state.plan ? ['📁', 'Projects  /  Assignment plan'] : this.state.newProject ? ['📁', 'Projects  /  New project'] : this.state.task ? [base[0], `${base[1]}  /  ${((window.__hmStore && window.__hmStore.tasks.find(x => x.topLeft === this.state.task)) || { title: 'Red Truck Reels' }).title}`] : base;
+    const page = this.props.page;
+    const plan = this.state.plan;
+    const np = !!this.state.newProject || !!plan;
+    return {
+      rows, footRows,
+      hasPage: !!page && !this.state.task && !np && (active === 'myspace' || active === 'settings'), noPage: !page,
+      hasSubPage: !!page && !this.state.task && !np && active === 'sub:Carres',
+      isOther: !!page && !this.state.task && !np && !['myspace', 'settings', 'sub:Carres', 'workflow', 'product', 'replace', 'dashboard', 'library', 'minutes', 'calendar'].includes(active),
+      hasCalendar: !!page && !this.state.task && !np && active === 'calendar',
+      hasLibrary: !!page && !this.state.task && !np && active === 'library',
+      isEmptyFlag: isEmpty,
+      hasDashboard: !!page && !this.state.task && !np && active === 'dashboard',
+      hasReplace: !!page && !this.state.task && !np && active === 'replace',
+      hasProduct: !!page && !this.state.task && !np && active === 'product',
+      hasMinutes: !!page && !this.state.task && !np && active === 'minutes',
+      hasWorkflow: !!page && !this.state.task && !np && active === 'workflow',
+      hasTask: !!page && !!this.state.task && !np,
+      taskId: this.state.task, viewerName: u.first,
+      isStoreTask: !!(window.__hmStore && this.state.task && window.__hmStore.tasks.some(x => x.topLeft === this.state.task)),
+      notStoreTask: !(window.__hmStore && this.state.task && window.__hmStore.tasks.some(x => x.topLeft === this.state.task)),
+      hasNewProject: !!page && !!this.state.newProject && !plan,
+      hasPlan: !!page && !!plan, planScenario: plan || 'plan',
+      openPlanNew: product => this.setState({ plan: product && /social/i.test(product) ? 'recurring' : 'plan' }),
+      openPlanMid: () => this.setState({ plan: 'midway' }),
+      closePlan: () => this.setState({ plan: null, newProject: false, task: null, active: 'projects' }),
+      onNew: () => mm && this.setState({ newProject: true, task: null, panel: 'none' }),
+      closeNew: () => this.setState({ newProject: false, active: 'projects' }),
+      backLabel: subHit ? subHit.name : (CRUMB[active] || CRUMB.myspace)[1],
+      openWorkflow: o => this.setState({ active: 'workflow', panel: 'none', wfNew: o || null }),
+      wfNewName: this.state.wfNew ? this.state.wfNew.name : '', wfNewSub: this.state.wfNew ? this.state.wfNew.sub : '', wfNewTpl: this.state.wfNew ? this.state.wfNew.tpl : '',
+      openTask: id => this.setState({ task: id || 'MKT-2990-2610-018', panel: 'none' }),
+      closeTask: () => this.setState({ task: null }),
+      openTaskNew: id => this.setState({ newProject: false, task: id, active: 'projects', panel: 'none' }),
+      taskScenario: this.props.taskScenario ?? 'normal',
+      pageUser: ({ director: 'mei', staff: 'jason', editor: 'ali', mm: 'rachel', designer: 'siti', ads: 'weilun' })[role],
+      pageTab: page === 'calendar' ? 'calendar' : 'overview',
+      pageView: this.props.view ?? 'month',
+      pageEmpty: isEmpty,
+      fontFamily: FONTS.find(f => f.name === font).family,
+      basePx: SIZES[size],
+      sideW: collapsed ? 64 : 248,
+      expanded: !collapsed,
+      labelOp: collapsed ? 0 : 1,
+      rowH: compact ? 30 : 38,
+      subH: compact ? 26 : 30,
+      tileS: compact ? 24 : 28,
+      tileTitle: collapsed ? 'Expand sidebar' : 'HOUZS Marketing',
+      toggleCollapse: () => this.setState(s => ({ collapsed: !s.collapsed })),
+      initials: u.initials, userTitle: u.title, avatarBg: u.bg, firstName: u.first,
+      newLabel: mm ? 'New Project' : 'New Page',
+      crumbEmoji: crumb[0], crumbLabel: crumb[1],
+      hasNotif, noNotif: !hasNotif,
+      showNotif: panel === 'notifications',
+      bellBg: panel === 'notifications' ? 'rgb(241 236 228)' : 'transparent',
+      toggleNotif: () => this.setPanel('notifications'),
+      showAppearance: panel === 'appearance',
+      panelLeft: collapsed ? 74 : 10,
+      closePanel: () => this.setState({ panel: 'none' }),
+      notEmpty: !isEmpty, empty: isEmpty,
+      sizeOpts: Object.keys(SIZES).map(k => ({ label: k, px: SIZES[k], ...seg(size === k), onClick: () => this.setState({ size: k }) })),
+      fontOpts: FONTS.map(f => ({
+        name: f.name, family: f.family,
+        border: font === f.name ? '1.5px solid rgb(90 62 43)' : '1.5px solid rgb(232 225 216)',
+        bg: font === f.name ? 'rgb(250 248 244)' : '#fff',
+        onClick: () => this.setState({ font: f.name }),
+      })),
+      densityOpts: [['compact', 'Compact'], ['comfortable', 'Comfortable']].map(([k, l]) => ({ label: l, ...seg(density === k), onClick: () => this.setState({ density: k }) })),
+      resetAppearance: () => this.setState({ size: 'M', font: 'Inter', density: 'comfortable' }),
+    };
+  }
+}
+</script>
+</body>
+</html>
