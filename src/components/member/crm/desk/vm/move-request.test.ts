@@ -18,6 +18,7 @@ const BEN = person("ben", "BEN", "rs", "anna", "Revenue Specialist");
 const customer = (id: string, assignedTo: string | null): CrmCustomer => ({
   id, name: `Customer ${id}`, phone: "60123456789", channel: "whatsapp", adId: null, ad: "WhatsApp · no ad", status: "follow_up",
   wonAmount: null, assignedTo, teamId: null, lastCustomerAt: null, createdAt: "2026-10-20T02:00:00Z", unread: 0, messages: [],
+  details: { type: "", size: "", loc: "", req: "", budget: "" }, detailsSaved: false,
 });
 
 function ctxOf(me: CrmPerson, opts: { chat?: string; kind?: string; invites?: CrmInvite[]; alR?: "all" | "unread" | "read" } = {}) {
