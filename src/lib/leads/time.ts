@@ -20,3 +20,13 @@ export function whenShort(iso: string, today: string): string {
 export function whenFull(iso: string): string {
   return formatIntlDate(new Date(iso), { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }, 'en-GB')
 }
+
+/** 14:05, in the office's time. */
+export function timeOf(iso: string): string {
+  return formatIntlDate(new Date(iso), { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }, 'en-GB')
+}
+
+/** 16 Oct — a day's rule in the chat (Inbox v2, 2026-10-22). */
+export function dayLabel(iso: string): string {
+  return formatIntlDate(new Date(iso), { timeZone: TZ, day: 'numeric', month: 'short' }, 'en-GB')
+}

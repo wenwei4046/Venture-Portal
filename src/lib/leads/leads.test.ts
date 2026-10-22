@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findPhone, formatPhone, whatsAppLink } from './phone'
-import { handoffText, inboxState, suggestedSales } from './handoff'
+import { handoffText, inboxState, suggestedSales, visitDay } from './handoff'
 import { leadInsight, rate } from './insight'
 import type { LeadContact, LeadSales } from './types'
 
@@ -43,11 +43,24 @@ describe('handing a lead over', () => {
   })
   it('writes what the salesperson needs, and says what is missing', () => {
     const text = handoffText(contact(), '2990s', { name: 'Daniel' }, 'Mei Ling')
-    expect(text).toContain('012-338 4721')
-    expect(text).toContain('Oct Sofa Week')
-    expect(text).toContain('[not set 未定]')
-    expect(text).toContain('Daniel')
-    expect(text).not.toContain('Note 备注')
+    // Inbox v2's message (2026-10-22): one line a field, "-" where nothing is known.
+    expect(text.split('\n')).toEqual([
+      'Hi Daniel, new lead from Lead View / 新客户',
+      'Name 姓名: Aisyah',
+      'Phone 电话: 012-338 4721',
+      'Interest 兴趣: L 型沙發',
+      'Budget 预算: -',
+      'Showroom 门市: -',
+      'Date 日期: 週六',
+      'Source 来源: Ad · Oct Sofa Week',
+      'Note 备注: -',
+      'CS: Mei Ling',
+    ])
+  })
+  it('says a picked day as a day, and leaves words typed before as they are', () => {
+    expect(visitDay('2026-10-24')).toBe('Sat 24 Oct')
+    expect(visitDay('Sunday afternoon')).toBe('Sunday afternoon')
+    expect(visitDay(' ')).toBe('-')
   })
   it('says where a conversation stands', () => {
     expect(inboxState(contact())).toBe('waiting')

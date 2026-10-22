@@ -21,7 +21,7 @@ import RouteFreshener from './RouteFreshener'
 import HrSidebar from './HrSidebar'
 import HrTopBar from './HrTopBar'
 import FinSidebar from './FinSidebar'
-import LeadSidebar from './LeadSidebar'
+import LeadShell from './LeadShell'
 import { isLeadViewPath } from './lead-nav'
 import ViewingAsBanner from './ViewingAsBanner'
 import { isHrView } from '@/lib/hr-view'
@@ -119,7 +119,25 @@ export default function PortalFrame({
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
 
-  if (hr || finShell || lead) {
+  if (lead) {
+    // Lead View's own shell (2026-10-22, the redesign v2 handoff): the dark sidebar and its top bar, its theme and
+    // faces. On a phone the portal's top bar and tab bar, as every view.
+    return (
+      <>
+        <div className="print:hidden contents md:hidden">
+          <TopBar user={user} fin={false} />
+        </div>
+        <LeadShell user={user} initialCollapsed={hrNavCollapsed}>{children}</LeadShell>
+        <BottomTabBar role={user.role} viewer={navUser} moreOpen={moreOpen} onMoreClick={() => setMoreOpen((o) => !o)} fin={false} />
+        <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} push={push} />
+        <Suspense fallback={null}>
+          <RouteFreshener />
+        </Suspense>
+      </>
+    )
+  }
+
+  if (hr || finShell) {
     // HR's shell — and Finance's since 2026-10-14: the square sidebar, the
     // white greeting bar, and the sheet as the scroller inside a 10px frame —
     // the frame is where drawers, windows and HR's toast are drawn, so they
@@ -131,9 +149,7 @@ export default function PortalFrame({
       <FinViewProvider value={finPage}>
         <div className={`hrv-shell${finShell ? ' fin-shell' : ''} flex h-screen overflow-hidden print:h-auto print:overflow-visible`}>
           <div className="print:hidden contents">
-            {lead ? (
-              <LeadSidebar user={user} initialCollapsed={hrNavCollapsed} />
-            ) : finShell ? (
+            {finShell ? (
               <FinSidebar user={navUser} navData={navData} initialCollapsed={hrNavCollapsed} principal={principalShell} />
             ) : (
               <HrSidebar user={navUser} revenueSub={revenueSubsOf(navData)} initialCollapsed={hrNavCollapsed} />
@@ -142,7 +158,7 @@ export default function PortalFrame({
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
             <div className="print:hidden contents">
               {user.viewingAs ? <ViewingAsBanner name={user.viewingAs.name} /> : null}
-              <HrTopBar user={user} viewLabel={lead ? 'Lead View' : principalShell ? 'Principal view' : finShell ? 'Finance view' : 'HR view'} viewValue={lead ? 'lead' : undefined} />
+              <HrTopBar user={user} viewLabel={principalShell ? 'Principal view' : finShell ? 'Finance view' : 'HR view'} />
               <div className="md:hidden">
                 <TopBar user={user} fin={finPage} />
               </div>

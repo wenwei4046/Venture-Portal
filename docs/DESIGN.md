@@ -23,6 +23,7 @@
 |---|---|---|---|
 | **HR — the ledger** (the default) | Every portal page, whatever the department (HR, Finance, the Principal), plus the HR phone app | `:root`; the white sheet (`.sheet-theme`), HR's shell (`.hrv-shell`), `[data-hr-app]` | Formal. Black ink on white sheets, orange as a marker (never text), Newsreader page titles, mono figures, dense grid tables |
 | **Revenue — the sales app** | Salespeople (Fair, IR), Team Leaders, the Principal viewing as one: the Revenue app `/member` and the CRM | `[data-revenue-app]` | Warm. Brown ink, a rust accent that is also the link colour, the income as a statement, the Arena's boards as bank cards, big rounded cards, Inter Tight headlines and amounts. Mobile-first, desktop at 1440 |
+| **Lead View — customer service** (2026-10-22) | Customer Service on the brands' Messenger / Instagram: `/leads` | `[data-lead-view]` (LeadShell), `--lv-*` | Warm paper. A dark walnut sidebar, Lora for every word and Cormorant Garamond for titles, a clay accent; the Claude Design handoff `docs/design_handoff_lead_view_inbox` is its spec (`.claude/rules/leads/lead-view.md` › REDESIGN V2) |
 
 **Pick the theme first.**
 

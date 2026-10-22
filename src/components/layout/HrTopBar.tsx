@@ -109,7 +109,7 @@ function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole | 
   )
 }
 
-function ViewSwitch({ value, viewingAs }: { value: UserRole | 'lead'; viewingAs?: string }) {
+export function ViewSwitch({ value, viewingAs }: { value: UserRole | 'lead'; viewingAs?: string }) {
   const form = useRef<HTMLFormElement>(null)
   const [picking, setPicking] = useState(false)
   return (

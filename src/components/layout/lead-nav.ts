@@ -1,46 +1,87 @@
-// Lead View's sidebar (2026-10-16, the user's design canvas "Lead View" — approved "1，2，3（中英）"): the view
-// sidebar HR's and Finance's views draw, with Lead View's own pages —
+// Lead View's sidebar (2026-10-22, the redesign v2 handoff `docs/design_handoff_lead_view_inbox` — the user: "照
+// claude design 最新版本"; until then the view sidebar of 2026-10-16):
 //
 //   Inbox · Leads · Insight · Campaigns
-//   I. SET UP   Automations · AI Agent · Data Center · Settings
+//   REPLIES  Reply rules · Reply templates · Step library · AI Agent
+//   FILES    General info · Data Center · AI corrections
+//   ADMIN    Business hours · Audit log · Settings
 //
-// Every board of the canvas has its page now; a new one joins here
-// with its page. Every row asks its page's tab, as every view sidebar does (visibleHrNav → opensPath).
+// A row whose page is not built yet (`href: null`) is drawn greyed, "Not built yet" — the redesign builds them
+// step by step (`.claude/rules/leads/lead-view.md` › REDESIGN V2). Reply templates are today's Automations page.
+// Every built row asks its page's tab, as every view sidebar does (opensPath).
 
 import { canAccessLeads } from '@/lib/roles'
-import type { HrIconName } from '@/components/hrv/icons'
+import { opensPath } from '@/lib/page-tabs'
 import type { NavViewer } from './nav-config'
-import type { HrNavItem, HrNavSection } from './hr-nav'
+import type { LeadIconName } from './lead-icons'
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(prefix + '/')
 
-const link = (key: string, label: string, icon: HrIconName, href: string, match: HrNavItem['match']): HrNavItem => ({
-  key, label, icon, href, match, visible: (v: NavViewer) => canAccessLeads(v),
-})
+export interface LeadNavItem {
+  key: string
+  label: string
+  icon: LeadIconName
+  /** null = the page is not built yet. */
+  href: string | null
+  match: (pathname: string) => boolean
+}
 
-export function leadNavSections(): HrNavSection[] {
+export interface LeadNavSection {
+  /** null = the unlabelled first group. */
+  label: string | null
+  items: LeadNavItem[]
+}
+
+const link = (key: string, label: string, icon: LeadIconName, href: string, exact = false): LeadNavItem => ({
+  key, label, icon, href, match: (p) => (exact ? p === href : under(p, href)),
+})
+const soon = (key: string, label: string, icon: LeadIconName): LeadNavItem => ({ key, label, icon, href: null, match: () => false })
+
+export function leadNavSections(): LeadNavSection[] {
   return [
     {
       label: null,
-      tone: 'walnut',
       items: [
-        link('leads-inbox', 'Inbox', 'in', '/leads', (p) => p === '/leads'),
-        link('leads-list', 'Leads', 'people', '/leads/list', (p) => under(p, '/leads/list')),
-        link('leads-insight', 'Insight', 'report', '/leads/insight', (p) => under(p, '/leads/insight')),
-        link('leads-campaigns', 'Campaigns', 'out', '/leads/campaigns', (p) => under(p, '/leads/campaigns')),
+        link('leads-inbox', 'Inbox', 'inbox', '/leads', true),
+        link('leads-list', 'Leads', 'users', '/leads/list'),
+        link('leads-insight', 'Insight', 'chart', '/leads/insight'),
+        link('leads-campaigns', 'Campaigns', 'megaphone', '/leads/campaigns'),
       ],
     },
     {
-      label: 'Set up',
-      tone: 'clay',
+      label: 'Replies',
       items: [
-        link('leads-flows', 'Automations', 'tree', '/leads/flows', (p) => under(p, '/leads/flows')),
-        link('leads-ai', 'AI Agent', 'idCard', '/leads/ai', (p) => under(p, '/leads/ai')),
-        link('leads-knowledge', 'Data Center', 'invoice', '/leads/knowledge', (p) => under(p, '/leads/knowledge')),
-        link('leads-settings', 'Settings', 'doc', '/leads/settings', (p) => under(p, '/leads/settings')),
+        soon('leads-rules', 'Reply rules', 'split'),
+        link('leads-flows', 'Reply templates', 'workflow', '/leads/flows'),
+        soon('leads-steps', 'Step library', 'blocks'),
+        link('leads-ai', 'AI Agent', 'sparkles', '/leads/ai'),
+      ],
+    },
+    {
+      label: 'Files',
+      items: [
+        soon('leads-info', 'General info', 'bookOpen'),
+        link('leads-knowledge', 'Data Center', 'library', '/leads/knowledge'),
+        soon('leads-corrections', 'AI corrections', 'history'),
+      ],
+    },
+    {
+      label: 'Admin',
+      items: [
+        soon('leads-hours', 'Business hours', 'clock'),
+        soon('leads-audit', 'Audit log', 'scroll'),
+        link('leads-settings', 'Settings', 'settings', '/leads/settings'),
       ],
     },
   ]
+}
+
+/** The sections this viewer sees: a built row only where its page opens for them; a group with no row left goes. */
+export function visibleLeadNav(sections: LeadNavSection[], viewer: NavViewer): LeadNavSection[] {
+  if (!canAccessLeads(viewer)) return []
+  return sections
+    .map(sec => ({ ...sec, items: sec.items.filter(i => i.href === null || opensPath(viewer.tabs, i.href)) }))
+    .filter(sec => sec.items.some(i => i.href !== null))
 }
 
 /** Is this path one of Lead View's pages? PortalFrame draws Lead View's shell on them. */

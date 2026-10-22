@@ -6,11 +6,11 @@ import InboxView from './_components/InboxView'
 
 export const dynamic = 'force-dynamic'
 
-/** Lead View › Inbox (2026-10-16, the design canvas "Lead View"). Lead View · View reads it; ?c= opens a conversation. */
-export default async function Page({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
+/** Lead View › Inbox (2026-10-16; Inbox v2 2026-10-22). Lead View · View reads it; ?c= opens a conversation, ?q= searches (the top bar). */
+export default async function Page({ searchParams }: { searchParams: Promise<{ c?: string; q?: string }> }) {
   await requirePage('/leads')
   const user = await requirePermission('leads')
-  const { c } = await searchParams
+  const { c, q } = await searchParams
   const [config, inbox, personas] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas()])
   if (!config.ok || !inbox.ok) {
     return (
@@ -27,9 +27,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       config={config.data}
       contacts={inbox.data}
       initialThread={thread?.ok ? thread.data : null}
+      initialQuery={q?.slice(0, 80) ?? ''}
       canReply={canDo(user, 'leads', 'create')}
       canEdit={canDo(user, 'leads', 'edit')}
       csName={user.name || 'Customer Service'}
+      // An API key for the AI Agent (never its value) — without one the composer says so.
+      aiConnected={!!process.env.ANTHROPIC_API_KEY}
       // Brands whose AI agent is a copilot: their conversations offer an AI draft (none while its tables are not there).
       aiBrands={personas.ok ? personas.data.filter(p => p.mode === 'copilot').map(p => p.brandId) : []}
     />

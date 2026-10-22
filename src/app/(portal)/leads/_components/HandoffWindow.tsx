@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
-import { btn } from '@/components/hrv/kit'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { handLeadOver } from '@/lib/leads/actions'
 import { handoffText, suggestedSales } from '@/lib/leads/handoff'
 import { formatPhone, whatsAppLink } from '@/lib/leads/phone'
 import type { LeadBrand, LeadContact } from '@/lib/leads/types'
-import { Bi, initials } from './bits'
-import s from './lead.module.css'
+import { LeadIcon } from '@/components/layout/lead-icons'
+import s from './inbox.module.css'
 
 /**
- * Hand a lead to one of the brand's salespeople (the user: 轉交方式 — 可以). The rotation suggests the one with
- * the fewest leads this week; Customer Service may pick anybody on the list. The WhatsApp message is filled in
- * and may be changed; Hand over records it (lead_handoff) and opens WhatsApp with it.
+ * Hand a lead to one of the brand's salespeople (Inbox v2's window, 2026-10-22). SALESPERSON · IN TURN: the
+ * rotation's NEXT is the one with the fewest leads this week, picked to start; Customer Service may pick anybody.
+ * The WhatsApp message is filled in and may be changed, or copied. *Mark as handed* records it (lead_handoff) and
+ * opens WhatsApp to the salesperson with it — the hand-over the KPI counts.
  */
 export default function HandoffWindow({ contact, brand, csName, onClose, onDone }: {
   contact: LeadContact
@@ -22,24 +22,44 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
   onDone: () => void
 }) {
   const next = suggestedSales(brand)
-  const [pick, setPick] = useState<string | null>(brand.handoffMode === 'rotate' ? next?.id ?? null : null)
+  const [pick, setPick] = useState<string | null>(next?.id ?? null)
   const chosen = brand.sales.find(x => x.id === pick) ?? null
-  const [text, setText] = useState('')
-  const [edited, setEdited] = useState(false)
+  const [text, setText] = useState(() => (next ? handoffText(contact, brand.name, next, csName) : ''))
   const [busy, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
-
-  // The text follows the salesperson picked until Customer Service changes it by hand.
-  useEffect(() => {
-    if (!edited) setText(chosen ? handoffText(contact, brand.name, chosen, csName) : '')
-  }, [chosen, contact, brand.name, csName, edited])
+  const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [busy, onClose])
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current) }, [])
 
+  // Picking somebody writes the message to them afresh, as the handoff does.
+  const choose = (id: string) => {
+    const who = brand.sales.find(x => x.id === id)
+    setPick(id)
+    if (who) setText(handoffText(contact, brand.name, who, csName))
+  }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch { /* nothing more to try */ }
+      ta.remove()
+    }
+    setCopied(true)
+    if (copiedTimer.current) clearTimeout(copiedTimer.current)
+    copiedTimer.current = setTimeout(() => setCopied(false), 1200)
+  }
   const go = () => {
     if (!chosen) return
     setError(null)
@@ -60,40 +80,46 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
   }
 
   return (
-    <div className={s.scrim} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
-      <div className={s.window} role="dialog" aria-modal="true" aria-label="Hand over to sales">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 className={s.windowTitle} style={{ flex: 1 }}>Hand over to {brand.name} sales</h2>
-          <button type="button" className={btn('outline')} onClick={onClose} disabled={busy} aria-label="Close">✕</button>
+    <div className={s.overlay} onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className={s.window} role="dialog" aria-modal="true" aria-label={`Hand over to ${brand.name} sales`}>
+        <div className={s.windowHead}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <h2 className={s.windowTitle}>Hand over to {brand.name} sales</h2>
+            <span className={s.sub} style={{ color: 'rgb(var(--lv-text-2))' }}>{contact.name || '—'} · {formatPhone(contact.phone)}</span>
+          </div>
+          <button type="button" className={s.close} onClick={onClose} disabled={busy} aria-label="Close"><LeadIcon name="x" size={15} /></button>
         </div>
-        {brand.sales.length === 0 ? (
-          <div className={s.error}><Bi block en={`${brand.name} has no salespeople yet — add them in Settings.`} zh="还没有销售名单，先到 Settings 加销售。" /></div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} role="group" aria-label="Salesperson">
-            {brand.sales.map(x => (
-              <button key={x.id} type="button" className={s.salesRow} aria-pressed={x.id === pick} onClick={() => setPick(x.id)}>
-                <span className={s.avatar} aria-hidden="true">{initials(x.name)}</span>
-                <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className={s.salesName}>{x.name}</span>
-                  <span className={s.salesMeta}>{formatPhone(x.phone)}{x.showroom ? ` · ${x.showroom}` : ''} · {x.week} this week</span>
+        <div className={s.windowBody}>
+          <div className={s.people} role="radiogroup" aria-label="Salesperson">
+            <span className={s.caps} style={{ paddingBottom: 4 }}>SALESPERSON · IN TURN</span>
+            {brand.sales.length === 0 ? (
+              <div className={s.error}>{brand.name} has no salespeople yet — add them in Settings.</div>
+            ) : brand.sales.map(x => (
+              <button key={x.id} type="button" role="radio" aria-checked={x.id === pick} className={s.person} onClick={() => choose(x.id)}>
+                <span className={s.radio} aria-hidden="true" />
+                <span className={s.personText}>
+                  <span className={s.personName}>{x.name}{next?.id === x.id ? <span className={s.next}>NEXT</span> : null}</span>
+                  <span className={s.personSub}>{x.showroom ? `${x.showroom} · ` : ''}{formatPhone(x.phone)}</span>
                 </span>
-                {next?.id === x.id ? <span className={s.brand} data-tone="clay">Next</span> : null}
+                <span className={s.week}>{x.week} this wk</span>
               </button>
             ))}
           </div>
-        )}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={s.hint}><Bi en="WhatsApp message (you can edit it)" zh="WhatsApp 内容（可以改）" /></span>
-          <textarea className={s.preview} value={text} onChange={e => { setEdited(true); setText(e.target.value) }} disabled={!chosen} />
-        </label>
-        {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <div className={s.actions} style={{ justifyContent: 'flex-end' }}>
-          <button type="button" className={btn('outline')} onClick={onClose} disabled={busy}><Bi en="Cancel" zh="取消" /></button>
-          <button type="button" className={btn('primary')} onClick={go} disabled={!chosen || busy || !text.trim()}>
-            {busy ? 'Handing over…' : <Bi en="Open WhatsApp & mark handed" zh="打开 WhatsApp 并标记已转交" />}
-          </button>
+          <div className={s.message}>
+            <div className={s.messageHead}>
+              <span className={s.caps}>WHATSAPP MESSAGE · YOU CAN EDIT IT</span>
+              <button type="button" className={s.close} onClick={copy} disabled={!text} title="Copy message" aria-label="Copy message"><LeadIcon name="copy" size={15} /></button>
+            </div>
+            <textarea className={s.waText} rows={11} value={text} onChange={e => setText(e.target.value)} disabled={!chosen} aria-label="WhatsApp message" />
+            {error ? <div className={s.error} role="alert">{error}</div> : null}
+            <div className={s.windowFoot}>
+              <span className={s.hint}>Opens WhatsApp to {chosen?.name ?? 'them'} with this message.</span>
+              <button type="button" className={s.markBtn} onClick={go} disabled={!chosen || busy || !text.trim()}>{busy ? 'Handing over…' : 'Mark as handed'}</button>
+            </div>
+          </div>
         </div>
       </div>
+      {copied ? <div className={s.toast} aria-live="polite"><span>Copied</span></div> : null}
     </div>
   )
 }
