@@ -5,7 +5,7 @@
 // roster is the Marketing department's People with Marketing's own word over it; the sidebar counts what is on the
 // caller's plate as My Space draws it (src/lib/marketing/my-space.ts) — a series' pattern, a paused project and a stage
 // not yet open never; the board answers its window; the search and the notices are the caller's. The next migration
-// (20261023233000, the tasks) runs after it and replaces the board and the sidebar: everything here still holds over
+// (20261023234000, the tasks) runs after it and replaces the board and the sidebar: everything here still holds over
 // its versions (validate-marketing-tasks.mjs tests what it adds). No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -102,7 +102,7 @@ await db.exec(`
 const file = (await readFile(new URL('20261023214100_marketing_core.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
-await db.exec((await readFile(new URL('20261023233000_marketing_tasks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n'))
+await db.exec((await readFile(new URL('20261023234000_marketing_tasks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n'))
 
 // ── The tables and who reaches them ─────────────────────────────────────────────
 check(await q(`SELECT code, name FROM public.mkt_subsidiaries ORDER BY sort_order`), [

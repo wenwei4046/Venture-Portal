@@ -40,6 +40,8 @@ export interface MktSub {
 export interface MktRecur {
   runs: string[]
   status: 'active' | 'paused' | 'ended'
+  /** The rule as the database keeps it — `ruleFromRow` (./recur) reads it. */
+  rule: Record<string, unknown> | null
 }
 
 export interface MktProject {
@@ -78,7 +80,8 @@ export interface MktStage {
   status: MktStageStatus
   apprIdx: number
   ver: number
-  changes: { by: string; reason: string } | null
+  /** Changes asked: by whom, why — and, sent back to this stage from a later one, which. */
+  changes: { by: string; reason: string; from: string | null } | null
   enteredAt: string | null
   acceptedAt: string | null
   submittedAt: string | null
@@ -142,99 +145,117 @@ function approver(v: unknown): MktApprover | null {
 function recur(v: unknown): MktRecur | null {
   if (!isObj(v)) return null
   const runs = (Array.isArray(v.runs) ? v.runs : []).map(day).filter((d): d is string => !!d)
-  return { runs, status: oneOf(v.status, ['active', 'paused', 'ended'] as const, 'active') }
+  return { runs, status: oneOf(v.status, ['active', 'paused', 'ended'] as const, 'active'), rule: isObj(v.rule) ? v.rule : null }
 }
 
 export const EMPTY_BOARD: MktBoard = { today: '', me: null, team: [], subs: [], projects: [], stages: [], subtasks: [], holidays: [] }
+
+/** One person of the roster as the database answers them. */
+export function personFromRow(p: Record<string, unknown>): MktPerson {
+  return {
+    id: str(p.id),
+    user: strOrNull(p.user),
+    full: str(p.full),
+    first: str(p.first) || str(p.full).split(/s+/)[0] || '',
+    title: strOrNull(p.title),
+    team: TEAMS.includes(p.team as MktTeam) ? (p.team as MktTeam) : null,
+    role: strOrNull(p.role),
+    color: strOrNull(p.color),
+    capacity: Math.max(1, int(p.capacity, 5)),
+  }
+}
+
+export function subFromRow(s: Record<string, unknown>): MktSub {
+  return {
+    id: str(s.id),
+    code: str(s.code),
+    name: str(s.name) || str(s.code),
+    dot: str(s.dot) || 'oklch(0.62 0.02 60)',
+    emoji: str(s.emoji) || '🏢',
+    client: s.client === true,
+    pic: strOrNull(s.pic),
+  }
+}
+
+export function projectFromRow(p: Record<string, unknown>): MktProject {
+  return {
+    id: str(p.id),
+    trackId: str(p.trackId),
+    kind: oneOf(p.kind, KINDS, 'quick'),
+    sub: str(p.sub),
+    title: str(p.title),
+    status: oneOf(p.status, PSTATUS, 'active'),
+    workflow: strOrNull(p.workflow),
+    owner: strOrNull(p.owner),
+    pic: strOrNull(p.pic),
+    cur: Math.max(0, int(p.cur)),
+    series: strOrNull(p.series),
+    run: p.run == null ? null : int(p.run),
+    recur: recur(p.recur),
+    startsOn: day(p.startsOn),
+    dueOn: day(p.dueOn),
+    createdAt: str(p.createdAt),
+    updatedAt: str(p.updatedAt),
+    doneAt: strOrNull(p.doneAt),
+  }
+}
+
+export function stageFromRow(s: Record<string, unknown>): MktStage {
+  return {
+    project: str(s.project),
+    idx: Math.max(0, int(s.idx)),
+    name: str(s.name),
+    dept: oneOf(s.dept, DEPTS, 'social'),
+    owner: strOrNull(s.owner),
+    appr: (Array.isArray(s.appr) ? s.appr : []).map(approver).filter((a): a is MktApprover => !!a),
+    split: s.split === true,
+    sla: Math.max(1, int(s.sla, 1)),
+    startsOn: day(s.startsOn),
+    dueOn: day(s.dueOn),
+    status: oneOf(s.status, SSTATUS, 'planned'),
+    apprIdx: Math.max(0, int(s.apprIdx)),
+    ver: Math.max(0, int(s.ver)),
+    changes: isObj(s.changes) ? { by: str(s.changes.by), reason: str(s.changes.reason), from: strOrNull(s.changes.from) } : null,
+    enteredAt: strOrNull(s.enteredAt),
+    acceptedAt: strOrNull(s.acceptedAt),
+    submittedAt: strOrNull(s.submittedAt),
+    doneAt: strOrNull(s.doneAt),
+  }
+}
+
+export function subtaskFromRow(t: Record<string, unknown>): MktSubtask {
+  return {
+    id: str(t.id),
+    project: str(t.project),
+    stage: Math.max(0, int(t.stage)),
+    title: str(t.title),
+    assignee: str(t.assignee),
+    dueOn: day(t.dueOn),
+    status: oneOf(t.status, TSTATUS, 'working'),
+    returns: Math.max(0, int(t.returns)),
+  }
+}
+
+export function holidaysFromRow(v: unknown): MktHoliday[] {
+  return list(v)
+    .filter(h => day(h.day))
+    .map(h => ({ day: day(h.day) as string, name: str(h.name) }))
+}
+
+/** Any list of rows, each an object. */
+export const rowsOf = list
 
 export function boardFromRow(v: unknown): MktBoard {
   if (!isObj(v)) return EMPTY_BOARD
   return {
     today: day(v.today) ?? '',
     me: strOrNull(v.me),
-    team: list(v.team)
-      .filter(p => str(p.id))
-      .map(p => ({
-        id: str(p.id),
-        user: strOrNull(p.user),
-        full: str(p.full),
-        first: str(p.first) || str(p.full).split(/\s+/)[0] || '',
-        title: strOrNull(p.title),
-        team: TEAMS.includes(p.team as MktTeam) ? (p.team as MktTeam) : null,
-        role: strOrNull(p.role),
-        color: strOrNull(p.color),
-        capacity: Math.max(1, int(p.capacity, 5)),
-      })),
-    subs: list(v.subs)
-      .filter(s => str(s.id) && str(s.code))
-      .map(s => ({
-        id: str(s.id),
-        code: str(s.code),
-        name: str(s.name) || str(s.code),
-        dot: str(s.dot) || 'oklch(0.62 0.02 60)',
-        emoji: str(s.emoji) || '🏢',
-        client: s.client === true,
-        pic: strOrNull(s.pic),
-      })),
-    projects: list(v.projects)
-      .filter(p => str(p.id) && str(p.trackId) && str(p.sub))
-      .map(p => ({
-        id: str(p.id),
-        trackId: str(p.trackId),
-        kind: oneOf(p.kind, KINDS, 'quick'),
-        sub: str(p.sub),
-        title: str(p.title),
-        status: oneOf(p.status, PSTATUS, 'active'),
-        workflow: strOrNull(p.workflow),
-        owner: strOrNull(p.owner),
-        pic: strOrNull(p.pic),
-        cur: Math.max(0, int(p.cur)),
-        series: strOrNull(p.series),
-        run: p.run == null ? null : int(p.run),
-        recur: recur(p.recur),
-        startsOn: day(p.startsOn),
-        dueOn: day(p.dueOn),
-        createdAt: str(p.createdAt),
-        updatedAt: str(p.updatedAt),
-        doneAt: strOrNull(p.doneAt),
-      })),
-    stages: list(v.stages)
-      .filter(s => str(s.project))
-      .map(s => ({
-        project: str(s.project),
-        idx: Math.max(0, int(s.idx)),
-        name: str(s.name),
-        dept: oneOf(s.dept, DEPTS, 'social'),
-        owner: strOrNull(s.owner),
-        appr: (Array.isArray(s.appr) ? s.appr : []).map(approver).filter((a): a is MktApprover => !!a),
-        split: s.split === true,
-        sla: Math.max(1, int(s.sla, 1)),
-        startsOn: day(s.startsOn),
-        dueOn: day(s.dueOn),
-        status: oneOf(s.status, SSTATUS, 'planned'),
-        apprIdx: Math.max(0, int(s.apprIdx)),
-        ver: Math.max(0, int(s.ver)),
-        changes: isObj(s.changes) ? { by: str(s.changes.by), reason: str(s.changes.reason) } : null,
-        enteredAt: strOrNull(s.enteredAt),
-        acceptedAt: strOrNull(s.acceptedAt),
-        submittedAt: strOrNull(s.submittedAt),
-        doneAt: strOrNull(s.doneAt),
-      })),
-    subtasks: list(v.subtasks)
-      .filter(t => str(t.id) && str(t.project) && str(t.assignee))
-      .map(t => ({
-        id: str(t.id),
-        project: str(t.project),
-        stage: Math.max(0, int(t.stage)),
-        title: str(t.title),
-        assignee: str(t.assignee),
-        dueOn: day(t.dueOn),
-        status: oneOf(t.status, TSTATUS, 'working'),
-        returns: Math.max(0, int(t.returns)),
-      })),
-    holidays: list(v.holidays)
-      .filter(h => day(h.day))
-      .map(h => ({ day: day(h.day) as string, name: str(h.name) })),
+    team: list(v.team).filter(p => str(p.id)).map(personFromRow),
+    subs: list(v.subs).filter(s => str(s.id) && str(s.code)).map(subFromRow),
+    projects: list(v.projects).filter(p => str(p.id) && str(p.trackId) && str(p.sub)).map(projectFromRow),
+    stages: list(v.stages).filter(s => str(s.project)).map(stageFromRow),
+    subtasks: list(v.subtasks).filter(x => str(x.id) && str(x.project) && str(x.assignee)).map(subtaskFromRow),
+    holidays: holidaysFromRow(v.holidays),
   }
 }
 

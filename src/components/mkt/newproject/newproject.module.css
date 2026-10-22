@@ -1,0 +1,204 @@
+/* New Project (`New Project.dc.html`) and its quick Workflow Builder (`Workflow Builder.dc.html`, quick mode), in
+   Marketing's tokens (globals.css › .mkt-shell). */
+
+.page { max-width: 1120px; margin: 0 auto; padding: 28px 36px 72px; box-sizing: border-box; color: rgb(var(--mk-ink)); }
+.crumbs { display: flex; align-items: center; gap: 10px; font-size: .92em; color: rgb(var(--mk-muted)); }
+.crumbLink { color: inherit; text-decoration: none; }
+.crumbLink:hover { color: rgb(var(--mk-ink)); text-decoration: underline; }
+
+.steps { display: flex; align-items: center; margin-top: 18px; padding: 14px 18px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); }
+.step { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.stepMark { width: 24px; height: 24px; flex: none; border-radius: 50%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border: 1.5px solid rgb(var(--mk-dash)); color: rgb(var(--mk-faint)); background: rgb(var(--mk-white)); }
+.stepMarkOn { border-color: rgb(var(--mk-ink)); color: rgb(var(--mk-ink)); }
+.stepLabel { font-size: .92em; color: rgb(var(--mk-quiet)); white-space: nowrap; }
+.stepLabelOn { font-weight: 600; color: rgb(var(--mk-ink)); }
+.stepLine { flex: 1; height: 1px; background: rgb(var(--mk-line)); margin: 0 12px; min-width: 16px; }
+
+.lead { margin-top: 28px; font-size: 1.5em; font-weight: 600; }
+.label { display: flex; align-items: center; gap: 8px; margin: 26px 0 10px; font-size: .75em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+
+.subs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.subCard, .modeCard {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; border: 1.5px solid rgb(var(--mk-line-2));
+  background: rgb(var(--mk-white)); cursor: pointer; transition: border-color .15s; text-align: left; font: inherit; color: inherit;
+}
+.subCard:hover, .modeCard:hover { border-color: rgb(var(--mk-hover-line)); }
+.cardOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-surface)); }
+.subDot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.cardText { min-width: 0; flex: 1; }
+.cardName { font-weight: 600; font-size: .98em; }
+.cardSub { font-size: .82em; color: rgb(var(--mk-muted)); margin-top: 2px; }
+.radio { width: 16px; height: 16px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid rgb(var(--mk-radio)); flex: none; }
+.radioOn { border: 5px solid rgb(var(--mk-ink)); }
+
+.modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.modeCard { padding: 14px 16px; align-items: flex-start; gap: 12px; }
+.modeIcon { font-size: 18px; line-height: 1.3; }
+.modeName { font-weight: 600; font-size: 1em; }
+.modeOff { cursor: not-allowed; opacity: .55; }
+.modeOff:hover { border-color: rgb(var(--mk-line-2)); }
+.soon { display: inline-flex; margin-top: 6px; font-size: .75em; padding: 2px 7px; border-radius: 5px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); }
+
+.box { margin-top: 22px; padding: 18px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); display: flex; flex-direction: column; gap: 16px; animation: mkIn .2s ease-out; }
+.boxNext { margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.fieldLabel { font-size: .88em; font-weight: 500; }
+.input, .textarea, .date {
+  box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; padding: 0 10px; font: inherit; outline: none;
+  background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); min-width: 0;
+}
+.input { height: 36px; }
+.date { height: 34px; }
+.textarea { padding: 8px 10px; resize: vertical; line-height: 1.5; }
+.input:focus, .textarea:focus, .date:focus { border-color: rgb(var(--mk-stat-hover)); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { height: 32px; padding: 0 12px; border-radius: 999px; display: flex; align-items: center; font-size: .9em; cursor: pointer; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); font-family: inherit; }
+.chipOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
+.reqHead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.seg { display: flex; gap: 2px; padding: 3px; background: rgb(var(--mk-surface-2)); border-radius: 8px; }
+.segBtn { height: 26px; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; cursor: pointer; font-size: .86em; border: 0; background: transparent; color: inherit; font-family: inherit; }
+.segBig { height: 28px; padding: 0 12px; font-size: .88em; }
+.segOn { background: rgb(var(--mk-white)); box-shadow: var(--mk-shadow-seg); font-weight: 600; }
+.segOff { cursor: not-allowed; opacity: .45; }
+
+.repeatHead { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.repeatRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.repeatLabel { font-size: .88em; font-weight: 500; width: 90px; }
+.day { width: 44px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .88em; cursor: pointer; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); user-select: none; font-family: inherit; }
+.dayOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
+.count { width: 72px; }
+.unit { font-size: .9em; color: rgb(var(--mk-muted)); }
+.summary { padding: 12px 14px; border-radius: 10px; background: rgb(var(--mk-surface)); border: 1px solid rgb(var(--mk-line-3)); display: flex; flex-direction: column; gap: 10px; }
+.summaryHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.summaryRule { font-weight: 600; font-size: .94em; }
+.summaryCount { font-size: .86em; color: rgb(var(--mk-muted)); }
+.runChips { display: flex; gap: 6px; flex-wrap: wrap; }
+.runChip { height: 26px; padding: 0 9px; border-radius: 6px; display: flex; align-items: center; font-family: var(--mk-mono); font-size: 11px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); color: rgb(var(--mk-text-2)); }
+.runMore { height: 26px; display: flex; align-items: center; font-size: .84em; color: rgb(var(--mk-muted)); }
+
+.footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.hint { font-size: .9em; color: rgb(var(--mk-muted)); }
+.hintRed { color: rgb(var(--mk-red)); }
+.primary { height: 38px; padding: 0 18px; border-radius: 8px; background: var(--mk-primary); color: rgb(var(--mk-ink-2)); display: flex; align-items: center; font-weight: 600; cursor: pointer; border: 0; font: inherit; font-weight: 600; white-space: nowrap; }
+.primary:hover { background: var(--mk-primary-hover); }
+.primary:disabled { cursor: not-allowed; opacity: .45; background: var(--mk-primary); }
+
+/* ── The quick Workflow Builder ─────────────────────────────────────────────── */
+.wb { margin-top: 14px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); overflow: hidden; }
+.wbHead { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid rgb(var(--mk-line-2)); flex-wrap: wrap; }
+.wbTitle { font-size: 1.05em; font-weight: 600; }
+.wbTabs { display: flex; gap: 2px; padding: 3px; background: rgb(var(--mk-surface-3)); border-radius: 8px; margin-left: 12px; }
+.wbTab { height: 30px; padding: 0 14px; border-radius: 6px; display: flex; align-items: center; background: transparent; border: 0; font: inherit; font-size: .92em; white-space: nowrap; color: inherit; }
+.wbTabOn { background: rgb(var(--mk-white)); box-shadow: var(--mk-shadow-seg); font-weight: 600; }
+.wbTabOff { opacity: .45; cursor: not-allowed; }
+.wbGrid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+.wbList { padding: 20px 24px 28px; min-width: 0; }
+.wbStages { display: flex; flex-direction: column; }
+.wbDrop { height: 0; border-radius: 6px; background: var(--mk-drop); transition: height .12s; }
+.wbDropOn { height: 6px; margin-bottom: 6px; }
+.wbStage {
+  display: flex; gap: 12px; align-items: stretch; padding: 12px 14px; border-radius: 12px; background: rgb(var(--mk-white));
+  border: 1.5px solid rgb(var(--mk-line-2)); cursor: pointer; transition: border-color .15s, box-shadow .15s; text-align: left; font: inherit; color: inherit; width: 100%;
+}
+.wbStage:hover { border-color: rgb(var(--mk-handle)); }
+.wbStageOn { border-color: rgb(var(--mk-brown)); box-shadow: var(--mk-shadow-hover); }
+.wbStageDrag { opacity: .4; }
+.wbRail { display: flex; flex-direction: column; align-items: center; gap: 6px; color: rgb(var(--mk-handle)); flex: none; }
+.wbGrip { font-size: 12px; letter-spacing: -2px; cursor: grab; }
+.wbNum { width: 24px; height: 24px; border-radius: 50%; background: rgb(var(--mk-surface-2)); font-size: 11px; font-weight: 600; color: rgb(var(--mk-ink)); display: flex; align-items: center; justify-content: center; }
+.wbBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.wbNameRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wbName { font-size: 1.04em; font-weight: 600; }
+.wbTag { font-size: .75em; padding: 2px 7px; border-radius: 5px; }
+.wbForm { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); }
+.wbFacts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .88em; color: rgb(var(--mk-text-2)); align-items: center; }
+.wbFact { display: flex; align-items: center; gap: 6px; }
+.wbFactK { color: rgb(var(--mk-muted)); }
+.wbFactV { font-weight: 500; }
+.wbFactMono { font-family: var(--mk-mono); font-size: 11px; }
+.wbMissing { color: rgb(var(--mk-red)); }
+.wbLink { width: 1.5px; height: 14px; background: rgb(var(--mk-dash)); margin-left: 26px; }
+.wbAdd {
+  margin-top: 12px; height: 44px; border-radius: 12px; border: 1.5px dashed rgb(var(--mk-dash-2)); display: flex; align-items: center; justify-content: center;
+  gap: 8px; color: rgb(var(--mk-muted)); cursor: pointer; font-size: .94em; background: transparent; font-family: inherit; width: 100%;
+}
+.wbAdd:hover { background: rgb(var(--mk-surface)); color: rgb(var(--mk-ink)); }
+
+.wbPanel { border-left: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); }
+.wbSettings { padding: 16px 18px 24px; display: flex; flex-direction: column; gap: 18px; animation: mkIn .15s ease-out; }
+.wbSetHead { display: flex; align-items: center; justify-content: space-between; }
+.wbSetLabel { font-size: .72em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.wbRemove { font-size: .84em; color: rgb(var(--mk-red)); cursor: pointer; background: none; border: 0; font-family: inherit; padding: 0; }
+.wbQ { font-size: .92em; font-weight: 600; }
+.wbDD { position: relative; }
+.wbDDBtn {
+  min-height: 40px; box-sizing: border-box; padding: 6px 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white));
+  display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; text-align: left; font: inherit; color: inherit;
+}
+.wbDDBtnOn { border-color: rgb(var(--mk-brown)); }
+.wbDDBtnMiss { border-color: rgb(var(--mk-miss-line)); }
+.wbDDIcon { width: 24px; text-align: center; font-size: 13px; }
+.wbDDText { flex: 1; min-width: 0; }
+.wbDDLabel { font-size: .92em; font-weight: 500; }
+.wbDDHint { font-size: .78em; color: rgb(var(--mk-muted)); }
+.wbCaret { font-size: 9px; color: rgb(var(--mk-muted)); }
+.wbMenu {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line));
+  border-radius: 10px; box-shadow: var(--mk-shadow-dd); padding: 6px; max-height: 280px; overflow-y: auto; animation: mkIn .12s ease-out;
+}
+.wbOpt { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 7px; cursor: pointer; width: 100%; background: transparent; border: 0; font: inherit; color: inherit; text-align: left; }
+.wbOpt:hover { background: rgb(var(--mk-surface-2)); }
+.wbOptOn { background: rgb(var(--mk-surface)); }
+.wbTick { width: 16px; text-align: center; font-size: 12px; }
+.wbAv { width: 24px; height: 24px; flex: none; border-radius: 50%; color: rgb(var(--mk-ink)); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1.5px rgb(var(--mk-white)); background: var(--mk-team-manager-bg); }
+.wbOptText { flex: 1; min-width: 0; }
+.wbOptLabel { font-size: .9em; font-weight: 500; }
+.wbOptHint { font-size: .78em; color: rgb(var(--mk-muted)); }
+.wbLevel { display: flex; flex-direction: column; gap: 5px; }
+.wbLevelHead { display: flex; align-items: center; gap: 8px; }
+.wbLevelN { font-size: .78em; font-weight: 600; color: rgb(var(--mk-muted)); }
+.wbLevelLock { font-size: 10.5px; color: rgb(var(--mk-muted)); }
+.wbLevelRemove { margin-left: auto; font-size: .8em; color: rgb(var(--mk-muted)); cursor: pointer; background: none; border: 0; font-family: inherit; padding: 0; }
+.wbAddLevel { align-self: flex-start; font-size: .86em; font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; font-family: inherit; color: inherit; padding: 0; }
+.wbSla { display: flex; align-items: center; gap: 10px; }
+.wbStepper { display: flex; align-items: center; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; height: 34px; }
+.wbStepBtn { width: 30px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: 0; font: inherit; color: inherit; }
+.wbStepBtn:hover { background: rgb(var(--mk-surface-2)); }
+.wbStepN { min-width: 34px; text-align: center; font-family: var(--mk-mono); font-size: 12px; }
+.wbBack { display: flex; flex-wrap: wrap; gap: 6px; }
+.wbBackOpt { height: 28px; padding: 0 10px; border-radius: 7px; display: flex; align-items: center; cursor: pointer; font-size: .86em; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); font-family: inherit; }
+.wbBackOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
+.wbFields { border: 1px solid rgb(var(--mk-line-2)); border-radius: 8px; overflow: hidden; }
+.wbFieldRow { border-bottom: 1px solid rgb(var(--mk-line-4)); }
+.wbFieldNote { background: rgb(var(--mk-note-bg)); }
+.wbFieldLine { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; font-size: .88em; }
+.wbGlyph { font-family: var(--mk-mono); font-size: 10px; color: rgb(var(--mk-muted)); width: 18px; padding-top: 3px; }
+.wbFieldName { flex: 1; min-width: 0; font-weight: 500; border: 0; background: transparent; font: inherit; color: inherit; outline: none; padding: 0; }
+.wbFieldNameNote { font-weight: 400; font-style: italic; color: rgb(var(--mk-brown)); }
+.wbFieldType { font-size: .85em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.wbFieldX { cursor: pointer; color: rgb(var(--mk-x)); background: none; border: 0; font: inherit; padding: 0; }
+.wbCols { padding: 0 10px 10px 36px; display: flex; flex-direction: column; gap: 6px; }
+.wbCol { display: flex; gap: 6px; align-items: center; }
+.wbColName { flex: 1; min-width: 0; height: 26px; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 6px; padding: 0 8px; font: inherit; font-size: .84em; outline: none; color: rgb(var(--mk-ink)); }
+.wbSelect { height: 28px; border: 1px solid rgb(var(--mk-line)); border-radius: 6px; font: inherit; font-size: .84em; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); }
+.wbAddCol { align-self: flex-start; font-size: .82em; cursor: pointer; background: none; border: 0; font-family: inherit; color: rgb(var(--mk-muted)); padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.wbFieldAdd { display: flex; gap: 6px; padding: 8px 10px; background: rgb(var(--mk-surface)); }
+.wbFieldInput { flex: 1; min-width: 0; height: 28px; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 6px; padding: 0 8px; font: inherit; font-size: .86em; outline: none; color: rgb(var(--mk-ink)); }
+.wbEmptyPanel { padding: 40px 24px; text-align: center; color: rgb(var(--mk-muted)); font-size: .92em; }
+
+.wbFoot { position: sticky; bottom: 0; display: flex; align-items: center; gap: 16px; padding: 12px 24px; border-top: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white) / .97); flex-wrap: wrap; }
+.wbFootItem { font-size: .94em; }
+.wbFootK { color: rgb(var(--mk-muted)); }
+.wbFootV { font-weight: 600; }
+.wbFootRule { width: 1px; height: 16px; background: rgb(var(--mk-line)); }
+.wbWarn { height: 26px; padding: 0 10px; border-radius: 999px; background: rgb(var(--mk-wait-bg)); border: 1px solid rgb(var(--mk-wait-line)); color: rgb(var(--mk-warn-ink)); display: flex; align-items: center; gap: 6px; font-size: .84em; white-space: nowrap; }
+.wbNoWarn { font-size: .86em; color: rgb(var(--mk-done)); }
+
+.toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); font-size: 13px; animation: mkIn .2s ease-out; }
+
+@media (max-width: 900px) {
+  .page { padding: 20px 16px 56px; }
+  .wbGrid { grid-template-columns: minmax(0, 1fr); }
+  .wbPanel { border-left: 0; border-top: 1px solid rgb(var(--mk-line-2)); }
+  .steps { overflow-x: auto; }
+}

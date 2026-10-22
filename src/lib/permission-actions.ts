@@ -190,7 +190,11 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.create': 'all',
   'hiring.edit': 'all',
   'hiring.view': 'all',
-  // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's.
+  // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's; a task started (Create), worked as its
+  // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000.
+  'marketing.create': 'all',
+  'marketing.edit': 'all',
+  'marketing.approve': 'all',
   'marketing.manage': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',

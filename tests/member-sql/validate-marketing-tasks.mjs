@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261023233000 (2026-10-23 — Marketing's quick and recurring tasks, ② of the Claude
+// Local PostgreSQL regression for 20261023234000 (2026-10-23 — Marketing's quick and recurring tasks, ② of the Claude
 // Design handoff "HOUZS Marketing Module Setup"). Both Marketing migrations run VERBATIM, twice, over the stand-ins the
 // first one's check uses. What is under test: who may start, work, approve, nudge and pause; the stage machine
 // (accept → submit / complete → approve / request changes → the next stage → closed) as hm-store.js runs it; the dates
@@ -96,7 +96,7 @@ await db.exec(`
 `)
 
 const core = (await readFile(new URL('20261023214100_marketing_core.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
-const tasks = (await readFile(new URL('20261023233000_marketing_tasks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+const tasks = (await readFile(new URL('20261023234000_marketing_tasks.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(core)
 await db.exec(tasks)
 await db.exec(core)

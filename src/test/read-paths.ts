@@ -359,6 +359,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'it_request_get',
   // Marketing's view (mig 20261023214100): its board, sidebar and search by Marketing · View; one's own notices.
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
+  // Marketing's tasks (mig 20261023234000): started by Marketing · Create; a stage accepted, worked, handed on by
+  // Marketing · Edit as its owner; decided by Marketing · Approve as its approver now; the Free space by Edit on a task
+  // one is on (Manage: any); Nudge and a series paused or ended by Manage; one project read by View.
+  'mkt_task_create', 'mkt_stage_accept', 'mkt_stage_save', 'mkt_stage_submit', 'mkt_stage_decide', 'mkt_free_block', 'mkt_nudge',
+  'mkt_series_set', 'mkt_project',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

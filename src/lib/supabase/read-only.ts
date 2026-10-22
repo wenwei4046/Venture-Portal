@@ -71,6 +71,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'it_request_get',
   // Marketing's view (mig 20261023214100): its board, sidebar, search and one's own notices — all STABLE.
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
+  // Marketing's task page (mig 20261023234000): one project, its stages' work and trail — STABLE.
+  'mkt_project',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

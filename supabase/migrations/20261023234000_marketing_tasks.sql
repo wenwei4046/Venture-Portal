@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261023233000_marketing_tasks.sql
+-- 20261023234000_marketing_tasks.sql
 -- Marketing's quick and recurring tasks — ② of the Claude Design handoff "HOUZS Marketing Module Setup" (2026-10-23;
 -- the user: "全部照设计做", in order): New Project's ⚡ Quick task and 🔁 Recurring task, the task page's Accept → work
 -- → Submit / Complete → Approve / Request changes, the notices that carry a task from person to person, Nudge, and a

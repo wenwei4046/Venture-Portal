@@ -1,0 +1,128 @@
+import { describe, expect, it } from 'vitest'
+import { eventText, seriesView, taskFromRow, taskView, trailLines } from './task'
+
+// A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
+// New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
+// where it stands.
+
+const RACHEL = 's-rachel'
+const SITI = 's-siti'
+const JASON = 's-jason'
+const team = [
+  { id: RACHEL, user: 'u1', full: 'RACHEL TAN', first: 'Rachel', title: 'MARKETING MANAGER', team: 'manager', role: null, color: null, capacity: 5 },
+  { id: SITI, user: 'u2', full: 'SITI AMINAH', first: 'Siti', title: 'GRAPHIC DESIGNER', team: 'design', role: null, color: null, capacity: 5 },
+  { id: JASON, user: 'u3', full: 'JASON LEE', first: 'Jason', title: 'SOCIAL MEDIA EXECUTIVE', team: 'social', role: null, color: null, capacity: 5 },
+]
+const stage = (idx: number, over: Record<string, unknown>) => ({
+  project: 'p1', idx, name: ['First draft', 'Redesign', 'Publish'][idx], dept: 'social', mode: 'person', owner: [RACHEL, SITI, JASON][idx],
+  cands: [], sla: 1, appr: [], split: false, spec: { form: [] }, work: {}, startsOn: '2026-10-23', dueOn: ['2026-10-26', '2026-10-27', '2026-10-28'][idx],
+  status: 'planned', apprIdx: 0, ver: 0, changes: null, ...over,
+})
+const row = (stages: Record<string, unknown>[], over: Record<string, unknown> = {}) => ({
+  today: '2026-10-26',
+  me: SITI,
+  team,
+  sub: { id: 'sub', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, pic: 'Kelvin' },
+  project: { id: 'p1', trackId: 'TSK-CAR-2610-001', kind: 'quick', sub: 'sub', title: 'Price update', status: 'active', qType: 'social',
+    brief: 'Change the price on the banner', owner: RACHEL, cur: 1, startsOn: '2026-10-23', dueOn: '2026-10-28', createdBy: 'Rachel Tan',
+    free: [{ id: 'abc123', type: 'check', text: 'Tell Kelvin', done: false, by: 'Rachel' }], ...over },
+  stages,
+  subtasks: [],
+  events: [
+    { id: 1, at: '2026-10-23T01:00:00Z', actor: 'Rachel', action: 'created', data: { kind: 'quick', stages: 3 } },
+    { id: 2, at: '2026-10-23T01:00:00Z', actor: 'Rachel', action: 'opened', stage: 0, stageName: 'First draft', fromTo: 'Rachel' },
+    { id: 3, at: '2026-10-23T02:30:00Z', actor: 'Rachel', action: 'completed', stage: 0, stageName: 'First draft' },
+    { id: 4, at: '2026-10-23T02:30:00Z', actor: 'Rachel', action: 'opened', stage: 1, stageName: 'Redesign', fromTo: 'Siti' },
+    { id: 5, at: '2026-10-23T03:00:00Z', actor: 'Rachel', action: 'free', data: { op: 'put', type: 'check' } },
+  ],
+  series: null,
+  holidays: [],
+})
+const ALL = { edit: true, approve: true, manage: true }
+const STAFF = { edit: true, approve: false, manage: false }
+
+describe('a task’s page', () => {
+  it('reads what the database answers', () => {
+    const page = taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'todo', appr: [{ kind: 'person', staff: RACHEL }],
+      spec: { form: [{ label: 'Final artwork', type: 'File' }], back: 0 } }), stage(2, {})]))!
+    expect([page.project.trackId, page.project.qType, page.project.free.length, page.stages[1].form, page.stages[1].back, page.sub?.pic])
+      .toEqual(['TSK-CAR-2610-001', 'social', 1, [{ label: 'Final artwork', type: 'File' }], 0, 'Kelvin'])
+    expect(taskFromRow(null)).toBeNull()
+  })
+
+  it('the owner of the stage now: Accept', () => {
+    const page = taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'todo' }), stage(2, {})]))!
+    const v = taskView(page, STAFF)
+    expect([v.status, v.actions.map(a => a.key), v.note, v.banner]).toEqual(['Waiting for Siti to Accept', ['accept'], 'New · just assigned to you',
+      { tone: 'waiting', text: 'You\'re up: Redesign · due Tue 27 Oct' }])
+    expect(v.meta.map(m => m.v)).toEqual(['Carres', 'Rachel', 'Siti', '⚡ Quick task · Social Media', 'Due Wed 28 Oct'])
+    expect(v.rail.map(r => [r.mark, r.state, r.appr])).toEqual([['✓', 'done', '— no approval'], ['S', 'current', '— no approval'], ['3', 'next', '— no approval']])
+  })
+
+  it('…working: Submit for approval once the form is filled in', () => {
+    const form = { form: [{ label: 'Final artwork', type: 'File' }] }
+    const before = taskView(taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'accepted', spec: form, appr: [{ kind: 'person', staff: RACHEL }] }), stage(2, {})]))!, STAFF)
+    expect([before.actions, before.note, before.noteRed]).toEqual([[{ key: 'submit', label: 'Submit for approval', disabled: true }], 'Fill in Final artwork', true])
+    expect(before.mine?.idx).toBe(1)
+    expect(before.work.map(w => [w.name, w.editable, w.badge])).toEqual([['Redesign', true, 'Siti · due 27 Oct'], ['First draft', false, '✓ Done']])
+    const after = taskView(taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'accepted', spec: form, work: { vals: { 'Final artwork': 'https://x' } } }), stage(2, {})]))!, STAFF)
+    expect([after.actions, after.note]).toEqual([[{ key: 'complete', label: 'Complete stage', disabled: false }], 'Ready'])
+  })
+
+  it('the approver: Approve or Request changes; everybody else waits', () => {
+    const rows = [stage(0, { status: 'done' }), stage(1, { status: 'review', ver: 2, appr: [{ kind: 'person', staff: RACHEL }] }), stage(2, {})]
+    const mine = taskView(taskFromRow({ ...row(rows), me: RACHEL })!, ALL)
+    expect([mine.actions.map(a => a.key), mine.banner?.text, mine.status, mine.version]).toEqual([['changes', 'approve'], 'Siti submitted Redesign v2 for your approval',
+      'Waiting for Rachel', 'Redesign · v2'])
+    const other = taskView(taskFromRow({ ...row(rows), me: JASON })!, ALL)
+    expect([other.actions, other.note, other.waitingOn]).toEqual([[], 'Waiting for Rachel', RACHEL])
+  })
+
+  it('changes asked: red, why — and from which stage when sent back', () => {
+    const page = taskFromRow(row([stage(0, { status: 'changes', changes: { by: 'Rachel', reason: 'Bigger logo', from: 'Redesign' } }), stage(1, {}), stage(2, {})], { cur: 0 }))!
+    const v = taskView({ ...page, me: RACHEL }, ALL)
+    expect([v.tone, v.status, v.banner]).toEqual(['red', 'Changes requested', { tone: 'red', text: 'Changes requested by Rachel on Redesign: "Bigger logo"' }])
+  })
+
+  it('late: red', () => {
+    const v = taskView(taskFromRow({ ...row([stage(0, { status: 'done' }), stage(1, { status: 'accepted' }), stage(2, {})]), today: '2026-10-29' })!, STAFF)
+    expect(v.tone).toBe('red')
+  })
+
+  it('done: every stage, the work of each', () => {
+    const page = taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'done' }), stage(2, { status: 'done' })], { status: 'done', cur: 2 }))!
+    const v = taskView(page, ALL)
+    expect([v.status, v.tone, v.banner?.text, v.actions, v.work.length, v.note]).toEqual(['Done', 'done', 'All 3 stages done', [], 3, 'All stages done'])
+  })
+
+  it('a run before its day: nobody’s yet', () => {
+    const page = taskFromRow(row([stage(0, { status: 'todo', owner: SITI }), stage(1, {}), stage(2, {})], { kind: 'recurring', series: 'p0', run: 2, cur: 0, startsOn: '2026-10-30' }))!
+    const v = taskView(page, ALL)
+    expect([v.status, v.tone, v.actions, v.note]).toEqual(['Opens Fri 30 Oct', 'draft', [], 'Opens Fri 30 Oct'])
+  })
+
+  it('the trail in the store’s words, newest first, the free space’s writes left out', () => {
+    const page = taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'todo' }), stage(2, {})]))!
+    expect(trailLines(page).map(l => [l.t, l.text])).toEqual([
+      ['23 Oct 10:30', 'Stage 2 · Redesign opened for Siti'],
+      ['23 Oct 10:30', 'Rachel completed First draft'],
+      ['23 Oct 09:00', 'Stage 1 · First draft opened for Rachel'],
+      ['23 Oct 09:00', 'Rachel created quick task "Price update" · 3 stages'],
+    ])
+    expect(eventText({ id: 9, at: '', actor: 'Rachel', action: 'changes', stage: 1, stageName: 'Redesign', fromTo: 'Rachel', reason: 'Bigger', version: 'v1',
+      data: { back: 0, to: 'First draft' } }, page)).toBe('Rachel requested changes on Redesign v1: "Bigger" · back to First draft')
+  })
+
+  it('a series: its rule, its runs', () => {
+    const page = taskFromRow({
+      ...row([stage(0, { status: 'planned' })], { kind: 'recurring', series: null, cur: 0, startsOn: '2026-10-26' }),
+      series: { id: 'p1', trackId: 'RCR-CAR-2610-002', title: 'Weekly post', status: 'active',
+        recur: { rule: { freq: 'weekly', days: [1], every: 1, start: '2026-10-26', endMode: 'count', count: 3 }, status: 'active' },
+        runs: [{ id: 'r1', run: 1, trackId: 'RCR-CAR-2610-002-R01', status: 'done', startsOn: '2026-10-26', stage: 'done' },
+          { id: 'r2', run: 2, trackId: 'RCR-CAR-2610-002-R02', status: 'active', startsOn: '2026-11-02', stage: 'todo' }] },
+    })!
+    expect(taskView(page, ALL)).toMatchObject({ isSeries: true, status: 'Active', actions: [], work: [] })
+    expect(seriesView(page)).toMatchObject({ rule: 'Every week on Monday', period: 'from 26 Oct 2026 · 3 runs',
+      runs: [{ label: 'Run 1', status: 'Done', tone: 'done' }, { label: 'Run 2', day: 'Mon 2 Nov', status: 'Scheduled', tone: 'draft' }] })
+  })
+})
