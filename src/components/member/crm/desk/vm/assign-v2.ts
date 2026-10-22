@@ -124,22 +124,30 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   // 4a (frame 06): the ads as a table — channel, the name managers typed (oxblood "Not named yet" with Set up when it has
   // none), Meta's headline, leads, the split in team colours — and one docked editor with Split · Ad performance · Audit log.
   const named = (a: (typeof ads)[number]) => !!data.adNames?.[a.id];
+  const brandOf = (id: string) => data.adNames?.[id]?.pageName || (data.adNames?.[id]?.pageId ? `Page ${data.adNames[id]!.pageId}` : "Other");
+  const brandSort = <C extends { id: string }>(cs: C[]) => { const order = [...new Set(cs.map(c => brandOf(c.id)))].sort((x, y) => Number(x === "Other") - Number(y === "Other") || x.localeCompare(y));
+    return [...cs].sort((x, y) => order.indexOf(brandOf(x.id)) - order.indexOf(brandOf(y.id))); };
   const adList4 = {
     summary: `${ads.length} ads`, unsetN: ads.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
     legend: T3.map(t => ({ name: t.name === DIRECTOR_TEAM ? "Director" : t.name.replace(/^Team /, ""), color: t.color })),
-    rows: as.adCards.map((c, i) => { const a = ads.find(x => x.label === c.name) ?? ads[i];
+    // By the ad's id (two ads may share a name — Meta lets a name repeat across ad sets), grouped by Page (2026-10-22, the
+    // owner: "分一下 DC & The conts"): one brand after another, Other (no Page known) last.
+    rows: brandSort(as.adCards).map((c, i, all) => { const a = ads.find(x => x.id === c.id);
+      const brand = brandOf(c.id), dup = all.filter(x => x.name === c.name).length > 1;
       // "Not named yet" (oxblood) until a manager types its name; Meta's headline — or what the CRM calls it — under it.
       const nameless = !!a && !named(a), hl = a?.cs.find(x => x.adHeadline)?.adHeadline ?? "";
       // The desktop keeps every ad; a paused one says so (2026-10-22 — the phone shows Running | Paused tabs).
       const paused = !!a && !adRunning(data.adNames?.[a.id], a.cs.map(x => x.createdAt).sort().at(-1) ?? null, now);
-      return { name: nameless ? "Not named yet" : c.name, nameless, paused, run: a ? adRunLine(data.adNames?.[a.id], now) : "",
+      const run = a ? adRunLine(data.adNames?.[a.id], now) : "";
+      return { name: nameless ? "Not named yet" : c.name, nameless, paused, run: dup ? [run, `ID …${c.id.slice(-6)}`].filter(Boolean).join(" · ") : run,
+        brand, brandHead: i === 0 || brandOf(all[i - 1].id) !== brand, brandN: all.filter(x => brandOf(x.id) === brand).length,
         headline: nameless ? hl || c.name : hl, ch: (a?.wa ? "whatsapp" : "messenger") as "whatsapp" | "messenger", leads: c.leads,
         segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set && !nameless, sel: ui.ad === a?.id, open: c.open }; }),
   };
   // Ads to teams' "+" (2026-10-22, the owner: "director 能提前先把广告加进来先做分配"): Meta's ads to pick from, or a typed id.
   const addList = ui.addAdList, q = ui.addAdQ.trim().toLowerCase();
   const have = new Set(adIds);
-  const pickAd = (r: { id: string; name: string; status: string; start: string | null; end: string | null }) =>
+  const pickAd = (r: { id: string; name: string; status: string; start: string | null; end: string | null; page?: string | null; pageName?: string | null }) =>
     void ctx.act.addAd(r).then(ok => { if (ok) { patch({ addAdOpen: false, addAdId: "" }); as.openAdById(r.id); } });
   const addAd = {
     open: ui.addAdOpen, canAdd: !!data.can.manage,

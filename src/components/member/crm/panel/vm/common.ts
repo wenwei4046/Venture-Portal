@@ -63,7 +63,9 @@ export function teamsOf(data: CrmData): Team[] {
     const people = [tl, ...downlineOf(tl.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(p => p && ["tl", "ta", "rs"].includes(p.role))]
       .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || Number(b.fullTime) - Number(a.fullTime) || a.name.localeCompare(b.name));
     const above = data.people.find(p => p.id === tl.uplineId && p.role === "stl");
-    return { id: tl.id, tl, name: teamName(tl), who: above ? `Senior TL ${above.name}` : tl.role === "tl" ? `TL ${tl.name}` : tl.name, c, tint, own, people };
+    // A team of one (a TA / RS reporting straight to the Revenue Director, nobody under them) is named by the person
+    // (2026-10-22, the owner: "如果他没有下线的，就放他的名，不然很难看懂").
+    return { id: tl.id, tl, name: people.length === 1 && tl.role !== "tl" ? tl.name : teamName(tl), who: above ? `Senior TL ${above.name}` : tl.role === "tl" ? `TL ${tl.name}` : tl.name, c, tint, own, people };
   });
 }
 

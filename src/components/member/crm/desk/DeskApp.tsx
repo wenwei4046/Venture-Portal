@@ -865,7 +865,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 </>)}
                               </div>
                             </Fragment>))}
-                            <span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}
+                            <span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>
                           </div>
                         </>)}
                       </div>

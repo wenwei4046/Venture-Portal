@@ -189,7 +189,6 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       }).concat(lockedHere.map(p => ({ name: p.name, v: "", set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
       sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
       sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
-      locked: lockedHere.length ? lockedHere.map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
     };
   }
   if (B && E && asv?.ae) {

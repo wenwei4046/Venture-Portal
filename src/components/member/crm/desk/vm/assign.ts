@@ -101,7 +101,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   // An ad with 3+ leads and not one visit booked is flagged (v2: "No appointments"; its cost per lead is Meta's, not known yet).
   const noAppt = (a: { id: string; leads: number }) => a.leads >= 3 && !data.visits.some(v => v.state !== "cancelled" && data.customers.some(c => c.id === v.customerId && c.adId === a.id));
   const adCards = shownAds.map(a => { const r = ruleOf(a.id), sel = ui.ad === a.id, st = statusOf(a.id), segs = segsOf(r);
-    return { name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger, chFg: a.wa ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger,
+    return { id: a.id, name: a.label, channel: a.wa ? "WhatsApp" : "Messenger", leads: String(a.leads), chBg: a.wa ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger, chFg: a.wa ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger,
       segs, set: !!r && r.mode !== null, unset: !r, status: st ?? "—", stColor: st ? ST_META[st][1] : "var(--crm-faint-2)", stTint: st ? ST_META[st][3] : "var(--crm-field)",
       tag: null as string | null, noTag: true, tagBg: "var(--crm-field)", tagFg: "var(--crm-ink-soft)",
       mode: r ? (r.mode === "even" ? `Evenly · each team 1/${TA.length || 1}` : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
@@ -137,14 +137,15 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const inModeOf = (id: string): InMode => tm[id] ?? "pct";
   const valOf = (t: (typeof T)[number], m: InMode, pid: string, k: number) => { const key = `${t.id}|${m}|${pid}`;
     if (mv[key] != null) return mv[key]; if (mv[pid] != null && m === inModeOf(t.id)) return mv[pid];
-    return m === "pct" ? Math.round(100 / (t.people.length || 1)) + (k < 100 - Math.round(100 / (t.people.length || 1)) * t.people.length ? 0 : 0) : 0; };
+    // An even share that adds up to 100 (three people: 34 · 33 · 33 — it was 33 each, "Adds up to 99%"; 2026-10-22).
+    const n = t.people.length || 1, base = Math.floor(100 / n);
+    return m === "pct" ? base + (k < 100 - base * n ? 1 : 0) : 0; };
   // Inside each team: only the teams the split gives a share, as the phone (the owner, 2026-10-18: "只有被选择%的team才会显示").
   const adTeams = TA.filter(t => (pctDefault[t.id] ?? 0) > 0).map(t => { const m = inModeOf(t.id), mem = t.people;
     const totalMax = mem.reduce((a2, p, k) => a2 + valOf(t, "max", p.id, k), 0), totalPct = mem.reduce((a2, p, k) => a2 + valOf(t, "pct", p.id, k), 0);
     return { name: t.name, color: t.color, share: `${pctDefault[t.id] ?? 0}%`, field: m !== "evenly", unit: m === "pct" ? "%" : "max",
       note: m === "max" ? `Up to ${totalMax} leads in this team` : m === "pct" ? (totalPct === 100 ? "Adds up to 100%" : `Adds up to ${totalPct}% · needs 100%`) : `Shared evenly among ${mem.length} people`,
       noteColor: m === "pct" && totalPct !== 100 ? "var(--crm-oxblood)" : "var(--crm-brown)",
-      lockedNote: t.all.some(p => lk.has(p.id)) ? t.all.filter(p => lk.has(p.id)).map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
       members: mem.map((p, k) => { const key = `${t.id}|${m}|${p.id}`, val = valOf(t, m, p.id, k), taken = takenOf(p.id);
         return { name: p.name, value: val, valueStr: String(val),
           onVal: (e: { target: { value: string } }) => { const nv = Math.min(m === "pct" ? 100 : 999, parseInt(String(e.target.value).replace(/\D/g, ""), 10) || 0); set(u => ({ ...u, mv: { ...u.mv, [key]: nv } })); },
