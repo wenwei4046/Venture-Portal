@@ -274,6 +274,7 @@ async function createPaymentVoucherInner(formData: FormData) {
     pool: string
     amount: number
     account_code: string
+    description: string | null
     override_account_type: AccountType | null
     override_gl_account_code: string | null
     override_reason: string | null
@@ -285,6 +286,8 @@ async function createPaymentVoucherInner(formData: FormData) {
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
         const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
+        // A line's own words (2026-10-22), the books' line when there are some.
+        const words = (formData.get(`source_rows[${i}][description]`) as string | null)?.trim() || null
         const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
         const ovGl   = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
         const ovRsn  = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -300,7 +303,7 @@ async function createPaymentVoucherInner(formData: FormData) {
             throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
           }
           rows.push({
-            pool, amount: amt, account_code: acct,
+            pool, amount: amt, account_code: acct, description: words,
             override_account_type: isOverride ? (ovType as AccountType) : null,
             override_gl_account_code: isOverride ? ovGl : null,
             override_reason: isOverride ? ovRsn : null,
@@ -314,7 +317,7 @@ async function createPaymentVoucherInner(formData: FormData) {
         throw new Error('Account is required on debit voucher source rows')
       }
       rows.push({
-        pool: sourcePool, amount, account_code: accountCode,
+        pool: sourcePool, amount, account_code: accountCode, description: null,
         override_account_type: null, override_gl_account_code: null, override_reason: null,
       })
     }
@@ -457,6 +460,7 @@ async function createPaymentVoucherInner(formData: FormData) {
           pool: r.pool,
           amount: r.amount,
           account_code: r.account_code,
+          description: r.description,
           override_account_type: r.override_account_type,
           override_gl_account_code: r.override_gl_account_code,
           override_reason: r.override_reason,
@@ -1119,7 +1123,7 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
   // copy refused after its insert left a blank draft behind.
   const { data: srcRows } = await supabase
     .from('payment_voucher_sources')
-    .select('pool, amount, account_code, role, override_account_type, override_gl_account_code, override_reason')
+    .select('pool, amount, account_code, role, description, override_account_type, override_gl_account_code, override_reason')
     .eq('voucher_id', sourceId)
   const headers = await headerAccounts(supabase, (srcRows ?? []).map((r) => r.account_code))
   const at = (srcRows ?? []).findIndex((r) => headers.has(r.account_code))
@@ -1169,6 +1173,7 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
         amount: r.amount,
         account_code: r.account_code,
         role: r.role,
+        description: r.description,
         override_account_type: r.override_account_type,
         override_gl_account_code: r.override_gl_account_code,
         override_reason: r.override_reason,
@@ -1361,6 +1366,7 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
     pool: string
     amount: number
     account_code: string
+    description: string | null
     override_account_type: AccountType | null
     override_gl_account_code: string | null
     override_reason: string | null
@@ -1375,6 +1381,7 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
         const pool = (formData.get(`source_rows[${i}][pool]`) as string)?.trim() ?? ''
         const amt = parseFloat((formData.get(`source_rows[${i}][amount]`) as string) ?? '0')
         const acct = (formData.get(`source_rows[${i}][account_code]`) as string)?.trim() || ''
+        const words = (formData.get(`source_rows[${i}][description]`) as string | null)?.trim() || null
         const ovType = (formData.get(`source_rows[${i}][override_account_type]`) as string)?.trim() ?? ''
         const ovGl = (formData.get(`source_rows[${i}][override_gl_account_code]`) as string)?.trim() ?? ''
         const ovRsn = (formData.get(`source_rows[${i}][override_reason]`) as string)?.trim() ?? ''
@@ -1390,7 +1397,7 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
             throw new Error(`source row ${i + 1}: account is required (every PV source row must reference a chart_of_accounts code)`)
           }
           rows.push({
-            pool, amount: amt, account_code: acct,
+            pool, amount: amt, account_code: acct, description: words,
             override_account_type: isOverride ? (ovType as AccountType) : null,
             override_gl_account_code: isOverride ? ovGl : null,
             override_reason: isOverride ? ovRsn : null,
@@ -1493,6 +1500,7 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
             pool: r.pool,
             amount: r.amount,
             account_code: r.account_code,
+            description: r.description,
             override_account_type: r.override_account_type,
             override_gl_account_code: r.override_gl_account_code,
             override_reason: r.override_reason,

@@ -51,6 +51,8 @@
   transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   outline: none;
 }
+/* A form with fields side by side (Create payment, 2026-10-22). */
+.dialog[data-wide] { width: min(680px, 100%); }
 .dialogRoot[data-shown='true'] .dialogScrim,
 .dialogRoot[data-shown='true'] .dialog { opacity: 1; }
 .dialogRoot[data-shown='true'] .dialog { transform: scale(1); }

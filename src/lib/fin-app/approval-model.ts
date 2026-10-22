@@ -433,7 +433,8 @@ export function approvalRecordModel(read: {
           short: read.insufficientBalance,
           pool: vc.voucher.direction === 'credit' ? formatPoolLabel(vc.voucher.target_pool) : formatSourcesLabel(vc.sources, vc.voucher.source_pool),
           description: vc.voucher.description,
-          sources: vc.sources.map((s) => ({ pool: formatPoolLabel(s.pool) ?? s.pool, account: s.account_label, amount: Number(s.amount) })),
+          // A line's own words (2026-10-22) before its account, as the voucher's drawer says it.
+          sources: vc.sources.map((s) => ({ pool: formatPoolLabel(s.pool) ?? s.pool, account: s.description ? [s.description, s.account_label].filter(Boolean).join(' · ') : s.account_label, amount: Number(s.amount) })),
           files: vc.attachments.map((f) => ({ id: f.id, name: f.file_name, size: f.file_size })),
           upstream: upstreamHref ? { label: voucherUpstreamLabel(vc.voucher.reference_type) ?? 'Upstream record', href: inApp(upstreamHref), portalHref: upstreamHref } : null,
         }

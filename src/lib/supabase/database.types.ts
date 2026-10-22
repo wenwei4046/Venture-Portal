@@ -5461,6 +5461,7 @@ export type Database = {
           account_code: string
           amount: number
           created_at: string
+          description: string | null
           id: string
           override_account_type:
             | Database["public"]["Enums"]["account_type"]
@@ -5475,6 +5476,7 @@ export type Database = {
           account_code: string
           amount: number
           created_at?: string
+          description?: string | null
           id?: string
           override_account_type?:
             | Database["public"]["Enums"]["account_type"]
@@ -5489,6 +5491,7 @@ export type Database = {
           account_code?: string
           amount?: number
           created_at?: string
+          description?: string | null
           id?: string
           override_account_type?:
             | Database["public"]["Enums"]["account_type"]

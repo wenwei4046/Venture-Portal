@@ -46,7 +46,7 @@ const DETAIL: VoucherDetail = {
   bank: { name: 'Hong Leong Bank', number: '5123-0098-77' },
   bankBalance: 100000,
   noCash: false,
-  sources: [{ pool: 'Marketing Dept Pool', account: 'Advertising', code: '6100', amount: 25000 }],
+  sources: [{ pool: 'Marketing Dept Pool', account: 'Advertising', code: '6100', amount: 25000, description: null }],
   account: 'Advertising',
   accountCodes: '6100',
   pool: 'Marketing Dept Pool',
@@ -93,6 +93,18 @@ describe('the drawer', () => {
     expect(within(dialog).getByText('Attachments · 1 file')).toBeInTheDocument()
     expect(within(dialog).getByText('214 KB')).toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: 'View full page ↗' })).toHaveAttribute('href', '/payments/v1')
+  })
+
+  it('says each line’s own words beside its account (2026-10-22)', async () => {
+    await drawn({
+      sources: [
+        { pool: 'Venture Pool', account: 'Office Rental', code: '9094', amount: 1200, description: 'October rent' },
+        { pool: 'Marketing Dept Pool', account: 'Printing & Stationery', code: '9099', amount: 250, description: null },
+      ],
+    })
+    const dialog = screen.getByRole('dialog', { name: 'HV-PV-202610-0044' })
+    expect(within(dialog).getByText('October rent · Office Rental')).toBeInTheDocument()
+    expect(within(dialog).getByText('Printing & Stationery')).toBeInTheDocument()
   })
 
   it('a draft: Submit for approval, Edit, and Void under ⋯', async () => {

@@ -186,6 +186,15 @@ describe('approvalRecordModel', () => {
     })
   })
 
+  it('a voucher’s line says its own words before its account (2026-10-22)', () => {
+    const lines = [
+      { pool: 'venture_pool', amount: '1200.00', account_code: '6200', account_label: '6200 · Rent', description: 'October rent' },
+      { pool: 'venture_pool', amount: '250.00', account_code: '9099', account_label: '9099 · Printing', description: null },
+    ]
+    const r = approvalRecordModel({ approval, submitterName: 'Carrie', verdict: { may: true }, loanContext: null, voucherContext: { ...voucher, sources: lines }, insufficientBalance: false })
+    expect(r.voucher?.sources.map((x) => x.account)).toEqual(['October rent · 6200 · Rent', '9099 · Printing'])
+  })
+
   it('a loan’s request: its terms; not this reader’s: why', () => {
     const r = approvalRecordModel({
       approval: { ...approval, request_type: 'new_loan', description: 'New loan to Carres', reference_table: 'loans', reference_id: 'loan-1', amount: 100000 },

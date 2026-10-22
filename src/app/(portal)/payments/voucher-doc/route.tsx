@@ -97,7 +97,7 @@ export async function GET(req: Request) {
   const [{ data: srcs }, { data: companies }, { data: banks }, coverageResult, salaryResult, requests] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+      .select('voucher_id, pool, amount, account_code, description, chart_of_accounts!pvs_account_code_fk(name)')
       .in('voucher_id', voucherIds)
       .order('amount', { ascending: false }),
     companyIds.length > 0
@@ -163,7 +163,7 @@ export async function GET(req: Request) {
   const companyMap = new Map((companies ?? []).map((c) => [c.id as string, c]))
   const bankMap = new Map((banks ?? []).map((b) => [b.id as string, b]))
   const sourcesByVoucher = new Map<string, VoucherDocData['sources']>()
-  for (const s of (srcs ?? []) as Array<{ voucher_id: string; pool: string; amount: string | number; account_code: string | null; chart_of_accounts: { name: string } | null }>) {
+  for (const s of (srcs ?? []) as Array<{ voucher_id: string; pool: string; amount: string | number; account_code: string | null; description?: string | null; chart_of_accounts: { name: string } | null }>) {
     const arr = sourcesByVoucher.get(s.voucher_id) ?? []
     const name = s.chart_of_accounts?.name ?? (s.account_code ? s.account_code.replace(/_/g, ' ') : null)
     arr.push({
@@ -171,6 +171,7 @@ export async function GET(req: Request) {
       // "6100 · Advertising" — the design's account, its code first.
       account_label: s.account_code && s.chart_of_accounts?.name ? `${s.account_code} · ${s.chart_of_accounts.name}` : name,
       amount: Number(s.amount),
+      description: s.description?.trim() || null,
     })
     sourcesByVoucher.set(s.voucher_id, arr)
   }

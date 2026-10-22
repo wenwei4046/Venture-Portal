@@ -34,6 +34,12 @@ describe('buildRepaymentSourceRows', () => {
     expect(buildRepaymentSourceRows([], { principal: 10, interest: 0, penalty: 0 }, null, has)[0].account_code).toBe('')
   })
 
+  it('a part’s own words go with it through a split edit (2026-10-22)', () => {
+    const prev: Partial<RepaymentSourceRow>[] = [{ role: 'interest', pool: 'venture_pool', amount: '450.00', account_code: '6000', autoAccount: true, description: 'October interest' }]
+    const rows = buildRepaymentSourceRows(prev, { principal: 1500, interest: 460, penalty: 0 }, '4054', has)
+    expect(rows.map((r) => [r.role, r.description])).toEqual([['principal', undefined], ['interest', 'October interest']])
+  })
+
   it('rows without a role (hand-added before ticking repayment) are dropped', () => {
     const rows = buildRepaymentSourceRows([{ pool: 'venture_pool', amount: '5.00', account_code: '9000' }], { principal: 10, interest: 0, penalty: 0 }, '4054', has)
     expect(rows).toHaveLength(1)
@@ -55,6 +61,14 @@ describe('seedRepaymentSourceRows', () => {
       { role: 'principal', pool: 'dept_pool_finance', amount: '1500.00', account_code: '4054', autoAccount: true }, // = default
       { role: 'interest', pool: 'venture_pool', amount: '450.00', account_code: '5027', autoAccount: false }, // kept, flagged manual
     ])
+  })
+
+  it('keeps a matched saved row’s own words (2026-10-22)', () => {
+    const rows = seedRepaymentSourceRows(
+      [{ pool: 'venture_pool', amount: '1500.00', account_code: '4054', description: 'Principal 2/6' }, { pool: 'venture_pool', amount: '450.00', account_code: '6000' }],
+      split, '4054', has,
+    )
+    expect(rows.map((r) => r.description)).toEqual(['Principal 2/6', undefined])
   })
 
   it('fills a blank saved account with the default', () => {

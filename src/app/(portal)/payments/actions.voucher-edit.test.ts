@@ -127,6 +127,16 @@ describe('a voucher’s Edit writes only what it is sent', () => {
     expect(writes.find((w) => w.table === 'payment_voucher_sources' && w.operation === 'insert')?.values).toHaveLength(2)
   })
 
+  it('each line sent keeps its own words (2026-10-22); a line without them keeps none', async () => {
+    const { writes } = database()
+    const fd = form({ source_rows_count: '2', 'source_rows[0][pool]': 'venture_pool', 'source_rows[0][amount]': '600', 'source_rows[0][account_code]': '9000', 'source_rows[0][description]': ' October rent ', 'source_rows[1][pool]': 'dept_pool_marketing', 'source_rows[1][amount]': '400', 'source_rows[1][account_code]': '9000' })
+    await expect(updatePaymentVoucher(fd)).rejects.toThrow('NEXT_REDIRECT')
+    expect(writes.find((w) => w.table === 'payment_voucher_sources' && w.operation === 'insert')?.values).toEqual([
+      expect.objectContaining({ pool: 'venture_pool', description: 'October rent' }),
+      expect.objectContaining({ pool: 'dept_pool_marketing', description: null }),
+    ])
+  })
+
   it('a receipt’s account alone rewrites its one row on the pool and amount it stands at', async () => {
     const { writes } = database({ direction: 'credit', target_pool: 'venture_pool', bank_account_id: null, sources: [{ amount: 1000, account_code: '5000' }] })
     await expect(updatePaymentVoucher(form({ account_code: '5010' }))).rejects.toThrow('NEXT_REDIRECT')

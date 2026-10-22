@@ -38,6 +38,8 @@ export interface VoucherSourceData {
   /** "6100 · Advertising". */
   account_label: string | null
   amount: number
+  /** The line's own words (2026-10-22), under its pool. */
+  description?: string | null
 }
 
 export interface StatutoryCoverageData {
@@ -164,7 +166,7 @@ function PaymentVoucherPage({ v }: { v: VoucherDocData }) {
   if (v.payment_reference) meta.push({ label: 'Reference', value: v.payment_reference })
   const rows =
     v.sources.length > 0
-      ? v.sources.map((s) => ({ cells: [s.pool_label, s.account_label ?? '—', docMoney(s.amount)] }))
+      ? v.sources.map((s) => ({ cells: [s.pool_label, s.account_label ?? '—', docMoney(s.amount)], second: s.description ?? null }))
       : [{ cells: ['—', '—', docMoney(v.amount)] }]
   const a = v.approval
   const approval: DocLine[] = [

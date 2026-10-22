@@ -34,6 +34,7 @@ export function FinDialog({
   label,
   locked = false,
   tall = false,
+  wide = false,
   children,
 }: {
   open: boolean
@@ -46,6 +47,8 @@ export function FinDialog({
   locked?: boolean
   /** A form's sheet on the phone stands 92% of the screen (the prototype's `h: '92%'`); the desktop ignores it. */
   tall?: boolean
+  /** 680px on a desktop for a form with fields side by side (Create payment, 2026-10-22); a phone's sheet ignores it. */
+  wide?: boolean
   children: ReactNode
 }) {
   const id = useId()
@@ -88,6 +91,7 @@ export function FinDialog({
         aria-labelledby={label ? undefined : `${id}-title`}
         className={s.dialog}
         data-tall={sheet && tall ? '' : undefined}
+        data-wide={!sheet && wide ? '' : undefined}
       >
         {sheet ? (
           <div className={s.sheetHead}>
