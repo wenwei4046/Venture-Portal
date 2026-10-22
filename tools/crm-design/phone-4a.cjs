@@ -456,7 +456,12 @@ function panel(body) {
   body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
   body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
-    '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.v}%, #fff ${r.v}%)`, ["--thumb" as string]: r.c }} />', "split slider");
+    '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.range} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.range}%, #fff ${r.range}%)`, ["--thumb" as string]: r.c }} />', "split slider");
+  // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00"): the decimal keypad and room for "33.33".
+  body = once(body, 'inputMode="numeric" pattern="[0-9]*" value={r.v} onChange={r.setN}', 'inputMode="decimal" value={r.v} onChange={r.setN}', "split share decimal");
+  { const i = body.indexOf('inputMode="decimal" value={r.v} onChange={r.setN}'), w = body.indexOf('width: "30px"', i);
+    if (w < 0 || w - i > 400) throw new Error("phone-4a: split share width");
+    body = body.slice(0, w) + 'width: "54px"' + body.slice(w + 'width: "30px"'.length); }
   body = teamRooms(body);
   // T07 · Showrooms: the title in 4a's face (the page keeps production's card and Edit — see CHECKLIST).
   body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>`, "showrooms title");

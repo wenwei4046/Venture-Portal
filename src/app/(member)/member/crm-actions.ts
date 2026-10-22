@@ -11,6 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
+import { listMetaAds, type MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -36,7 +37,7 @@ const CRM_WRITES = [
   // The chat composer's Recents (mig 20261014251500): one's own recent emoji.
   "crm_save_recent_emoji",
   // An ad's name (mig 20261016120000), CRM · Manage.
-  "crm_name_ad",
+  "crm_name_ad", "crm_add_ad",
   // CRM Desktop v2 · Channels: link / unlink a Page or number, its default (mig 20261015100000).
   "crm_set_channel",
   // Settings › General (mig 20261018100000), CRM · Manage.
@@ -113,7 +114,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad",
   "crm_set_channel", "crm_save_settings",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
@@ -212,7 +213,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // One's own recent emoji, the chat composer's Recents (mig 20261014251500).
     soft<{ recent_emoji: string[] | null }[]>(db.from("crm_staff_prefs").select("recent_emoji")),
     // Ads' names (mig 20261016120000).
-    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at")),
+    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at, added_at, starts_at, ends_at")),
     // Settings › General (mig 20261018100000): null before it, so the CRM keeps today's values.
     (async () => { try { const { data, error } = await db.rpc("crm_settings_read"); return error ? null : (data as unknown); } catch { return null; } })(),
     // Members locked out of the dealing for now (mig 20261022130000).
@@ -387,6 +388,22 @@ export async function refreshCrmTemplates(): Promise<{ ok: true; changed: number
     return { ok: true, changed: Number(data ?? 0) };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's review could not be read.") };
+  }
+}
+
+/**
+ * The ads Meta has in the ad accounts the system user sees (2026-10-22, the desktop's Ads to teams "+" and its sync of
+ * what is running or about to run): read by the server with the system user's token, for CRM · Manage only.
+ */
+export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | { ok: false; error: string }> {
+  try {
+    await session();
+    await requireCrm("manage");
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("Meta is not connected on this server.");
+    return { ok: true, ads: await listMetaAds(token) };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "Meta's ads could not be read.") };
   }
 }
 

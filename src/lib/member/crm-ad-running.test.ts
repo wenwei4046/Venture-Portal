@@ -18,3 +18,19 @@ describe('adRunning', () => {
     expect(adRunning(undefined, null, now)).toBe(false)
   })
 })
+
+describe('an ad’s run in a line', () => {
+  it('reads scheduled, pending, running and ended', async () => {
+    const { adRunLine, adToSync } = await import('./crm-ad-running')
+    expect(adRunLine({ status: 'ACTIVE', startAt: '2026-10-25T01:00:00Z', endAt: '2026-10-30T15:00:00Z' }, now)).toBe('Scheduled · starts 25 Oct, 9:00 am · ends 30 Oct')
+    expect(adRunLine({ status: 'PENDING_REVIEW', startAt: '2026-10-25T01:00:00Z', endAt: null }, now)).toBe('Pending review · 25 Oct')
+    expect(adRunLine({ status: 'ACTIVE', startAt: '2026-10-19T08:39:00Z', endAt: null }, now)).toBe('Running · since 19 Oct')
+    expect(adRunLine({ status: 'ACTIVE', startAt: '2026-10-01T00:00:00Z', endAt: '2026-10-10T00:00:00Z' }, now)).toBe('Ended 10 Oct')
+    expect(adRunLine({ status: 'CAMPAIGN_PAUSED' }, now)).toBe('Paused')
+    expect(adRunLine(undefined, now)).toBe('')
+    expect(adToSync({ status: 'ACTIVE', start: null, end: null }, now)).toBe(true)
+    expect(adToSync({ status: 'PENDING_REVIEW', start: '2026-10-25T00:00:00Z', end: null }, now)).toBe(true)
+    expect(adToSync({ status: 'PAUSED', start: null, end: null }, now)).toBe(false)
+    expect(adToSync({ status: 'ACTIVE', start: null, end: '2026-10-01T00:00:00Z' }, now)).toBe(false)
+  })
+})

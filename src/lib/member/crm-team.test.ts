@@ -192,7 +192,7 @@ describe("assignment", () => {
   });
 
   it("waits for the Principal or HOD only when there is no team at all", () => {
-    expect(assignEnquiry("x", tuesday, { rules: [], teams: {} }, emptyCounts(), members.filter(m => m.role !== "tl")).assignment).toEqual({ teamId: null, memberId: null });
+    expect(assignEnquiry("x", tuesday, { rules: [], teams: {} }, emptyCounts(), members.filter(m => m.role !== "tl" && m.role !== "ta" && m.role !== "rs")).assignment).toEqual({ teamId: null, memberId: null }); // nobody who takes enquiries (a TA / RS with no TL above heads a team since 2026-10-22)
   });
 });
 
@@ -292,7 +292,8 @@ describe("the CRM adapts to the company chart, never the other way (user 2026-10
   const names = (ms: CrmMember[]) => ms.map(m => m.id);
 
   it("gives the HOD every team and the Team tab though no TL reports to them", () => {
-    expect(names(visibleTeams(as("hod"), chart))).toEqual(["tla", "tlb"]);
+    // A TA or RS reporting to nobody heads a team of their own (2026-10-22, isTeamTop).
+    expect(names(visibleTeams(as("hod"), chart))).toEqual(["tla", "tlb", "loneTa"]);
     expect(leadsPeople(as("hod"), chart)).toBe(true);
   });
 
@@ -307,8 +308,8 @@ describe("the CRM adapts to the company chart, never the other way (user 2026-10
     expect(leadsPeople(as("a1"), chart)).toBe(false);
   });
 
-  it("names the TAs and RS no TL leads, so the Boss and HOD can fix the chart", () => {
-    expect(names(withoutTeam(chart))).toEqual(["loneTa", "loneRs"]);
+  it("leaves nobody without a team: a TA or RS with no TL above heads their own (2026-10-22, isTeamTop)", () => {
+    expect(names(withoutTeam(chart))).toEqual([]);
   });
 });
 

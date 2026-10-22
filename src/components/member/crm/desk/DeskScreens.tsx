@@ -231,6 +231,15 @@ export default function DeskScreens(p: DeskScreensProps) {
   const lastSig = useRef(settingsSig);
   useEffect(() => { if (lastSig.current === settingsSig) return; lastSig.current = settingsSig; if (histOn) patch({ history: null }); }, [settingsSig, histOn, patch]);
 
+  // Assignment brings in, by itself, every Meta ad running or about to run (2026-10-22, the owner: "广告开始跑，或者 pending
+  // 要跑（几时开始，几时结束），在 desktop 都要看到") — CRM · Manage, at most every 10 minutes (act.metaAds(true) → crm_add_ad).
+  const synced = useRef(0);
+  useEffect(() => {
+    if (ui.tab !== "assignment" || !live || !data.can.manage || Date.now() - synced.current < 10 * 60_000) return;
+    synced.current = Date.now();
+    void act.metaAds(true).then(rows => { if (rows) patch({ addAdList: rows }); });
+  }, [ui.tab, live, data.can.manage, act, patch]);
+
   // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
   const seeded = useRef("");
   const seedKey = `${ui.tab}:${ui.pick}:${ui.stage}`;

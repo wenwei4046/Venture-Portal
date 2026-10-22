@@ -13,6 +13,7 @@ import { sendTo } from "./inbox";
 import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META, teamColours } from "./tokens";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 import { lockedOf, sharedOut } from "../../shared/locked";
+import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
 
 const ago = (iso: string, now: Date) => { const m = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
   return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
@@ -73,8 +74,10 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   } : { name: "", ini: "", ad: "", owner: "", status: "", msg: "", out: false, inn: false, time: "", clock: "", reply: "", remindLog: "", reminded: false, notReminded: true };
 
   // ── Ads to teams (D2 / D3).
-  const adIds = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))];
-  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? `Ad ${id}`, leads: cs.length, wa: cs.some(c => c.channel === "whatsapp") }; };
+  // An ad added before its first lead joins the list (2026-10-22, crm_add_ad; adNames' `added`).
+  const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
+  const adIds = [...new Set([...data.customers.map(c => c.adId).filter((x): x is string => !!x), ...added])];
+  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? data.adNames?.[id]?.name ?? `Ad ${id}`, leads: cs.length, wa: !cs.length || cs.some(c => c.channel === "whatsapp") }; };
   const ads = adIds.map(adOf).sort((a, b) => b.leads - a.leads);
   const statusOf = (_id: string): string | null => null; // Meta's delivery status (waits for the Meta connection, PROPOSALS.md C).
   const adSt = ui.adSt;
@@ -87,7 +90,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     // A By % team with somebody locked opens on what the others really get: their saved % scaled to 100.
     const mv0: Record<string, number> = rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {};
     if (rule) TA.forEach(t => { if (fromDb(rule.tm?.[t.id]) !== "pct") return; const s = sharedOut(rule.pp, t.people.map(p => p.id), t.all.some(p => lk.has(p.id))); if (s) Object.assign(mv0, s); });
-    set(u => ({ ...u, ad: id, stage: "op", adLog: false, adMode: rule?.mode === "even" ? "evenly" : "team",
+    set(u => ({ ...u, ad: id, stage: "op", adLog: false, splitTyping: null, adMode: rule?.mode === "even" ? "evenly" : "team",
       tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: mv0,
       split: rule && rule.mode !== "even" ? { ...rule.split } : null })); };
   const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
@@ -122,12 +125,13 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const mode = ui.adMode, tm = ui.tm, mv = ui.mv;
   const evenSplit = () => { const n = TA.length || 1, base = Math.floor(100 / n); return Object.fromEntries(TA.map((t, i) => [t.id, base + (i < 100 - base * n ? 1 : 0)])); };
   const pctDefault = ui.split ?? (TA.length === 3 ? Object.fromEntries(TA.map((t, i) => [t.id, [50, 30, 20][i]])) : evenSplit());
+  // A team's share to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00"); the box keeps what is typed.
   const setSplit = (id: string, raw: string) => {
-    const v = Math.max(0, Math.min(100, (parseInt(String(raw).replace(/\D/g, ""), 10) || 0)));
+    const tx = pctText(String(raw)), v = pctOf(tx);
     const others = TA.map(x => x.id).filter(n => n !== id), rest = others.reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
-    const out: Record<string, number> = { [id]: v }; let left = 100 - v;
-    others.forEach((n, i) => { const share = i === others.length - 1 ? left : rest ? Math.round(((100 - v) * (pctDefault[n] ?? 0)) / rest) : Math.round((100 - v) / others.length); out[n] = share; left -= share; });
-    patch({ split: out });
+    const out: Record<string, number> = { [id]: v }; let left = r2(100 - v);
+    others.forEach((n, i) => { const share = i === others.length - 1 ? left : rest ? r2(((100 - v) * (pctDefault[n] ?? 0)) / rest) : r2((100 - v) / others.length); out[n] = share; left = r2(left - share); });
+    patch({ split: out, splitTyping: { id, text: tx } });
   };
   const takenOf = (pid: string) => (ad ? data.customers.filter(c => c.adId === ad.id && c.assignedTo === pid).length : 0);
   const inModeOf = (id: string): InMode => tm[id] ?? "pct";
@@ -158,7 +162,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     lk.forEach(id => { if (pp[id] == null && saved[id] != null) pp[id] = saved[id]; });
     return { mode: "split" as const, split: { ...pctDefault }, pm: "pct" as const, pp, tm: tmo };
   };
-  const draftOk = mode === "evenly" || (Object.values(pctDefault).reduce((a2, n) => a2 + n, 0) === 100
+  const draftOk = mode === "evenly" || (is100(Object.values(pctDefault).reduce((a2, n) => a2 + n, 0))
     && TA.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0) === 100; if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
   const saveOne = async (id: string, label: string) => ctx.act.saveAdRule(id, label, ruleFromDraft());
   // The ad's name, typed in the editor's title (crm_name_ad; the phone's ad editor does the same — panel/vm/assign.ts).
@@ -179,9 +183,9 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     adOpen, ad: { name: ad?.label ?? "", meta: ad ? `${ad.wa ? "WhatsApp" : "Messenger"} · ${ad.leads} leads` : "", ...adNaming },
     adModes: ([["evenly", "Evenly"], ["team", "By team"]] as const).map(([v, label]) => ({ label, on: v === mode, off: v !== mode, pick: () => patch({ adMode: v }) })),
     adByTeam: mode === "team", adEvenly: mode !== "team",
-    adSplit: TA.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1)), pctStr: String(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1))),
+    adSplit: TA.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1)), pctStr: ui.splitTyping?.id === t.id && mode === "team" ? ui.splitTyping.text : pctShow(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1))),
       onRange: (e: { target: { value: string } }) => setSplit(t.id, e.target.value) })),
-    resetSplit: () => patch({ split: null, mv: {} }),
+    resetSplit: () => patch({ split: null, mv: {}, splitTyping: null }),
     evenTotal: TA.reduce((a2, t) => a2 + t.people.length, 0),
     evenTeams: TA.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
     adTeams, closeAd: () => patch({ ad: null }),

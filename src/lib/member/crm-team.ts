@@ -67,19 +67,30 @@ export function allDownlines(memberId: string, members: CrmMember[]): CrmMember[
 /** People over the limit of direct downlines — the hierarchy should not allow it. */
 export const overLimit = (members: CrmMember[]) => members.filter(m => directDownlines(m.id, members).length > MAX_DOWNLINES);
 
-/** The TL whose team a person is in (a TL is in their own). Above TL: none. */
+/**
+ * A team's top (2026-10-22, mig 20261022170000 crm_is_team_top; the owner: "只要是 report to peter (revenue director)，就是一个
+ * team"): a TL, or a TA / RS whose upline is the Revenue Director or the Boss (or who has none).
+ */
+export function isTeamTop(m: CrmMember, members: CrmMember[]): boolean {
+  if (m.role === "tl") return true;
+  if (m.role !== "ta" && m.role !== "rs") return false;
+  const up = m.uplineId ? members.find(x => x.id === m.uplineId) : undefined;
+  return !up || up.role === "hod" || up.role === "boss";
+}
+
+/** The top whose team a person is in (a top is in their own). Above it: none. */
 export function teamOf(memberId: string, members: CrmMember[]): string | undefined {
   let m = members.find(x => x.id === memberId);
   for (let guard = 0; m && guard < 10; guard++) {
-    if (m.role === "tl") return m.id;
+    if (isTeamTop(m, members)) return m.id;
     if (m.role !== "ta" && m.role !== "rs") return undefined;
     m = members.find(x => x.id === m!.uplineId);
   }
   return undefined;
 }
 
-/** Every TL — one team each. */
-export const allTeams = (members: CrmMember[]) => members.filter(m => m.role === "tl");
+/** Every team's top — one team each. */
+export const allTeams = (members: CrmMember[]) => members.filter(m => isTeamTop(m, members));
 
 /** The people in a TL's team who take enquiries: the TL, their TAs and RS. */
 export const teamHandlers = (tlId: string, members: CrmMember[]) =>
@@ -116,7 +127,7 @@ export function visibleTeams(viewer: CrmMember, members: CrmMember[]): CrmMember
   if (assignsAds(viewer)) return allTeams(members);
   const own = teamOf(viewer.id, members);
   if (own) return members.filter(m => m.id === own);
-  return visibleMembers(viewer, members).filter(m => m.role === "tl");
+  return visibleMembers(viewer, members).filter(m => isTeamTop(m, members));
 }
 
 /**

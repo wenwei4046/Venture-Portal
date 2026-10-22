@@ -4,7 +4,9 @@
  * move a customer, undo either, the ad rules and full-time allocation, the
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
-import { crmWrite, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
+import { adToSync } from "@/lib/member/crm-ad-running";
 import type { CrmData, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
@@ -15,6 +17,10 @@ export interface PanelActions extends SalesActions {
   /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
   /** Names an ad (crm_name_ad, CRM · Manage); an empty name takes the given name off. */
   nameAd(ad: string, name: string): Promise<boolean>;
+  /** Adds an ad before its first lead (crm_add_ad, CRM · Manage; 2026-10-22): it joins Ads to teams with its run. */
+  addAd(ad: { id: string; name: string; status: string; start: string | null; end: string | null }): Promise<boolean>;
+  /** Meta's ads in the connected ad accounts; also adds, by itself, every one running or about to run (`sync`). */
+  metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
@@ -41,7 +47,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     if (!r.ok) { base.toast(r.error); return null; }
     return r;
   };
-  return {
+  const api: PanelActions = {
     ...base,
     async sendTo(customerId, staffId) {
       if (!(await write("crm_send_to", { p_contact: customerId, p_staff: staffId }))) return false;
@@ -53,6 +59,29 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders }))) return false;
       setData(d => ({ ...d, settings: st }));
       return true;
+    },
+    async addAd(ad) {
+      if (!(await write("crm_add_ad", { p_ad: ad.id, p_name: ad.name, p_status: ad.status || null, p_start: ad.start, p_end: ad.end }))) return false;
+      setData(d => {
+        const cur = d.adNames?.[ad.id];
+        return { ...d, adNames: { ...(d.adNames ?? {}), [ad.id]: { name: cur?.source === "manual" ? cur.name : ad.name || cur?.name || `Ad ${ad.id}`, source: cur?.source ?? "meta",
+          status: ad.status || cur?.status || null, statusAt: new Date().toISOString(), added: true, startAt: ad.start ?? cur?.startAt ?? null, endAt: ad.end } } };
+      });
+      return true;
+    },
+    async metaAds(sync) {
+      if (!live) return null;
+      const r = await fetchMetaAds();
+      if (!r.ok) return null;
+      if (sync) {
+        const now = new Date(), have = data().adNames ?? {};
+        for (const a of r.ads) {
+          const h = have[a.id];
+          if (!adToSync(a, now) || (h?.added && h.status === a.status && (h.startAt ?? null) === a.start && (h.endAt ?? null) === a.end)) continue;
+          await api.addAd(a);
+        }
+      }
+      return r.ads;
     },
     async nameAd(ad, name) {
       const nm = name.trim();
@@ -155,4 +184,5 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
   };
+  return api;
 }

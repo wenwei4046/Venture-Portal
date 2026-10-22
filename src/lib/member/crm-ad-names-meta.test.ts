@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -93,5 +93,26 @@ describe('ad statuses from Ads Manager', () => {
 
   it('does nothing without a token', async () => {
     expect(await refreshAdStatuses(statusDb(['111111']).client, undefined)).toBe(0)
+  })
+})
+
+describe('the ads Meta lists for "+"', () => {
+  it('reads every account, leaves deleted ones to Meta’s filter, running first then newest', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('me/adaccounts')) return new Response(JSON.stringify({ data: [{ id: 'act_1', name: 'IR@The Conts' }, { id: 'bad' }] }), { status: 200 })
+      if (u.includes('act_1/ads')) return new Response(JSON.stringify({ data: [
+        { id: '111111', name: 'Old paused', effective_status: 'PAUSED', created_time: '2026-10-01T00:00:00+0800' },
+        { id: '222222', name: 'New running', effective_status: 'ACTIVE', created_time: '2026-10-19T00:00:00+0800' },
+        { id: 'x', name: 'bad id' },
+      ] }), { status: 200 })
+      return new Response('{}', { status: 400 })
+    }) as unknown as typeof fetch
+    const rows = await listMetaAds('T', f)
+    expect(rows.map(r => [r.id, r.status, r.account])).toEqual([['222222', 'ACTIVE', 'IR@The Conts'], ['111111', 'PAUSED', 'IR@The Conts']])
+    expect(String((f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('filtering=')
+  })
+  it('throws when Meta refuses the accounts', async () => {
+    await expect(listMetaAds('T', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).rejects.toThrow()
   })
 })

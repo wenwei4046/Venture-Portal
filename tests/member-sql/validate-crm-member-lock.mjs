@@ -81,4 +81,22 @@ for (const fn of ['crm_pick_inside', 'crm_fulltime_pick', 'crm_assign_contact'])
   check(/crm_deal_handlers/.test(src), true, `${fn} picks from crm_deal_handlers`)
 }
 
+// ── A By % team keeps a locked member's % and still saves (mig 20261022160000: the check sums crm_deal_handlers) ──
+await db.exec((await readFile(new URL('20261022160000_crm_split_skips_locked.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+await as('boss', 'select public.crm_set_locked($1, true)', [id('s', 'ann')])
+const people = { [id('s', 'tla')]: 50, [id('s', 'bob')]: 50, [id('s', 'ann')]: 40 }
+const saved = await as('boss', 'select public.crm_save_ad_assign($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7::jsonb) as r', ['424242', 'Ad', 'split', JSON.stringify({ [id('s', 'tla')]: 100 }), 'pct', JSON.stringify(people), JSON.stringify({ [id('s', 'tla')]: 'pct' })])
+check(!!saved[0].r, true, 'a By % team adding up to 100 without its locked member saves, the locked % kept')
+await assert.rejects(as('boss', 'select public.crm_save_ad_assign($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7::jsonb)', ['434343', 'Ad', 'split', JSON.stringify({ [id('s', 'tla')]: 100 }), 'pct', JSON.stringify({ [id('s', 'tla')]: 50, [id('s', 'bob')]: 40 }), JSON.stringify({ [id('s', 'tla')]: 'pct' })]), /100/, 'the others must still add up to 100'); checks++
+check(!!(await as('boss', 'select public.crm_save_ad_assign($1, $2, $3, $4::jsonb, $5, $6::jsonb, $7::jsonb) as r', ['454545', 'Ad', 'split', JSON.stringify({ [id('s', 'tla')]: 100 }), 'pct', JSON.stringify({ [id('s', 'tla')]: 33.33, [id('s', 'bob')]: 66.67 }), JSON.stringify({ [id('s', 'tla')]: 'pct' })]))[0].r, true, 'shares to the hundredth add up exactly')
+
+// ── Everybody reporting straight to the Revenue Director is a team (mig 20261022170000, crm_is_team_top) ──
+await db.exec((await readFile(new URL('20261022170000_crm_team_top.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+await q('insert into users values ($1, true, null)', [id('u', 'solo')])
+await q("insert into hr_staff_costs (id, employee_name, user_id, title_id, reports_to) values ($1, 'solo', $2, $3, $4)", [id('s', 'solo'), id('u', 'solo'), id('t', 'rs'), id('s', 'hod')])
+check((await q('select crm_is_team_top($1) as a, crm_is_team_top($2) as b, crm_is_team_top($3) as c', [id('s', 'solo'), id('s', 'tla'), id('s', 'bob')]))[0], { a: true, b: true, c: false }, 'an RS reporting to the Revenue Director heads a team; a TL does; an RS under a TL does not')
+check((await q('select crm_team_of($1)::text as t', [id('s', 'solo')]))[0].t, id('s', 'solo'), 'their team is their own')
+check((await q('select array(select h::text from crm_all_handlers() h) as h'))[0].h.includes(id('s', 'solo')), true, 'they take enquiries')
+check((await q('select crm_team_of($1)::text as t', [id('s', 'bob')]))[0].t, id('s', 'tla'), "a TL's team is unchanged")
+
 console.log(`crm member lock: ${checks} checks passed`)

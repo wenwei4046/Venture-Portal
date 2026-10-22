@@ -36,6 +36,7 @@ adSum
 adTeams
 adTot
 adTotals
+addAd
 alertsP
 apCmpLabel
 apCmpOn

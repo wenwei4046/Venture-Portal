@@ -7,7 +7,7 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import type { CrmCustomer, CrmData, CrmPerson, CrmVisit } from "@/lib/member/crm-data";
 import { formatIntlDate } from "@/lib/utils";
-import { downlineOf, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
+import { downlineOf, isTeamTop, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
 import type { SalesTab } from "../../sales/ui";
@@ -57,12 +57,13 @@ export interface PanelCtx {
 
 /** The teams, each a TL with everyone below them, in the design's order and colours. */
 export function teamsOf(data: CrmData): Team[] {
-  return data.people.filter(p => p.role === "tl").sort((a, b) => a.name.localeCompare(b.name)).map((tl, k) => {
+  // A team is every top — a TL, or a TA / RS reporting straight to the Revenue Director (2026-10-22, isTeamTop).
+  return data.people.filter(p => isTeamTop(p, data.people)).sort((a, b) => a.name.localeCompare(b.name)).map((tl, k) => {
     const [c, tint, own] = hue(k);
     const people = [tl, ...downlineOf(tl.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(p => p && ["tl", "ta", "rs"].includes(p.role))]
       .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || Number(b.fullTime) - Number(a.fullTime) || a.name.localeCompare(b.name));
     const above = data.people.find(p => p.id === tl.uplineId && p.role === "stl");
-    return { id: tl.id, tl, name: teamName(tl), who: above ? `Senior TL ${above.name}` : `TL ${tl.name}`, c, tint, own, people };
+    return { id: tl.id, tl, name: teamName(tl), who: above ? `Senior TL ${above.name}` : tl.role === "tl" ? `TL ${tl.name}` : tl.name, c, tint, own, people };
   });
 }
 

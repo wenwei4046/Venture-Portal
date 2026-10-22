@@ -60,8 +60,8 @@ module.exports = [
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
   // Active members (2026-10-22, the owner: a member not active for now is off Assignment's lists, their share to the others;
   // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
-  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}',
-    "Assignment › Active members: each person Active or Locked (crm_set_locked)."],
+  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}',
+    "Assignment › Active members: each person Active or Locked (crm_set_locked); Ads to teams' + picker (DeskAddAd, crm_add_ad)."],
   ['<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>',
     '<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}',
     "Ads to teams: a team with somebody locked says so (their share goes to the others)."],
@@ -72,4 +72,7 @@ module.exports = [
     "Ads to teams: a locked person's name greyed."],
   ['{!!(t.field) && (<>', '{!!(m.locked) && (<span aria-label="Locked" style={{ flex: "0 0 auto", width: "56px", height: "32px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>)}{!!(t.field && !m.locked) && (<>',
     "Ads to teams: a locked person has a lock, no box."],
+  // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00").
+  ['<input type="text" inputMode="numeric" value={t.pctStr} onChange={t.onRange} style={{ width: "30px",', '<input type="text" inputMode="decimal" value={t.pctStr} onChange={t.onRange} style={{ width: "50px",',
+    "Ads to teams: a team share to two decimals."],
 ];
