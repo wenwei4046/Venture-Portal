@@ -64,7 +64,7 @@
 .btn:active { transform: scale(0.98); }
 .btn[data-kind='primary'] { border: 0; background: var(--ds-accent); font-weight: 500; }
 
-/* ── The hub: the cards beside the table, wrapping above it when narrow ── */
+/* ── The hub: the cards beside the table, wrapping above it when narrow; on a desktop a row above it (below) ── */
 .hub {
   display: flex;
   flex-wrap: wrap;
@@ -72,19 +72,21 @@
   gap: 20px;
   margin-top: 24px;
 }
-.cards {
+.cardsBox {
   flex: 1 1 260px;
   min-width: 0;
+}
+.cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: var(--row, repeat(auto-fill, minmax(168px, 1fr)));
   gap: 10px;
   align-content: start;
 }
 /* Approvals' cards keep the phone's words ("Submitted by the executive", "96 approved · 3 rejected"): one to a
    row beside the table, three across when they wrap above it. */
-.cards[data-wide='true'] { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.cards[data-wide='true'] { grid-template-columns: var(--row, repeat(auto-fill, minmax(220px, 1fr))); }
 .hero {
-  grid-column: 1 / -1;
+  grid-area: var(--hero, auto / 1 / auto / -1);
   padding: 16px 16px 14px;
   border: 1.5px solid rgb(var(--fv-card-payroll));
   border-radius: 12px;
@@ -311,6 +313,54 @@
 .card[data-tone='staff'] { --card-bg: rgb(var(--tone-olive-deep)); --card-fg: var(--ds-surface); }
 .card[data-tone='quiet'] { --card-bg: rgb(var(--fv-card-quiet)); --card-fg: rgb(var(--hvs-ink)); }
 .card[data-tone='peach'] { --card-bg: var(--ds-row-hover); --card-fg: rgb(var(--hvs-ink)); }
+
+/* A desktop (2026-10-22, the user: "可以帮我把finance 的这些card move 上去吗" → "可以，原本的底色不要变，
+   电话版本的也不要变"): the cards sit in a row above the table, which takes the hub's whole width — the
+   total first, 1.6 cards wide, then a column a card (`--n`), the Allocator's notice under the row. A card's
+   name and line wrap rather than cut; its figure stays whole on its line. Short of room for the row the
+   cards take two rows beside the total (`--half` columns), and short of that they wrap above the table as
+   before. The box they sit in is measured in steps of 280px + 185px a step — a row of n cards 175px wide
+   needs step n; HubCards says the step each layout needs from its own figures (`data-one-row`,
+   `data-two-rows`, `cardRowFit`). A phone keeps its layout. */
+@media (min-width: 768px) {
+  .hub { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .cardsBox { container: hub-cards / inline-size; }
+  .cards { --row: minmax(0, 1.6fr) repeat(var(--cols), minmax(0, 1fr)); grid-auto-flow: row dense; }
+  .card { align-content: space-between; }
+  .cardName, .cardSub { white-space: normal; }
+}
+@container hub-cards (min-width: 650px) {
+  .cards[data-two-rows='2'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='2'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 835px) {
+  .cards[data-two-rows='3'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='3'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1020px) {
+  .cards[data-two-rows='4'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='4'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1205px) {
+  .cards[data-two-rows='5'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='5'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1390px) {
+  .cards[data-two-rows='6'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='6'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1575px) {
+  .cards[data-two-rows='7'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='7'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1760px) {
+  .cards[data-two-rows='8'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='8'] { --cols: var(--n); --hero: auto; }
+}
+@container hub-cards (min-width: 1945px) {
+  .cards[data-two-rows='9'] { --cols: var(--half); --hero: span 2 / auto; }
+  .cards[data-one-row='9'] { --cols: var(--n); --hero: auto; }
+}
 
 /* ── The table panel ── */
 .panel {
