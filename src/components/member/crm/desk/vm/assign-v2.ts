@@ -15,6 +15,7 @@ import { crmFigures } from "./adsperf";
 import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
+import { adRunning } from "@/lib/member/crm-ad-running";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -128,7 +129,9 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     rows: as.adCards.map((c, i) => { const a = ads.find(x => x.label === c.name) ?? ads[i];
       // "Not named yet" (oxblood) until a manager types its name; Meta's headline — or what the CRM calls it — under it.
       const nameless = !!a && !named(a), hl = a?.cs.find(x => x.adHeadline)?.adHeadline ?? "";
-      return { name: nameless ? "Not named yet" : c.name, nameless,
+      // The desktop keeps every ad; a paused one says so (2026-10-22 — the phone shows Running | Paused tabs).
+      const paused = !!a && !adRunning(data.adNames?.[a.id], a.cs.map(x => x.createdAt).sort().at(-1) ?? null, now);
+      return { name: nameless ? "Not named yet" : c.name, nameless, paused,
         headline: nameless ? hl || c.name : hl, ch: (a?.wa ? "whatsapp" : "messenger") as "whatsapp" | "messenger", leads: c.leads,
         segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set && !nameless, sel: ui.ad === a?.id, open: c.open }; }),
   };

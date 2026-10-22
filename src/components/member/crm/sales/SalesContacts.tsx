@@ -124,7 +124,7 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
           </>)}
           {(v.contacts).map((p, p_i) => (<Fragment key={p_i}>
             {!!(p.head) && (<>
-              <div data-letter={p.head} style={{ padding: "14px 0 4px", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-rust)" }}>{p.head}</div>
+              <div data-letter={p.head} style={{ padding: "14px 0 4px", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-rust)" }}>{p.head}</div>
             </>)}
             <div style={{ position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: "0", bottom: "0", right: "0", display: "flex", opacity: p.actOp, transition: "opacity 120ms" }}>
@@ -143,7 +143,7 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
                     {!!(p.view) && (<>
                       <span style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: "0" }}>
-                        <strong style={{ minWidth: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-ink)" }}>{p.name}</strong>
+                        <strong style={{ minWidth: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "calc(15.76px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-ink)" }}>{p.name}</strong>
                       </span>
                     </>)}
                     {!!(p.editing) && (<>
@@ -159,14 +159,14 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                       </span>
                     </>)}
                     {!!(p.view) && (<>
-                      <small style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", letterSpacing: "0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{p.phone}</small>
+                      <small style={{ fontSize: "calc(13.59px * var(--rv-type, 1))", color: "var(--crm-faint)", letterSpacing: "0.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{p.phone}</small>
                     </>)}
                     {!!(p.editing) && (<>
                       <input onClick={p.stop} value={p.draftPh} onChange={p.typePh} onKeyDown={p.key} inputMode="tel" placeholder="Phone" aria-label="Phone" style={{ width: "100%", height: "34px", marginTop: "4px", padding: "0 10px", boxSizing: "border-box", border: "1.5px solid var(--crm-rule)", borderRadius: "10px", outline: "none", font: "inherit", fontSize: "calc(14px * var(--rv-type, 1))", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }} />
                     </>)}
                   </span>
                 </div>
-                <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "14px", background: p.stBg, color: p.stFg, fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.stDot }} />{p.st}</span><a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "50%", display: "grid", placeItems: "center", color: "var(--crm-faint)", opacity: p.hasTel ? 1 : 0.5, pointerEvents: p.hasTel ? "auto" : "none", textDecoration: "none" }}>
+                <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "14px", background: p.stBg, color: p.stFg, fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: p.stDot }} />{p.st}</span><a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "30px", height: "30px", boxSizing: "border-box", borderRadius: "50%", display: "grid", placeItems: "center", color: "var(--crm-faint)", opacity: p.hasTel ? 1 : 0.5, pointerEvents: p.hasTel ? "auto" : "none", textDecoration: "none" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z">
                     </path>{!p.hasTel && (<path d="M3 3l18 18" />)}

@@ -212,7 +212,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // One's own recent emoji, the chat composer's Recents (mig 20261014251500).
     soft<{ recent_emoji: string[] | null }[]>(db.from("crm_staff_prefs").select("recent_emoji")),
     // Ads' names (mig 20261016120000).
-    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source")),
+    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at")),
     // Settings › General (mig 20261018100000): null before it, so the CRM keeps today's values.
     (async () => { try { const { data, error } = await db.rpc("crm_settings_read"); return error ? null : (data as unknown); } catch { return null; } })(),
   ]);

@@ -223,7 +223,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
   'crm_settings_read',
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
-  'crm_ads_unnamed', 'crm_meta_name_ad',
+  'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_auto_reply_due', 'crm_auto_reply_claim', 'crm_auto_reply_done',
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask

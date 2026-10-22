@@ -1060,7 +1060,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
 
 interface AdListBits {
   adList4: { summary: string; unsetN: number; legend: { name: string; color: string }[];
-    rows: { name: string; nameless: boolean; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
+    rows: { name: string; nameless: boolean; paused?: boolean; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
   stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
 }
 // The name keeps 136 px (the channel icon and "Not named yet"); the split bar gives way first on a narrow screen (the owner, 2026-10-18: "调一下 Split 宽度").
@@ -1101,7 +1101,7 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <span style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.nameless ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{r.name}</span>
+              <span style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.nameless ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{r.name}{r.paused && <span style={{ marginLeft: "8px", padding: "1px 6px", borderRadius: "4px", background: "var(--crm-rule-soft)", font: "500 10px Inter, sans-serif", letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--crm-faint)", verticalAlign: "2px" }}>Paused</span>}</span>
               {r.headline && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.headline}</span>}
             </span>
           </span>
