@@ -66,7 +66,7 @@ describe('ad names from Ads Manager', () => {
   })
 })
 
-// Whether each ad is still running (2026-10-22, mig 20261022100000): the hourly sweep asks Graph ad by ad and keeps
+// Whether each ad is still running (2026-10-22, mig 20261022120000): the hourly sweep asks Graph ad by ad and keeps
 // each status; an ad the token cannot see is skipped.
 describe('ad statuses from Ads Manager', () => {
   function statusDb(ids: string[]) {

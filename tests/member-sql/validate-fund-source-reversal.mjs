@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261022100000 (2026-10-21, a reversed payment takes its fund-source repayments with
+// Local PostgreSQL regression for 20261022120000 (2026-10-21, a reversed payment takes its fund-source repayments with
 // it — the user, shown HV-PV-202608-0295's Reverse payment leaving HOUZS Century's RM 98,000 fund source repaid:
 // "A：一起删+重开").
 // Approval writes a fund-source repayment voucher's rows into fund_source_repayments (payment_voucher_id) and
@@ -175,7 +175,7 @@ await refuses(`insert into fund_source_repayments (fund_source_id, amount, payme
 await db.exec('rollback')
 
 // ── The migration ───────────────────────────────────────────────────────────────────────────────────────────────
-const MIGRATION = await text(new URL('20261022100000_voucher_reversal_fund_source_repayments.sql', migrations))
+const MIGRATION = await text(new URL('20261022120000_voucher_reversal_fund_source_repayments.sql', migrations))
 await db.exec(MIGRATION)
 const fn = (await q(`select prosrc, prosecdef, proconfig from pg_proc where proname = 'reverse_voucher_fund_source_repayments'`))[0]
 const GUARD = "PERFORM public.tab_write_guard(ARRAY['/payments', '/payments/[id]', '/receipts'], ARRAY['treasury.void']);"

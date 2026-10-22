@@ -52,7 +52,7 @@ export async function metaAdName(adId: string, token: string, fetchImpl: typeof 
 /**
  * Names the ads among `ids` that have no name yet. `db` is the webhook's service-role client, which calls RPCs only
  * (CLAUDE.md › Machine ingest): crm_ads_unnamed and crm_meta_name_ad (mig 20261019100000), the service role's alone;
- * the ad's running status is kept with it (crm_meta_ad_status, mig 20261022100000).
+ * the ad's running status is kept with it (crm_meta_ad_status, mig 20261022120000).
  * At most five ads a delivery. Never throws.
  */
 export async function nameAdsFromMeta(db: SupabaseClient, ids: string[], token: string | undefined, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<number> {
@@ -77,7 +77,7 @@ export async function nameAdsFromMeta(db: SupabaseClient, ids: string[], token: 
 }
 
 /**
- * Whether each ad is still running (2026-10-22, mig 20261022100000): every ad a customer came from (crm_ads_to_check)
+ * Whether each ad is still running (2026-10-22, mig 20261022120000): every ad a customer came from (crm_ads_to_check)
  * is asked of Graph one by one (`?ids=` is refused since Graph v26), at most 100 a run, and its status kept by
  * crm_meta_ad_status — both the service role's alone. The hourly sweep calls it (app/api/member-queue). An ad the token
  * cannot see is skipped (the screens then go by its last lead). Never throws; answers how many statuses were kept.

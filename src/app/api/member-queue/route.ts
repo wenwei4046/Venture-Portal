@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
-    // Whether each CRM ad is still running (mig 20261022100000): Ads Manager's effective_status, kept for the
+    // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
     if (adStatuses) console.info('CRM ad statuses kept', adStatuses)
