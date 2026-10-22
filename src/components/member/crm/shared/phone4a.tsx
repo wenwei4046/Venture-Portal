@@ -344,17 +344,13 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
 /**
  * T03 · Assignment › Active (2026-10-22, the owner: its own tab after Ads to teams): every team, each person Active or
  * Locked — a locked member takes no new leads and leaves Assignment's lists, their share to the rest of the team. Saved at
- * by Save, always on top (grey until something changed; the owner, 2026-10-22: "为什么 apps 没有 save button") — Cancel beside it
- * while something changed (crm_set_locked; shared/locked.ts › activeVM).
+ * by Save — Phone4aActiveSave, in Assignment's title row (the owner, 2026-10-22: "为什么 apps 没有 save button", then "save
+ * button overlap"): always there, grey until something changed, Cancel beside it while there are changes.
  */
 export function Phone4aActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
-        {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "38px", padding: "0 16px", borderRadius: "19px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
-        <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "38px", padding: "0 20px", borderRadius: "19px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: fs(13.5), fontWeight: 600, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
-      </div>
       {groups.map(g => (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
@@ -377,5 +373,15 @@ export function Phone4aActive({ v }: { v: ActiveVM }) {
         </div>
       ))}
     </section>
+  );
+}
+
+/** Assignment › Active's Save, at the right of the title (grey until a switch changed; Cancel beside it then). */
+export function Phone4aActiveSave({ v }: { v: ActiveVM }) {
+  return (
+    <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+      {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "36px", padding: "0 14px", borderRadius: "18px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: fs(13), fontWeight: 500, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
+      <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "36px", padding: "0 18px", borderRadius: "18px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: fs(13), fontWeight: 600, color: "#fff", whiteSpace: "nowrap", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
+    </span>
   );
 }

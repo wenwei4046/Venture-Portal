@@ -94,7 +94,7 @@ export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
                   </span>
                   <span style={{ flex: "none", fontVariantNumeric: "tabular-nums", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", color: l.whenC }}>{l.when}</span>
                 </span>
-                <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.ad}</span>
+                <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: l.padR }}>{l.ad}</span>
                 <span style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: l.padR }}>{l.preview}</span>
                 <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px", marginTop: "1px" }}>
                   {!!(l.urgShow) && (<>
