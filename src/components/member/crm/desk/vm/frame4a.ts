@@ -104,6 +104,7 @@ interface HeadBits {
   insightPdf: () => void;
   insightSub: string;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
+  addAd?: { canAdd: boolean; show: () => void };
   dpOpen: () => void;
 }
 
@@ -116,7 +117,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
     calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },
     adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: null }, // the owner, 2026-10-18: "删掉download，已经有export了" — PDF is in Export (PDF report)
-    assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
+    assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },

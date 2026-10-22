@@ -60,8 +60,8 @@ module.exports = [
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
   // Active members (2026-10-22, the owner: a member not active for now is off Assignment's lists, their share to the others;
   // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
-  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}',
-    "Assignment › Active members: each person Active or Locked (crm_set_locked)."],
+  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}',
+    "Assignment › Active members: each person Active or Locked (crm_set_locked); Ads to teams' + picker (DeskAddAd, crm_add_ad)."],
   ['<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>',
     '<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}',
     "Ads to teams: a team with somebody locked says so (their share goes to the others)."],

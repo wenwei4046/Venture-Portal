@@ -103,3 +103,34 @@ export async function refreshAdStatuses(db: SupabaseClient, token: string | unde
 
 /** For tests: forget the ads Meta would not name. */
 export function forgetAdMisses() { misses.clear() }
+
+export interface MetaAdRow { id: string; name: string; status: string; account: string; created: string; start: string | null; end: string | null }
+
+/**
+ * Every ad of the ad accounts the system user sees (2026-10-22, the desktop's Ads to teams "+": "director 能提前先把广告加进
+ * 来先做分配"; "广告开始跑，或者 pending 要跑（几时开始，几时结束）"): /me/adaccounts, then each account's ads (name,
+ * effective_status, created_time, the ad set's start and end; deleted and archived ones
+ * left out), running first, newest first, at most 300. The server's — the token never leaves it. Throws when Meta refuses.
+ */
+export async function listMetaAds(token: string, fetchImpl: typeof fetch = fetch): Promise<MetaAdRow[]> {
+  const get = async (path: string) => {
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Meta answered ${res.status}`);
+    return (await res.json()) as { data?: unknown[] };
+  };
+  const accounts = ((await get('me/adaccounts?fields=id,name&limit=50')).data ?? []) as { id?: unknown; name?: unknown }[];
+  const rows: MetaAdRow[] = [];
+  for (const acc of accounts) {
+    if (typeof acc.id !== 'string' || !/^act_\d+$/.test(acc.id)) continue;
+    const filter = encodeURIComponent(JSON.stringify([{ field: 'effective_status', operator: 'NOT_IN', value: ['DELETED', 'ARCHIVED'] }]));
+    let ads: unknown[] = [];
+    try { ads = (await get(`${acc.id}/ads?fields=id,name,effective_status,created_time,adset{start_time,end_time}&limit=100&filtering=${filter}`)).data ?? []; } catch { continue; }
+    for (const a of ads as { id?: unknown; name?: unknown; effective_status?: unknown; created_time?: unknown; adset?: { start_time?: unknown; end_time?: unknown } }[]) {
+      if (typeof a.id !== 'string' || !AD_ID.test(a.id)) continue;
+      rows.push({ id: a.id, name: typeof a.name === 'string' ? a.name.trim().slice(0, 120) : `Ad ${a.id}`, status: typeof a.effective_status === 'string' ? a.effective_status.toUpperCase() : '',
+        account: typeof acc.name === 'string' ? acc.name : acc.id, created: typeof a.created_time === 'string' ? a.created_time : '',
+        start: typeof a.adset?.start_time === 'string' ? a.adset.start_time : null, end: typeof a.adset?.end_time === 'string' ? a.adset.end_time : null });
+    }
+  }
+  return rows.sort((x, y) => Number(y.status === 'ACTIVE') - Number(x.status === 'ACTIVE') || y.created.localeCompare(x.created)).slice(0, 300);
+}

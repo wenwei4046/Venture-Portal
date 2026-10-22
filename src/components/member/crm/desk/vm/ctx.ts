@@ -4,6 +4,7 @@
  * object (CrmFrame.dc.html's this.state) and so does this.
  */
 import type { Dispatch, SetStateAction } from "react";
+import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
@@ -110,6 +111,8 @@ export interface DeskUi {
   mwt: Record<string, boolean> | null;
   /** Assignment › Active members: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
+  /** Ads to teams' "+": open, its search, Meta's ads (null = not read yet, "error" = Meta refused), a typed ad id. */
+  addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;
   cltF: string; cltFOpen: boolean; cltEdit: string | null; cltDraft: string | null; cltDN: string | null; cltDC: "WhatsApp" | "Messenger" | null; cltIsNew: boolean; cltAsk: string | null; cltMore: boolean; cltVars: string[];
   frmOpen: boolean; frmCur: string | null; frmDraft: FormSection[] | null; frmName: string | null; frmIsNew: boolean; frmExp: string | null; frmOptIn: Record<string, string>;
@@ -191,7 +194,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null,
+  mwt: null, mwtSaved: false, actDraft: null, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

@@ -578,3 +578,45 @@ export function DeskActive({ v }: { v: ActiveVM }) {
     </>
   );
 }
+
+/**
+ * Ads to teams' "+" (2026-10-22, the owner: "director 能提前先把广告加进来先做分配"): Meta's ads in the connected ad accounts —
+ * running and about-to-run first, each with its run — or an ad id typed from Ads Manager. Picking one adds it
+ * (crm_add_ad) and opens its split.
+ */
+export function DeskAddAd({ v }: { v: { close: () => void; q: string; onQ: (e: { target: { value: string } }) => void; loading: boolean; failed: boolean;
+  rows: { id: string; name: string; account: string; run: string; have: boolean; pick: () => void }[]; typed: string; onTyped: (e: { target: { value: string } }) => void; addTyped: () => void } }) {
+  const field = { height: "38px", boxSizing: "border-box" as const, padding: "0 12px", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", color: "var(--crm-ink)", outline: "none" };
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(42,22,12,.28)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Add an ad" style={{ width: "min(620px, calc(100vw - 48px))", maxHeight: "min(680px, calc(100vh - 80px))", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "16px", boxShadow: "0 20px 50px rgba(42,22,12,.25)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <strong style={{ flex: 1, fontSize: "17px", fontWeight: 600, color: "var(--crm-ink)" }}>Add an ad</strong>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ width: "32px", height: "32px", border: 0, borderRadius: "16px", background: "var(--crm-field)", color: "var(--crm-ink)", cursor: "pointer", fontSize: "16px" }}>×</button>
+        </div>
+        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", borderBottom: "1px solid var(--crm-field)" }}>
+          <input value={v.q} onChange={v.onQ} placeholder="Search Meta's ads by name or account" autoFocus style={{ ...field, flex: 1 }} />
+        </div>
+        <div style={{ flex: 1, minHeight: "120px", overflowY: "auto" }}>
+          {v.loading && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)" }}>Reading Meta&apos;s ads…</div>}
+          {v.failed && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-oxblood)" }}>Meta&apos;s ads could not be read. Type the ad id below instead.</div>}
+          {!v.loading && !v.failed && !v.rows.length && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)" }}>No ad matches.</div>}
+          {v.rows.map(r => (
+            <button key={r.id} type="button" onClick={r.pick} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 20px", border: 0, borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", textAlign: "left", cursor: "pointer" }} className="crm4a-row">
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.account} · {r.run}</span>
+              </span>
+              <span style={{ flex: "none", fontSize: "12.5px", fontWeight: 600, color: r.have ? "var(--crm-faint)" : "var(--crm-rust)" }}>{r.have ? "In the list · Edit" : "Add"}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 20px", borderTop: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}>
+          <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>Or an ad id</span>
+          <input value={v.typed} onChange={v.onTyped} inputMode="numeric" placeholder="e.g. 120254841448710368" style={{ ...field, flex: 1 }} />
+          <button type="button" onClick={v.addTyped} disabled={!/^\d{5,32}$/.test(v.typed)} style={{ height: "38px", padding: "0 18px", borderRadius: "19px", border: 0, background: /^\d{5,32}$/.test(v.typed) ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -73,8 +73,10 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   } : { name: "", ini: "", ad: "", owner: "", status: "", msg: "", out: false, inn: false, time: "", clock: "", reply: "", remindLog: "", reminded: false, notReminded: true };
 
   // ── Ads to teams (D2 / D3).
-  const adIds = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))];
-  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? `Ad ${id}`, leads: cs.length, wa: cs.some(c => c.channel === "whatsapp") }; };
+  // An ad added before its first lead joins the list (2026-10-22, crm_add_ad; adNames' `added`).
+  const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
+  const adIds = [...new Set([...data.customers.map(c => c.adId).filter((x): x is string => !!x), ...added])];
+  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? data.adNames?.[id]?.name ?? `Ad ${id}`, leads: cs.length, wa: !cs.length || cs.some(c => c.channel === "whatsapp") }; };
   const ads = adIds.map(adOf).sort((a, b) => b.leads - a.leads);
   const statusOf = (_id: string): string | null => null; // Meta's delivery status (waits for the Meta connection, PROPOSALS.md C).
   const adSt = ui.adSt;

@@ -15,7 +15,7 @@ import { crmFigures } from "./adsperf";
 import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
-import { adRunning } from "@/lib/member/crm-ad-running";
+import { adRunLine, adRunning } from "@/lib/member/crm-ad-running";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -43,8 +43,9 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const hist = ui.history ?? [];
 
   // ── The ads (the live list: one per ad id the CRM saw), their leads, their rule.
-  const adIds = [...new Set(data.customers.map(c => c.adId).filter((x): x is string => !!x))];
-  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? `Ad ${id}`, cs, wa: cs.some(c => c.channel === "whatsapp") }; };
+  const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
+  const adIds = [...new Set([...data.customers.map(c => c.adId).filter((x): x is string => !!x), ...added])];
+  const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? data.adNames?.[id]?.name ?? `Ad ${id}`, cs, wa: !cs.length || cs.some(c => c.channel === "whatsapp") }; };
   const ads = adIds.map(adOf).sort((a, b) => b.cs.length - a.cs.length);
   // The Revenue Director first, above the teams (the owner, 2026-10-16).
   const T3 = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
@@ -131,11 +132,28 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
       const nameless = !!a && !named(a), hl = a?.cs.find(x => x.adHeadline)?.adHeadline ?? "";
       // The desktop keeps every ad; a paused one says so (2026-10-22 — the phone shows Running | Paused tabs).
       const paused = !!a && !adRunning(data.adNames?.[a.id], a.cs.map(x => x.createdAt).sort().at(-1) ?? null, now);
-      return { name: nameless ? "Not named yet" : c.name, nameless, paused,
+      return { name: nameless ? "Not named yet" : c.name, nameless, paused, run: a ? adRunLine(data.adNames?.[a.id], now) : "",
         headline: nameless ? hl || c.name : hl, ch: (a?.wa ? "whatsapp" : "messenger") as "whatsapp" | "messenger", leads: c.leads,
         segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set && !nameless, sel: ui.ad === a?.id, open: c.open }; }),
   };
+  // Ads to teams' "+" (2026-10-22, the owner: "director 能提前先把广告加进来先做分配"): Meta's ads to pick from, or a typed id.
+  const addList = ui.addAdList, q = ui.addAdQ.trim().toLowerCase();
+  const have = new Set(adIds);
+  const pickAd = (r: { id: string; name: string; status: string; start: string | null; end: string | null }) =>
+    void ctx.act.addAd(r).then(ok => { if (ok) { patch({ addAdOpen: false, addAdId: "" }); as.openAdById(r.id); } });
+  const addAd = {
+    open: ui.addAdOpen, canAdd: !!data.can.manage,
+    show: () => { patch({ addAdOpen: true, addAdQ: "", addAdId: "" }); if (!ui.addAdList || ui.addAdList === "error") void ctx.act.metaAds(false).then(r => patch({ addAdList: r ?? "error" })); },
+    close: () => patch({ addAdOpen: false }),
+    q: ui.addAdQ, onQ: (e: { target: { value: string } }) => patch({ addAdQ: e.target.value }),
+    loading: addList === null, failed: addList === "error",
+    rows: (Array.isArray(addList) ? addList : []).filter(r => !q || r.name.toLowerCase().includes(q) || r.id.includes(q) || r.account.toLowerCase().includes(q)).slice(0, 80)
+      .map(r => ({ id: r.id, name: r.name, account: r.account, run: adRunLine({ status: r.status, startAt: r.start, endAt: r.end }, now) || r.status, have: have.has(r.id), pick: () => pickAd(r) })),
+    typed: ui.addAdId, onTyped: (e: { target: { value: string } }) => patch({ addAdId: e.target.value.replace(/D/g, "").slice(0, 32) }),
+    addTyped: () => { const id = ui.addAdId; if (!/^d{5,32}$/.test(id)) return; const known = Array.isArray(addList) ? addList.find(r => r.id === id) : undefined; pickAd(known ?? { id, name: "", status: "", start: null, end: null }); },
+  };
   return {
+    addAd,
     adList4,
     saveOne4: as.saveAd, saveAll4: as.applyAll,
     adList: frame.isAdsOp, adGrid: false, adOverview: !as.adOpen, adNone: frame.isAdsOp && inSheet && !as.adOpen, adNoneW: frame.sheetW + 304,
