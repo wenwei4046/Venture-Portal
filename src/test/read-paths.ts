@@ -378,7 +378,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'reassign_invoice_gl_account', 'reassign_voucher_gl_account', 'refresh_base_rate', 'reject_dept_payment_request',
   'reject_invoice_request', 'reject_payroll_run', 'rename_account_code', 'reopen_payroll_run', 'request_loan_cancel',
   'return_voucher_to_draft', 'revenue_pay_preview', 'revenue_payroll_adjustments', 'revenue_save_pay_lines',
-  // Reverse payment's step after the void (mig 20261021230000): the voucher's fund-source repayments — Treasury · Void.
+  // Reverse payment's step after the void (mig 20261022100000): the voucher's fund-source repayments — Treasury · Void.
   'reverse_voucher_fund_source_repayments',
   'reverse_voucher_pool_rows', 'revert_terms_change', 'rnp_invoice_events', 'save_revenue_payroll_row',
   'set_fund_source_min_pay_interest', 'set_fund_source_notes', 'set_fund_source_repayment_start', 'set_loan_funding_source',

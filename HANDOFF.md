@@ -12,7 +12,7 @@ Reverse on such vouchers). Branch `fix/fund-source-reversal-cleanup` (worktree `
   (repaid, 0 outstanding), and the corrected PV is refused (`createPaymentVoucherInner`: *Cannot repay fund source
   with status repaid*; approval's `block_repayment_on_inactive_fund_source` the same). Production 2026-10-21: 39 paid
   fund-source vouchers, 67 rows, none reversed → no bad data.
-- Mig `20261021230000_voucher_reversal_fund_source_repayments.sql`: `reverse_voucher_fund_source_repayments(uuid)`
+- Mig `20261022100000_voucher_reversal_fund_source_repayments.sql`: `reverse_voucher_fund_source_repayments(uuid)`
   (DEFINER; `tab_write_guard(/payments, /payments/[id], /receipts; treasury.void)` + `has_any_action(treasury.void)`
   when signed in; EXECUTE authenticated + service_role, not anon / PUBLIC; md5(prosrc) `57373b5f…`). Only a VOIDED
   voucher qualifies; deletes that voucher's rows (each source locked FOR UPDATE); a repaid source it removed principal
@@ -38,7 +38,7 @@ Reverse on such vouchers). Branch `fix/fund-source-reversal-cleanup` (worktree `
   PGlite), grants auth / service only; finance@'s own DELETE removed 0 (the bug, on production); the step refused the
   still-paid PV; after the void it removed 2, source 89b09736 repaid → active, outstanding 98,000, second run 0, all
   rows 167 → 165. Afterwards production unchanged (no function, PV paid, 2 rows, source repaid).
-- Next: the user's OK → apply (LF text, one transaction, schema_migrations `20261021230000`, NOTIFY pgrst) → PR →
+- Next: the user's OK → apply (LF text, one transaction, schema_migrations `20261022100000`, NOTIFY pgrst) → PR →
   merge. The DB goes first: the app calls the new RPC.
 
 ## CHECKPOINT 2026-10-21 y (DATA FIX + SHIPPED) — Revenue Department's payroll accrual

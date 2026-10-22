@@ -8,7 +8,7 @@ import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 // (false)) — nothing went and nothing said so: the source still read repaid,
 // and the corrected voucher was refused ("Cannot repay fund source with status
 // repaid"). The rows go through reverse_voucher_fund_source_repayments now
-// (mig 20261021230000), once the voucher is voided; it also reopens the source.
+// (mig 20261022100000), once the voucher is voided; it also reopens the source.
 
 const mocks = vi.hoisted(() => ({ requireActionOn: vi.fn(), createClient: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requireActionOn, requireActionOn: mocks.requireActionOn, requireAnyActionOn: mocks.requireActionOn, requirePayrollPayoutsActionOn: mocks.requireActionOn, requireApproverOn: mocks.requireActionOn }))
