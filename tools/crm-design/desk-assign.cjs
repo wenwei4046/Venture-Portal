@@ -62,9 +62,6 @@ module.exports = [
   // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
   ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}',
     "Assignment › Active members: each person Active or Locked (crm_set_locked); Ads to teams' + picker (DeskAddAd, crm_add_ad)."],
-  ['<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>',
-    '<span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}',
-    "Ads to teams: a team with somebody locked says so (their share goes to the others)."],
   // A locked person stays in Ads to teams' list, grey with a lock instead of the box (the owner, 2026-10-22: "不要消失在
   // assignment list 里面，而是改成小锁头，灰色，不能 edit"; vm/assign.ts appends them with `locked`).
   ['<span style={{ fontSize: "13.5px", fontWeight: "600" }}>{m.name}</span>',
