@@ -222,7 +222,7 @@ export interface CrmData {
    * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
-  adNames?: Record<string, { name: string; source: "manual" | "meta" }>;
+  adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null }>;
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
@@ -367,7 +367,7 @@ export interface CrmDataRows {
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
-  adNames?: { ad_source_id: string; name: string; source: string }[];
+  adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null }[];
   /** crm_settings_read()'s answer; absent before the migration. */
   settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
@@ -469,7 +469,7 @@ export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAu
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
-  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual" };
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}) };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {

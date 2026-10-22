@@ -5,6 +5,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { flushPush } from '@/lib/push/outbox'
 import { sweepHiringLeftovers } from '@/lib/hiring/leftovers'
 import { sweepDataCenterBin } from '@/lib/documentation/drive-bin-sweep'
+import { refreshAdStatuses } from '@/lib/member/crm-ad-names-meta'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,10 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
+    // Whether each CRM ad is still running (mig 20261022100000): Ads Manager's effective_status, kept for the
+    // phone's Assignment tabs (Running | Paused). Best effort — a count only.
+    const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
+    if (adStatuses) console.info('CRM ad statuses kept', adStatuses)
     // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
     await flushPush()
     // Hiring's leftovers (mig 20261011210000; the user: every hour, even when nobody touches Hiring): files no

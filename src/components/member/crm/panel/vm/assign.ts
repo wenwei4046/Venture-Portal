@@ -12,6 +12,7 @@ import type { AdDraft, FtDraft } from "../ui";
 import { waitingByLevel } from "./overlays";
 import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
+import { adRunning } from "@/lib/member/crm-ad-running";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Revenue Director" };
@@ -131,6 +132,15 @@ export function assignVM(ctx: PanelCtx) {
       mode: r?.mode ?? "unset", split: r && Object.keys(r.split).length ? { ...r.split } : even, pm: r?.pm ?? "cnt", pp: { ...(r?.pp ?? {}) }, lockT: [], lockP: [] };
   };
   const ads = adIds.map(draftOf).sort((a, b) => b.leads - a.leads || a.label.localeCompare(b.label));
+  // Running | Paused (2026-10-22, the owner: an ad that ended needs no assigning on the phone; the desktop keeps every ad).
+  // Ads Manager's status where it was read, else a lead in the last 7 days (lib/member/crm-ad-running.ts). Rules unchanged.
+  const lastLead = (id: string) => data.customers.filter(c => c.adId === id).reduce<string | null>((m, c) => (!m || c.createdAt > m ? c.createdAt : m), null);
+  const running = new Set(adIds.filter(id => adRunning(data.adNames?.[id], lastLead(id), now)));
+  const adTab = ui.adTab ?? "running";
+  const nRun = ads.filter(a => running.has(a.id)).length, nPaused = ads.length - nRun;
+  const adTabs = ([["running", "Running", nRun], ["paused", "Paused", nPaused]] as const).map(([k, label, n]) => ({ label, n, on: adTab === k, pick: () => patch({ adTab: k }) }));
+  const shownAds = ads.filter(a => running.has(a.id) === (adTab === "running"));
+  const adsEmpty = shownAds.length ? "" : adTab === "running" ? "No ad is running now." : "No paused ads.";
   // By team from the card (rev 1011 §6.6): each team keeps its inside mode; a team never set is By % with an even split.
   const saveAd = (d: AdDraft) => {
     if (d.mode !== "split" && d.mode !== "people") return act.saveAdRule(d.id, d.label, { mode: d.mode === "unset" ? null : d.mode, split: d.split, pm: d.pm, pp: d.pp });
@@ -143,7 +153,7 @@ export function assignVM(ctx: PanelCtx) {
     return act.saveAdRule(d.id, d.label, { mode: "split", split: d.split, pm: "pct", pp, tm });
   };
   const head4 = (id: string) => data.customers.find(c => c.adId === id && c.adHeadline)?.adHeadline ?? "";
-  const adRows = ads.map(a => ({
+  const adRows = shownAds.map(a => ({
     // 4a (T03): the channel, the ad's headline under its name, Set up while it has no rule.
     head: head4(a.id), wa: a.page === "WhatsApp", setUp: !ruleOf(a.id),
     ...mkRow(adTeams, a, p => void saveAd({ ...a, ...p })),
@@ -199,7 +209,7 @@ export function assignVM(ctx: PanelCtx) {
   return {
     onAssign: ui.tab === "assign" && !ui.lead,
     hasWaiting: organic.length > 0, waitingN: organic.length, waitList,
-    adTeams, adRows, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
+    adTeams, adRows, adTabs, adsEmpty, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
     asgAttSum, asgAtt, openAtt: () => patch({ att: true }),
     ftSum, ftOpen: !!ui.ftEd, fe,
     // The Team Leader's own page (design 1a's TL view) is the salesperson CRM's; never shown here.

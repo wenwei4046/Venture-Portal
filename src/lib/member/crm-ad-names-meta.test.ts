@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -63,5 +63,35 @@ describe('ad names from Ads Manager', () => {
     const broken = { rpc: vi.fn(async () => { throw new Error('down') }) } as unknown as SupabaseClient
     expect(await nameAdsFromMeta(broken, ['444444'], 'T', f)).toBe(0)
     expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
+  })
+})
+
+// Whether each ad is still running (2026-10-22, mig 20261022100000): the hourly sweep asks Graph ad by ad and keeps
+// each status; an ad the token cannot see is skipped.
+describe('ad statuses from Ads Manager', () => {
+  function statusDb(ids: string[]) {
+    const kept: Array<{ p_ad: string; p_status: string }> = []
+    const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === 'crm_ads_to_check') return { data: ids, error: null }
+      if (fn === 'crm_meta_ad_status') { kept.push(args as { p_ad: string; p_status: string }); return { data: true, error: null } }
+      return { data: null, error: { message: 'unknown' } }
+    })
+    return { client: { rpc } as unknown as SupabaseClient, kept }
+  }
+
+  it('asks each ad and keeps its status, skipping the ad Graph cannot see', async () => {
+    const d = statusDb(['111111', '222222', '333333'])
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('/111111?fields=name,effective_status')) return new Response(JSON.stringify({ name: 'A', effective_status: 'ACTIVE' }), { status: 200 })
+      if (u.includes('/222222?')) return new Response(JSON.stringify({ name: 'B', effective_status: 'campaign_paused' }), { status: 200 })
+      return new Response('{}', { status: 400 })
+    }) as unknown as typeof fetch
+    expect(await refreshAdStatuses(d.client, 'T', f)).toBe(2)
+    expect(d.kept).toEqual([{ p_ad: '111111', p_name: 'A', p_status: 'ACTIVE' }, { p_ad: '222222', p_name: 'B', p_status: 'CAMPAIGN_PAUSED' }])
+  })
+
+  it('does nothing without a token', async () => {
+    expect(await refreshAdStatuses(statusDb(['111111']).client, undefined)).toBe(0)
   })
 })

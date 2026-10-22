@@ -74,4 +74,20 @@ for (const fn of ['crm_ads_unnamed', 'crm_meta_name_ad']) {
 }
 await assert.rejects(as('ann', `select public.crm_meta_name_ad('555555', 'x')`), /permission denied/, 'a signed-in person cannot call it'); checks++
 
+// ── Whether an ad is still running (mig 20261022100000): the hourly sweep keeps Ads Manager's effective_status ──
+await db.exec((await readFile(new URL('20261022100000_crm_ad_status.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+await q(`insert into crm_contacts (channel, account_id, external_id, name, ad_source_id) values ('whatsapp', 'PN1', '60100', 'A', '111111'), ('whatsapp', 'PN1', '60101', 'B', '444444'), ('whatsapp', 'PN1', '60102', 'C', null)`)
+check([...(await q(`select public.crm_ads_to_check() as a`))[0].a].sort(), ['111111', '444444'], 'to check: every ad a customer came from, once')
+check((await q(`select public.crm_meta_ad_status('111111', 'ignored', ' paused ') as k`))[0].k, true, 'keeps the status of a named ad')
+check((await q(`select name, source, meta_status, status_at is not null as at from crm_ad_names where ad_source_id = '111111'`))[0], { name: 'Renamed by hand', source: 'manual', meta_status: 'PAUSED', at: true }, '…upper-cased and stamped; the manual name stays')
+check((await q(`select public.crm_meta_ad_status('444444', 'Skyline', 'ACTIVE') as k`))[0].k, true, 'an unnamed ad is named by Meta and keeps its status')
+check((await q(`select name, source, meta_status from crm_ad_names where ad_source_id = '444444'`))[0], { name: 'Skyline', source: 'meta', meta_status: 'ACTIVE' }, '…as meta')
+check((await q(`select public.crm_meta_ad_status('666666', '', 'ACTIVE') as a, public.crm_meta_ad_status('x', 'n', 'ACTIVE') as b, public.crm_meta_ad_status('444444', 'n', ' ') as c`))[0], { a: false, b: false, c: false }, 'no row and no name, a bad id or no status keeps nothing')
+for (const fn of ['crm_ads_to_check', 'crm_meta_ad_status']) {
+  const f = (await q(`select prosecdef, proacl::text as acl from pg_proc where proname = $1`, [fn]))[0]
+  check(f.prosecdef, true, `${fn}: SECURITY DEFINER`)
+  check(/(^|[{,])(anon|authenticated)=/.test(f.acl) || /(^|[{,])=X/.test(f.acl), false, `${fn}: nobody's but the service role's`)
+}
+await assert.rejects(as('ann', `select public.crm_meta_ad_status('111111', 'x', 'ACTIVE')`), /permission denied/, 'a signed-in person cannot keep a status'); checks++
+
 console.log(`crm meta ad names: ${checks} checks passed`)

@@ -135,7 +135,7 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
             <span onClick={v.markAll} style={{ flex: "none", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }} className={H.hov6}>Mark all as read</span>
           </>)}
         </div>
-        <div style={{ display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>{(v.nTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", background: t.on ? "var(--crm-rust)" : "transparent", color: t.on ? "#fff" : "var(--crm-muted)", cursor: "pointer" }}>{t.label}<span style={{ fontVariantNumeric: "tabular-nums", color: t.on ? "var(--crm-rust-meta)" : "var(--crm-faint)" }}>{t.cnt}</span></span>))}</div>
+        <div style={{ display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>{(v.nTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", background: t.on ? "var(--crm-rust)" : "transparent", color: t.on ? "#fff" : "var(--crm-muted)", cursor: "pointer" }}>{t.label}<span style={{ fontVariantNumeric: "tabular-nums", color: t.on ? "var(--crm-rust-meta)" : "var(--crm-faint)" }}>{t.cnt}</span></span>))}</div>
         {!!(v.nEmpty) && (<>
           <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", color: "var(--crm-muted)", textAlign: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -188,8 +188,8 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
                     </svg>
                   </span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <span style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: u.unread ? "600" : "400", lineHeight: "1.3", color: "var(--crm-ink)" }}>{u.text}</span>
-                    <span style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{u.meta}</span>
+                    <span style={{ fontSize: "calc(15.76px * var(--rv-type, 1))", fontWeight: u.unread ? "600" : "400", lineHeight: "1.3", color: "var(--crm-ink)" }}>{u.text}</span>
+                    <span style={{ fontSize: "calc(13.59px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{u.meta}</span>
                     {!!(u.sum) && (<span style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-ink)", lineHeight: "1.35", marginTop: "2px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{u.sum}</span>)}
                   </span>
                   {!!(u.unread) && (<>
