@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { useEscape } from '@/components/hrv/overlay'
@@ -83,8 +83,23 @@ export interface HubCardItem {
 }
 
 /**
- * The cards beside the table: the walnut-framed total, an optional notice and
- * month control, then a card per list — the active one ringed in the accent.
+ * The step of the stylesheet's (280px + 185px a step, `@container hub-cards`)
+ * a desktop's row of these cards needs, and the step for two rows beside the
+ * total: a card is 175px or more and as wide as its figure (15px mono, 9px a
+ * character, 14px a side); the total, 1.6 cards, as wide as its own (26px
+ * mono, 15.6px a character, 16px a side); 10px between.
+ */
+export function cardRowFit(values: string[], heroValue: string): { one: number; two: number } {
+  const card = Math.max(175, 28 + 9 * Math.max(0, ...values.map((v) => v.length)), (32 + 15.6 * heroValue.length) / 1.6)
+  const step = (cols: number) => Math.max(cols, Math.ceil(((cols + 1.6) * card + 10 * cols - 280) / 185 - 1e-9))
+  return { one: step(values.length), two: step(Math.ceil(values.length / 2)) }
+}
+
+/**
+ * The cards beside the table — on a desktop a row above it (2026-10-22): the
+ * walnut-framed total, an optional notice and month control, then a card per
+ * list — the active one ringed in the accent. The stylesheet lays the row out
+ * from how many cards there are and the step they need, measured on their box.
  */
 export function HubCards({
   heroLabel,
@@ -106,37 +121,46 @@ export function HubCards({
   /** Wider cards — one to a row beside the table — for a hub whose cards say more than a word (Approvals). */
   wide?: boolean
 }) {
+  const fit = cardRowFit(cards.map((c) => c.value), heroValue)
   return (
-    <div className={s.cards} data-wide={wide ? 'true' : undefined}>
-      <div className={s.hero}>
-        <div className={s.heroBar} aria-hidden="true" />
-        <div className={s.heroLabel}>{heroLabel}</div>
-        <div className={s.heroValue}>{heroValue}</div>
-        {heroExtra}
+    <div className={s.cardsBox}>
+      <div
+        className={s.cards}
+        data-wide={wide ? 'true' : undefined}
+        data-one-row={fit.one}
+        data-two-rows={fit.two}
+        style={{ '--n': cards.length, '--half': Math.ceil(cards.length / 2) } as CSSProperties}
+      >
+        <div className={s.hero}>
+          <div className={s.heroBar} aria-hidden="true" />
+          <div className={s.heroLabel}>{heroLabel}</div>
+          <div className={s.heroValue}>{heroValue}</div>
+          {heroExtra}
+        </div>
+        {notice ? <div className={s.notice}>{notice}</div> : null}
+        {cards.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            className={s.card}
+            data-tone={c.tone}
+            data-light={LIGHT.has(c.tone) ? 'true' : undefined}
+            data-active={c.key === active ? 'true' : undefined}
+            aria-pressed={c.key === active}
+            onClick={() => onSelect(c.key)}
+          >
+            <span className={s.cardArc} aria-hidden="true" />
+            <span className={s.cardChip} aria-hidden="true">
+              <HrIcon name={c.icon} size={15} />
+            </span>
+            <span className={s.cardText}>
+              <span className={s.cardName}>{c.label}</span>
+              <span className={s.cardSub}>{c.sub}</span>
+            </span>
+            <span className={s.cardAmount}>{c.value}</span>
+          </button>
+        ))}
       </div>
-      {notice ? <div className={s.notice}>{notice}</div> : null}
-      {cards.map((c) => (
-        <button
-          key={c.key}
-          type="button"
-          className={s.card}
-          data-tone={c.tone}
-          data-light={LIGHT.has(c.tone) ? 'true' : undefined}
-          data-active={c.key === active ? 'true' : undefined}
-          aria-pressed={c.key === active}
-          onClick={() => onSelect(c.key)}
-        >
-          <span className={s.cardArc} aria-hidden="true" />
-          <span className={s.cardChip} aria-hidden="true">
-            <HrIcon name={c.icon} size={15} />
-          </span>
-          <span className={s.cardText}>
-            <span className={s.cardName}>{c.label}</span>
-            <span className={s.cardSub}>{c.sub}</span>
-          </span>
-          <span className={s.cardAmount}>{c.value}</span>
-        </button>
-      ))}
     </div>
   )
 }
