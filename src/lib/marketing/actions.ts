@@ -113,7 +113,7 @@ export async function decideMktStage(project: string, approve: boolean, reason?:
 
 /** The manager's Nudge: a notice to whoever the task waits on, at most one an hour. */
 export async function nudgeMkt(project: string): Promise<Done<{ who: string; already: boolean }>> {
-  await requireActionOn(['/marketing/tracking', '/marketing/projects/[id]'], 'marketing', 'manage')
+  await requireActionOn('/marketing/tracking', 'marketing', 'manage')
   if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
   const { data, error } = await (await client()).rpc('mkt_nudge', { p_project: project })
   if (error) return { ok: false, reason: words(error, 'The nudge could not be sent. Please try again.') }

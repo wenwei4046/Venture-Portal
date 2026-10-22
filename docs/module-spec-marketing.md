@@ -19,8 +19,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 
 | PR | Contents | Status |
 |---|---|---|
-| ① | The permission and templates; the tables and readers; the shell (sidebar, top bar, search, bell, Appearance, account menu); My Space's task tiles; the Calendar; Projects (list + a project's stages); the Tracking Dashboard (read) | this PR |
-| ② | New Project (product project → minutes → PIC tracking link → PIC response; Quick task; Recurring task and its repeat rule), the Assignment plan (SLA working days, approvers ≤ 3 levels, split), the task pages (accept → work → submit / complete; approve / request changes; subtasks and Review delivery; reassign; versions), notices (the bell, *Assignment plan* banners), Nudge, the billing drafts and Finance's import | next |
+| ① | The permission and templates; the tables and readers; the shell (sidebar, top bar, search, bell, Appearance, account menu); My Space's task tiles; the Calendar; Projects (list + a project's stages); the Tracking Dashboard (read) | #634, live 2026-10-23 |
+| ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | this PR |
+| ②b | 📦 Product projects: product → minutes → PIC tracking link → PIC response, the Assignment plan (SLA, approvers ≤ 3 levels, split, 🔓 picked by the stage before), subtasks and Review delivery, reassign, the billing drafts and Finance's import — after ③, whose builders make the products, workflows and minutes it starts from | after ③ |
 | ③ | The builders: Workflow Builder (stages, who, SLA, approvals, deliverables, form fields, versions, lock), the Canvas Template Editor, Product Builder (one-time / recurring, items × price, cost → margin, versions), Minutes Builder | |
 | ④ | Tracking's actions, the Subsidiary page (stats, month / week / timeline, key dates, feed), the Audit trail (replay, formal log, CSV / PDF), the Task map, Replace Person, Marketing's clients (+ Add subsidiary) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
@@ -47,7 +48,12 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 12. **Nudge on WhatsApp.** Staff phone numbers live in People; ② sends an in-app notice first.
 13. **Working hours.** "Not accepted · 5 working hours" and the PIC's "6 working hours" need a definition of working hours (the attendance schedule?) — asked, not guessed.
 14. **Projects list** — not designed; built in the Calendar's look.
-15. **"New Page"** (the staff's top-bar button) — undesigned; the dustbin purge and a recurring run's opening need a scheduled sweep (②).
+15. **"New Page"** (the staff's top-bar button) — undesigned; the dustbin purge needs a scheduled sweep (⑥).
+16. **No clock** (②a). Production has neither pg_cron nor pg_net, so a recurring run is made ahead (60 days) and opens on its day by itself (readers ask `starts_on ≤ today`); every Marketing write tops the series up. Nobody is told on the morning a run opens — it is on their plate.
+17. **Approvers** (②a). The handoff offers MM, AMM and a content Director; the database answers permissions only for the caller, so the picker offers the roster's managers (team `manager`) and the decision asks Approve. Anybody else — a question.
+18. **Files** (②a). A File field and a stage's files are links until Marketing's R2 bucket (R2 is live since 2026-10-23: `file_buckets` + `file_objects` policies in a migration of Marketing's own).
+19. **A table field** keeps its columns; the handoff's preset rows and filling a table in on the task page come with the Canvas Template Editor (③).
+20. **Holidays by state.** HR's holidays carry their states; Marketing skips every one (a Sarawak-only day too) until the user says which state the office keeps.
 
 ## 5. Open questions (for the user)
 
@@ -55,3 +61,6 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 2. When is an unaccepted stage red — after how many working hours? What are the PIC's "working hours"?
 3. Once R2 is in, should uploads go above 50 MB?
 4. HR invites Marketing's 12 people (no logins yet) — when?
+5. Does anybody besides MM / AMM approve stages (the handoff's content Director)?
+6. Nudge on WhatsApp too (from People's phone numbers)?
+7. Which state's holidays does Marketing keep?

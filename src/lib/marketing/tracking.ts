@@ -32,6 +32,8 @@ export interface TrackTask {
   stageName: string
   owner: string | null
   ownerName: string
+  /** Who it waits on now — its stage's owner, or its approver; null while the PIC has it. Nudge goes to them. */
+  waitsOn: string | null
   tone: TrackTone
   why: string
   due: string | null
@@ -120,6 +122,7 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
       stageName: s.name,
       owner: s.owner,
       ownerName: first(s.owner),
+      waitsOn: appr ? (appr.kind === 'person' ? appr.staff : null) : s.owner,
       tone,
       why,
       due: s.dueOn,

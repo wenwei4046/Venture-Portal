@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cardHref, cardMeta, type PlateCard, type PlateColumn, type WeekRow } from '@/lib/marketing/my-space'
 import type { MktNotice } from '@/lib/marketing/shell'
+import AcceptButton from './AcceptButton'
 import s from './myspace.module.css'
 
 // My Space (`My Space.dc.html` → `My Space Bento.dc.html`): the viewer's cover, name and role, the greeting with what
@@ -20,6 +21,8 @@ export interface MySpaceProps {
   columns: PlateColumn[]
   week: WeekRow[]
   plans: MktNotice[]
+  /** Marketing · Edit: a stage to accept is accepted on its tile. */
+  canAccept: boolean
 }
 
 export default function MySpace(p: MySpaceProps) {
@@ -46,9 +49,9 @@ export default function MySpace(p: MySpaceProps) {
           {p.greeting}, {p.first} ☀️ <span className={s.greetRest}>— {p.plateLine}</span>
         </div>
         <div className={s.board}>
-          <Tasks column={col('turn')} wide className={s.turn} />
-          <Tasks column={col('waiting')} className={s.waiting} />
-          <Tasks column={col('delegated')} className={s.delegated} />
+          <Tasks column={col('turn')} wide className={s.turn} canAccept={p.canAccept} />
+          <Tasks column={col('waiting')} className={s.waiting} canAccept={p.canAccept} />
+          <Tasks column={col('delegated')} className={s.delegated} canAccept={p.canAccept} />
           <div className={`${s.tile} ${s.week}`}>
             <div className={s.weekTile}>
               <div className={s.weekHead}>🗓️ This week</div>
@@ -70,7 +73,7 @@ export default function MySpace(p: MySpaceProps) {
   )
 }
 
-function Tasks({ column, wide = false, className }: { column: PlateColumn; wide?: boolean; className: string }) {
+function Tasks({ column, wide = false, className, canAccept }: { column: PlateColumn; wide?: boolean; className: string; canAccept: boolean }) {
   const red = column.anyRed
   return (
     <div className={`${s.tile} ${className}${column.key === 'waiting' && red ? ` ${s.tileRed}` : ''}`}>
@@ -83,7 +86,7 @@ function Tasks({ column, wide = false, className }: { column: PlateColumn; wide?
         {column.cards.length ? (
           <div className={`${s.cards}${wide ? ` ${s.cards2}` : ''}`}>
             {column.cards.map(c => (
-              <Card key={c.key} c={c} />
+              <Card key={c.key} c={c} canAccept={canAccept} />
             ))}
           </div>
         ) : (
@@ -94,7 +97,7 @@ function Tasks({ column, wide = false, className }: { column: PlateColumn; wide?
   )
 }
 
-function Card({ c }: { c: PlateCard }) {
+function Card({ c, canAccept }: { c: PlateCard; canAccept: boolean }) {
   const href = cardHref(c)
   return (
     <div className={`${s.card}${c.tone === 'red' ? ` ${s.cardRed}` : c.isNew ? ` ${s.cardNew}` : ''}`}>
@@ -112,7 +115,7 @@ function Card({ c }: { c: PlateCard }) {
         </span>
         <span className={s.grow} />
         {c.action === 'accept' ? (
-          <Link href={href} className={s.act}>Accept</Link>
+          canAccept ? <AcceptButton project={c.projectId} href={href} /> : <Link href={href} className={s.act}>Accept</Link>
         ) : c.action === 'review' ? (
           <Link href={href} className={s.act}>Review</Link>
         ) : c.action === 'open' ? (
