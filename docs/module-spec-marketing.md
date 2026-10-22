@@ -23,8 +23,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | #639, live 2026-10-23 |
 | ②b | 📦 Product projects: product → minutes → PIC tracking link → PIC response, the Assignment plan (SLA, approvers ≤ 3 levels, split, 🔓 picked by the stage before), subtasks and Review delivery, reassign, the billing drafts and Finance's import — after ③, whose builders make the products, workflows and minutes it starts from | after ③ |
 | ③a | The Workflow Builder: actions and their templates, the stages (who — at assignment or 🔓 by the stage before, SLA, approval levels, PIC words, subtasks, back to, fields with a table's preset rows), the lock, drafts saved as typed on their count, versions published whole, Clone (mig `20261023235500`) | #642, live 2026-10-23 |
-| ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | this PR |
-| ③c–d | The Product Builder (one-time / recurring, items × price, cost → margin, an intake minutes template, versions), the Canvas Template Editor | next |
+| ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | #644, live 2026-10-23 |
+| ③c | The Product Builder: products one-time or recurring monthly, their code made by the database, categories of actions (quantity, unit price, each on a workflow — or a new one made there), the intake minutes template, list price, cost and margin (the manager's alone), versions taking effect on a day, retire / reactivate (mig `20261023235900`) | this PR |
+| ③d | The Canvas Template Editor | next |
 | ④ | Tracking's actions, the Subsidiary page (stats, month / week / timeline, key dates, feed), the Audit trail (replay, formal log, CSV / PDF), the Task map, Replace Person, Marketing's clients (+ Add subsidiary) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
@@ -61,6 +62,13 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 23. **Emoji, the template's note, deliverables** (③a). The handoff's samples carry an emoji, a note (*Used by Ads and Social Media*) and deliverables per stage, but its Workflow Builder edits none of them: a new action's templates are ✨, the note is set by whoever makes it (the Product Builder's *+ New action workflow* later), deliverables are not built.
 24. **A template that is never used** (③a). The handoff cannot delete a template or an action; neither can the portal yet — a question.
 25. **Minutes: when and shown** (③b). The handoff's Minutes Builder code keeps *when* minutes open (new project, monthly, a stage asks, done) and a *show* switch per field, but its screen draws neither — not built; when minutes open comes with product projects (②b). Its sample templates' *Choice*, *Checkbox*, *Date range* and *Task link* (action items that open tasks) cannot be added from its screen either.
+
+26. **Product codes** (③c). The handoff's samples carry hand-made codes (PKG-SM-A, PRD-VID-REEL) under an *auto-generated* lock; the database makes them, `PRD-<YY><NNN>` (PRD-26001), and nobody types one.
+27. **Which clients a product is for** (③c). The handoff's products keep a list of subsidiaries (all eight by default, Showroom VM Setup three) that its screen never shows or sets — not built: every product is offered to every client until asked.
+28. **One workflow per product** (③c). The handoff's sample products also name a workflow of their own (*Social Media Monthly · v4*) besides each action's; its screen links each action only — built that way.
+29. **The margin's red line** (③c). *Below 20%* is the handoff's, kept as it draws it — a warning beside the figure, never used in a price. A Settings value if the managers want their own.
+30. **A product's promise** (③c). The Workflow Builder's *Product promise* (gap 22) stays on the workflow: the handoff's Product Builder has no promise either.
+31. **Deleting** (③c). The handoff retires a product but never deletes one; neither does the portal (as templates, question 8).
 
 ## 5. Open questions (for the user)
 

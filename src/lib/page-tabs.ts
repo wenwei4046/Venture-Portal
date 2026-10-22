@@ -196,6 +196,7 @@ export const PAGE_TABS = {
   '/marketing/projects/[id]': ['mkt.projects'],
   '/marketing/tracking': ['mkt.tracking'],
   '/marketing/workflows': ['mkt.tracking'],
+  '/marketing/products': ['mkt.tracking'],
   '/marketing/minutes': ['mkt.tracking'],
 } as const satisfies Record<string, readonly string[]>
 

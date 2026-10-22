@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
+import { productBookFromRow, type ProductBook } from './products'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
@@ -43,6 +44,15 @@ export async function readMinutesTemplates(): Promise<MinutesTemplate[]> {
   const { data, error } = await db.rpc('mkt_minutes_templates')
   if (error) throw new Error(error.message)
   return minutesTemplatesFromRow(data)
+}
+
+/** The Product Builder's products, prices and versions, and the templates its pickers offer (mig 20261023235900) —
+ * Marketing · Manage. */
+export async function readProducts(): Promise<ProductBook> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_products')
+  if (error) throw new Error(error.message)
+  return productBookFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */
