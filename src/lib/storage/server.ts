@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fileBucket, keptFileBucket, type FileBucket } from './buckets'
+import { fileBucket, keptFileBucket, publicFileUrl, type FileBucket } from './buckets'
 import { contentTypeOf, inlineSafe, objectNameProblem, uploadSize } from './names'
 
 /**
@@ -96,7 +96,7 @@ function r2Bucket(db: SupabaseClient, original: SupabaseStorage | null, id: stri
     const bucket = original.from(id)
     const fn = bucket[method]
     if (typeof fn !== 'function') return Promise.resolve(fail(`${method} is not available.`, 400) as T)
-    return Promise.resolve(fn.apply(bucket, args) as T)
+    return Promise.resolve(fn.call(bucket, ...args) as T)
   }
   const isError = (v: unknown): v is StorageError => !!v && typeof v === 'object' && (v as StorageError).name === 'StorageError'
 
@@ -237,8 +237,8 @@ function r2Bucket(db: SupabaseClient, original: SupabaseStorage | null, id: stri
     getPublicUrl(path) {
       // Asked without waiting (Storage answers it at once): the bucket as last read here decides.
       const b = keptFileBucket(id)
-      const base = process.env.R2_PUBLIC_URL?.trim().replace(/\/+$/, '')
-      if (b?.backend === 'r2' && b.public && base) return { data: { publicUrl: `${base}/${[id, ...path.split('/')].map(encodeURIComponent).join('/')}` } }
+      const address = b?.backend === 'r2' ? publicFileUrl(b, path) : null
+      if (address) return { data: { publicUrl: address } }
       if (original) return original.from(id).getPublicUrl(path) as { data: { publicUrl: string } }
       return { data: { publicUrl: '' } }
     },
@@ -277,9 +277,9 @@ export async function prepareUpload(db: SupabaseClient, bucketId: string, file: 
   const { error } = await db.from('file_objects').insert({ id: rowId, bucket_id: bucketId, name: file.path, metadata: { size: file.size, mimetype: contentType } })
   if (error) return { ok: false, message: insertRefusal(error).message }
   try {
-    const { presignPut, publicObjectUrl, r2Location } = await r2()
+    const { presignPut, r2Location } = await r2()
     const signed = await presignPut(r2Location(bucketId, file.path, b.public), { size: file.size, contentType }, PUT_LINK_SECONDS)
-    return { ok: true, backend: 'r2', id: rowId, url: signed.url, headers: signed.headers, publicUrl: b.public ? publicObjectUrl(bucketId, file.path) : null }
+    return { ok: true, backend: 'r2', id: rowId, url: signed.url, headers: signed.headers, publicUrl: b.public ? publicFileUrl(b, file.path) : null }
   } catch {
     await db.from('file_objects').delete().eq('id', rowId)
     return { ok: false, message: 'File storage could not be reached. Please try again.' }

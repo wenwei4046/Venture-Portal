@@ -10,7 +10,8 @@ import { AwsClient, AwsV4Signer } from 'aws4fetch'
  * Two R2 buckets: every private bucket's objects sit in `R2_BUCKET`, every public one's in `R2_PUBLIC_BUCKET`, each
  * under its own bucket's name (`hr-documents/documents/…`), so a key is `<bucket>/<name>` and the database keeps
  * `bucket_id` + `name` exactly as storage.objects did. A presigned link is only ever made on R2's own S3 address —
- * R2 refuses one on a custom domain — and a public object is read from `R2_PUBLIC_URL` (cdn.houzsventure.com).
+ * R2 refuses one on a custom domain — and a public object is read on its bucket's own address (`file_buckets.public_url`,
+ * cdn.houzsventure.com), which needs no signing.
  */
 
 export interface R2Settings {
@@ -19,8 +20,6 @@ export interface R2Settings {
   secretAccessKey: string
   privateBucket: string
   publicBucket: string
-  /** The public bucket's own address, with no trailing slash; null until its domain is on. */
-  publicUrl: string | null
 }
 
 /** Where one object lives in R2. */
@@ -30,15 +29,14 @@ export interface R2Location {
 }
 
 /** The R2 settings from the environment, or null while any is missing (the portal then refuses R2 buckets' files). */
-export function r2Settings(env: NodeJS.ProcessEnv = process.env): R2Settings | null {
+export function r2Settings(env: Readonly<Record<string, string | undefined>> = process.env): R2Settings | null {
   const accountId = env.R2_ACCOUNT_ID?.trim()
   const accessKeyId = env.R2_ACCESS_KEY_ID?.trim()
   const secretAccessKey = env.R2_SECRET_ACCESS_KEY?.trim()
   const privateBucket = env.R2_BUCKET?.trim()
   const publicBucket = env.R2_PUBLIC_BUCKET?.trim()
   if (!accountId || !accessKeyId || !secretAccessKey || !privateBucket || !publicBucket) return null
-  const publicUrl = env.R2_PUBLIC_URL?.trim().replace(/\/+$/, '') || null
-  return { accountId, accessKeyId, secretAccessKey, privateBucket, publicBucket, publicUrl }
+  return { accountId, accessKeyId, secretAccessKey, privateBucket, publicBucket }
 }
 
 function settings(): R2Settings {
@@ -67,11 +65,6 @@ export function encodeKey(key: string): string {
 
 function objectUrl(s: R2Settings, loc: R2Location): string {
   return `https://${s.accountId}.r2.cloudflarestorage.com/${loc.r2Bucket}/${encodeKey(loc.key)}`
-}
-
-/** A public object's address on the public bucket's own domain; null while that domain is not on. */
-export function publicObjectUrl(bucket: string, name: string, s: R2Settings = settings()): string | null {
-  return s.publicUrl ? `${s.publicUrl}/${encodeKey(`${bucket}/${name}`)}` : null
 }
 
 /** `attachment` with the file's own name — plain for old browsers, UTF-8 (RFC 5987) for the rest. */
