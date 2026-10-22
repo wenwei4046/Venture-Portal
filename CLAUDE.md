@@ -8,6 +8,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://gixpptmfuryskbwkmiwz.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon / publishable key. Safe to ship to browsers — RLS is what protects the data, not this key. Real value in .env.local and Vercel>
 SUPABASE_SERVICE_ROLE_KEY=<secret key, sb_secret_… . BYPASSES RLS. Never commit it and never paste it into a script — read it from env. Real value in .env.local, in Vercel, and as a Cloudflare Worker secret of the same name>
 ERP_SYNC_SECRET=<≥32 chars; shared with the Houzs ERP database (scm.venture_portal_sync_config vp.secret). Set on Vercel Production — until it is, /api/erp/* answers 503>
+R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET / R2_PUBLIC_BUCKET=<Cloudflare R2, where the files live (2026-10-23). The key reaches every file: .env.local and Vercel only, never a script or a browser>
 ```
 Repository
 ```
@@ -22,7 +23,7 @@ This file keeps only what holds across the whole portal. What the portal decided
 | HR | Attendance (Today, Records, Requests, Leave balances, Month close, Settings, Readiness), HR Costing (Payroll, Payment, Billing Allocation, department mode), Director Salary, Director Pool, Claims, People (People Management, Hierarchy, employee codes), HR's view (its shell, the `components/hrv` kit), Meeting Rooms, the Guest Link (and its public `/g/<code>`), Documentation, Hiring, the HR phone app (`/hr-app`) | `.claude/rules/hr/` — `payroll.md`, `people.md`, `hr-view.md`, `rooms.md`, `documentation.md`, `hiring.md`, `hr-app.md`, `attendance.md` |
 | Finance | Payments, Receipts, Invoices, Billing, Fund IN / OUT, Statements, Dept Pool, OPEX, Reports, Reconciliation | `.claude/rules/finance/` — `finance-view.md`; money rules in Key Business Rules below |
 | Principal | Approvals, Settings, People › Permissions | `.claude/rules/portal-wide/permissions.md` |
-| Every tab | permissions and the database's guard rails, navigation speed, the installed app (PWA) | `.claude/rules/portal-wide/` — `permissions.md`, `speed.md`, `pwa.md`; summarised under Permissions and Coding Conventions below |
+| Every tab | permissions and the database's guard rails, navigation speed, the installed app (PWA), files (R2) | `.claude/rules/portal-wide/` — `permissions.md`, `speed.md`, `pwa.md`, `storage.md`; summarised under Permissions and Coding Conventions below |
 
 Keeping it that way: a new decision is written into its tab's file (`**TITLE (date):**`, as before), never here — this file stays under 40,000 characters (`src/lib/claude-md.test.ts`) and well below it (cut to ~30,000 on 2026-10-15): a rule says itself here in its fewest words; its reasons and history go to the rules file. The first decision for a tab with no folder starts one, with its row above. A rules file opens with `paths:` frontmatter — route groups and `[param]` folders written as `*`, because `(` and `[` are glob syntax — and the test refuses a file without it, which would load at every launch.
 Architecture
@@ -45,6 +46,8 @@ src/
 │   ├── supabase/          ← client.ts · server.ts (anon key + RLS) · admin.ts (service role,
 │   │                         BYPASSES RLS — ten callers, Coding Conventions › Supabase client;
 │   │                         another is a decision, not a detail) · database.types.ts (generated)
+│   ├── storage/           ← files: every client's `.storage` — a bucket's files in R2 or Storage by
+│   │                         `file_buckets.backend`; who may = `file_objects`' policies (portal-wide/storage.md)
 │   └── auth.ts · roles.ts · utils.ts  ← gates · sidebar canAccess* · formatMoney / formatDate / cn / dayjs
 ├── test/setup.ts · types/index.ts
 └── (no middleware)        ← gating is the layouts' requireAuth. The session middleware sits DORMANT
