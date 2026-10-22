@@ -556,4 +556,82 @@ const lockedInfo = await q(`select count(*)::int n from information_schema.role_
   where table_name in ('lead_info_cats','lead_info_cards','lead_business_hours') and grantee in ('anon','authenticated')`)
 check(lockedInfo[0].n, 0, 'no grants on the new tables')
 
+// ── Reply rules, Reply templates and the Step library (mig 20261023100000; the registry rows are production's, left out here) ──
+const replySql = (await readFile(new URL('../../supabase/migrations/20261023100000_lead_reply.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(replySql.slice(0, replySql.indexOf('-- ── The two new pages, by name')))
+await db.exec((await readFile(new URL('../../supabase/migrations/20261023100100_lead_reply_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+await as(CS_USER, ALL)
+const tpl = [
+  { id: 's1', name: 'Welcome', kind: 'question', text: 'What are you looking for?', saveAs: 'interest', pos: { x: 0, y: 0 },
+    buttons: [{ label: 'Sofa', next: 's2' }, { label: 'Just looking', next: '', endMsg: 'No problem, browse away!' }] },
+  { id: 's2', name: 'Ask for phone', kind: 'phone', text: 'Your mobile number?', retryText: 'Numbers only please.', retryMax: '1', failNext: 'person', next: 's3' },
+  { id: 's3', name: 'Anything else', kind: 'text', text: 'Anything we should know?', saveAs: 'note', next: '' },
+]
+const saveTpl = async (id, data) => (await q('select public.lead_save_template($1, $2::jsonb) i', [id, JSON.stringify(data)]))[0].i
+await refuses(`select public.lead_save_template(null, $1::jsonb)`, [JSON.stringify({ name: 'x', steps: [{ ...tpl[0], buttons: [{ label: 'Sofa', next: 'nope' }] }] })], /goes to a step of this template, or ends/, 'an option to nowhere')
+await refuses(`select public.lead_save_template(null, $1::jsonb)`, [JSON.stringify({ name: 'x', steps: [{ ...tpl[1], next: '', retryMax: '9' }] })], /1 to 5 times/, 'a retry limit past 5')
+await refuses(`select public.lead_save_template(null, $1::jsonb)`, [JSON.stringify({ name: 'x', steps: [{ id: 's1', kind: 'ai', text: '', name: 'AI' }, { id: 's2', kind: 'dance', text: 'x' }] })], /an option, an answer/, 'an unknown kind')
+const sofaTpl = await saveTpl(null, { name: 'Sofa enquiry', description: 'Ad Oct Sofa Week', endMsg: 'Thanks! We’ll be in touch soon 😊', steps: tpl })
+let flowRow = (await q('select active, trigger_kind, end_msg, description from public.lead_flows where id = $1', [sofaTpl]))[0]
+check([flowRow.active, flowRow.trigger_kind, flowRow.description], [false, 'first', 'Ad Oct Sofa Week'], 'a new template is not started by a trigger')
+check((await q('select public.lead_flows() f'))[0].f.find(f => f.id === sofaTpl).endMsg, 'Thanks! We’ll be in touch soon 😊', 'the reader carries the closing message')
+// The rules: Carress on Instagram → the template, working hours and after.
+await refuses(`select public.lead_save_reply_rules('[]'::jsonb, $1::jsonb)`, [JSON.stringify([{ brandId: bCarress, channel: 'instagram', work: 'gone', after: 'cs' }])], /a template that is there/, 'a reply to nothing')
+await q(`select public.lead_save_reply_rules($1::jsonb, $2::jsonb)`, [JSON.stringify([{ adId: '120210000000009', when: 'open', reply: 'ai' }, { adId: '120210000000009', when: 'any', reply: sofaTpl }]),
+  JSON.stringify([{ brandId: bCarress, channel: 'instagram', work: sofaTpl, after: sofaTpl }])])
+const rules = (await q('select public.lead_reply_rules() r'))[0].r
+check([rules.ads.length, rules.pages.find(p => p.brandId === bCarress && p.channel === 'instagram').work, rules.pages.find(p => p.brandId === b2990 && p.channel === 'messenger').work],
+  [2, sofaTpl, 'cs'], 'rules read back; a page with none is Customer Service')
+await refuses(`select public.lead_save_reply_rules($1::jsonb, '[]'::jsonb)`, [JSON.stringify([{ adId: '120210000000009', when: 'any', reply: 'cs' }, { adId: '120210000000009', when: 'any', reply: 'ai' }])], /same ad at the same time/, 'two rules for one ad and time')
+// An ad rule beats the page; the hours pick between the ad's rules (a Monday 11:00 is open, 23:00 closed).
+const contactRule = async (contact, at) => (await q('select public.lead_rule_reply(c, $2::timestamptz) r from public.lead_contacts c where c.id = $1', [contact, at]))[0].r
+await db.exec(`update public.lead_contacts set ad_id = '120210000000009' where id = '${aisyah}'`)
+check(await contactRule(aisyah, '2026-10-19T03:00:00Z'), 'ai', 'working hours: the ad’s open rule')
+check(await contactRule(aisyah, '2026-10-19T15:00:00Z'), sofaTpl, 'after hours: the ad’s any-time rule')
+await db.exec(`update public.lead_contacts set ad_id = null where id = '${aisyah}'`)
+check(await contactRule(aisyah, '2026-10-19T03:00:00Z'), null, 'no ad, 2990s Messenger has no rule — today’s triggers decide')
+// The template runs: options, a wrong phone (asked again), a right one, an answer kept in the note, the closing message.
+const zoe = (await q(`select public.lead_simulate($1, 'instagram', 'Zoe', '', 'hello') c`, [bCarress]))[0].c
+const zoeOut = async () => (await q(`select body, buttons from public.lead_messages where contact_id = $1 and direction = 'out' order by id`, [zoe])).map(m => m.body)
+check(await zoeOut(), ['What are you looking for?'], 'the rule started the template')
+await q(`select public.lead_simulate($1, 'instagram', 'Zoe', '', 'sofa')`, [bCarress])
+await q(`select public.lead_simulate($1, 'instagram', 'Zoe', '', 'later')`, [bCarress])
+check((await zoeOut()).slice(-2), ['Your mobile number?', 'Numbers only please.'], 'not a phone: asked again')
+await q(`select public.lead_simulate($1, 'instagram', 'Zoe', '', '012-338 4999')`, [bCarress])
+await q(`select public.lead_simulate($1, 'instagram', 'Zoe', '', 'Prefer olive green')`, [bCarress])
+check((await zoeOut()).slice(-2), ['Anything we should know?', 'Thanks! We’ll be in touch soon 😊'], 'the answer, then the template’s closing message')
+const zoeCard = (await q('select interest, note, flow_state, phone from public.lead_contacts where id = $1', [zoe]))[0]
+check([zoeCard.interest, zoeCard.note, zoeCard.flow_state, zoeCard.phone], ['Sofa', 'Prefer olive green', 'done', '0123384999'], 'interest and note kept, the phone found, done')
+// Still wrong after the tries: to a person.
+const yan = (await q(`select public.lead_simulate($1, 'instagram', 'Yan', '', 'hi') c`, [bCarress]))[0].c
+await q(`select public.lead_simulate($1, 'instagram', 'Yan', '', 'sofa')`, [bCarress])
+await q(`select public.lead_simulate($1, 'instagram', 'Yan', '', 'no')`, [bCarress])
+await q(`select public.lead_simulate($1, 'instagram', 'Yan', '', 'still no')`, [bCarress])
+const yanCard = (await q('select flow_state, last_dir from public.lead_contacts where id = $1', [yan]))[0]
+check([yanCard.flow_state, yanCard.last_dir], ['done', 'in'], 'still wrong: handed to a person, waiting in the Inbox')
+// An option that ends says its own closing message.
+const xia = (await q(`select public.lead_simulate($1, 'instagram', 'Xia', '', 'hi') c`, [bCarress]))[0].c
+await q(`select public.lead_simulate($1, 'instagram', 'Xia', '', 'Just looking')`, [bCarress])
+check((await q(`select body from public.lead_messages where contact_id = $1 and direction = 'out' order by id desc limit 1`, [xia]))[0].body, 'No problem, browse away!', 'an option’s own closing message')
+// The library: a step, saved again as v2; a template holding v1 is out of date.
+const libSave = async (id, data) => (await q('select public.lead_save_library_item($1, $2::jsonb) i', [id, JSON.stringify(data)]))[0].i
+await refuses(`select public.lead_save_library_item(null, $1::jsonb)`, [JSON.stringify({ kind: 'step', name: 'Two', steps: tpl })], /a flow is several/, 'a step is one step')
+const askPhone = await libSave(null, { kind: 'step', name: 'Ask for phone', description: 'Gets a number', steps: [{ ...tpl[1], next: '' , failNext: 'person' }] })
+await saveTpl(sofaTpl, { name: 'Sofa enquiry', endMsg: 'Thanks!', steps: tpl.map(s => (s.id === 's2' ? { ...s, lib: { id: askPhone, ver: 1 } } : s)) })
+await libSave(askPhone, { kind: 'step', name: 'Ask for phone', description: 'Gets a number', steps: [{ ...tpl[1], text: 'Your WhatsApp number?', next: '', failNext: 'person' }] })
+const lib = (await q('select public.lead_library() l'))[0].l.find(l => l.id === askPhone)
+check([lib.ver, lib.usedIn.length, lib.usedIn[0].flowName, lib.usedIn[0].steps, lib.usedIn[0].outdated], [2, 1, 'Sofa enquiry', ['Ask for phone'], 1], 'v2, used in the template, which holds v1')
+await q('select public.lead_remove_library_item($1)', [askPhone])
+check((await q('select public.lead_library() l'))[0].l.some(l => l.id === askPhone), false, 'removed; the template keeps its copy')
+for (const [fn, page] of [['lead_save_template', "'/leads/flows'"], ['lead_save_reply_rules', "'/leads/rules'"], ['lead_save_library_item', "'/leads/flows', '/leads/library'"], ['lead_remove_library_item', "'/leads/library'"]]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY[${page}], ARRAY['leads.manage']);`), true, `${fn} asks ${page}`)
+}
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses(`select public.lead_save_template(null, $1::jsonb)`, [JSON.stringify({ name: 'x', steps: tpl })], /Lead View · Manage/, 'templates need Manage')
+await refuses(`select public.lead_save_reply_rules('[]'::jsonb, '[]'::jsonb)`, [], /Lead View · Manage/, 'rules need Manage')
+await as(CS_USER, ALL)
+check((await q(`select count(*)::int n from information_schema.role_table_grants
+  where table_name in ('lead_reply_rules','lead_reply_pages','lead_step_library') and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on the new tables')
+
 console.log(`validate-leads: ${checks} checks passed`)

@@ -10,6 +10,7 @@ import { fetchMetaAds } from './ads-server'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
+import type { LibraryItem, ReplyRules, TemplateStep } from './template'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
 
 /**
@@ -102,6 +103,36 @@ export async function saveInfo(cats: Array<Pick<InfoCat, 'id' | 'label'>>, cards
 export async function saveHours(week: BusinessHours['week'], specials: BusinessHours['specials']) {
   await requireActionOn('/leads/hours', 'leads', 'manage')
   return call<null>('lead_save_hours', { p_week: week, p_specials: specials }, 'The hours were not saved.')
+}
+
+/** Reply templates' Save: a template's name, description, closing message and steps (new: id null). Returns its id. */
+export async function saveTemplate(templateId: string | null, data: { name: string; description: string; endMsg: string; steps: TemplateStep[] }) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<string>('lead_save_template', { p_id: templateId, p_data: data }, 'The template was not saved.')
+}
+
+/** Reply templates: a template gone (its conversations keep their messages). */
+export async function removeTemplate(templateId: string) {
+  await requireActionOn('/leads/flows', 'leads', 'manage')
+  return call<null>('lead_remove_flow', { p_id: templateId }, 'The template was not removed.')
+}
+
+/** Reply rules' Save: every ad rule and every page's two replies. */
+export async function saveReplyRules(ads: ReplyRules['ads'], pages: ReplyRules['pages']) {
+  await requireActionOn('/leads/rules', 'leads', 'manage')
+  return call<null>('lead_save_reply_rules', { p_ads: ads.map(a => ({ id: a.id.startsWith('new-') ? '' : a.id, adId: a.adId, when: a.when, reply: a.reply })), p_pages: pages }, 'The rules were not saved.')
+}
+
+/** The Step library: an item, new (version 1) or saved as its next version. Returns its id. */
+export async function saveLibraryItem(itemId: string | null, data: Pick<LibraryItem, 'kind' | 'name' | 'description' | 'steps'>) {
+  await requireActionOn(['/leads/library', '/leads/flows'], 'leads', 'manage')
+  return call<string>('lead_save_library_item', { p_id: itemId, p_data: data }, 'The library item was not saved.')
+}
+
+/** The Step library: an item gone; templates keep their copies. */
+export async function removeLibraryItem(itemId: string) {
+  await requireActionOn('/leads/library', 'leads', 'manage')
+  return call<null>('lead_remove_library_item', { p_id: itemId }, 'The library item was not removed.')
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────

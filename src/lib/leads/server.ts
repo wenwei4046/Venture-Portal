@@ -6,6 +6,7 @@ import type { LeadAd } from './ads'
 import type { Campaign } from './campaign'
 import type { LeadFlow } from './flow'
 import type { BusinessHours, LeadInfo } from './info'
+import type { LibraryItem, ReplyRules } from './template'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -72,6 +73,16 @@ export function loadInfo(): Promise<Read<LeadInfo>> {
 /** Business hours: the week and the special dates. */
 export function loadHours(): Promise<Read<BusinessHours>> {
   return rpc<BusinessHours>('lead_business_hours', undefined, 'The business hours')
+}
+
+/** Reply rules: by ad, and by page and channel (mig 20261023100000). */
+export function loadReplyRules(): Promise<Read<ReplyRules>> {
+  return rpc<ReplyRules>('lead_reply_rules', undefined, 'The reply rules')
+}
+
+/** The Step library, with where each item is used. */
+export function loadLibrary(): Promise<Read<LibraryItem[]>> {
+  return rpc<LibraryItem[]>('lead_library', undefined, 'The step library')
 }
 
 /** Every flow, with what each started this week. */

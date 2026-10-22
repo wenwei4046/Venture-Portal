@@ -109,6 +109,8 @@ export const PAGE_TABS = {
   '/leads/insight': ['lead.insight'],
   '/leads/campaigns': ['lead.campaigns'],
   '/leads/flows': ['lead.flows'],
+  '/leads/rules': ['lead.rules'],
+  '/leads/library': ['lead.library'],
   '/leads/ai': ['lead.ai'],
   '/leads/knowledge': ['lead.knowledge'],
   '/leads/info': ['lead.info'],

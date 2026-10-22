@@ -51,9 +51,9 @@ export function leadNavSections(): LeadNavSection[] {
     {
       label: 'Replies',
       items: [
-        soon('leads-rules', 'Reply rules', 'split'),
+        link('leads-rules', 'Reply rules', 'split', '/leads/rules'),
         link('leads-flows', 'Reply templates', 'workflow', '/leads/flows'),
-        soon('leads-steps', 'Step library', 'blocks'),
+        link('leads-steps', 'Step library', 'blocks', '/leads/library'),
         link('leads-ai', 'AI Agent', 'sparkles', '/leads/ai'),
       ],
     },
