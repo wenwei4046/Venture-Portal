@@ -5,6 +5,7 @@
  * are the CRM's own; Meta's (spend, impressions, clicks …) show "—" until Meta is connected (PROPOSALS.md C).
  */
 import type { CrmCustomer } from "@/lib/member/crm-data";
+import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import type { DeskCtx } from "./ctx";
 import { INS_CARDS, MON } from "./insight";
@@ -41,6 +42,21 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
   const appt = new Set(vs.map(v => v.customerId)).size, showup = vs.filter(v => v.state === "attended").length, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
+/**
+ * Meta's figures for a set of ads over a range, summed (null when none of them could be read), and every metric built
+ * from them with the CRM's own (2026-10-22, the owner: "做花费和每个名单成本"): cost per lead / appointment / won.
+ */
+export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<string, number | null>): Record<string, number | null> {
+  const got = figs.filter((f): f is MetaFig => !!f);
+  if (!got.length) return {};
+  const s = got.reduce((a, f) => ({ spend: a.spend + f.spend, impr: a.impr + f.impr, reach: a.reach + f.reach, clicks: a.clicks + f.clicks, allClicks: a.allClicks + f.allClicks, msgconv: a.msgconv + f.msgconv }),
+    { spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 });
+  const per = (n: number | null | undefined) => (n ? s.spend / n : null);
+  return { spend: s.spend, impr: s.impr, reach: s.reach, results: s.msgconv, msgconv: s.msgconv, cpr: per(s.msgconv), cpmsg: per(s.msgconv),
+    freq: s.reach ? s.impr / s.reach : null, cpm: s.impr ? (s.spend / s.impr) * 1000 : null, cpp: s.reach ? (s.spend / s.reach) * 1000 : null,
+    clicks: s.clicks, cpc: per(s.clicks), ctr: s.impr ? (s.clicks / s.impr) * 100 : null, allclk: s.allClicks, ctrall: s.impr ? (s.allClicks / s.impr) * 100 : null, cpcall: per(s.allClicks),
+    cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won) };
+}
 export const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
 
 export function adsPerfVM(ctx: DeskCtx) {
@@ -70,7 +86,12 @@ export function adsPerfVM(ctx: DeskCtx) {
       : cmode === 2 ? [new Date(new Date(ra).getFullYear() - 1, new Date(ra).getMonth(), new Date(ra).getDate()).getTime(), new Date(new Date(rb).getFullYear() - 1, new Date(rb).getMonth(), new Date(rb).getDate()).getTime()]
         : [ra - len * DAY, ra - DAY];
   const rangeTxt = (a: number, b: number) => (a === b ? dfmt(isoOf(a)) : `${dfmt(isoOf(a))} – ${dfmt(isoOf(b))}`);
-  const status = (_adId: string): string | null => null; // Meta's delivery (PROPOSALS.md C).
+  // Meta's delivery, as Ads Manager last said (crm_ad_names.meta_status, hourly).
+  const status = (adId: string): string | null => { const st = (data.adNames?.[adId]?.status ?? "").toUpperCase();
+    return !st ? null : st === "ACTIVE" || st === "WITH_ISSUES" ? "Running" : /PAUSED|ARCHIVED|DELETED|DISAPPROVED/.test(st) ? "Paused" : "Pending"; };
+  // Meta's figures for a range (read by DeskScreens through fetchAdInsights into ui.apMeta, keyed "from|to").
+  const rkey = (a: number, b: number) => `${isoOf(a)}|${isoOf(b)}`;
+  const metaOf = (ids: string[], a: number, b: number) => ids.map(id => ui.apMeta?.[rkey(a, b)]?.[id]);
   // Every ad, as Ads to teams lists them (the owner, 2026-10-22: "全部的广告也要在这里"): the ones that brought leads, and the
   // ones added before their first lead (adNames' `added`, crm_add_ad) with 0s.
   const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
@@ -78,23 +99,23 @@ export function adsPerfVM(ctx: DeskCtx) {
     return { id, name: cs[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !cs.length || cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
-  const val = (cs: CrmCustomer[], k: string, a: number, b: number): number | null => crmFigures(cs, ctx, a, b)[k] ?? null;
-  const cell = (cs: CrmCustomer[], m: (typeof ALL)[number], isTotal: boolean, adId: string) => {
+  const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
+  const cell = (cs: CrmCustomer[], m: (typeof ALL)[number], isTotal: boolean, adId: string, ids: string[]) => {
     if (m[0] === "delivery") return { v: isTotal ? "" : status(adId) ?? "—", cv: "", d: "", dc: "", db: "" };
-    const v = val(cs, m[0], ra, rb);
+    const v = val(cs, ids, m[0], ra, rb);
     if (!cmp) return { v: fmt(v, m[3]), cv: "", d: "", dc: "", db: "" };
-    const pv = val(cs, m[0], ca, cb); let dd = "—", dc = "var(--crm-muted)", db = "var(--crm-field)";
+    const pv = val(cs, ids, m[0], ca, cb); let dd = "—", dc = "var(--crm-muted)", db = "var(--crm-field)";
     if (v != null && pv) { const p = ((v - pv) / pv) * 100, good = p > 0 !== COSTY.test(m[0]); dd = Math.abs(p) < 0.5 ? "0%" : `${p > 0 ? "▲ " : "▼ "}${Math.abs(p).toFixed(0)}%`;
       if (Math.abs(p) >= 0.5) { dc = good ? "var(--crm-brown)" : "var(--crm-oxblood)"; db = good ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)"; } }
     else if (v && !pv) { dd = "New"; dc = "var(--crm-brown)"; db = "var(--crm-tint-follow)"; }
     return { v: fmt(v, m[3]), cv: fmt(pv, m[3]), d: dd, dc, db };
   };
   const srt = ui.apSort;
-  const sv = (a: (typeof ads)[number], k: string): number | string => (k === "name" ? a.name : k === "delivery" ? status(a.id) ?? "" : val(a.cs, k, ra, rb) ?? -Infinity);
+  const sv = (a: (typeof ads)[number], k: string): number | string => (k === "name" ? a.name : k === "delivery" ? status(a.id) ?? "" : val(a.cs, [a.id], k, ra, rb) ?? -Infinity);
   const ADs = srt ? AD.slice().sort((a, b) => { const x = sv(a, srt.k), y = sv(b, srt.k); const c = typeof x === "string" ? x.localeCompare(String(y)) : x - Number(y); return srt.dir === "asc" ? c : -c; }) : AD;
   const allCs = AD.flatMap(a => a.cs);
-  const rows = ADs.map(a => { const st = status(a.id); return { name: a.name, meta: `${a.ch} · ${st ?? "Not synced"}`, dot: st ? ST_META[st][1] : "var(--crm-faint-2)", bg: "#fff", w: 600, cells: cols.map(m => cell(a.cs, m, false, a.id)) }; });
-  rows.push({ name: `Total · ${AD.length} ads`, meta: rangeTxt(ra, rb), dot: "transparent", bg: "var(--crm-cream-nav)", w: 700, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, ""))) });
+  const rows = ADs.map(a => { const st = status(a.id); return { name: a.name, meta: `${a.ch} · ${st ?? "Not synced"}`, dot: st ? ST_META[st][1] : "var(--crm-faint-2)", bg: "#fff", w: 600, cells: cols.map(m => cell(a.cs, m, false, a.id, [a.id])) }; });
+  rows.push({ name: `Total · ${AD.length} ads`, meta: rangeTxt(ra, rb), dot: "transparent", bg: "var(--crm-cream-nav)", w: 700, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(a => a.id)))) });
   const CM: [string, string][] = [["Previous period", rangeTxt(ra - len * DAY, ra - DAY)], ["Same period last month", MON[(new Date(ra).getMonth() + 11) % 12].slice(0, 3)], ["Same period last year", `${MON[new Date(ra).getMonth()].slice(0, 3)} ${new Date(ra).getFullYear() - 1}`]];
   if (cmode === "custom") CM.push(["Custom", rangeTxt(ca, cb)]);
   // The date picker (F2): presets, a two-month calendar, typed DD/MM/YYYY dates (- or . too), Compare in blue.
@@ -137,7 +158,11 @@ export function adsPerfVM(ctx: DeskCtx) {
         pick: () => { if (tg === "cmp") { upd({ cf: isoOf(a), ct: isoOf(b), step: 0 }); return; } const L = Math.round((b - a) / DAY) + 1; upd({ preset: label, from: isoOf(a), to: isoOf(b), cf: isoOf(a - L * DAY), ct: isoOf(a - DAY), step: 0 }); } }; }),
       cells };
   })();
+  // The ranges whose Meta figures the table needs (DeskScreens reads the missing ones; numeric ad ids only).
+  const metaIds = AD.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
+  const apNeed = (cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ key: rkey(a, b), since: isoOf(a), until: isoOf(b), ids: metaIds.filter(id => !(id in (ui.apMeta?.[rkey(a, b)] ?? {}))) })).filter(n => n.ids.length);
   return {
+    apNeed,
     kAdsPerf: ui.tab === "adsperf",
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
     ap4: {
@@ -146,8 +171,8 @@ export function adsPerfVM(ctx: DeskCtx) {
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
       rows: ADs.map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
-        cells: cols.map(m => { const c = cell(a.cs, m, false, a.id), raw = val(a.cs, m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
-      total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, ""))) },
+        cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
+      total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,
     },
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },

@@ -166,3 +166,29 @@ export async function listMetaAds(token: string, fetchImpl: typeof fetch = fetch
   kept.forEach(r => { r.pageName = r.page ? names.get(r.page) ?? null : null; });
   return kept.sort((x, y) => Number(y.status === 'ACTIVE') - Number(x.status === 'ACTIVE') || y.created.localeCompare(x.created)).slice(0, 300);
 }
+
+/** An ad's figures from Ads Manager for a range (2026-10-22, Ads Performance: "做花费和每个名单成本"). */
+export interface MetaFig { spend: number; impr: number; reach: number; clicks: number; allClicks: number; msgconv: number }
+
+/**
+ * Meta's insights for one ad over [since, until] (YYYY-MM-DD, the ad account's days): spend, impressions, reach, link
+ * clicks, all clicks and messaging conversations started. An ad with no delivery in the range answers zeros; one the
+ * token cannot see answers null (Ads Performance shows "—"). The server's only (the token never leaves it).
+ */
+export async function metaAdInsights(adId: string, token: string, since: string, until: string, fetchImpl: typeof fetch = fetch): Promise<MetaFig | null> {
+  if (!AD_ID.test(adId) || !/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  try {
+    const range = encodeURIComponent(JSON.stringify({ since, until }));
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}/insights?fields=spend,impressions,reach,inline_link_clicks,clicks,actions&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const row = (((await res.json()) as { data?: Record<string, unknown>[] }).data ?? [])[0] ?? {};
+    const num = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? Number(v) || 0 : 0);
+    const actions = Array.isArray(row.actions) ? (row.actions as { action_type?: unknown; value?: unknown }[]) : [];
+    const msg = actions.find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
+    return { spend: num(row.spend), impr: num(row.impressions), reach: num(row.reach), clicks: num(row.inline_link_clicks), allClicks: num(row.clicks), msgconv: num(msg?.value) };
+  } catch {
+    return null;
+  }
+}

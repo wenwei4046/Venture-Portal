@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, metaAdInsights } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -138,5 +138,19 @@ describe("only the ads sent to the CRM's ad number", () => {
   it('reads other numbers from the server when named', () => {
     expect(crmAdNumbers(undefined)).toEqual(['60183580219'])
     expect(crmAdNumbers('+60 18-358 0219, 60189079042')).toEqual(['60183580219', '60189079042'])
+  })
+})
+
+describe("an ad's figures from Ads Manager", () => {
+  it('reads spend, delivery and messaging conversations for the range', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      expect(decodeURIComponent(String(url))).toContain('"since":"2026-10-01","until":"2026-10-22"')
+      return new Response(JSON.stringify({ data: [{ spend: '123.45', impressions: '9000', reach: '4000', inline_link_clicks: '80', clicks: '120', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '15' }] }] }), { status: 200 })
+    }) as unknown as typeof fetch
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', f)).toEqual({ spend: 123.45, impr: 9000, reach: 4000, clicks: 80, allClicks: 120, msgconv: 15 })
+  })
+  it('answers zeros with no delivery, null for an ad the token cannot see', async () => {
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch)).toEqual({ spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 })
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
   })
 })
