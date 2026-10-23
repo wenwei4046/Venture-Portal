@@ -101,7 +101,7 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
               <div className={s.tvTile}>
                 <div className={s.tvTileLabel}>Reason</div>
                 <div className={s.tvTileValue}>
-                  <ReasonPick talent={t} canEdit={can.edit} className={s.select} />
+                  <ReasonPick talent={t} reasons={board.talentReasons} canEdit={can.edit} className={s.select} />
                 </div>
               </div>
               {tiles.map(([l, v]) => (

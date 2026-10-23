@@ -6,9 +6,10 @@ import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { inviteHiringTalent, saveHiringTalent } from '@/lib/hiring/actions'
 import { savedIn } from '@/lib/hiring/bank'
-import { REASONS } from '@/lib/hiring/reasons'
+import { NEW_REASON, startReason } from '@/lib/hiring/reasons'
 import { answerOf, departmentNames, pickRows } from '@/lib/hiring/view'
-import type { HiringBoard, HiringCandidate, HiringRequest, TalentReason } from '@/lib/hiring/types'
+import type { HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
+import { ReasonSelect, sendReason } from './ReasonSelect'
 import s from './hiring.module.css'
 
 /** Pick from Talent Bank (README §11): the bank's people not already on this request, matching ones first; Add invites them. */
@@ -62,17 +63,21 @@ export function PickTalentWindow({ board, request: r, open, onClose }: { board: 
 
 /**
  * Move to Talent Bank… (README §11): a candidate kept on file — name, phone, email, department, what they fit, why keep
- * them; their files go with them. The reason they are kept (2026-10-24): Not right now for somebody still in the running.
+ * them; their files go with them. The reason they are kept (2026-10-24): Not right now for somebody still in the running
+ * — one of HR's reasons, or a new one named here (Edit).
  */
 export function MoveToTalentWindow({
   board,
   request: r,
   candidate: c,
+  canAddReason,
   onClose,
 }: {
   board: HiringBoard
   request: HiringRequest
   candidate: HiringCandidate | null
+  /** Hiring · Edit names new reasons. */
+  canAddReason: boolean
   onClose: () => void
 }) {
   const departments = departmentNames(board)
@@ -87,7 +92,8 @@ export function MoveToTalentWindow({
   const [dept, setDept] = useState('')
   const [position, setPosition] = useState('')
   const [notes, setNotes] = useState('')
-  const [reason, setReason] = useState<TalentReason>('not_right_now')
+  const [reason, setReason] = useState('')
+  const [newReason, setNewReason] = useState('')
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
 
@@ -97,7 +103,8 @@ export function MoveToTalentWindow({
     setPhone(c.phone)
     setEmail('')
     setPosition(answerOf(r, 'position'))
-    setReason(c.stage === 'rejected' ? 'not_shortlisted' : 'not_right_now')
+    setReason(startReason(board.talentReasons, c.stage === 'rejected' ? 'not_shortlisted' : 'not_right_now'))
+    setNewReason('')
     const first = (answerOf(r, 'dept') || 'Revenue').split(' · ')[0]
     setDept(guest ? answerOf(r, 'dept') || first : departments.includes(first) ? first : departments[0] ?? first)
     setNotes(c.note)
@@ -109,6 +116,7 @@ export function MoveToTalentWindow({
   const save = () => {
     if (!c) return
     if (!name.trim() || !position.trim()) return setErr('Name and position are needed.')
+    if (reason === NEW_REASON && !newReason.trim()) return setErr('Name the new reason.')
     const form = new FormData()
     form.set('candidate', c.id)
     form.set('name', name)
@@ -117,8 +125,10 @@ export function MoveToTalentWindow({
     form.set('department', dept)
     form.set('position', position)
     form.set('notes', notes)
-    form.set('reason', reason)
     start(async () => {
+      const why = await sendReason(board.talentReasons, reason, newReason)
+      if (!why.ok) return setErr(why.reason)
+      form.set('reason', why.id)
       const out = await saveHiringTalent(form)
       if (!out.ok) return setErr(out.reason)
       flash(name.trim() + ' saved to the Talent Bank')
@@ -151,16 +161,18 @@ export function MoveToTalentWindow({
             <span className={s.labelText}>Email</span>
             <input className={s.input} value={email} onChange={e => setEmail(e.target.value)} />
           </label>
-          <label className={s.label}>
-            <span className={s.labelText}>Reason *</span>
-            <Select bare className={s.select} value={reason} onChange={e => setReason(e.target.value as TalentReason)}>
-              {REASONS.map(x => (
-                <option key={x.id} value={x.id}>
-                  {x.label}
-                </option>
-              ))}
-            </Select>
-          </label>
+          <ReasonSelect
+            label="Reason *"
+            reasons={board.talentReasons}
+            value={reason}
+            newName={newReason}
+            canAdd={canAddReason}
+            onChange={v => {
+              setReason(v)
+              setErr('')
+            }}
+            onNewName={setNewReason}
+          />
           {guest ? null : (
             <label className={s.label}>
               <span className={s.labelText}>Department *</span>

@@ -5,10 +5,11 @@ import { Window } from '@/components/hrv/overlay'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { saveHiringCandidate } from '@/lib/hiring/actions'
-import { REASONS, outReason } from '@/lib/hiring/reasons'
+import { NEW_REASON, outReason, startReason } from '@/lib/hiring/reasons'
 import { STAGE, STAGE_ORDER, answerOf } from '@/lib/hiring/view'
-import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest, TalentReason } from '@/lib/hiring/types'
+import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
 import { FileRow, WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
+import { ReasonSelect, sendReason } from './ReasonSelect'
 import s from './hiring.module.css'
 
 /**
@@ -17,13 +18,15 @@ import s from './hiring.module.css'
  * note, their files, and "Change which fields appear here". Files (2026-10-11):
  * the ones on record, each to Remove (on Save), and new ones with their type
  * — uploaded, then filed with the rest on Save. Status turned to Not selected
- * asks why (2026-10-24): they are kept in the Talent Bank with it.
+ * asks why (2026-10-24): they are kept in the Talent Bank with it — one of HR's
+ * reasons, or a new one named here (Edit).
  */
 export default function CandidateWindow({
   board,
   request: r,
   state,
   canAddType,
+  canAddReason,
   onClose,
   onFields,
 }: {
@@ -32,6 +35,8 @@ export default function CandidateWindow({
   state: { mode: 'add' } | { mode: 'edit'; candidate: HiringCandidate } | null
   /** Hiring · Edit names new file types. */
   canAddType: boolean
+  /** …and new reasons. */
+  canAddReason: boolean
   onClose: () => void
   onFields: () => void
 }) {
@@ -39,7 +44,8 @@ export default function CandidateWindow({
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [stage, setStage] = useState<CandidateStage>('shortlisted')
-  const [reason, setReason] = useState<TalentReason>('not_shortlisted')
+  const [reason, setReason] = useState('')
+  const [newReason, setNewReason] = useState('')
   const [note, setNote] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [waiting, setWaiting] = useState<Waiting[]>([])
@@ -52,7 +58,8 @@ export default function CandidateWindow({
     setName(c?.name ?? '')
     setPhone(c?.phone ?? '')
     setStage(c?.stage ?? 'shortlisted')
-    setReason(outReason(c?.stage ?? 'shortlisted'))
+    setReason(startReason(board.talentReasons, outReason(c?.stage ?? 'shortlisted')))
+    setNewReason('')
     setNote(c?.note ?? '')
     setAnswers(c ? { ...c.answers } : {})
     setWaiting([])
@@ -66,7 +73,10 @@ export default function CandidateWindow({
     if (!name.trim()) return flash(editing ? 'Name can’t be empty' : 'Add the candidate’s name')
     const problem = waitingProblem(waiting)
     if (problem) return flash(problem)
+    if (asksWhy && reason === NEW_REASON && !newReason.trim()) return flash('Name the new reason.')
     start(async () => {
+      const why = asksWhy ? await sendReason(board.talentReasons, reason, newReason) : null
+      if (why && !why.ok) return flash(why.reason)
       const sent = await sendWaiting(waiting, board.fileTypes)
       if (!sent.ok) return flash(sent.reason)
       const form = new FormData()
@@ -75,7 +85,7 @@ export default function CandidateWindow({
       form.set('name', name)
       form.set('phone', phone)
       form.set('stage', stage)
-      if (asksWhy) form.set('reason', reason)
+      if (why?.ok) form.set('reason', why.id)
       form.set('note', note)
       form.set('answers', JSON.stringify(answers))
       form.set('files', JSON.stringify(sent.files))
@@ -119,16 +129,15 @@ export default function CandidateWindow({
             </Select>
           </label>
           {asksWhy ? (
-            <label className={s.label}>
-              <span className={s.labelText}>Why not selected</span>
-              <Select bare className={s.select} value={reason} onChange={e => setReason(e.target.value as TalentReason)}>
-                {REASONS.map(x => (
-                  <option key={x.id} value={x.id}>
-                    {x.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <ReasonSelect
+              label="Why not selected"
+              reasons={board.talentReasons}
+              value={reason}
+              newName={newReason}
+              canAdd={canAddReason}
+              onChange={setReason}
+              onNewName={setNewReason}
+            />
           ) : null}
           {board.candidateFields.map(f => (
             <label key={f.id} className={s.label}>

@@ -22,7 +22,7 @@ import { todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
 import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
 import { missingAnswers } from '@/lib/hiring/view'
-import { REASONS, outReason } from '@/lib/hiring/reasons'
+import { STARTING_REASONS, whyOrder } from '@/lib/hiring/reasons'
 import type { TalentReason } from '@/lib/hiring/types'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
@@ -797,16 +797,15 @@ function SheetLayer(p: {
   }
 
   if (sh.k === 'stage' && hr && sh.why) {
-    // Not selected keeps them in the Talent Bank: why — the one their stage says first.
-    const first = outReason(sh.cur)
+    // Not selected keeps them in the Talent Bank: why — HR's reasons that are on, the one their stage says first.
     const dot = CHIP[candChip('rejected').tone][1]
     return (
       <Sheet open eyebrow={hr.id} title={`Not selected · ${sh.name}`} sub="Why?" onClose={close}>
-        {[...REASONS].sort((a, b) => Number(b.id === first) - Number(a.id === first)).map(x => (
+        {whyOrder(d.hireReasons ?? STARTING_REASONS, sh.cur).map(x => (
           <button key={x.id} type="button" className={s.option} style={{ background: 'var(--ds-surface-2)' }}
             onClick={() => run(() => actions.candStage(hr.id, sh.cid, 'rejected', x.id), close, `${sh.name} · Not selected · kept in Talent Bank`)}>
             <span className={s.optionDot} style={{ background: dot }} />
-            <span style={{ flex: 1, fontWeight: 500 }}>{x.label}</span>
+            <span style={{ flex: 1, fontWeight: 500 }}>{x.name}</span>
           </button>
         ))}
         {err}
