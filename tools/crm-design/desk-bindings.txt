@@ -290,6 +290,7 @@ kMetrics
 kNote
 kPeople
 kPick
+kReports
 kSection
 kTeam
 kTopMove
@@ -379,6 +380,7 @@ railOn
 replyOn
 replyText
 replyWho
+reports
 resetAudit
 resetList
 resetMenu

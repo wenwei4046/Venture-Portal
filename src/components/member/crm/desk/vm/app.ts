@@ -20,6 +20,7 @@ import { channelsVM } from "./channels";
 import { showroomsVM } from "./showrooms";
 import { settingsVM } from "./settings";
 import { adsPerfVM } from "./adsperf";
+import { reportsVM } from "./reports-page";
 import { chatProgressVM } from "./chatprogress";
 import { chatVM } from "./chat";
 import { railVM } from "./rail";
@@ -71,6 +72,7 @@ export function deskVM(ctx: DeskCtx) {
     ...auditVM(ctx),
     ...channelsVM(ctx),
     ...adsPerfVM(ctx),
+    ...reportsVM(ctx),
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.
