@@ -200,6 +200,23 @@ describe('the cover and the pictures', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Change the photo' }).style.backgroundImage).toContain(`/files/marketing/${photo}`))
   })
 
+  it('one picture at a time: while the avatar goes up, every button that picks one waits — never a click that does nothing', async () => {
+    let arrive: (v: { data: { path: string }; error: null }) => void = () => {}
+    bucket.upload.mockImplementationOnce(() => new Promise(res => { arrive = res }))
+    render(<MySpace {...props({ space: spaceFromRow({ layout: [...DEFAULT_LAYOUT, { id: 'photo', x: 0, y: 364, w: 0.25, h: 182 }] }) })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Change profile picture' }))
+    pick(png('me.png'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add a photo' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toHaveTextContent('Add a photo')
+    expect(screen.getByRole('button', { name: /Change cover/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Change profile picture' })).toBeDisabled()
+
+    arrive({ data: { path: 'x' }, error: null })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add a photo' })).toBeEnabled())
+    expect(screen.getByRole('button', { name: /Change cover/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Change profile picture' })).toBeEnabled()
+  })
+
   it('not an image: said, nothing sent; a save refused: the picture taken back out of the bucket', async () => {
     render(<MySpace {...props()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Change profile picture' }))

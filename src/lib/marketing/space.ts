@@ -375,9 +375,12 @@ export function spacePatchOf(p: SpacePatch): Record<string, unknown> {
 }
 
 // ── Pictures ───────────────────────────────────────────────────────────────────────
+/** A space's pictures. One goes up at a time: while it does, every button that picks one waits. */
+export type SpacePicture = 'cover' | 'avatar' | 'photo' | 'pet'
+
 /** The cover, the avatar and one's own animal — space/<uuid>/<name>, which Marketing sees; the photo —
  * mine/<uuid>/<name>, which only its owner does (the bucket's policies, mig 20261024007600). */
-export const spacePicturePath = (kind: 'cover' | 'avatar' | 'photo' | 'pet', fileName: string, uuid: string) =>
+export const spacePicturePath = (kind: SpacePicture, fileName: string, uuid: string) =>
   `${kind === 'photo' ? 'mine' : 'space'}/${uuid}/${tidyFileName(fileName)}`
 
 /** A space's picture: an image, and not a large one. */

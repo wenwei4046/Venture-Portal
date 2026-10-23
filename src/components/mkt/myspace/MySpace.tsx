@@ -10,7 +10,7 @@ import type { MktNotice } from '@/lib/marketing/shell'
 import {
   addedTile, DEFAULT_LAYOUT, DEFAULT_THEME, formOf, knownAfter, newPiece, PET_NAME_MAX, PET_STATES, petState, pictureProblem, removedTile,
   ROOM_MAX_PIECES, sameLayout, spacePicturePath, twoAbreast, type Pet, type PetState, type PieceKind, type Room, type Space, type SpacePatch,
-  type SpaceTheme, type TileKind, type TilePlace,
+  type SpacePicture, type SpaceTheme, type TileKind, type TilePlace,
 } from '@/lib/marketing/space'
 import { createClient } from '@/lib/supabase/client'
 import NotesTile from './NotesTile'
@@ -33,7 +33,6 @@ import s from './myspace.module.css'
 // opens the pet's setup. What they change is saved as they change it (only that part); what is drawn is theirs from
 // then on — a page drawn again by the server never takes it back.
 
-type Picture = 'cover' | 'avatar' | 'photo' | 'pet'
 const PICTURE_KEY = { cover: 'coverPath', avatar: 'avatarPath', photo: 'photoPath', pet: 'petPath' } as const
 /** A layout or a room settles, words stop being typed: then it is saved. */
 const SETTLE_MS = { layout: 400, room: 400, pet: 600, status: 700, notes: 800 } as const
@@ -63,7 +62,7 @@ export default function MySpace(p: MySpaceProps) {
   const [space, setSpace] = useState<Space>(p.space)
   const [drawer, setDrawer] = useState<DrawerTab | null>(null)
   const [coverPop, setCoverPop] = useState(false)
-  const [sending, setSending] = useState<Picture | null>(null)
+  const [sending, setSending] = useState<SpacePicture | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [redo, setRedo] = useState(false)
   const [mood, setMood] = useState<PetState | null>(null)
@@ -73,7 +72,7 @@ export default function MySpace(p: MySpaceProps) {
   const timers = useRef(new Map<Later, ReturnType<typeof setTimeout>>())
   const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const picking = useRef<Picture | null>(null)
+  const picking = useRef<SpacePicture | null>(null)
   useEffect(() => { latest.current = space }, [space])
   useEffect(() => () => { if (moodTimer.current) clearTimeout(moodTimer.current) }, [])
 
@@ -224,7 +223,7 @@ export default function MySpace(p: MySpaceProps) {
     setSpace(cur => ({ ...cur, cover, coverPath: null }))
     void save({ cover, coverPath: null })
   }
-  const pick = (kind: Picture) => {
+  const pick = (kind: SpacePicture) => {
     if (sending) return
     picking.current = kind
     setCoverPop(false)
@@ -285,7 +284,7 @@ export default function MySpace(p: MySpaceProps) {
     delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
     week: { body: <WeekTile week={p.week} /> },
     notes: { bare: true, body: <NotesTile text={space.notes} canEdit={p.canEdit} onChange={t => change('notes', t)} onDone={() => flushKey('notes')} /> },
-    photo: { bare: true, body: <PhotoTile path={space.photoPath} canEdit={p.canEdit && !drawer} sending={sending === 'photo'} onPick={() => pick('photo')} /> },
+    photo: { bare: true, body: <PhotoTile path={space.photoPath} canEdit={p.canEdit && !drawer} sending={sending} onPick={() => pick('photo')} /> },
   }
   const setupOpen = p.hasPet && p.canEdit && (redo || !space.pet.onboarded)
 
@@ -301,7 +300,7 @@ export default function MySpace(p: MySpaceProps) {
       <div className={s.frame}>
         <div className={s.space}>
           <SpaceCover cover={space.cover} coverPath={space.coverPath} avatarPath={space.avatarPath} letter={p.letter} avatarBg={p.avatarBg}
-            canEdit={p.canEdit} sending={sending === 'pet' ? null : sending} popOpen={coverPop} onPop={setCoverPop} onPreset={presetCover}
+            canEdit={p.canEdit} sending={sending} popOpen={coverPop} onPop={setCoverPop} onPreset={presetCover}
             onPick={pick}
             pet={pet ? <PetNode species={pet.species} form={pet.form} img={pet.img} size={44} state={pet.state} color={pet.color} /> : null} />
           <div className={s.who}>
@@ -342,7 +341,7 @@ export default function MySpace(p: MySpaceProps) {
             onTheme={setTheme} onReset={reset} onDone={closeDrawer}
             room={
               <RoomDrawerTab room={room} selected={selected} onRoom={setRoom} onAddPiece={addPiece} onFlip={flipPiece} onRemovePiece={removePiece}
-                pet={p.hasPet ? space.pet : null} petPath={space.petPath} form={formOf(level)} sendingPet={sending === 'pet'}
+                pet={p.hasPet ? space.pet : null} petPath={space.petPath} form={formOf(level)} sending={sending}
                 onPet={setPet} onPetName={name => setPet({ name: name.slice(0, PET_NAME_MAX) })} onPetNameDone={() => flushKey('pet')}
                 onPickPet={() => pick('pet')} onClearPet={clearPetPicture} onRedo={redoSetup} />
             } />

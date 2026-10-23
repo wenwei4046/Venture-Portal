@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fileRoute } from '@/lib/storage/browser'
 import {
-  COVERS, NAME_IDEAS, PET_COLOR_NAMES, PET_COLORS, PET_NAME_MAX, SPECIES, SPECIES_KEYS, type Pet, type PetColor, type SpeciesKey,
+  COVERS, NAME_IDEAS, PET_COLOR_NAMES, PET_COLORS, PET_NAME_MAX, SPECIES, SPECIES_KEYS, type Pet, type PetColor, type SpacePicture, type SpeciesKey,
 } from '@/lib/marketing/space'
 import PetNode from './PetNode'
 import s from './myspace.module.css'
@@ -32,7 +32,7 @@ export interface OnboardingProps {
   avatarPath: string | null
   letter: string
   avatarBg: string
-  sending: 'cover' | 'avatar' | 'photo' | 'pet' | null
+  sending: SpacePicture | null
   onPickPet: () => void
   onUseKind: () => void
   onPreset: (cover: number) => void
@@ -92,7 +92,7 @@ export default function Onboarding(p: OnboardingProps) {
                 <span className={s.obKindEvo} aria-hidden="true">{SPECIES[k].forms.join(' → ')}</span>
               </button>
             ))}
-            <button type="button" role="radio" aria-checked={own} className={`${s.obKind} ${s.obOwn}`} disabled={p.sending === 'pet'}
+            <button type="button" role="radio" aria-checked={own} className={`${s.obKind} ${s.obOwn}`} disabled={p.sending != null}
               onClick={() => { setOwn(true); setSpecies(null); p.onPickPet() }}>
               <span className={s.obOwnIcon} aria-hidden="true">⬆</span>
               <span className={s.obKindName}>My own animal</span>
@@ -104,10 +104,12 @@ export default function Onboarding(p: OnboardingProps) {
         {step === 1 ? (
           <>
             {preview('idle')}
-            <input className={s.obName} value={name} maxLength={PET_NAME_MAX} placeholder="Give your pet a name" aria-label="Pet's name"
-              onChange={e => setName(e.target.value.slice(0, PET_NAME_MAX))} />
-            <div className={s.chips}>
-              {NAME_IDEAS.map(n => <button key={n} type="button" className={s.chip} onClick={() => setName(n)}>{n}</button>)}
+            <div className={s.obNameBox}>
+              <input className={s.obName} value={name} maxLength={PET_NAME_MAX} placeholder="Give your pet a name" aria-label="Pet's name"
+                onChange={e => setName(e.target.value.slice(0, PET_NAME_MAX))} />
+              <div className={s.chips}>
+                {NAME_IDEAS.map(n => <button key={n} type="button" className={s.chip} onClick={() => setName(n)}>{n}</button>)}
+              </div>
             </div>
           </>
         ) : null}
@@ -138,7 +140,7 @@ export default function Onboarding(p: OnboardingProps) {
                   className={s.coverOpt} data-cover={String(i)} onClick={() => p.onPreset(i)} />
               ))}
             </div>
-            <button type="button" className={s.dashBtn} disabled={p.sending === 'cover'} onClick={() => p.onPick('cover')}>
+            <button type="button" className={s.dashBtn} disabled={p.sending != null} onClick={() => p.onPick('cover')}>
               {p.sending === 'cover' ? 'Uploading…' : '⬆ Upload your own cover image'}
             </button>
           </>
@@ -146,11 +148,11 @@ export default function Onboarding(p: OnboardingProps) {
 
         {step === 4 ? (
           <div className={s.obAvatarRow}>
-            <button type="button" className={s.obAvatar} style={{ background: p.avatarBg }} aria-label="Upload a photo" disabled={p.sending === 'avatar'}
+            <button type="button" className={s.obAvatar} style={{ background: p.avatarBg }} aria-label="Upload a photo" disabled={p.sending != null}
               onClick={() => p.onPick('avatar')}>
               {face}
             </button>
-            <button type="button" className={s.btnLine} disabled={p.sending === 'avatar'} onClick={() => p.onPick('avatar')}>
+            <button type="button" className={s.btnLine} disabled={p.sending != null} onClick={() => p.onPick('avatar')}>
               {p.sending === 'avatar' ? 'Uploading…' : '⬆ Upload a photo'}
             </button>
           </div>

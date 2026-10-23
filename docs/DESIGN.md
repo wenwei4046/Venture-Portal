@@ -1711,12 +1711,13 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
 
 - **Theme.** Its own, light whatever the theme: `.mkt-shell` in `globals.css` — channels `--mk-*` (ink 51 36 27, app ground 243 243 241, sidebar 248 245 240, brown 90 62 43 for what is picked, the primary `#EC9B55` / `#E0893F` with ink lettering), the handoff's four statuses (Overdue · Waiting · Done · Draft, each a ground, an edge, words and a dot), the teams' chips (Content · Social Media · Design · Ads · Brand · the manager) and a meeting's blue. Everything is sized in em from the base the Appearance panel picks. Chivo Mono for Track IDs and dates (`--mk-mono`).
 - **The shell** (`components/mkt/shell`): the sidebar 248px (folds to 64; the H tile or « toggles it) — HOUZS Marketing and the number of subsidiaries, the avatar (the account menu: Change password, Change email, My documents, IT support, Sign out), rows on 28px emoji tiles in four tones (sand, mist, peach, cream), the picked row on `236 229 219` with a 3px brown mark, red count pills (a dot on the tile while folded), Subsidiaries opening its list (a 7px dot and the emoji, those with something for the viewer first), MANAGER TOOLS under a rule, at the foot My claims, Meeting Rooms and Settings. The top bar: 60px, white, radius 16, 10px in — the crumb, the search (440 × 36, ⌘K), then Me and the memo bell for a personal login, the Principal's view switch, the 🔔 with its red count. The page on a white card, radius 16, 10px in. Panels: Notifications 380px from the top right; Appearance 320px at the foot (S / M / L / XL, Inter / Nunito / IBM Plex, Compact / Comfortable, Reset).
-- **My Space** (`/marketing`; its own side `My Space Bento.dc.html`, ⑦-1):
+- **My Space** (`/marketing`; its own side `My Space Bento.dc.html`, ⑦-1 and ⑦-2):
   - **The cover** is 190px: one of four gradients, or a picture. *🖼️ Change cover* (top right) opens the four, the one shown ringed in the accent, and *⬆ Upload a cover image*.
-  - **The 96px avatar** sits on the cover: a picture, or the first letter on the team's colour. A click picks another.
-  - **Under the cover**: the name (1.6em/600) with the role, then the status — a box with a dashed underline, *Set a status*, 80 characters at most. **✥ Edit layout** is on the right, walnut while on.
+  - **The 96px avatar** sits on the cover: a picture, or the first letter on the team's colour. A click picks another. Its owner's pet (44px) stands beside it, on the cover's lower edge.
+  - **Under the cover**: the name (1.6em/600) with the role, then the status — a box with a dashed underline, *Set a status*, 80 characters at most — and, muted, *· Mochi Lv 1 · 💻 Working*. **✥ Edit layout** is on the right, walnut while on.
   - **The greeting**: *Good morning, Mei ☀️ — you have 2 things on your plate*.
   - **The board** is as its owner laid it out. Each tile sits where it was put: across as a share of the width, down in px, 12px apart. The tiles:
+    - 🏠 The room (2×2, top left on a first board)
     - My turn (its cards two abreast when the tile is half the board or wider)
     - Waiting on others
     - Delegated by me
@@ -1734,7 +1735,30 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
     - *Reset layout and theme*
     - **Done**, in the accent
   - **Under 520px wide** the tiles go one under another.
-  - The room, the pet, the lobby and chat come with ⑦-2 onwards.
+  - **The room** fills its tile, edge to edge:
+    - The wall in its colour (Peach, Sage, Sky, Blush, Cream, Night — `--mk-room-*`).
+    - A window at 7% / 12%, 30% high and 20% wide (34% in a narrow tile), framed 6px white (Night: dusk violet). Its sky is day, the evening from 18:00, or night on the Night wall, with 🌤️ or 🌙.
+    - The floor: the lower 30%, boards 56px wide (Oak, Walnut, Tile, Grass, Carpet — `--mk-floor-*`), under a 6px skirting.
+    - The furniture: emoji with a 3px drop shadow, on the floor or hung at 56% up, smaller in a short (0.55) or narrow (0.75) tile. While decorating a piece takes a grab cursor, and the picked one a dashed ring in the accent.
+    - The pet walks the floor, 2.6s from spot to spot.
+    - *🏠 My room* (top left) and *🎨 Decorate* (top right) are white pills at 90%.
+  - **The pet** is an emoji of its kind and form (or one's own animal), its colour a filter, a soft shadow under it, a bubble over it for its mood (❗ 💻 💦 💤 ✨). Each mood has its motion: a slow 3px bob (*Chilling*), a hop (*New task!*), a rocking (*Working*), a shiver (*Overloaded*), slow breathing (*Sleeping*), a spin for *Level up!*.
+  - **The drawer's tabs** — *Layout* · *🎨 Room & pet* — sit in a grey pill at its top, the open one white:
+    - *Wall* and *Floor* as 34px swatches.
+    - *Add furniture*: four columns of 20px emoji with a 10px name.
+    - The picked piece in a bar, with *⇋ Flip* and *Remove* (red).
+    - *Your pet*: the name box, the kinds as chips, a dashed *⬆ Upload your animal*, the three forms (the one now outlined in the accent, the later ones faded), the seven colours as 24px circles (the chosen one ringed in ink), *Redo pet setup*.
+  - **The setup** opens over a blurred 45% ink scrim, on a white 620px panel (radius 20, 28 × 32 in):
+    - The steps as 24px numbered circles joined by lines: the step now outlined in ink, those done filled in ink with ✓. Under 520px only the step now keeps its name.
+    - The title, 1.5em/600, with no line under it.
+    - Pet: the four kinds as cards (a 48px emoji, the name, its forms *🐱 → 🐈 → 🦁*) and a dashed *Upload a picture*.
+    - Name: a box and six ideas as chips.
+    - Colour: 48px swatches, *Pick a colour to continue.* in red when skipped.
+    - Cover: a 110px preview and the four presets.
+    - Photo: the avatar with *⬆ Upload a photo*.
+    - The foot: *← Back*, *Skip*, and **Continue →** / **Finish →** in the primary.
+  - **Uploading**: while one picture goes up, every button that picks one is disabled; the one going up says *Uploading…*.
+  - The lobby, chat, the trophies and the pet's levels come with ⑦-3 onwards.
 - **Calendar** (`/marketing/calendar`): the month's name 1.85em with ‹ › and Today, *Only mine*, ▦ Month · ▥ Week · ☰ List; the layers (📣 Posts · ⏱ Stage due dates · 🗓️ Shoots & meetings, with the month's counts), the subsidiary chips, the legend; the month grid (Monday first, cells 124px, today on a brown disc, three items then *+N more*), the week's seven columns, the list by day; a 320px panel for the item or the day picked, *Open task*. A stage's due date is a white card with a dashed edge in its status.
 - **Projects** (`/marketing/projects`, not drawn by the handoff): the Calendar's head and chips, a search, Open · Done · All, and the List's table — Project (title, Track ID · kind), Subsidiary, Stage, Now with, Due, Status.
 - **Tracking Dashboard** (`/marketing/tracking`, the manager's): 📊 and the title, 👥 By people · 🔀 By workflow; This week · This month · Custom, subsidiary, workflow and person; five cards — Ongoing, Needs you, Overdue, At risk, On track — that filter by state; a card per person (load against capacity in slots, *Now on* with its stage segments and days on the stage, *Also on*, on-time % and days per stage, *Only …*); by workflow, the people's load strip and a lane per workflow with a column per stage, the slowest flagged 🐢. *Nudge* on a person's card tells them about their task that waits on them most (once an hour).
@@ -1761,6 +1785,7 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
 
 ## Part IV — Version index
 
+- **v4.143** · 2026-10-23 · **My Space's room and pet** (the handoff's `My Space Bento.dc.html`, its room and the first visit): the 🏠 room tile — wall, window and its sky, floor, furniture, the pet walking about, *🎨 Decorate*; the pet beside the avatar and on the status line, its bubble and motion for its mood; the drawer's *Layout* · *🎨 Room & pet* tabs (Wall, Floor, Add furniture, ⇋ Flip / Remove, Your pet); the five-step setup (Pet, Name, Colour, Cover, Photo) (#this) → Marketing's view — its shell and first pages
 - **v4.142** · 2026-10-23 · **My Space laid out by its owner** (the handoff's `My Space Bento.dc.html`, its own side, first part): the cover (four gradients or a picture — *🖼️ Change cover*), the avatar (a picture), the status; **✥ Edit layout** — every tile dragged anywhere and resized from eight handles, ✕ / 🔒, the drawer's *Add a tile*, *Page background*, *Accent*, *Tile corners*, *Reset layout and theme*, **Done**; 📝 Notes and 🖼️ Photo; under 520px the tiles one under another (#673) → Marketing's view — its shell and first pages
 - **v4.141** · 2026-10-23 · **A Library file on a task** (the handoff's *Attach to task* · *Attach from Library*): a file's ··· *Attach to task* — its subsidiary's open tasks with their Track IDs and *Now at …*; on the task page, 📚 *Library files* under Requirements — chips opening the Library's own file, ×, **+ Attach from Library** (the subsidiary's file folders, those on the task ticked already, *Attach n files*) (#665) → Marketing's view — its shell and first pages
 - **v4.140** · 2026-10-23 · **A Library guest link** (the handoff's *Share link*): the dialog — *Create link*, then the address with **Copy**, *Link expires* 24 hours · 7 days · 30 days · Never, *Allow download*, *Stop link*; the stranger's page `/l/<code>` in the `.mkt-pic` palette — the brand's banner, the item, its files shown in place or saved when allowed, *View only*, *This link is closed* (#664) → Marketing's view — its shell and first pages

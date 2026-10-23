@@ -2,7 +2,7 @@
 
 import {
   CATALOG, FLOOR_NAMES, FLOORS, FORM_LEVELS, PET_COLOR_NAMES, PET_COLORS, PET_NAME_MAX, PIECES, SPECIES, SPECIES_KEYS, WALL_NAMES, WALLS,
-  type Pet, type PieceKind, type Room,
+  type Pet, type PieceKind, type Room, type SpacePicture,
 } from '@/lib/marketing/space'
 import s from './myspace.module.css'
 
@@ -22,7 +22,8 @@ export interface RoomDrawerTabProps {
   pet: Pet | null
   petPath: string | null
   form: number
-  sendingPet: boolean
+  /** A picture on its way up: *⬆ Upload your animal* waits for it. */
+  sending: SpacePicture | null
   onPet: (patch: Partial<Pet>) => void
   onPetName: (name: string) => void
   onPetNameDone: () => void
@@ -90,8 +91,8 @@ export default function RoomDrawerTab(p: RoomDrawerTabProps) {
             ))}
           </div>
           <div className={s.petUpload}>
-            <button type="button" className={s.dashBtn} disabled={p.sendingPet} onClick={p.onPickPet}>
-              {p.sendingPet ? 'Uploading…' : '⬆ Upload your animal'}
+            <button type="button" className={s.dashBtn} disabled={p.sending != null} onClick={p.onPickPet}>
+              {p.sending === 'pet' ? 'Uploading…' : '⬆ Upload your animal'}
             </button>
             {p.petPath ? <button type="button" className={s.selBtn} onClick={p.onClearPet}>Remove</button> : null}
           </div>
