@@ -9,6 +9,7 @@ import {
   reasonsNeeded, REASON_MAX, REASON_MIN, stageEditable, unassigned, type PlanDraft, type PlanStage,
 } from '@/lib/marketing/plan'
 import type { MktTaskPage, PlanAppr } from '@/lib/marketing/task'
+import { picNames } from '@/lib/marketing/clients'
 import type { PickPerson } from '@/lib/marketing/tasks'
 import { personBg } from '../builder/people'
 import s from './plan.module.css'
@@ -45,7 +46,9 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const p = page.project
-  const pic = page.sub?.pic || p.pic
+  // The project's own PICs (its company's when it started — the user's answer 29: one or two).
+  const pic = picNames(p.pic || page.sub?.pic, p.pic2)
+  const two = !!p.pic2
   const nameOf = (id: string | null | undefined) => (id ? people.find(x => x.id === id)?.first ?? approvers.find(x => x.id === id)?.first ?? 'someone' : '')
   const person = (id: string | null | undefined) => people.find(x => x.id === id) ?? approvers.find(x => x.id === id)
   const dates = planDates(draft, holidays)
@@ -247,7 +250,15 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
                             ) : (
                               <span className={s.appr} title="Approvers are always locked">
                                 <span>{a.kind === 'pic' ? '🔗' : '👤'}</span>
-                                <span className={s.apprName}>{a.kind === 'pic' ? `PIC · ${pic || 'the PIC'}` : nameOf(a.staff)}</span>
+                                <span className={s.apprName}>{a.kind === 'pic' ? `${two && a.all ? 'Both PICs' : 'PIC'} · ${pic || 'the PIC'}` : nameOf(a.staff)}</span>
+                                {/* Two PICs: either one's approval, or both (set per approval — the user's answer 29). */}
+                                {a.kind === 'pic' && two ? (
+                                  <button type="button" className={`${s.apprToggle}${a.all ? ` ${s.apprToggleOn}` : ''}`} aria-pressed={!!a.all}
+                                    aria-label={a.all ? 'Both PICs approve — make it either' : 'Either PIC approves — make it both'} disabled={!ed.people}
+                                    onClick={() => upd(i, { appr: st.appr.map((x, j) => (j === k && x.kind === 'pic' ? (x.all ? { kind: 'pic' } : { kind: 'pic', all: true }) : x)) })}>
+                                    {a.all ? 'Both' : 'Either'}
+                                  </button>
+                                ) : null}
                                 <span className={s.lockSmall} aria-hidden="true">🔒</span>
                                 {ed.people ? (
                                   <button type="button" className={s.apprX} aria-label={`Remove ${a.kind === 'pic' ? 'the PIC' : nameOf(a.staff)}`}

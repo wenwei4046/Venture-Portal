@@ -14,7 +14,11 @@ import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type
 
 /** An approval level as a deliverable's template has it (②b-2a): a person, the PIC on the link, or one the manager picks
  * at assignment. */
-export type PlanAppr = { kind: 'person'; staff: string } | { kind: 'pic' } | { kind: 'assign' }
+export type PlanAppr = { kind: 'person'; staff: string } | { kind: 'pic'; all?: boolean } | { kind: 'assign' }
+
+/** The PICs' approvals kept while an approval waits for both (a stage's at its version and level, the minutes' for their
+ * sending — mig 20261025035000): whose ("1" · "2"), by name. */
+export type PicOk = Partial<Record<'1' | '2', { name: string; at: string | null }>>
 
 export interface TaskStage extends MktStage {
   mode: 'person' | 'assign' | 'prev'
@@ -23,6 +27,8 @@ export interface TaskStage extends MktStage {
   extra: string | null
   /** Its approval levels, one picked at assignment included. */
   levels: PlanAppr[]
+  /** The PICs' approvals of this version at this level (mig 20261025035000). */
+  picOk: PicOk | null
   form: FormField[]
   back: number | null
   work: StageWork
@@ -87,6 +93,8 @@ export interface TaskProject extends MktProject {
   deliv: TaskDeliv | null
   /** A deliverable's template is locked: every stage the manager's to assign, no subtasks. */
   locked: boolean
+  /** The project's second PIC (the user's answer 29), null for none. */
+  pic2: string | null
 }
 
 export interface MktTaskPage {
@@ -145,8 +153,9 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       cands: Array.isArray(s.cands) ? s.cands.filter((c): c is string => typeof c === 'string') : [],
       extra: typeof s.extra === 'string' && s.extra ? s.extra : null,
       levels: (Array.isArray(s.appr) ? s.appr : []).filter(isObj).flatMap((a): PlanAppr[] =>
-        a.kind === 'pic' ? [{ kind: 'pic' }] : a.kind === 'assign' ? [{ kind: 'assign' }]
+        a.kind === 'pic' ? [a.all === true ? { kind: 'pic', all: true } : { kind: 'pic' }] : a.kind === 'assign' ? [{ kind: 'assign' }]
           : a.kind === 'person' && typeof a.staff === 'string' ? [{ kind: 'person', staff: a.staff }] : []),
+      picOk: picOkFromRow(s.picOk),
       form: formFromRow(spec.form),
       back: typeof spec.back === 'number' ? spec.back : null,
       work: workFromRow(s.work),
@@ -177,7 +186,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
     sub: isObj(v.sub) ? subFromRow(v.sub) : null,
     project: {
       ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free),
-      parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true,
+      parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true, pic2: strOrNull(p.pic2),
     },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
@@ -248,10 +257,22 @@ export function nameOf(team: readonly MktPerson[], id: string | null | undefined
   return p ? p.first || p.full : '—'
 }
 
-/** "👤 Rachel → 👤 Daniel" · "🔗 PIC" · "— no approval". */
+/** "👤 Rachel → 👤 Daniel" · "🔗 PIC" · "🔗 Both PICs" · "— no approval". */
 export function approvalText(team: readonly MktPerson[], s: MktStage): string {
   if (!s.appr.length) return '— no approval'
-  return s.appr.map(a => (a.kind === 'pic' ? '🔗 PIC' : `👤 ${nameOf(team, a.staff)}`)).join(' → ')
+  return s.appr.map(a => (a.kind === 'pic' ? (a.all ? '🔗 Both PICs' : '🔗 PIC') : `👤 ${nameOf(team, a.staff)}`)).join(' → ')
+}
+
+/** Who a PIC level waits for, by the project's own PICs (the user's answer 29): "Kelvin (PIC)"; either of two —
+ * "Kelvin or Hana (PIC)"; both — "Kelvin and Hana (PIC)", or, one of them in, the one still to answer. */
+export function picApprover(p: { pic: string | null; pic2: string | null }, sub: { pic: string | null } | null, all: boolean, ok: PicOk | null): string {
+  const one = (p.pic || sub?.pic || '').trim()
+  const two = (p.pic2 || '').trim()
+  if (!two) return `${one || 'the PIC'} (PIC)`
+  if (!all) return `${one || 'the PIC'} or ${two} (PIC)`
+  if (ok?.['1'] && !ok['2']) return `${two} (PIC) · ${ok['1'].name || one} approved`
+  if (ok?.['2'] && !ok['1']) return `${one} (PIC) · ${ok['2'].name || two} approved`
+  return `${one} and ${two} (PIC)`
 }
 
 export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
@@ -263,7 +284,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const open = p.status === 'active' && !isSeries && !notYet && !!cur
   const owner = cur ? nameOf(team, cur.owner) : '—'
   const appr = cur ? approverNow(cur) : null
-  const approver = appr ? (appr.kind === 'pic' ? `${page.sub?.pic || 'the PIC'} (PIC)` : nameOf(team, appr.staff)) : '—'
+  const approver = appr ? (appr.kind === 'pic' ? picApprover(p, page.sub, appr.all === true, cur?.picOk ?? null) : nameOf(team, appr.staff)) : '—'
   const amOwner = open && !!me && cur.owner === me
   const working = amOwner && (cur.status === 'accepted' || cur.status === 'changes')
   const amApprover = open && cur.status === 'review' && appr?.kind === 'person' && !!me && appr.staff === me
@@ -403,6 +424,20 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
 
 /** "23 Oct 09:14", on the office's clock. */
 export const trailTime = (at: string) => (at ? officeTime(at).format('D MMM HH:mm') : '')
+
+export function picOkFromRow(v: unknown): PicOk | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  const out: PicOk = {}
+  for (const k of ['1', '2'] as const) {
+    const x = r[k]
+    if (x && typeof x === 'object' && !Array.isArray(x)) {
+      const o = x as Record<string, unknown>
+      out[k] = { name: typeof o.name === 'string' ? o.name : '', at: typeof o.at === 'string' ? o.at : null }
+    }
+  }
+  return Object.keys(out).length ? out : null
+}
 
 function parentFromRow(v: unknown): TaskProject['parentProject'] {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null

@@ -188,3 +188,27 @@ describe('two PICs — the second one’s link (②b-2d-2a, the user’s answer 
     expect(screen.queryByText(/^You approved/)).toBeNull()
   })
 })
+
+describe('an approval asking both PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const ok1 = { '1': { name: 'Kelvin Tan', at: '2026-10-24T03:00:00Z' } }
+  it('the minutes, the first PIC’s approval in: they read whom it waits for, and have nothing more to answer', () => {
+    render(<PicPage code={CODE} initial={page({ you: 1, pic: 'Kelvin', other: 'Hana Lee', both: true, ok: ok1 })} />)
+    expect(screen.getAllByText('Waiting for Hana Lee').length).toBeGreaterThan(0)
+    expect(screen.getByText('You approved the minutes. They go ahead once Hana Lee approves too.')).toBeTruthy()
+    expect(screen.getByText('You approved · waiting for Hana Lee')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+  })
+  it('…the second PIC reads the first’s approval in, and answers', () => {
+    render(<PicPage code={CODE} initial={page({ you: 2, pic: 'Hana Lee', other: 'Kelvin', both: true, ok: ok1 })} />)
+    expect(screen.getByText('Kelvin Tan approved the minutes. They go ahead once you approve too.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy()
+  })
+  it('a stage: the other PIC’s approval of this version shown above the answer', () => {
+    render(<PicPage code={CODE} initial={page({ you: 2, pic: 'Hana Lee', other: 'Kelvin', status: 'active',
+      reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-24T03:00:00Z', pic: 1 },
+      work: [{ id: 'd1', title: 'Image post 1/2', status: 'active', stages: 1, done: 0,
+        stage: { idx: 0, name: 'Design', status: 'review', ver: 2, waiting: true, both: true, ok: ok1, fields: [], links: [] }, last: null }] })} />)
+    expect(screen.getByText('Kelvin Tan approved this version — waiting for you')).toBeTruthy()
+    expect(within(screen.getByLabelText('Image post 1/2')).getByRole('button', { name: 'Approve' })).toBeTruthy()
+  })
+})

@@ -104,6 +104,10 @@
 .apprPick { border-color: rgb(var(--mk-red-line)); color: rgb(var(--mk-red)); background: rgb(var(--mk-red-soft)); cursor: pointer; padding: 0 10px; }
 .apprName { font-weight: 500; }
 .lockSmall { font-size: 10px; }
+/* Two PICs: Either / Both on the PIC level (②b-2d-2b) — a small pill inside the chip, ink when both. */
+.apprToggle { height: 18px; padding: 0 7px; border-radius: 9px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.apprToggle:disabled { cursor: default; }
+.apprToggleOn { background: rgb(var(--mk-ink)); border-color: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); }
 .apprX { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; cursor: pointer; color: rgb(var(--mk-muted)); font: inherit; padding: 0; }
 .apprX:hover { background: rgb(var(--mk-line-3)); }
 .addLevel { height: 28px; padding: 0 8px; border-radius: 7px; border: 1px dashed rgb(var(--mk-line)); display: flex; align-items: center; font: inherit; font-size: .84em; color: rgb(var(--mk-muted)); cursor: pointer; white-space: nowrap; background: transparent; }

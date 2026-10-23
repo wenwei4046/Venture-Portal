@@ -5,7 +5,7 @@
 
 import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { delivFromRow, trailTime, type TaskDeliv, type Tone } from './task'
+import { delivFromRow, picOkFromRow, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -61,6 +61,8 @@ export interface ProductProjectPage {
     link: string | null
     /** The second PIC's own link: made with the minutes sent, or once they are named after. */
     link2: string | null
+    /** Whose approvals the minutes have while they wait for both PICs (mig 20261025035000). */
+    picOk: PicOk | null
     linkSentAt: string | null
     picReply: PicReply | null
     override: { by: string; at: string | null; reason: string } | null
@@ -161,6 +163,7 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
       whatsapp2: str(p.whatsapp2),
       link: strOrNull(p.link),
       link2: strOrNull(p.link2),
+      picOk: picOkFromRow(p.picOk),
       linkSentAt: strOrNull(p.linkSentAt),
       picReply: reply
         ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at),
@@ -416,4 +419,16 @@ export function productEventText(e: { actor: string; action: string; reason: str
 /** The trail newest first, in the store's words. */
 export function productTrail(page: Pick<ProductProjectPage, 'project' | 'trail'>): { key: string; t: string; text: string }[] {
   return page.trail.map((e, i) => ({ key: `${e.at}:${i}`, t: trailTime(e.at), text: productEventText(e, page.project.product) }))
+}
+
+/** While the minutes wait for both PICs (the template's *Both PICs sign off*, two PICs on the project — ②b-2d-2b): whose
+ * approval is in and whom they wait for; null when nobody's is in yet, or either PIC's counts. */
+export function bothWaiting(page: Pick<ProductProjectPage, 'project' | 'minutes'>): string | null {
+  const pr = page.project
+  const doc = page.minutes.find(m => m.intake) ?? page.minutes[0]
+  if (pr.status !== 'waiting_pic' || !doc?.template.rules.picAll || !pr.pic2 || !pr.picOk) return null
+  const one = pr.picOk['1'], two = pr.picOk['2']
+  if (one && !two) return `${one.name || pr.pic} approved · waiting for ${pr.pic2}`
+  if (two && !one) return `${two.name || pr.pic2} approved · waiting for ${pr.pic || 'the PIC'}`
+  return null
 }

@@ -5,7 +5,7 @@
 
 import { officeTime } from '@/lib/office-time'
 import { shortDay } from './board'
-import type { Tone } from './task'
+import { picOkFromRow, type PicOk, type Tone } from './task'
 
 export type PicStatus = 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done'
 const STATUSES: readonly PicStatus[] = ['waiting_pic', 'changes', 'approved', 'active', 'paused', 'done']
@@ -37,10 +37,15 @@ export interface PicPage {
   other: string | null
   /** The last answer on the minutes — either PIC's, `pic` saying whose. */
   reply: { decision: 'approved' | 'changes'; name: string; reason: string; at: string | null; pic: PicNo } | null
-  /** Waiting again because something they see changed after they approved: which fields. */
-  updated: { fields: string; at: string | null } | null
+  /** Waiting again because something they see changed after an approval: which fields — and whether the approval taken
+   * back was this PIC's (`mine`), or only the other's (`by`, their name — ②b-2d-2b). */
+  updated: { fields: string; at: string | null; mine: boolean; by: string | null } | null
   /** Waiting again after the changes they asked for: what they asked. */
   asked: { reason: string; at: string | null } | null
+  /** The minutes wait for both PICs (the template asks it, the project has two — mig 20261025035000), and whose
+   * approvals this sending has. */
+  both: boolean
+  ok: PicOk | null
   minutes: { title: string; fields: PicField[] }
   /** The work (②b-2d): each deliverable planned, and its stage now. */
   work: PicWork[]
@@ -68,8 +73,11 @@ export interface PicWork {
     dueOn: string | null
     /** The version the team sent — their answer names it. */
     ver: number
-    /** Waiting for the PIC's approval now. */
+    /** Waiting for THIS PIC's approval now — no longer, on a level asking both, once they approved. */
     waiting: boolean
+    /** Its level asks both PICs, and whose approvals this version has. */
+    both: boolean
+    ok: PicOk | null
     note: string | null
     fields: PicWorkField[]
     links: { url: string; label: string }[]
@@ -83,6 +91,17 @@ export type PicNo = 1 | 2
 const picNo = (v: unknown): PicNo => (v === 2 ? 2 : 1)
 /** "Kelvin Tan (PIC)" as the trail names a PIC — their name alone. */
 const bare = (name: string) => name.replace(/ \(PIC\)$/, '')
+
+/** Where an approval asking both PICs stands for the one holding this link: they approved (and it waits for the other),
+ * or the other did (and it waits for them) — else null (either PIC's counts, or nobody's is in yet). */
+export function bothState(both: boolean, ok: PicOk | null, you: PicNo, other: string | null): { mine: true; other: string } | { mine: false; theirs: string } | null {
+  if (!both || !ok) return null
+  const me = String(you) as '1' | '2'
+  const them = String(3 - you) as '1' | '2'
+  if (ok[me]) return { mine: true, other: other || 'the other PIC' }
+  if (ok[them]) return { mine: false, theirs: ok[them]?.name || other || 'The other PIC' }
+  return null
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -131,6 +150,8 @@ function workFromRow(w: Record<string, unknown>): PicWork {
       dueOn: strOrNull(s.dueOn),
       ver: n(s.ver),
       waiting: s.waiting === true,
+      both: s.both === true,
+      ok: picOkFromRow(s.ok),
       note: strOrNull(s.note),
       fields: (Array.isArray(s.fields) ? s.fields : []).filter(isObj).map(f => ({ name: str(f.name), type: str(f.type), value: workValue(str(f.type), f.value) })),
       links: (Array.isArray(s.links) ? s.links : []).filter(isObj).filter(l => /^https:\/\//i.test(str(l.url))).map(l => ({ url: str(l.url), label: str(l.label) })),
@@ -166,8 +187,10 @@ export function picPageFromRow(v: unknown): PicPage | null {
       ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at),
           pic: picNo(reply.pic) }
       : null,
-    updated: updated ? { fields: str(updated.fields), at: strOrNull(updated.at) } : null,
+    updated: updated ? { fields: str(updated.fields), at: strOrNull(updated.at), mine: updated.mine !== false, by: strOrNull(updated.by) } : null,
     asked: asked ? { reason: str(asked.reason), at: strOrNull(asked.at) } : null,
+    both: v.both === true,
+    ok: picOkFromRow(v.ok),
     minutes: {
       title: str(minutes.title),
       fields: (Array.isArray(minutes.fields) ? minutes.fields : []).filter(isObj)
@@ -178,11 +201,14 @@ export function picPageFromRow(v: unknown): PicPage | null {
 }
 
 /** Where a deliverable stands, in the PIC's words — the changes theirs, or the other PIC's (`you` — whose link). */
-export function workState(w: PicWork, today: string, you: PicNo = 1): { label: string; tone: Tone } {
+export function workState(w: PicWork, today: string, you: PicNo = 1, other: string | null = null): { label: string; tone: Tone } {
   if (w.status === 'done') return { label: 'Done', tone: 'done' }
   if (w.status === 'paused') return { label: 'Paused', tone: 'draft' }
   if (w.startsOn && today && w.startsOn > today) return { label: `Starts ${shortDay(w.startsOn)}`, tone: 'draft' }
   if (w.stage?.waiting) return { label: 'Waiting for your approval', tone: 'waiting' }
+  // A level asking both PICs, theirs in: it waits for the other (②b-2d-2b).
+  const both = w.stage && w.stage.status === 'review' ? bothState(w.stage.both, w.stage.ok, you, other) : null
+  if (both?.mine) return { label: `Waiting for ${both.other}`, tone: 'waiting' }
   if (w.stage?.status === 'changes' && w.last?.action === 'pic changes') {
     return { label: w.last.pic === you ? 'The team is making your changes' : `The team is making ${bare(w.last.name)}’s changes`, tone: 'draft' }
   }
@@ -224,11 +250,20 @@ export function picStatus(status: PicStatus): { label: string; tone: Tone } {
 
 /** The banner under the title: why it waits for them, or that nothing does — red, the handoff's *Overdue — please
  * review*, once it has waited 4 working hours (2026-10-24 — the user's answer 2). */
-export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'> & Partial<Pick<PicPage, 'you' | 'reply'>>, overdue = false): { tone: Tone; title: string; text: string } | null {
+export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'> & Partial<Pick<PicPage, 'you' | 'reply' | 'both' | 'ok' | 'other'>>, overdue = false): { tone: Tone; title: string; text: string } | null {
   if (p.status === 'waiting_pic') {
     const late = (title: string) => (overdue ? 'Overdue — please review' : title)
     const tone: Tone = overdue ? 'red' : 'waiting'
-    if (p.updated) return { tone, title: late('Updated after your approval — please review again'), text: `The team changed ${p.updated.fields || 'the minutes'}.` }
+    // Both PICs sign off (②b-2d-2b): theirs is in — it waits for the other; or the other's is — it waits for them.
+    const both = bothState(!!p.both, p.ok ?? null, p.you ?? 1, p.other ?? null)
+    if (both?.mine) return { tone: 'waiting', title: `Waiting for ${both.other}`, text: `You approved the minutes. They go ahead once ${both.other} approves too.` }
+    if (both && !both.mine) return { tone, title: late('Waiting for your approval'), text: `${both.theirs} approved the minutes. They go ahead once you approve too.` }
+    // Changed after an approval: theirs — or only the other PIC's, whom it names (②b-2d-2b).
+    if (p.updated) {
+      return p.updated.mine
+        ? { tone, title: late('Updated after your approval — please review again'), text: `The team changed ${p.updated.fields || 'the minutes'}.` }
+        : { tone, title: late('Updated — please review'), text: `The team changed ${p.updated.fields || 'the minutes'} after ${p.updated.by || 'the other PIC'} approved.` }
+    }
     // The changes were theirs, or the other PIC's (the reply resent still says whose).
     const asker = p.reply && p.reply.pic !== (p.you ?? 1) ? p.reply.name : 'You'
     if (p.asked) return { tone, title: late('Updated — please review again'), text: `${asker} asked: “${p.asked.reason}”` }
@@ -242,7 +277,7 @@ export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: str
 
 /** The progress: the meeting, the minutes sent, their approval, the work. Minutes that asked no sign-off never went to
  * the PIC (no sending, no answer) — the team completed them; the link is theirs for the work (②b-2d). */
-export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you'>> & { work?: readonly PicWork[] }): PicStep[] {
+export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other'>> & { work?: readonly PicWork[] }): PicStep[] {
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
   if (approved && !p.sentAt && !p.reply) {
     return [
@@ -253,7 +288,11 @@ export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' |
   }
   // The answer was theirs, or the other PIC's (either one's counts — the user's answer 29).
   const other = p.reply && p.reply.pic !== (p.you ?? 1) ? p.reply.name : null
-  const yours: PicStep = p.status === 'waiting_pic' ? { label: 'Your approval', state: 'cur', date: '', sub: 'Waiting for you' }
+  // Both PICs sign off (②b-2d-2b): whose approval is in while the minutes wait.
+  const both = bothState(!!p.both, p.ok ?? null, p.you ?? 1, p.other ?? null)
+  const yours: PicStep = p.status === 'waiting_pic'
+    ? both?.mine ? { label: `Waiting for ${both.other}`, state: 'cur', date: '', sub: 'You approved the minutes' }
+      : { label: 'Your approval', state: 'cur', date: '', sub: both ? `${both.theirs} approved — waiting for you` : 'Waiting for you' }
     : p.status === 'changes' ? { label: other ? `The team is making ${other}’s changes` : 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
     : { label: other ? `${other} approved the minutes` : 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
   return [

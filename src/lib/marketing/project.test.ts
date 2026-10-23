@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attendeesOf, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
+  attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
   productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage,
 } from './project'
 
@@ -18,7 +18,7 @@ const FIELDS = [
   { name: 'Budget note', type: 'Short text', req: false, pic: false, lock: false },
   { name: 'Signatures', type: 'Signature', req: true, pic: true, lock: false },
 ]
-const RULES = { sign: true, pic: true, project: true, file: true, lock: true }
+const RULES = { sign: true, pic: true, picAll: false, project: true, file: true, lock: true }
 
 function page(project: Record<string, unknown> = {}, minutes: Record<string, unknown> = {}, trail: object[] = []): ProductProjectPage {
   return productProjectFromRow({
@@ -202,5 +202,18 @@ describe('the save and the link', () => {
     expect(linkUrl('https://venture.example/', 'abc')).toBe('https://venture.example/t/abc')
     expect(whatsappUrl('+60 12-345 6789', 'Hi Kelvin: https://x/t/abc')).toBe('https://wa.me/60123456789?text=Hi%20Kelvin%3A%20https%3A%2F%2Fx%2Ft%2Fabc')
     expect(whatsappUrl('12', 'x')).toBeNull()
+  })
+})
+
+describe('the minutes waiting for both PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const both = { ...RULES, picAll: true }
+  it('says whose approval is in and whom they wait for — only while they wait, with two PICs, the template asking both', () => {
+    const pp = (project: Record<string, unknown>, rules = both) => page({ status: 'waiting_pic', pic2: 'Hana', ...project }, { template: { id: 't1', version: 1, name: 'Kickoff', fields: FIELDS, rules } })
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBe('Kelvin Tan approved · waiting for Hana')
+    expect(bothWaiting(pp({ picOk: { '2': { name: 'Hana Lee', at: null } } }))).toBe('Hana Lee approved · waiting for Kelvin')
+    expect(bothWaiting(pp({ picOk: null }))).toBeNull()
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }, RULES))).toBeNull()
+    expect(bothWaiting(pp({ pic2: null, picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
+    expect(bothWaiting(pp({ status: 'approved', picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
   })
 })

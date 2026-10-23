@@ -125,9 +125,9 @@ const ACME = (await one(`SELECT public.mkt_sub_add('Acme Sdn Bhd', 'Kelvin')`)).
 await one(`SELECT public.mkt_sub_edit($1, $2::jsonb)`, [ACME, JSON.stringify({ whatsapp: '0123456789', pic2: 'Hana Lee', whatsapp2: '0132221111' })])
 
 // A product project for it, its minutes sent; its two links.
-async function started() {
+async function started(product = prod.id) {
   await as(U.josiah, MANAGER)
-  const s = await one(`SELECT public.mkt_product_start($1, $2)`, [ACME, prod.id])
+  const s = await one(`SELECT public.mkt_product_start($1, $2)`, [ACME, product])
   const rev = await peek1(`SELECT rev FROM public.mkt_minutes WHERE id = $1`, [s.minutes])
   await one(`SELECT public.mkt_minutes_fill($1, $2, $3::jsonb)`, [s.minutes, rev, JSON.stringify({ vals: { Attendees: [S.josiah] } })])
   const sent = await one(`SELECT public.mkt_minutes_send($1, $2)`, [s.minutes, rev + 1])
@@ -232,5 +232,76 @@ p1 = await stageAnswer(A.l1, 2, 'approve', 'Kelvin Tan')
 check([p1.work[0].status, p1.work[0].stage.status], ['done', 'done'], 'both in: the stage done')
 check((await peek(`SELECT data FROM public.mkt_events WHERE project_id = $1 AND action = 'pic approved' ORDER BY id`, [D])).map(e => [e.data.pic, e.data.waiting ?? null]),
   [[1, 'Hana Lee'], [2, 'Kelvin'], [1, null]], 'the trail: each approval, the first of a version waiting for the other')
+
+// The other PIC taken off while a level waits for both, one approval in: it waits for the PIC left again — never
+// stuck with nobody to answer it (their link closed, the first's page saying they approved).
+A = await started()
+await asStranger()
+await answer(A.l1, 'approve', 'Kelvin Tan')
+await answer(A.l2, 'approve', 'Hana Lee')
+await as(U.josiah, MANAGER)
+await one(`SELECT public.mkt_product_begin($1)`, [A.id])
+const E = await peek1(`SELECT id FROM public.mkt_projects WHERE parent_id = $1`, [A.id])
+await one(`SELECT public.mkt_deliverable_plan($1, $2::jsonb)`, [E, plan([{ kind: 'pic', all: true }])])
+await as(U.ali, STAFF)
+await one(`SELECT public.mkt_stage_accept($1)`, [E])
+await one(`SELECT public.mkt_stage_save($1, '{"vals":{"Final image":"https://canva.com/e1"}}'::jsonb)`, [E])
+await one(`SELECT public.mkt_stage_submit($1)`, [E])
+await asStranger()
+p1 = await one(`SELECT public.mkt_pic_stage_answer($1, $2, 1, 'approve', 'Kelvin Tan', NULL)`, [A.l1, E])
+check(p1.work[0].stage.waiting, false, 'the first PIC approved: no longer waiting for them')
+await as(U.josiah, MANAGER)
+const mrev = await peek1(`SELECT rev FROM public.mkt_minutes WHERE id = $1`, [A.minutes])
+await one(`SELECT public.mkt_minutes_fill($1, $2, $3::jsonb)`, [A.minutes, mrev, JSON.stringify({ pic2: null, whatsapp2: null })])
+await asStranger()
+p1 = await one(`SELECT public.mkt_pic_page($1)`, [A.l1])
+check([p1.work[0].stage.waiting, p1.work[0].stage.both], [true, false], 'the second PIC taken off: it waits for the first again')
+p1 = await one(`SELECT public.mkt_pic_stage_answer($1, $2, 1, 'approve', 'Kelvin Tan', NULL)`, [A.l1, E])
+check(p1.work[0].stage.status, 'done', '…and their approval settles it')
+
+// An edit the PICs see while the minutes wait for both, one's approval in: it takes that approval back — and each PIC's
+// page says whose it was.
+const fillOf = async (id, patch) => {
+  await as(U.josiah, MANAGER)
+  const r = await peek1(`SELECT rev FROM public.mkt_minutes WHERE id = $1`, [id])
+  const out = await one(`SELECT public.mkt_minutes_fill($1, $2, $3::jsonb)`, [id, r, JSON.stringify(patch)])
+  await asStranger()
+  return out
+}
+A = await started()
+await asStranger()
+await answer(A.l1, 'approve', 'Kelvin Tan')
+let fill = await fillOf(A.minutes, { pic: 'Kelvin T.' })
+p1 = await one(`SELECT public.mkt_pic_page($1)`, [A.l1])
+p2 = await one(`SELECT public.mkt_pic_page($1)`, [A.l2])
+check([fill.reapproval, p1.status, p1.ok, p1.updated?.mine, p2.updated?.mine, p2.updated?.by], [true, 'waiting_pic', null, true, false, 'Kelvin Tan'],
+  'an edit while it waits for both takes the approval in back; the first PIC reads it was theirs, the second whose')
+check((await peek(`SELECT data FROM public.mkt_events WHERE project_id = $1 AND action = 'edited after approval'`, [A.id])).map(e => e.data.took),
+  [[{ pic: 1, name: 'Kelvin Tan' }]], 'the trail keeps whose approval the edit took back')
+p1 = await answer(A.l1, 'approve', 'Kelvin Tan')
+check(p1.status, 'waiting_pic', '…so the first approves again, and it waits for the second')
+fill = await fillOf(A.minutes, { pic: 'Kelvin Tan' })
+check(fill.reapproval, true, '…and again an edit takes it back')
+fill = await fillOf(A.minutes, { pic: 'Kelvin' })
+check(fill.reapproval, false, 'nobody’s approval in: an edit asks nothing again')
+
+// Either PIC's approval counts (the rule off): approved by the first, then edited — only they read "after your approval".
+await as(U.josiah, MANAGER)
+const either = await one(`SELECT public.mkt_minutes_save(NULL, NULL, $1::jsonb)`, [JSON.stringify({ name: 'Kickoff (either)', fields: FIELDS,
+  rules: { sign: false, pic: true, picAll: false, project: true, file: true, lock: false } })])
+await one(`SELECT public.mkt_minutes_publish($1, $2)`, [either.id, either.rev])
+const prod2 = await one(`SELECT public.mkt_product_save(NULL, NULL, '{"kind":"one"}'::jsonb)`)
+const ps2 = await one(`SELECT public.mkt_product_save($1, 1, $2::jsonb)`, [prod2.id, JSON.stringify({ name: 'Post pack (either)', intake: either.id, price: 500,
+  effectiveFrom: TODAY, groups: [{ name: 'Graphic design', items: [{ name: 'Image post', qty: 1, price: 500, workflow: wf.id }] }] })])
+await one(`SELECT public.mkt_product_publish($1, $2)`, [prod2.id, ps2.rev])
+const B = await started(prod2.id)
+await asStranger()
+p2 = await answer(B.l2, 'approve', 'Hana Lee')
+check(p2.status, 'approved', 'either PIC’s approval: approved')
+await fillOf(B.minutes, { pic: 'Kelvin T.' })
+p1 = await one(`SELECT public.mkt_pic_page($1)`, [B.l1])
+p2 = await one(`SELECT public.mkt_pic_page($1)`, [B.l2])
+check([p1.status, p1.updated?.mine, p1.updated?.by, p2.updated?.mine], ['waiting_pic', false, 'Hana Lee', true],
+  'edited after the second PIC’s approval: they read it was theirs, the first whose it was')
 
 console.log(`marketing both PICs: ${checks} checks passed`)

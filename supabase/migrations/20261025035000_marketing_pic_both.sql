@@ -10,11 +10,13 @@
 -- mkt_stages + pic_ok — a stage's: { ver, lvl, "1": …, "2": … }; another version's or level's are stale.
 -- Replaced from production's bodies (md5 equal — 20261025034000's, 20261025032000's, 20261023235800's):
 --   mkt_minutes_check     the rules keep picAll (only with pic)
---   mkt_minutes_fill      both PICs signing off: a second PIC named or changed after approval approves again
+--   mkt_minutes_fill      both PICs signing off: a second PIC named or changed after approval approves again; an edit
+--                         the PICs see while one's approval is in takes it back; the trail keeps whose it took back
 --   mkt_pic_answer        both: the first approval kept, the minutes wait for the other's ("You approved already" to a
 --                         second answer of the same PIC); both in — approved, as before
 --   mkt_pic_stage_answer  the same for a stage's level that asks both
 --   mkt_pic_page          + both / ok for the minutes; a stage's both / ok, and waiting only for the PIC yet to answer
+--                         (while the level still has two to ask); an edit's `updated` says whether it took back theirs
 --   mkt_product_project   + picOk — whose approvals the minutes have now
 --   mkt_project           + the project's second PIC; a stage's picOk
 --   mkt_deliverable_plan  the PIC level keeps all; one PIC level a stage
@@ -141,6 +143,8 @@ DECLARE
   v_signed  jsonb;
   v_by      text;
   v_reapp   boolean := false;
+  v_ok      jsonb;
+  v_took    jsonb;
 BEGIN
   PERFORM public.mkt_need(ARRAY['marketing.manage'], 'Writing the minutes is the manager''s.');
   IF jsonb_typeof(v_patch) IS DISTINCT FROM 'object' THEN
@@ -238,14 +242,24 @@ BEGIN
   v_att := public.mkt_minutes_attendees(v_mv.fields, v_vals);
   v_signed := coalesce((SELECT jsonb_object_agg(k, v) FROM jsonb_each(v_m.signed) s(k, v) WHERE k::uuid = ANY (v_att)), '{}'::jsonb);
 
-  -- Approved, then changed where the PIC sees: the PIC approves again.
-  IF v_m.intake AND v_p.status = 'approved' AND coalesce((v_mv.rules -> 'pic') = 'true'::jsonb, false)
-     AND cardinality(v_seen) > 0 THEN
+  -- Approved, then changed where the PIC sees: the PIC approves again. So too while the minutes wait for both PICs with
+  -- one's approval in (②b-2d-2b): what they approved changed — theirs no longer counts. The trail keeps whose approvals
+  -- the edit took back (`took`), so each PIC's page says whether it was theirs.
+  v_ok := CASE WHEN v_p.pic_ok ->> 'sent' = (extract(epoch FROM v_p.link_sent_at))::text THEN v_p.pic_ok - 'sent' ELSE '{}'::jsonb END;
+  IF v_m.intake AND coalesce((v_mv.rules -> 'pic') = 'true'::jsonb, false) AND cardinality(v_seen) > 0
+     AND (v_p.status = 'approved' OR (v_p.status = 'waiting_pic' AND v_ok <> '{}'::jsonb)) THEN
     v_reapp := true;
+    v_took := CASE WHEN v_ok <> '{}'::jsonb
+                   THEN (SELECT jsonb_agg(jsonb_build_object('pic', e.k::integer, 'name', e.v ->> 'name') ORDER BY e.k)
+                           FROM jsonb_each(v_ok) e(k, v) WHERE e.k IN ('1', '2'))
+                   WHEN v_p.pic_reply ->> 'decision' = 'approved'
+                   THEN jsonb_build_array(jsonb_build_object('pic', CASE WHEN v_p.pic_reply ->> 'pic' = '2' THEN 2 ELSE 1 END,
+                                                             'name', v_p.pic_reply ->> 'name'))
+                   ELSE '[]'::jsonb END;
     UPDATE public.mkt_projects SET status = 'waiting_pic', link_sent_at = now(), pic_reply = NULL, updated_at = now()
      WHERE id = v_p.id;
     PERFORM public.mkt_log(v_p.id, 'edited after approval', p_reason => array_to_string(v_seen, ', '),
-                           p_data => jsonb_build_object('fields', to_jsonb(v_seen)));
+                           p_data => jsonb_build_object('fields', to_jsonb(v_seen), 'took', coalesce(v_took, '[]'::jsonb)));
   END IF;
   IF v_patch ? 'pic' OR v_patch ? 'whatsapp' OR v_patch ? 'pic2' OR v_patch ? 'whatsapp2' THEN
     -- The second PIC's own link: made when they are named once the link has gone out, gone when they are taken off.
@@ -586,7 +600,14 @@ BEGIN
     'both', coalesce((v_mv.rules -> 'picAll') = 'true'::jsonb, false) AND nullif(btrim(coalesce(v_p.pic2_name, '')), '') IS NOT NULL,
     'ok', CASE WHEN v_p.pic_ok ->> 'sent' = (extract(epoch FROM v_p.link_sent_at))::text THEN v_p.pic_ok - 'sent' END,
     'updated', CASE WHEN v_p.status = 'waiting_pic' AND v_last.action = 'edited after approval'
-                    THEN jsonb_build_object('fields', v_last.reason, 'at', v_last.at) END,
+                    THEN jsonb_build_object('fields', v_last.reason, 'at', v_last.at,
+                           -- Whose approval the edit took back (②b-2d-2b): this PIC's — or only the other's, named. An
+                           -- edit from before there were two took back the one PIC's.
+                           'mine', jsonb_typeof(v_last.data -> 'took') IS DISTINCT FROM 'array'
+                                   OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_last.data -> 'took') t WHERE t ->> 'pic' = v_you::text),
+                           'by', CASE WHEN jsonb_typeof(v_last.data -> 'took') = 'array'
+                                      THEN (SELECT t ->> 'name' FROM jsonb_array_elements(v_last.data -> 'took') t
+                                             WHERE t ->> 'pic' IS DISTINCT FROM v_you::text LIMIT 1) END) END,
     'asked', CASE WHEN v_p.status = 'waiting_pic' AND v_last.action = 'resent' AND v_p.pic_reply ->> 'decision' = 'changes'
                   THEN jsonb_build_object('reason', v_p.pic_reply ->> 'reason', 'at', v_p.pic_reply ->> 'at') END,
     'minutes', jsonb_build_object('title', v_m.title, 'fields', v_out),
@@ -600,10 +621,13 @@ BEGIN
                'done', (SELECT count(*) FROM public.mkt_stages s WHERE s.project_id = d.id AND s.status = 'done'),
                'stage', (SELECT jsonb_build_object(
                            'idx', s.idx, 'name', s.name, 'status', s.status, 'dueOn', s.due_on, 'ver', s.ver,
-                           -- Waiting for THIS PIC: a level asking both waits no longer for the one who approved.
+                           -- Waiting for THIS PIC: a level asking both waits no longer for the one who approved — while
+                           -- it still has two to ask (the other taken off, it waits for the one left again, never stuck).
                            'waiting', s.status = 'review' AND s.appr -> s.appr_idx ->> 'kind' = 'pic'
-                                      AND NOT coalesce(s.pic_ok ->> 'ver' = s.ver::text AND s.pic_ok ->> 'lvl' = s.appr_idx::text
-                                                       AND s.pic_ok ? v_you::text, false),
+                                      AND NOT (coalesce(s.appr -> s.appr_idx ->> 'all' = 'true', false)
+                                               AND nullif(btrim(coalesce(v_p.pic2_name, '')), '') IS NOT NULL
+                                               AND coalesce(s.pic_ok ->> 'ver' = s.ver::text AND s.pic_ok ->> 'lvl' = s.appr_idx::text
+                                                            AND s.pic_ok ? v_you::text, false)),
                            'both', s.appr -> s.appr_idx ->> 'kind' = 'pic' AND coalesce(s.appr -> s.appr_idx ->> 'all' = 'true', false)
                                    AND nullif(btrim(coalesce(v_p.pic2_name, '')), '') IS NOT NULL,
                            'ok', CASE WHEN s.pic_ok ->> 'ver' = s.ver::text AND s.pic_ok ->> 'lvl' = s.appr_idx::text

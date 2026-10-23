@@ -104,6 +104,8 @@
 /* Completion rules */
 .rule { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: 0; border-top: 1px solid rgb(var(--mk-line-4)); background: rgb(var(--mk-white)); font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .rule:hover { background: rgb(var(--mk-surface)); }
+/* A rule beneath another (Both PICs sign off under PIC signs off): stepped in under its switch. */
+.ruleUnder { padding-left: 46px; border-top-style: dashed; }
 .ruleName { font-size: .9em; font-weight: 500; }
 
 /* The foot */

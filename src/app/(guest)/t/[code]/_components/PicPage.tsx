@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
-  dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
+  bothState, dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
 } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
 import PicWork from './PicWork'
@@ -69,12 +69,14 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
     )
   }
 
-  const status = picStatus(page.status)
-  const overdue = !!now && page.status === 'waiting_pic' && !!page.sentAt && workingHours(page.sentAt, now, new Set()) >= ACCEPT_HOURS
+  // Both PICs sign off (②b-2d-2b): theirs in, the minutes wait for the other — nothing more to answer here.
+  const both = page.status === 'waiting_pic' ? bothState(page.both, page.ok, page.you, page.other) : null
+  const status = both?.mine ? { label: `Waiting for ${both.other}`, tone: 'waiting' as Tone } : picStatus(page.status)
+  const overdue = !!now && page.status === 'waiting_pic' && !both?.mine && !!page.sentAt && workingHours(page.sentAt, now, new Set()) >= ACCEPT_HOURS
   const banner = picBanner(page, overdue)
   const answered = picAnswered(page)
   const steps = picTimeline(page)
-  const waiting = page.status === 'waiting_pic'
+  const waiting = page.status === 'waiting_pic' && !both?.mine
   const go = (to: typeof step) => {
     setError(null)
     setStep(to)
@@ -141,6 +143,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
                 ))}
               </dl>
 
+              {both?.mine ? <div className={s.workLast}>You approved · waiting for {both.other}</div> : null}
               {waiting && step === 'choose' ? (
                 <div className={s.choose}>
                   <button type="button" className={`${s.btn} ${s.approve}`} onClick={() => go('approve')}>Approve</button>

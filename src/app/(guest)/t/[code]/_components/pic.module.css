@@ -100,6 +100,8 @@
 .workMeta { font-size: 12px; color: rgb(var(--pk-muted)); }
 .workStage { margin-top: 8px; font-size: 13px; font-weight: 600; }
 .workNote { font-size: 13px; color: rgb(var(--pk-text-2)); padding: 8px 10px; border-radius: 8px; background: rgb(var(--pk-page)); }
+/* The other PIC's approval in, on a level asking both (②b-2d-2b): green, as done. */
+.workBoth { font-size: 13px; font-weight: 500; color: rgb(var(--pk-done)); padding: 8px 10px; border-radius: 8px; background: rgb(var(--pk-done-bg)); }
 .workItem .fields { padding: 0; }
 .workItem .choose, .workItem .step { padding-left: 0; padding-right: 0; }
 .workItem .step { margin: 4px -16px -12px; padding: 16px; }
