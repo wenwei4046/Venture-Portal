@@ -7,7 +7,7 @@
  */
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Ic, type Icon4a } from "../shared/icons4a";
-import { usePanelOpen } from "./panel-state";
+import { usePanelOpenOn } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
 import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
@@ -175,10 +175,12 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
         {extra}
         {/* v2 (2026-10-23, the owner: "全部根据新设计"; supersedes 2026-10-18's bell alone): CRM alerts is the outline button
             with the bell, its words, and an orange dot + oxblood count when some are unread. */}
-        <button type="button" onClick={f4.openAlerts} aria-label="CRM alerts" style={{ ...BTN, height: "36px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
-          font: "500 13px Inter, sans-serif", boxSizing: "border-box", border: "1px solid var(--crm-line)", whiteSpace: "nowrap", color: "var(--crm-ink)" }} className="crm4a-outline">
-          <Ic name="bell" size={15} />CRM alerts
-          {f4.alertsN && <><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--crm-orange)" }} /><span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-oxblood)" }}>{f4.alertsN}</span></>}
+        {/* The owner, 2026-10-23 (testing v2): "改成小铃铛即可" — the bell alone in a 36 px outline square, the unread count on its corner. */}
+        <button type="button" onClick={f4.openAlerts} aria-label="CRM alerts" title="CRM alerts" style={{ ...BTN, position: "relative", width: "36px", height: "36px", borderRadius: "7px", display: "grid", placeItems: "center",
+          boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">
+          <Ic name="bell" size={16} />
+          {f4.alertsN && <span style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", display: "grid", placeItems: "center",
+            background: "var(--crm-rust)", color: "#fff", font: "600 10px Inter, sans-serif", fontVariantNumeric: "tabular-nums", boxShadow: "0 0 0 2px #fff" }}>{f4.alertsN}</span>}
         </button>
         {h.cta && (
           <span style={{ position: "relative" }}>
@@ -603,7 +605,7 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
         )}
       </div>
       {v.ppHasChips && (
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", margin: "12px 0 14px" }}>
           {v.ppChips.map(c => <button key={c.label} type="button" onClick={c.clear} style={{ ...BTN, height: "26px", padding: "0 10px", borderRadius: "13px", display: "flex", alignItems: "center", gap: "6px",
             font: "500 12px Inter, sans-serif", background: "var(--crm-cream)", color: "var(--crm-ink)" }}>{c.label}<Ic name="x" size={11} /></button>)}
           <button type="button" onClick={v.ppClear} style={{ ...BTN, padding: "0 4px", font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Clear all</button>
@@ -730,7 +732,8 @@ export function CollapseBtn4a({ onClick }: { onClick: () => void }) {
  * its foot. Nobody picked: who still lacks property info, each opening its customer. Open at first, kept per browser.
  */
 function ContactSelected4a({ s }: { s: RailSide }) {
-  const [open, toggle] = usePanelOpen("contacts-selected", true);
+  // A name clicked in the table opens the panel even when it was folded (the owner, 2026-10-23: "点名字后可以看到 customer info & open chat").
+  const [open, toggle] = usePanelOpenOn("contacts-selected", s.has ? s.name : null, true);
   if (!open) return <FoldedRail4a icon="user-round" label="Selected" open={toggle} />;
   const KICK2: CSSProperties = { font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" };
   const row = (k: string, val: ReactNode, c?: string) => (
@@ -1170,8 +1173,10 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     );
   };
   const C = v.apChartV;
+  // The header band and every row run the whole width of the columns however many metrics are added (the owner,
+  // 2026-10-23: "要 full cover 不管加多少指标") — the rows sit in a max-content box inside the sideways scroller.
   const table = (
-    <div style={{ display: "flex", flexDirection: "column", overflowX: "auto", minWidth: 0 }}>
+    <div style={{ overflowX: "auto", minWidth: 0 }}><div style={{ display: "flex", flexDirection: "column", width: "max-content", minWidth: "100%" }}>
       <div style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", padding: "9px 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)", borderBottom: "1px solid var(--crm-nav-line)",
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
         <span style={{ position: "relative", minWidth: 0, display: "flex" }}><button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button><Resize id="ad" /></span>
@@ -1198,7 +1203,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
         {A.total.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} total />)}
         <span />
       </div>
-    </div>
+    </div></div>
   );
   if (!C) return table;
   // The chart, then the ads one by one — each folds to its head (the owner, 2026-10-23: "下方的个别数据及图片做成可展开收缩").

@@ -13,3 +13,10 @@ export function usePanelOpen(name: string, dflt = true): [boolean, () => void] {
   const toggle = useCallback(() => setOpen(o => { const n = !o; try { localStorage.setItem(key, n ? "1" : "0"); } catch { /* storage refused */ } return n; }), [key]);
   return [open, toggle];
 }
+
+/** The same, opened again whenever `when` changes to something (a customer picked in the table opens the panel even if it was folded). */
+export function usePanelOpenOn(name: string, when: string | null, dflt = true): [boolean, () => void] {
+  const [open, toggle] = usePanelOpen(name, dflt);
+  useEffect(() => { if (when && !open) toggle(); }, [when]); // eslint-disable-line react-hooks/exhaustive-deps
+  return [open, toggle];
+}

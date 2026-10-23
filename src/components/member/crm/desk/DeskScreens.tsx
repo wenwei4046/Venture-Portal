@@ -278,13 +278,15 @@ export default function DeskScreens(p: DeskScreensProps) {
 
   // Ads Performance reads Ads Manager's figures for the range on screen (and the compare range) — spend, cost per lead …
   // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
-  const apNeedKey = JSON.stringify(v.apNeed ?? []);
+  // …and Assignment's Ad performance tab, for the ad open there (2026-10-23).
+  const needs = [...((v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]), ...(ui.tab === "assignment" && ui.adPane === "perf" ? v.adMetaNeed ?? [] : [])];
+  const apNeedKey = JSON.stringify(needs);
   // …on Ads Performance, and on Reports › Ads performance, which draws the same table (2026-10-23).
-  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads");
+  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads") || (ui.tab === "assignment" && ui.adPane === "perf");
   const asked = useRef(new Set<string>());
   useEffect(() => {
     if (!adsOn || !live || !data.can.manage) return;
-    for (const n of (v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]) {
+    for (const n of needs) {
       const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
       if (!ids.length) continue;
       ids.forEach(id => asked.current.add(`${n.key}|${id}`));

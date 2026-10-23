@@ -11,7 +11,7 @@
  */
 import type { CSSProperties } from "react";
 import type { DeskCtx, HistRow } from "./ctx";
-import { crmFigures } from "./adsperf";
+import { crmFigures, isoOf, metaFigures } from "./adsperf";
 import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
@@ -77,13 +77,19 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const per = PER.find(p => p[0] === ui.adPer) ?? PER[2];
   const f = ad ? crmFigures(ad.cs, ctx, per[2], per[3]) : {};
   const leads = (f.leads as number) ?? 0, appt = (f.appt as number) ?? 0;
-  // Meta's figures (spend, reach, clicks) wait for Meta Ads (README › Data sources): "—" until connected.
+  // Ads Manager's own figures for the ad and the range (the owner, 2026-10-23: "assignment 的广告成效也要出现"): read as Ads
+  // Performance reads them (fetchAdInsights into ui.apMeta, "from|to"; DeskScreens asks for adMetaNeed) — "—" until they come.
+  const mkey = `${isoOf(per[2])}|${isoOf(per[3])}`, mFig = ad ? ui.apMeta?.[mkey]?.[ad.id] : undefined;
+  const M = metaFigures([mFig], { leads, appt, won: (f.won as number) ?? 0 });
+  const adMetaNeed = ad && ad.id && !(ad.id in (ui.apMeta?.[mkey] ?? {})) ? [{ key: mkey, since: isoOf(per[2]), until: isoOf(per[3]), ids: [ad.id] }] : [];
+  const rm = (n: number | null | undefined) => (n == null ? "—" : `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   const pc = (a: number | null, b: number | null) => (a == null || !b ? "—" : `${((a / b) * 100).toFixed(a / b < 0.1 ? 1 : 0)}%`);
-  const FN: [string, number | null, string][] = [["Reach", null, ""], ["Clicks", null, "— of reach"], ["Leads", leads, "— of clicks"], ["Appointments", appt, `${pc(appt, leads)} of leads`]];
-  const mx = Math.max(1, leads);
+  const reach = (M.reach as number | null | undefined) ?? null, clicks = (M.clicks as number | null | undefined) ?? null;
+  const FN: [string, number | null, string][] = [["Reach", reach, ""], ["Clicks", clicks, `${pc(clicks, reach)} of reach`], ["Leads", leads, `${pc(leads, clicks)} of clicks`], ["Appointments", appt, `${pc(appt, leads)} of leads`]];
+  const mx = Math.max(1, reach ?? 0, clicks ?? 0, leads);
   const adFunnel = FN.map(([k, n, sub], i) => ({ k, n: n == null ? "—" : n.toLocaleString("en-MY"), sub, w: n ? Math.max(3, Math.round(Math.sqrt(n / mx) * 100)) : 0, color: ["var(--crm-line)", "var(--crm-st-won)", "var(--crm-rust)", "var(--crm-brown)"][i] }));
-  const adCosts = [["Cost per click", "—"], ["Cost per lead", "—"], ["Cost per appointment", "—"], ["Click-through rate", "—"]].map(([k, v]) => ({ k, v }));
-  const adSumRows = [["Spend", "RM —", ""], ["Leads", String(leads), ""], ["Cost per lead", "—", ""], ["Appointments", String(appt), leads ? `${Math.round((appt / leads) * 100)}% of leads` : ""]].map(([k, v, sub]) => ({ k, v, sub }));
+  const adCosts = [["Cost per click", rm(M.cpc)], ["Cost per lead", rm(M.cpl)], ["Cost per appointment", rm(M.cpappt)], ["Click-through rate", M.ctr == null ? "—" : `${(M.ctr as number).toFixed(2)}%`]].map(([k, v]) => ({ k, v }));
+  const adSumRows = [["Spend", M.spend == null ? "RM —" : rm(M.spend as number), ""], ["Leads", String(leads), ""], ["Cost per lead", rm(M.cpl), ""], ["Appointments", String(appt), leads ? `${Math.round((appt / leads) * 100)}% of leads` : ""]].map(([k, v, sub]) => ({ k, v, sub }));
   // The custom range's calendar: this month, days after today greyed.
   const t0 = ui.adCustT ?? { ...cu, step: 0 };
   const first = new Date(now.getFullYear(), now.getMonth(), 1), lead = (first.getDay() + 6) % 7, days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -231,7 +237,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     adTeams,
     applyChk: ui.applyChk, toggleApplyChk: () => patch({ applyChk: !ui.applyChk }), applyChkLabel: `Also apply to all ${shownN || ads.length}${noun} ads`,
     saveOrApply: () => (ui.applyChk ? as.applyAll : as.saveAd)(),
-    adSum: { rows: adSumRows }, adFunnel, adCosts,
+    adSum: { rows: adSumRows }, adFunnel, adCosts, adMetaNeed,
     adPerLabel: per[0] === "Custom" ? per[1] : per[0], adPerOpen: ui.adPerOpen, adPerBg: ui.adPerOpen ? "var(--crm-tint-attention)" : "#fff",
     adPerToggle: () => patch({ adPerOpen: !ui.adPerOpen, adCal: false }),
     adPerOpts: PER.map(([label, range]) => { const on = label === per[0]; return { label, range, bg: on ? "var(--crm-sel)" : "transparent", w: on ? 650 : 500,
