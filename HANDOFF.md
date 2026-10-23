@@ -1,5 +1,31 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-23 f (OPEN — waiting on the user) — where a report opens onto its ledger lines
+
+Session 0cbfb699 (Finance user; reply in 华语 — memory `reply-in-mandarin-always`) shipped c (#620 hub cards in a
+row), d (#625 Create payment's lines + mig 20261022183000) and e (#627 Revenue's payroll by account in the Cash
+Flow) — all live. Then: "然后关于点看detail ledger 的 我想要优化。顺便确定现在哪里有着点开看detail 的功能？" →
+answered where it is (below) and offered A / B / C → the user: "set a checkpoint 然后move 去下个context window".
+**Next: ask which (or what they want) and show a before / after sample first — nothing built.**
+
+- **Opens onto its lines now (desktop Reports):** P&L, Cash Flow, Receipt & Payment in a single month —
+  `reports/_components/GlReportView.tsx` passes `drill={!asAt}` to `SheetReport.tsx`; an account's ▸ expands its
+  journal lines inline: `JE no · DD MMM`, `description · party`, amount (`report-sheet.ts` `txnsOf`, from
+  `gl-reports.ts` `GlTxn`: entryNo / description / party). The lines are text only — no way on to the voucher or
+  JE. Trial Balance: an account's name links to `/reports/ledger?code=…` (General Ledger, that account). General
+  Ledger: pick accounts + dates → every line.
+- **Does not:** Balance Sheet (As at); Monthly P&L / Monthly Cash Flow / Monthly Receipt & Payment
+  (`MonthlyPnlBody` / `MonthlyCashFlowBody` / `monthly-receipt-payment/page.tsx` render `SheetReport` without
+  `drill`); Dept Pool's per-department P&L | Cash Flow (`dept-pool/statements/[seg]`, the same monthly bodies — the
+  Revenue cash flow the user was reading). The Finance phone app's Report is its own (lib/fin-app/report-pages).
+- **Offered:** A — the monthly reports and Dept Pool's statements open onto their lines too; B — a line opens its
+  voucher / JE; C — what a line says (e.g. the voucher's number rather than the JE's). Or the user's own idea.
+- Loose ends, none asked for: GL override is still on a voucher's Edit (desktop form, phone sheet) — removed only
+  from Create payment, ask before removing more; PETER's RM 4,000 Sep'26 deduction has no reason (the user asks
+  HR; it stays in 9093); `repayment_start_date` and `payroll_batch_commission_split` are recorded in
+  schema_migrations under apply_migration's timestamps (20261012101209, 20261021125636), not their file numbers
+  (20261012190000, 20261021210000).
+
 ## CHECKPOINT 2026-10-22 e (SHIPPED, #627) — Cash Flow: Revenue's payroll to HR by account
 
 User, on Revenue's Cash Flow (Oct on 4070 *Accrual - Salary*, Sep on Commission & Allowances): asked why → Sep'26

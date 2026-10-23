@@ -480,7 +480,7 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
       if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
-      const typed = new Blob([await file.arrayBuffer()], { type: mime });
+      const typed = new Blob([file], { type: mime });
       const sent = await sendMessengerAttachment({ pageId: contact.account_id, psid: contact.external_id, token: pageAccess, window: window as "open" | "human_agent", kind: kind === "document" ? "file" : kind, file: typed, filename });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
@@ -491,7 +491,7 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
       const sendAs = async (k: typeof kind, voice = false) => {
         const type = k === "video" && mime === "video/quicktime" ? "video/mp4" : k === "document" ? (mime || "application/octet-stream") : k === "audio" && opus ? "audio/ogg; codecs=opus" : mime;
         const name = k === "video" && mime === "video/quicktime" ? filename.replace(/\.mov$/i, "") + ".mp4" : filename;
-        const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file: new Blob([await file.arrayBuffer()], { type }), filename: name });
+        const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file: new Blob([file], { type }), filename: name });
         if (!up.ok) return up;
         return sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, k, up.id, caption, name, voice) });
       };
@@ -620,7 +620,8 @@ export async function forwardCrmMessage(messageId: string, toContact: string): P
       mime = (r.headers.get("content-type") ?? mime).split(";")[0].trim();
     }
     if (!blob) throw new Error("The file could not be read. Try again.");
-    if (blob.size > 25 * 1024 * 1024) throw new Error("A file can be forwarded up to 25 MB.");
+    // The bucket's own limit (100 MB on R2); sendCrmMedia then holds it to the target channel's.
+    if (blob.size > 100 * 1024 * 1024) throw new Error("A file can be forwarded up to 100 MB.");
     const kind = mediaKindOf(mime);
     const name = kind === "document" ? (String(m.body ?? "").trim() || "file") : `${kind}`;
     const path = mediaPath(toContact, name, mime);

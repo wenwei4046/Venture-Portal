@@ -85,6 +85,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_sub_feed',
   // A Marketing project's formal log (mig 20261024006000): every line of its trail — STABLE.
   'mkt_project_log',
+  // Marketing's Library (mig 20261024007000): its folder types, folders, files and Dustbin — STABLE.
+  'mkt_library',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

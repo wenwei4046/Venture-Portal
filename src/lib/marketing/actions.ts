@@ -12,6 +12,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
+import { libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, type Library, type LibProfile } from './library'
 
 /**
  * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900, 20261024002000 and
@@ -369,3 +370,83 @@ export async function putMktFree(project: string, op: 'put' | 'remove', block: {
   return { ok: true, free: freeFromRow(data) }
 }
 
+
+// ── The Library (⑥-1, mig 20261024007000) ─────────────────────────────────────
+// Each answers with the Library as it now stands, for the page that wrote it.
+
+async function library(db: SupabaseClient): Promise<Library | null> {
+  const { data, error } = await db.rpc('mkt_library')
+  return error ? null : libraryFromRow(data)
+}
+
+async function libraryAfter(db: SupabaseClient, error: { message?: string } | null, fallback: string): Promise<Done<{ library: Library }>> {
+  if (error) return { ok: false, reason: words(error, fallback) }
+  revalidatePath('/marketing/library')
+  const lib = await library(db)
+  return lib ? { ok: true, library: lib } : { ok: false, reason: 'Saved — the Library could not be read again. Refresh the page.' }
+}
+
+/** A new folder type, for every subsidiary — the manager's. */
+export async function addMktLibType(name: string, color: string, cat: string): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'manage')
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_type_add', { p_name: String(name ?? '').slice(0, 80), p_color: String(color ?? ''), p_cat: String(cat ?? '') })
+  return libraryAfter(db, error, 'The folder type could not be added. Please try again.')
+}
+
+/** A subsidiary's folder of a type; a link type takes its https address. */
+export async function addMktLibFolder(sub: string, type: string, url: string | null): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if (!isId(sub) || !isId(type)) return { ok: false, reason: 'Pick a subsidiary and a folder type.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_folder_add', { p_sub: sub, p_type: type, p_url: url ? String(url).trim().slice(0, 1000) : null })
+  return libraryAfter(db, error, 'The folder could not be added. Please try again.')
+}
+
+/** The file just put in the bucket, into a folder. */
+export async function fileMktLib(folder: string, name: string, path: string): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if (!isId(folder)) return { ok: false, reason: 'That folder is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_file_add', { p_folder: folder, p_name: String(name ?? '').slice(0, 300), p_path: String(path ?? '') })
+  return libraryAfter(db, error, 'The file could not be added. Please try again.')
+}
+
+/** A file to another folder; a folder to another subsidiary. */
+export async function moveMktLib(kind: 'file' | 'folder', id: string, to: string): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if ((kind !== 'file' && kind !== 'folder') || !isId(id) || !isId(to)) return { ok: false, reason: 'Pick where it goes.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_move', { p_kind: kind, p_id: id, p_to: to })
+  return libraryAfter(db, error, 'It could not be moved. Please try again.')
+}
+
+/** To the Dustbin (a folder with its files), or out of it. */
+export async function binMktLib(kind: 'file' | 'folder', id: string, restore = false): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if ((kind !== 'file' && kind !== 'folder') || !isId(id)) return { ok: false, reason: 'That is not there.' }
+  const db = await client()
+  const { error } = await db.rpc(restore ? 'mkt_lib_restore' : 'mkt_lib_bin', { p_kind: kind, p_id: id })
+  return libraryAfter(db, error, restore ? 'It could not be restored. Please try again.' : 'It could not be moved to the Dustbin. Please try again.')
+}
+
+/** Gone for good, from the Dustbin — the manager's. */
+export async function deleteMktLib(kind: 'file' | 'folder', id: string): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'manage')
+  if ((kind !== 'file' && kind !== 'folder') || !isId(id)) return { ok: false, reason: 'That is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_delete', { p_kind: kind, p_id: id })
+  return libraryAfter(db, error, 'It could not be deleted. Please try again.')
+}
+
+/** A subsidiary's brand profile, saved whole (⑥-2, mig 20261024007200) — the manager's. */
+export async function saveMktLibProfile(sub: string, profile: LibProfile): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'manage')
+  if (!isId(sub)) return { ok: false, reason: 'That subsidiary is not on the list.' }
+  const db = await client()
+  // Whatever came in, read as a stored profile would be (only the handoff's colours and fonts, words as text).
+  const p = profile ?? NO_PROFILE
+  const clean = profileFromRow({ avatar: p.avatar, avatar_path: p.avatarPath, banner: p.banner, banner_path: p.bannerPath, font: p.font, name: p.name, caption: p.caption })
+  const { error } = await db.rpc('mkt_lib_profile_save', { p_sub: sub, p_profile: profileToRow(clean) })
+  return libraryAfter(db, error, 'The brand profile could not be saved. Please try again.')
+}

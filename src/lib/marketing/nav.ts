@@ -39,6 +39,7 @@ export const MKT_NAV: readonly MktNavRow[] = [
   { key: 'calendar', emoji: '📅', label: 'Calendar', tone: 'mist', href: '/marketing/calendar', count: 'calendar' },
   { key: 'subs', emoji: '🏢', label: 'Subsidiaries', tone: 'peach' },
   { key: 'projects', emoji: '📁', label: 'Projects', tone: 'sand', href: '/marketing/projects', count: 'projects' },
+  { key: 'library', emoji: '📚', label: 'Library', tone: 'mist', href: '/marketing/library' },
   { key: 'tracking', emoji: '📊', label: 'Tracking Dashboard', tone: 'sand', href: '/marketing/tracking', count: 'tracking', manager: true },
   { key: 'workflow', emoji: '🧩', label: 'Workflow Builder', tone: 'mist', href: '/marketing/workflows', manager: true },
   { key: 'product', emoji: '📦', label: 'Product Builder', tone: 'peach', href: '/marketing/products', manager: true },
