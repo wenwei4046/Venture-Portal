@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.mkt_spaces (
 );
 ALTER TABLE public.mkt_spaces ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.mkt_spaces FROM anon, authenticated;
-SELECT public.audit_register('mkt_spaces', 'Marketing personal spaces', 'Marketing', '{marketing}', 'none',
+SELECT public.audit_register('mkt_spaces', 'Marketing personal spaces', 'Marketing', '{}', 'none',
   p_keys => '{user_id}', p_reason => 'A layout dragged is saved often; nothing in it is worth a history.');
 
 -- ── A space's picture: its owner's, under space/ ──────────────────────────────────
