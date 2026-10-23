@@ -73,7 +73,10 @@ export function teamsOf(data: CrmData): Team[] {
     // A team of one (a TA / RS reporting straight to the Revenue Director, nobody under them) is named by the person
     // (2026-10-22, the owner: "如果他没有下线的，就放他的名，不然很难看懂").
     return { id: tl.id, tl, name: people.length === 1 && tl.role !== "tl" ? tl.name : teamName(tl), who: above ? `Senior TL ${above.name}` : tl.role === "tl" ? `TL ${tl.name}` : tl.name, c, tint, own, people };
-  });
+  })
+    // Teams first, then the people who are a team on their own, each by name (the owner, 2026-10-24: "RD-》team->"; the
+    // Revenue Director's row always comes before them all). The colours stay with each team as they were.
+    .sort((x, y) => Number(x.people.length === 1 && x.tl.role !== "tl") - Number(y.people.length === 1 && y.tl.role !== "tl") || x.name.localeCompare(y.name));
 }
 
 /** "RS · Full time", "TL", "Senior TL" — as the design tags people. */
