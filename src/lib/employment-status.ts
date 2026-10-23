@@ -9,21 +9,29 @@
  * it ends — HR view's bell — acknowledges, then confirms them as permanent, extends it, or ends their employment.
  * The people on the roster before that day carry no status ("Not set") until HR sets one (the user's answer).
  *
+ * Contract (2026-10-24 — LI SEAN asked on IT-0006 for the Revenue team's contract status; the user: "can add with one
+ * is Contract, then need pick time period as well, 6 month, 12 month, 18, 24, until 36"): a period counted from the
+ * hire date the same way (mig 20261025013000: `contract_months`, `contract_end` generated). Nobody is reminded of it.
+ *
  * Pure, so the roster, the person's window and page, the bell and both forms read one set of rules.
  */
 import dayjs from 'dayjs'
 import type { ChipTone } from '@/components/hrv/kit'
 
-export type EmploymentStatus = 'probation' | 'permanent' | 'part_time'
+export type EmploymentStatus = 'probation' | 'contract' | 'permanent' | 'part_time'
 
-/** In the order the forms offer them — a new hire is most often on probation. */
-export const EMPLOYMENT_STATUSES: readonly EmploymentStatus[] = ['probation', 'permanent', 'part_time']
+/** In the order the forms offer them — a new hire is most often on probation; a contract is the other with an end. */
+export const EMPLOYMENT_STATUSES: readonly EmploymentStatus[] = ['probation', 'contract', 'permanent', 'part_time']
 
 export const EMPLOYMENT_STATUS_LABEL: Readonly<Record<EmploymentStatus, string>> = {
   probation: 'Probation',
+  contract: 'Contract',
   permanent: 'Permanent',
   part_time: 'Part time',
 }
+
+/** The four as a sentence says them — a refusal, a chip's hint. */
+const STATUS_WORDS = 'Probation, Contract, Permanent or Part time'
 
 /** A record filed before employment status existed, until HR sets it. */
 export const NOT_SET = 'Not set'
@@ -35,8 +43,17 @@ export const EXTEND_MONTH_CHOICES = [1, 2, 3] as const
 /** The database's ceiling (hr_staff_costs_probation_months_check), extensions included. */
 export const MAX_PROBATION_MONTHS = 24
 
-/** HR is told this many days before a probation ends (the user, 2026-10-23: 14 days before). */
-export const PROBATION_NOTICE_DAYS = 14
+/** A contract's periods (the user, 2026-10-24: "6 month, 12 month, 18, 24, until 36"). */
+export const CONTRACT_MONTH_CHOICES = [6, 12, 18, 24, 30, 36] as const
+export const DEFAULT_CONTRACT_MONTHS = 12
+/** The database's ceiling (hr_staff_costs_contract_months_check). */
+export const MAX_CONTRACT_MONTHS = 36
+
+/**
+ * HR is told this many days before a probation ends (the user, 2026-10-23: 14 days before; 2026-10-24: "go with 15
+ * days" — the 15 their reply to LI SEAN promised). notify_probation_due (mig 20261025012000) counts the same window.
+ */
+export const PROBATION_NOTICE_DAYS = 15
 
 export function employmentStatusOf(v: unknown): EmploymentStatus | null {
   return typeof v === 'string' && (EMPLOYMENT_STATUSES as readonly string[]).includes(v) ? (v as EmploymentStatus) : null
@@ -71,6 +88,11 @@ export function probationEnd(hireDate: string | null | undefined, months: number
   const tm = total % 12
   const last = new Date(utcDay(ty, tm + 1, 0)).getUTCDate()
   return ymdOf(utcDay(ty, tm, Math.min(d, last)) - 86_400_000)
+}
+
+/** A contract's last day, counted the same way — the database's `contract_end` (mig 20261025013000) to the day. */
+export function contractEnd(hireDate: string | null | undefined, months: number | null | undefined): string | null {
+  return probationEnd(hireDate, months)
 }
 
 /** Whole days from `from` to `to` (both YYYY-MM-DD) — positive when `to` is later. */
@@ -120,17 +142,26 @@ export interface StatusFacts {
   /** The reminder acknowledged for the end it stands at. */
   probationAcked?: boolean
   ackName?: string | null
+  /** A contract's last day (2026-10-24) — the database's `contract_end`. */
+  contractEnd?: string | null
 }
 
 /**
- * The chip for an active person: Permanent (green), Part time (blue), Probation (amber) — "Probation · 9d left",
- * "· ends today", "· ended" once HR is being told — or Not set.
+ * The chip for an active person: Permanent (green), Part time (blue), Contract (peach, its end in the hint),
+ * Probation (amber) — "Probation · 9d left", "· ends today", "· ended" once HR is being told — or Not set.
  */
 export function statusChip(f: StatusFacts, today: string): StatusChip {
   if (f.status === undefined) return { label: 'Active', tone: 'ledger' }
-  if (f.status === null) return { label: NOT_SET, tone: 'plain', title: 'Employment status not set — Probation, Permanent or Part time, on their page' }
+  if (f.status === null) return { label: NOT_SET, tone: 'plain', title: `Employment status not set — ${STATUS_WORDS}, on their page` }
   if (f.status === 'permanent') return { label: EMPLOYMENT_STATUS_LABEL.permanent, tone: 'ledger' }
   if (f.status === 'part_time') return { label: EMPLOYMENT_STATUS_LABEL.part_time, tone: 'info' }
+  if (f.status === 'contract') {
+    return {
+      label: EMPLOYMENT_STATUS_LABEL.contract,
+      tone: 'runOn',
+      title: f.contractEnd ? `Contract ${probationEndLine(f.contractEnd, today, true)}` : 'Contract — its end is counted from the hire date, which is missing',
+    }
+  }
   if (!f.probationEnd) return { label: 'Probation', tone: 'alert', title: 'Probation — its end is counted from the hire date, which is missing' }
   const title = [
     `Probation ${probationEndLine(f.probationEnd, today, true)}`,
@@ -141,30 +172,49 @@ export function statusChip(f: StatusFacts, today: string): StatusChip {
   return { label: `Probation · ${n > 0 ? `${n}d left` : n === 0 ? 'ends today' : 'ended'}`, tone: 'alert', title }
 }
 
-/** "Probation · 3 months · ends 31 Dec 2026", "Permanent", "Part time" — or null when not set. */
+/**
+ * "Probation · 3 months · ends 31 Dec 2026", "Contract · 12 months · ends 30 Sep 2027", "Permanent", "Part time" — or
+ * null when not set. `months` and `endsOn` are the period of whichever of the two it is.
+ */
 export function statusLine(status: EmploymentStatus | null, months: number | null, endsOn: string | null): string | null {
   if (!status) return null
-  if (status !== 'probation') return EMPLOYMENT_STATUS_LABEL[status]
-  return ['Probation', months ? monthsLabel(months) : null, endsOn ? `ends ${dayLabel(endsOn)}` : null].filter(Boolean).join(' · ')
+  if (status !== 'probation' && status !== 'contract') return EMPLOYMENT_STATUS_LABEL[status]
+  return [EMPLOYMENT_STATUS_LABEL[status], months ? monthsLabel(months) : null, endsOn ? `ends ${dayLabel(endsOn)}` : null].filter(Boolean).join(' · ')
 }
 
-/** What a form sent for the status and the period, checked: the columns to write. */
+/** What a form sent for the status and the period, checked: the columns to write — the other status's period cleared. */
 export interface StatusColumns {
   employment_status: EmploymentStatus
   probation_months: number | null
+  contract_months: number | null
+}
+
+/** A period a form sent, a whole number of months within the database's ceiling — or null. */
+function monthsOf(raw: string | number | null | undefined, max: number): number | null {
+  const months = Number((raw ?? '').toString().trim())
+  return Number.isInteger(months) && months >= 1 && months <= max ? months : null
 }
 
 /**
- * The status a form chose and, for a probation, its period — refused in words for the screen. Add Staff and the
- * transfer always send it; a person's page only when it changed.
+ * The status a form chose and, for a probation or a contract, its period — refused in words for the screen. Add Staff
+ * and the transfer always send it; a person's page only when it changed.
  */
-export function statusColumns(rawStatus: string | null | undefined, rawMonths: string | number | null | undefined): StatusColumns {
+export function statusColumns(
+  rawStatus: string | null | undefined,
+  rawMonths: string | number | null | undefined,
+  rawContractMonths: string | number | null | undefined,
+): StatusColumns {
   const status = employmentStatusOf((rawStatus ?? '').toString().trim())
-  if (!status) throw new Error('Pick the employment status — Probation, Permanent or Part time.')
-  if (status !== 'probation') return { employment_status: status, probation_months: null }
-  const months = Number((rawMonths ?? '').toString().trim())
-  if (!Number.isInteger(months) || months < 1 || months > MAX_PROBATION_MONTHS) {
-    throw new Error('Pick the probation period.')
+  if (!status) throw new Error(`Pick the employment status — ${STATUS_WORDS}.`)
+  if (status === 'probation') {
+    const months = monthsOf(rawMonths, MAX_PROBATION_MONTHS)
+    if (months === null) throw new Error('Pick the probation period.')
+    return { employment_status: status, probation_months: months, contract_months: null }
   }
-  return { employment_status: status, probation_months: months }
+  if (status === 'contract') {
+    const months = monthsOf(rawContractMonths, MAX_CONTRACT_MONTHS)
+    if (months === null) throw new Error('Pick the contract period.')
+    return { employment_status: status, probation_months: null, contract_months: months }
+  }
+  return { employment_status: status, probation_months: null, contract_months: null }
 }

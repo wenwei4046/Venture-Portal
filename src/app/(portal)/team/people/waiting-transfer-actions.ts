@@ -35,8 +35,9 @@ export async function transferFromWaitingList(input: TransferInput): Promise<Tra
   }
   const refused = transferRefusal(input)
   if (refused) return { ok: false, reason: refused }
-  // Probation, Permanent or Part time, a probation with its period (2026-10-23) — filed on the same insert.
-  const status = statusColumns(input.employmentStatus, input.probationMonths)
+  // Probation, Contract, Permanent or Part time, a probation or a contract with its period (2026-10-23; Contract
+  // 2026-10-24) — filed on the same insert, through the 13-argument transfer (mig 20261025013000).
+  const status = statusColumns(input.employmentStatus, input.probationMonths, input.contractMonths)
 
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.rpc('member_transfer_waiting', {
@@ -52,6 +53,7 @@ export async function transferFromWaitingList(input: TransferInput): Promise<Tra
     p_email: input.email.trim() || null,
     p_employment_status: status.employment_status,
     p_probation_months: status.probation_months,
+    p_contract_months: status.contract_months,
   })
   if (error) return { ok: false, reason: transferErrorWords(error) }
   const answer = (data ?? {}) as { staffId?: unknown; code?: unknown }

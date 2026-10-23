@@ -9,10 +9,13 @@ import { BANK_NAMES } from '@/lib/banks'
 import { revenuePath } from '@/lib/revenue'
 import { defaultHireDate, missingFields, transferBanner, transferRefusal, type TransferInput, type WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
 import {
+  CONTRACT_MONTH_CHOICES,
+  DEFAULT_CONTRACT_MONTHS,
   DEFAULT_PROBATION_MONTHS,
   EMPLOYMENT_STATUSES,
   EMPLOYMENT_STATUS_LABEL,
   PROBATION_MONTH_CHOICES,
+  contractEnd,
   dayLabel,
   monthsLabel,
   probationEnd,
@@ -50,9 +53,11 @@ export default function WaitingTransferForm({
   const [titleId, setTitleId] = useState(titles[0]?.id ?? '')
   const [reportsTo, setReportsTo] = useState<string | null>(managers.find(m => m.submittedIt)?.id ?? null)
   const [hireDate, setHireDate] = useState(defaultHireDate(facts.start, today))
-  // Probation, Permanent or Part time (2026-10-23) — asked as on Add Staff; a probation with its period.
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — asked as on Add Staff; a probation
+  // or a contract with its period.
   const [employmentStatus, setEmploymentStatus] = useState('')
   const [probationMonths, setProbationMonths] = useState<number>(DEFAULT_PROBATION_MONTHS)
+  const [contractMonths, setContractMonths] = useState<number>(DEFAULT_CONTRACT_MONTHS)
   const [nric, setNric] = useState('')
   const [phone, setPhone] = useState(facts.contact ?? '')
   const [email, setEmail] = useState('')
@@ -66,9 +71,12 @@ export default function WaitingTransferForm({
   const backHref = `${revenuePath(subSlug, 'hierarchy')}?tab=waiting`
   const input: TransferInput = {
     requestId: facts.requestId, name, titleId, reportsTo, hireDate, nric, bankName, bankAccountNo: account, contact: phone, email,
-    employmentStatus, probationMonths: employmentStatus === 'probation' ? probationMonths : null,
+    employmentStatus,
+    probationMonths: employmentStatus === 'probation' ? probationMonths : null,
+    contractMonths: employmentStatus === 'contract' ? contractMonths : null,
   }
   const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, probationMonths) : null
+  const contractEnds = employmentStatus === 'contract' ? contractEnd(hireDate, contractMonths) : null
   const missing = tried ? new Set(missingFields(input)) : new Set<string>()
 
   async function add() {
@@ -156,6 +164,20 @@ export default function WaitingTransferForm({
                     </button>
                   ))}
                   {probationEnds ? <span className={s.basisNote}>ends {dayLabel(probationEnds)}</span> : null}
+                </div>
+              </>
+            ) : null}
+
+            {employmentStatus === 'contract' ? (
+              <>
+                <span className={s.label} id="transfer-contract">Contract period</span>
+                <div className={s.choices} role="group" aria-labelledby="transfer-contract">
+                  {CONTRACT_MONTH_CHOICES.map(n => (
+                    <button key={n} type="button" className={hv.choice} aria-pressed={contractMonths === n} onClick={() => setContractMonths(n)}>
+                      {monthsLabel(n)}
+                    </button>
+                  ))}
+                  {contractEnds ? <span className={s.basisNote}>ends {dayLabel(contractEnds)}</span> : null}
                 </div>
               </>
             ) : null}

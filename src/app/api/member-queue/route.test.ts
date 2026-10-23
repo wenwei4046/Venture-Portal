@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The hourly sweep (api/member-queue) writes the due notices before it flushes the phones' pushes — a probation
-// ending within 14 days among them (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送").
+// ending within 15 days among them (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送"; 15 days, not
+// 14, since mig 20261025012000).
 
 const calls = vi.hoisted(() => [] as string[])
 const answers = vi.hoisted(() => ({

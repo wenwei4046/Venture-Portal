@@ -137,13 +137,14 @@ export const PCB_LABELS: Readonly<Record<string, string>> = {
 }
 
 /**
- * Fields saved together: a bank account is its bank and its number; an employment status its probation's period
- * (2026-10-23) — switching to Probation sends the period it shows, switching away sends none (no field is drawn).
+ * Fields saved together: a bank account is its bank and its number; an employment status its probation's or its
+ * contract's period (2026-10-23; Contract 2026-10-24) — switching to Probation or Contract sends the period it shows,
+ * switching away sends none (no field is drawn).
  */
 const SAVED_TOGETHER: ReadonlyArray<readonly string[]> = [
   ['bank_name', 'bank_account_no'],
   ['bank_name_2', 'bank_account_no_2'],
-  ['employment_status', 'probation_months'],
+  ['employment_status', 'probation_months', 'contract_months'],
 ]
 
 /**
