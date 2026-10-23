@@ -248,7 +248,7 @@ export default function DeskScreens(p: DeskScreensProps) {
   // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
   const apNeedKey = JSON.stringify(v.apNeed ?? []);
   // …on Ads Performance, and on Reports › Ads performance, which draws the same table (2026-10-23).
-  const adsOn = ui.tab === "adsperf" || (ui.tab === "reports" && ui.rpCat === "ads");
+  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads");
   const asked = useRef(new Set<string>());
   useEffect(() => {
     if (!adsOn || !live || !data.can.manage) return;

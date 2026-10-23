@@ -202,7 +202,8 @@ export function adsPerfVM(ctx: DeskCtx) {
     setPer: (n: number) => patch({ apPer: n, apPg: 0 }), pages, cur: pg, go: (i: number) => patch({ apPg: i }) };
   return {
     apNeed, apDayNeed, apChartV, apPager,
-    kAdsPerf: ui.tab === "adsperf",
+    // Insight › Ads performance (v2 frame 01b) is this page's body under Insight's head.
+    kAdsPerf: ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads"),
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
     ap4: {
       tabs: ([["Today", 4], ["This week", 5], ["This month", 0], ["Custom", "custom"]] as const).map(([label, k]) => ({ label, on: ui.apRange === k,

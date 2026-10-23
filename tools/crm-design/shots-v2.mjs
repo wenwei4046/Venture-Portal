@@ -1,5 +1,5 @@
 /**
- * The CRM desktop against the redesign v2 handoff (2026-10-23, docs/design_handoff_crm_redesign_v2): screenshots a
+ * The CRM desktop against the redesign v2 handoff (2026-10-23, docs/design_handoff_crm_redesign_v3): screenshots a
  * frame of `CRM Desktop.dc.html` and the app's same page, both at the frame's size, in headless Chrome, so the two can
  * be compared side by side (the demo data differ, so this is not a pixel diff).
  *
@@ -18,7 +18,7 @@ const [out, list] = process.argv.slice(2);
 if (!out || !list) { console.error("usage: node tools/crm-design/shots-v2.mjs <outDir> <frame,frame>"); process.exit(1); }
 mkdirSync(out, { recursive: true });
 const repo = resolve(import.meta.dirname, "../..");
-const dir = join(repo, "docs/design_handoff_crm_redesign_v2");
+const dir = join(repo, "docs/design_handoff_crm_redesign_v3");
 const BASE = process.env.CRM_BASE ?? "http://localhost:3107";
 const APP_URL = `${BASE}/member/preview?app=proto&role=principal&device=desktop&page=account&view=crm&crmAs=hod`;
 // The app's way to each frame: clicks by exact visible text (the CRM nav, then the page's own tabs).
@@ -46,7 +46,7 @@ const js = async e => (await send("Runtime.evaluate", { expression: e, awaitProm
 
 async function click(text) {
   const c = await js(`(() => { const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && e.children.length < 12 && (e.innerText || "").trim() === ${JSON.stringify(text)});
-    const el = all.at(0); if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    const vis = all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 8 && r.height > 8; }); const el = vis.find(e => e.getBoundingClientRect().left >= 72) || vis.at(0) || all.at(0); if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   if (!c) { console.log("  not found:", text); return; }
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c.x, y: c.y, button: "left", clickCount: 1 });

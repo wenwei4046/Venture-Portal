@@ -158,7 +158,7 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 /** A page's head: its title, underline tabs, a muted line, CRM alerts and the page's one primary button. */
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
-  return (
+  return (<>
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
       {h.tabs.length > 0 && (
@@ -220,7 +220,14 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
         )}
       </div>
     </div>
-  );
+    {/* v2 frames 01 / 01b: a second row of tabs under the title (Insight's Team performance | Ads performance). */}
+    {h.subTabs && h.subTabs.length > 0 && (
+      <div style={{ flex: "none", display: "flex", gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
+        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "8px 0 10px", whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
+          borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
+      </div>
+    )}
+  </>);
 }
 
 interface InsightBits {
@@ -234,7 +241,7 @@ const T_COLS = "minmax(0,2.2fr) minmax(0,0.7fr) minmax(0,1.5fr) repeat(3,minmax(
 /** Frame 01 · Insight: the cream hero of six figures, Team performance (a team opens to its people) and Leads by status. */
 export function DeskInsight4a({ v }: { v: InsightBits }) {
   return (<>
-    <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", padding: "26px 0", borderRadius: "12px", background: "var(--crm-cream)" }}>
+    <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", padding: "26px 0", borderRadius: "12px", background: "var(--crm-sum)", border: "1px solid var(--crm-sum-line)" }}>
       {v.metrics4.map(m => (
         <button key={m.label} type="button" onClick={m.open} style={{ ...BTN, display: "flex", flexDirection: "column", gap: "10px", padding: "0 18px", minWidth: 0,
           borderLeft: `1px solid ${m.first ? "transparent" : "var(--crm-hero-line)"}` }} className="crm4a-metric">
@@ -264,8 +271,8 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
             <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, paddingLeft: r.person ? "18px" : 0 }}>
               <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: r.dot }} />
               <span style={{ fontWeight: r.person ? 400 : 500, whiteSpace: "nowrap", color: r.person ? "var(--crm-ink-soft)" : "var(--crm-ink)" }}>{r.name}</span>
-              {/* No line after a team's name (the owner, 2026-10-18); a person keeps theirs. */}
-              {r.person && <span style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>}
+              {/* v2 frame 01 draws the team's lead after its name again ("TL Priya Menon"; supersedes 2026-10-18's none). */}
+              {r.sub && <span style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>}
             </span>
             <span style={{ textAlign: "right", fontWeight: 500 }}>{r.leads}</span>
             <span style={{ display: "flex", alignItems: "center", gap: "10px", paddingLeft: "24px" }}>

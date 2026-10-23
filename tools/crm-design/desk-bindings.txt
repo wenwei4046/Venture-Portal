@@ -30,12 +30,9 @@ adPerLabel
 adPerOpen
 adPerOpts
 adPerToggle
-adPerf
 adSplit
 adSum
 adTeams
-adTot
-adTotals
 addAd
 alertsP
 apCmpLabel
@@ -247,15 +244,11 @@ ftOff
 ftOn
 ftOpen
 ftSaveOrApply
-goAdsPerf
 history
 ibCols
 infoBack
 infoBackLabel
 infoChat
-insAdCols
-insAdMinW
-insHead
 isActOp
 isCenter
 isCltOp
@@ -305,8 +298,6 @@ me
 menuBtnBg
 menuOpen
 menuW
-metaDot
-metaSync
 micD
 mq
 msgs

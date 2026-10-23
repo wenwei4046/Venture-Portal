@@ -1984,64 +1984,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
           {!!(v.notWide) && (<>
             <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: v.f4.pad, display: "flex", flexDirection: "column", gap: v.f4.gap, overflow: "auto" }}>
               {!!(v.kList) && (<DeskInboxList4a v={v} />)}
-              {!!(v.kInsight) && (<>
-                <DeskInsight4a v={v} />
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>
-                  <strong style={{ flex: "1", font: "500 18px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.metaDot }}>
-                    </span>{v.metaSync}</span>
-                  <DeskCardPicker v={v} />
-                  <button type="button" onClick={v.goAdsPerf} style={{ display: "inline-flex", alignItems: "center", gap: "4px", border: "0", padding: "0", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>View all<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m9 6 6 6-6 6">
-                      </path>
-                    </svg></button>
-                </div>
-                <div style={{ flex: "0 0 auto", display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
-                  {(v.adTotals).map((k, k_i) => (<Fragment key={k_i}>
-                    <div style={{ padding: "14px 18px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", fontWeight: "600" }}>{k.label}</span>
-                      <b style={{ fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
-                    </div>
-                  </Fragment>))}
-                </div>
-                <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflowX: "auto" }}>
-                  <div style={{ minWidth: `${v.insAdMinW}px` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>
-                      {(v.insHead).map((h, h_i) => (<Fragment key={h_i}><button type="button" onClick={h.sort} style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: h.justify, gap: "5px", padding: "0", border: "0", background: "none", font: "inherit", color: h.fg, letterSpacing: "inherit", textTransform: "uppercase", textAlign: h.align, cursor: "pointer" }}><span>{h.label}</span><span style={{ flex: "0 0 auto", fontSize: "10px", color: h.ac }}>{h.arrow}</span><span onPointerDown={h.resize} onDoubleClick={h.unsize} onClick={e => e.stopPropagation()} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-12px", bottom: "-12px", right: "-12px", width: "12px", cursor: "col-resize", display: "flex", justifyContent: "center" }}><span style={{ width: "1px", margin: "8px 0", background: "var(--crm-rule)" }}></span></span></button></Fragment>))}
-                    </div>
-                    {(v.adPerf).map((r, r_i) => (<Fragment key={r_i}>
-                      <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--crm-field)", fontSize: "14.5px", fontWeight: "600", fontVariantNumeric: "tabular-nums" }}>
-                        <span style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "0" }}>
-                          <strong style={{ fontSize: "14.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
-                          <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "600" }}>
-                            <span style={{ color: r.chFg }}>{r.channel}</span>
-                            <span style={{ color: "var(--crm-faint-2)" }}>·</span>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: r.stInk }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: r.stDot }}>
-                              </span>{r.status}</span>
-                          </span>
-                        </span>
-                        <span style={{ textAlign: "center" }}>{r.spend}</span>
-                        <span style={{ textAlign: "center" }}>{r.reach}</span>
-                        <span style={{ textAlign: "center" }}>{r.clicks}</span>
-                        <span style={{ textAlign: "center", color: "var(--crm-muted)" }}>{r.ctr}</span>
-                        <span style={{ textAlign: "center" }}>{r.leads}</span>
-                        <span style={{ textAlign: "center", color: r.cplColor }}>{r.cpl}</span>
-                        <span style={{ textAlign: "center" }}>{r.appt}</span>
-                      </div>
-                    </Fragment>))}
-                    <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", alignItems: "center", padding: "14px 20px", background: "var(--crm-cream-nav)", fontSize: "14.5px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>
-                      <span style={{ fontSize: "12px", letterSpacing: ".08em", color: "var(--crm-ink)" }}>TOTAL · {v.adTot.n} ADS</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.spend}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.reach}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.clicks}</span>
-                      <span style={{ textAlign: "center", color: "var(--crm-muted)" }}>{v.adTot.ctr}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.leads}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.cpl}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.appt}</span>
-                    </div>
-                  </div>
-                </div>
-              </>)}
+              {!!(v.kInsight) && (<DeskInsight4a v={v} />)}
               {!!(v.kCh) && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px", paddingTop: "8px" }}>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", borderBottom: "1px solid var(--crm-rule)" }}>

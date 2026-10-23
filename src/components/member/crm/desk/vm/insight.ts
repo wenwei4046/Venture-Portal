@@ -165,7 +165,8 @@ export function insightVM(ctx: DeskCtx) {
   const insAdMinW = Math.max(820, 40 + (IW.name ?? 220) + IH.slice(1).reduce((n, [k]) => n + (IW[k] ?? 72) + 12, 0));
   const lt = adPerf.reduce((a, x) => a + x._n, 0), at = adPerf.reduce((a, x) => a + Number(x.appt), 0);
   return {
-    kInsight: ctx.ui.tab === "insight",
+    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads",
+    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"]] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,

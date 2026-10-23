@@ -251,16 +251,17 @@ module.exports = function desk4a(body) {
   body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "13');
   body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "13');
 
-  // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a). The Ads
-  // Performance part production keeps below them stays, under a 4a section head.
+  // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a).
   {
     const start = '<div style={{ flex: "0 0 auto", position: "relative", padding: "26px 30px 0", borderRadius: "26px"';
     const end = '<div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>\n                  <strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>';
     const a = body.indexOf(start), b = body.indexOf(end);
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: insight body");
-    body = body.slice(0, a) + "<DeskInsight4a v={v} />\n                " + body.slice(b);
-    body = once(body, '<strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>',
-      '<strong style={{ flex: "1", font: "500 18px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>', "insight ads head");
+    // v2 (frames 01 / 01b, 2026-10-23): production's Ads Performance part under Insight is gone — Insight's own Ads
+    // performance tab draws Ads Performance's body (kAdsPerf, vm/adsperf.ts), so the block is the 4a body alone.
+    const head = body.lastIndexOf("{!!(v.kInsight) && (<>", a), close = body.indexOf("{!!(v.kCh) && (<>", b);
+    if (head < 0 || close < b) throw new Error("desk-4a: insight block");
+    body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              " + body.slice(close);
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
