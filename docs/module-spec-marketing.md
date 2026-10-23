@@ -29,9 +29,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ③c | The Product Builder: products one-time or recurring monthly, their code made by the database, categories of actions (quantity, unit price, each on a workflow — or a new one made there), the intake minutes template, list price, cost and margin (the manager's alone), versions taking effect on a day, retire / reactivate (mig `20261023235900`) | #646, live 2026-10-23 |
 | ③d | The Canvas Template Editor (the Workflow Builder's Canvas template tab): the task page laid out — Requirements, a section per stage, the manager's own sections, the Free space; a section's 🔒 / ⭐ / 👁 and stage; a field's ⭐ / 👁, stage, a date on the calendar, a choice's options; the Preview as the staff and as the PIC; kept with the draft and published with the version (mig `20261024001000`) | #648, live 2026-10-23 |
 | ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | #653 |
-| ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | this PR |
-| ④-3 | The Audit trail tab: the formal log, its filters; export waits for question 18 | next |
-| ④-4 | The Task map and Replay | |
+| ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | #654 |
+| ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | this PR |
+| ④-4 | The Task map and Replay | next |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
@@ -105,6 +105,11 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 59. **Key dates** (④-2). The handoff's are typed into its sample (Payday, 11.11, *Carres showroom opens*); built from HR's holidays (gap 6) until question 14.
 60. **The timeline's bars** (④-2). The handoff's are campaigns; built as projects — from their start (else the day made) to their due day, ten weeks from the Monday two weeks back.
 61. **Progress** (④-2). The handoff's n/m is never defined: built as stages done (or passed) ÷ stages (question 17).
+62. **Where the log opens** (④-3). The handoff's is a tab of the product task page (Canvas · Map · Audit trail · Versions), which comes with the Assignment plan (②b-2). Until then **Formal log** on the trail's head of every project's page opens it over the page — quick and recurring tasks too (question 22).
+63. **Export** (④-3). The handoff exports the filtered rows as PDF or CSV for anybody who sees the log; Marketing's permission row has no Export tick (View, Create, Edit, Approve, Manage) — whether to add one is question 18. Not built.
+64. **Corrections** (④-3). The handoff's *correction of #n* and its footer (*mistakes are fixed by adding a correction entry*) have no screen that adds one (question 19): the log says *Read-only*.
+65. **Attachment** (④-3). No record holds a file — a stage's files are links (gap 18): the column comes with Marketing's R2 bucket.
+66. **The Free space** (④-3). Its writes are records too, but stay off the log as they stay off the trail (question 20).
 
 ## 5. Open questions (for the user)
 

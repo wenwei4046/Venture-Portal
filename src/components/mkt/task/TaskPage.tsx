@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { acceptMktStage, decideMktStage, putMktFree, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
 import { nameOf, seriesView, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
 import { missingWork, type FormField, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
+import FormalLogSheet from '../audit/FormalLogSheet'
+import a from '../audit/audit.module.css'
 import s from './task.module.css'
 
 // A task's page (`New Task Page.dc.html`): where it stands and who it is with, what the viewer may do now — Accept,
@@ -24,6 +26,7 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [linkDraft, setLinkDraft] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -450,7 +453,10 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
         </div>
 
         <aside className={s.trail} aria-label="Audit trail">
-          <div className={s.trailHead}>Audit trail</div>
+          <div className={s.trailHead}>
+            <span>Audit trail</span>
+            <button type="button" className={a.open} onClick={() => setLogOpen(true)}>Formal log</button>
+          </div>
           {lines.map(l => (
             <div key={l.id} className={s.trailLine}>
               <div className={s.trailTime}>{l.t}</div>
@@ -458,6 +464,7 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
             </div>
           ))}
         </aside>
+        {logOpen ? <FormalLogSheet project={page.project.id} track={page.project.trackId} onClose={() => setLogOpen(false)} /> : null}
       </div>
 
       {modal && cur ? (
