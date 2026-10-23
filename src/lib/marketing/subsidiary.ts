@@ -26,7 +26,8 @@ export interface SubStat {
 export function subStats(board: MktBoard, sub: string, events: readonly CalEvent[]): SubStat[] {
   const rows = projectRows(board).filter(r => r.sub?.id === sub)
   const open = rows.filter(r => r.open)
-  const weekEnd = addDays(board.today, 6)
+  // This week runs to Sunday, as My Space's does.
+  const weekEnd = addDays(mondayOf(board.today), 6)
   const due = events.filter(e => e.kind === 'due' && !e.recur)
   const overdue = due.filter(e => e.tone === 'red').length
   const month = board.today.slice(0, 7)
@@ -85,6 +86,7 @@ export interface SubProjectRow extends ProjectRow {
   /** Its stages done, of all of them. */
   done: number
   total: number
+  /** Its owner's first name — else whoever's stage it is at; '—' for nobody. */
   owner: string
 }
 
@@ -96,7 +98,8 @@ export function subProjects(board: MktBoard, sub: string): SubProjectRow[] {
     const stages = ix.stagesOf(r.id)
     const cur = stages.find(s => s.idx === p?.cur) ?? stages[0] ?? null
     const done = p?.status === 'done' ? stages.length : stages.filter(s => s.status === 'done' || (p ? s.idx < p.cur : false)).length
-    const owner = ix.person(p?.owner ?? null)
+    // Its owner on Marketing's roster — else (the Principal made it) whoever's stage it is at.
+    const owner = ix.person(p?.owner ?? null) ?? ix.person(cur?.owner ?? null)
     return { ...r, team: cur?.dept ?? null, done, total: stages.length, owner: owner?.first || owner?.full || '—' }
   })
 }
@@ -118,6 +121,8 @@ export interface TimelineBar {
   left: number
   width: number
   range: string
+  /** What the bar says: its span, or its due day when the span does not fit. */
+  label: string
 }
 
 /** Each project with a span (its start and its due day) that touches the window, clipped to it. */
@@ -133,10 +138,11 @@ export function timelineBars(board: MktBoard, rows: readonly SubProjectRow[], w:
     if (!from || !to || to < w.start || from > end) continue
     const a = from < w.start ? w.start : from
     const b = to > end ? end : to
+    const width = ((daysBetween(a, b) + 1) / w.days) * 100
+    const range = `${shortDay(from)} – ${shortDay(to)}`
     out.push({
       id: r.id, trackId: r.trackId, title: r.title, team: r.team, tone: r.tone,
-      left: pct(w, a), width: ((daysBetween(a, b) + 1) / w.days) * 100,
-      range: `${shortDay(from)} – ${shortDay(to)}`,
+      left: pct(w, a), width, range, label: width >= 16 ? range : shortDay(to),
     })
   }
   return out

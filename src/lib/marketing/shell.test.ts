@@ -60,6 +60,7 @@ describe("Marketing's shell", () => {
     expect(mktNavActive('/marketing/calendar', null)).toBe('calendar')
     expect(mktNavActive('/marketing/projects', new URLSearchParams('sub=CAR'))).toBe('sub:CAR')
     expect(mktNavActive('/marketing/subsidiaries/car', null)).toBe('sub:CAR')
+    expect(mktCrumb('/marketing/subsidiaries/NOPE')).toEqual({ emoji: '🏢', label: 'Subsidiaries' })
     expect(mktNavActive('/marketing/projects', new URLSearchParams('q=x'))).toBe('projects')
     expect(mktNavActive('/admin/rooms', null)).toBe('rooms')
     expect(mktCrumb('/marketing/tracking')).toEqual({ emoji: '📊', label: 'Tracking Dashboard' })

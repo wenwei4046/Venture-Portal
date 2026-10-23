@@ -118,7 +118,8 @@
 .tlHeadTall { height: 66px; }
 .tlMonth { position: absolute; top: 6px; padding-left: 8px; font-size: .85em; font-weight: 600; border-left: 1px solid rgb(var(--mk-line)); height: 20px; white-space: nowrap; }
 .tlWeek { position: absolute; top: 28px; font-family: var(--mk-mono); font-size: 9.5px; color: rgb(var(--mk-faint)); transform: translateX(-50%); }
-.tlWeek:first-of-type { transform: none; }
+/* The window's first Monday sits on the edge: written from it, not centred on it. */
+.tlWeekFirst { transform: none; padding-left: 8px; }
 .tlFlag { position: absolute; bottom: 4px; transform: translateX(-50%); }
 .tlRow { display: contents; }
 .tlLabel { padding: 0 12px; height: 44px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgb(var(--mk-line-4)); border-right: 1px solid rgb(var(--mk-line-2)); font-size: .9em; min-width: 0; }

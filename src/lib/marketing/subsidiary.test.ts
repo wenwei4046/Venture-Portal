@@ -25,7 +25,8 @@ const board = boardFromRow({
     { id: id(2), trackId: 'TSK-HK-2610-002', kind: 'quick', sub: HK, title: 'Hookka ad copy', status: 'active', cur: 0, updatedAt: '2026-10-22T01:00:00Z' },
     { id: id(3), trackId: 'MKT-CAR-2610-008', kind: 'product', sub: CAR, title: 'Sofa launch', status: 'waiting_pic', cur: 0, owner: ALI, pic: 'Mr Tan',
       createdAt: '2026-10-20T02:00:00Z', updatedAt: '2026-10-20T02:00:00Z' },
-    { id: id(4), trackId: 'TSK-CAR-2610-003', kind: 'quick', sub: CAR, title: 'Banner resize', status: 'done', cur: 0, owner: MEI,
+    // Made by the Principal (off Marketing's roster): its owner shows as whoever's stage it is at.
+    { id: id(4), trackId: 'TSK-CAR-2610-003', kind: 'quick', sub: CAR, title: 'Banner resize', status: 'done', cur: 0, owner: 'ffffffff-0000-0000-0000-000000000001',
       dueOn: '2026-10-20', createdAt: '2026-10-15T02:00:00Z', doneAt: '2026-10-20T05:00:00Z', updatedAt: '2026-10-20T05:00:00Z' },
     // Done at 04:00 on the 1st in the office — this month, though UTC says September.
     { id: id(5), trackId: 'TSK-CAR-2609-001', kind: 'quick', sub: CAR, title: 'Old flyer', status: 'done', cur: 0,
@@ -54,11 +55,12 @@ const board = boardFromRow({
 const events = calendarEvents(board).filter(e => e.sub?.id === CAR)
 
 describe('a subsidiary’s page', () => {
-  it('opens on where its work stands — the office’s month, a run to come not yet due, red only when overdue', () => {
+  it('opens on where its work stands — this week to Sunday, the office’s month, red only when overdue', () => {
+    // Due this week: the run's stage on Friday the 23rd — not the 28th (next week), nor a run to come.
     expect(subStats(board, CAR, events).map(s => `${s.label} ${s.value}${s.sub ? ` ${s.sub}` : ''}${s.red ? ' red' : ''}`)).toEqual([
       'Projects running 3',
       'Waiting for PIC 1',
-      'Due this week 2',
+      'Due this week 1',
       'Done this month 2',
       'Overdue 1 needs action red',
     ])
@@ -100,10 +102,11 @@ describe('a subsidiary’s page', () => {
     expect(timelineLeft(w, '2026-10-22')).toBe(25)
     const bars = timelineBars(board, subProjects(board, CAR), w)
     // Sofa launch has no due day yet; the flyers ended before the window.
-    expect(bars.map(b => `${b.title} ${b.range} ${b.left.toFixed(2)}+${b.width.toFixed(2)}`)).toEqual([
-      'Year-End Video 1 Oct – 28 Oct 0.00+34.29',
-      'Weekly reel 19 Oct – 23 Oct 20.00+7.14',
-      'Banner resize 15 Oct – 20 Oct 14.29+8.57',
+    // A bar too short for its span says its due day.
+    expect(bars.map(b => `${b.title} ${b.range} ${b.left.toFixed(2)}+${b.width.toFixed(2)} "${b.label}"`)).toEqual([
+      'Year-End Video 1 Oct – 28 Oct 0.00+34.29 "1 Oct – 28 Oct"',
+      'Weekly reel 19 Oct – 23 Oct 20.00+7.14 "23 Oct"',
+      'Banner resize 15 Oct – 20 Oct 14.29+8.57 "20 Oct"',
     ])
     const heads = timelineHeads(w)
     expect(heads.months.map(m => m.name)).toEqual(['Oct', 'November', 'December'])

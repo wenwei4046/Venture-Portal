@@ -201,7 +201,7 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                 <div className={s.tlCorner}>Project</div>
                 <div className={`${s.tlHead}${keyOn ? ` ${s.tlHeadTall}` : ''}`}>
                   {heads.months.map(m => <div key={`${m.name}${m.left}`} className={s.tlMonth} style={{ left: `${m.left}%` }}>{m.name}</div>)}
-                  {heads.weeks.map(w => <div key={w.left} className={s.tlWeek} style={{ left: `${w.left}%` }}>{w.n}</div>)}
+                  {heads.weeks.map(w => <div key={w.left} className={`${s.tlWeek}${w.left === 0 ? ` ${s.tlWeekFirst}` : ''}`} style={{ left: `${w.left}%` }}>{w.n}</div>)}
                   {flags.filter(f => f.day >= tw.start && f.day < addDays(tw.start, tw.days)).map(f => (
                     <div key={f.day + f.name} className={`${s.flag} ${s.tlFlag}`} style={{ left: `${timelineLeft(tw, f.day)}%` }} title={f.name}>⚑ {f.short}</div>
                   ))}
@@ -212,7 +212,7 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                     <div className={s.tlTrack}>
                       <Link href={href(b.trackId)} className={`${s.tlBar} ${b.tone === 'red' ? s.red : b.team ? TEAM[b.team] : s.draft}${b.tone === 'done' ? ` ${s.faded}` : ''}`}
                         style={{ left: `${b.left}%`, width: `${b.width}%` }} title={`${b.title} · ${b.range}`}>
-                        {b.range}
+                        {b.label}
                       </Link>
                       <span className={s.today} style={{ left: `${timelineLeft(tw, board.today)}%` }} aria-hidden="true" />
                     </div>
@@ -273,7 +273,9 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                   <span className={s.bar}><span className={`${s.barFill}${r.tone === 'red' ? ` ${s.barRed}` : r.tone === 'done' ? ` ${s.barDone}` : ''}`} style={{ width: `${pctDone}%` }} /></span>
                   <span className={s.barText}>{r.total ? `${r.done}/${r.total}` : '—'}</span>
                 </span>
-                <span className={s.tdOwner} role="cell"><span className={s.ownerAv} aria-hidden="true">{r.owner.slice(0, 1)}</span>{r.owner}</span>
+                <span className={s.tdOwner} role="cell">
+                  {r.owner !== '—' ? <span className={s.ownerAv} aria-hidden="true">{r.owner.slice(0, 1)}</span> : null}{r.owner}
+                </span>
                 <span className={`${s.tdDue}${r.tone === 'red' ? ` ${s.dueRed}` : ''}`} role="cell">{r.dueLabel}</span>
               </Link>
             )

@@ -77,6 +77,8 @@ export function mktNavActive(pathname: string, search: URLSearchParams | null): 
 export function mktCrumb(pathname: string): { emoji: string; label: string } {
   const path = pathname.split('?')[0]
   if (path === '/marketing/new') return { emoji: '📁', label: 'Projects / New project' }
+  // A subsidiary's page names itself once the shell has its list (MktShell); until then, or for no such code, this.
+  if (path.startsWith('/marketing/subsidiaries/')) return { emoji: '🏢', label: 'Subsidiaries' }
   const row = MKT_NAV.filter(r => r.href && under(path, r.href)).sort((a, b) => (b.href ?? '').length - (a.href ?? '').length)[0]
   if (row) return { emoji: row.emoji, label: row.label }
   const other: Record<string, { emoji: string; label: string }> = {
