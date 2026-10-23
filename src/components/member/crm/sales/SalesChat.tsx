@@ -10,7 +10,7 @@ import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { Phone4aStrip } from "../shared/phone4a";
+import { Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";
 
@@ -521,7 +521,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                 </Fragment>))}
               </div>
             </div>
-            <span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
+            <Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
           </div>
         </div>
       </>)}

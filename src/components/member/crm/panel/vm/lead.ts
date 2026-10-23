@@ -270,6 +270,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
           bg: sel ? "var(--crm-rust)" : ok ? "#fff" : "var(--crm-field)", fg: sel ? "#fff" : ok ? "var(--crm-ink)" : "var(--crm-faint-2)", bd: sel ? "var(--crm-rust)" : ok ? "var(--crm-rule)" : "var(--crm-field)" };
       }),
       bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "var(--crm-rust)" : "var(--crm-line)",
+      remarks: room?.remarks?.trim() ?? "",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
         const at = slotAt(B.day, B.slot!).toISOString(), moving = B.visitId;
@@ -336,6 +337,6 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
-    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm,
+    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm, bookRemarks: book?.remarks ?? "",
   };
 }

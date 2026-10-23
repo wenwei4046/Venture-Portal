@@ -235,6 +235,17 @@ export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: s
   );
 }
 
+/** Book visit: the showroom's staff-only remarks under the times (2026-10-23), as the desktop's Appointment sheet shows them. */
+export function Phone4aRoomRemarks({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-sel)" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Remarks · staff only</span>
+      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{text}</span>
+    </div>
+  );
+}
+
 /** M11 · Mine's Insight: Month / Week / Day / Range, the rust hero, the counts, Avg. reply time and Leads by status. */
 export function Phone4aInsightMine({ v }: { v: { p4: {
   periods: { label: string; on: boolean; pick: () => void }[]; range: string;

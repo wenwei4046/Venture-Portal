@@ -389,6 +389,8 @@ export function chatVM(ctx: SalesCtx) {
         return { t, left: leftOf(b.day, t), pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
           bg: on ? RUST : off ? "var(--crm-cream-nav)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint)" : INK, border: on ? RUST : off ? "var(--crm-cream-nav)" : BD, weight: on ? 650 : 500 };
       }),
+      // The showroom's staff-only remarks under the times (the owner, 2026-10-23: "book visit 下方如果有remarks的話要顯示出來").
+      bookRemarks: room?.remarks?.trim() ?? "",
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",
       confirmBg: ready ? RUST : "var(--crm-line)",
       confirmBook: ready && room ? () => void oneAtATime(`book:${c.id}`, async () => {

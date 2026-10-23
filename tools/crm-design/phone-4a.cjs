@@ -206,6 +206,7 @@ function sales(name, body) {
   if (name === "SalesNav") body = swap(body, '<nav style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nav3b} />", "sales bottom bar");
   if (name === "SalesInbox") body = inbox(body);
   if (name === "SalesChat") body = chat(body, "v.cl");
+  if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
   if (name === "SalesCalendar") body = calendar(body);
   if (name === "SalesContacts") body = contacts(body);
@@ -485,6 +486,7 @@ function panel(body) {
   // Change list 16 · the bottom bar (T01).
   body = swap(body, '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nv.nav} hidden={!v.navOn} />", "panel bottom bar");
   body = panelChat(body);
+  body = once(body, "<span onClick={v.ld.lx.confirm}", "<Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm}", "panel book remarks");
   body = teamInsight(body);
   body = teamInbox(body);
   body = teamAssign(body);

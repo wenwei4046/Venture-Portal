@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -505,7 +505,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </Fragment>))}
                   </div>
                 </div>
-                <span onClick={v.ld.lx.confirm} style={{ flex: "none", height: "48px", borderRadius: "24px", background: v.ld.lx.bookBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.bookLabel}</span>
+                <Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm} style={{ flex: "none", height: "48px", borderRadius: "24px", background: v.ld.lx.bookBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.bookLabel}</span>
               </div>
             </div>
           </>)}
