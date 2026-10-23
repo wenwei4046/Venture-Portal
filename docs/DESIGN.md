@@ -1711,7 +1711,30 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
 
 - **Theme.** Its own, light whatever the theme: `.mkt-shell` in `globals.css` — channels `--mk-*` (ink 51 36 27, app ground 243 243 241, sidebar 248 245 240, brown 90 62 43 for what is picked, the primary `#EC9B55` / `#E0893F` with ink lettering), the handoff's four statuses (Overdue · Waiting · Done · Draft, each a ground, an edge, words and a dot), the teams' chips (Content · Social Media · Design · Ads · Brand · the manager) and a meeting's blue. Everything is sized in em from the base the Appearance panel picks. Chivo Mono for Track IDs and dates (`--mk-mono`).
 - **The shell** (`components/mkt/shell`): the sidebar 248px (folds to 64; the H tile or « toggles it) — HOUZS Marketing and the number of subsidiaries, the avatar (the account menu: Change password, Change email, My documents, IT support, Sign out), rows on 28px emoji tiles in four tones (sand, mist, peach, cream), the picked row on `236 229 219` with a 3px brown mark, red count pills (a dot on the tile while folded), Subsidiaries opening its list (a 7px dot and the emoji, those with something for the viewer first), MANAGER TOOLS under a rule, at the foot My claims, Meeting Rooms and Settings. The top bar: 60px, white, radius 16, 10px in — the crumb, the search (440 × 36, ⌘K), then Me and the memo bell for a personal login, the Principal's view switch, the 🔔 with its red count. The page on a white card, radius 16, 10px in. Panels: Notifications 380px from the top right; Appearance 320px at the foot (S / M / L / XL, Inter / Nunito / IBM Plex, Compact / Comfortable, Reset).
-- **My Space** (`/marketing`): the cover (190px, the first gradient), the 96px avatar on it, the name 1.6em/600 with the role, *Good morning, Mei ☀️ — you have 2 things on your plate*, then the board — My turn (two columns of cards, two rows tall), Waiting on others, Delegated by me, This week — tiles radius 14 on the linen ground. A card: the title (opens the task), a dot and *Carres · Stage 1/5 · Script · Due 21 Oct*, the status pill and Accept (accepts on the tile, then the task opens) / Open / Review. Red first. The room, the pet, the lobby and chat come with their own module.
+- **My Space** (`/marketing`; its own side `My Space Bento.dc.html`, ⑦-1):
+  - **The cover** is 190px: one of four gradients, or a picture. *🖼️ Change cover* (top right) opens the four, the one shown ringed in the accent, and *⬆ Upload a cover image*.
+  - **The 96px avatar** sits on the cover: a picture, or the first letter on the team's colour. A click picks another.
+  - **Under the cover**: the name (1.6em/600) with the role, then the status — a box with a dashed underline, *Set a status*, 80 characters at most. **✥ Edit layout** is on the right, walnut while on.
+  - **The greeting**: *Good morning, Mei ☀️ — you have 2 things on your plate*.
+  - **The board** is as its owner laid it out. Each tile sits where it was put: across as a share of the width, down in px, 12px apart. The tiles:
+    - My turn (its cards two abreast when the tile is half the board or wider)
+    - Waiting on others
+    - Delegated by me
+    - This week
+    - 📝 Notes, on 255 249 222
+    - 🖼️ Photo: the picture, or a dashed *🖼️ Add a photo*
+
+    A card shows the title (which opens the task), a dot and *Carres · Stage 1/5 · Script · Due 21 Oct*, the status pill, and Accept / Open / Review. Accept accepts on the tile, then the task opens. Accept and Review are in the accent. Red cards come first.
+  - **While laying out**, every tile is veiled white at 35% and dashed. Each shows ✥ (top left), ✕ — or 🔒 on My turn and Waiting — its name (bottom left) and eight handles in the accent. The tile moving is outlined in the accent and lifted, and the board grows 140px deeper to drag into.
+  - **The drawer** (290px, sticky):
+    - *Add a tile*, two columns
+    - *Page background*: Linen, Mint, Lilac, Sand, White — 34px swatches, the chosen one ringed in the accent
+    - *Accent*: orange, walnut, blue, green, pink — 26px circles; lettering on the accent is dark on orange and white on the rest
+    - *Tile corners*: Square 6 · Soft 14 · Round 24
+    - *Reset layout and theme*
+    - **Done**, in the accent
+  - **Under 520px wide** the tiles go one under another.
+  - The room, the pet, the lobby and chat come with ⑦-2 onwards.
 - **Calendar** (`/marketing/calendar`): the month's name 1.85em with ‹ › and Today, *Only mine*, ▦ Month · ▥ Week · ☰ List; the layers (📣 Posts · ⏱ Stage due dates · 🗓️ Shoots & meetings, with the month's counts), the subsidiary chips, the legend; the month grid (Monday first, cells 124px, today on a brown disc, three items then *+N more*), the week's seven columns, the list by day; a 320px panel for the item or the day picked, *Open task*. A stage's due date is a white card with a dashed edge in its status.
 - **Projects** (`/marketing/projects`, not drawn by the handoff): the Calendar's head and chips, a search, Open · Done · All, and the List's table — Project (title, Track ID · kind), Subsidiary, Stage, Now with, Due, Status.
 - **Tracking Dashboard** (`/marketing/tracking`, the manager's): 📊 and the title, 👥 By people · 🔀 By workflow; This week · This month · Custom, subsidiary, workflow and person; five cards — Ongoing, Needs you, Overdue, At risk, On track — that filter by state; a card per person (load against capacity in slots, *Now on* with its stage segments and days on the stage, *Also on*, on-time % and days per stage, *Only …*); by workflow, the people's load strip and a lane per workflow with a column per stage, the slowest flagged 🐢. *Nudge* on a person's card tells them about their task that waits on them most (once an hour).
@@ -1738,6 +1761,7 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
 
 ## Part IV — Version index
 
+- **v4.142** · 2026-10-23 · **My Space laid out by its owner** (the handoff's `My Space Bento.dc.html`, its own side, first part): the cover (four gradients or a picture — *🖼️ Change cover*), the avatar (a picture), the status; **✥ Edit layout** — every tile dragged anywhere and resized from eight handles, ✕ / 🔒, the drawer's *Add a tile*, *Page background*, *Accent*, *Tile corners*, *Reset layout and theme*, **Done**; 📝 Notes and 🖼️ Photo; under 520px the tiles one under another (#673) → Marketing's view — its shell and first pages
 - **v4.141** · 2026-10-23 · **A Library file on a task** (the handoff's *Attach to task* · *Attach from Library*): a file's ··· *Attach to task* — its subsidiary's open tasks with their Track IDs and *Now at …*; on the task page, 📚 *Library files* under Requirements — chips opening the Library's own file, ×, **+ Attach from Library** (the subsidiary's file folders, those on the task ticked already, *Attach n files*) (#665) → Marketing's view — its shell and first pages
 - **v4.140** · 2026-10-23 · **A Library guest link** (the handoff's *Share link*): the dialog — *Create link*, then the address with **Copy**, *Link expires* 24 hours · 7 days · 30 days · Never, *Allow download*, *Stop link*; the stranger's page `/l/<code>` in the `.mkt-pic` palette — the brand's banner, the item, its files shown in place or saved when allowed, *View only*, *This link is closed* (#664) → Marketing's view — its shell and first pages
 - **v4.139** · 2026-10-23 · **A subsidiary's brand in the Library** (the handoff's *Edit … profile*, the manager's ✎): its cover or colour, its logo or colour and letter, its name in one of six brand fonts with its caption — on its card and banner; the dialog's preview, seven swatches each, ⬆ Upload logo / cover, the font tiles, Display name, Caption; SCHEDULE — its next three dates as chips (#663) → Marketing's view — its shell and first pages

@@ -8,6 +8,7 @@ import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
+import { spaceFromRow, type Space } from './space'
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
@@ -96,6 +97,14 @@ export async function readTaskFiles(project: string): Promise<TaskFile[]> {
   const { data, error } = await db.rpc('mkt_task_library', { p_project: project })
   if (error) throw new Error(error.message)
   return taskFilesFromRow(data)
+}
+
+/** The viewer's own space (⑦-1, mig 20261024007500) — the design's default before the first save. */
+export async function readSpace(): Promise<Space> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_space')
+  if (error) throw new Error(error.message)
+  return spaceFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */
