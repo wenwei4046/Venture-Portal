@@ -170,6 +170,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 116. **The template's Locked switch** (②b-2a). The handoff's plan toggles it; it is the Workflow Builder's setting ("Workflow setting from Workflow Builder"), so the plan shows it read only.
 117. **The canvas's own fields** (②b-2a). A template's own sections' fields belong to a stage; a deliverable's stage carries them in its fields (with their section's title), so they are filled and checked with it. The task page draws them in its stage's list, not yet in the canvas's sections.
 118. **A change of hands once open** (②b-2a). The handoff's mid-way plan asks a reason for every change; built: a reason for a stage that changes from one person to another (5–300 characters); approvals, days and subtasks of stages not begun change without one (logged *plan changed*).
+119. **A deliverable's Requirements** (②b-2a, seen on the preview walk). The handoff's product task page opens on 📋 Requirements from the intake minutes; a deliverable's task page shows its own brief (none) until the product task page's canvas is built.
+120. **The minutes once the work started** (②b-2a). An edit the PIC sees sends the minutes back to them only while the project is *approved*; once its work has started (*active*) it does not — whether the minutes lock then, or the work pauses for the PIC, is not decided.
 
 ## 5. Open questions (for the user) — all answered 2026-10-24, §6
 
