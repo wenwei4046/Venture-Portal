@@ -11,6 +11,7 @@ import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
 import type { AttConfig, AttLedger, AttMonth, AttRequest } from '@/lib/attendance/types'
 import type { HiringField } from '@/lib/hiring/types'
+import type { ProbationReview } from '@/lib/probation-reviews'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -172,7 +173,17 @@ export interface HrAppData {
     today: boolean; approve: boolean; balances: boolean; close: boolean; records: boolean; people: boolean
   }
   /** The writes behind its buttons, by their page's boxes and the cells: a button they may not use is not drawn. */
-  may: { attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
+  may: {
+    attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean
+    /** Acknowledge a probation's reminder (2026-10-23): People · Edit on a person's page. Absent reads as no. */
+    probationAck?: boolean
+  }
+  /**
+   * The probations HR is reminded of (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"): everybody active on
+   * probation (`probation_reviews()`, lib/probation-reviews.ts), for whoever may acknowledge one. Null while they may
+   * not, and while viewing as somebody. Absent reads as none.
+   */
+  probation?: ProbationReview[] | null
   /**
    * HR › Attendance as its own readers answer it (2026-10-17, HR Mobile — Today, Approve, a person, Leave balances,
    * Month close, Records): null while none of those pages is open to them. Absent reads as none.
@@ -431,6 +442,9 @@ export function clashOf(bookings: readonly HrBooking[], roomId: string, date: st
 /** A memo's tag (2026-10-12): the olive of Documentation's kind tag. */
 export const MEMO_TAG = { tag: 'MEMO', bg: 'rgb(238 240 226)', fg: 'rgb(88 98 68)' } as const
 
+/** A probation's tag (2026-10-23): the design system's warning pair, as the roster's Probation chip wears it. */
+export const PROBATION_TAG = { tag: 'PROB', bg: 'var(--ds-warning-bg)', fg: 'var(--ds-warning)' } as const
+
 /**
  * A notice's tag, in the Review list's own colours: HIRE (a hiring request), ROOM (a meeting), REQ (a member's
  * request), MEMO (a memo or letter for them — 2026-10-12).
@@ -441,6 +455,8 @@ export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string
   if (n.refKind === 'memo') return { ...MEMO_TAG }
   // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
   if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  // A probation ending (2026-10-23): the person — the amber of the roster's Probation chip.
+  if (n.refKind === 'hr_staff') return { ...PROBATION_TAG }
   return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
 }
 

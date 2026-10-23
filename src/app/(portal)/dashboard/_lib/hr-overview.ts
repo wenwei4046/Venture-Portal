@@ -7,6 +7,8 @@ import { adminMemberAction } from '@/lib/member/server'
 import { canAccessAttendance, canAccessDirectorSalary, canAccessHRCosting, canAccessHiring } from '@/lib/roles'
 import { loadConfig, loadLedger, loadMonth, loadRequests } from '@/lib/attendance/server'
 import { attendanceNews } from '@/lib/attendance/overview'
+import { officeToday } from '@/lib/office-time'
+import { probationsEnding, reviewsFromRow, seesProbationReminders, waitingCount } from '@/lib/probation-reviews'
 import type { User } from '@/types'
 
 // HR's Overview (2026-10-14, the Finance revamp v2 — `HR Overview.dc.html`,
@@ -38,7 +40,7 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
 
   const year = Number(period.slice(0, 4))
   const seesAttendance = canAccessAttendance(user)
-  const [summaryRead, hiring, members, attConfig, attMonth, attRequests, attLedger] = await Promise.all([
+  const [summaryRead, hiring, members, attConfig, attMonth, attRequests, attLedger, probationRead] = await Promise.all([
     supabase.rpc('hr_dashboard_summary', { p_period: period }),
     canAccessHiring(user) ? loadHiringBoard() : Promise.resolve(null),
     can(user, 'member_requests_manage') ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
@@ -46,7 +48,10 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
     seesAttendance ? loadMonth(officeTime().format('YYYY-MM-DD')) : Promise.resolve(null),
     seesAttendance ? loadRequests() : Promise.resolve(null),
     seesAttendance ? loadLedger(year) : Promise.resolve(null),
+    // The probations waiting for Acknowledge (2026-10-23 — the user: "HR Overview 首页上的数字"), as HR view's bell counts them.
+    seesProbationReminders(user) ? supabase.rpc('probation_reviews') : Promise.resolve(null),
   ])
+  const probations = probationRead && !probationRead.error ? waitingCount(reviewsFromRow(probationRead.data), officeToday()) : 0
   // Attendance (2026-10-15, the Attendance handoff's Overview): requests waiting for HR, who is not in yet, the close.
   const att = attConfig?.ok && attMonth?.ok && attRequests?.ok && attLedger?.ok
     ? attendanceNews(attConfig.data, attMonth.data, attRequests.data, attLedger.data)
@@ -67,11 +72,13 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
   // Where the month stands (H01): the payroll, the hiring requests, the director salary.
   const payroll = rows === 0 ? `${monthName} payroll is not imported yet` : submitted ? `${monthName} payroll is submitted` : `${monthName} payroll is imported`
   const directorWords = director === 'confirmed' ? 'director salary confirmed' : director === 'draft' ? 'director salary in draft' : 'director salary not calculated'
-  const parts = att ? [att.summary] : [
+  const parts = att ? att.summary.split(' · ') : [
     canAccessHRCosting(user) ? payroll : null,
     waiting === null ? null : `${waiting} hiring ${waiting === 1 ? 'request' : 'requests'} waiting`,
     canAccessDirectorSalary(user) ? directorWords : null,
   ].filter((p): p is string => p !== null)
+  // The probations HR is told of: after the requests waiting for HR, as the HR app's Home says it — only while some wait.
+  if (probations > 0) parts.splice(1, 0, probationsEnding(probations))
 
   return {
     period,
@@ -84,6 +91,7 @@ export async function loadHrOverview(supabase: SupabaseClient, user: User): Prom
       mem: newRequests ? `${newRequests} new` : null,
       dsal: director === 'not_calculated' ? 'Not calculated' : director === 'draft' ? 'Draft' : null,
     },
-    badges: { hire: waiting ?? 0, mem: newRequests ?? 0, memReq: newRequests ?? 0, ...(att?.badges ?? {}) },
+    // People's tile and its row in People Management (both pplPeople): the probations waiting for Acknowledge.
+    badges: { hire: waiting ?? 0, mem: newRequests ?? 0, memReq: newRequests ?? 0, ...(att?.badges ?? {}), pplPeople: probations },
   }
 }

@@ -10,7 +10,7 @@ import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { Phone4aStrip } from "../shared/phone4a";
+import { Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";
 
@@ -243,7 +243,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
             <h2 style={{ margin: "0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700" }}>Invite to this chat</h2>
             {(v.hm.groups).map((g, g_i) => (<Fragment key={g_i}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+                <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                   </span>{g.name} · {g.n}</span>
                 {(g.people).map((o, o_i) => (<Fragment key={o_i}>
                   <div onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-rule)", cursor: o.cur, opacity: o.op }}>
@@ -521,7 +521,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                 </Fragment>))}
               </div>
             </div>
-            <span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
+            <Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
           </div>
         </div>
       </>)}

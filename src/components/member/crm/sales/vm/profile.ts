@@ -6,7 +6,7 @@
  */
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
-import { downlineOf, jobTitle, titleOf } from "../../shared/people";
+import { downlineOf, jobTitle, teamName, teamOf, titleOf } from "../../shared/people";
 import { CHANNEL, firstName, ini, stop, type SalesCtx } from "./common";
 import { openSummary } from "../../shared/notif-summary";
 import { lastWordsOf, summaryFor } from "../../shared/notif-summary-data";
@@ -16,7 +16,7 @@ const swv = (on: boolean) => ({ Bg: on ? "var(--crm-brown)" : "var(--crm-line)",
 const to12 = (hhmm: string) => { const [H, M] = hhmm.split(":").map(Number); return { h: H % 12 || 12, m: M, ap: (H < 12 ? "AM" : "PM") as "AM" | "PM" }; };
 const lbl = (hhmm: string) => { const t = to12(hhmm); return `${t.h}:${String(t.m).padStart(2, "0")} ${t.ap}`; };
 
-export function profileVM(ctx: SalesCtx) {
+export function profileVM(ctx: SalesCtx, onExit?: () => void) {
   const { ui, set, patch, data, owner, viewingOther, act, embedded, nameOf } = ctx;
   // Unread | Read (rev 1010 §6): an update is read once tapped; an invitation stays unread until answered.
   const notifs = salesNotifs(ctx), isRead = (n: (typeof notifs)[number]) => isReadNotif(n, data);
@@ -61,6 +61,16 @@ export function profileVM(ctx: SalesCtx) {
     stop, stopTeam: stop,
     profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
     meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
+    // v3 M12: the main page — the avatar centred, its line, MESSAGES (Notifications, Auto-reply, Quick replies).
+    pf12: {
+      ini: ini(owner.name), name: owner.name, sub: [jobTitle(owner), teamName(teamOf(owner.id, data.people))].filter(Boolean).join(" · "),
+      house: !!onExit, exit: () => onExit?.(), flush: true,
+      groups: [{ title: "Messages", rows: [
+        { label: "Notifications", icon: "bell" as const, open: () => patch({ profSub: "notif", nTab: "all" }), n: unread ? String(unread) : "", badge: true },
+        { label: "Auto-reply", icon: "bot" as const, open: () => patch({ profSub: "auto" }), n: AR.welcome.on || AR.after.on || AR.kws.some(k => k.on) ? "On" : "Off", badge: false },
+        { label: "Quick replies", icon: "message-square-text" as const, open: () => patch({ profSub: "quick" }), n: String(qrs.length), badge: false },
+      ] }],
+    },
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",
     // No View my team (rev 1010 §7.3): team views live on the Team side.
     hasTeam: false, teamSub: team.map(p => firstName(p.name)).join(", "),

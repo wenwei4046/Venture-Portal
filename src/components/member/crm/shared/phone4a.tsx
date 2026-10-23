@@ -235,6 +235,64 @@ export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: s
   );
 }
 
+/** Book visit: the showroom's staff-only remarks under the times (2026-10-23), as the desktop's Appointment sheet shows them. */
+export function Phone4aRoomRemarks({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-sel)" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Remarks · staff only</span>
+      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{text}</span>
+    </div>
+  );
+}
+
+type ProfRow = { label: string; icon: Icon4a; open: () => void; n: string; badge: boolean };
+/** v3 T06 / M12 · a Profile as the prototype draws it: the house top-right, the avatar centred with its name and line, on
+ * the Team side View as a team member (the dark card), then groups of rows (MANAGE · ME, or MESSAGES) as white cards —
+ * each row a solid rust tile, a count or state, a chevron. */
+export function Phone4aProfile({ p }: { p: { ini: string; name: string; sub: string; house: boolean; exit: () => void; viewAs?: () => void; groups: { title: string; rows: ProfRow[] }[]; flush?: boolean } }) {
+  const Group = ({ title, rows }: { title: string; rows: ProfRow[] }) => rows.length ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <span style={{ padding: "0 6px", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{title}</span>
+      <div style={{ borderRadius: "16px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", overflow: "hidden" }}>
+        {rows.map((r, i) => (
+          <button key={r.label} type="button" onClick={r.open} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "12px 16px", boxSizing: "border-box", borderTop: i ? "1px solid var(--crm-rule-soft)" : 0, textAlign: "left" }}>
+            <span style={{ flex: "none", width: "34px", height: "34px", borderRadius: "10px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }}><Ic name={r.icon} size={17} /></span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>{r.label}</span>
+            {r.n && (r.badge
+              ? <span style={{ minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "11px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", fontSize: fs(12), fontWeight: 600 }}>{r.n}</span>
+              : <span style={{ fontSize: fs(14), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{r.n}</span>)}
+            <span style={{ display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+  return (
+    // flush: drawn inside a page that pads itself (Mine's Profile) — it takes that padding back.
+    <main data-prof-glow="1" style={{ flex: "1 1 auto", minHeight: 0, margin: p.flush ? "-14px -20px -24px" : 0, overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px",
+      background: "linear-gradient(180deg, var(--crm-sand) 0%, var(--crm-sel) 18%, #fff 42%)" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", minHeight: "40px" }}>
+        {p.house && <button type="button" onClick={p.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.7)", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", marginTop: "-6px" }}>
+        <span style={{ width: "92px", height: "92px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", border: "4px solid #fff", boxShadow: "0 4px 14px rgba(42,22,12,.12)", fontFamily: TIGHT, fontSize: fs(32), fontWeight: 500 }}>{p.ini}</span>
+        <h1 style={{ margin: "6px 0 0", fontFamily: TIGHT, fontSize: fs(22), fontWeight: 500, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>{p.name}</h1>
+        <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{p.sub}</span>
+      </div>
+      {p.viewAs && <button type="button" onClick={p.viewAs} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", textAlign: "left" }}>
+        <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.12)", color: "var(--crm-peach)" }}><Ic name="users" size={17} /></span>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span style={{ fontSize: fs(15), fontWeight: 600 }}>View as a team member</span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-peach-soft)" }}>Open anyone&apos;s CRM · reply and book for them</span>
+        </span>
+        <span style={{ display: "flex", color: "var(--crm-peach-soft)" }}><Ic name="chevron-right" size={15} /></span>
+      </button>}
+      {p.groups.map(g => <Group key={g.title} title={g.title} rows={g.rows} />)}
+    </main>
+  );
+}
+
 /** M11 · Mine's Insight: Month / Week / Day / Range, the rust hero, the counts, Avg. reply time and Leads by status. */
 export function Phone4aInsightMine({ v }: { v: { p4: {
   periods: { label: string; on: boolean; pick: () => void }[]; range: string;
@@ -382,25 +440,22 @@ export function Phone4aCalLists({ v }: { v: {
 /** T03 · an ad on Assignment: its channel, name and headline, the leads, the split bar in team colours, a chevron (the card opens
  * its split) and, unset, "Not set up" (v3). */
 export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: boolean; leads: number; setUp: boolean; held?: boolean; heldTxt?: string; bar: { w: string; c: string; op?: number }[]; edit: () => void } }) {
+  // Compact (the owner, 2026-10-23: "下方的廣告也是有沒有可能小一點，如果同時打很多廣告就很亂"): one line — channel, name,
+  // leads, chevron — and a thin split bar under it; the headline is the title tooltip.
   return (
-    <div onClick={a.edit} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 14px", borderRadius: "14px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-        <span style={{ display: "flex", paddingTop: "2px", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={16} /></span>
-        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-          {a.head && <span style={{ fontSize: fs(12.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.head}</span>}
-        </span>
-        <span style={{ flex: "none", fontSize: fs(13), color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", paddingTop: "2px" }}>{a.leads} leads</span>
+    <div onClick={a.edit} title={a.head || undefined} style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "9px 12px", borderRadius: "12px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ flex: "none", display: "flex", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={14} /></span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+        {a.held && <span style={{ flex: "none", padding: "2px 7px", borderRadius: "9px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(10.5), fontWeight: 600 }}>{a.heldTxt}</span>}
+        {/* v3 T03: the whole card opens the split; an unset ad says "Not set up". */}
+        {a.setUp && <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: fs(11), fontWeight: 500, whiteSpace: "nowrap" }}>Not set up</span>}
+        <span style={{ flex: "none", fontSize: fs(12), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{a.leads} leads</span>
+        <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={13} /></span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingLeft: "0" }}>
-        <span style={{ flex: 1, display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden", background: "var(--crm-track)" }}>
-          {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
-        </span>
-        {a.held && <span style={{ flex: "none", padding: "3px 8px", borderRadius: "10px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(11), fontWeight: 600 }}>{a.heldTxt}</span>}
-        {/* v3 T03: no Edit split / Set up buttons — the whole card opens the split; an unset ad says "Not set up". */}
-        {a.setUp && <span style={{ flex: "none", height: "26px", padding: "0 10px", borderRadius: "13px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: fs(12), fontWeight: 500, whiteSpace: "nowrap" }}>Not set up</span>}
-        <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>
-      </div>
+      <span style={{ display: "flex", gap: "2px", height: "4px", borderRadius: "2px", overflow: "hidden", background: "var(--crm-track)" }}>
+        {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
+      </span>
     </div>
   );
 }
@@ -423,7 +478,6 @@ function RoomHours({ h }: { h: Room4["hours"] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "baseline" }}>
         <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(15) }}>Opening hours</span>
-        <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>Type, or tap the grid</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", borderRadius: "14px", background: "var(--crm-sel)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -456,7 +510,6 @@ function RoomHours({ h }: { h: Room4["hours"] }) {
           </div>
         ))}
       </div>
-      <span style={{ fontSize: fs(12), lineHeight: 1.4, color: "var(--crm-muted)" }}>Tap a row to change single days. Days with the same hours are grouped.</span>
     </div>
   );
 }
@@ -565,16 +618,19 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
  */
 export function Phone4aActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
+  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); all open at first.
+  const [shut, setShut] = useState<Record<string, boolean>>({});
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      {groups.map(g => (
+      {groups.map(g => { const off = !!shut[g.name]; return (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+          <button type="button" aria-expanded={!off} onClick={() => setShut(x => ({ ...x, [g.name]: !off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
-            <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: g.color }}>{g.name}</strong>
+            <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-ink)" }}>{g.name}</strong>
             <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
-          </div>
-          {g.people.map((p, k) => (
+            <span style={{ display: "flex", color: "var(--crm-faint)", transform: off ? "none" : "rotate(180deg)", transition: "transform 160ms" }}><Ic name="chevron-down" size={15} /></span>
+          </button>
+          {!off && g.people.map((p, k) => (
             <div key={p.id} role="button" aria-pressed={p.active} onClick={p.toggle} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 14px", borderTop: k ? "1px solid var(--crm-rule-soft)" : "0", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
               <span style={{ flex: "none", width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: fs(12), fontWeight: 600 }}>{p.ini}</span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
@@ -587,7 +643,7 @@ export function Phone4aActive({ v }: { v: ActiveVM }) {
             </div>
           ))}
         </div>
-      ))}
+      ); })}
     </section>
   );
 }

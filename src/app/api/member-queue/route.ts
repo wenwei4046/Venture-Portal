@@ -40,6 +40,11 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
+    // Probations ending within 14 days (mig 20261024223000): once to each HR app holder who may still acknowledge
+    // it, asked as them — then sent by the flush below. A count only (the names are people's).
+    const probationDue = await db.rpc('notify_probation_due')
+    if (probationDue.error) console.error('Probation notices failed', probationDue.error.code ?? 'unknown')
+    else if (probationDue.data) console.info('Probation notices written', probationDue.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())

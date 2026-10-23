@@ -7,7 +7,7 @@
  */
 import { urgencyOf } from "../../sales/vm/common";
 import { jobTitle } from "../../shared/people";
-import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, ini, numbersOf, pct, periodRange, tagOf, type PanelCtx } from "./common";
+import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, ini, numbersOf, pct, periodRange, seatOf, tagOf, type PanelCtx } from "./common";
 
 export function overviewVM(ctx: PanelCtx) {
   const { ui, set, patch, data, me, now, teams, directors } = ctx;
@@ -30,13 +30,15 @@ export function overviewVM(ctx: PanelCtx) {
   const row = (id: string, name: string, who: string, c: string, ids: string[], people: typeof teams[number]["people"], tints: [string, string]) => {
     const s = ofStaff(ids), canOpen = people.length > 0, open = !!ui.openT[id];
     return {
-      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due), won: pct(s.won, s.leads),
+      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due),
       canOpen, open: canOpen && open, rot: open ? "90deg" : "0deg", cur: canOpen ? "pointer" : "default",
       toggle: canOpen ? () => set(u => ({ ...u, openT: { ...u.openT, [id]: !open } })) : undefined,
       people: people.map(p => {
         const v = ofStaff([p.id]), w = waiting.filter(x => x.assignedTo === p.id).length, lead = p.role === "tl" || p.role === "stl";
         return { name: p.name, ini: ini(p.name), aBg: lead ? tints[1] : tints[0], aFg: lead ? "#fff" : tints[1], tag: tagOf(p), waiting: w ? ` · ${w} waiting` : "",
-          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due), open: () => ctx.openCrmOf(p.id) };
+          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due),
+          // The owner, 2026-10-23: a member opens the Team inbox filtered to them, still as oneself — never as them (View as is Profile's).
+          open: () => set(u => ({ ...u, tab: "inbox", lead: null, inbTeam: seatOf(ctx, p.id)?.id ?? "", inbWho: p.id, inbCol: 0 })) };
       }),
     };
   };

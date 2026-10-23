@@ -22,6 +22,7 @@ import { loadMyMemos } from '@/lib/memos/server'
 import { NO_MEMOS } from '@/lib/memos/model'
 import { loadMyDocuments } from '@/lib/documentation/my-docs'
 import { loadBoard, loadLedger, loadRequests } from '@/lib/attendance/server'
+import { reviewsFromRow, seesProbationReminders } from '@/lib/probation-reviews'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -208,13 +209,18 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
       hireCreate: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'create'),
       talentEdit: parts.talent && canDo(onPage(user, PART_PAGE.talent), 'hiring', 'edit'),
       book: parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'create'),
+      // A probation's reminder (2026-10-23): People · Edit on a person's page, as HR view's bell asks — never while
+      // viewing as somebody.
+      probationAck: parts.people && seesProbationReminders(user),
     },
   }
 }
 
 /**
  * What HR's new work they are told of (2026-10-11, mig 20261011180000): the parts the app shows them and may act
- * in. The database keeps only those their own actions hold (`notification_topics_sync`).
+ * in. The database keeps only those their own actions hold (`notification_topics_sync`). A probation ending
+ * (2026-10-23, mig 20261024223000): whoever may acknowledge it — a topic no permission change forgets, since the
+ * sweep asks again, as them, each time it tells.
  */
 export function hrTopics(user: User): string[] {
   const { parts, may } = appAccess(user)
@@ -222,6 +228,7 @@ export function hrTopics(user: User): string[] {
     ...(may.hireApprove ? ['hiring.guest'] : []),
     ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
     ...(may.decide ? ['member.requests'] : []),
+    ...(may.probationAck ? ['people.probation'] : []),
   ]
 }
 
@@ -250,7 +257,12 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [attRead, phones] = await Promise.all([attendanceOf(parts, today), parts.people ? mobiles() : Promise.resolve({})])
+  const [attRead, phones, probationRead] = await Promise.all([
+    attendanceOf(parts, today),
+    parts.people ? mobiles() : Promise.resolve({}),
+    // The probations HR is reminded of (2026-10-23): read only for whoever may acknowledge one.
+    may.probationAck ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
+  ])
   const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
@@ -317,6 +329,7 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     parts,
     may,
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
+    probation: probationRead && !probationRead.error ? reviewsFromRow(probationRead.data) : null,
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
     memos: mine.memos,

@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { acknowledged, dueReviews, reviewsFromRow, seesProbationReminders, waitingCount } from './probation-reviews'
+import { PROBATION_NOTICE_DAYS } from './employment-status'
+import { acknowledged, dueReviews, probationsEnding, reviewsFromRow, seesProbationReminders, waitingCount } from './probation-reviews'
 
 const row = (over: Record<string, unknown>) => ({
   id: 'p1', name: 'TEOH CHEA HUAN', firstName: 'CHEA HUAN', lastName: 'TEOH', code: 'HV009', department: 'Revenue Department',
@@ -56,5 +59,18 @@ describe('who is told', () => {
   it('not while viewing as somebody, nor with the page’s Edit box unticked', () => {
     expect(seesProbationReminders({ ...hr, viewingAs: { id: 'x', name: 'X' } })).toBe(false)
     expect(seesProbationReminders({ ...hr, closed: ['hr.people.edit'] })).toBe(false)
+  })
+})
+
+// The phone (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送，以及 HR Overview 首页上的数字").
+describe('the sweep and the summary lines', () => {
+  it('the hourly sweep tells within the window the bell lists — the SQL keeps PROBATION_NOTICE_DAYS', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261024223000_probation_push.sql'), 'utf8')
+    expect(sql).toContain(`s.probation_end - ${PROBATION_NOTICE_DAYS} <= v_today AND v_today <= s.probation_end`)
+  })
+
+  it('a summary line’s part: one probation, many probations', () => {
+    expect(probationsEnding(1)).toBe('1 probation ending')
+    expect(probationsEnding(3)).toBe('3 probations ending')
   })
 })

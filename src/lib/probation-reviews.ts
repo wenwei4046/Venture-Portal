@@ -4,7 +4,10 @@
  * notification side, in desktop view"). The bell asks `probation_reviews()` (mig 20261024214500) for everybody active
  * on probation and lists those ending within PROBATION_NOTICE_DAYS or past; each waits for Acknowledge until HR
  * acknowledges it, then stays listed until they are confirmed, extended past the window or their employment ends.
- * Computed when the bell reads, never stored as notices: whoever may act sees it, on whichever computer.
+ * Computed when the bell reads: whoever may act sees it, on whichever computer. The phone (2026-10-23, mig
+ * 20261024223000 — the user: "HR 手机 app 里的提醒和推送，以及 HR Overview 首页上的数字"): the HR app's Home lists
+ * the same ones and its person page acknowledges them, and the hourly sweep tells each phone once per end
+ * (`notify_probation_due`); HR's Overview counts them on its People tiles.
  */
 import type { User } from '@/types'
 import { canDo } from '@/lib/permission-actions'
@@ -68,6 +71,9 @@ export function dueReviews(list: readonly ProbationReview[], today: string): Pro
 export function waitingCount(list: readonly ProbationReview[], today: string): number {
   return dueReviews(list, today).filter(r => !acknowledged(r)).length
 }
+
+/** A summary line's part for them (HR's Overview, the HR app's Home): "1 probation ending", "3 probations ending". */
+export const probationsEnding = (n: number): string => `${n} probation${n === 1 ? '' : 's'} ending`
 
 /**
  * Who is told, in HR view's bell: whoever may edit people on a person's page (People · Edit, with that page's box

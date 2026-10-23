@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AttConfig, AttLedger, AttMonth, AttRequest, AttStep } from '@/lib/attendance/types'
 import type { HrAppData } from '@/lib/hr-app/model'
+import type { ProbationReview } from '@/lib/probation-reviews'
 
 const itSupport = vi.hoisted(() => ({ render: vi.fn() }))
 vi.mock('@/components/it-support/ItSupport', () => ({
@@ -313,6 +314,68 @@ describe('the bell (2026-10-11)', () => {
     render(<HrApp data={{ ...data, personalLogin: false }} actions={actions} />)
     expect(screen.queryByTestId('me')).toBeNull()
     expect(window.location.search).toBe('')
+  })
+})
+
+// A probation ending (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送"): Home lists the ones
+// waiting, the person's page acknowledges one, a tapped push or a bell notice opens the person.
+describe('a probation ending (2026-10-23)', () => {
+  const review = (over: Partial<ProbationReview> = {}): ProbationReview => ({
+    id: 's2', name: 'Nurul Huda', code: 'HV040', department: 'HR', title: 'HR Executive', hireDate: '2026-07-23', months: 3,
+    endsOn: '2026-10-22', ackEnd: null, ackName: null, ackAt: null, ...over,
+  })
+  const acked = review({ id: 's3', name: 'Kar Jun', endsOn: '2026-10-20', ackEnd: '2026-10-20', ackName: 'Grace Lim', ackAt: '2026-10-14T01:00:00Z' })
+  const withProbation = (over: Partial<HrAppData> = {}): HrAppData =>
+    ({ ...data, probation: [review(), acked], may: { ...data.may, probationAck: true }, ...over })
+
+  it('Home lists those waiting and its line counts them; one opens the person, whose page acknowledges it', async () => {
+    const ack = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: ack }} />)
+    expect(screen.getByText('1 request waiting for HR · 1 probation ending · 1 not in yet · 1 late · October closes 3 Nov.')).toBeInTheDocument()
+    expect(screen.getByText('Probation ending')).toBeInTheDocument()
+    const row = screen.getByRole('button', { name: /Nurul Huda/ })
+    expect(row).toHaveTextContent('Ends 22 Oct 2026 · in 8 days · HR')
+    // Acknowledged already: not on Home.
+    expect(screen.queryByRole('button', { name: /Kar Jun.*Ends/ })).toBeNull()
+    fireEvent.click(row)
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+    expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await waitFor(() => expect(ack).toHaveBeenCalledWith('s2'))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Acknowledged'))
+    expect(actions.refresh).toHaveBeenCalled()
+  })
+
+  it('acknowledged for its end: who and when, no button — and none without the box, nor while viewing as somebody', () => {
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: done }} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.getByText('Acknowledged by Grace Lim · 14 Oct 2026')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    cleanup()
+    render(<HrApp data={withProbation({ may: { ...data.may, probationAck: false } })} actions={{ ...actions, probationAck: done }} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    cleanup()
+    render(<HrApp data={withProbation({ viewingAs: 'Grace Lim' })} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.queryByText('Probation ending')).toBeNull()
+  })
+
+  it('a tapped push opens the person (?open=person:…), then forgets the address; the bell’s notice is tagged PROB and opens them', () => {
+    window.history.pushState(null, '', '/hr-app?open=person:s2')
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    cleanup()
+    const notices = { unread: 1, items: [{ id: 'n9', kind: 'people' as const, title: 'Probation ending · Nurul Huda', body: 'Ends 22 Oct 2026 · in 8 days · HR',
+      refKind: 'hr_staff' as const, refId: 's2', at: new Date().toISOString(), read: false }] }
+    render(<HrApp data={withProbation({ notices })} actions={{ ...actions, probationAck: done }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    expect(screen.getByText('PROB')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Probation ending · Nurul Huda'))
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
   })
 })
 
