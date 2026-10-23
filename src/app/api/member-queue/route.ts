@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
-    // Probations ending within 14 days (mig 20261024223000): once to each HR app holder who may still acknowledge
+    // Probations ending within 15 days (mig 20261024223000; 15, not 14, since 20261025010000): once to each HR app holder who may still acknowledge
     // it, asked as them — then sent by the flush below. A count only (the names are people's).
     const probationDue = await db.rpc('notify_probation_due')
     if (probationDue.error) console.error('Probation notices failed', probationDue.error.code ?? 'unknown')

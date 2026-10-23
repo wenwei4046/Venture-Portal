@@ -33,7 +33,7 @@ describe('what the bell lists and counts', () => {
     row({ id: 'no-hire', endsOn: null, hireDate: null }),
   ])
 
-  it('ending within 14 days or past — waiting ones first, soonest first', () => {
+  it('ending within 15 days or past — waiting ones first, soonest first', () => {
     expect(dueReviews(list, today).map(r => r.id)).toEqual(['ended', 'soon', 'extended', 'acked'])
   })
 

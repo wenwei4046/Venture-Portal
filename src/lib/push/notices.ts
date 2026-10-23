@@ -18,7 +18,7 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
   // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
   | 'mkt_project'
-  // People (2026-10-23, mig 20261024223000): a probation ending within 14 days, to whoever may acknowledge it — the
+  // People (2026-10-23, mig 20261024223000): a probation ending within 15 days (since mig 20261025010000), to whoever may acknowledge it — the
   // person on probation (their People record's id); the HR app's bell lists it, a tap opens them there.
   | 'hr_staff'
 
