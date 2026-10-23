@@ -45,7 +45,7 @@ export function deskVM(ctx: DeskCtx) {
     // v2's Move / Share heads. A Move is a request (2026-10-23) — to whose direct upline, as chatMenuVM lists them.
     move: { avatar: "", title: "Move", sub: cur ? `${cur.name} · a request to ${moveHolder(ctx, cur) === ctx.me.id ? "your" : `${ctx.nameOf(moveHolder(ctx, cur))}'s`} direct upline` : "", subColor: "var(--crm-muted)", menu: false },
     share: { avatar: "", title: ctx.me.role === "boss" ? "Share · invite your team" : "Share", sub: cur ? `${cur.name}${ctx.me.role === "boss" ? " · they join the chat with you" : " · invite a teammate · same team only"}` : "", subColor: "var(--crm-muted)", menu: false },
-    metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : "Pick the columns for Ads Performance", subColor: "var(--crm-muted)", menu: false },
+    metrics: { avatar: "", title: "Customise metrics", sub: ui.mFor === "cards" ? "Pick the cards for Insight" : ui.mFor === "chart" ? "Pick up to 6 metrics for the chart" : "Pick the columns for Ads Performance", subColor: "var(--crm-muted)", menu: false },
     clist: { avatar: "", ...clist.clistHead, subColor: "var(--crm-muted)", menu: false },
     info: { avatar: "", ...info.infoHead, subColor: "var(--crm-muted)", menu: false },
     team: { avatar: "", ...team.teamHead, subColor: "var(--crm-muted)", menu: false },

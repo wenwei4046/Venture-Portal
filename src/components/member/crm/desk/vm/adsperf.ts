@@ -11,7 +11,7 @@ import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
 import { INS_CARDS, MON } from "./insight";
 import { columnSizer } from "./columns";
-import { CHART_DEF, CHART_MAX, CHART_METRICS, chartFmt, dailySeries, dayLabel, daysOf, SERIES } from "./adschart";
+import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES } from "./adschart";
 import { ST_META } from "./tokens";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
@@ -25,6 +25,8 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
 export const ALL = METRICS.flatMap(g => g[2]);
+/** The chart's metrics are the table's (2026-10-23, the owner: "他的资料跟下方的 + 是一样的"), less Delivery. */
+const CHART_METRICS = ALL.filter(m => m[3] !== "t").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
 // lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
 export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
@@ -66,9 +68,10 @@ export function adsPerfVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now } = ctx;
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const monthA = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  // Customise metrics picks for Ads Performance's columns, or (ui.mFor "cards") Insight's ad cards — the same pane.
-  const forCards = ui.mFor === "cards";
-  const baseOf = (u: typeof ui) => (u.mFor === "cards" ? u.insCards ?? INS_CARDS : u.apSel ?? DEF);
+  // Customise metrics picks for Ads Performance's columns, (ui.mFor "cards") Insight's ad cards, or (ui.mFor "chart") the
+  // chart's tiles, six at most — the same pane and list (2026-10-23: the chart's + opens it too).
+  const forCards = ui.mFor === "cards", forChart = ui.mFor === "chart";
+  const baseOf = (u: typeof ui) => (u.mFor === "cards" ? u.insCards ?? INS_CARDS : u.mFor === "chart" ? (u.apChart ?? CHART_DEF).filter((k): k is string => !!k) : u.apSel ?? DEF);
   const sel = ui.apSel ?? DEF, dsel = ui.mDraft ?? baseOf(ui), q = ui.mq.toLowerCase();
   // Drag a header's right edge to size its column (the owner, 2026-10-13); double-click the edge to give it back.
   const W = ui.apW;
@@ -187,8 +190,9 @@ export function adsPerfVM(ctx: DeskCtx) {
         change: (e: { target: { value: string } }) => setSlot(i, e.target.value),
         remove: chosen.length > 1 ? () => setSlot(i, null) : null };
     }),
-    canAdd: chosen.length < CHART_MAX && chosen.length < CHART_METRICS.length,
-    add: () => { const k = CHART_METRICS.find(x => !chosen.includes(x[0]))?.[0]; if (!k) return; const free = slots.findIndex(s => !s); setSlot(free >= 0 ? free : slots.length, k); },
+    canAdd: true,
+    // + opens Customise metrics on the chart's tiles — the table's + list (2026-10-23).
+    add: () => patch({ pane: "docked", kind: "metrics", mFor: "chart", mDraft: null, mDrag: null }),
     lines: slots.map((k, i) => (k && !ui.apChartOff[k] ? { key: k, color: SERIES[i], fmt: CHART_METRICS.find(x => x[0] === k)![2], label: CHART_METRICS.find(x => x[0] === k)![1], values: series[k] } : null))
       .filter((l): l is NonNullable<typeof l> => !!l),
   };
@@ -231,16 +235,17 @@ export function adsPerfVM(ctx: DeskCtx) {
     dpApply: () => set(u => (u.dp ? { ...u, apRange: "custom", apF: u.dp.from, apT: u.dp.to, apCF: u.dp.cf, apCT: u.dp.ct, apPreset: u.dp.preset, apCmp: u.dp.cmp, apCmpMode: "range", dp: { ...u.dp, open: false } } : u)),
     dp: dpVM,
     openMetrics: () => patch({ pane: "docked", kind: "metrics", mFor: "ads", mDraft: null, mDrag: null }),
-    saveMetrics: () => set(u => ({ ...u, ...(u.mFor === "cards" ? { insCards: (u.mDraft ?? baseOf(u)).length ? u.mDraft ?? baseOf(u) : INS_CARDS } : { apSel: u.mDraft ?? baseOf(u) }), mDraft: null, mDrag: null, pane: "closed" })),
+    saveMetrics: () => set(u => ({ ...u, ...(u.mFor === "cards" ? { insCards: (u.mDraft ?? baseOf(u)).length ? u.mDraft ?? baseOf(u) : INS_CARDS }
+      : u.mFor === "chart" ? { apChart: (u.mDraft ?? baseOf(u)).length ? (u.mDraft ?? baseOf(u)).slice(0, CHART_MAX) : CHART_DEF } : { apSel: u.mDraft ?? baseOf(u) }), mDraft: null, mDrag: null, pane: "closed" })),
     mDirty: !!ui.mDraft && JSON.stringify(ui.mDraft) !== JSON.stringify(baseOf(ui)),
-    mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : DEF)] }),
+    mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : forChart ? CHART_DEF.filter((k): k is string => !!k) : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",
     mFoldAll: () => set(u => { const all = METRICS.every(g => u.mFold[g[0]]); return { ...u, mFold: { ...u.mFold, ...Object.fromEntries(METRICS.map(g => [g[0], !all])) } }; }),
-    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.length}`,
+    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && m[3] === "t")).length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
-      items: items.filter(m => !q || m[1].toLowerCase().includes(q)).map(m => { const on = dsel.includes(m[0]);
+      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && m[3] === "t")).map(m => { const on = dsel.includes(m[0]);
         return { label: m[1], hint: m[2], on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
-          toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
+          toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); if (!c.includes(m[0]) && u.mFor === "chart" && c.length >= CHART_MAX) return u; return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
     mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
       const dragging = ui.mDrag === i;
       return { n: i + 1, label: m[1], first: i === 0, last: i === dcols.length - 1, upC: i === 0 ? "var(--crm-line)" : "var(--crm-ink-soft)", dnC: i === dcols.length - 1 ? "var(--crm-line)" : "var(--crm-ink-soft)", bg: "#fff",

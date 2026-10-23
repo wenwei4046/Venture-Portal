@@ -11,17 +11,17 @@
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 
-export type ChartFmt = "rm" | "n" | "pct";
-export const CHART_METRICS: [string, string, ChartFmt][] = [
-  ["spend", "Amount spent", "rm"], ["leads", "Leads", "n"], ["cpl", "Cost per lead", "rm"], ["appt", "Appointments", "n"],
-  ["showup", "Showed up", "n"], ["won", "Won", "n"], ["msgconv", "Conversations started", "n"], ["impr", "Impressions", "n"],
-  ["clicks", "Link clicks", "n"], ["ctr", "CTR (link)", "pct"], ["cpc", "Cost per link click", "rm"], ["cpm", "CPM", "rm"],
-];
+export type ChartFmt = "rm" | "n" | "pct" | "x";
+/** The chart picks from the table's own metrics (2026-10-23, the owner: "这个 + 要可以选择要看什么资料，他的资料跟下方的
+ * + 是一样的") — Customise metrics' list, less Delivery (a word, not a figure); vm/adsperf.ts builds it from METRICS. */
+export const chartFmtOf = (f: string): ChartFmt => (f === "rm" || f === "rm2" ? "rm" : f === "pct" ? "pct" : f === "x" ? "x" : "n");
 export const CHART_DEF: (string | null)[] = ["spend", "leads", "cpl", "appt"];
 export const CHART_MAX = 6;
 /** One colour a tile's PLACE, so a line keeps its colour when another is hidden or taken off (globals.css --crm-series-*). */
 export const SERIES = [1, 2, 3, 4, 5, 6].map(n => `var(--crm-series-${n})`);
-const META_KEYS = new Set(["spend", "cpl", "msgconv", "impr", "clicks", "ctr", "cpc", "cpm"]);
+/** Every metric that is Meta's, or built on Meta's spend: empty until an ad has been read. */
+const META_KEYS = new Set(["spend", "impr", "reach", "results", "cpr", "freq", "cpm", "cpp", "msgconv", "cpmsg", "newmsg", "msgreply", "blocks", "clicks", "cpc", "ctr", "allclk", "ctrall", "cpcall", "outclk",
+  "eng", "reacts", "comments", "shares", "saves", "follows", "cpe", "v3", "thru", "cpthru", "v25", "v50", "v75", "v100", "hook", "cpl", "cpappt", "cpwon"]);
 
 export const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -35,7 +35,7 @@ export function daysOf(a: number, b: number): string[] {
 }
 
 export const chartFmt = (v: number | null | undefined, f: ChartFmt) =>
-  v == null ? "—" : f === "rm" ? `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : f === "pct" ? `${v.toFixed(2)}%` : Math.round(v).toLocaleString("en-MY");
+  v == null ? "—" : f === "rm" ? `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : f === "pct" ? `${v.toFixed(2)}%` : f === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY");
 
 /**
  * Each metric's value day by day. `meta` holds one entry per ad on screen: its days (a day it did not deliver is 0), null
@@ -59,10 +59,14 @@ export function dailySeries(keys: string[], days: string[], cs: CrmCustomer[], v
   }
   const read = meta.filter((m): m is Record<string, MetaFig> => !!m);
   const sum = (k: keyof MetaFig) => days.map(d => read.reduce((n, m) => n + (m[d]?.[k] ?? 0), 0));
-  const spend = sum("spend"), impr = sum("impr"), clicks = sum("clicks"), msgconv = sum("msgconv");
+  const spend = sum("spend"), impr = sum("impr"), reach = sum("reach"), clicks = sum("clicks"), allclk = sum("allClicks"), msgconv = sum("msgconv");
   const div = (a: number[], b: number[], x = 1) => a.map((n, i) => (b[i] ? (n / b[i]) * x : null));
-  const all: Record<string, (number | null)[]> = { leads, appt, showup, won, spend, impr, clicks, msgconv,
-    cpl: div(spend, leads), ctr: div(clicks, impr, 100), cpc: div(spend, clicks), cpm: div(spend, impr, 1000) };
+  // Each metric as the table builds it over a range (vm/adsperf.ts › metaFigures / crmFigures), one day at a time; a day's
+  // reach is the ads' reach that day added up. Meta's metrics the CRM does not read (engagement, video …) stay empty.
+  const all: Record<string, (number | null)[]> = { leads, appt, showup, won, spend, impr, reach, clicks, allclk, msgconv, results: msgconv,
+    cpl: div(spend, leads), cpappt: div(spend, appt), cpwon: div(spend, won), cpr: div(spend, msgconv), cpmsg: div(spend, msgconv),
+    freq: div(impr, reach), cpm: div(spend, impr, 1000), cpp: div(spend, reach, 1000), ctr: div(clicks, impr, 100), cpc: div(spend, clicks),
+    ctrall: div(allclk, impr, 100), cpcall: div(spend, allclk), apptrate: div(appt, leads, 100), showrate: div(showup, appt, 100), winrate: div(won, leads, 100) };
   const none = days.map(() => null);
   return Object.fromEntries(keys.map(k => [k, META_KEYS.has(k) && !read.length ? none : all[k] ?? none]));
 }

@@ -64,7 +64,7 @@ export function DeskAdsChart({ v }: { v: AdsChartBits }) {
               </div>
             ))}
             {v.canAdd && (
-              <button type="button" onClick={v.add} title="Add a metric" style={{ ...BTN, flex: "0 0 auto", width: "44px", borderRadius: "10px", border: "1px dashed var(--crm-rust)", color: "var(--crm-rust)", display: "grid", placeItems: "center", minHeight: "62px" }}>
+              <button type="button" onClick={v.add} title="Choose the metrics (the table's Customise metrics list)" style={{ ...BTN, flex: "0 0 auto", width: "44px", borderRadius: "10px", border: "1px dashed var(--crm-rust)", color: "var(--crm-rust)", display: "grid", placeItems: "center", minHeight: "62px" }}>
                 <Ic name="plus" size={16} />
               </button>
             )}
