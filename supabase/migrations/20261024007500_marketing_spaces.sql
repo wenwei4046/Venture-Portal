@@ -1,4 +1,4 @@
--- Marketing ⑦-1 (2026-10-24): My Space's personal side, first part — the handoff's `My Space Bento.dc.html`: the
+-- Marketing ⑦-1 (2026-10-23): My Space's personal side, first part — the handoff's `My Space Bento.dc.html`: the
 -- cover (one of four gradients, or a picture uploaded), the avatar (uploaded), the status line, and the board laid out
 -- by its owner (Edit layout: tiles moved and resized anywhere, added and removed, the page's background, the accent,
 -- the corners, Reset), with the Notes and Photo tiles. The prototype kept all of it in the browser

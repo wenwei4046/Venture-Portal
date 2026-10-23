@@ -1,9 +1,11 @@
-// Local PostgreSQL regression for 20261024007500 (2026-10-24 — Marketing ⑦-1: My Space's personal side, `My Space
-// Bento.dc.html` of the Claude Design handoff "HOUZS Marketing Module Setup"). The R2 move's table and Marketing's
-// migrations run (the Library's too — a space's pictures share its bucket), then this one, twice. What is under test:
-// one space per login, read by its owner alone; only the parts sent saved; a layout checked whole (known tiles, once
-// each, within the board, the minimum size, My turn and Waiting kept); the look by keys; the words tidied; a picture
-// only one's own just sent under space/ (an image), the one replaced taken off, the one shown filed; who may. No live I/O.
+// Local PostgreSQL regression for 20261024007500 and 20261024007600 (2026-10-23 — Marketing ⑦-1: My Space's personal
+// side, `My Space Bento.dc.html` of the Claude Design handoff "HOUZS Marketing Module Setup"). The R2 move's table and
+// Marketing's migrations run (the Library's too — a space's pictures share its bucket), then these two, each twice. What
+// is under test: one space per login, read by its owner alone; only the parts sent saved; a layout checked whole (known
+// tiles, once each, within the board, the minimum size, My turn and Waiting kept); the look by keys; the words tidied; a
+// picture only one's own just sent (an image) — the cover and the avatar under space/, which teammates see, the photo
+// under mine/, which nobody else does, not even a manager; the one replaced taken off, the one shown filed; who may.
+// No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -130,12 +132,14 @@ const MIGS = ['20261023214100_marketing_core.sql', '20261023234000_marketing_tas
   '20261024005000_marketing_subsidiary_page.sql', '20261024006000_marketing_project_log.sql']
 for (const m of MIGS) await db.exec(await sql(m))
 for (const m of ['20261024007000_marketing_library.sql', '20261024007100_marketing_library_bigger_uploads.sql',
-  '20261024007200_marketing_brand_profiles.sql', '20261024007300_marketing_library_shares.sql']) {
+  '20261024007200_marketing_brand_profiles.sql', '20261024007300_marketing_library_shares.sql', '20261024007400_marketing_task_library.sql']) {
   await db.exec(await sql(m))
 }
-const mig = await sql('20261024007500_marketing_spaces.sql')
-await db.exec(mig)
-await db.exec(mig) // twice: nothing changes, nothing breaks
+for (const m of ['20261024007500_marketing_spaces.sql', '20261024007600_marketing_space_private_photo.sql']) {
+  const mig = await sql(m)
+  await db.exec(mig)
+  await db.exec(mig) // twice: nothing changes, nothing breaks
+}
 
 // ── The table, the functions, the bucket ──────────────────────────────────────────
 check(await peek1(`SELECT mode FROM public.audit_registered WHERE t = 'mkt_spaces'`), 'none', 'a layout dragged is no history')
@@ -143,7 +147,8 @@ for (const fn of ['mkt_space()', 'mkt_space_save(jsonb)']) {
   check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
     [false, true], `${fn}: a sign-in’s, never the publishable key’s`)
 }
-check(await peek1(`SELECT count(*)::int FROM pg_policies WHERE tablename = 'file_objects' AND policyname = 'mkt_space_upload'`), 1, 'a policy for a space’s pictures')
+check(await peek1(`SELECT string_agg(policyname, ',' ORDER BY policyname) FROM pg_policies WHERE tablename = 'file_objects' AND policyname LIKE 'mkt_space%'`),
+  'mkt_space_mine_read,mkt_space_mine_upload,mkt_space_upload', 'policies for a space’s pictures: space/ sent, mine/ sent and read')
 
 const save = patch => one(`SELECT public.mkt_space_save($1::jsonb)`, [JSON.stringify(patch)])
 const saveRefused = (patch, pattern, what) => refuses(`SELECT public.mkt_space_save($1::jsonb)`, [JSON.stringify(patch)], pattern, what)
@@ -185,27 +190,49 @@ await saveRefused({ cover: 7 }, /four covers/, 'one of the four covers')
 await saveRefused({ status: 'x'.repeat(81) }, /at most 80/, 'a status of 80 at most')
 check((await save({ cover: null })).cover, null, 'no preset: the first one is drawn')
 
-// ── Pictures: one's own, under space/, an image ───────────────────────────────────
+// ── Pictures: one's own, an image — the cover and the avatar under space/ (teammates see them), the photo under mine/
+// (its owner alone) ───────────────────────────────────────────────────────────────
 const AV = `space/${id(981)}/me.png`
 const COVER = `space/${id(982)}/cover.jpg`
-const DOC = `space/${id(983)}/cv.pdf`
+const DOC = `mine/${id(983)}/cv.pdf`
 const HIS = `space/${id(984)}/his.png`
+const PHOTO = `mine/${id(988)}/beach.jpg`
+const STRAY = `space/${id(989)}/beach.jpg`
 await as(U.mei, VIEW)
 await assert.rejects(put(`space/${id(985)}/x.png`), /row-level security|violates/, 'Marketing · Edit sends a picture'); checks++
+await assert.rejects(put(`mine/${id(990)}/x.png`), /row-level security|violates/, 'Marketing · Edit sends a photo'); checks++
 await as(U.ali, STAFF)
 await put(HIS)
 await as(U.mei, STAFF)
-await assert.rejects(put(`elsewhere/${id(986)}/x.png`), /row-level security|violates/, 'only under space/ (or the Library’s)'); checks++
+await assert.rejects(put(`elsewhere/${id(986)}/x.png`), /row-level security|violates/, 'only under space/ or mine/ (or the Library’s)'); checks++
 await put(AV)
 await put(COVER, 5000, 'image/jpeg')
 await put(DOC, 900, 'application/pdf')
+await put(PHOTO, 4000, 'image/jpeg')
+await put(STRAY, 4000, 'image/jpeg')
 await saveRefused({ avatarPath: HIS }, /has not arrived/, 'never a picture another sent')
 await saveRefused({ avatarPath: `space/${id(987)}/gone.png` }, /has not arrived/, 'never one not there')
+await saveRefused({ photoPath: STRAY }, /has not arrived/, 'the photo is under mine/ — never space/')
+await saveRefused({ avatarPath: PHOTO }, /has not arrived/, 'the avatar is under space/ — never mine/')
 await saveRefused({ photoPath: DOC }, /is an image/, 'a picture is an image')
-sp = await save({ avatarPath: AV, coverPath: COVER })
-check([sp.avatarPath, sp.coverPath], [AV, COVER], 'its avatar and cover')
+sp = await save({ avatarPath: AV, coverPath: COVER, photoPath: PHOTO })
+check([sp.avatarPath, sp.coverPath, sp.photoPath], [AV, COVER, PHOTO], 'its avatar, cover and photo')
+const sees = async name => (await q(`SELECT count(*)::int AS n FROM public.file_objects WHERE name = $1`, [name]))[0].n
+check([await sees(AV), await sees(COVER), await sees(PHOTO)], [1, 1, 1], 'its owner sees all three')
+await as(U.ali, VIEW)
+check([await sees(AV), await sees(COVER), await sees(PHOTO)], [1, 1, 0], 'a teammate sees the avatar and the cover — never the photo')
+await as(U.josiah, MANAGER)
+check(await sees(PHOTO), 0, 'nor does a manager')
+check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [PHOTO])).length, 0,
+  'nor may a manager take it away')
+await as(U.mei, STAFF)
 check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [AV])).length, 0,
   'a picture the space shows is filed — not taken back from under it')
+sp = await save({ photoPath: null })
+check([sp.photoPath, await peek1(`SELECT count(*)::int FROM public.file_objects WHERE name = $1`, [PHOTO])], [null, 0],
+  'the photo taken off loses its bytes’ row')
+check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [STRAY])).length, 1,
+  'a picture never shown is its sender’s to take back')
 sp = await save({ coverPath: null, avatarPath: AV })
 check([sp.coverPath, sp.avatarPath, await peek1(`SELECT count(*)::int FROM public.file_objects WHERE name = $1`, [COVER]),
   await peek1(`SELECT count(*)::int FROM public.file_objects WHERE name = $1`, [AV])], [null, AV, 0, 1],
