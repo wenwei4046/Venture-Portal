@@ -77,7 +77,8 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
         tone,
         label: done ? 'Completed' : tone === 'red' ? `Overdue · ${who}` : `Due · ${who}`,
         icon: quick ? '⚡' : '⏱',
-        kindLabel: p.kind === 'product' ? 'Project · stage due' : p.kind === 'quick' ? 'Quick Task · stage due' : 'Recurring task · stage due',
+        kindLabel: p.kind === 'product' ? 'Project · stage due' : p.kind === 'deliverable' ? 'Deliverable · stage due'
+          : p.kind === 'quick' ? 'Quick Task · stage due' : 'Recurring task · stage due',
         time: null,
         quick,
         recur: false,

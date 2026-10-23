@@ -178,6 +178,12 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
           <span>/</span>
           {page.sub ? <Link href={`/marketing/projects?sub=${encodeURIComponent(page.sub.code)}`} className={s.crumbLink}>{page.sub.name}</Link> : null}
           <span>/</span>
+          {p.parentProject ? (
+            <>
+              <Link href={`/marketing/projects/${encodeURIComponent(p.parentProject.trackId)}`} className={s.crumbLink}>📦 {p.parentProject.title}</Link>
+              <span>/</span>
+            </>
+          ) : null}
           <span className={s.crumbText}>{p.title}</span>
           <span className={s.grow} />
           <span className={s.ver}>{view.version}</span>
@@ -191,6 +197,12 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
             <div className={s.title}>{p.title}</div>
           </div>
           <div className={s.headRight}>
+            {/* A deliverable's Assignment Plan, the manager's (②b-2a). */}
+            {can.manage && p.kind === 'deliverable' && (p.status === 'planning' || p.status === 'active') ? (
+              <Link href={`/marketing/projects/${encodeURIComponent(p.trackId)}?plan=1`} className={`${s.btn}${p.status === 'planning' ? ` ${s.btnPrimary}` : ''}`}>
+                {p.status === 'planning' ? 'Plan it →' : 'Assignment plan'}
+              </Link>
+            ) : null}
             {view.actions.length ? (
               <div className={s.actions}>
                 {view.actions.map(a => {

@@ -12,9 +12,17 @@ import {
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
 
+/** An approval level as a deliverable's template has it (②b-2a): a person, the PIC on the link, or one the manager picks
+ * at assignment. */
+export type PlanAppr = { kind: 'person'; staff: string } | { kind: 'pic' } | { kind: 'assign' }
+
 export interface TaskStage extends MktStage {
   mode: 'person' | 'assign' | 'prev'
   cands: string[]
+  /** The words beside its person ("+ talent"). */
+  extra: string | null
+  /** Its approval levels, one picked at assignment included. */
+  levels: PlanAppr[]
   form: FormField[]
   back: number | null
   work: StageWork
@@ -61,11 +69,24 @@ export interface TaskSeries {
   runs: TaskRun[]
 }
 
+/** What a deliverable is of its product (②b-2a): its category, its action, which of how many. */
+export interface TaskDeliv {
+  group: string
+  item: string
+  n: number
+  of: number
+}
+
 export interface TaskProject extends MktProject {
   brief: string | null
   qType: TaskType | null
   createdBy: string | null
   free: FreeBlock[]
+  /** A deliverable's product project. */
+  parentProject: { id: string; trackId: string; title: string; status: MktProjectStatus } | null
+  deliv: TaskDeliv | null
+  /** A deliverable's template is locked: every stage the manager's to assign, no subtasks. */
+  locked: boolean
 }
 
 export interface MktTaskPage {
@@ -122,6 +143,10 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       ...stageFromRow(s),
       mode: s.mode === 'assign' || s.mode === 'prev' ? s.mode : 'person',
       cands: Array.isArray(s.cands) ? s.cands.filter((c): c is string => typeof c === 'string') : [],
+      extra: typeof s.extra === 'string' && s.extra ? s.extra : null,
+      levels: (Array.isArray(s.appr) ? s.appr : []).filter(isObj).flatMap((a): PlanAppr[] =>
+        a.kind === 'pic' ? [{ kind: 'pic' }] : a.kind === 'assign' ? [{ kind: 'assign' }]
+          : a.kind === 'person' && typeof a.staff === 'string' ? [{ kind: 'person', staff: a.staff }] : []),
       form: formFromRow(spec.form),
       back: typeof spec.back === 'number' ? spec.back : null,
       work: workFromRow(s.work),
@@ -150,7 +175,10 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
     me: strOrNull(v.me),
     team: rowsOf(v.team).filter(x => str(x.id)).map(personFromRow),
     sub: isObj(v.sub) ? subFromRow(v.sub) : null,
-    project: { ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free) },
+    project: {
+      ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free),
+      parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true,
+    },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
     events: rowsOf(v.events).map(eventFromRow),
@@ -257,7 +285,8 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     actions.push({ key: 'changes', label: 'Request changes', disabled: false }, { key: 'approve', label: 'Approve', disabled: false })
   }
   if (!actions.length) {
-    note = isSeries ? '' : done ? 'All stages done' : notYet ? `Opens ${longDay(p.startsOn as string)}` : !open ? '' : cur.status === 'review' ? `Waiting for ${approver}` : `Now with ${owner}`
+    note = isSeries ? '' : done ? 'All stages done' : p.status === 'planning' ? 'Not planned yet — its people and start day come with the Assignment Plan'
+      : notYet ? `Opens ${longDay(p.startsOn as string)}` : !open ? '' : cur.status === 'review' ? `Waiting for ${approver}` : `Now with ${owner}`
   }
 
   let tone: Tone = 'waiting'
@@ -274,6 +303,9 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   } else if (p.status === 'paused') {
     tone = 'draft'
     status = 'Paused'
+  } else if (p.status === 'planning') {
+    tone = 'draft'
+    status = 'Not planned yet'
   } else if (notYet) {
     tone = 'draft'
     status = `Opens ${longDay(p.startsOn as string)}`
@@ -302,6 +334,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const typeLabel = TASK_TYPES.find(t => t.key === p.qType)?.label
   const kindText = p.kind === 'quick' ? `⚡ Quick task${typeLabel ? ` · ${typeLabel}` : ''}`
     : p.kind === 'recurring' ? (isSeries ? `🔁 Recurring task${typeLabel ? ` · ${typeLabel}` : ''}` : `🔁 Run ${p.run ?? ''}${typeLabel ? ` · ${typeLabel}` : ''}`)
+    : p.kind === 'deliverable' ? `📦 Deliverable${p.deliv && p.deliv.of > 1 ? ` · ${p.deliv.n} of ${p.deliv.of}` : ''}`
     : '📦 Project'
   const meta = [
     { k: 'Subsidiary', v: page.sub?.name ?? '—' },
@@ -371,6 +404,23 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
 /** "23 Oct 09:14", on the office's clock. */
 export const trailTime = (at: string) => (at ? officeTime(at).format('D MMM HH:mm') : '')
 
+function parentFromRow(v: unknown): TaskProject['parentProject'] {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  const status = typeof r.status === 'string' ? (r.status as MktProjectStatus) : 'active'
+  return typeof r.id === 'string' && r.id ? { id: r.id, trackId: String(r.trackId ?? ''), title: String(r.title ?? ''), status } : null
+}
+
+/** " · starts Mon 2 Nov" — a plan's start day, as the trail says it. */
+const planStart = (e: TaskEvent) => (typeof e.data?.start === 'string' ? ` · starts ${longDay(e.data.start)}` : '')
+
+export function delivFromRow(v: unknown): TaskDeliv | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  const n = Number(r.n), of = Number(r.of)
+  return { group: String(r.group ?? ''), item: String(r.item ?? ''), n: Number.isFinite(n) ? n : 1, of: Number.isFinite(of) ? of : 1 }
+}
+
 export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'stages'>): string {
   const n = e.stage != null ? e.stage + 1 : null
   const stage = e.stageName ?? (e.stage != null ? page.stages[e.stage]?.name ?? '' : '')
@@ -400,6 +450,11 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'ended': return e.data?.after === 'last run' ? 'The last run is done · the series ended' : `${e.actor} ended the series`
     case 'attached': return `${e.actor} attached "${e.reason ?? ''}" from the Library`
     case 'detached': return `${e.actor} took "${e.reason ?? ''}" off the task`
+    // A deliverable's Assignment Plan (②b-2a).
+    case 'planned': return `${e.actor} saved the plan${planStart(e)}`
+    case 'replanned': return `${e.actor} changed the plan${planStart(e)}`
+    case 'plan changed': return `${e.actor} changed the plan`
+    case 'reassigned': return `${e.actor} moved ${stage}: ${e.fromTo ?? '—'}${e.reason ? ` · "${e.reason}"` : ''}`
     default: return `${e.actor} · ${e.action}`
   }
 }

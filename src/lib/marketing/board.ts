@@ -6,8 +6,9 @@
 import { groupOf } from './groups'
 import type { MktTeam } from './shell'
 
-export type MktProjectKind = 'product' | 'quick' | 'recurring'
-export type MktProjectStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
+/** A deliverable (②b-2a) is a product project's sub-task — one action × one of its quantity — on its action's workflow. */
+export type MktProjectKind = 'product' | 'quick' | 'recurring' | 'deliverable'
+export type MktProjectStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'planning' | 'active' | 'paused' | 'done' | 'cancelled'
 export type MktStageStatus = 'planned' | 'todo' | 'accepted' | 'review' | 'changes' | 'done'
 export type MktSubtaskStatus = 'working' | 'ready' | 'revising' | 'approved'
 /** A stage's group: a People title of the Marketing department as People writes it, '' for none (lib/marketing/groups.ts
@@ -60,6 +61,8 @@ export interface MktProject {
   cur: number
   series: string | null
   run: number | null
+  /** A deliverable's product project. */
+  parent: string | null
   recur: MktRecur | null
   startsOn: string | null
   dueOn: string | null
@@ -121,8 +124,8 @@ export interface MktBoard {
 }
 
 const TEAMS: readonly MktTeam[] = ['manager', 'content', 'social', 'design', 'ads', 'brand']
-const KINDS: readonly MktProjectKind[] = ['product', 'quick', 'recurring']
-const PSTATUS: readonly MktProjectStatus[] = ['minutes', 'waiting_pic', 'changes', 'approved', 'active', 'paused', 'done', 'cancelled']
+const KINDS: readonly MktProjectKind[] = ['product', 'quick', 'recurring', 'deliverable']
+const PSTATUS: readonly MktProjectStatus[] = ['minutes', 'waiting_pic', 'changes', 'approved', 'planning', 'active', 'paused', 'done', 'cancelled']
 const SSTATUS: readonly MktStageStatus[] = ['planned', 'todo', 'accepted', 'review', 'changes', 'done']
 const TSTATUS: readonly MktSubtaskStatus[] = ['working', 'ready', 'revising', 'approved']
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -194,6 +197,7 @@ export function projectFromRow(p: Record<string, unknown>): MktProject {
     cur: Math.max(0, int(p.cur)),
     series: strOrNull(p.series),
     run: p.run == null ? null : int(p.run),
+    parent: strOrNull(p.parent),
     recur: recur(p.recur),
     startsOn: day(p.startsOn),
     dueOn: day(p.dueOn),

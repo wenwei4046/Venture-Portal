@@ -3,9 +3,9 @@
 // attended and signed), what is still missing before they go to the PIC, the step it stands at (Subsidiary & product ·
 // Meeting minutes · Tracking link · PIC response), and only what changed, for the save. Pure.
 
-import { personFromRow, subFromRow, type MktPerson, type MktSub } from './board'
+import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { trailTime, type Tone } from './task'
+import { delivFromRow, trailTime, type TaskDeliv, type Tone } from './task'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -61,7 +61,26 @@ export interface ProductProjectPage {
     product: { id: string; version: number; name: string; kind: 'one' | 'recurring'; note: string } | null
   }
   minutes: MinutesDoc[]
-  trail: { at: string; actor: string; action: string; reason: string }[]
+  trail: { at: string; actor: string; action: string; reason: string; data: Record<string, unknown> | null }[]
+  /** Its deliverables, once the work started (②b-2a). */
+  deliverables: ProductDeliverable[]
+}
+
+/** A deliverable as its product's page lists it: where it stands, its stage now and whose. */
+export interface ProductDeliverable {
+  id: string
+  trackId: string
+  title: string
+  status: MktProjectStatus
+  cur: number
+  deliv: TaskDeliv | null
+  workflow: string | null
+  startsOn: string | null
+  dueOn: string | null
+  doneAt: string | null
+  stages: number
+  done: number
+  stage: { idx: number; name: string; status: MktStageStatus; owner: string | null; dueOn: string | null } | null
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -142,8 +161,75 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
         : null,
     },
     minutes: rows(v.minutes).map(minutesFromRow),
-    trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason) })),
+    trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason), data: isObj(e.data) ? e.data : null })),
+    deliverables: rows(v.deliverables).map(deliverableFromRow),
   }
+}
+
+const D_STATUSES: readonly MktProjectStatus[] = ['planning', 'active', 'paused', 'done', 'cancelled']
+const S_STATUSES: readonly MktStageStatus[] = ['planned', 'todo', 'accepted', 'review', 'changes', 'done']
+const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
+
+function deliverableFromRow(d: Record<string, unknown>): ProductDeliverable {
+  const s = isObj(d.stage) ? d.stage : null
+  return {
+    id: str(d.id),
+    trackId: str(d.trackId),
+    title: str(d.title),
+    status: D_STATUSES.find(x => x === d.status) ?? 'planning',
+    cur: count(d.cur),
+    deliv: delivFromRow(d.deliv),
+    workflow: strOrNull(d.workflow),
+    startsOn: strOrNull(d.startsOn),
+    dueOn: strOrNull(d.dueOn),
+    doneAt: strOrNull(d.doneAt),
+    stages: count(d.stages),
+    done: count(d.done),
+    stage: s
+      ? { idx: count(s.idx), name: str(s.name), status: S_STATUSES.find(x => x === s.status) ?? 'planned', owner: strOrNull(s.owner), dueOn: strOrNull(s.dueOn) }
+      : null,
+  }
+}
+
+/** The work may start: the PIC approved the minutes (or it was started before approval) and nothing is made yet. */
+export function canBeginWork(page: Pick<ProductProjectPage, 'project' | 'deliverables'>): boolean {
+  const { status, override } = page.project
+  return !page.deliverables.length && (status === 'approved' || (!!override && (status === 'waiting_pic' || status === 'changes')))
+}
+
+/** Deliverables done ÷ all (the user's answer 17) — a cancelled one counts in neither. */
+export function deliverableProgress(list: readonly ProductDeliverable[]): { done: number; all: number } {
+  const live = list.filter(d => d.status !== 'cancelled')
+  return { done: live.filter(d => d.status === 'done').length, all: live.length }
+}
+
+/** Where a deliverable stands, in the list's words and tone. */
+export function deliverableState(d: ProductDeliverable, team: readonly MktPerson[], today: string): { label: string; tone: Tone } {
+  if (d.status === 'planning') return { label: 'Not planned', tone: 'draft' }
+  if (d.status === 'done') return { label: 'Done', tone: 'done' }
+  if (d.status === 'cancelled') return { label: 'Cancelled', tone: 'draft' }
+  if (d.status === 'paused') return { label: 'Paused', tone: 'draft' }
+  if (d.startsOn && today && d.startsOn > today) return { label: `Starts ${longDay(d.startsOn)}`, tone: 'draft' }
+  const s = d.stage
+  if (!s) return { label: 'In progress', tone: 'waiting' }
+  const who = s.owner ? team.find(p => p.id === s.owner)?.first || 'someone' : 'Picked by the stage before'
+  const late = !!s.dueOn && !!today && s.dueOn < today
+  return { label: `Stage ${s.idx + 1} of ${d.stages} · ${s.name} · ${who}`, tone: late ? 'red' : 'waiting' }
+}
+
+/** The list in the product's order: each category, its actions, their deliverables. */
+export function deliverableGroups(list: readonly ProductDeliverable[]): { group: string; items: { item: string; rows: ProductDeliverable[] }[] }[] {
+  const out: { group: string; items: { item: string; rows: ProductDeliverable[] }[] }[] = []
+  for (const d of list) {
+    const group = d.deliv?.group ?? ''
+    const item = d.deliv?.item ?? d.title
+    let g = out.find(x => x.group === group)
+    if (!g) out.push((g = { group, items: [] }))
+    let it = g.items.find(x => x.item === item)
+    if (!it) g.items.push((it = { item, rows: [] }))
+    it.rows.push(d)
+  }
+  return out
 }
 
 /** A product on sale, as New Project offers it (mkt_product_picker). */
@@ -226,7 +312,9 @@ export function requiredTally(doc: Pick<MinutesDoc, 'template'>, vals: Readonly<
  * minutes go to them; approved without them, every step is done. */
 export function stepsOf(status: ProductStatus, pic: boolean): { label: string; state: 'done' | 'current' | 'todo' }[] {
   const labels = ['Subsidiary & product', 'Meeting minutes', 'Tracking link', ...(pic ? ['PIC response'] : [])]
-  const cur = status === 'minutes' ? 2 : status === 'waiting_pic' ? 3 : pic ? 4 : labels.length + 1
+  // Once the work has started, every step is behind it.
+  const cur = status === 'active' || status === 'done' ? labels.length + 1
+    : status === 'minutes' ? 2 : status === 'waiting_pic' ? 3 : pic ? 4 : labels.length + 1
   return labels.map((label, i) => ({ label, state: i + 1 < cur ? 'done' : i + 1 === cur ? 'current' : 'todo' }))
 }
 
@@ -285,9 +373,12 @@ export function productStatus(status: ProductStatus): { label: string; tone: Ton
 }
 
 /** One line of a product project's trail in the store's words (mkt_log's actions on a product project). */
-export function productEventText(e: { actor: string; action: string; reason: string | null }, product: { name: string; version: number } | null): string {
+export function productEventText(e: { actor: string; action: string; reason: string | null; data?: Record<string, unknown> | null }, product: { name: string; version: number } | null): string {
   const who = e.actor || 'Somebody'
+  const n = Number(e.data?.deliverables) || 0
   return e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
+    : e.action === 'work started' ? `${who} started the work · ${n} deliverable${n === 1 ? '' : 's'}`
+    : e.action === 'closed' ? 'Every deliverable done · project closed'
     : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
     : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`
     : e.action === 'minutes completed' ? `${who} completed ${e.reason || 'the minutes'}`

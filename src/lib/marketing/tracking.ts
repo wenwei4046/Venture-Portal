@@ -13,7 +13,8 @@
 // those days' 09:00–13:00 and 14:00–18:00, office time (board.ts › workingHours). Pure.
 
 import {
-  ACCEPT_HOURS, addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, weekdayOf, workingHours, type MktBoard, type MktSub,
+  ACCEPT_HOURS, addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, weekdayOf, workingHours, type MktBoard,
+  type MktProjectKind, type MktSub,
 } from './board'
 
 export type TrackTone = 'red' | 'waiting' | 'risk' | 'ok'
@@ -59,10 +60,11 @@ function waited(since: string | null, now: Date): string {
   return h < 24 ? plural(Math.max(1, Math.floor(h)), 'hour') : plural(Math.floor(h / 24), 'day')
 }
 
-const FLOW: Record<'product' | 'quick' | 'recurring', { icon: string; name: string }> = {
+const FLOW: Record<MktProjectKind, { icon: string; name: string }> = {
   product: { icon: '📦', name: 'Product projects' },
   quick: { icon: '⚡', name: 'Quick tasks' },
   recurring: { icon: '🔁', name: 'Recurring tasks' },
+  deliverable: { icon: '📦', name: 'Deliverables' },
 }
 
 export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
@@ -109,14 +111,16 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
         why = `${plural(need, 'SLA day')} left, ${plural(left, 'working day')} to deadline`
       }
     }
-    const flow = p.kind === 'product' ? `wf:${p.workflow ?? ''}` : p.kind
+    // A deliverable runs on its action's workflow — its lane is that workflow's (②b-2a).
+    const onWorkflow = p.kind === 'product' || p.kind === 'deliverable'
+    const flow = onWorkflow ? `wf:${p.workflow ?? ''}` : p.kind
     out.push({
       projectId: p.id,
       trackId: p.trackId,
       title: p.title,
       sub: ix.sub(p.sub) ?? null,
       flow,
-      flowName: p.kind === 'product' ? p.workflow || FLOW.product.name : FLOW[p.kind].name,
+      flowName: onWorkflow ? p.workflow || FLOW[p.kind].name : FLOW[p.kind].name,
       flowIcon: FLOW[p.kind].icon,
       cur: s.idx,
       stages: stages.map(x => x.name),

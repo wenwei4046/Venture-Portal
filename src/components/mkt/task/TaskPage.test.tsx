@@ -130,3 +130,31 @@ describe('the task page, for the people who work it', () => {
     expect(screen.queryByRole('dialog', { name: 'Audit trail' })).toBeNull()
   })
 })
+
+describe('a deliverable on its task page (②b-2a)', () => {
+  const deliverable = (status: string, extra: Record<string, unknown> = {}) => taskFromRow({
+    today: '2026-10-26', me: RACHEL, team,
+    sub: { id: 'sub', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, pic: 'Kelvin' },
+    project: { id: 'd1', trackId: 'MKT-CAR-2610-001-D02', kind: 'deliverable', sub: 'sub', title: 'Image post 2/2', status, cur: 0,
+      parent: { id: 'p1', trackId: 'MKT-CAR-2610-001', title: 'Carres · Social Pack', status: 'active' },
+      deliv: { group: 'Graphic design', item: 'Image post', n: 2, of: 2 }, locked: false, free: [], ...extra },
+    stages: [{ project: 'd1', idx: 0, name: 'Design', dept: 'GRAPHIC DESIGNER', mode: 'assign', sla: 2, appr: [], spec: { form: [] }, work: {}, status: 'planned' }],
+    events: [], holidays: [],
+  }) as MktTaskPage
+
+  it('names its product, says it is not planned, and offers the manager its plan', () => {
+    render(<TaskPage initial={deliverable('planning')} can={{ edit: true, approve: true, manage: true }} />)
+    expect(screen.getByRole('link', { name: '📦 Carres · Social Pack' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001')
+    expect(screen.getAllByText('Not planned yet').length).toBeGreaterThan(0)
+    expect(screen.getByText('📦 Deliverable · 2 of 2')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Plan it →' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001-D02?plan=1')
+  })
+
+  it('planned: the manager reopens its plan; the staff never see it', () => {
+    const { unmount } = render(<TaskPage initial={deliverable('active', { startsOn: '2026-11-02' })} can={{ edit: true, approve: true, manage: true }} />)
+    expect(screen.getByRole('link', { name: 'Assignment plan' })).toBeTruthy()
+    unmount()
+    render(<TaskPage initial={deliverable('planning')} can={{ edit: true, approve: false, manage: false }} />)
+    expect(screen.queryByRole('link', { name: /Plan it|Assignment plan/ })).toBeNull()
+  })
+})
