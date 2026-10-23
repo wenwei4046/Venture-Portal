@@ -67,7 +67,8 @@ describe('steps 2–3 — where, who takes over, why', () => {
     expect(screen.getByText('Pick who takes over')).toBeTruthy()
     // Anybody on the roster but her, her own group first.
     const pick = screen.getByRole('radiogroup', { name: 'Replace with' })
-    expect(within(pick).getAllByRole('radio').map(r => r.textContent)).toEqual(['HHafiz· GRAPHIC DESIGNER · 3 active', 'MMei· VIDEOGRAPHER · 0 active'])
+    expect(within(pick).getAllByRole('radio').map(r => [r.textContent, r.getAttribute('title')])).toEqual([
+      ['HHafiz· 3 active', 'Hafiz · GRAPHIC DESIGNER · 3 active'], ['MMei· 0 active', 'Mei · VIDEOGRAPHER · 0 active']])
     fireEvent.click(within(pick).getByRole('radio', { name: /Hafiz/ }))
     expect(screen.getByText('Hafiz is already a candidate — Siti will just be removed')).toBeTruthy()
     expect(screen.getByText('Hafiz already approves this stage — untick it, or pick somebody else')).toBeTruthy()

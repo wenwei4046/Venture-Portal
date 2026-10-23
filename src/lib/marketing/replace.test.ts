@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  placeWords, recNo, reasonOk, replaceBlock, replaceCountsFromRow, replaceDoneFromRow, replacePlacesFromRow, replacePreview, replaceResults,
+  activeOf, placeWords, recNo, reasonOk, replaceBlock, replaceCountsFromRow, replaceDoneFromRow, replacePlacesFromRow, replacePreview, replaceResults,
   replaceTakers, replaceWho, swapNote, toAccept, type ReplacePlace,
 } from './replace'
 
@@ -69,6 +69,7 @@ describe('the people', () => {
     const people = [{ id: MEI, first: 'Mei', hint: '', group: 'VIDEOGRAPHER' }, { id: SITI, first: 'Siti', hint: '', group: 'GRAPHIC DESIGNER' },
       { id: HAFIZ, first: 'Hafiz', hint: '', group: 'GRAPHIC DESIGNER' }]
     expect(replaceTakers(people, SITI).map(p => p.first)).toEqual(['Hafiz', 'Mei'])
+    expect([activeOf('GRAPHIC DESIGNER · 3 active'), activeOf('0 active')]).toEqual(['3 active', '0 active'])
   })
 })
 

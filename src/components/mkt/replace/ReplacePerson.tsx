@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { replaceMktPerson } from '@/lib/marketing/actions'
 import { officeTime } from '@/lib/office-time'
 import {
-  placeWords, recNo, REPLACE_GROUPS, REPLACE_REASONS, replaceBlock, replacePreview, replaceResults, replaceTakers, swapNote, toAccept,
+  activeOf, placeWords, recNo, REPLACE_GROUPS, REPLACE_REASONS, replaceBlock, replacePreview, replaceResults, replaceTakers, swapNote, toAccept,
   type ReplaceDone, type ReplacePlace, type ReplacePlaces, type ReplaceTone, type ReplaceWho,
 } from '@/lib/marketing/replace'
 import type { PickPerson } from '@/lib/marketing/tasks'
@@ -198,11 +198,11 @@ export default function ReplacePerson({ who, places, takers, names }: {
               <div className={s.takers} role="radiogroup" aria-labelledby="rp-to">
                 {replaceTakers(takers, from.id).map(t => (
                   <button key={t.id} type="button" role="radio" aria-checked={to === t.id} className={`${s.taker}${to === t.id ? ` ${s.takerOn}` : ''}`}
-                    onClick={() => setTo(t.id)}>
+                    title={`${t.first} · ${t.hint}`} onClick={() => setTo(t.id)}>
                     <span className={`${s.radio}${to === t.id ? ` ${s.radioOn}` : ''}`} aria-hidden="true" />
                     <span className={`${s.av} ${s.av24}`} style={{ background: personBg(t) }} aria-hidden="true">{initial(t.first)}</span>
                     <span className={s.takerName}>{t.first}</span>
-                    <span className={s.takerHint}>· {t.hint}</span>
+                    <span className={s.takerHint}>· {activeOf(t.hint)}</span>
                   </button>
                 ))}
               </div>

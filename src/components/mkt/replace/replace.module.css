@@ -2,7 +2,8 @@
 .page { max-width: 980px; margin: 0 auto; padding: 26px 36px 72px; box-sizing: border-box; color: rgb(var(--mk-ink)); }
 .head { display: flex; align-items: center; gap: 10px; }
 .headIcon { font-size: 18px; }
-.title { font-size: 1.5em; font-weight: 600; }
+/* The shell's own face, as the handoff's — never the portal's display serif a bare h1 takes. */
+.title { margin: 0; font-family: inherit; font-size: 1.5em; font-weight: 600; line-height: 1.2; }
 .grow { flex: 1; }
 
 /* The steps */
@@ -19,7 +20,7 @@
 
 /* Step 1 — who */
 .section { margin-top: 24px; animation: rpIn .2s ease-out; }
-.sectionTitle { font-size: 1.1em; font-weight: 600; }
+.sectionTitle { margin: 0; font-family: inherit; font-size: 1.1em; font-weight: 600; }
 .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
 .person { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; border: 1.5px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); cursor: pointer; font: inherit; color: inherit; text-align: left; }
 .person:hover { border-color: rgb(var(--mk-hover-line)); }

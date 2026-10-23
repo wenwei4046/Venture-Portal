@@ -165,6 +165,9 @@ export function replaceWho(team: readonly { id: string; first: string; full: str
   return out.sort((a, b) => b.places - a.places || a.first.localeCompare(b.first))
 }
 
+/** "3 active" — what is on a person's plate, from the pickers' hint ("TITLE · 3 active"); the title shows on hover. */
+export const activeOf = (hint: string) => hint.split(' · ').pop() ?? ''
+
 /** Who may take over (answer 25 — anybody on the roster), the one replaced's own group first. */
 export function replaceTakers(people: readonly PickPerson[], from: string): PickPerson[] {
   const group = people.find(p => p.id === from)?.group ?? ''
