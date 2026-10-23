@@ -185,10 +185,11 @@ export function movedInMonth(records: ReadonlyArray<FundRecord>, month: string):
 /** "0.850%" — a monthly rate as the portal writes it. */
 export const ratePct = (rate: number) => `${(rate * 100).toFixed(3)}%`
 
-/** The row's Description: how it is lent or taken — its rate, its term, a loan's funding source. */
-export function fundLine(r: FundRecord): string {
+/** The row's Description: how it is lent or taken — its rate, its term, and a loan's funding source where the
+ *  list has no Source column of its own (the Finance phone app; the desktop hub's is beside it, 2026-10-23). */
+export function fundLine(r: FundRecord, withSource = true): string {
   const term = r.months == null ? 'no fixed term' : `${r.months} ${r.months === 1 ? 'month' : 'months'}`
-  const parts = [r.side === 'in' ? r.typeLabel : null, `${ratePct(r.rate)} /mo`, term, r.fundingSource ? `SC ${r.fundingSource}` : null]
+  const parts = [r.side === 'in' ? r.typeLabel : null, `${ratePct(r.rate)} /mo`, term, withSource && r.fundingSource ? `SC ${r.fundingSource}` : null]
   return parts.filter(Boolean).join(' · ')
 }
 
