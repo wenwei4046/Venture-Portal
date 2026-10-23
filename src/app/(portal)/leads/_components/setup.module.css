@@ -212,3 +212,12 @@
 @media (max-width: 1100px) { .special { grid-template-columns: 1fr 1fr; } }
 .saved { font-size: 13px; color: rgb(var(--lv-green)); }
 .notReady { flex: none; align-self: flex-start; margin-bottom: 10px; font-size: 13px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-muted)); padding: 6px 12px; border-radius: 999px; }
+
+/* A category's right-click menu (2026-10-23). */
+.ctxScrim { position: fixed; inset: 0; z-index: 60; }
+.ctxMenu { position: fixed; z-index: 61; min-width: 170px; padding: 6px; background: rgb(var(--lv-white)); border: 1px solid rgb(var(--lv-frame)); border-radius: 8px; box-shadow: var(--lv-shadow-menu); }
+.ctxItem { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 0; border-radius: 5px; background: transparent; font: inherit; font-size: 13px; color: rgb(var(--lv-ink)); text-align: left; cursor: pointer; }
+.ctxItem:hover { background: rgb(var(--lv-hover)); }
+.ctxItem[data-danger] { color: rgb(var(--lv-red)); }
+.catBtn .catDel { opacity: 0; }
+.catBtn:hover .catDel, .catBtn:focus-within .catDel { opacity: 1; }

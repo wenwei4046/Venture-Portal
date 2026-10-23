@@ -50,6 +50,8 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
   const [fStats, setFStats] = useState<string[]>([])
   const [open, setOpen] = useState<string | null>(null)
   const [catIn, setCatIn] = useState<string | null>(null)
+  // A category's right-click menu (the user, 2026-10-23: "加delete") — any category, seeded or added.
+  const [catMenu, setCatMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   // Unsaved changes: the browser asks before the tab closes.
   useEffect(() => {
@@ -136,11 +138,12 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
           {[{ id: 'All', label: 'All', icon: 'grid' as LeadIconName, custom: false }, ...d.cats.map(c => ({ id: c.id, label: c.label, icon: CAT_ICON[c.icon] ?? 'fileText', custom: c.custom }))].map(c => {
             const count = c.id === 'All' ? d.cards.filter(byBrand).length : d.cards.filter(x => x.catId === c.id && byBrand(x)).length
             return (
-              <button key={c.id} type="button" className={s.catBtn} aria-pressed={!view && cat === c.id} onClick={() => { setCat(c.id); setView(null) }}>
+              <button key={c.id} type="button" className={s.catBtn} aria-pressed={!view && cat === c.id} onClick={() => { setCat(c.id); setView(null) }}
+                onContextMenu={e => { if (c.id === 'All' || !canEdit) return; e.preventDefault(); setCatMenu({ id: c.id, x: e.clientX, y: e.clientY }) }}>
                 <span className={s.catIcon}><LeadIcon name={c.icon} size={14} /></span>
                 <span className={s.catLabel}>{c.label}</span>
                 <span className={s.catCount}>{count}</span>
-                {c.custom && canEdit ? (
+                {c.id !== 'All' && canEdit ? (
                   <span className={s.catDel} role="button" tabIndex={0} title="Delete category" aria-label={`Delete ${c.label}`}
                     onClick={e => { e.stopPropagation(); const k = d.cats.find(x => x.id === c.id); if (k) removeCat(k) }}
                     onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); const k = d.cats.find(x => x.id === c.id); if (k) removeCat(k) } }}>×</span>
@@ -148,6 +151,16 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
               </button>
             )
           })}
+          {catMenu ? (
+            <>
+              <div className={s.ctxScrim} onClick={() => setCatMenu(null)} onContextMenu={e => { e.preventDefault(); setCatMenu(null) }} aria-hidden="true" />
+              <div className={s.ctxMenu} style={{ left: catMenu.x, top: catMenu.y }} role="menu">
+                <button type="button" role="menuitem" className={s.ctxItem} data-danger="" onClick={() => { const k = d.cats.find(x => x.id === catMenu.id); setCatMenu(null); if (k) removeCat(k) }}>
+                  <LeadIcon name="trash" size={13} /> Delete category
+                </button>
+              </div>
+            </>
+          ) : null}
           {catIn !== null ? (
             <input className={s.catInput} value={catIn} onChange={e => setCatIn(e.target.value)} placeholder="Category name, press Enter" autoFocus maxLength={60}
               onKeyDown={e => { if (e.key === 'Enter') addCat(); if (e.key === 'Escape') setCatIn(null) }} onBlur={() => { if (!(catIn ?? '').trim()) setCatIn(null) }} />

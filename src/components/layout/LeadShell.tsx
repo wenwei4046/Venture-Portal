@@ -72,6 +72,10 @@ export default function LeadShell({ user, initialCollapsed, children }: { user: 
             <span className={s.brandSub}>Internal ledger</span>
           </span>
         </div>
+        <button type="button" className={s.item} data-fold="" onClick={toggle} title={collapsed ? 'Expand menu' : 'Collapse menu'}>
+          <LeadIcon name={collapsed ? 'panelOpen' : 'panelClose'} />
+          <span className={s.itemLabel}>Collapse</span>
+        </button>
         {sections.map((sec, i) => (
           <div key={sec.label ?? i} className={s.group}>
             {sec.label ? <div className={s.groupLabel}>{sec.label.toUpperCase()}</div> : null}
@@ -100,10 +104,6 @@ export default function LeadShell({ user, initialCollapsed, children }: { user: 
           </div>
         ))}
         <div className={s.spacer} />
-        <button type="button" className={s.item} onClick={toggle} title={collapsed ? 'Expand menu' : 'Collapse menu'}>
-          <LeadIcon name={collapsed ? 'panelOpen' : 'panelClose'} />
-          <span className={s.itemLabel}>Collapse</span>
-        </button>
         <div className={s.me}>
           <span className={s.avatar} aria-hidden="true">{initialsOf(name)}</span>
           <span className={s.meText}>

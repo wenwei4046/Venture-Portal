@@ -325,6 +325,8 @@ function Words({ words, onChange, suggest, disabled }: { words: string[]; onChan
   )
 }
 
+type Line = { who: 'customer' | 'us'; text: string; flag?: string; meta?: string }
+
 function TestAgent({ brandId, brandName, persona, draft, connected, canManage, onClose }: {
   brandId: string
   brandName: string

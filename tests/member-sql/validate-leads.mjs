@@ -756,4 +756,18 @@ check(step6.includes("('/leads/audit', 'lead.audit')") && step6.includes("('lead
   await as(CS_USER, ALL)
 }
 
+// ── General info: any category can be deleted (mig 20261023500000) ──
+await db.exec((await readFile(new URL('../../supabase/migrations/20261023500000_lead_info_any_category.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+{
+  const before = (await q('select public.lead_info() i'))[0].i
+  const delivery = before.cats.find(c => c.label === 'Delivery')
+  check(!!delivery && delivery.custom === false, true, 'Delivery is a seeded category')
+  await saveInfo({ cats: before.cats.filter(c => c.id !== delivery.id), cards: before.cards.filter(c => c.catId !== delivery.id) })
+  const after = (await q('select public.lead_info() i'))[0].i
+  check([after.cats.some(c => c.id === delivery.id), after.cats.length], [false, before.cats.length - 1], 'a seeded category the save leaves out is deleted')
+  check((await q('select deleted_at is not null d from public.lead_info_cats where id = $1', [delivery.id]))[0].d, true, 'soft-deleted, as a custom one')
+  await saveInfo({ cats: after.cats, cards: after.cards })
+  check((await q('select public.lead_info() i'))[0].i.cats.length, after.cats.length, 'the rest stay')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

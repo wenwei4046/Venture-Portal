@@ -35,6 +35,23 @@ export function readLayout(raw: string | null): InboxLayout {
   }
 }
 
+/**
+ * The two right-hand panels (2026-10-23, the user: the customer panel "默认展开，但可收起", the timeline "独立做在右手边，
+ * 默认收起"): open or folded to a rail, as this browser last left them.
+ */
+export const PANELS_KEY = 'inboxv2-panels'
+export const LOG_W = 300
+export interface InboxPanels { card: boolean; log: boolean }
+export function readPanels(raw: string | null): InboxPanels {
+  try {
+    const p: unknown = raw ? JSON.parse(raw) : {}
+    const o = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>
+    return { card: o.card !== false, log: o.log === true }
+  } catch {
+    return { card: true, log: false }
+  }
+}
+
 export type Replier = { kind: 'cs'; label: string } | { kind: 'template'; label: string }
 
 /**

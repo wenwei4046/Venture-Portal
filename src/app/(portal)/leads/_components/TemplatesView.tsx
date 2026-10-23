@@ -578,6 +578,7 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
   const dis = !canEdit
   const set = (o: Partial<TemplateStep>) => setStep(step.id, o)
   const text = useRef<HTMLTextAreaElement>(null)
+  const [kindOpen, setKindOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [infoCard, setInfoCard] = useState(0)
   // Every live card, whatever its brand: a template may run on any page.
@@ -671,13 +672,26 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
         </span>
 
         <span className={s.label}>THEN</span>
-        <div className={s.kinds} role="radiogroup" aria-label="Then">
-          {KINDS.map(k => (
-            <button key={k.kind} type="button" role="radio" aria-checked={step.kind === k.kind} className={s.kind} style={toneStyle(k.kind)} disabled={dis} onClick={() => step.kind !== k.kind && setKind(k.kind)}>
-              <span className={s.kindDot} />
-              <span className={s.kindText}>{k.label}<span className={s.kindHint}>{k.hint}</span></span>
-            </button>
-          ))}
+        {/* A dropdown, as drawn (the user, 2026-10-23: "原本应该是下拉式的"): the step's type, opening the radio list. */}
+        <div className={s.kindPick}>
+          <button type="button" className={s.kindTrigger} style={toneStyle(step.kind)} disabled={dis} aria-haspopup="listbox" aria-expanded={kindOpen} onClick={() => setKindOpen(o => !o)}>
+            <span className={s.kindDot} />
+            <span className={s.kindText}>{KINDS.find(k => k.kind === step.kind)?.label}<span className={s.kindHint}>{KINDS.find(k => k.kind === step.kind)?.hint}</span></span>
+            <LeadIcon name="chevronDown" size={14} />
+          </button>
+          {kindOpen ? (
+            <>
+              <div className={s.kindScrim} onClick={() => setKindOpen(false)} aria-hidden="true" />
+              <div className={s.kinds} data-menu="" role="radiogroup" aria-label="Then">
+                {KINDS.map(k => (
+                  <button key={k.kind} type="button" role="radio" aria-checked={step.kind === k.kind} className={s.kind} style={toneStyle(k.kind)} disabled={dis} onClick={() => { if (step.kind !== k.kind) setKind(k.kind); setKindOpen(false) }}>
+                    <span className={s.kindDot} />
+                    <span className={s.kindText}>{k.label}<span className={s.kindHint}>{k.hint}</span></span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
         </div>
 
         {step.kind === 'question' ? (

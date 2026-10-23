@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { officeTime } from '@/lib/office-time'
-import { saveLeadCard, setLeadOutcome, setOptIn } from '@/lib/leads/actions'
-import type { OptIn } from '@/lib/leads/campaign'
+import { saveLeadCard, setLeadOutcome } from '@/lib/leads/actions'
 import { isVisitDate, phoneStage, phoneSteps } from '@/lib/leads/inbox'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
-import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadEvent, Shown } from '@/lib/leads/types'
+import type { Appt, LeadBrand, LeadCardFields, LeadContact, Shown } from '@/lib/leads/types'
 import { CHANNEL_LABEL } from './bits'
 import HandoffWindow from './HandoffWindow'
 import s from './inbox.module.css'
@@ -15,13 +14,12 @@ import s from './inbox.module.css'
 /**
  * The customer (Inbox v2's right-hand column, 2026-10-22): who they are; the PHONE card — found in the chat and
  * confirmed, or typed — with its three steps and the hand-over to the brand's sales; FOR THE SALESPERSON, what the
- * salesperson needs (a note the customer never sees); Promotions consent (production's, which the handoff keeps in
- * its logic); and the TIMELINE, newest first.
+ * salesperson needs (a note the customer never sees). Since 2026-10-23 (the user) the TIMELINE is its own panel on the
+ * Inbox's right, folded until opened, and Promotions consent is off the card (a test's consent is no longer set by hand).
  */
-export default function CustomerCard({ contact, events, brand, canEdit, csName, onSaved }: {
+export default function CustomerCard({ contact, brand, canEdit, csName, onSaved }: {
   contact: LeadContact
   csName: string
-  events: LeadEvent[]
   brand: LeadBrand | undefined
   canEdit: boolean
   onSaved: () => void
@@ -154,59 +152,11 @@ export default function CustomerCard({ contact, events, brand, canEdit, csName, 
         {error ? <div className={s.error} role="alert">{error}</div> : null}
       </div>
 
-      <Promotions contact={contact} canEdit={canEdit} onSaved={onSaved} />
-
-      <div className={s.timeline}>
-        <span className={s.caps}>TIMELINE</span>
-        {events.length === 0 ? <span className={s.sub}>—</span> : [...events].reverse().map((e, i) => (
-          <div key={i} className={s.event}>
-            <span className={s.eventAt}>{whenFull(e.at)}</span>
-            <span>{e.what}{e.by ? <span className={s.sub}> · {e.by}</span> : null}</span>
-          </div>
-        ))}
-      </div>
-
       {handing && brand ? (
         <HandoffWindow contact={{ ...contact, ...form, name: form.name || contact.name }} brand={brand} csName={csName}
           onClose={() => setHanding(false)} onDone={() => { setHanding(false); onSaved() }} />
       ) : null}
     </>
-  )
-}
-
-const OPT_IN: ReadonlyArray<{ id: OptIn; label: string; tone: string }> = [
-  { id: 'none', label: 'Not asked', tone: 'quiet' },
-  { id: 'in', label: 'Agreed', tone: 'green' },
-  { id: 'out', label: 'Unsubscribed', tone: 'red' },
-]
-
-/**
- * Promotions consent (Campaigns, mig 20261016340000): past 24 hours a campaign reaches only who agreed. A real
- * customer agrees through Meta; a test conversation's is set here, to try Campaigns before Meta is connected.
- */
-function Promotions({ contact, canEdit, onSaved }: { contact: LeadContact; canEdit: boolean; onSaved: () => void }) {
-  const [busy, start] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const state = contact.optIn ?? 'none'
-  const may = canEdit && contact.isTest
-  const put = (next: OptIn) => start(async () => {
-    setError(null)
-    const r = await setOptIn(contact.id, next)
-    if (!r.ok) setError(r.reason)
-    else onSaved()
-  })
-  return (
-    <div className={s.block} style={{ gap: 6 }}>
-      <span className={s.caps}>PROMOTIONS</span>
-      <div className={s.pills}>
-        {OPT_IN.map(o => (
-          <button key={o.id} type="button" className={s.pill} data-tone={o.tone} aria-pressed={state === o.id}
-            disabled={!may || busy || state === o.id} onClick={() => put(o.id)}>{o.label}</button>
-        ))}
-      </div>
-      <span className={s.sub} style={{ fontSize: 13 }}>{contact.isTest ? 'Set by hand on test conversations only.' : 'Set by the customer’s reply to a promotion.'}</span>
-      {error ? <div className={s.error} role="alert">{error}</div> : null}
-    </div>
   )
 }
 

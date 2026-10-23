@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, replyingNow, RIGHT_W } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, readPanels, replyingNow, RIGHT_W } from './inbox'
 
 describe('the Inbox columns the browser keeps', () => {
   it('starts at the handoff widths', () => {
@@ -37,5 +37,14 @@ describe('the phone card', () => {
   it('shows a picked day in the date box and keeps older words as words', () => {
     expect(isVisitDate('2026-10-24')).toBe(true)
     expect(isVisitDate('Sunday afternoon')).toBe(false)
+  })
+})
+
+describe('the right-hand panels', () => {
+  it('opens the customer and folds the timeline until the browser kept otherwise', () => {
+    expect(readPanels(null)).toEqual({ card: true, log: false })
+    expect(readPanels('oops')).toEqual({ card: true, log: false })
+    expect(readPanels(JSON.stringify({ card: false, log: true }))).toEqual({ card: false, log: true })
+    expect(readPanels(JSON.stringify({ card: 'no', log: 1 }))).toEqual({ card: true, log: false })
   })
 })

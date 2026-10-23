@@ -6,7 +6,8 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, RIGHT_W, clampWidth, readLayout, replyingNow, type InboxLayout } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
 import type { LeadBrand, LeadConfig, LeadContact, LeadMessage, LeadThread } from '@/lib/leads/types'
@@ -82,6 +83,19 @@ export default function InboxView({
     try { setLayout(readLayout(window.localStorage.getItem(LAYOUT_KEY))) } catch { /* a private window keeps the handoff's */ }
   }, [])
   const drag = useDrag(layout, setLayout)
+  // The customer panel opens, the timeline folds, until this browser kept otherwise.
+  const [panels, setPanels] = useState<InboxPanels>({ card: true, log: false })
+  useEffect(() => {
+    try { setPanels(readPanels(window.localStorage.getItem(PANELS_KEY))) } catch { /* a private window keeps the defaults */ }
+  }, [])
+  const togglePanel = (k: keyof InboxPanels) => setPanels(p => {
+    const next = { ...p, [k]: !p[k] }
+    try { window.localStorage.setItem(PANELS_KEY, JSON.stringify(next)) } catch { /* not kept in a private window */ }
+    return next
+  })
+  const RAIL = 40
+  const cardW = panels.card ? layout.rightW : RAIL
+  const logW = panels.log ? LOG_W : RAIL
 
   const brands = useMemo(() => new Map(config.brands.map(b => [b.id, b])), [config.brands])
   const q = query.trim().toLowerCase()
@@ -134,9 +148,9 @@ export default function InboxView({
         </div>
       </div>
 
-      <div className={s.grid} style={{ gridTemplateColumns: `${layout.listW}px minmax(0,1fr) ${layout.rightW}px` }}>
+      <div className={s.grid} style={{ gridTemplateColumns: `${layout.listW}px minmax(0,1fr) ${cardW}px ${logW}px` }}>
         <div className={s.handle} style={{ left: layout.listW, marginLeft: -5 }} onMouseDown={e => drag(e, 'listW')} title="Drag to resize" aria-hidden="true" />
-        <div className={s.handle} style={{ right: layout.rightW, marginRight: -4 }} onMouseDown={e => drag(e, 'rightW')} title="Drag to resize" aria-hidden="true" />
+        {panels.card ? <div className={s.handle} style={{ right: cardW + logW, marginRight: -4 }} onMouseDown={e => drag(e, 'rightW')} title="Drag to resize" aria-hidden="true" /> : null}
 
         {/* ── Conversations ── */}
         <section className={s.list} aria-label="Conversations">
@@ -204,12 +218,42 @@ export default function InboxView({
         </section>
 
         {/* ── The customer ── */}
-        <aside className={s.panel} aria-label="Customer">
-          {contact ? (
-            <CustomerCard key={contact.id} contact={contact} events={thread?.events ?? []} brand={brandOf}
-              canEdit={canEdit} csName={csName} onSaved={() => load(contact.id)} />
-          ) : null}
-        </aside>
+        {panels.card ? (
+          <aside className={s.panel} aria-label="Customer">
+            <button type="button" className={s.fold} title="Fold the customer panel" aria-label="Fold the customer panel" onClick={() => togglePanel('card')}>»</button>
+            {contact ? (
+              <CustomerCard key={contact.id} contact={contact} brand={brandOf}
+                canEdit={canEdit} csName={csName} onSaved={() => load(contact.id)} />
+            ) : null}
+          </aside>
+        ) : (
+          <button type="button" className={s.rail} onClick={() => togglePanel('card')} title="Open the customer panel">
+            <span className={s.railArrow}>«</span><span className={s.railLabel}>Customer</span>
+          </button>
+        )}
+
+        {/* ── The timeline: its own panel on the right, folded until opened (the user, 2026-10-23) ── */}
+        {panels.log ? (
+          <aside className={s.log} aria-label="Timeline">
+            <button type="button" className={s.logHead} onClick={() => togglePanel('log')} title="Fold the timeline">
+              <LeadIcon name="history" size={15} /><span className={s.logTitle}>Timeline</span><span className={s.logSub}>this chat</span><span className={s.fill} />›
+            </button>
+            <div className={s.logBody}>
+              {!contact ? <span className={s.logEmpty}>Pick a chat to see its history</span>
+                : !(thread?.events ?? []).length ? <span className={s.logEmpty}>Nothing has happened in this chat yet</span>
+                : [...(thread?.events ?? [])].reverse().map((e, i) => (
+                  <div key={i} className={s.event}>
+                    <span className={s.eventAt}>{whenFull(e.at)}</span>
+                    <span>{e.what}{e.by ? <span className={s.logSub}> · {e.by}</span> : null}</span>
+                  </div>
+                ))}
+            </div>
+          </aside>
+        ) : (
+          <button type="button" className={s.rail} data-log="" onClick={() => togglePanel('log')} title="Open the timeline">
+            <LeadIcon name="history" size={15} /><span className={s.railLabel}>Timeline</span>
+          </button>
+        )}
       </div>
     </div>
   )
