@@ -13,7 +13,7 @@ import type { HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import type { MemberRequest } from '@/lib/member/types'
 import type { Booking } from '@/lib/rooms/model'
 import type { User } from '@/types'
-import { appAccess, bookingOf, dataCenterOf, hireOf, memberRequestOf, talentOf } from './server'
+import { appAccess, bookingOf, dataCenterOf, hireOf, hrTopics, memberRequestOf, talentOf } from './server'
 
 // HR's account: every Round-2 cell, the keys that open their pages.
 const HR_ACTIONS = {
@@ -29,7 +29,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
   it('with nothing unticked, every part and every write their cells hold', () => {
     expect(appAccess(hrUser({}))).toEqual({
       parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false },
-      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, probationAck: false },
     })
   })
 
@@ -39,7 +39,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     const closed = ['hr.hiring_requests.view', 'hr.hiring_requests.create', 'hr.hiring_requests.edit', 'hr.hiring_requests.approve', 'hr.talent_bank.edit']
     const access = appAccess(hrUser({ tabs, closed }))
     expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
-    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true })
+    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true, probationAck: false })
   })
 
   it('Member services’ Edit unticked: its requests still show, nothing is decided from the app', () => {
@@ -56,6 +56,22 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     const tabs = ['hr.att_today.view', 'hr.att_requests.view', 'hr.att_balances.view', 'hr.att_close.view', 'hr.att_records.view']
     expect(appAccess({ ...user, tabs, closed: ['hr.att_requests.approve'] }).may.attDecide).toBe(false)
     expect(appAccess(hrUser({})).may.attDecide).toBe(false)
+  })
+
+  // A probation ending (2026-10-23, mig 20261024223000): Acknowledge, and the topic that tells the phone.
+  it('People · Edit on a person’s page: a probation’s Acknowledge — and people.probation, whose notices reach the phone', () => {
+    const people = hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all' }, permissions: [...HR_KEYS, 'team'] })
+    expect(appAccess(people).may.probationAck).toBe(true)
+    expect(hrTopics(people)).toEqual(['hiring.guest', 'rooms.guest', 'member.requests', 'people.probation'])
+    // The person page's Edit unticked, People · View only, or viewing as somebody: neither.
+    for (const user of [
+      { ...people, closed: ['hr.people.edit'] },
+      hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all' }, permissions: [...HR_KEYS, 'team'] }),
+      { ...people, viewingAs: { id: 'x', name: 'Somebody' } },
+    ]) {
+      expect(appAccess(user).may.probationAck).toBe(false)
+      expect(hrTopics(user)).not.toContain('people.probation')
+    }
   })
 
   it('without the cell, the tab opens nothing', () => {

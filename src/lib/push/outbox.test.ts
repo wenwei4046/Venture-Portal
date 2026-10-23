@@ -140,6 +140,16 @@ describe('a notice', () => {
     ] })).toEqual({ unread: 2, items: [{ id: 'n1', kind: 'rooms', title: 'T', body: 'B', refKind: 'booking', refId: 'b1', at: '2026-10-11T03:00:00Z', read: false }] })
     expect(noticesFromRow(null)).toEqual({ unread: 0, items: [] })
   })
+
+  // A probation ending (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送"): the person, in the HR app.
+  it('about a probation ending: kept, and opens the person in the HR app whichever app the phone signed up in', () => {
+    const row = { id: 'n3', kind: 'people', title: 'Probation ending · LI SEAN', body: 'Ends 31 Oct 2026 · in 8 days · HR', refKind: 'hr_staff', refId: 'st 1', at: '2026-10-23T02:00:00Z', read: false }
+    expect(noticesFromRow({ unread: 1, items: [row] }).items).toEqual([row])
+    expect(noticeUrl({ refKind: 'hr_staff', refId: 'st 1' }, 'hr')).toBe('/hr-app?open=person:st%201')
+    expect(noticeUrl({ refKind: 'hr_staff', refId: 'st1' }, 'revenue')).toBe('/hr-app?open=person:st1')
+    expect(openTarget('person:st1')).toEqual({ k: 'person', id: 'st1' })
+    expect(noticeTag({ id: 'n3', refKind: 'hr_staff', refId: 'st1' })).toBe('n3')
+  })
 })
 
 // The CRM tells a person's phone about their own chats (2026-10-14, mig 20261014030000): a customer's message, a new
