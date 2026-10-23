@@ -150,6 +150,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
             ref={vp}
             className={`${s.vp}${drag ? ` ${s.vpDrag}` : ''}`}
             style={{ height: VH }}
+            role="region"
             aria-label={`${track} — task map`}
             onMouseDown={e => { moved.current = false; setDrag({ x: e.clientX, px }) }}
             onMouseMove={e => {

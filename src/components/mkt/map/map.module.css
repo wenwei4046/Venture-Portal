@@ -67,8 +67,8 @@
 .future { background: rgb(var(--mk-white) / .6); border: 1.5px dashed rgb(var(--mk-radio)); box-shadow: none; opacity: .75; }
 .cardWho { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .av { width: 22px; height: 22px; flex: none; border-radius: 50%; background: var(--mk-team-manager-bg); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.cardPerson { font-size: 12px; color: rgb(var(--mk-text-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cardTitle { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardPerson { font-size: 12px; line-height: 1.35; color: rgb(var(--mk-text-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardTitle { font-size: 14px; font-weight: 600; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cardFoot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgb(var(--mk-muted)); }
 .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .done .dot { background: rgb(var(--mk-done-dot)); }

@@ -30,8 +30,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ③d | The Canvas Template Editor (the Workflow Builder's Canvas template tab): the task page laid out — Requirements, a section per stage, the manager's own sections, the Free space; a section's 🔒 / ⭐ / 👁 and stage; a field's ⭐ / 👁, stage, a date on the calendar, a choice's options; the Preview as the staff and as the PIC; kept with the draft and published with the version (mig `20261024001000`) | #648, live 2026-10-23 |
 | ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | #653 |
 | ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | #654 |
-| ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | this PR |
-| ④-4 | The Task map and Replay | next |
+| ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | #655 |
+| ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | this PR |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
@@ -110,6 +110,12 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 64. **Corrections** (④-3). The handoff's *correction of #n* and its footer (*mistakes are fixed by adding a correction entry*) have no screen that adds one (question 19): the log says *Read-only*.
 65. **Attachment** (④-3). No record holds a file — a stage's files are links (gap 18): the column comes with Marketing's R2 bucket.
 66. **The Free space** (④-3). Its writes are records too, but stay off the log as they stay off the trail (question 20).
+67. **Where the map opens** (④-4). The handoff's Map is a tab of the product task page (②b-2); until then **Map** on a task's trail head opens the project's sheet (Map · Audit trail). A product project's intake has no stages: no map (question 22).
+68. **Subtasks on the map** (④-4). The handoff's *Thumbnail* (picked by Ali) and its *Review delivery* gate: the portal keeps subtasks but no screen makes one yet — none is drawn.
+69. **"Opened by Jason from a Social Media project"** (④-4). A project opened from another, and the intake on the map, have no source (question 23): the map starts at *Created*.
+70. **Ads and Brand lanes** (④-4). The handoff's lanes are Social Media 📣, Content 🎬 and Design 🎨: Ads takes 📈, Brand ✨.
+71. **"📍 You are here"** (④-4). The handoff's words for where the work stands; the viewer is rarely there — *📍 Now here*. Its corner hint (*Drag or scroll … hover a line for details*) is an instruction: the page carries none.
+72. **Replay's pace** (④-4). The handoff runs a dot along each line of a step, 0.8 s a line; built as a record every 1.1 s, a dot along each line it makes.
 
 ## 5. Open questions (for the user)
 
