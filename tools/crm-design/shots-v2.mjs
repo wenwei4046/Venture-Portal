@@ -96,7 +96,7 @@ try {
     if (steps) {
       await send("Emulation.setDeviceMetricsOverride", { width: box.width, height: box.height, deviceScaleFactor: 1, mobile: PHONE });
       await send("Page.navigate", { url: PHONE ? phoneUrl(f) : APP_URL });
-      for (let i = 0; i < 80; i++) { await sleep(250); if (await js(`[...document.querySelectorAll('*')].some(e => e.offsetParent !== null && (e.innerText || '').trim() === ${JSON.stringify(PHONE ? "Inbox" : "Audit log")})`)) break; }
+      for (let i = 0; i < 80; i++) { await sleep(250); if (await js(`[...document.querySelectorAll('*')].some(e => e.offsetParent !== null && (e.innerText || '').trim() === ${JSON.stringify(PHONE ? (f.startsWith("T") ? "Assignment" : "Inbox") : "Audit log")})`)) break; }
       await js("document.fonts.ready.then(() => true)"); await sleep(800);
       for (const [t] of steps) await click(t);
       writeFileSync(join(out, `${f}-app.png`), await capture({ x: 0, y: 0, width: box.width, height: box.height }));

@@ -272,7 +272,8 @@ export function Phone4aCalLists({ v }: { v: {
   );
 }
 
-/** T03 · an ad on Assignment: its channel, name and headline, the leads, the split bar in team colours, Edit split / Set up. */
+/** T03 · an ad on Assignment: its channel, name and headline, the leads, the split bar in team colours, a chevron (the card opens
+ * its split) and, unset, "Not set up" (v3). */
 export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: boolean; leads: number; setUp: boolean; held?: boolean; heldTxt?: string; bar: { w: string; c: string; op?: number }[]; edit: () => void } }) {
   return (
     <div onClick={a.edit} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 14px", borderRadius: "14px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
@@ -289,8 +290,9 @@ export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: bool
           {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
         </span>
         {a.held && <span style={{ flex: "none", padding: "3px 8px", borderRadius: "10px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(11), fontWeight: 600 }}>{a.heldTxt}</span>}
-        <span style={{ flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", display: "grid", placeItems: "center", fontSize: fs(12.5), fontWeight: 500,
-          ...(a.setUp ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }}>{a.setUp ? "Set up" : "Edit split"}</span>
+        {/* v3 T03: no Edit split / Set up buttons — the whole card opens the split; an unset ad says "Not set up". */}
+        {a.setUp && <span style={{ flex: "none", height: "26px", padding: "0 10px", borderRadius: "13px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: fs(12), fontWeight: 500, whiteSpace: "nowrap" }}>Not set up</span>}
+        <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>
       </div>
     </div>
   );
