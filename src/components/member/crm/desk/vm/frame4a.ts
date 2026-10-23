@@ -75,7 +75,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "assignment", "forms", "adsperf"].includes(tab) && tab !== "adsperf" ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -124,7 +124,8 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     // v2 (frame 05, note 02): no period tabs (the range button under the title does it); Export is the head's primary, its
     // menu Excel / CSV / PDF report as before.
     adsperf: { tabs: [], sub: "", cta: { label: "Export", icon: null, act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } } },
-    assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
+    // v2 (frames 06b / 06c): Assignment's five sections are the second row of tabs.
+    assignment: { tabs: [], subTabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },

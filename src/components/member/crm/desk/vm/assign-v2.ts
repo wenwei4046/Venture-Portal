@@ -15,9 +15,9 @@ import { crmFigures } from "./adsperf";
 import type { assignPageVM } from "./assign";
 import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
-import { adRunLine, adRunning } from "@/lib/member/crm-ad-running";
-import { leadsByAd } from "./leads-by-ad";
-import { chatRows, teamNameOf } from "./data";
+import { adRunLine, adRunning, adStatusOf } from "@/lib/member/crm-ad-running";
+import { lbaRange, lbaStatus, leadsByAd, type LbaStatus } from "./leads-by-ad";
+import { chatRows, initials, teamNameOf } from "./data";
 import { STATUS, type StatusName } from "../../shared/palette";
 
 const DAY = 86_400_000;
@@ -163,20 +163,80 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     typed: ui.addAdId, onTyped: (e: { target: { value: string } }) => patch({ addAdId: e.target.value.replace(/\D/g, "").slice(0, 32) }),
     addTyped: () => { const id = ui.addAdId; if (!/^\d{5,32}$/.test(id)) return; const known = Array.isArray(addList) ? addList.find(r => r.id === id) : undefined; pickAd(known ?? { id, name: "", status: "", start: null, end: null }); },
   };
-  // Assignment › Leads by ad (2026-10-22): each ad, who got how many of its leads (vm/leads-by-ad.ts).
+  // Assignment › Leads by ad (2026-10-22; v2 frames 06b / 06b·2 / 06b·3): one table — every ad with its teams, status,
+  // members and leads, an ad opening to who got its leads; a member opens the panel of the leads they got (vm/leads-by-ad.ts).
   const lbaPer = ui.lbaPer ?? "month";
+  const lbaCustom = ui.lbaFrom && ui.lbaTo ? { from: ui.lbaFrom, to: ui.lbaTo } : null;
+  const lbaR = lbaRange(lbaPer, now, lbaCustom);
   const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
+  const teamOfStaff = (id: string) => ctx.directors.some(d => d.id === id) ? { id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM }
+    : (() => { const t = ctx.teams.find(x => x.id === id || x.people.some(p => p.id === id)); return t ? { id: t.id, name: t.name } : null; })();
+  const teamColor = (tid: string | null) => !tid ? "var(--crm-faint-2)" : tid === DIRECTOR_SPLIT_KEY ? DIRECTOR_C[0] : teamColours(Math.max(0, ctx.teams.findIndex(t => t.id === tid)))[0];
+  const ST_PILL: Record<LbaStatus, { bg: string; fg: string; dot: string }> = {
+    Running: { bg: "var(--crm-tint-new)", fg: "var(--crm-ink)", dot: "var(--crm-ink)" },
+    Paused: { bg: "var(--crm-tint-appt)", fg: "var(--crm-text-appt)", dot: "var(--crm-amber)" },
+    Ended: { bg: "var(--crm-tint-lost)", fg: "var(--crm-muted)", dot: "var(--crm-faint-2)" },
+    Pending: { bg: "var(--crm-field)", fg: "var(--crm-muted)", dot: "var(--crm-faint-2)" },
+  };
+  const lbaSt = ui.lbaSt ?? "all", lbaQ = (ui.lbaQ ?? "").trim().toLowerCase();
+  const rangeLabel = (() => { if (!Number.isFinite(lbaR[0])) return "all time";
+    const a = new Date(lbaR[0]), b = new Date(Number.isFinite(lbaR[1]) ? lbaR[1] - 86_400_000 : now.getTime());
+    const d = (x: Date) => x.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return a.getMonth() === b.getMonth() ? `${a.getDate()}–${d(b)}` : `${d(a)} – ${d(b)}`; })();
+  const customLabel = lbaCustom ? (() => { const [x, y] = [lbaCustom.from, lbaCustom.to].sort().map(s => new Date(`${s}T00:00:00`));
+    return `${x.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${y.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`; })() : "Pick dates";
+  const allAds = leadsByAd(data.customers, adIds, id => adOf(id).label, id => ctx.nameOf(id), teamOfStaff, lbaR).map(a => {
+    const running = adStatusOf(data.adNames?.[a.id], data.customers.filter(c => c.adId === a.id).map(c => c.createdAt).sort().at(-1) ?? null, now);
+    return { ...a, status: lbaStatus(data.adNames?.[a.id], running, now), wa: adOf(a.id).wa };
+  });
+  const shownAdsL = allAds.filter(a => (lbaSt === "all" || a.status.toLowerCase() === lbaSt)
+    && (!lbaQ || a.name.toLowerCase().includes(lbaQ) || a.rows.some(r => r.name.toLowerCase().includes(lbaQ))));
+  const srt = ui.lbaSort ?? { k: "leads", dir: "desc" as const };
+  const sortKey = (a: (typeof allAds)[number]) => srt.k === "ad" ? a.name.toLowerCase() : srt.k === "status" ? a.status : srt.k === "members" ? (a.rows[0]?.name ?? "").toLowerCase() : a.total;
+  const sorted = [...shownAdsL].sort((x, y) => { const p = sortKey(x), q = sortKey(y); const r = typeof p === "number" && typeof q === "number" ? p - q : String(p).localeCompare(String(q)); return srt.dir === "asc" ? r : -r; });
+  const pick = ui.lbaPick, pickAdRow = pick ? allAds.find(a => a.id === pick.ad) : undefined, pickRow = pickAdRow?.rows.find(r => r.who === pick?.who);
+  const visitOf = (cid: string) => data.visits.filter(x => x.customerId === cid && x.state === "booked" && new Date(x.start).getTime() >= now.getTime()).sort((p, q) => p.start.localeCompare(q.start))[0];
+  const roomName = (id: string) => data.rooms.find(r => r.id === id)?.name ?? "";
+  const when = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const pill = (cid: string) => { const st = STATUS[(stOf.get(cid) ?? "") as StatusName]; return { status: stOf.get(cid) ?? "", stBg: st?.tint ?? "var(--crm-field)", stFg: st?.text ?? "var(--crm-muted)" }; };
+  const openChat = (id: string) => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: id, fromTeam: false, inbF: "All", whoSel: [] });
   const leadsByAdV = {
-    periods: ([["month", "This month"], ["all", "All time"]] as const).map(([k, label]) => ({ label, on: lbaPer === k, pick: () => patch({ lbaPer: k }) })),
-    // An ad's card folds to its head; a person opens to the leads they got — status as Contacts says it, a tap opens the chat
-    // (2026-10-23, the owner: "点成员名单要可以看到他们得到的 list", "这些名单做可收缩及展开的功能").
-    ads: leadsByAd(data.customers, adIds, id => adOf(id).label, id => ctx.nameOf(id), id => teamNameOf(ctx, id), lbaPer, now).map(a => ({ ...a,
-      shut: !!ui.lbaShut[a.id], fold: () => set(u => ({ ...u, lbaShut: { ...u.lbaShut, [a.id]: !u.lbaShut[a.id] } })),
-      rows: a.rows.map(r => { const k = `${a.id}|${r.who}`, open = !!ui.lbaOpen[k];
-        return { ...r, open, toggle: () => set(u => ({ ...u, lbaOpen: { ...u.lbaOpen, [k]: !u.lbaOpen[k] } })),
-          leads: r.leads.map(l => { const st = STATUS[(stOf.get(l.id) ?? "") as StatusName];
-            return { ...l, when: new Date(l.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }), status: stOf.get(l.id) ?? "", stBg: st?.tint ?? "var(--crm-field)", stFg: st?.text ?? "var(--crm-muted)", stDot: st?.dot ?? null,
-              open: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: l.id, fromTeam: false, inbF: "All", whoSel: [] }) }; }) }; }) })),
+    title: "Leads by ad", count: `${shownAdsL.length} ad${shownAdsL.length === 1 ? "" : "s"} · ${shownAdsL.reduce((s, a) => s + a.total, 0)} leads`,
+    q: ui.lbaQ ?? "", setQ: (e: { target: { value: string } }) => patch({ lbaQ: e.target.value }),
+    periods: ([["month", "This month"], ["last", "Last month"], ["all", "All time"], ["custom", "Custom"]] as const).map(([k, label]) => ({ label, on: lbaPer === k, pick: () => patch({ lbaPer: k }) })),
+    custom: lbaPer === "custom" ? { label: customLabel, from: ui.lbaFrom ?? "", to: ui.lbaTo ?? "", setFrom: (e: { target: { value: string } }) => patch({ lbaFrom: e.target.value }), setTo: (e: { target: { value: string } }) => patch({ lbaTo: e.target.value }) } : null,
+    statuses: ([["all", "All"], ["running", "Running"], ["paused", "Paused"], ["ended", "Ended"]] as const).map(([k, label]) => ({ label, on: lbaSt === k, dot: k === "all" ? null : ST_PILL[label as LbaStatus].dot, pick: () => patch({ lbaSt: k }) })),
+    sort: (["ad", "status", "members", "leads"] as const).reduce((o, k) => ({ ...o, [k]: { on: srt.k === k, dir: srt.dir,
+      pick: () => patch({ lbaSort: srt.k === k ? { k, dir: srt.dir === "desc" ? "asc" : "desc" } : { k, dir: k === "leads" ? "desc" : "asc" } }) } }), {} as Record<"ad" | "status" | "members" | "leads", { on: boolean; dir: "asc" | "desc"; pick: () => void }>),
+    ads: sorted.map((a, i) => { const open = ui.lbaShut[a.id] === undefined ? i === 0 && !lbaQ ? true : !!lbaQ : !ui.lbaShut[a.id];
+      const max = Math.max(1, ...a.rows.map(r => r.n)), st = ST_PILL[a.status];
+      return { id: a.id, name: a.name, wa: a.wa, total: a.total, open, toggle: () => set(u => ({ ...u, lbaShut: { ...u.lbaShut, [a.id]: open } })),
+        teamDots: a.teams.slice(0, 3).map(teamColor), teamsLabel: `${a.teams.length} team${a.teams.length === 1 ? "" : "s"}`,
+        status: a.status, stBg: st.bg, stFg: st.fg, first: a.rows[0]?.name ?? "—", more: a.rows.length > 1 ? `+${a.rows.length - 1}` : "",
+        rows: a.rows.map(r => ({ who: r.who, name: r.name, ini: r.who ? initials(r.name) : "–", team: r.team, teamDot: teamColor(r.teamId), n: r.n, pct: `${Math.round(r.pct * 100)}%`, barW: `${Math.round((r.n / max) * 100)}%`,
+          on: pick?.ad === a.id && pick.who === r.who, none: !r.who,
+          pick: () => patch({ lbaPick: pick?.ad === a.id && pick.who === r.who ? null : { ad: a.id, who: r.who }, lbaLead: null }) })) }; }),
+    empty: !sorted.length,
+    // 06b·2 / 06b·3: the member's leads from that ad in the period; › folds it to the 44 px rail, × closes it.
+    panel: pickAdRow && pickRow ? {
+      name: pickRow.name, ini: pickRow.who ? initials(pickRow.name) : "–", team: pickRow.team, teamDot: teamColor(pickRow.teamId), n: pickRow.n,
+      line: `from ${pickAdRow.name} · ${rangeLabel}`, shut: !!ui.lbaPickShut,
+      fold: () => patch({ lbaPickShut: true }), unfold: () => patch({ lbaPickShut: false }), close: () => patch({ lbaPick: null, lbaLead: null }),
+      rail: `${pickRow.name} · ${pickRow.n} lead${pickRow.n === 1 ? "" : "s"}`,
+      leads: pickRow.leads.map(l => { const c = data.customers.find(x => x.id === l.id), vis = visitOf(l.id), open = ui.lbaLead === l.id;
+        const vAt = vis ? new Date(vis.start) : null;
+        return { id: l.id, name: l.name, sub: [l.phone, when(l.at)].filter(Boolean).join(" · "), ...pill(l.id), open,
+          toggle: () => patch({ lbaLead: open ? null : l.id }),
+          facts: c ? [
+            ["Channel", c.channel === "whatsapp" ? "WhatsApp" : "Messenger"],
+            ["Visit", vAt ? `${vAt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${vAt.toLocaleTimeString("en-MY", { hour: "numeric", minute: vAt.getMinutes() ? "2-digit" : undefined })} · ${roomName(vis!.showroomId)}` : "—"],
+            ["Interested in", c.details.type || "—"],
+            ["Budget", c.details.budget || "—"],
+            ["First contact", `${when(c.createdAt)}, ${new Date(c.createdAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`],
+          ] as [string, string][] : [],
+          openChat: () => openChat(l.id),
+          openInfo: () => patch({ pane: "overlay", kind: "info", infoId: l.id, visit: null }) }; }),
+    } : null,
   };
   return {
     leadsByAd: leadsByAdV,

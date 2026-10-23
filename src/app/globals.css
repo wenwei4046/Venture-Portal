@@ -422,6 +422,7 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-hero-line: #EBD6C3;
   --crm-track: #EFE7E1;
   --crm-track-2: #EEE2D8;
+  --crm-hover-2: #FFFCF9;
   /* channels — these two appear nowhere else */
   --crm-whatsapp: #25D366;
   --crm-messenger: #0A7CFF;

@@ -121,7 +121,11 @@ export interface DeskUi {
   /** Split rows set by hand (note 06: dragging one re-balances only the rows not touched) and the teams opened to their people. */
   splitTouched: string[]; splitOpen: Record<string, boolean>; mvTyping: { key: string; text: string } | null;
   /** Assignment › Leads by ad: this month or all time. */
-  lbaPer: "month" | "all";
+  lbaPer: "month" | "last" | "all" | "custom";
+  /** Leads by ad (v2 06b): Custom's two days, the status filter, the search, the sort, the member picked (its panel folded), the lead opened. */
+  lbaFrom: string | null; lbaTo: string | null; lbaSt: "all" | "running" | "paused" | "ended"; lbaQ: string;
+  lbaSort: { k: "ad" | "status" | "members" | "leads"; dir: "asc" | "desc" } | null;
+  lbaPick: { ad: string; who: string } | null; lbaPickShut: boolean; lbaLead: string | null;
   /** Leads by ad: an ad's card folded (by ad id), a person's list of leads opened ("ad|person"). */
   lbaShut: Record<string, boolean>; lbaOpen: Record<string, boolean>;
   /** Active members / Member work type: a team's card folded (by team name). */
@@ -220,7 +224,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaFrom: null, lbaTo: null, lbaSt: "all", lbaQ: "", lbaSort: null, lbaPick: null, lbaPickShut: false, lbaLead: null, lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

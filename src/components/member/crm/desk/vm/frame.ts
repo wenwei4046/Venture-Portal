@@ -30,7 +30,8 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
     // Chat progress is Inbox's fourth column; Member work type moved here from Settings). No Organic Leads (2026-10-13).
     assignment: [
       ["Ads to teams", `${adIds.length} ads · ` + (held ? `${held} ${held === 1 ? "lead" : "leads"} over the limit` : unset ? `${unset} on the default (evenly)` : "all set"), "megaphone"],
-      ["Leads by ad", "Who got how many leads from each ad", "users"],
+      // v2 (06b / 06c): no line under the tabs — the table card carries its own title and counts.
+      ["Leads by ad", "", "users"],
       ["Active members", data.lockedStaff?.length ? `${data.lockedStaff.length} locked · no new leads for now` : "Everyone takes new leads", "users"],
       ["Full time lead allocation", ftTeams ? `On for ${ftTeams} of ${ctx.teams.length} teams` : "Not set for any team", "users"],
       ["Member work type", "Full time or part time for each member", "briefcase"],
