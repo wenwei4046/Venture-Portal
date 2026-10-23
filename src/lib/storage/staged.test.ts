@@ -38,7 +38,7 @@ function fakeDb(rows: Record<string, number>, files: Record<string, Uint8Array>)
           expect(bucket).toBe('uploads')
           reads.push(path)
           const bytes = files[path]
-          return bytes ? { data: new Blob([bytes]), error: null } : { data: null, error: { message: 'Object not found' } }
+          return bytes ? { data: new Blob([new Uint8Array(bytes)]), error: null } : { data: null, error: { message: 'Object not found' } }
         },
         remove: vi.fn(async (paths: string[]) => {
           expect(bucket).toBe('uploads')
