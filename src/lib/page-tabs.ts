@@ -194,6 +194,7 @@ export const PAGE_TABS = {
   '/marketing/new': ['mkt.projects'],
   '/marketing/projects': ['mkt.projects'],
   '/marketing/projects/[id]': ['mkt.projects'],
+  '/marketing/subsidiaries/[code]': ['mkt.projects'],
   '/marketing/tracking': ['mkt.tracking'],
   '/marketing/workflows': ['mkt.tracking'],
   '/marketing/products': ['mkt.tracking'],

@@ -383,6 +383,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_pic_page', 'mkt_pic_answer',
   // Marketing's own clients (mig 20261024004000): added by Marketing · Manage, its code made by the database.
   'mkt_sub_add',
+  // A subsidiary's page (mig 20261024005000): its projects' newest trail lines, by Marketing · View.
+  'mkt_sub_feed',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
