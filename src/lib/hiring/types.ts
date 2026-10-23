@@ -5,6 +5,8 @@
 
 export type HiringStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandidateStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
+/** Why somebody is kept in the Talent Bank (mig 20261024233700; the words: `reasons.ts`). */
+export type TalentReason = 'not_shortlisted' | 'failed_interview' | 'not_right_now' | 'declined_offer' | 'other'
 export type HiringFieldType = 'text' | 'number' | 'longtext' | 'select' | 'range'
 export type CandidateFieldType = 'text' | 'number' | 'date' | 'choice'
 
@@ -129,6 +131,8 @@ export interface HiringTalent {
   department: string
   fromRequest: string | null
   notes: string
+  /** Why they are kept (2026-10-24); null for somebody kept before it was asked. */
+  reason: TalentReason | null
   /** Résumé first, then by type, then as added. */
   files: HiringFile[]
   savedBy: string

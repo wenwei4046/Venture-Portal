@@ -317,6 +317,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hiring_bank_add_talent', 'hiring_bank_file_add', 'hiring_bank_file_delete', 'hiring_bank_folder_move', 'hiring_bank_move_all',
   // …its Bin (mig 20261013061500): Restore, Delete forever and Empty bin ask Edit.
   'hiring_bank_bin_restore', 'hiring_bank_bin_delete', 'hiring_bank_bin_empty',
+  // …and why somebody is kept there (mig 20261024233700): changed on their page, asking Edit.
+  'hiring_talent_set_reason',
   // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
   'guest_link_rename_department',
   // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers, and

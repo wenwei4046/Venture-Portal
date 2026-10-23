@@ -165,7 +165,7 @@ export function genPage(key: GenKey, d: HrAppData, filter: string | null, day: s
       ...base,
       intro: 'People who applied before and are worth asking again.',
       sections: [{
-        rows: d.talents.map(t => ({ key: t.id, title: t.name, sub: `${t.position} · ${t.dept}`, right: t.when, lead: { kind: 'person', name: t.name }, open: { k: 'talent', id: t.id } })),
+        rows: d.talents.map(t => ({ key: t.id, title: t.name, sub: `${t.position} · ${t.reason ?? t.dept}`, right: t.when, lead: { kind: 'person', name: t.name }, open: { k: 'talent', id: t.id } })),
       }],
       empty: 'Nobody kept on file yet.',
     }
