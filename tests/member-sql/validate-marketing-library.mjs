@@ -6,7 +6,9 @@
 // of a type in a subsidiary; a file filed only when its bytes' row is there and the caller's; move, bin, restore,
 // delete for good (the bytes' rows with them) and the Dustbin's 30 days; who may each; the page in the tab registry.
 // Then ⑥-2 (007200): a subsidiary's brand profile — the manager's, only the handoff's colours and fonts, its words tidied,
-// a picture only one's own just sent (an image), the one a profile shows filed, the one replaced taken off. No live I/O.
+// a picture only one's own just sent (an image), the one a profile shows filed, the one replaced taken off. Then the
+// user's answers of 2026-10-24 (20261025004000): the Dustbin's 60 days and the hourly cron's purge, a manager's link
+// folder type, a brand profile Marketing · Edit's. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -493,5 +495,57 @@ await one(`SELECT public.mkt_lib_bin('file', $1)`, [ta])
 await as(U.josiah, MANAGER)
 await one(`SELECT public.mkt_lib_delete('file', $1)`, [ta])
 check(await peek1(`SELECT count(*)::int FROM public.mkt_task_files WHERE file_id = $1`, [ta]), 0, 'deleted for good: off every task')
+
+// ── 2026-10-24: the user's answers (20261025004000) — the Dustbin's 60 days and the hourly purge; a manager's link
+//    folder type; a brand profile Marketing · Edit's ───────────────────────────────────────────────────────────────
+await db.exec('RESET ROLE')
+const answers = await sql('20261025004000_marketing_library_answers.sql')
+await db.exec(answers)
+await db.exec(answers) // twice: nothing changes, nothing breaks
+
+// L3 "60 days , auto clean": 31 days on a file waits still; past 60 it goes — with the cron's purge, nobody touching the Library.
+await as(U.mei, STAFF)
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [tb])
+await peek(`UPDATE public.mkt_lib_files SET trashed_at = now() - interval '31 days' WHERE id = $1`, [tb])
+await as(U.ali, VIEW)
+const inBin = async () => (await one(`SELECT public.mkt_library()`)).trash.some(t => t.id === tb)
+check(await inBin(), true, '31 days on: still in the Dustbin (60 days since 2026-10-24)')
+await peek(`UPDATE public.mkt_lib_files SET trashed_at = now() - interval '61 days' WHERE id = $1`, [tb])
+check(await inBin(), false, 'past 60 days: out of the Dustbin’s list')
+check([await one(`SELECT has_function_privilege('service_role', 'public.mkt_lib_purge()', 'EXECUTE')`),
+  await one(`SELECT has_function_privilege('authenticated', 'public.mkt_lib_purge()', 'EXECUTE')`)], [true, false],
+  'the purge: the hourly cron’s (the service role), never a sign-in’s')
+check(await peek1(`SELECT count(*)::int FROM public.mkt_lib_files WHERE id = $1`, [tb]), 1, 'nobody has touched the Library: the file waits for the purge')
+await as(null, [], 'service_role')
+await q(`SELECT public.mkt_lib_purge()`)
+check([await peek1(`SELECT count(*)::int FROM public.mkt_lib_files WHERE id = $1`, [tb]),
+  await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [TB])], [0, 0],
+  'the cron’s purge: its row and its bytes’ row gone (R2’s sweep takes the bytes)')
+
+// 31 "可以": a manager makes a link folder type too, as Raw footage.
+await as(U.mei, STAFF)
+await refuses(`SELECT public.mkt_lib_type_add('Edited reels', 'oklch(0.55 0.12 300)', 'Video', true)`, [], /Folder types are the manager's/, 'a link type is the manager’s too')
+await as(U.josiah, MANAGER)
+const reels = await one(`SELECT public.mkt_lib_type_add('Edited reels', 'oklch(0.55 0.12 300)', 'Video', true)`)
+check([reels.name, reels.cat, reels.link], ['Edited reels', 'Video', true], 'the manager’s own link folder type')
+check((await one(`SELECT public.mkt_lib_type_add('Mood two', 'oklch(0.55 0.12 300)', 'Content')`)).link, false, 'three arguments: a files type, as before')
+check(await peek1(`SELECT count(*)::int FROM pg_proc WHERE proname = 'mkt_lib_type_add'`), 1, 'one function — the three-argument one dropped')
+check([await one(`SELECT has_function_privilege('anon', 'public.mkt_lib_type_add(text,text,text,boolean)', 'EXECUTE')`),
+  await one(`SELECT has_function_privilege('authenticated', 'public.mkt_lib_type_add(text,text,text,boolean)', 'EXECUTE')`)], [false, true],
+  'a sign-in’s, never the publishable key’s')
+await as(U.mei, STAFF)
+await refuses(`SELECT public.mkt_lib_folder_add($1, $2)`, [H2990, reels.id], /Paste the folder's link/, 'its folders are links')
+const reelsF = (await one(`SELECT public.mkt_lib_folder_add($1, $2, 'https://drive.google.com/drive/folders/r1')`, [H2990, reels.id])).id
+check(await peek1(`SELECT url FROM public.mkt_lib_folders WHERE id = $1`, [reelsF]), 'https://drive.google.com/drive/folders/r1', 'a link folder of it, kept')
+
+// L2 "人人都能改 · but with audit log": Marketing · Edit changes a profile and sends its pictures; View alone never.
+await as(U.ali, VIEW)
+await refuses(`SELECT public.mkt_lib_profile_save($1, '{}'::jsonb)`, [CAR], /Editing a brand profile is not open/, 'View alone never changes a profile')
+await assert.rejects(put(`brand/${id(981)}/v.png`, 1000, 'image/png'), /row-level security|violates/, '…nor sends its pictures'); checks++
+await as(U.mei, STAFF)
+const MEIS = `brand/${id(982)}/mei-logo.png`
+await put(MEIS, 1000, 'image/png')
+await save(CAR, { avatar_path: MEIS, font: 'Nunito', name: 'Carres' })
+check(await profileOf(CAR), { avatar_path: MEIS, font: 'Nunito', name: 'Carres' }, 'Marketing · Edit changes a profile and sends its logo')
 
 console.log(`marketing library: ${checks} checks passed`)

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cloneMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
+import { cloneMktWorkflow, deleteMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
 import { canvasProblems, canvasRemap, stageMap } from '@/lib/marketing/canvas'
 import { moveStage, removeStage } from '@/lib/marketing/tasks'
 import {
@@ -10,6 +10,7 @@ import {
   wfWarnings, wfWhoText, WF_MAX_PROMISE, WF_MAX_STAGES, type WfEdit, type WfStage, type WfTemplate,
 } from '@/lib/marketing/workflows'
 import type { BuilderPerson } from '../builder/people'
+import DeleteDraft from '../builder/DeleteDraft'
 import StageList, { Fact } from '../builder/StageList'
 import CanvasEditor from './CanvasEditor'
 import TemplateSettings from './TemplateSettings'
@@ -20,7 +21,8 @@ import w from './workflows.module.css'
 // left, each with its templates (+ Add template, Clone, + a new action); the template's stages in the middle (drag to
 // move them, + Add stage) with the lock over the whole workflow; the stage's settings on the right; at the foot the
 // total, how often the PIC approves, the product's promise, the warnings, the projects that stay on the version they
-// started on, and Publish. A draft is saved as it is typed — only what changed, never over somebody else's save.
+// started on, and Publish. A draft is saved as it is typed — only what changed, never over somebody else's save. A
+// template never published may be deleted (the user's answer 8, 2026-10-24), asked first.
 
 type SaveState = { state: 'saved' } | { state: 'saving' } | { state: 'error'; reason: string; stale: boolean }
 
@@ -225,6 +227,28 @@ export default function WorkflowBuilder({
       setWfs(list => list.map(t => (t.id === sel.id ? { ...t, version: r.version, changed: false, live: r.live } : t)))
       const stay = r.version > 1 ? `, ${stayOn(r.live, r.version - 1)}` : ''
       flash(`Published ${sel.action} · ${edit.tname.trim() || sel.tname} v${r.version} · new tasks use v${r.version}${stay}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  /** A template never published, deleted — the next one opens (or none is left). */
+  const remove = async () => {
+    if (!sel || busy) return
+    setBusy(true)
+    try {
+      if (!(await flush())) return
+      const r = await deleteMktWorkflow(sel.id, revRef.current)
+      if (!r.ok) return flash(r.reason)
+      const list = r.workflows ?? wfs.filter(t => t.id !== sel.id)
+      setWfs(list)
+      selRef.current = null
+      editRef.current = null
+      savedRef.current = null
+      setSelId(null)
+      setEdit(null)
+      if (list[0]) await open(list[0].id, list)
+      else router.replace('/marketing/workflows', { scroll: false })
+      flash(`Deleted “${sel.action} · ${sel.tname}”`)
     } finally {
       setBusy(false)
     }
@@ -449,7 +473,9 @@ export default function WorkflowBuilder({
           {warnings.map(x => <span key={x} className={b.wbWarn}>⚠️ {x}</span>)}
           {warnings.length ? null : <span className={b.wbNoWarn}>No warnings</span>}
           <span className={w.grow} />
-          {sel.version ? <span className={w.live}>{stayOn(sel.live, sel.version)}</span> : null}
+          {sel.version
+            ? <span className={w.live}>{stayOn(sel.live, sel.version)}</span>
+            : <DeleteDraft key={sel.id} what="template" busy={busy} onDelete={() => void remove()} />}
           <button type="button" className={w.publish} disabled={publishOff} title={publishWhy} onClick={() => void publish()}>Publish v{next}</button>
         </div>
       ) : null}

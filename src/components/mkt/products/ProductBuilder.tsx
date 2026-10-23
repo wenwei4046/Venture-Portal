@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductStatus } from '@/lib/marketing/actions'
+import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductStatus } from '@/lib/marketing/actions'
 import {
   editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
 } from '@/lib/marketing/products'
 import { firstWfStage, wfStagesPayload } from '@/lib/marketing/workflows'
 import { formatMoney } from '@/lib/utils'
+import DeleteDraft from '../builder/DeleteDraft'
 import MoneyInput from './MoneyInput'
 import pb from './products.module.css'
 
@@ -206,6 +207,22 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
   }
   const saveDraft = async () => {
     if (await flush()) flash('Draft saved')
+  }
+  /** A product still a draft, deleted (the user's answer 8) — back to the list. */
+  const remove = async () => {
+    if (!sel || busy) return
+    setBusy(true)
+    try {
+      if (!(await flush())) return
+      const r = await deleteMktProduct(sel.id, revRef.current)
+      if (!r.ok) return flash(r.reason)
+      const products = r.book?.products ?? book.products.filter(p => p.id !== sel.id)
+      setBook(b => r.book ?? { ...b, products })
+      await open(null, products)
+      flash(`Deleted ${sel.name.trim() || sel.code}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   // ── The list ──
@@ -513,6 +530,7 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
               ) : null}
               <div className={pb.pubFoot}>
                 {sel.status === 'active' ? <button type="button" className={pb.danger} disabled={busy} onClick={() => void setStatus('retire')}>Retire product</button> : null}
+                {sel.status === 'draft' ? <DeleteDraft key={sel.id} what="product" busy={busy} onDelete={() => void remove()} /> : null}
                 <span className={pb.grow} />
                 {ro ? null : (
                   <span className={problems.length ? pb.pubNoteBad : pb.pubNote}>

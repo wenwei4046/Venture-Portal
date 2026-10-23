@@ -12,6 +12,7 @@ const actions = vi.hoisted(() => ({
   publishMktProduct: vi.fn(),
   setMktProductStatus: vi.fn(),
   saveMktWorkflow: vi.fn(),
+  deleteMktProduct: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
@@ -122,6 +123,23 @@ describe('the Product Builder', () => {
     })
     await waitFor(() => expect(actions.publishMktProduct).toHaveBeenCalledWith('p1', 5))
     expect(await screen.findByText('Published Social Media Package A v4 · effective 01/11/2026')).toBeTruthy()
+  })
+
+  it('deletes a product still a draft, asked first — back to the list; one on sale is retired instead (answer 8)', async () => {
+    actions.deleteMktProduct.mockResolvedValue({ ok: true, book: productBookFromRow({ ...BOOK, products: [SMA, RETIRED] }) })
+    const { unmount } = builder('p1')
+    expect(screen.queryByRole('button', { name: 'Delete draft' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Retire product' })).toBeTruthy()
+    unmount()
+    builder('p2')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('group', { name: 'Delete this product?' })).getByRole('button', { name: 'Delete' }))
+    })
+    expect(actions.deleteMktProduct).toHaveBeenCalledWith('p2', 1)
+    expect(await screen.findByText('Deleted Brand Book')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /All\s*2/ })).toBeTruthy()
+    expect(router.replace).toHaveBeenLastCalledWith('/marketing/products', { scroll: false })
   })
 
   it('retired: read-only, Reactivate', async () => {

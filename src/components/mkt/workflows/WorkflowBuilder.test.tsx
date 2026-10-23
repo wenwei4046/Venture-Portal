@@ -11,6 +11,7 @@ const actions = vi.hoisted(() => ({
   saveMktWorkflow: vi.fn(),
   publishMktWorkflow: vi.fn(),
   cloneMktWorkflow: vi.fn(),
+  deleteMktWorkflow: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
@@ -190,6 +191,35 @@ describe('the Workflow Builder', () => {
     expect(actions.cloneMktWorkflow).toHaveBeenCalledWith('w1')
     expect(await screen.findByText('Cloned “Full production” · rename it, then publish')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Full production copy')
+  })
+
+  it('deletes a template never published, asked first — the next one opens; a published one offers no delete (answer 8)', async () => {
+    actions.deleteMktWorkflow.mockResolvedValue({ ok: true, workflows: list(REELS) })
+    builder([REELS, BROKEN], 'w2')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    const ask = screen.getByRole('group', { name: 'Delete this template?' })
+    await act(async () => {
+      fireEvent.click(within(ask).getByRole('button', { name: 'Delete' }))
+    })
+    expect(actions.deleteMktWorkflow).toHaveBeenCalledWith('w2', 1)
+    expect(await screen.findByText('Deleted “Brand book · Standard”')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Full production')
+    expect(screen.queryByRole('button', { name: 'Delete draft' })).toBeNull()
+    expect(router.replace).toHaveBeenLastCalledWith('/marketing/workflows?w=w1', { scroll: false })
+  })
+
+  it('a delete the database refuses says why and keeps the template; Keep takes the question back', async () => {
+    actions.deleteMktWorkflow.mockResolvedValue({ ok: false, reason: 'The product "Social Media Package A" links this template — unlink it there first.' })
+    builder([REELS, BROKEN], 'w2')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Delete this template?' })).getByRole('button', { name: 'Keep' }))
+    expect(actions.deleteMktWorkflow).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('group', { name: 'Delete this template?' })).getByRole('button', { name: 'Delete' }))
+    })
+    expect(await screen.findByText('The product "Social Media Package A" links this template — unlink it there first.')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Standard')
   })
 
   it('a table keeps preset rows: a cell filled in is the team’s to read, a blank one theirs to fill in', async () => {
