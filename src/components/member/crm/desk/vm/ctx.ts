@@ -189,7 +189,9 @@ export interface DeskUi {
   // Audit log
   auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
   // Customer form (the page): its draft, the preview's device
-  cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
+  cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop";
+  /** v2 frame 08: which of the saved forms the editor is on (null = the first, the one Customer info asks); Delete asked again. */
+  cfForm: string | null; cfDelAsk: boolean; cfNew: Record<string, string>; cfType: string | null;
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
   cfPage: number; cfDrag: { k: "f" | "s"; si: number; fi?: number } | null; cfOver: string | null;
   // Channels
@@ -237,7 +239,7 @@ export const initialDeskUi = (): DeskUi => ({
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
-  cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
+  cfDraft: null, cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 

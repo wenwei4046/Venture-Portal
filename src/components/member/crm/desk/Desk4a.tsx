@@ -1879,13 +1879,13 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
   );
 }
 
-type FormBits = Pick<ReturnType<typeof import("./vm/formpage").formPageVM>, "cfPages" | "cfSecs" | "cfDirty" | "cfReset" | "cfDevs" | "cfDesk" | "cfDragEnd">;
+type FormBits = Pick<ReturnType<typeof import("./vm/formpage").formPageVM>, "cfPages" | "cfSecs" | "cfDirty" | "cfReset" | "cfDevs" | "cfDesk" | "cfDragEnd" | "cfForms">;
 const Switch = ({ on, act, locked }: { on: boolean; act?: () => void; locked?: boolean }) => (
   <span role="switch" aria-checked={on} onClick={locked ? undefined : act} style={{ position: "relative", width: "30px", height: "18px", flex: "none", borderRadius: "9px", background: on ? "var(--crm-rust)" : "var(--crm-track)", cursor: locked ? "default" : "pointer", opacity: locked ? 0.6 : 1, transition: "background .15s" }}>
     <span style={{ position: "absolute", top: "2px", left: on ? "14px" : "2px", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left .15s" }} />
   </span>
 );
-const CHIP: CSSProperties = { flex: "none", maxWidth: "64px", padding: "2px 7px", borderRadius: "4px", background: "var(--crm-cream-nav)", font: "500 11px Inter, sans-serif", color: "var(--crm-ink-soft)", textAlign: "center", overflow: "hidden" };
+const CHIP: CSSProperties = { flex: "none", maxWidth: "88px", boxSizing: "border-box", padding: "3px 8px", borderRadius: "4px", background: "var(--crm-field)", font: "500 11px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const CF_FIELD: CSSProperties = { height: "34px", boxSizing: "border-box", padding: "0 10px", border: "1px solid var(--crm-line)", borderRadius: "6px", background: "#fff", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", outline: "none" };
 const CF_LABEL: CSSProperties = { display: "flex", flexDirection: "column", gap: "4px", font: "500 11px Inter, sans-serif", color: "var(--crm-muted)" };
 const CF_KICK: CSSProperties = { font: "500 10.5px Inter, sans-serif", letterSpacing: "0.1em", color: "var(--crm-faint)" };
@@ -1900,7 +1900,28 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
   return (
     <div onDragEnd={v.cfDragEnd} style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "242px minmax(0,1fr) 340px" }}>
       <div style={{ padding: "18px 16px 24px 36px", borderRight: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", gap: "4px", overflowY: "auto" }}>
-        <span style={{ ...CF_KICK, paddingBottom: "10px" }}>PAGES</span>
+        {/* v2 frame 08: the form picker — several forms kept, the first in use; Duplicate and Delete beside it. */}
+        <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", paddingBottom: "8px" }}>Form</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "16px", marginBottom: "14px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <label style={{ position: "relative", flex: 1, minWidth: 0, height: "34px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden" }}>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{v.cfForms.list.find(x => x.id === v.cfForms.cur)?.label.replace(/ · in use$/, "") ?? "Customer info"}</span>
+            <span style={{ marginLeft: "auto", flex: "none", display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={11} /></span>
+            <select value={v.cfForms.cur} onChange={v.cfForms.pick} aria-label="Form" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}>{v.cfForms.list.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
+          </label>
+          <button type="button" onClick={v.cfForms.duplicate} title="Duplicate form" aria-label="Duplicate form" style={{ ...BTN, flex: "none", width: "34px", height: "34px", borderRadius: "7px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink-soft)" }}><Ic name="copy" size={14} /></button>
+          <button type="button" onClick={v.cfForms.canDelete ? v.cfForms.askDelete : undefined} title={v.cfForms.deleteTip} aria-label="Delete form" style={{ ...BTN, flex: "none", width: "34px", height: "34px", borderRadius: "7px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)",
+            color: v.cfForms.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: v.cfForms.canDelete ? "pointer" : "not-allowed" }}><Ic name="trash-2" size={14} /></button>
+        </div>
+        {v.cfForms.ask && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "-6px 0 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+            Delete this form? Answers already given stay on each customer.
+            <span style={{ display: "flex", gap: "8px" }}>
+              <button type="button" onClick={v.cfForms.askDelete} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif" }}>Cancel</button>
+              <button type="button" onClick={v.cfForms.del} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+            </span>
+          </div>
+        )}
+        <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", paddingBottom: "10px" }}>Pages</span>
         {P.tabs.map(t => (
           <button key={t.num} type="button" onClick={t.pick} onDragOver={t.over} onDrop={t.drop} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "6px",
             background: t.lit ? "var(--crm-tint-attention)" : t.on ? "var(--crm-cream-nav-active)" : "transparent", outline: t.lit ? "2px dashed var(--crm-rust)" : "none", outlineOffset: "-3px",
@@ -1928,7 +1949,8 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
               {s.custom
                 ? <input type="text" value={s.title} onChange={s.setTitle} placeholder="Section name" style={{ flex: 1, minWidth: 0, border: 0, padding: 0, background: "transparent", font: `500 18px ${TIGHT}`, color: "var(--crm-ink)", outline: "none" }} />
                 : <span style={{ flex: 1, font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>{s.title}</span>}
-              <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{s.count} {s.count === 1 ? "field" : "fields"}</span>
+              <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{s.count} {s.count === 1 ? "field" : "fields"}</span>
+              <span style={{ width: "56px", textAlign: "right", font: "500 10px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Required</span>
               {s.removable && <button type="button" onClick={s.remove} title="Delete section" style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>}
             </div>
             {s.autoList.map(a => (
@@ -1939,9 +1961,7 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
                   <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Filled by the CRM</span>
                 </span>
                 <span style={CHIP}>Automatic</span>
-                <Switch on={false} locked />
-                <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", width: "58px" }}>Required</span>
-                <span style={{ width: "14px" }} />
+                <Switch on={false} locked />                <span style={{ width: "14px" }} />
               </div>
             ))}
             {s.fields.map((f, fi) => { const key = `${si}:${fi}`, isOpen = open === key;
@@ -1955,7 +1975,6 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
                     </span>
                     <span style={CHIP}>{f.type}</span>
                     <Switch on={f.reqOn} act={f.toggleReq} locked={f.core} />
-                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", width: "58px" }}>Required</span>
                     <button type="button" onClick={() => setOpen(isOpen ? null : key)} title={isOpen ? "Close" : "Edit field"} style={{ ...BTN, display: "flex", color: "var(--crm-faint)", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Ic name="chevron-right" size={14} /></button>
                   </div>
                   {isOpen && (
