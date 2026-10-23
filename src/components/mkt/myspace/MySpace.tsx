@@ -4,18 +4,19 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { flash } from '@/components/hrv/toast'
-import { saveMktSpace } from '@/lib/marketing/actions'
+import { careMktPet, saveMktSpace } from '@/lib/marketing/actions'
 import type { PlateColumn, WeekRow } from '@/lib/marketing/my-space'
 import type { MktNotice } from '@/lib/marketing/shell'
 import {
-  addedTile, DEFAULT_LAYOUT, DEFAULT_THEME, formOf, knownAfter, newPiece, PET_NAME_MAX, PET_STATES, petState, pictureProblem, removedTile,
-  ROOM_MAX_PIECES, sameLayout, spacePicturePath, twoAbreast, type Pet, type PetState, type PieceKind, type Room, type Space, type SpacePatch,
-  type SpacePicture, type SpaceTheme, type TileKind, type TilePlace,
+  addedTile, DEFAULT_LAYOUT, DEFAULT_THEME, formOf, knownAfter, levelUpWords, newPiece, PET_NAME_MAX, PET_STATES, petState, pictureProblem,
+  removedTile, ROOM_MAX_PIECES, sameLayout, spacePicturePath, twoAbreast, workoutWords, xpBar, type Pet, type PetState, type PetStats,
+  type PieceKind, type Room, type Space, type SpacePatch, type SpacePicture, type SpaceTheme, type TileKind, type TilePlace,
 } from '@/lib/marketing/space'
 import { createClient } from '@/lib/supabase/client'
 import NotesTile from './NotesTile'
 import Onboarding from './Onboarding'
 import PetNode from './PetNode'
+import PetTile from './PetTile'
 import PhotoTile from './PhotoTile'
 import RoomDrawerTab from './RoomDrawerTab'
 import RoomTile from './RoomTile'
@@ -23,12 +24,14 @@ import SpaceBoard, { type BoardTile } from './SpaceBoard'
 import SpaceCover from './SpaceCover'
 import SpaceDrawer, { type DrawerTab } from './SpaceDrawer'
 import TaskTile from './TaskTile'
+import TrophiesTile from './TrophiesTile'
 import WeekTile from './WeekTile'
 import s from './myspace.module.css'
 
-// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1 and ⑦-2): the viewer's cover, avatar (and their pet beside
-// it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their board — the room,
-// My turn, Waiting on others, Delegated by me, This week, Notes and Photo, laid out as they left it. Above it, an
+// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1, ⑦-2 and ⑦-5): the viewer's cover, avatar (and their pet
+// beside it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their board — the
+// room, the pet (its level, XP and energy; fed and worked out), My turn, Waiting on others, Delegated by me, the
+// trophies, This week, Notes and Photo, laid out as they left it. Above it, an
 // Assignment plan that put them on a project, while it is unread. The first visit of somebody on Marketing's roster
 // opens the pet's setup. What they change is saved as they change it (only that part); what is drawn is theirs from
 // then on — a page drawn again by the server never takes it back.
@@ -56,6 +59,10 @@ export interface MySpaceProps {
   /** Marketing · Edit: the space is laid out and dressed, a stage to accept accepted on its tile. */
   canEdit: boolean
   space: Space
+  /** The pet in numbers (`mkt_pet()`); null off Marketing's roster. */
+  petStats: PetStats | null
+  /** The viewer's id: the level this device last saw is kept under it. */
+  viewer: string
 }
 
 export default function MySpace(p: MySpaceProps) {
@@ -66,6 +73,8 @@ export default function MySpace(p: MySpaceProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [redo, setRedo] = useState(false)
   const [mood, setMood] = useState<PetState | null>(null)
+  const [stats, setStats] = useState<PetStats | null>(p.petStats)
+  const [caring, setCaring] = useState(false)
   // The space as last saved (to put back what a refused save changed) and as now drawn (what a later save sends).
   const confirmed = useRef<Space>(p.space)
   const latest = useRef<Space>(p.space)
@@ -217,6 +226,52 @@ export default function MySpace(p: MySpaceProps) {
     setRedo(true)
   }
 
+  // ── ⑦-5: its level, fed and worked out ──────────────────────────────────────────────
+  const level = stats ? xpBar(stats.xp).level : 1
+  const hasStats = stats != null
+  // A level reached — here (a workout) or since this device last saw the pet (a stage finished elsewhere) — is
+  // announced once (the prototype's level-up). The level seen is kept in this browser alone: a convenience.
+  const seenLevel = useRef<number | null>(null)
+  useEffect(() => {
+    if (!p.hasPet || !hasStats) return
+    const key = `mkt-pet-level:${p.viewer}`
+    let seen = seenLevel.current
+    try {
+      const kept = Number(window.localStorage.getItem(key))
+      if (Number.isInteger(kept) && kept >= 1) seen = kept
+      window.localStorage.setItem(key, String(level))
+    } catch {
+      // A private window, or storage blocked: this visit's own level-ups only.
+    }
+    seenLevel.current = level
+    const now = latest.current
+    if (seen != null && level > seen && now.pet.onboarded) {
+      showMood('levelUp', 3500)
+      flash(levelUpWords(now.pet.name || 'Your pet', now.pet.species, seen, level, !!now.petPath))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a level reached; the rest is read as it is then
+  }, [level, hasStats, p.hasPet, p.viewer])
+  const care = async (what: 'feed' | 'workout') => {
+    if (caring || !stats) return
+    const before = stats
+    setCaring(true)
+    try {
+      const r = await careMktPet(what)
+      if (!r.ok) {
+        flash(r.reason)
+        return
+      }
+      setStats(r.pet)
+      if (what === 'feed') showMood('eating', 2500)
+      else {
+        showMood('exercising', 3000)
+        flash(workoutWords(latest.current.pet.name || 'Your pet', r.pet.xp > before.xp))
+      }
+    } finally {
+      setCaring(false)
+    }
+  }
+
   // ── Pictures ─────────────────────────────────────────────────────────────────────
   const presetCover = (cover: number) => {
     setCoverPop(false)
@@ -265,9 +320,8 @@ export default function MySpace(p: MySpaceProps) {
     const t = placeOf(id)
     return t ? twoAbreast(t) : false
   }
-  const level = 1
-  const state = mood ?? petState(p.plate)
-  const pet = p.hasPet ? { species: space.pet.species, form: formOf(level), img: space.petPath, state, color: space.pet.color } : null
+  const state = mood ?? petState(p.plate, stats?.energy)
+  const pet = p.hasPet ? { species: space.pet.species, level, form: formOf(level), img: space.petPath, state, color: space.pet.color } : null
   const petName = space.pet.name || 'Your pet'
   const roomPlace = placeOf('room')
   const tiles: Partial<Record<TileKind, BoardTile>> = {
@@ -279,9 +333,16 @@ export default function MySpace(p: MySpaceProps) {
           onDecorate={() => { setDrawer('room'); setCoverPop(false) }} />
       ),
     } : undefined,
+    pet: {
+      body: (
+        <PetTile pet={pet} name={petName} stats={stats} canCare={p.canEdit} caring={caring} onFeed={() => void care('feed')}
+          onExercise={() => void care('workout')} />
+      ),
+    },
     turn: { body: <TaskTile column={col('turn')} wide={wide('turn')} canAccept={p.canEdit} /> },
     waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} canAccept={p.canEdit} />, red: col('waiting').anyRed },
     delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
+    trophies: { body: <TrophiesTile stats={stats} /> },
     week: { body: <WeekTile week={p.week} /> },
     notes: { bare: true, body: <NotesTile text={space.notes} canEdit={p.canEdit} onChange={t => change('notes', t)} onDone={() => flushKey('notes')} /> },
     photo: { bare: true, body: <PhotoTile path={space.photoPath} canEdit={p.canEdit && !drawer} sending={sending} onPick={() => pick('photo')} /> },

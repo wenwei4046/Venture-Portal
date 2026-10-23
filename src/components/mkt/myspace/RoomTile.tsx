@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { officeTime } from '@/lib/office-time'
-import { CATALOG, PET_SIZE, roomScale, type PetColor, type PetState, type Room, type SpeciesKey, type TilePlace } from '@/lib/marketing/space'
+import { CATALOG, petSize, roomScale, type PetColor, type PetState, type Room, type SpeciesKey, type TilePlace } from '@/lib/marketing/space'
 import PetNode from './PetNode'
 import s from './myspace.module.css'
 
@@ -13,6 +13,8 @@ import s from './myspace.module.css'
 
 export interface RoomPet {
   species: SpeciesKey
+  /** Its level (1–6): it grows. */
+  level: number
   form: number
   img: string | null
   state: PetState
@@ -106,7 +108,7 @@ export default function RoomTile(p: RoomTileProps) {
       {p.pet ? (
         <div className={s.roomPet} style={{ left: `${spot.x}%` }}>
           <PetNode species={p.pet.species} form={p.pet.form} img={p.pet.img} state={p.pet.state} color={p.pet.color}
-            size={Math.round(PET_SIZE[0] * (scale + 0.15))} facing={spot.facing} />
+            size={Math.round(petSize(p.pet.level) * (scale + 0.15))} facing={spot.facing} />
         </div>
       ) : null}
       <span className={s.roomLabel}>🏠 {p.label}</span>
