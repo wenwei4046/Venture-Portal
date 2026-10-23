@@ -143,7 +143,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
                 ))}
               </dl>
 
-              {both?.mine ? <div className={s.workLast}>You approved · waiting for {both.other}</div> : null}
+              {both?.mine ? <div className={s.bothMine}>You approved · waiting for {both.other}</div> : null}
               {waiting && step === 'choose' ? (
                 <div className={s.choose}>
                   <button type="button" className={`${s.btn} ${s.approve}`} onClick={() => go('approve')}>Approve</button>

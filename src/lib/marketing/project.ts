@@ -411,7 +411,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
     : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason ?? ''}"`
     : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
-    : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link`
+    // The first of two when both PICs sign off (②b-2d-2b) names whom the minutes still wait for.
+    : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link${typeof e.data?.waiting === 'string' && e.data.waiting ? ` · waiting for ${e.data.waiting}` : ''}`
     : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason ?? ''}"`
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }

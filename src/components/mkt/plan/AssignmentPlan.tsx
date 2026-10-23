@@ -250,7 +250,10 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
                             ) : (
                               <span className={s.appr} title="Approvers are always locked">
                                 <span>{a.kind === 'pic' ? '🔗' : '👤'}</span>
-                                <span className={s.apprName}>{a.kind === 'pic' ? `${two && a.all ? 'Both PICs' : 'PIC'} · ${pic || 'the PIC'}` : nameOf(a.staff)}</span>
+                                {(() => {
+                                  const who = a.kind === 'pic' ? `${two && a.all ? 'Both PICs' : 'PIC'} · ${pic || 'the PIC'}` : nameOf(a.staff)
+                                  return <span className={s.apprName} title={who}>{who}</span>
+                                })()}
                                 {/* Two PICs: either one's approval, or both (set per approval — the user's answer 29). */}
                                 {a.kind === 'pic' && two ? (
                                   <button type="button" className={`${s.apprToggle}${a.all ? ` ${s.apprToggleOn}` : ''}`} aria-pressed={!!a.all}

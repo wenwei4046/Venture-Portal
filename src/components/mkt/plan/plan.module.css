@@ -99,10 +99,12 @@
 .arrow { color: rgb(var(--mk-faint)); font-size: 12px; }
 .appr {
   height: 28px; padding: 0 6px 0 9px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex;
-  align-items: center; gap: 5px; font-size: .9em; white-space: nowrap; font-family: inherit; color: inherit;
+  align-items: center; gap: 5px; font-size: .9em; white-space: nowrap; font-family: inherit; color: inherit; max-width: 100%; min-width: 0;
 }
+/* A long name (two PICs) never pushes the chip into the next column: the name gives way, the rest stays whole. */
+.appr > * { flex: none; }
 .apprPick { border-color: rgb(var(--mk-red-line)); color: rgb(var(--mk-red)); background: rgb(var(--mk-red-soft)); cursor: pointer; padding: 0 10px; }
-.apprName { font-weight: 500; }
+.apprName { font-weight: 500; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .lockSmall { font-size: 10px; }
 /* Two PICs: Either / Both on the PIC level (②b-2d-2b) — a small pill inside the chip, ink when both. */
 .apprToggle { height: 18px; padding: 0 7px; border-radius: 9px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
