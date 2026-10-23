@@ -130,7 +130,7 @@ describe('the hub', () => {
     expect(screen.getByText('5 · RM 200,000.00')).toBeInTheDocument()
     const carres = list().find((r) => r.textContent?.includes('Carres'))!
     expect(within(carres).getByText('−RM 100,000.00')).toHaveAttribute('data-tone', 'danger')
-    expect(within(carres).getByText('2.000% /mo · 12 months · SC HC')).toBeInTheDocument()
+    expect(within(carres).getByText('2.000% /mo · 12 months')).toBeInTheDocument()
     const cancelled = list().find((r) => r.textContent?.includes('HOUZS Kitchen'))!
     expect(within(cancelled).getByText('−RM 15,000.00')).toHaveAttribute('data-faint', 'true')
 
@@ -142,6 +142,36 @@ describe('the hub', () => {
 
     fireEvent.click(cardBtn(/^Cancelled/))
     expect(screen.getByText('1 · RM 15,000.00')).toBeInTheDocument()
+  })
+
+  it('gives a loan’s funding source a Source column of its own, after the Description — it filters, and search still finds it', async () => {
+    hub()
+    await act(async () => undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Source/ }))
+    const heads = screen.getAllByRole('columnheader').map((h) => h.querySelector('span')?.textContent)
+    expect(heads).toEqual(['Name', 'Description', 'Source', 'Amount'])
+    const carres = list().find((r) => r.textContent?.includes('Carres'))!
+    expect(within(carres).getByText('HC')).toBeInTheDocument()
+    expect(within(carres).queryByText(/SC HC/)).toBeNull()
+    expect(within(list().find((r) => r.textContent?.includes('Hookka'))!).getByText('—')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Source' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter · Source' })).getByRole('menuitemcheckbox', { name: /HC/ }))
+    expect(list()).toHaveLength(1)
+    expect(list()[0]).toHaveTextContent('Carres (CAR)')
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter · Source' })).getByRole('button', { name: 'Clear' }))
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search company, description…' }), { target: { value: 'sc hc' } })
+    expect(list()).toHaveLength(1)
+    expect(list()[0]).toHaveTextContent('Carres (CAR)')
+  })
+
+  it('has no Source column on Fund IN', async () => {
+    hub({ side: 'in', records: [deal({ id: 's', side: 'in', type: 'director_loan', typeLabel: 'Director loan' })] })
+    await act(async () => undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }))
+    expect(screen.queryByRole('menuitemcheckbox', { name: /Source/ })).toBeNull()
   })
 
   it('opens on the card asked for, and searches party, description and notes', () => {

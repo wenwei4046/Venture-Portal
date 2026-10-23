@@ -3,6 +3,7 @@
 import { useState, useTransition, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { DialogButton, DialogConfirm, DialogForm, DialogMenu, Field, FinDialog, Hint, type DialogMenuItem } from '@/components/finv/Dialog'
+import { stageInto } from '@/lib/storage/stage'
 import {
   approveVoucher,
   getAttachmentSignedUrl,
@@ -124,10 +125,10 @@ export function useVoucherSteps(
       if (files.length === 0) return
       const form = new FormData()
       form.set('voucher_id', v.id)
-      for (const f of files) form.append('files', f)
       setError(null)
       startBusy(async () => {
         try {
+          await stageInto(form, 'files', files)
           const { count } = await uploadVoucherAttachment(form)
           flash(`${count} ${count === 1 ? 'file' : 'files'} added`)
           onFilesChanged()

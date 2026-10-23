@@ -19,17 +19,15 @@ and its 34 policies, kept as the fallback until the owner says to delete them
   `INSERT … SELECT` once more: a browser still on a pre-#633 bundle uploads
   straight to Storage, and that file needs its bytes and its row in R2.
 
-## Owed — uploads that pass through a Server Action stop at 4 MB (2026-10-23)
+## Owed — the CRM's one upload that still passes through a Server Action (2026-10-23)
 
-`next.config.ts` caps a Server Action's body at 4 MB (Vercel's own limit is
-4.5 MB), so a file sent through one can never be bigger, whatever its bucket
-allows: payment-voucher attachments (`payments/actions.ts`), Invoice
-Financing's (`ba/actions.ts`, which says "max 15 MB"), and the waiting-list
-form templates (`revenue/waiting-actions.ts`). Every other upload already goes
-from the browser straight to R2 (`startUpload`, a presigned PUT; a 1 GB video
-went up in 37 s on 2026-10-23). Moving these three to the browser-direct path
-lifts the cap. Bigger files elsewhere are each bucket's own
-`file_buckets.file_size_limit` / `allowed_mime_types`, set by a migration.
+Every portal page that handed a file to a Server Action (4 MB body) now sends it
+ahead to the sender's own folder of `uploads` first (mig `20261024006800`,
+`.claude/rules/portal-wide/storage.md` › A FILE SENT AHEAD). One is left, in the
+CRM, which is Kaiyee's code: a showroom photo (`member/crm-actions.ts`,
+`ROOM_PHOTO_BYTES` 4 MB — WhatsApp takes no picture past 5 MB anyway). Kaiyee
+was told; `stageInto` (browser) and `formFile` (action) are the two calls if he
+wants it to go ahead too.
 
 ## Owed — the React Compiler's lint rules (2026-10-21)
 

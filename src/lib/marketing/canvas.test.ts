@@ -6,7 +6,7 @@ import {
 import type { FormField } from './tasks'
 import { newWfStage, wfStageFromRow, type WfStage } from './workflows'
 
-// 2026-10-24 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, ③ of the handoff): the task page's layout
+// 2026-10-23 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, ③ of the handoff): the task page's layout
 // kept with a workflow template — what the builder reads, sends, follows when the stages change, refuses on publishing
 // (as mkt_canvas_check / mkt_workflow_check do: tests/member-sql/validate-marketing-canvas.mjs) and previews.
 

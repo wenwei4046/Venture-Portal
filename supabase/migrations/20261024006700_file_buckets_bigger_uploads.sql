@@ -1,4 +1,4 @@
--- Bigger uploads (2026-10-24 — the owner, the morning after every bucket moved to Cloudflare R2: "make the size more
+-- Bigger uploads (2026-10-23 — the owner, the morning after every bucket moved to Cloudflare R2: "make the size more
 -- bigger for all, let me know the limit"; the night before: "make sure in future i can upload all big file, video and
 -- etc"). A file now goes from the browser straight to R2 on a link made for that one file (lib/storage/server.ts ›
 -- prepareUpload — never through a function, whose body stops at 4.5 MB), so a bucket's limit is the portal's own

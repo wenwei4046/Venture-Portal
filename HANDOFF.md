@@ -1,5 +1,61 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-23 h (SHIPPED, #677) — Fund OUT: a loan's funding source in a Source column of its own
+
+Session 35e03c3c, after g. User, on the Fund OUT list: "fund out 出去的 sc 可以单独一个column 吗？ 确定先" → shown a
+before/after sample (SC column after Description, filter chips) → "栏名用source" → "全绿就合并上线" → (asked to confirm
+it went through a PR) "那就行，做吧". Squash-merged 18d6eb3e; production deploy success 05:18 UTC.
+
+- `FundHub` (desktop hub, Fund OUT only): column `source` · *Source* after `desc` — `r.fundingSource` as recorded
+  (`HC`, `HV (HC)`, `2990s`…), `—` when none; kind `text`, so it sorts, filters by its funnel and ticks off in Columns.
+  The Description is `fundLine(r, false)` (rate · term). Search (`fundHaystack`) still includes the SC; the Finance
+  phone app's line keeps `SC …` (`fundLine` default); the drawer's *Funding source* row stays; Fund IN unchanged.
+- Saved layouts on production for `fin.fund-out`: Principal's (`date, name, desc, rate, amount, outstanding`, hidden
+  status/type) and Finance Manager's — neither hides `source`, so it shows for both, right after Description
+  (`applyOrder`: a column new to a saved order follows its nearest default predecessor). No layout → Name ·
+  Description · Amount as before; Source is ticked on like Date / Rate. No `table_layout_defaults` row exists.
+- Tests: `FundHub.test.tsx` (+2: Source after Description, `HC` / `—`, its funnel filters to HC, search `sc hc`;
+  no Source on Fund IN), `fund-hub.test.ts` (`fundLine(r, false)`). No database change.
+- Also verified for g: the live app's `treasury_terms_history` reads (with `next_interest_on_original`) — 35 × 200
+  after the #671 deploy (edge logs); production has `pgrst_ddl_watch`, so the schema cache reloaded by itself.
+- The repo refuses GitHub auto-merge, and CI must not be polled: with a check still running, finish other work,
+  read `ccd_pr get_status` again, merge when it is all green.
+
+## CHECKPOINT 2026-10-23 g (SHIPPED, #671 + mig 20261024100000 + data) — 从某月起生效 · 利息按原本金算; HC's Conts 60k / 58k
+
+Session 35e03c3c (Finance user; reply in 华语). User: "帮我检查HC 那两笔为什么是part payment" → "5月那期利率本来就是3.5%"
+→ "5月还是用本金*3.5%，6月就变成还是用本金*3%" → "别显示成penalty … 还是算成interest" (the penalty relabel is REJECTED
+— don't re-offer it) → "第2种，确定了开pr 做" → "全绿就上线".
+
+- Why October read part paid on the Repayment Schedule calendar: HC's Conts 60k (dcf15071, due the 2nd) and 58k
+  (32460c13, due the 15th), 6 instalments May–Oct 2026, were 3% from day one; May was paid 2,100 / 2,030 (3.5%), so
+  the extra 300 / 290 carried oldest-first onto October. September was paid late (PV-202610-0449 on 2 Oct,
+  -0450 on 17 Oct — their own "5rd Installment"); October itself is unpaid.
+- A 从某月起 change re-bases the flat interest on the principal still owed at its month (3% from June = 1,500 on the
+  50k left), which is not this deal. **New:** a change may take its interest on the ORIGINAL principal — checkbox
+  `利息按原本金算` on both desktop Amend forms, *Interest on the original principal* on the phone sheet. The flag
+  lives on the history row the change files (`treasury_terms_history.next_interest_on_original`, describing the
+  segment AFTER it, as `reason` does), so revert takes it back. `amend_fund_source_from` / `amend_loan_from` gained
+  `p_interest_on_original` (8 args; the 7-arg ones dropped). `TermsSegment.interestBase / interestOnOriginal`.
+- First 从某月起 change ever on production (0 history rows before), so readers that took the record's months (the
+  months LEFT from the change) as the whole term were fixed: `installmentsInAll` (Fund IN / OUT pages' Term,
+  repaid-by / matures, both lists), Fund IN page's Monthly payment from the current segment (the view's would say
+  13,800), Company Statement term + Total Interest via `planTotals` (6mo, 11,100) — what is LEFT still reads the
+  current segment, as designed 2026-09-21.
+- Live: migration applied first (one transaction, refusing itself unless prosrc md5 = PGlite's `d0e49557…` /
+  `aa693414…`, anon no EXECUTE, no 7-arg left; schema_migrations `20261024100000`, created_by
+  `claude-terms-original-base`) → #671 squash-merged (f4df89c0) → production deploy success 04:17 UTC → data, as the
+  system, through the app's RPCs: `amend_fund_source(id, {"cost_rate":0.035})` then
+  `amend_fund_source_from(id, '2026-06-01', 0.03, null, null, '5月本金×3.5%，6月起本金×3%（利息按原本金）', false, true)`,
+  pre/post-checked in the same transaction. Now: both 3% × 5 from 2026-06; history May 3.5% × 6 flagged; repayment
+  rows untouched.
+- Verified with production's rows through the app's own code (the browser pane is signed out — not looked at
+  there): 60k May 12,100 paid, Jun–Sep 11,800 paid, **Oct 11,800 unpaid (overdue)**; 58k May 11,696.67, Jun–Sep
+  11,406.67, Oct 11,406.65 unpaid; Term 6 months, repaid by 2 / 15 Oct; Statement 6mo, 11,100 / 10,730.
+- Tests: `src/lib/terms-interest-on-original.test.ts` (13), `tests/member-sql/validate-terms-interest-on-original.mjs`
+  (14 checks). Local full unit run: one failure, `erp-sync/catalogue.test.ts` › *the ingest strips…*, a CRLF
+  false failure (passes against the LF blob; CI green).
+
 ## CHECKPOINT 2026-10-23 f (OPEN — waiting on the user) — where a report opens onto its ledger lines
 
 Session 0cbfb699 (Finance user; reply in 华语 — memory `reply-in-mandarin-always`) shipped c (#620 hub cards in a

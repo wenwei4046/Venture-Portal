@@ -77,7 +77,7 @@ export default function LoanAmendForm({
               <input type="radio" name="mode" checked={fromMode} onChange={() => setMode('from')} className="accent-[var(--accent)]" />
               从某月起生效
             </span>
-            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">之前的月份照旧条件,生效月起用新的;利息按生效月初剩余本金算。</span>
+            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">之前的月份照旧条件,生效月起用新的;利息按生效月初剩余本金算（也可以勾选按原本金算）。</span>
           </label>
           <label className={`border rounded-md p-3 cursor-pointer ${!fromMode ? 'border-accent bg-accent-bg/40' : 'border-hairline'}`}>
             <span className="flex items-center gap-2 text-sm font-sans text-ink">
@@ -117,6 +117,13 @@ export default function LoanAmendForm({
               <span className="text-sm font-sans text-graphite">
                 改成无固定期限
                 <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起没有每月应还本金，想还多少还多少；利息照生效月初剩余本金 × 利率算，不随本金减少。</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 mt-3 cursor-pointer">
+              <input id="interest_on_original" name="interest_on_original" type="checkbox" className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <span className="text-sm font-sans text-graphite">
+                利息按原本金算
+                <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起的利息 = 原本金 × 新利率，不按生效月初剩余本金算；每月本金照旧 = 剩余本金 ÷ 剩余期数。</span>
               </span>
             </label>
           </div>

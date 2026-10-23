@@ -171,21 +171,25 @@ export function channelsVM(ctx: DeskCtx) {
     chMenu: menu.map((m, i) => ({ l: m.title, t: m.type, set: (e: { target: { value: string } }) => { const a = menu.map(x => ({ ...x })); a[i].title = e.target.value; put("menu", a); }, remove: () => { if (can) put("menu", menu.filter((_, j) => j !== i)); } })),
     chMenuAdd: () => { if (can && menu.length < 5) put("menu", [...menu, { title: "", type: "Reply" }]); },
     // WhatsApp.
-    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-cream)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
+    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-sel)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
     waCount: live.length, waAdd: () => { if (can) { open(WA_MANAGER); toast("Opened WhatsApp Manager — add the number there, then Refresh here"); } },
     wn: { name: wn?.number ?? "—", disp: wn?.verifiedName || "—", id: wn?.id ?? "", cat: WA_VERTICALS.find(v => v[0] === vertical)?.[1] ?? "Other" }, waIni: (wn?.verifiedName || "W").charAt(0).toUpperCase(),
     waSubs: ([["insights", "Insights"], ["prof", "Profile"], ["auto", "Automations"], ["links", "Message links"], ["calls", "Call settings"], ["log", "Call log"]] as const)
       .map(([k, label]) => ({ label, on: k === wsub, off: k !== wsub, pick: () => patch({ chWaTab: k }) })),
     waIns: wsub === "insights", waProf: wsub === "prof", waAuto: wsub === "auto", waLinks: wsub === "links", waCalls: wsub === "calls", waLog: wsub === "log",
-    // A display name is changed through Meta's review in WhatsApp Manager.
-    waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: false, notEditing: true, edit: () => { if (can) open(WA_MANAGER); }, draft: wn?.verifiedName ?? "", setDraft: () => {}, cancel: () => {}, submit: () => {} },
+    // A display name is edited here and sent to Meta for review (the owner, 2026-10-23: "为什么点 edit 会跳转到 fb").
+    waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: ui.chDn != null, notEditing: ui.chDn == null,
+      edit: () => { if (can) patch({ chDn: wn?.verifiedName ?? "" }); }, draft: ui.chDn ?? wn?.verifiedName ?? "",
+      setDraft: (e: { target: { value: string } }) => patch({ chDn: e.target.value }), cancel: () => patch({ chDn: null }),
+      submit: () => { const nn = (ui.chDn ?? "").trim(); if (!wn || !nn || nn === wn.verifiedName) { patch({ chDn: null }); return; }
+        void ctx.deskAct.saveMeta({ kind: "wa-name", id: wn.id, name: wn.number, newName: nn }).then(ok => { if (ok) { patch({ chDn: null }); toast("Sent to Meta · the new name shows once WhatsApp approves it (1–2 days)"); meta.reload(); } }); } },
     waCatOpen: ui.chDlg?.kind === "cat", waCatToggle: () => { if (can) patch({ chDlg: ui.chDlg?.kind === "cat" ? null : { kind: "cat", id: "" } }); },
-    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-cream)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
+    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-sel)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
     waF: [wf("desc", "Description", prof?.description ?? "", 512, { long: true }), wf("addr", "Address", prof?.address ?? "", 256, { ph: "Business address" }), wf("mail", "Email", prof?.email ?? "", 128, { ph: "Business email" })],
     waWeb: [wf("web1", "Website", prof?.websites[0] ?? "", 256, { ph: "https://www.example.com" }), wf("web2", "", prof?.websites[1] ?? "", 256, { ph: "https://www.example.com" })],
-    waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) open(META_SUITE); },
-    waUser: "", waUserNone: true, waUserHas: false, waUserCreate: () => { if (can) open(WA_MANAGER); },
-    waOba: "", waObaNone: true, waObaHas: false, waObaReq: () => { if (can) open(WA_MANAGER); },
+    waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) { open(META_SUITE); toast("Instagram is linked in Meta Business Suite — opened it"); } },
+    waUser: "", waUserNone: true, waUserHas: false, waUserCreate: () => { if (can) { open(WA_MANAGER); toast("Meta lets a username be set only in WhatsApp Manager — opened it"); } },
+    waOba: "", waObaNone: true, waObaHas: false, waObaReq: () => { if (can) { open(WA_MANAGER); toast("The blue tick is requested in WhatsApp Manager (Meta has no API for it) — opened it"); } },
     waStats: [["Conversations · 30 days", String(recent.length)], ["Delivered", pc(delivered, outs.length)], ["Read", pc(read, outs.length)], ["Quality rating", qualityWords(wn?.quality ?? "")],
       ["Messaging limit", limitWords(wn?.limit ?? "")], ["Blocked by customers", "View in Meta"]].map(([k, v]) => ({ k, v })),
     waAutoRows: ([["Welcome message", "Sent when someone messages for the first time", autoOn(wk("aw"), !!auto?.welcome), "aw"], ["Conversation starters", "Up to 4 questions people can tap", autoOn(wk("as"), !!auto?.prompts.length), "as"],
@@ -215,13 +219,26 @@ export function channelsVM(ctx: DeskCtx) {
         const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number))
           ?? (n.verifiedName ? pages.find(p => !used.has(p.id) && nm(p.name) === nm(n.verifiedName!)) : undefined);
         if (pg) used.add(pg.id);
-        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chTab: "wa" }),
+        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chProf: n.id }),
           wa: { title: "WhatsApp Business", sub: `${n.verifiedName ? "Verified · " : ""}message quality ${qualityWords(n.quality)}`, linked: n.on,
             act: n.on ? () => patch({ chTab: "wa" }) : () => setLink("wa", n.id, n.number, true, false, `${n.number} linked · its chats come into Inbox`), actLabel: n.on ? "Manage" : "Link" },
           page: pg ? pageRow(pg) : { id: "", title: "Facebook Page", sub: "Link a Page to receive its Messenger chats here", linked: false, act: () => open(META_SUITE), actLabel: "Link" } };
       });
       const loose = pages.filter(p => !used.has(p.id)).map(pageRow);
-      return { cards, loose, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
+      // v2 frame 09b (note 07): the number's Business profile drawer — the WhatsApp profile Meta holds, its Page beside it.
+      const pn = nums.find(n => n.id === ui.chProf);
+      const pp = pn ? pages.find(p => same(p.phone, pn.number)) ?? (pn.verifiedName ? pages.find(p => p.name.trim().toLowerCase() === pn.verifiedName!.trim().toLowerCase()) : undefined) : undefined;
+      const synced = pn ? linkOf("wa", pn.id)?.updatedAt : undefined;
+      const profile = pn ? {
+        key: pn.id, title: `${pn.number}${pn.verifiedName ? ` · ${pn.verifiedName}` : ""}`, waId: pn.id, waLabel: pn.number, waName: pn.verifiedName || pn.number,
+        pageId: pp?.id ?? "", pageLabel: pp?.name ?? "", photo: pp?.picture ?? null, nameStatus: pn.nameStatus, can,
+        init: { name: pn.verifiedName ?? "", about: pn.profile?.about ?? pp?.about ?? "", description: pn.profile?.description ?? "", address: pn.profile?.address ?? "",
+          email: pn.profile?.email ?? pp?.email ?? "", website: pn.profile?.websites?.[0] ?? pp?.website ?? "", vertical: pn.profile?.vertical ?? "" },
+        synced: synced ? `Last synced ${new Date(synced).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${new Date(synced).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}` : "Not synced from here yet",
+        close: () => patch({ chProf: null }),
+        save: (form: FormData) => ctx.deskAct.saveProfile(form).then(r => { if (r) meta.reload(); return r; }),
+      } : null;
+      return { cards, loose, profile, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
         tpls: (M?.templates ?? []).map(t => { const st = stWord(t.status), mine = data.templates?.find(x => x.metaName === t.name);
           return { name: t.name, body: mine?.body ?? "", cat: t.category.charAt(0) + t.category.slice(1).toLowerCase(), lang: LANG_WORDS[t.language] ?? t.language, st,
             dot: st === "Approved" ? "var(--crm-brown)" : st === "Pending" ? "var(--crm-amber)" : "var(--crm-orange)", fg: st === "Rejected" ? "var(--crm-oxblood)" : "var(--crm-ink)" }; }) };

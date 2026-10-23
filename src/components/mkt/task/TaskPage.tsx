@@ -6,8 +6,10 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { acceptMktStage, decideMktStage, putMktFree, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
 import { nameOf, seriesView, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
 import { missingWork, type FormField, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
+import type { TaskFile } from '@/lib/marketing/library'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
+import TaskLibrary from './TaskLibrary'
 import s from './task.module.css'
 
 // A task's page (`New Task Page.dc.html`): where it stands and who it is with, what the viewer may do now — Accept,
@@ -20,7 +22,7 @@ const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person', 'Select', 'Mult
 const blockId = () => (Math.random().toString(36).slice(2) + '00000000').slice(0, 10)
 const isLink = (v: string) => /^https?:\/\/\S+$/i.test(v.trim())
 
-export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: TaskViewer }) {
+export default function TaskPage({ initial, can, files = [] }: { initial: MktTaskPage; can: TaskViewer; files?: TaskFile[] }) {
   const router = useRouter()
   const [page, setPage] = useState(initial)
   const [pending, start] = useTransition()
@@ -254,6 +256,11 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
               <div className={s.reqText}>{view.requirements.text}</div>
             </div>
           </div>
+
+          {!view.isSeries ? (
+            <TaskLibrary project={page.project.id} sub={page.project.sub} initial={files}
+              open={page.project.status !== 'done' && page.project.status !== 'cancelled'} canEdit={can.edit} />
+          ) : null}
 
           {sv ? (
             <div>

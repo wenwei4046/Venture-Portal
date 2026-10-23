@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261024001000 (2026-10-24 — Marketing's Canvas Template Editor, ③ of the Claude Design
+// Local PostgreSQL regression for 20261024001000 (2026-10-23 — Marketing's Canvas Template Editor, ③ of the Claude Design
 // handoff "HOUZS Marketing Module Setup"). The Marketing migrations up to the Workflow Builder run, a template is made, then
 // the canvas migration runs over it, twice. What is under test: only the functions call the helpers; a template made
 // before keeps its stages and gets the empty canvas; a stage's section and a field's settings written clean (a note never

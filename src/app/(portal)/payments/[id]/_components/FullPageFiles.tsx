@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { HrIcon } from '@/components/hrv/icons'
 import { flash } from '@/components/hrv/toast'
+import { stageInto } from '@/lib/storage/stage'
 import { deleteVoucherAttachment, getAttachmentSignedUrl, uploadVoucherAttachment } from '../../actions'
 import type { DetailFile } from '../../_lib/voucher-detail'
 import s from '@/components/finv/full.module.css'
@@ -56,10 +57,10 @@ export default function FullPageFiles({
       if (picked.length === 0) return
       const form = new FormData()
       form.set('voucher_id', voucherId)
-      for (const f of picked) form.append('files', f)
       setError(null)
       startBusy(async () => {
         try {
+          await stageInto(form, 'files', picked)
           const { count } = await uploadVoucherAttachment(form)
           flash(`${count} ${count === 1 ? 'file' : 'files'} added`)
           router.refresh()

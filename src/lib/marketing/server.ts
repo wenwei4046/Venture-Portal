@@ -3,7 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
-import { libraryFromRow, type Library } from './library'
+import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
@@ -88,6 +88,14 @@ export async function readLibrary(): Promise<Library> {
   const { data, error } = await db.rpc('mkt_library')
   if (error) throw new Error(error.message)
   return libraryFromRow(data)
+}
+
+/** A task's files from the Library (⑥-4), newest first. */
+export async function readTaskFiles(project: string): Promise<TaskFile[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_task_library', { p_project: project })
+  if (error) throw new Error(error.message)
+  return taskFilesFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

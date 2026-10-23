@@ -255,7 +255,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     const wS = new Date(sd); wS.setDate(sd.getDate() - ((sd.getDay() + 6) % 7));
     const open = roomSlots(room, B.day), cap = room?.cap ?? 2;
     return {
-      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "var(--crm-rust)" : "var(--crm-rule)", bg: B.room === i ? "var(--crm-cream)" : "#fff", dot: B.room === i ? "var(--crm-rust)" : "transparent", ring: B.room === i ? "var(--crm-rust)" : "var(--crm-line)" })),
+      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "var(--crm-rust)" : "var(--crm-rule)", bg: B.room === i ? "var(--crm-sel)" : "#fff", dot: B.room === i ? "var(--crm-rust)" : "transparent", ring: B.room === i ? "var(--crm-rust)" : "var(--crm-line)" })),
       isMonth: B.view !== "week", isWeek: B.view === "week", vMonth: () => setB({ view: "month" }), vWeek: () => setB({ view: "week" }),
       vMonthBg: B.view !== "week" ? "#fff" : "transparent", vWeekBg: B.view === "week" ? "#fff" : "transparent", vMonthFg: B.view !== "week" ? "var(--crm-ink)" : "var(--crm-muted)", vWeekFg: B.view === "week" ? "var(--crm-ink)" : "var(--crm-muted)",
       monthLbl: firstD.toLocaleDateString("en-GB", { month: "short", year: "numeric" }).replace("Sept", "Sep"),

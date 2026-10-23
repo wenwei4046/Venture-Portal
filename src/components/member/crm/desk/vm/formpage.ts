@@ -20,10 +20,14 @@ const PREVIEW: CrmCustomer = { id: "preview", name: "", phone: "", channel: "wha
 
 export function formPageVM(ctx: DeskCtx) {
   const { ui, set, patch, data, W, deskAct } = ctx;
-  const saved = formV2(data);
+  // v2 frame 08: the form picker — several forms kept; the FIRST (sort order) is the one every Customer info asks.
+  const forms = data.forms ?? [];
+  const chosen = forms.find(f => f.id === ui.cfForm) ?? forms[0];
+  const sel = { forms: chosen ? [chosen] : [] };
+  const saved = formV2(sel);
   const secs: FormSectionV2[] = ui.cfDraft ?? saved;
   const dirty = !!ui.cfDraft && JSON.stringify(ui.cfDraft) !== JSON.stringify(saved);
-  const edit = (fn: (s: FormSectionV2[]) => void) => set(u => { const next = JSON.parse(JSON.stringify(u.cfDraft ?? formV2(data))) as FormSectionV2[]; fn(next); return { ...u, cfDraft: next, cfType: null }; });
+  const edit = (fn: (s: FormSectionV2[]) => void) => set(u => { const next = JSON.parse(JSON.stringify(u.cfDraft ?? formV2(sel))) as FormSectionV2[]; fn(next); return { ...u, cfDraft: next, cfType: null }; });
   const upd = (si: number, fi: number, p: Partial<FormSectionV2["fields"][number]>) => edit(S => { Object.assign(S[si].fields[fi], p); });
   // ── Pages (the owner, 2026-10-16: "變成可以換 page，新增 page，並且每個都可以拖動"): the page open, its tabs, add / rename / delete.
   const pages = [...new Set(secs.map(x => x.page))].sort((a, b) => a - b);
@@ -69,7 +73,7 @@ export function formPageVM(ctx: DeskCtx) {
     many: pages.length > 1, canDelete: pages.length > 1 && allCustom,
     deleteTip: pages.length < 2 ? "" : allCustom ? "Delete this page and its sections" : "Drag Contact, Lead, Visit or Property onto another page's tab first",
     remove: () => { if (!(pages.length > 1 && allCustom)) return; const i = pages.indexOf(pg);
-      set(u => { const next = tidyPages((u.cfDraft ?? formV2(data)).filter(x => x.page !== pg));
+      set(u => { const next = tidyPages((u.cfDraft ?? formV2(sel)).filter(x => x.page !== pg));
         return { ...u, cfDraft: next, cfType: null, cfPage: Math.max(0, i - 1), cfPv: { ...(u.cfPv ?? {}), page: Math.max(0, i - 1) } }; }); },
     dragging: !!drag,
   };
@@ -100,9 +104,21 @@ export function formPageVM(ctx: DeskCtx) {
     cfSave: () => { if (!dirty || !ui.cfDraft) return;
       // Nameless questions are not kept.
       const clean = ui.cfDraft.map(s => ({ ...s, fields: s.fields.filter(f => f.label.trim()) }));
-      void deskAct.saveForm(toCrmForm(clean, data.forms?.[0]?.id ?? null, data.forms?.[0]?.name ?? "Customer info")).then(id => {
+      void deskAct.saveForm(toCrmForm(clean, chosen?.id ?? null, chosen?.name ?? "Customer info")).then(id => {
         if (id) patch({ cfDraft: null, cfNew: {}, toast: "Customer form saved · salespeople see it in Customer info" }); }); },
     cfReset: () => patch({ cfDraft: null, cfNew: {}, cfType: null, cfPage: 0, cfPv: null }),
+    cfForms: {
+      list: forms.map((f, i) => ({ id: f.id, label: i === 0 ? `${f.name} · in use` : f.name })), cur: chosen?.id ?? "",
+      pick: (e: { target: { value: string } }) => patch({ cfForm: e.target.value, cfDraft: null, cfNew: {}, cfType: null, cfPage: 0, cfPv: null, cfDelAsk: false }),
+      duplicate: () => { if (!chosen) return; void deskAct.saveForm({ id: null, name: `${chosen.name} (copy)`, sections: chosen.sections }).then(id => { if (id) patch({ cfForm: id, cfDraft: null, cfPage: 0, toast: `Duplicated · ${chosen.name} (copy)` }); }); },
+      // The form in use (the first) is never deleted; nor the last one.
+      canDelete: !!chosen && forms.length > 1 && forms[0]?.id !== chosen.id,
+      deleteTip: !chosen || forms.length < 2 ? "The only form cannot be deleted" : forms[0]?.id === chosen.id ? "Set another form as active first" : "Delete this form",
+      inUse: !!chosen && forms[0]?.id === chosen.id,
+      setActive: () => { if (!chosen || forms[0]?.id === chosen.id) return; void deskAct.setActiveForm(chosen.id).then(ok => { if (ok) patch({ toast: `${chosen.name} is in use · salespeople see it in Customer info` }); }); },
+      ask: ui.cfDelAsk, askDelete: () => patch({ cfDelAsk: !ui.cfDelAsk }),
+      del: () => { if (!chosen || forms.length < 2 || forms[0]?.id === chosen.id) return; void deskAct.deleteForm(chosen.id).then(ok => { if (ok) patch({ cfForm: null, cfDraft: null, cfDelAsk: false, toast: `Deleted · ${chosen.name}` }); }); },
+    },
     cfPages, cfPagesOn: true, cfDragEnd: end,
     cfSecs: secs.map((sec, si) => [sec, si] as const).filter(([sec]) => sec.page === pg).map(([sec, si]) => ({ label: sec.label,
       title: sec.custom ? sec.label : sec.label.charAt(0) + sec.label.slice(1).toLowerCase(), anchor: `cf-sec-${si}`, count: sec.fields.length, desc: sec.custom ? "" : SECTION_DESC[sec.label] ?? "",
@@ -136,7 +152,7 @@ export function formPageVM(ctx: DeskCtx) {
           toggleReq: () => { if (!core) upd(si, fi, { req: !f.req }); }, reqCur: core ? "default" : "pointer",
           remove: () => { if (!core) edit(S => { S[si].fields.splice(fi, 1); }); },
           typeOpen, typeToggle: () => patch({ cfType: typeOpen ? null : `${si}:${f.id}` }), typeClose: () => patch({ cfType: null }), typeBd: typeOpen ? "var(--crm-rust)" : "var(--crm-line)",
-          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "var(--crm-cream)" : "transparent", fg: t === f.type ? "var(--crm-rust)" : "var(--crm-ink)", w: t === f.type ? 650 : 500, chk: t === f.type ? "var(--crm-rust)" : "transparent",
+          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "var(--crm-sel)" : "transparent", fg: t === f.type ? "var(--crm-rust)" : "var(--crm-ink)", w: t === f.type ? 650 : 500, chk: t === f.type ? "var(--crm-rust)" : "transparent",
             pick: () => upd(si, fi, { type: t }) })),
           pv: pv(f) }; }) })),
 

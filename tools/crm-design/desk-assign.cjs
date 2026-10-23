@@ -82,4 +82,8 @@ module.exports = [
   // Member work type: one list, team after team, scrolled down (the owner, 2026-10-22: "active member & member work type 做成往下滑的名单").
   [/<div style=\{\{ display: "grid", gridTemplateColumns: "repeat\(auto-fill, minmax\(340px, 1fr\)\)", gap: "14px", alignItems: "stretch" \}\}>(\s*\{\(v\.mwtTeams\)\.map)/,
     '<div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>$1', "Member work type: one vertical list."],
+  // …and each team folds to its head (2026-10-23, the owner: "这些名单做可收缩及展开的功能"; vm/settings.ts › mwtTeams.shut / fold).
+  [/(\{\(v\.mwtTeams\)\.map\(\(g, g_i\) => \(<Fragment key=\{g_i\}>\s*<div style=\{\{[^}]*\}\}>\s*)<div style=\{\{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "[^"]*" \}\}>([\s\S]*?)<\/div>(\s*)\{\(g\.people\)\.map\(/,
+    '$1<button type="button" onClick={g.fold} aria-expanded={!g.shut} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", border: "0", borderBottom: g.shut ? "0" : "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }}><span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: g.shut ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></span>$2</button>$3{!g.shut && (g.people).map(',
+    "Member work type: a team folds to its head."],
 ];

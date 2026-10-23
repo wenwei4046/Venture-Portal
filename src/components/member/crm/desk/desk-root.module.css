@@ -36,4 +36,6 @@
 
 /* Ads Performance: a column head's resize grip — a thin rust line while hovered or dragged (the owner, 2026-10-18). */
 .root.root.root :global(.crm4a-colgrip)::after { content: ""; position: absolute; top: 8px; bottom: 8px; left: 4px; width: 2px; border-radius: 1px; background: transparent; }
+/* Contacts' column edges show where to drag (2026-10-23, the owner drew them in: "做成可调节宽度"). */
+.root.root.root :global(.crm4a-colgrip-seen)::after { background: var(--crm-line) !important; }
 .root.root.root :global(.crm4a-colgrip):hover::after, .root.root.root :global(.crm4a-colgrip):active::after { background: var(--crm-rust) !important; }

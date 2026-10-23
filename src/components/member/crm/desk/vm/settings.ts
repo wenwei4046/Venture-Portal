@@ -42,15 +42,20 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const saved: Record<string, boolean> = Object.fromEntries(teams.flatMap(t => t.people).map(p => [p.id, p.fullTime]));
   const on = ui.mwt ?? saved;
   const dirty = !!ui.mwt && Object.keys(on).some(id => !!on[id] !== !!saved[id]);
-  const mwtTeams = teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], count: `${t.people.filter(p => on[p.id]).length} of ${t.people.length} full time`,
+  // A team folds to its head (2026-10-23, the owner: "这些名单做可收缩及展开的功能").
+  const mwtTeams = teams.map((t, k) => ({ name: t.name, shut: !!ui.teamShut[t.name], fold: () => set(u => ({ ...u, teamShut: { ...u.teamShut, [t.name]: !u.teamShut[t.name] } })), color: teamColours(k)[0], count: `${t.people.filter(p => on[p.id]).length} of ${t.people.length} full time`,
     people: t.people.map(p => ({ name: p.name, role: jobTitle(p), wt: on[p.id] ? "Full time" : "Part time", wtBg: on[p.id] ? "var(--crm-tint-follow)" : "var(--crm-field)", wtFg: on[p.id] ? "var(--crm-brown)" : "var(--crm-muted)",
       ini: initials(p.name), track: on[p.id] ? "var(--crm-brown)" : "var(--crm-line)", knob: on[p.id] ? 19 : 3,
       toggle: () => set(u => ({ ...u, mwt: { ...(u.mwt ?? saved), [p.id]: !(u.mwt ?? saved)[p.id] }, mwtSaved: false })) })) }));
   // ── Active members (2026-10-22, the owner: its own section after Ads to teams): Active or Locked, saved by Save.
-  const actVM = activeVM([
+  // v2 (06c): each person's leads this month beside the switch (who holds them now).
+  const m0 = new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), actLeads: Record<string, number> = {};
+  data.customers.forEach(c => { if (c.assignedTo && new Date(c.createdAt).getTime() >= m0) actLeads[c.assignedTo] = (actLeads[c.assignedTo] ?? 0) + 1; });
+  const actBase = activeVM([
     ...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
     ...teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], people: t.people })),
   ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg }));
+  const actVM = { ...actBase, leads: actLeads };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 
@@ -214,10 +219,10 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     { title: "Notifications", sub: "Only a person's own customers ever notify", rows: [
       { t: "Push for new messages", s: cur.pushMessages ? "Each phone turns its own on · Revenue app › Settings" : "Off · no phone is told of a customer's message", v: cur.pushMessages ? "On" : "Off", key: "pushMessages" },
       { t: "Reminders", s: `Visits tomorrow and today, chats waiting ${cur.replySoonH} · ${cur.replyUrgentH} · ${cur.replyOverdueH} h, windows closing`, v: cur.reminders ? "On" : "Off", key: "reminders" },
-      { t: "Team inbox alerts", s: "The Team inbox shows everyone but tells of nobody else", v: "Off" }] },
+      { t: "Team inbox alerts", s: cur.teamAlerts ? "Managers get alerts for their own people's chats" : "Off · each person hears of their own customers only", v: cur.teamAlerts ? "On" : "Off", key: "teamAlerts" }] },
     { title: "New leads", sub: "What happens when a lead arrives", rows: [
       { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams · an ad with no split goes to the Revenue Director" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
-      { t: "Send auto-reply", s: "Each person's own, switched on in their Profile › Auto-reply · sent to their customers", v: "On" }] },
+      { t: "Send auto-reply", s: cur.sendAutoReply ? "The person's own auto-reply, if set in their Profile" : "Off · no auto-reply for anyone", v: cur.sendAutoReply ? "On" : "Off", key: "sendAutoReply" }] },
   ];
   const settings4 = {
     can: !!data.can.manage, cur,

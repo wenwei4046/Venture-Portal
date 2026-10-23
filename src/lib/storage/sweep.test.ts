@@ -63,11 +63,32 @@ describe('the hourly sweep of the buckets in R2', () => {
       { bucket_id: 'it-requests', name: 'u/never-came.png', created_at: DAY_AGO },
       { bucket_id: 'it-requests', name: 'u/on-its-way.png', created_at: HOUR_AGO },
     ], { 'it-requests': 'r2', 'hr-documents': 'supabase' })
-    expect(await sweepFileObjects(db, NOW)).toEqual({ rowsWithoutFile: 1, filesWithoutRow: 1 })
+    expect(await sweepFileObjects(db, NOW)).toEqual({ rowsWithoutFile: 1, filesWithoutRow: 1, stagedLeft: 0 })
     expect(deleted).toEqual(['it-requests/u/never-came.png'])
     expect(r2.r2DeleteMany).toHaveBeenCalledWith([{ r2Bucket: 'priv', key: 'it-requests/u/stray.png' }])
     // A bucket still in Storage is not looked at.
     expect(r2.r2List).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes a day-old file sent ahead of a Server Action, row and file — a younger one is still on its way', async () => {
+    r2.r2List.mockImplementation(async (bucket: string, prefix: string) => ({
+      objects: prefix === 'uploads/'
+        ? [
+            { key: 'uploads/u/k1/left.pdf', size: 1, lastModified: DAY_AGO },
+            { key: 'uploads/u/k2/sending.pdf', size: 1, lastModified: HOUR_AGO },
+          ]
+        : [],
+      next: null,
+    }))
+    const { db, deleted } = fakeDb([
+      { bucket_id: 'uploads', name: 'u/k1/left.pdf', created_at: DAY_AGO },
+      { bucket_id: 'uploads', name: 'u/k2/sending.pdf', created_at: HOUR_AGO },
+      { bucket_id: 'it-requests', name: 'u/kept.png', created_at: DAY_AGO },
+    ], { uploads: 'r2', 'it-requests': 'r2' })
+    expect(await sweepFileObjects(db, NOW)).toEqual({ rowsWithoutFile: 1, filesWithoutRow: 0, stagedLeft: 1 })
+    // it-requests' kept.png has no file in this listing: a row without its file, as ever; the staged one goes whole.
+    expect(deleted).toEqual(['uploads/u/k1/left.pdf', 'it-requests/u/kept.png'])
+    expect(r2.r2DeleteMany).toHaveBeenCalledWith([{ r2Bucket: 'priv', key: 'uploads/u/k1/left.pdf' }])
   })
 
   it('does nothing while R2 is not set up', async () => {

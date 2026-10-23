@@ -188,7 +188,9 @@ export function insightVM(ctx: SalesCtx) {
         .map(([label, value, d]) => ({ label: label as string, value: value as string, delta: (d as { text: string }).text, good: (d as { good: boolean }).good })),
       counts: [["Leads", leads.length, "leads"], ["Appointments", visits.length, "appts"], ["Upcoming", upcoming, "up"]].map(([label, n, k]) => ({ label: label as string, n: n as number, open: openList(k as "leads" | "appts" | "up") })),
       reply: reply == null ? { n: "—", unit: "" } : reply < 60 ? { n: String(reply), unit: "min" } : { n: `${Math.floor(reply / 60)}`, unit: reply % 60 ? `h ${reply % 60} min` : "h" },
-      status: st7.map(([label, n]) => ({ label, n, c: STATUS[label].dot, hot: label === "Attention" })), total: tot7,
+      // v3 (M Insight): a status opens Inbox on those leads — the Inbox chip of the same name.
+      status: st7.map(([label, n]) => ({ label, n, c: STATUS[label].dot, hot: label === "Attention",
+        open: () => set(u => ({ ...u, tab: "inbox", chat: null, filter: label === "New" ? { type: "new", v: "New" } : label === "Attention" ? { type: "urgency", v: "Attention" } : label === "Cold leads" ? { type: "cold", v: "Cold leads" } : { type: "status", v: label }, hist: [...u.hist, u.tab].slice(-20) })) })), total: tot7,
     },
     pStatus: status.map(([label, n, c]) => ({ label, n, c, w: `${tot ? n / tot * 100 : 0}%` })),
     irOpen: !!sh, irClose: () => patch({ insSheet: null }),

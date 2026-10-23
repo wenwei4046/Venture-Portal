@@ -25,7 +25,9 @@ export function adsVM(ctx: PanelCtx) {
   const L = sum("leads"), LB = sum("bLeads");
   return {
     ...dateSheetVM(ctx), ...cmp,
-    onAds: ui.tab === "ads",
+    onAds: ui.tab === "ads" || ui.tab === "overview",
+    // Drawn under Insight's head (v3 T01) rather than as Profile's page.
+    inIns: ui.tab === "overview",
     adPerf,
     adCmpRows: c ? [
       { label: "Leads", vA: String(L), vB: String(LB), ...dlr(L, LB, false) },

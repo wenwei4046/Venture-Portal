@@ -108,6 +108,7 @@ async function amendFundSourceFromWork(formData: FormData): Promise<{ error: str
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
+  const interestOnOriginal = formData.get('interest_on_original') === 'on'
 
   const { error } = await supabase.rpc('amend_fund_source_from', {
     p_fund_source_id: id,
@@ -118,6 +119,7 @@ async function amendFundSourceFromWork(formData: FormData): Promise<{ error: str
     p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
+    p_interest_on_original: interestOnOriginal,
   })
   if (error) return { error: `修改失败: ${error.message}` }
 

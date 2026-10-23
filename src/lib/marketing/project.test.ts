@@ -4,7 +4,7 @@ import {
   productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage,
 } from './project'
 
-// 2026-10-24 — a 📦 product project before its work starts (②b-1, `New Project.dc.html` steps 2–4): the page as
+// 2026-10-23 — a 📦 product project before its work starts (②b-1, `New Project.dc.html` steps 2–4): the page as
 // mkt_product_project answers it, what stops the intake minutes going to the PIC, the stepper, the side card's count,
 // only what changed for the save, the link and its WhatsApp, the trail in words. The database's side is
 // tests/member-sql/validate-marketing-product-projects.mjs.
@@ -55,7 +55,7 @@ describe('a product project as the page reads it', () => {
   })
 
   it('a team member with no first name is called by the first word of their full name', () => {
-    // 2026-10-24: the split read /s+/ (the letter s), so "RACHEL TAN" came out whole and "SITI AMINAH" not at all.
+    // 2026-10-23: the split read /s+/ (the letter s), so "RACHEL TAN" came out whole and "SITI AMINAH" not at all.
     const pp = page()
     expect(pp.team.map(x => x.first)).toEqual(['RACHEL', 'Siti'])
   })

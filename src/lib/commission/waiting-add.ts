@@ -112,10 +112,11 @@ export function waitingAddDetail(
 /**
  * What HR attaches as an applicant's signed form — with "+" and in the waiting drawer: the member app's PDF, PNG
  * or JPG (`verifiedUpload`), and since 2026-10-20 a Word file too (the user: "want word file as well"), each of
- * 3 MB or less. The member app itself still takes a PDF, PNG or JPG only.
+ * 100 MB or less (3 MB until 2026-10-23, when the file began to go ahead of its Server Action — lib/storage/stage.ts;
+ * mig 20261024006800 lets the database keep that much). The member app itself still takes a PDF, PNG or JPG only.
  */
 export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx'
-export const SIGNED_FORM_MAX_BYTES = 3 * 1024 * 1024
+export const SIGNED_FORM_MAX_BYTES = 100 * 1024 * 1024
 export const SIGNED_FORM_KINDS = 'a PDF, Word, PNG or JPG file'
 
 /** Word's own types, as the bucket keeps them (mig 20261020160000). */
@@ -125,7 +126,7 @@ export const WORD_DOC = 'application/msword'
 /** What the window can tell before sending: the size. The bytes are checked on the server. */
 export function signedFormRefusal(file: { size: number }): string | null {
   if (file.size < 1) return 'That file is empty — attach the signed form again.'
-  if (file.size > SIGNED_FORM_MAX_BYTES) return 'The signed form must be 3 MB or smaller.'
+  if (file.size > SIGNED_FORM_MAX_BYTES) return 'The signed form must be 100 MB or smaller.'
   return null
 }
 

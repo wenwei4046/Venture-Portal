@@ -43,3 +43,20 @@ describe("Team notifications are one's own", () => {
     expect(panelNotifs(ctxFor("principal"))).toEqual([]);
   });
 });
+
+describe("Team inbox alerts (v2 frame 10, a setting)", () => {
+  const withTeam = (me: string, viewAll: boolean) => {
+    const c = ctxFor(me) as unknown as { data: Record<string, unknown> };
+    c.data.settings = { teamAlerts: true };
+    c.data.can = { viewAll };
+    c.data.people = [{ id: "peter", role: "hod", uplineId: null }, { id: "anthony", role: "tl", uplineId: "peter" }, { id: "kris", role: "tl", uplineId: null }];
+    return c as unknown as PanelCtx;
+  };
+  it("on: a leader also hears of their own people's chats — ANTHONY's for PETER, not KRIS's", () => {
+    const keys = panelNotifs(withTeam("peter", false)).map(n => n.customerId);
+    expect(keys).toEqual(expect.arrayContaining(["toAnthony", "waitsAnthony", "toPeter", "waitsPeter"]));
+  });
+  it("on: View at All hears of everybody's, as the Team inbox shows them", () => {
+    expect(panelNotifs(withTeam("kris", true)).map(n => n.customerId)).toEqual(expect.arrayContaining(["toPeter", "waitsPeter", "toAnthony"]));
+  });
+});

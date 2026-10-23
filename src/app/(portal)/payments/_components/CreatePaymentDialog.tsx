@@ -5,12 +5,13 @@ import { DateField } from '@/components/finv/DateField'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { FilesField } from '@/components/finv/FilesField'
 import { PartyInput } from '@/components/finv/PartyInput'
-import { FILES_CAP, fileSize, money, neededSentence, num, poolName, shortDay } from '@/components/finv/form-words'
+import { filesProblem, money, neededSentence, num, poolName, shortDay } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { typeLabel, type AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
+import { stageInto } from '@/lib/storage/stage'
 import { createPaymentFromDialog } from '../actions'
 import { openCreatePayment } from '../create-actions'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
@@ -239,12 +240,11 @@ export default function CreatePaymentDialog({
   } else if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category, amount')
   if (method !== 'netting' && !bankId) need.push('a bank')
   if (!desc.trim()) need.push('a description')
-  const filesBytes = files.reduce((n, f) => n + f.size, 0)
   const offBy = repay && total > 0 && lines.length > 0 ? Math.round((total - lineSum) * 100) / 100 : 0
   const problem =
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
-    (filesBytes > FILES_CAP ? `The files come to ${fileSize(filesBytes)} — under 4 MB goes in one save. Compress them or add some later.` : null)
+    filesProblem(files)
   const ok = problem === null && !!opts
 
   const save = async (submit: boolean) => {
@@ -279,10 +279,11 @@ export default function CreatePaymentDialog({
       fd.set('repayment_interest', num(interest).toFixed(2))
       fd.set('repayment_penalty', num(penalty).toFixed(2))
     }
-    files.forEach((f, i) => fd.append(`attachment_${i}`, f))
     fd.set('attachment_count', String(files.length))
     if (submit) fd.set('submit', '1')
     try {
+      // Each file sent ahead, the save carrying only its line (2026-10-23 — no longer 4 MB for them all).
+      for (const [i, f] of files.entries()) await stageInto(fd, `attachment_${i}`, f)
       const res = await createPaymentFromDialog(fd)
       if (!res.ok) {
         setError(res.reason)

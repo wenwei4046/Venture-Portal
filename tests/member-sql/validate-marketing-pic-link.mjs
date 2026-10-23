@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261024003000 (2026-10-24 — Marketing ⑤-1, the PIC's link for a product project's
+// Local PostgreSQL regression for 20261024003000 (2026-10-23 — Marketing ⑤-1, the PIC's link for a product project's
 // intake minutes: `PIC Link.dc.html` of the Claude Design handoff "HOUZS Marketing Module Setup"). Marketing's migrations
 // up to the product projects run, then this one, twice. What is under test, as the stranger the page is (anon, no
 // session): only a real code opens a page, and only a sent product project's; the page carries only what the PIC sees

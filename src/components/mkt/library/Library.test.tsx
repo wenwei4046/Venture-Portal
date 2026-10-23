@@ -8,7 +8,7 @@ import { libraryFromRow } from '@/lib/marketing/library'
 
 const actions = vi.hoisted(() => ({
   addMktLibFolder: vi.fn(), addMktLibType: vi.fn(), binMktLib: vi.fn(), deleteMktLib: vi.fn(), fileMktLib: vi.fn(), moveMktLib: vi.fn(),
-  saveMktLibProfile: vi.fn(),
+  saveMktLibProfile: vi.fn(), shareMktLib: vi.fn(), stopMktLibShare: vi.fn(), attachMktTaskFiles: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const replace = vi.fn()
@@ -84,8 +84,9 @@ describe('the Library', () => {
       .toEqual(['Brandbookalready here (off)', 'Product photosalready here (off)', 'Raw footagealready here (off)', 'Meeting minutes'])
     expect(within(pop).queryByLabelText('New folder type name')).toBeNull()
     fireEvent.click(within(pop).getByRole('button', { name: /Meeting minutes/ }))
-    await waitFor(() => expect(actions.addMktLibFolder).toHaveBeenCalledWith(CAR, T.minutes, null))
-    expect(flash).toHaveBeenCalledWith('Folder "Meeting minutes" added to Carres')
+    // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — it raced on CI).
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Folder "Meeting minutes" added to Carres'))
+    expect(actions.addMktLibFolder).toHaveBeenCalledWith(CAR, T.minutes, null)
   })
 
   it('lets the manager make a folder type for every subsidiary', async () => {
@@ -177,7 +178,7 @@ describe('the Library', () => {
   })
 })
 
-// 2026-10-24 — ⑥-2: a subsidiary's brand profile (the manager's ✎) and its Schedule.
+// 2026-10-23 — ⑥-2: a subsidiary's brand profile (the manager's ✎) and its Schedule.
 describe('a brand in the Library', () => {
   const LOGO = 'brand/00000000-0000-4000-8000-000000000009/carres-logo.png'
   const dressed = {
@@ -236,5 +237,74 @@ describe('a brand in the Library', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(bucket.remove).toHaveBeenCalledWith([cover]))
     expect(actions.saveMktLibProfile).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-23 — ⑥-3: a file's or a folder's guest link.
+describe('a guest link', () => {
+  const CODE = '0123456789abcdef0123456789abcdef'
+  const shared = { ...lib, shares: [{ kind: 'file' as const, id: 'x2', code: CODE, download: true, expiry: '7d' as const, expires: '2026-10-31T02:22:00Z' }] }
+
+  it('is made only when asked — 7 days and download by default', async () => {
+    actions.shareMktLib.mockResolvedValueOnce({ ok: true, library: shared })
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Share "Logo pack"' })
+    expect(within(dlg).queryByLabelText('Guest link')).toBeNull()
+    expect(within(dlg).getByRole('radio', { name: '7 days' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(dlg).getByRole('switch', { name: 'Allow download' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Create link' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '7d', true))
+    expect((within(dlg).getByLabelText('Guest link') as HTMLInputElement).value).toBe(`${window.location.origin}/l/${CODE}`)
+    expect(within(dlg).getByText('Expires Sat 31 Oct, 10:22')).toBeTruthy()
+    expect(flash).toHaveBeenCalledWith('Link created')
+  })
+
+  it('once live, changes at once; Stop link closes it', async () => {
+    actions.stopMktLibShare.mockResolvedValueOnce({ ok: true, library: lib })
+    actions.shareMktLib.mockResolvedValue({ ok: true, library: shared })
+    render(<Library initial={shared} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }).textContent).toContain('live')
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Share "Logo pack"' })
+    // The dialog's buttons wait while a change is on its way: each next click waits for them (a click on a disabled
+    // button does nothing).
+    const ready = (role: 'switch' | 'button', name: string) =>
+      waitFor(() => expect((within(dlg).getByRole(role, { name }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(within(dlg).getByRole('radio', { name: '30 days' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', true))
+    await ready('switch', 'Allow download')
+    fireEvent.click(within(dlg).getByRole('switch', { name: 'Allow download' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', false))
+    await ready('button', 'Stop link')
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Stop link' }))
+    await waitFor(() => {
+      expect(flash).toHaveBeenCalledWith('Link stopped')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+    expect(actions.stopMktLibShare).toHaveBeenCalledWith('file', 'x2')
+  })
+
+  it('Attach to task: one of the file’s subsidiary’s open tasks', async () => {
+    actions.attachMktTaskFiles.mockResolvedValueOnce({ ok: true, attached: 1, files: [] })
+    const tasks = { [CAR]: [{ id: '50000000-0000-4000-8000-000000000001', trackId: 'TSK-CAR-2610-001', title: 'Banner', stage: 'Publish' }] }
+    render(<Library initial={lib} tasks={tasks} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Attach to task/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Attach "Logo pack" to a task' })
+    expect(within(dlg).getAllByRole('button').slice(1).map(b => b.textContent)).toEqual(['TSK-CAR-2610-001BannerNow at Publish'])
+    fireEvent.click(within(dlg).getByRole('button', { name: /TSK-CAR-2610-001/ }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Attached "Logo pack" to TSK-CAR-2610-001'))
+    expect(actions.attachMktTaskFiles).toHaveBeenCalledWith('50000000-0000-4000-8000-000000000001', ['x2'])
+  })
+
+  it('is never offered for a link folder', () => {
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Raw footage — more' }))
+    expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: /Share link/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Brandbook — more' }))
+    expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ })).toBeTruthy()
   })
 })

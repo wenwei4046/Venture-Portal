@@ -339,4 +339,159 @@ check([await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_i
 await save(H2990, {})
 check(await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [COVER]), 0, '…until nothing shows it')
 
+// ── ⑥-3: a guest share link (20261024007300) ──────────────────────────────────────
+await db.exec('RESET ROLE')
+const sharesMig = await sql('20261024007300_marketing_library_shares.sql')
+await db.exec(sharesMig)
+await db.exec(sharesMig) // twice: nothing changes, nothing breaks
+for (const [fn, anon, auth] of [['mkt_lib_share(text,uuid,text,boolean)', false, true], ['mkt_lib_share_stop(text,uuid)', false, true],
+  ['mkt_lib_shared(text)', true, true], ['mkt_lib_shared_file(text,uuid)', true, true], ['mkt_lib_share_of(text,uuid)', false, false],
+  ['mkt_lib_share_may_read(text)', true, false]]) {
+  check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
+    [anon, auth], `${fn}: ${anon ? 'the stranger’s, by its code' : auth ? 'a sign-in’s' : 'nobody’s to call'}`)
+}
+const SA = `library/${id(961)}/brief.pdf`
+const SB = `library/${id(962)}/shoot.jpg`
+const SC = `library/${id(963)}/elsewhere.pdf`
+await as(U.mei, STAFF)
+await put(SA)
+await put(SB, 4096, 'image/jpeg')
+await put(SC)
+const fa = (await one(`SELECT public.mkt_lib_file_add($1, 'Brief', $2)`, [brandCar, SA])).id
+const fb = (await one(`SELECT public.mkt_lib_file_add($1, 'Shoot', $2)`, [brandCar, SB])).id
+const fc = (await one(`SELECT public.mkt_lib_file_add($1, 'Elsewhere', $2)`, [photosCar, SC])).id
+const share = (kind, item, expiry = '7d', dl = true) => one(`SELECT public.mkt_lib_share($1, $2, $3, $4)`, [kind, item, expiry, dl])
+
+await as(U.ali, VIEW)
+await refuses(`SELECT public.mkt_lib_share('file', $1, '7d', true)`, [fa], /Sharing from the Library is not open/, 'sharing is Marketing · Edit’s')
+await as(U.mei, STAFF)
+const a1 = await share('file', fa)
+check([/^[0-9a-f]{32}$/.test(a1.code), a1.download, Math.round((Date.parse(a1.expires) - Date.now()) / 864e5)], [true, true, 7], 'a file’s link: 32 random hex, download on, 7 days')
+await refuses(`SELECT public.mkt_lib_share('file', $1, '1y', true)`, [fa], /Pick when the link expires/, 'only the four expiries')
+await refuses(`SELECT public.mkt_lib_share('folder', $1, '7d', true)`, [rawCar], /link folder is shared by its own link/, 'never a link folder')
+await refuses(`SELECT public.mkt_lib_share('page', $1, '7d', true)`, [fa], /Share a file or a folder/, 'a file or a folder')
+const a2 = await share('file', fa, '24h', false)
+check([a2.code, a2.download, a2.expiry, Math.round((Date.parse(a2.expires) - Date.now()) / 36e5)], [a1.code, false, '24h', 24],
+  'shared again: the same link, its expiry (what was picked, and when) and download changed')
+const b1 = await share('folder', brandCar, 'never')
+check(b1.expires, null, 'a folder’s link that never expires')
+await as(U.ali, VIEW)
+check((await one(`SELECT public.mkt_library()`)).shares.map(s => `${s.kind}:${s.code === a1.code ? 'A' : s.code === b1.code ? 'B' : '?'}:${s.download}:${s.expiry}`).sort(),
+  ['file:A:false:24h', 'folder:B:true:never'], 'Marketing sees each live link')
+
+// The stranger: the page’s read and one file’s place — by the code, nothing else.
+await as(null, [], 'anon')
+check(await one(`SELECT public.mkt_lib_shared('nope')`), null, 'a wrong code opens nothing')
+const pa = await one(`SELECT public.mkt_lib_shared($1)`, [a1.code])
+check([pa.kind, pa.name, pa.folder, pa.sub.name, pa.download, pa.files.map(f => f.name)], ['file', 'Brief', 'Brandbook', 'Carres', false, ['Brief']], 'a file’s page')
+check(Object.keys(pa.files[0]).sort(), ['at', 'ext', 'id', 'mime', 'name', 'size'], 'never a path, never who sent it')
+check(pa.files[0].ext, 'PDF', 'its kind from its name’s ending')
+check((await one(`SELECT public.mkt_lib_shared($1)`, [b1.code])).files.map(f => f.name), ['Shoot', 'Brief'], 'a folder’s page: its files, newest first')
+check((await one(`SELECT public.mkt_lib_shared_file($1, $2)`, [b1.code, fb])).path, SB, 'a file of the link: its place, to sign')
+check(await one(`SELECT public.mkt_lib_shared_file($1, $2)`, [a1.code, fb]), null, 'never a file the link does not hold')
+const asStranger = async code => {
+  await q(`SELECT set_config('request.headers', $1, false)`, [code === undefined ? '' : JSON.stringify({ 'x-link-code': code })])
+  return (await q(`SELECT name FROM public.file_objects WHERE bucket_id = 'marketing' ORDER BY name`)).map(r => r.name)
+}
+check(await asStranger(b1.code), [SA, SB], 'the bucket opens to the folder’s code its files, nothing else')
+check(await asStranger(a1.code), [SA], '…to a file’s code that file')
+check([await asStranger('ffffffffffffffffffffffffffffffff'), await asStranger(undefined)], [[], []], '…to anything else, nothing')
+// The brand's own pictures open to its links' codes — the page wears them.
+await as(U.josiah, MANAGER)
+const PIC = `brand/${id(964)}/logo.png`
+await put(PIC, 900, 'image/png')
+await save(CAR, { avatar_path: PIC })
+await as(null, [], 'anon')
+check([await asStranger(b1.code), await asStranger(a1.code)], [[PIC, SA, SB], [PIC, SA]], '…and its brand’s logo, to either')
+
+// Binned, stopped, expired: closed. Shared again past its expiry: a new code.
+await as(U.mei, STAFF)
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [fa])
+await as(null, [], 'anon')
+check([await one(`SELECT public.mkt_lib_shared($1)`, [a1.code]), (await one(`SELECT public.mkt_lib_shared($1)`, [b1.code])).files.map(f => f.name), await asStranger(b1.code)],
+  [null, ['Shoot'], [PIC, SB]], 'a binned file: its link closed, gone from its folder’s')
+await as(U.mei, STAFF)
+await one(`SELECT public.mkt_lib_restore('file', $1)`, [fa])
+await one(`SELECT public.mkt_lib_share_stop('folder', $1)`, [brandCar])
+await refuses(`SELECT public.mkt_lib_share_stop('folder', $1)`, [brandCar], /no link to stop/, 'stopped once')
+await as(null, [], 'anon')
+check([await one(`SELECT public.mkt_lib_shared($1)`, [b1.code]), await asStranger(b1.code)], [null, []], 'a stopped link opens nothing')
+await peek(`UPDATE public.mkt_lib_shares SET expires_at = now() - interval '1 second' WHERE code = $1`, [a1.code])
+check([await one(`SELECT public.mkt_lib_shared($1)`, [a1.code]), await asStranger(a1.code)], [null, []], 'nor one past its expiry')
+await as(U.mei, STAFF)
+const a3 = await share('file', fa, '30d', true)
+check([a3.code !== a1.code, await peek1(`SELECT stopped_at IS NOT NULL FROM public.mkt_lib_shares WHERE code = $1`, [a1.code])], [true, true],
+  'shared again past its expiry: a new code, the old one closed')
+
+// Deleted for good: its links go with it.
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [fc])
+await as(U.josiah, MANAGER)
+await share('file', fb)
+await one(`SELECT public.mkt_lib_bin('folder', $1)`, [brandCar])
+await one(`SELECT public.mkt_lib_delete('folder', $1)`, [brandCar])
+check(await peek1(`SELECT count(*)::int FROM public.mkt_lib_shares WHERE file_id IN ($1, $2) OR folder_id = $3`, [fa, fb, brandCar]), 0,
+  'a folder deleted for good takes its links, and its files’')
+
+// ── ⑥-4: a Library file attached to a task (20261024007400) ─────────────────────────
+await db.exec('RESET ROLE')
+const attachMig = await sql('20261024007400_marketing_task_library.sql')
+await db.exec(attachMig)
+await db.exec(attachMig) // twice: nothing changes, nothing breaks
+for (const fn of ['mkt_task_library(uuid)', 'mkt_task_attach(uuid,uuid[])', 'mkt_task_detach(uuid,uuid)']) {
+  check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
+    [false, true], `${fn}: a sign-in’s, never the publishable key’s`)
+}
+const project = async (track, kind, sub, status = 'active', series = null) =>
+  peek1(`INSERT INTO public.mkt_projects (track_id, kind, subsidiary_id, title, status, series_id, run_no) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [track, kind, sub, `E2E ${track}`, status, series, series ? 1 : null])
+const TQ = await project('TSK-CAR-2610-901', 'quick', CAR)
+const PJ = await project('MKT-CAR-2610-902', 'product', CAR, 'minutes')
+const RS = await project('RCR-CAR-2610-903', 'recurring', CAR)
+const RR = await project('RCR-CAR-2610-903-R01', 'recurring', CAR, 'active', RS)
+const TD = await project('TSK-CAR-2610-904', 'quick', CAR, 'done')
+const handCar = await peek1(`SELECT id FROM public.mkt_lib_folders WHERE subsidiary_id = $1 AND type_id = $2 AND trashed_at IS NULL`, [CAR, await type('Handbook')])
+const TA = `library/${id(971)}/alpha.pdf`
+const TB = `library/${id(972)}/beta.jpg`
+const TC = `library/${id(973)}/other.pdf`
+await as(U.mei, STAFF)
+await put(TA)
+await put(TB, 4096, 'image/jpeg')
+await put(TC)
+const ta = (await one(`SELECT public.mkt_lib_file_add($1, 'Alpha brief', $2)`, [handCar, TA])).id
+const tb = (await one(`SELECT public.mkt_lib_file_add($1, 'Beta photo', $2)`, [handCar, TB])).id
+const tc = (await one(`SELECT public.mkt_lib_file_add($1, 'Other', $2)`, [photosCar, TC])).id
+const attach = (p, files) => one(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [p, files])
+const trail = async p => (await peek(`SELECT action, reason FROM public.mkt_events WHERE project_id = $1 ORDER BY id`, [p])).map(e => `${e.action}:${e.reason}`)
+
+await as(U.ali, VIEW)
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [ta]], /Attaching to a task is not open/, 'attaching is Marketing · Edit’s')
+await as(U.mei, STAFF)
+const at1 = await attach(TQ, [ta, tb, ta])
+check([at1.attached, at1.files.map(f => f.name)], [2, ['Alpha brief', 'Beta photo']], 'two files on the task — the Library’s, no copy')
+check(Object.keys(at1.files[0]).sort(), ['at', 'by', 'folder', 'id', 'mime', 'name', 'path', 'size'], 'each with its place, its folder, who attached it')
+check((await attach(TQ, [ta])).attached, 0, 'attached once')
+check(await trail(TQ), ['attached:Alpha brief', 'attached:Beta photo'], 'the trail says each, once')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [tc]], /another subsidiary's/, 'only the task’s own subsidiary’s files')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [PJ, [ta]], /attached to a task/, 'never a product project (②b-2)')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [RS, [ta]], /attached to a task/, 'never a series — its runs are the tasks')
+check((await attach(RR, [ta])).attached, 1, 'a run of a recurring task takes them')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TD, [ta]], /That task is closed/, 'never a closed task')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [id(999)]], /not in the Library/, 'never a file not there')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, []], /Pick a file/, 'something to attach')
+
+// Binned in the Library: off the task until restored. Taken off: the file stays. Deleted for good: gone from the task.
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [ta])
+await as(U.ali, VIEW)
+check((await one(`SELECT public.mkt_task_library($1)`, [TQ])).map(f => f.name), ['Beta photo'], 'a binned file waits off the task')
+await as(U.mei, STAFF)
+await one(`SELECT public.mkt_lib_restore('file', $1)`, [ta])
+check((await one(`SELECT public.mkt_task_detach($1, $2)`, [TQ, tb])).map(f => f.name), ['Alpha brief'], 'taken off the task')
+check([await peek1(`SELECT count(*)::int FROM public.mkt_lib_files WHERE id = $1 AND trashed_at IS NULL`, [tb]), (await trail(TQ)).at(-1)],
+  [1, 'detached:Beta photo'], '…the file still in the Library, the trail saying so')
+await refuses(`SELECT public.mkt_task_detach($1, $2)`, [TQ, tb], /not on the task/, 'taken off once')
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [ta])
+await as(U.josiah, MANAGER)
+await one(`SELECT public.mkt_lib_delete('file', $1)`, [ta])
+check(await peek1(`SELECT count(*)::int FROM public.mkt_task_files WHERE file_id = $1`, [ta]), 0, 'deleted for good: off every task')
+
 console.log(`marketing library: ${checks} checks passed`)

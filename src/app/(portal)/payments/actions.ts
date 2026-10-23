@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
+import { dropStaged, dropStagedIn, formFile, formFiles, type FormFile } from '@/lib/storage/staged'
 import { requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
@@ -61,8 +62,29 @@ async function interBillingNatureSplitsForMirror(
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
 async function createPaymentVoucherInner(formData: FormData) {
+  try {
+    return await makePaymentVoucher(formData)
+  } catch (err) {
+    // A save that failed takes the files it was sent ahead with away again — the page sends them anew (2026-10-23).
+    if (!isRedirect(err)) await dropStagedIn(await createClient(), formData).catch(() => undefined)
+    throw err
+  }
+}
+
+async function makePaymentVoucher(formData: FormData) {
   const user = await requireActionOn('/payments', 'treasury', 'create')
   const supabase = await createClient()
+
+  // The files that go with it (attachment_0 …): since 2026-10-23 each one is sent ahead to its sender's own folder of
+  // `uploads` (lib/storage/staging.ts — a Server Action's body stops at 4 MB); from a page loaded before that, the
+  // File itself. Looked up before anything is written, so one that did not arrive stops the save, not the file.
+  const attachmentCount = parseInt((formData.get('attachment_count') as string) ?? '0', 10)
+  const attachments: FormFile[] = []
+  for (let i = 0; i < attachmentCount; i++) {
+    const read = await formFile(supabase, formData, `attachment_${i}`)
+    if (!read.ok) throw new Error(read.reason)
+    if (read.file && read.file.size > 0) attachments.push(read.file)
+  }
 
   const voucherType = formData.get('voucher_type') as string
   const amount = parseFloat((formData.get('amount') as string) ?? '0')
@@ -771,18 +793,17 @@ async function createPaymentVoucherInner(formData: FormData) {
     }
   }
 
-  // ── Upload attachments to Supabase Storage ──
-  const attachmentCount = parseInt((formData.get('attachment_count') as string) ?? '0', 10)
-  for (let i = 0; i < attachmentCount; i++) {
-    const file = formData.get(`attachment_${i}`) as File | null
-    if (!file || file.size === 0) continue
-
+  // ── Upload attachments to file storage ──
+  for (const [i, file] of attachments.entries()) {
     const ext = file.name.split('.').pop() ?? 'bin'
     const storagePath = `${data.id}/${Date.now()}-${i}.${ext}`
 
-    const { error: uploadError } = await supabase.storage
-      .from('payment-attachments')
-      .upload(storagePath, file, { contentType: file.type })
+    const bytes = await file.bytes().catch(() => null)
+    const { error: uploadError } = bytes
+      ? await supabase.storage
+          .from('payment-attachments')
+          .upload(storagePath, bytes, { contentType: file.type })
+      : { error: { message: 'not read' } }
 
     if (!uploadError) {
       // Record in payment_attachments table
@@ -796,6 +817,7 @@ async function createPaymentVoucherInner(formData: FormData) {
       })
     }
   }
+  await dropStaged(supabase, attachments)
 
   revalidatePath('/payments')
   revalidatePath('/dashboard')
@@ -2159,7 +2181,8 @@ const ALLOWED_MIME = [
   'text/csv',
 ]
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
-const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+// 100 MB, the bucket's own (mig 20261024006700): each file is sent ahead of this action (lib/storage/staging.ts).
+const MAX_BYTES = 100 * 1024 * 1024
 // A file can be ADDED to a voucher until it is voided — including after it is
 // approved or paid (2026-10-05: two paid PVs had been made without their
 // receipts; user: "做第 2 条"). Nothing is ever REMOVED from a decided voucher:
@@ -2187,66 +2210,74 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
   }
   const afterDecision = !UNDECIDED_STATUSES.includes(voucher.status)
 
-  const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
+  // Each sent ahead to the sender's own folder of `uploads` (2026-10-23), or the File itself from an older page.
+  const read = await formFiles(supabase, formData, 'files')
+  if (!read.ok) throw new Error(read.reason)
+  const files = read.files.filter((f) => f.size > 0)
   if (files.length === 0) throw new Error('No files provided')
 
-  let uploaded = 0
-  for (const file of files) {
-    if (file.size > MAX_BYTES) {
-      throw new Error(`File "${file.name}" is larger than 10 MB`)
+  try {
+    let uploaded = 0
+    for (const file of files) {
+      if (file.size > MAX_BYTES) {
+        throw new Error(`File "${file.name}" is larger than 100 MB`)
+      }
+      if (!ALLOWED_MIME.includes(file.type)) {
+        throw new Error(`File "${file.name}" has disallowed MIME type: ${file.type}`)
+      }
+      const lowerName = file.name.toLowerCase()
+      const dotIdx = lowerName.lastIndexOf('.')
+      const ext = dotIdx >= 0 ? lowerName.slice(dotIdx) : ''
+      if (!ALLOWED_EXT.includes(ext)) {
+        throw new Error(`File "${file.name}" has disallowed extension: ${ext || '(none)'}`)
+      }
+
+      const key = `${voucherId}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, '_')}`
+      const buf = await file.bytes()
+      const { error: upErr } = await supabase.storage
+        .from('payment-attachments')
+        .upload(key, buf, { contentType: file.type, upsert: false })
+
+      if (upErr) throw new Error(`Upload failed for "${file.name}": ${upErr.message}`)
+
+      const { error: insErr } = await supabase.from('payment_attachments').insert({
+        voucher_id: voucherId,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        storage_path: key,
+        description,
+        uploaded_by: user.id,
+      })
+
+      if (insErr) {
+        // Best effort: rollback the storage object so we don't leak orphans
+        await supabase.storage.from('payment-attachments').remove([key]).catch(() => {})
+        throw new Error(`Attachment record insert failed: ${insErr.message}`)
+      }
+
+      uploaded++
     }
-    if (!ALLOWED_MIME.includes(file.type)) {
-      throw new Error(`File "${file.name}" has disallowed MIME type: ${file.type}`)
-    }
-    const lowerName = file.name.toLowerCase()
-    const dotIdx = lowerName.lastIndexOf('.')
-    const ext = dotIdx >= 0 ? lowerName.slice(dotIdx) : ''
-    if (!ALLOWED_EXT.includes(ext)) {
-      throw new Error(`File "${file.name}" has disallowed extension: ${ext || '(none)'}`)
-    }
 
-    const key = `${voucherId}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, '_')}`
-    const buf = Buffer.from(await file.arrayBuffer())
-    const { error: upErr } = await supabase.storage
-      .from('payment-attachments')
-      .upload(key, buf, { contentType: file.type, upsert: false })
-
-    if (upErr) throw new Error(`Upload failed for "${file.name}": ${upErr.message}`)
-
-    const { error: insErr } = await supabase.from('payment_attachments').insert({
-      voucher_id: voucherId,
-      file_name: file.name,
-      file_type: file.type,
-      file_size: file.size,
-      storage_path: key,
-      description,
-      uploaded_by: user.id,
-    })
-
-    if (insErr) {
-      // Best effort: rollback the storage object so we don't leak orphans
-      await supabase.storage.from('payment-attachments').remove([key]).catch(() => {})
-      throw new Error(`Attachment record insert failed: ${insErr.message}`)
+    // Something added to a voucher that was already decided: the row says who
+    // and when, and this is the entry the Audit log reads. The files are in
+    // place either way, so a failure here is reported, not thrown.
+    if (afterDecision) {
+      const { error: logErr } = await supabase.from('access_log').insert({
+        user_id: user.id,
+        action: 'add_attachment',
+        resource_type: 'payment_voucher',
+        resource_id: voucherId,
+        metadata: { voucher_status: voucher.status, count: uploaded, files: files.map((f) => f.name) },
+      })
+      if (logErr) console.error('add_attachment audit row failed:', voucherId, logErr.message)
     }
 
-    uploaded++
+    revalidatePath(`/payments/${voucherId}`)
+    revalidatePath('/approvals')
+    return { count: uploaded }
+  } finally {
+    // The staged copies go, kept or refused (an older page's Files have none).
+    await dropStaged(supabase, files)
   }
-
-  // Something added to a voucher that was already decided: the row says who
-  // and when, and this is the entry the Audit log reads. The files are in
-  // place either way, so a failure here is reported, not thrown.
-  if (afterDecision) {
-    const { error: logErr } = await supabase.from('access_log').insert({
-      user_id: user.id,
-      action: 'add_attachment',
-      resource_type: 'payment_voucher',
-      resource_id: voucherId,
-      metadata: { voucher_status: voucher.status, count: uploaded, files: files.map((f) => f.name) },
-    })
-    if (logErr) console.error('add_attachment audit row failed:', voucherId, logErr.message)
-  }
-
-  revalidatePath(`/payments/${voucherId}`)
-  revalidatePath('/approvals')
-  return { count: uploaded }
 }

@@ -50,11 +50,13 @@ export function arrayDrag(set: DeskCtx["set"], key: "auCols", w0: number[], min:
   };
 }
 
-/** One named width in a map (Contacts' table: each column by its key). */
+/** One named width in a map (Contacts' table: each column by its key). The drag starts from the column as drawn — it
+ * started from a default width, so the first drag of a shared (fr) column jumped (2026-10-23, the owner: "做成可调节宽度"). */
 export function mapDrag(set: DeskCtx["set"], key: "ppCW", w0: number, k: string, lo: number, hi: number) {
   return (e: Down) => {
-    e.preventDefault();
+    e.preventDefault(); e.stopPropagation();
     const host = e.currentTarget.parentElement, sc = host ? host.getBoundingClientRect().width / (host.offsetWidth || 1) || 1 : 1, x0 = e.clientX;
+    if (host && host.offsetWidth) w0 = host.offsetWidth;
     const move = (ev: PointerEvent) => { const n = Math.round(Math.min(hi, Math.max(lo, w0 + (ev.clientX - x0) / sc))); set(u => ({ ...u, [key]: { ...(u[key] as Record<string, number>), [k]: n } }) as DeskUi); };
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
     document.body.style.cursor = "col-resize"; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);

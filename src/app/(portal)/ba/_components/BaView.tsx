@@ -7,6 +7,7 @@ import { officeToday } from '@/lib/office-time'
 import { baLimitWarning, baMissing, baTermsOf, calcBa, type BaTermsFields } from '@/lib/ba'
 import Link from 'next/link'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { stagedOnce, stageInto } from '@/lib/storage/stage'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import type { RowMenuItem } from '@/components/RowMenu'
@@ -322,6 +323,8 @@ function RecordForm({
   )
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [file, setFile] = useState<File | null>(null)
+  // Auto-read, then kept on save: one staged copy of the advice for both (lib/storage/stage.ts, 2026-10-23).
+  const [stage] = useState(() => stagedOnce())
   const fileRef = useRef<HTMLInputElement>(null)
   const [readNote, setReadNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -343,8 +346,13 @@ function RecordForm({
     setError(null)
     setReadNote(null)
     const fd = new FormData()
-    fd.set('file', file)
     startReading(async () => {
+      try {
+        fd.set('file', await stage(file))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'The document could not be sent.')
+        return
+      }
       const r = await extractBaFromDocument(fd)
       if (r.error) {
         setError(r.error)
@@ -405,8 +413,14 @@ function RecordForm({
       }
       if (file && savedId) {
         const fd = new FormData()
-        fd.set('file', file)
-        const up = await uploadBaAttachment(savedId, fd)
+        const id = savedId
+        const up = await stage(file).then(
+          (line) => {
+            fd.set('file', line)
+            return uploadBaAttachment(id, fd)
+          },
+          (err: unknown) => ({ error: err instanceof Error ? err.message : 'the document could not be sent' }),
+        )
         if (up.error) {
           setError(`BA saved, but the document upload failed: ${up.error}`)
           return
@@ -782,9 +796,12 @@ export function AttachmentChips({ row, full = false }: { row: BaRow; full?: bool
   const upload = (f: File | null) => {
     if (!f) return
     const fd = new FormData()
-    fd.set('file', f)
     startTransition(async () => {
-      const r = await uploadBaAttachment(row.id, fd)
+      // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+      const r = await stageInto(fd, 'file', f).then(
+        () => uploadBaAttachment(row.id, fd),
+        (err: unknown) => ({ error: err instanceof Error ? err.message : 'The document could not be sent.' }),
+      )
       if (r.error) alert(r.error)
     })
   }

@@ -23,7 +23,7 @@ export function segmentLine(s: TermsSegment, i: number): string {
   let line = `${pct(s.rate)} /mo · ${monthsLabel(s.months)}${s.compounding ? ' · compounding' : ''}`
   if (!s.compounding && s.months) {
     line += ` · monthly RM ${formatMoneyBare(s.principalPerMonth)} + ${formatMoneyBare(s.interestPerMonth)}`
-    if (i > 0) line += ` on RM ${formatMoneyBare(s.base)}`
+    if (i > 0) line += s.interestOnOriginal ? ` · interest on the original RM ${formatMoneyBare(s.interestBase ?? 0)}` : ` on RM ${formatMoneyBare(s.base)}`
   }
   return line
 }
@@ -51,7 +51,8 @@ function ChangeCard({ c }: { c: TermsChangeComparison }) {
           ) : (
             <>
               {monthsLabel(c.old.months)} → {monthsLabel(c.new.months)}
-              {c.old.endYM || c.new.endYM ? ` · ends ${c.old.endYM ?? '—'} → ${c.new.endYM ?? '—'}` : ''} · base RM {formatMoneyBare(c.new.base)} · monthly{' '}
+              {c.old.endYM || c.new.endYM ? ` · ends ${c.old.endYM ?? '—'} → ${c.new.endYM ?? '—'}` : ''} · base RM {formatMoneyBare(c.new.base)}
+              {c.new.interestOnOriginal ? ` · interest on the original RM ${formatMoneyBare(c.new.interestBase ?? 0)}` : ''} · monthly{' '}
               {formatMoneyBare(c.old.principalPerMonth + c.old.interestPerMonth)} → {formatMoneyBare(c.new.principalPerMonth + c.new.interestPerMonth)} ·
               remaining interest {formatMoneyBare(c.totals.oldInterest)} → {formatMoneyBare(c.totals.newInterest)} ({signed(c.totals.diffInterest)})
               {c.totals.shortfall > 0.005 ? (

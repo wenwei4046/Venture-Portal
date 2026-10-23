@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ProductPick } from '@/lib/marketing/project'
 
-// 2026-10-24 — New Project's 📦 branch (②b-1, `New Project.dc.html` step 1): a product project is the manager's; they
+// 2026-10-23 — New Project's 📦 branch (②b-1, `New Project.dc.html` step 1): a product project is the manager's; they
 // pick who it is for and a product on sale, and its intake meeting minutes open next. The database's side is
 // tests/member-sql/validate-marketing-product-projects.mjs.
 
@@ -56,8 +56,9 @@ describe('New Project’s product projects', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open meeting minutes →' }))
     })
-    await waitFor(() => expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b'))
-    expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-MVS-2610-001')
+    // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — such waits raced on CI).
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-MVS-2610-001'))
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b')
     expect(actions.createMktTask).not.toHaveBeenCalled()
   })
 
@@ -99,8 +100,8 @@ describe('New Project’s + Add subsidiary', () => {
     await act(async () => {
       fireEvent.click(save)
     })
-    await waitFor(() => expect(actions.addMktClient).toHaveBeenCalledWith('Acme Furniture', 'Mr Tan'))
-    expect(screen.getByRole('radio', { name: /Acme Furniture/ }).getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Acme Furniture/ }).getAttribute('aria-checked')).toBe('true'))
+    expect(actions.addMktClient).toHaveBeenCalledWith('Acme Furniture', 'Mr Tan')
     expect(screen.getByText('PIC · Mr Tan')).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: 'Company or client name' })).toBeNull()
   })

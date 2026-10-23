@@ -36,8 +36,11 @@ export interface PanelActions extends SalesActions {
   /** Meta's review brought in (on opening the page); the changes arrive with the next read. */
   refreshTemplates(): Promise<void>;
   readNotifs(keys: string[], all?: boolean): void;
-  saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<boolean>;
+  /** The saved showroom's id, or false. */
+  saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<string | false>;
   removeRoom(id: string): Promise<boolean>;
+  /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
+  saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
 }
 
 export function makePanelActions(base: SalesActions, { live, data, setData }: { live: boolean; data: () => CrmData; setData: Dispatch<SetStateAction<CrmData>> }): PanelActions {
@@ -56,7 +59,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveSettings(st) {
-      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders }))) return false;
+      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
       return true;
     },
@@ -173,14 +176,19 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       const saved = r.data as { id: string } | null;
       const next: CrmRoom = { ...room, id: saved?.id ?? room.id ?? `r${Date.now()}` };
       setData(d => ({ ...d, rooms: d.rooms.some(x => x.id === next.id) ? d.rooms.map(x => (x.id === next.id ? next : x)) : [...d.rooms, next] }));
+      return next.id;
+    },
+    async saveRoomRemarks(id, remarks) {
+      if (!(await write("crm_save_showroom_remarks", { p_id: id, p_remarks: remarks }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
       return true;
     },
-    // Delete = closed for good: off every booking list; its past visits keep their showroom.
+    // Delete = gone from the lists, its past visits keep their showroom; refused while visits are upcoming (crm_delete_showroom,
+    // the desktop's rule — v3 T07 links the two).
     async removeRoom(id) {
-      const room = data().rooms.find(r => r.id === id);
-      if (!room) return false;
-      if (!(await write("crm_save_showroom_full", { p_id: id, p_name: room.name, p_address: room.address, p_slots: room.slots, p_cap: room.cap, p_weekly: room.weekly, p_blocks: room.blocks, p_active: false }))) return false;
-      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, active: false } : r)) }));
+      if (!data().rooms.some(r => r.id === id)) return false;
+      if (!(await write("crm_delete_showroom", { p_id: id }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, active: false, deleted: true } : r)) }));
       return true;
     },
   };

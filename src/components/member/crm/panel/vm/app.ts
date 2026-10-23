@@ -19,12 +19,12 @@ import { navVM } from "./nav";
 import { calendarInfoVM, calendarListVM } from "./calendar-list";
 import { assignExtraVM } from "./assign-1011";
 import { memberWorkTypeVM, templatesVM } from "./profile-1011";
-import { teamName, teamOf } from "../../shared/people";
+import { jobTitle, teamName, teamOf } from "../../shared/people";
 import { teamMineSwap } from "../../shared/team-mine";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
 import type { KeyboardEvent } from "react";
-import type { PanelCtx } from "./common";
+import { first, ini, type PanelCtx } from "./common";
 
 /** The ad editor's numbers (rev 1011 §8): Enter moves to the next visible number box and selects it; on the last one the
  * keyboard closes. Never a submit. The prototype's own handler, over the page (the app has no screen-label root). */
@@ -39,9 +39,22 @@ export function enterNext(e: KeyboardEvent<HTMLInputElement>) {
 /** A group whose screen is off: never read by the markup (it sits behind show.*), typed as the group. */
 const off = <T,>() => undefined as unknown as T;
 
+/** v3 T01 · Insight's head, on both of its sides. */
+function insightHead(ctx: PanelCtx, house: boolean, ads: boolean) {
+  const { me, patch } = ctx, boss = me.role === "boss";
+  return {
+    greet: `Hello, ${boss ? "Principal" : first(me.name)}`, // the owner, 2026-10-18: "改成 hello"
+    sub: `${boss ? "Principal" : jobTitle(me)} · ${ctx.data.can.viewAll ? "All access" : teamName(teamOf(me.id, ctx.data.people)) || "My team"}`,
+    ini: ini(me.name), house, exit: () => ctx.exitApp(),
+    sw: ctx.data.can.manage ? { ads, team: () => patch({ ovAds: false }), adsPick: () => patch({ ovAds: true }) } : null,
+  };
+}
+
 export function panelAppVM(ctx: PanelCtx) {
   const { ui, set, now } = ctx, tab = ui.tab, lead = !!ui.lead;
-  const show = { ov: tab === "overview" && !lead, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads", as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
+  // v3 T01: Insight's Ads performance side is the Ads Performance page under Insight's head (CRM · Manage, as that page).
+  const ovAds = tab === "overview" && !lead && ui.ovAds && ctx.data.can.manage;
+  const show = { ov: tab === "overview" && !lead && !ovAds, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
   const ld = show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>();
   const cf = customerForm({
     form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
@@ -71,6 +84,8 @@ export function panelAppVM(ctx: PanelCtx) {
     bellIn: !!bl.showBell && show.ib, bellTop: false,
     // The house on Insight too, the page Team opens on (2026-10-16, the owner) — left of the avatar.
     houseOv: !!bl.showBell && show.ov,
+    // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
+    th: insightHead(ctx, !!bl.showBell, ovAds),
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

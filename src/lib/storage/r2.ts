@@ -124,15 +124,25 @@ async function answer(res: Response): Promise<R2Answer> {
   return { ok: false, status: res.status, message: code ? `${code} (${res.status})` : `R2 answered ${res.status}` }
 }
 
-/** Puts one object from the server; never over one already there. */
+/** The tries a put gets on an R2 hiccup (5xx / 429), as the client's own `retries` gives every other call. */
+const PUT_TRIES = 4
+
+/**
+ * Puts one object from the server; never over one already there. Signed first (the body is UNSIGNED-PAYLOAD, so it is
+ * no part of the signature), then sent with the bytes themselves (2026-10-23): handed to `fetch` inside a Request, as
+ * aws4fetch's own `fetch` does, the body became a stream that Next's server sends chunked, without a length — and R2
+ * refuses every such PUT, `411 MissingContentLength` (Finance's voucher attachments, the morning after the move).
+ */
 export async function r2Put(loc: R2Location, body: Blob | ArrayBuffer | Uint8Array, contentType: string): Promise<R2Answer> {
   const s = settings()
-  const res = await aws(s).fetch(objectUrl(s, loc), {
-    method: 'PUT',
-    body: body as BodyInit,
-    headers: { 'content-type': contentType, 'if-none-match': '*' },
-  })
-  return answer(res)
+  let res: Response | null = null
+  for (let i = 0; i < PUT_TRIES; i++) {
+    if (i > 0) await new Promise(resolve => setTimeout(resolve, Math.random() * 50 * 2 ** i))
+    const signed = await aws(s).sign(objectUrl(s, loc), { method: 'PUT', headers: { 'content-type': contentType, 'if-none-match': '*' } })
+    res = await fetch(signed.url, { method: 'PUT', headers: signed.headers, body: body as BodyInit, cache: 'no-store' })
+    if (res.status < 500 && res.status !== 429) break
+  }
+  return answer(res as Response)
 }
 
 /** Reads one object (a Range passed on). The caller reads the body. */

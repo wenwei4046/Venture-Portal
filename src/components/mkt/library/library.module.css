@@ -150,6 +150,35 @@
 .fontName { font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 3px; }
 .dialogFoot { border-top: 1px solid rgb(var(--mk-line-3)); padding-top: 12px; }
 
+/* Attach to task (⑥-4): a row per open task. */
+.taskId { font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-muted)); flex: none; min-width: 130px; }
+.taskTitle { font-weight: 500; }
+
+/* A guest link's dialog (⑥-3). */
+.shareRow { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 8px; background: rgb(var(--mk-surface-2)); }
+.shareUrl {
+  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; padding: 0; font-family: var(--mk-mono); font-size: 11.5px;
+  color: rgb(var(--mk-ink)); text-overflow: ellipsis;
+}
+.copyBtn {
+  height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); font: inherit;
+  font-size: 12px; cursor: pointer; flex: none;
+}
+.expiries { display: flex; gap: 6px; flex-wrap: wrap; }
+.expiry {
+  height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2));
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.expiryOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
+.toggleRow {
+  display: flex; align-items: center; gap: 10px; border: 0; background: transparent; padding: 0; font: inherit; font-size: 12.5px; color: inherit;
+  cursor: pointer; align-self: flex-start;
+}
+.track { width: 30px; height: 18px; border-radius: 9px; background: rgb(var(--mk-field-hover)); position: relative; flex: none; transition: background .15s; }
+.trackOn { background: rgb(var(--mk-ink)); }
+.knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgb(var(--mk-white)); transition: left .15s; }
+.trackOn .knob { left: 14px; }
+
 /* Folders. */
 .secHead { position: relative; display: flex; align-items: center; margin-top: 20px; gap: 8px; }
 .secLabel { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: rgb(var(--mk-muted)); }
