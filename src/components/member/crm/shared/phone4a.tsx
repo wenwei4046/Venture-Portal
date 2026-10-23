@@ -412,12 +412,62 @@ type Room4 = {
   gmaps: string; waze: string; hasAddr: boolean; cap: number; capMinus?: () => void; capPlus?: () => void;
   days: string[]; grid: { label: string; cells: { on: boolean; pick: () => void }[] }[]; odd: string[];
   closures: { day: string; what: string; rm: () => void }[]; addClosure: () => void; dirty: boolean; cancel: () => void; save: () => void; del: () => void; canDel: boolean;
+  hours: { all: { f: string; t: string; apply: (f: string, t: string) => void };
+    groups: { label: string; hours: string; open: boolean; days: { l: string; open: boolean; f: string; t: string; set: (f: string, t: string) => void; toggle: () => void }[] }[] };
+  remarks: string; setRemarks: (e: RChangeEvent<HTMLTextAreaElement>) => void;
 };
-/** T07 · a showroom as one page: name and address in place, map chips, Visits per slot, the 24 × 7 weekly slots, Closures. */
+const TIME: CSSProperties = { flex: 1, minWidth: 0, height: "40px", padding: "0 12px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "10px", background: "#fff", outline: "none", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" };
+/** v3 T07 · Opening hours: All days + Apply to all days, then the days grouped by the same hours; a group opens to its days. */
+function RoomHours({ h }: { h: Room4["hours"] }) {
+  const [f, setF] = useState(h.all.f), [t, setT] = useState(h.all.t), [open, setOpen] = useState<number | null>(null);
+  useEffect(() => { setF(h.all.f); setT(h.all.t); }, [h.all.f, h.all.t]);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "baseline" }}>
+        <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(15) }}>Opening hours</span>
+        <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>Type, or tap the grid</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", borderRadius: "14px", background: "var(--crm-sel)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ flex: "none", width: "58px", fontSize: fs(13), color: "var(--crm-ink)" }}>All days</span>
+          <input type="time" step={3600} aria-label="All days from" value={f} onChange={e => setF(e.target.value)} style={TIME} />
+          <span style={{ color: "var(--crm-faint)" }}>–</span>
+          <input type="time" step={3600} aria-label="All days to" value={t} onChange={e => setT(e.target.value)} style={TIME} />
+        </div>
+        <button type="button" onClick={() => h.all.apply(f, t)} style={{ ...BTN, height: "40px", borderRadius: "20px", background: "var(--crm-rust)", color: "#fff", fontSize: fs(14), fontWeight: 600 }}>Apply to all days</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", border: "1px solid var(--crm-line)", borderRadius: "14px", overflow: "hidden" }}>
+        {h.groups.map((g, i) => (
+          <div key={i} style={{ borderTop: i ? "1px solid var(--crm-rule-soft)" : 0 }}>
+            <button type="button" onClick={() => setOpen(open === i ? null : i)} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "42px", padding: "0 14px", boxSizing: "border-box", color: g.open ? "var(--crm-ink)" : "var(--crm-faint)" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: g.open ? "var(--crm-brown)" : "var(--crm-line)" }} />
+              <span style={{ flex: 1, textAlign: "left", fontSize: fs(14) }}>{g.label}</span>
+              <span style={{ fontSize: fs(14), fontVariantNumeric: "tabular-nums" }}>{g.hours}</span>
+              <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: open === i ? "rotate(90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-right" size={14} /></span>
+            </button>
+            {open === i && g.days.map(d => (
+              <div key={d.l} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 14px 8px 30px" }}>
+                <span style={{ flex: "none", width: "34px", fontSize: fs(13) }}>{d.l}</span>
+                {d.open ? <>
+                  <input type="time" step={3600} aria-label={d.l + " from"} defaultValue={d.f} onBlur={e => d.set(e.target.value, d.t)} style={{ ...TIME, height: "34px" }} />
+                  <input type="time" step={3600} aria-label={d.l + " to"} defaultValue={d.t} onBlur={e => d.set(d.f, e.target.value)} style={{ ...TIME, height: "34px" }} />
+                </> : <span style={{ flex: 1, fontSize: fs(13), color: "var(--crm-faint)" }}>Closed</span>}
+                <button type="button" onClick={d.toggle} style={{ ...BTN, flex: "none", fontSize: fs(12.5), fontWeight: 500, color: "var(--crm-rust)" }}>{d.open ? "Close" : "Open"}</button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <span style={{ fontSize: fs(12), lineHeight: 1.4, color: "var(--crm-muted)" }}>Tap a row to change single days. Days with the same hours are grouped.</span>
+    </div>
+  );
+}
+/** T07 (v3) · a showroom as one page: name and address in place, map chips, Opening hours, Visits per slot, the weekly slots
+ * folded to a row, Closures, Remarks (staff only). Delete is the header's trash. */
 export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
   const q = r.q4;
-  const [editName, setEditName] = useState(false);
-  const chip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", borderRadius: "18px", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: fs(15), textDecoration: "none" };
+  const [editName, setEditName] = useState(false), [grid, setGrid] = useState(false);
+  const chip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", borderRadius: "18px", background: "var(--crm-field)", color: "var(--crm-ink)", fontSize: fs(14), textDecoration: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingBottom: q.dirty ? "70px" : "0" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -431,6 +481,7 @@ export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
         <a href={q.gmaps} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Google Maps</a>
         <a href={q.waze} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Waze</a>
       </div>
+      <RoomHours h={q.hours} />
       <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 14px 14px 16px", border: "1px solid var(--crm-line)", borderRadius: "16px" }}>
         <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
           <span style={{ fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)" }}>Visits per slot</span>
@@ -443,18 +494,23 @@ export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-          <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17) }}>Weekly slots</span>
-          <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>12 am – 11 pm · tap to open or close</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, minmax(0,1fr))", columnGap: "5px", rowGap: "5px" }}>
+        {/* v3 T07: the weekly slots fold to one row; tapped, the 24 × 7 grid opens. */}
+        <button type="button" onClick={() => setGrid(!grid)} aria-expanded={grid} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", border: "1px solid var(--crm-line)", borderRadius: "14px", textAlign: "left" }}>
+          <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="calendar" size={18} /></span>
+          <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
+            <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Weekly slots</span>
+            <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{grid ? "12 am – 11 pm · tap to open or close" : "Tap to paint open hours on the grid"}</span>
+          </span>
+          <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: grid ? "rotate(90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-right" size={15} /></span>
+        </button>
+        {grid && <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, minmax(0,1fr))", columnGap: "5px", rowGap: "5px" }}>
           <span />
           {q.days.map((d, i) => <span key={i} style={{ textAlign: "center", fontSize: fs(12), fontWeight: 500, color: "var(--crm-muted)" }}>{d}</span>)}
           {q.grid.map((row, h) => [
             <span key={"l" + h} style={{ fontSize: fs(11), color: "var(--crm-faint)", lineHeight: "14px" }}>{row.label}</span>,
             ...row.cells.map((c, k) => <button key={h + ":" + k} type="button" onClick={c.pick} aria-label={`${h}:00 day ${k + 1} ${c.on ? "open" : "closed"}`} style={{ ...BTN, height: "14px", borderRadius: "3px", background: c.on ? "var(--crm-brown)" : "var(--crm-field)" }} />),
           ])}
-        </div>
+        </div>}
         {q.odd.length > 0 && <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>Also off the hour: {q.odd.join(", ")}</span>}
       </div>
       <div style={{ display: "flex", flexDirection: "column" }}>
@@ -472,7 +528,15 @@ export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
           </div>
         ))}
       </div>
-      {q.canDel && <button type="button" onClick={q.del} style={{ ...BTN, alignSelf: "flex-start", fontSize: fs(14), fontWeight: 500, color: "var(--crm-oxblood)" }}>Delete showroom</button>}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(15) }}>Remarks</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "22px", padding: "0 8px", borderRadius: "11px", background: "var(--crm-field)", color: "var(--crm-muted)", fontSize: fs(11), fontWeight: 500 }}><Ic name="lock" size={10} />Staff only</span>
+        </div>
+        <textarea value={q.remarks} onChange={q.setRemarks} rows={3} placeholder="Notes for the team — parking, where to meet the customer…" aria-label="Remarks"
+          style={{ padding: "12px 14px", border: "1px solid var(--crm-line)", borderRadius: "12px", background: "#fff", outline: "none", resize: "none", font: "inherit", lineHeight: 1.45, color: "var(--crm-ink)" }} />
+        <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>Customers never see this.</span>
+      </div>
       {q.dirty && (
         <div style={{ position: "sticky", bottom: "0", display: "flex", gap: "8px", margin: "0 -20px", padding: "12px 20px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
           <button type="button" onClick={q.cancel} style={{ ...BTN, flex: 1, height: "46px", borderRadius: "23px", border: "1px solid var(--crm-line)", fontSize: fs(15), fontWeight: 500 }}>Cancel</button>

@@ -21,8 +21,36 @@ const sDays = (s: string) => (s.includes("@") ? s.split("@")[1].split("").map(Nu
 const dTxt = (d: number[]) => (d.length === 7 ? "Every day" : d.join("") === "01234" ? "Mon – Fri" : d.join("") === "56" ? "Sat, Sun" : d.map(x => WD[x]).join(", "));
 const srt = (a: string[]) => [...new Set(a)].sort();
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const pad2 = (h: number) => `${String(h).padStart(2, "0")}:00`;
+/** v3 T07 · opening hours from (and into) the weekly slots. Only whole-hour slots are rewritten; one off the hour stays. */
+function hoursOf(d: RoomDraft, on: (h: number, k: number) => boolean, begin: (p: Partial<RoomDraft>) => void) {
+  const rangeOf = (k: number) => { const hs = Array.from({ length: 24 }, (_, h) => h).filter(h => on(h, k)); return hs.length ? { f: hs[0], t: hs[hs.length - 1] + 1 } : null; };
+  const setDays = (ks: number[], f: number, t: number | null) => {
+    const M = Array.from({ length: 24 }, (_, h) => Array.from({ length: 7 }, (_, k) => on(h, k)));
+    ks.forEach(k => { for (let h = 0; h < 24; h++) M[h][k] = t != null && h >= f && h < t; });
+    const kept = d.slots.filter(s => !s.split("@")[0].endsWith(":00"));
+    const whole = M.flatMap((row, h) => { const ds = row.map((x, k) => (x ? k : -1)).filter(k => k >= 0); return ds.length ? [ds.length === 7 ? pad2(h) : `${pad2(h)}@${ds.join("")}`] : []; });
+    // A day opened here is no longer closed every week.
+    begin({ slots: [...whole, ...kept].sort(), weekly: t != null ? d.weekly.filter(w => !ks.some(k => WI[k] === w)) : d.weekly });
+  };
+  const rs = DN.map((_, k) => rangeOf(k)), first = rs.find(Boolean) ?? { f: 10, t: 21 };
+  const txt = (r: { f: number; t: number } | null) => (r ? `${pad2(r.f)} – ${pad2(r.t)}` : "Closed");
+  const groups: { label: string; hours: string; open: boolean; days: number[] }[] = [];
+  rs.forEach((r, k) => { const g = groups[groups.length - 1], h = txt(r);
+    if (g && g.hours === h) { g.days.push(k); g.label = `${DN[g.days[0]]} – ${DN[k]}`; } else groups.push({ label: DN[k], hours: h, open: !!r, days: [k] }); });
+  const hourOf = (v: string) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, Math.min(24, n)) : null; };
+  return {
+    all: { f: pad2(first.f), t: pad2(first.t), apply: (fv: string, tv: string) => { const f = hourOf(fv), t = hourOf(tv); if (f == null || t == null || t <= f) return; const open = rs.map((r, k) => (r ? k : -1)).filter(k => k >= 0); setDays(open.length ? open : [0, 1, 2, 3, 4, 5, 6], f, t); } },
+    groups: groups.map(g => ({ label: g.label, hours: g.hours, open: g.open, days: g.days.map(k => { const r = rs[k];
+      return { l: DN[k], open: !!r, f: r ? pad2(r.f) : pad2(first.f), t: r ? pad2(r.t) : pad2(first.t),
+        set: (fv: string, tv: string) => { const f = hourOf(fv), t = hourOf(tv); if (f != null && t != null && t > f) setDays([k], f, t); },
+        toggle: () => (r ? setDays([k], 0, null) : setDays([k], first.f, first.t)) }; }) })),
+  };
+}
+
 const draftOf = (r: CrmRoom | null, i: number): RoomDraft => ({
-  i, id: r?.id ?? null, name: r?.name ?? "", addr: r?.address ?? "", slots: r ? [...r.slots] : [], cap: r?.cap ?? 2, weekly: r ? [...r.weekly] : [], blocks: r ? r.blocks.map(b => ({ ...b })) : [],
+  i, id: r?.id ?? null, name: r?.name ?? "", addr: r?.address ?? "", remarks: r?.remarks ?? "", slots: r ? [...r.slots] : [], cap: r?.cap ?? 2, weekly: r ? [...r.weekly] : [], blocks: r ? r.blocks.map(b => ({ ...b })) : [],
   newT: "", newD: null, bA: "", bB: "", bWhy: "", bAll: true, bT1: "", bT2: "", bPick: null, calFor: null, calYM: null,
 });
 
@@ -47,7 +75,7 @@ export function roomsVM(ctx: PanelCtx) {
     const mine = !!ed && ed.i === i && !!ed.quick, d: RoomDraft = mine ? ed! : draftOf(r, i);
     const begin = (p: Partial<RoomDraft>) => set(u => ({ ...u, rmEdit: { ...(u.rmEdit && u.rmEdit.i === i && u.rmEdit.quick ? u.rmEdit : { ...draftOf(r, i), quick: true }), ...p } }));
     const saved = draftOf(r, i);
-    const dirty = mine && (d.name !== saved.name || d.addr !== saved.addr || d.cap !== saved.cap || JSON.stringify(srt(d.slots)) !== JSON.stringify(srt(saved.slots)) || JSON.stringify([...d.weekly].sort()) !== JSON.stringify([...saved.weekly].sort()));
+    const dirty = mine && ((d.remarks ?? "") !== (saved.remarks ?? "") || d.name !== saved.name || d.addr !== saved.addr || d.cap !== saved.cap || JSON.stringify(srt(d.slots)) !== JSON.stringify(srt(saved.slots)) || JSON.stringify([...d.weekly].sort()) !== JSON.stringify([...saved.weekly].sort()));
     const q = encodeURIComponent(d.addr || d.name);
     const hourOf = (s: string) => Number(s.split("@")[0].split(":")[0]);
     const on = (h: number, k: number) => d.slots.some(s => hourOf(s) === h && sDays(s).includes(k)) && !d.weekly.includes(WI[k]);
@@ -73,7 +101,12 @@ export function roomsVM(ctx: PanelCtx) {
           rm: () => begin({ blocks: d.blocks.filter(x => x !== b) }) }))],
       addClosure: () => patch({ rmEdit: { ...(mine ? d : draftOf(r, i)), quick: false } }),
       dirty, cancel: () => patch({ rmEdit: null }),
-      save: () => void act.saveRoom({ id: d.id, name: d.name.trim() || "Showroom", address: d.addr.trim(), active: true, slots: d.slots, cap: d.cap, weekly: d.weekly, blocks: d.blocks }).then(ok => { if (ok) patch({ rmEdit: null }); }),
+      save: () => void act.saveRoom({ id: d.id, name: d.name.trim() || "Showroom", address: d.addr.trim(), active: true, slots: d.slots, cap: d.cap, weekly: d.weekly, blocks: d.blocks })
+        .then(async id => { if (!id) return; if ((d.remarks ?? "") !== (saved.remarks ?? "") && !(await act.saveRoomRemarks(id, d.remarks ?? ""))) return; patch({ rmEdit: null }); }),
+      // v3 T07: opening hours typed in — All days + Apply to all days, then the days grouped by the same hours; a group opens
+      // to its single days. They ARE the weekly slots: a day's hours = its first open hour to the hour after its last.
+      hours: hoursOf(d, on, begin),
+      remarks: d.remarks ?? "", setRemarks: (e: ChangeEvent<HTMLTextAreaElement>) => begin({ remarks: e.target.value.slice(0, 1000) }),
       del: () => patch({ rmDel: i }), canDel: !!r,
     };
   };
@@ -177,6 +210,8 @@ export function roomsVM(ctx: PanelCtx) {
     rmOpen: ui.roomsOpen, stop, closeRooms: () => patch({ roomsOpen: false, rmEdit: null }),
     rmAdd: () => patch({ rmEdit: { ...draftOf(null, rooms.length), quick: true }, rmAt: rooms.length }),
     rmList: rmList.filter((_, i) => i === at),
+    // v3 T07: Delete is a trash icon in the header, for the showroom on screen.
+    rmCanDel: !!shown[at] && !ed, rmDelCur: () => patch({ rmDel: at }),
     rmPager: shown.length > 1, rmPos: `${at + 1} / ${shown.length}`, rmPrev: step(-1), rmNext: step(1),
     rmPrevOp: !ed && at > 0 ? 1 : 0.3, rmNextOp: !ed && at < shown.length - 1 ? 1 : 0.3,
     tpOpen: !!tp, tpClose: () => patch({ rmTP: null }), tpStop: (e: SyntheticEvent) => e.stopPropagation(),

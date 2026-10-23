@@ -8,6 +8,8 @@ export interface AdDraft { id: string; label: string; page: string; leads: numbe
 export interface FtDraft { tid: string; m: "cnt" | "pct"; on: number[]; v: Record<string, Record<number, number>>; sel: { id: string; days: number[] } | null; lockD: Record<number, string[]> }
 export interface RoomDraft {
   i: number; id: string | null; name: string; addr: string; slots: string[]; cap: number; weekly: number[]; blocks: { a: string; b: string; why: string }[];
+  /** v3 T07: staff-only remarks. */
+  remarks?: string;
   newT: string; newD: number[] | null; bA: string; bB: string; bWhy: string; bAll: boolean; bT1: string; bT2: string; bPick: "t1" | "t2" | null; calFor: "A" | "B" | null; calYM: [number, number] | null;
   /** 4a (T07): a draft begun on the page itself — the page stays in place with a Save bar (the full editor is for closures). */
   quick?: boolean;
