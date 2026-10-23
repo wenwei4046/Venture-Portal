@@ -114,9 +114,11 @@ describe('a hiring request, as the app draws it', () => {
   it('keeps somebody in the Talent Bank by their own words', () => {
     const t: HiringTalent = {
       id: 't1', no: 'T-001', name: 'Joyce Tan', phone: '', email: 'joyce@example.invalid', position: 'Account Executive', department: 'Finance',
-      fromRequest: 'HR-199', notes: 'Strong on AR.', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
+      fromRequest: 'HR-199', notes: 'Strong on AR.', reason: 'not_right_now', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
     }
-    expect(talentOf(t)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.' })
+    expect(talentOf(t)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.', reason: 'Not right now' })
+    // Kept before the reason was asked (2026-10-24): none said.
+    expect(talentOf({ ...t, reason: null }).reason).toBeUndefined()
   })
 })
 

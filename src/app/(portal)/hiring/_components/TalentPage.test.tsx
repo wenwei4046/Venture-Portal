@@ -11,6 +11,7 @@ const actions = vi.hoisted(() => ({
   removeHiringTalent: vi.fn(),
   replaceHiringFile: vi.fn(),
   saveTalentNotes: vi.fn(),
+  setTalentReason: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadHiringFile: vi.fn() }))
 const { push, flash } = vi.hoisted(() => ({ push: vi.fn(), flash: vi.fn() }))
@@ -46,6 +47,21 @@ describe('Hiring › Talent Bank › a talent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Invite to interview' }))
     await waitFor(() => expect(actions.inviteHiringTalent).toHaveBeenCalledWith('T-102', 'HR-205'))
     expect(flash).toHaveBeenCalledWith('Marcus Wong invited to interview for HR-205')
+  })
+
+  // 2026-10-24 (IT-0008): why they are kept, and where they came from.
+  it('says why they are kept and where they came from; Edit changes why, the rest read it', async () => {
+    render(<TalentPage board={HIRING_BOARD} talent={talent('T-102')} can={{ create: true, edit: true }} />)
+    expect(screen.getByText('HR-198 · Senior Revenue Specialist')).toBeInTheDocument()
+    const why = screen.getByLabelText('Why Marcus Wong is kept') as HTMLSelectElement
+    expect(why.value).toBe('failed_interview')
+    fireEvent.change(why, { target: { value: 'declined_offer' } })
+    await waitFor(() => expect(actions.setTalentReason).toHaveBeenCalledWith('T-102', 'declined_offer'))
+    expect(flash).toHaveBeenCalledWith('Marcus Wong · Declined offer')
+    cleanup()
+    render(<TalentPage board={HIRING_BOARD} talent={talent('T-101')} can={{ create: false, edit: false }} />)
+    expect(screen.queryByLabelText('Why Aisyah Rahman is kept')).toBeNull()
+    expect(screen.getByText('Added in Talent Bank')).toBeInTheDocument()
   })
 
   it('saves HR notes on leaving the field', async () => {

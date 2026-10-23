@@ -123,6 +123,8 @@ export interface HrTalent {
   from?: string | null
   when: string
   notes: string
+  /** Why they are kept, in words (2026-10-24) — none for somebody kept before it was asked. */
+  reason?: string
 }
 
 export interface HrDocType {

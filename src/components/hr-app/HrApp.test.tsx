@@ -376,6 +376,34 @@ describe('a probation ending (2026-10-23)', () => {
     expect(screen.getByText('PROB')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Probation ending · Nurul Huda'))
     expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+// IT-0008 (2026-10-24): a candidate not selected leaves the list for the Talent Bank — on the phone as on the request page.
+describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
+  const hire = {
+    id: 'HR-205', status: 'acknowledged', position: 'Revenue Specialist', headcount: 1, dept: 'Revenue · Fair', budget: '', start: '', ownerName: null,
+    requester: 'Kar Jun', when: '9 Oct 2026', events: [],
+    candidates: [{ id: 'c1', name: 'Daniel Lee', source: 'Applied', stage: 'appointment' }, { id: 'c2', name: 'Nur Iman', source: 'Applied', stage: 'rejected' }],
+  } as unknown as HrAppData['hires'][number]
+
+  it('lists the ones still in the running; Not selected asks why — the one their stage says first — then keeps them in the bank', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [hire], parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    expect(screen.getByText('Daniel Lee')).toBeInTheDocument()
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    fireEvent.click(screen.getByText('Daniel Lee'))
+    fireEvent.click(screen.getByRole('button', { name: /^Not selected/ }))
+    expect(stage).not.toHaveBeenCalled()
+    expect(screen.getByText('Not selected · Daniel Lee')).toBeInTheDocument()
+    const why = ['Failed interview', 'Not shortlisted', 'Not right now', 'Declined offer', 'Other']
+    expect(screen.getAllByRole('button').map(b => b.textContent).filter(t => why.includes(t ?? ''))).toEqual(why)
+    fireEvent.click(screen.getByRole('button', { name: 'Not right now' }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'not_right_now'))
+  })
+
+  it('everybody not selected: the list says they are in the Talent Bank', () => {
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [{ ...hire, candidates: hire.candidates.slice(1) }], parts: { ...data.parts, hiring: true } }} actions={actions} />)
+    expect(screen.getByText('Not selected · 1 · in Talent Bank')).toBeInTheDocument()
   })
 })
 

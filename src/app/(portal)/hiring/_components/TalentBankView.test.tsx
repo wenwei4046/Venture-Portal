@@ -7,6 +7,7 @@ const actions = vi.hoisted(() => ({
   addHiringFileType: vi.fn(), hiringFileLink: vi.fn(), removeHiringTalent: vi.fn(), addBankFolder: vi.fn(), renameBankFolder: vi.fn(),
   deleteBankFolder: vi.fn(), moveBankTalent: vi.fn(), addBankTalent: vi.fn(), saveBankFile: vi.fn(), deleteBankFile: vi.fn(),
   moveBankFolder: vi.fn(), moveBankEveryone: vi.fn(), restoreBankItem: vi.fn(), deleteBankItemForever: vi.fn(), emptyBankBin: vi.fn(),
+  setTalentReason: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadHiringFile: vi.fn() }))
 const { push, flash } = vi.hoisted(() => ({ push: vi.fn(), flash: vi.fn() }))
@@ -248,6 +249,72 @@ describe('Hiring › Talent Bank as a Drive', () => {
     expect(screen.queryByRole('button', { name: 'More actions for Seniors' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More actions for Nur Iman' }))
     expect(screen.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Open'])
+  })
+})
+
+// 2026-10-24 (IT-0008; the user: "最好的是它可以显示 candidate 是从哪里来的 … 包括 upload 的时候，最好能放一个 drop 掉的原因
+// … 做成一个 dropdown"): why somebody is kept, and where they came from.
+describe('why somebody is kept in the Talent Bank', () => {
+  it('a card says why they are kept — while a request has them, that they are interviewing; kept before it was asked, as before', () => {
+    view(undefined, 'dept:hv:HR')
+    expect(screen.getByRole('button', { name: /^Joyce Tan/ }).textContent).toContain('HR Executive · Other')
+    cleanup()
+    view(undefined, `folder:${SENIORS}`)
+    expect(screen.getByRole('button', { name: /^Marcus Wong/ }).textContent).toContain('Senior Revenue Specialist · Failed interview')
+    cleanup()
+    view(undefined, 'dept:hv:Revenue')
+    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Revenue Specialist · Interviewing · HR-203')
+    cleanup()
+    view(undefined, 'dept:hv:Finance')
+    expect(screen.getByRole('button', { name: /^Aisyah Rahman/ }).textContent).toContain('Account Executive · Available')
+  })
+
+  it('the panel says why and where they came from; Edit changes why, as it is picked', async () => {
+    actions.setTalentReason.mockResolvedValue({ ok: true })
+    view(undefined, `folder:${SENIORS}`)
+    fireEvent.click(screen.getByRole('button', { name: /^Marcus Wong/ }))
+    const panel = within(screen.getByRole('dialog'))
+    expect(panel.getByText('HR-198 · Senior Revenue Specialist')).toBeInTheDocument()
+    const why = panel.getByLabelText('Why Marcus Wong is kept') as HTMLSelectElement
+    expect([why.value, [...why.options].map(o => o.text)]).toEqual(['failed_interview', ['Not shortlisted', 'Failed interview', 'Not right now', 'Declined offer', 'Other']])
+    fireEvent.change(why, { target: { value: 'not_right_now' } })
+    await waitFor(() => expect(actions.setTalentReason).toHaveBeenCalledWith('T-102', 'not_right_now'))
+    expect(flash).toHaveBeenCalledWith('Marcus Wong · Not right now')
+  })
+
+  it('somebody added in the bank came from it; kept before the reason was asked, Edit picks one; without Edit it is words', () => {
+    view(undefined, 'dept:hv:Finance')
+    fireEvent.click(screen.getByRole('button', { name: /^Aisyah Rahman/ }))
+    let panel = within(screen.getByRole('dialog'))
+    expect(panel.getByText('Added in Talent Bank')).toBeInTheDocument()
+    expect((panel.getByLabelText('Why Aisyah Rahman is kept') as HTMLSelectElement).value).toBe('')
+    expect(panel.getByRole('option', { name: 'Pick a reason…' })).toBeInTheDocument()
+    cleanup()
+    view({ create: false, edit: false }, 'dept:hv:HR')
+    fireEvent.click(screen.getByRole('button', { name: /^Joyce Tan/ }))
+    panel = within(screen.getByRole('dialog'))
+    expect(panel.queryByLabelText('Why Joyce Tan is kept')).toBeNull()
+    expect(panel.getByText('Other')).toBeInTheDocument()
+  })
+
+  it('+ New › Add talent asks why they are kept — Not right now unless another is picked', async () => {
+    view(undefined, 'dept:hv:Finance')
+    pressNew('Add talent')
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lee Mei' } })
+    fireEvent.change(screen.getByLabelText('Good fit for (position)'), { target: { value: 'Driver' } })
+    const why = screen.getByLabelText('Reason *') as HTMLSelectElement
+    expect(why.value).toBe('not_right_now')
+    fireEvent.change(why, { target: { value: 'failed_interview' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save talent' }))
+    await waitFor(() => expect(actions.addBankTalent).toHaveBeenCalled())
+    expect((actions.addBankTalent.mock.calls[0][1] as FormData).get('reason')).toBe('failed_interview')
+  })
+
+  it('the search finds people by why they are kept', () => {
+    view()
+    fireEvent.change(screen.getByLabelText('Search the Talent Bank'), { target: { value: 'failed interview' } })
+    expect(screen.getByRole('button', { name: /Marcus Wong · Senior Revenue Specialist/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Joyce Tan/ })).toBeNull()
   })
 })
 

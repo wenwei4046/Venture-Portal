@@ -5,8 +5,9 @@ import { Window } from '@/components/hrv/overlay'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { saveHiringCandidate } from '@/lib/hiring/actions'
+import { REASONS, outReason } from '@/lib/hiring/reasons'
 import { STAGE, STAGE_ORDER, answerOf } from '@/lib/hiring/view'
-import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
+import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest, TalentReason } from '@/lib/hiring/types'
 import { FileRow, WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
 import s from './hiring.module.css'
 
@@ -15,7 +16,8 @@ import s from './hiring.module.css'
  * window): Name *, Phone, Status, the candidate fields, a reference or special
  * note, their files, and "Change which fields appear here". Files (2026-10-11):
  * the ones on record, each to Remove (on Save), and new ones with their type
- * — uploaded, then filed with the rest on Save.
+ * — uploaded, then filed with the rest on Save. Status turned to Not selected
+ * asks why (2026-10-24): they are kept in the Talent Bank with it.
  */
 export default function CandidateWindow({
   board,
@@ -37,6 +39,7 @@ export default function CandidateWindow({
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [stage, setStage] = useState<CandidateStage>('shortlisted')
+  const [reason, setReason] = useState<TalentReason>('not_shortlisted')
   const [note, setNote] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [waiting, setWaiting] = useState<Waiting[]>([])
@@ -49,6 +52,7 @@ export default function CandidateWindow({
     setName(c?.name ?? '')
     setPhone(c?.phone ?? '')
     setStage(c?.stage ?? 'shortlisted')
+    setReason(outReason(c?.stage ?? 'shortlisted'))
     setNote(c?.note ?? '')
     setAnswers(c ? { ...c.answers } : {})
     setWaiting([])
@@ -56,6 +60,8 @@ export default function CandidateWindow({
   }, [state])
 
   const kept = editing?.files ?? []
+  // Turning Not selected here keeps them in the Talent Bank: why. One already not selected is the bank's to change.
+  const asksWhy = stage === 'rejected' && editing?.stage !== 'rejected'
   const save = () => {
     if (!name.trim()) return flash(editing ? 'Name can’t be empty' : 'Add the candidate’s name')
     const problem = waitingProblem(waiting)
@@ -69,13 +75,14 @@ export default function CandidateWindow({
       form.set('name', name)
       form.set('phone', phone)
       form.set('stage', stage)
+      if (asksWhy) form.set('reason', reason)
       form.set('note', note)
       form.set('answers', JSON.stringify(answers))
       form.set('files', JSON.stringify(sent.files))
       if (editing) form.set('remove', JSON.stringify(removing))
       const out = await saveHiringCandidate(form)
       if (!out.ok) return flash(out.reason)
-      flash(out.warning ?? name.trim() + (editing ? ' saved' : ' added'))
+      flash(out.warning ?? name.trim() + (editing ? ' saved' : ' added') + (asksWhy ? ' · kept in Talent Bank' : ''))
       onClose()
     })
   }
@@ -111,6 +118,18 @@ export default function CandidateWindow({
               ))}
             </Select>
           </label>
+          {asksWhy ? (
+            <label className={s.label}>
+              <span className={s.labelText}>Why not selected</span>
+              <Select bare className={s.select} value={reason} onChange={e => setReason(e.target.value as TalentReason)}>
+                {REASONS.map(x => (
+                  <option key={x.id} value={x.id}>
+                    {x.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          ) : null}
           {board.candidateFields.map(f => (
             <label key={f.id} className={s.label}>
               <span className={s.labelText}>{f.label}</span>

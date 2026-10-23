@@ -1,4 +1,5 @@
 import type { FolderCard } from '@/lib/documentation/drive'
+import { reasonLabel } from './reasons'
 import type { HiringRequest, HiringTalent } from './types'
 
 /**
@@ -517,7 +518,7 @@ export function searchBank(query: string, tree: BankTree): BankHit[] {
     })
     .filter((x): x is { kind: 'place'; card: FolderCard; path: string } => !!x)
   const people: BankHit[] = tree.talents
-    .filter(t => has(t.name) || has(t.position) || has(t.phone) || has(t.email) || has(t.notes))
+    .filter(t => has(t.name) || has(t.position) || has(t.phone) || has(t.email) || has(t.notes) || (!!t.reason && has(reasonLabel(t.reason))))
     .map(talent => ({ kind: 'talent' as const, talent, path: pathLine(placeOfTalent(talent, tree.bank), tree) }))
   const files: BankHit[] = tree.bank.files.filter(f => has(f.name)).map(file => ({ kind: 'file' as const, file, path: pathLine(file.parent, tree) }))
   return [...places, ...people, ...files].slice(0, 60)
