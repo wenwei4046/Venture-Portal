@@ -12,6 +12,7 @@ import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
+import { Ic } from "../shared/icons4a";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -566,6 +567,8 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
  */
 export function DeskActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
+  // A team's card folds to its head (2026-10-23, the owner: "这些名单做可收缩及展开的功能") — this screen's own, not saved.
+  const [shut, setShut] = useState<Record<string, boolean>>({});
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "14px", marginTop: "-10px" }}>
@@ -577,12 +580,14 @@ export function DeskActive({ v }: { v: ActiveVM }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
         {groups.map(g => (
           <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
+            <button type="button" onClick={() => setShut(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut[g.name]} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", border: 0,
+              borderBottom: shut[g.name] ? "0" : "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }}>
+              <span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: shut[g.name] ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={14} /></span>
               <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
               <strong style={{ flex: "1", minWidth: 0, fontSize: "14px", fontWeight: 700, color: g.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</strong>
               <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
-            </div>
-            {g.people.map(p => (
+            </button>
+            {!shut[g.name] && g.people.map(p => (
               <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
                 <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: "12px", fontWeight: 700, display: "grid", placeItems: "center" }}>{p.ini}</span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
@@ -647,7 +652,9 @@ export function DeskAddAd({ v }: { v: { close: () => void; q: string; onQ: (e: {
  * Assignment › Leads by ad (2026-10-22, the owner: "我想要有一个独立的功能，可以看到每个广告谁拿到多少个名单"): every ad, the
  * people who got its leads with how many and their share, This month | All time (vm/leads-by-ad.ts).
  */
-export function DeskLeadsByAd({ v }: { v: { periods: { label: string; on: boolean; pick: () => void }[]; ads: { id: string; name: string; total: number; rows: { name: string; team: string; n: number; pct: number }[] }[] } }) {
+interface LbaLeadV { id: string; name: string; when: string; status: string; stBg: string; stFg: string; stDot: string | null; open: () => void }
+interface LbaRowV { who: string; name: string; team: string; n: number; pct: number; open: boolean; toggle: () => void; leads: LbaLeadV[] }
+export function DeskLeadsByAd({ v }: { v: { periods: { label: string; on: boolean; pick: () => void }[]; ads: { id: string; name: string; total: number; shut: boolean; fold: () => void; rows: LbaRowV[] }[] } }) {
   return (
     <>
       <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "10px", background: "var(--crm-field)", alignSelf: "flex-start", marginTop: "-10px" }}>
@@ -659,18 +666,40 @@ export function DeskLeadsByAd({ v }: { v: { periods: { label: string; on: boolea
         {!v.ads.length && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px" }}>No ads yet.</div>}
         {v.ads.map(a => (
           <div key={a.id} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "10px", padding: "12px 16px", borderBottom: a.rows.length ? "1px solid var(--crm-field)" : "0" }}>
+            {/* The head folds the card (2026-10-23, the owner: "这些名单做可收缩及展开的功能"). */}
+            <button type="button" onClick={a.fold} aria-expanded={!a.shut} style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", padding: "12px 16px", border: 0, background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer",
+              borderBottom: a.rows.length && !a.shut ? "1px solid var(--crm-field)" : "0" }}>
+              <span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: a.shut ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={14} /></span>
               <strong style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 650, color: "var(--crm-ink)", lineHeight: 1.3, overflowWrap: "anywhere" }}>{a.name}</strong>
               <span style={{ flex: "none", fontSize: "13px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{a.total} {a.total === 1 ? "lead" : "leads"}</span>
-            </div>
-            {a.rows.map(r => (
-              <div key={r.name} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 140px 36px", alignItems: "center", gap: "12px", padding: "8px 16px", borderBottom: "1px solid var(--crm-field)" }}>
-                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <span style={{ fontSize: "13.5px", fontWeight: 600, color: r.team ? "var(--crm-ink)" : "var(--crm-oxblood)", lineHeight: 1.25, overflowWrap: "anywhere" }}>{r.name}</span>
-                  {r.team && <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{r.team}</span>}
-                </span>
-                <span style={{ height: "6px", borderRadius: "3px", background: "var(--crm-field)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.round(r.pct * 100)}%`, background: "var(--crm-rust)" }} /></span>
-                <span style={{ textAlign: "right", fontSize: "14px", fontWeight: 650, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{r.n}</span>
+            </button>
+            {!a.shut && a.rows.map(r => (
+              <div key={r.who || "none"} style={{ borderBottom: "1px solid var(--crm-field)" }}>
+                {/* A person opens to the leads they got from this ad (2026-10-23: "点成员名单要可以看到他们得到的 list"). */}
+                <button type="button" onClick={r.toggle} aria-expanded={r.open} title={r.open ? "Hide their leads" : "Show their leads"} style={{ display: "grid", gridTemplateColumns: "14px minmax(0, 1fr) 140px 36px", alignItems: "center", gap: "12px",
+                  width: "100%", padding: "8px 16px", border: 0, background: r.open ? "var(--crm-cream)" : "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }} className={r.open ? undefined : "crm4a-row"}>
+                  <span style={{ display: "flex", color: "var(--crm-faint)", transform: r.open ? "none" : "rotate(-90deg)", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
+                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                    <span style={{ fontSize: "13.5px", fontWeight: 600, color: r.team ? "var(--crm-ink)" : "var(--crm-oxblood)", lineHeight: 1.25, overflowWrap: "anywhere" }}>{r.name}</span>
+                    {r.team && <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{r.team}</span>}
+                  </span>
+                  <span style={{ height: "6px", borderRadius: "3px", background: "var(--crm-field)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${Math.round(r.pct * 100)}%`, background: "var(--crm-rust)" }} /></span>
+                  <span style={{ textAlign: "right", fontSize: "14px", fontWeight: 650, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{r.n}</span>
+                </button>
+                {r.open && (
+                  <div style={{ padding: "2px 16px 10px 42px", display: "flex", flexDirection: "column" }}>
+                    {r.leads.map(l => (
+                      <button key={l.id} type="button" onClick={l.open} title="Open the chat" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto 56px 14px", alignItems: "center", gap: "10px", padding: "7px 8px", border: 0, borderRadius: "8px",
+                        background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }} className="crm4a-row">
+                        <span style={{ fontSize: "13px", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                        {l.status ? <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", height: "20px", padding: "0 8px", borderRadius: "10px", background: l.stBg, color: l.stFg, fontSize: "11.5px", fontWeight: 500, whiteSpace: "nowrap" }}>
+                          {l.stDot && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: l.stDot }} />}{l.status}</span> : <span />}
+                        <span style={{ fontSize: "12px", color: "var(--crm-muted)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{l.when}</span>
+                        <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={12} /></span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

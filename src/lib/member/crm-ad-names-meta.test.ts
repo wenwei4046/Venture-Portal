@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, metaAdInsights } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, metaAdInsights, metaAdDaily } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -152,5 +152,21 @@ describe("an ad's figures from Ads Manager", () => {
   it('answers zeros with no delivery, null for an ad the token cannot see', async () => {
     expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch)).toEqual({ spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 })
     expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
+  })
+})
+
+describe("an ad's figures day by day (Ads Performance's chart, 2026-10-23)", () => {
+  it('keys each day by its date and asks Graph for time_increment=1', async () => {
+    const f = vi.fn(async (_url: string | URL | Request) => new Response(JSON.stringify({ data: [
+      { date_start: '2026-10-20', spend: '10.5', impressions: '300', reach: '200', inline_link_clicks: '4', clicks: '9', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '2' }] },
+      { date_start: '2026-10-21', spend: '7', impressions: '100', reach: '90', inline_link_clicks: '1', clicks: '2' },
+    ] }), { status: 200 })) as unknown as typeof fetch
+    const days = await metaAdDaily('111111', 'T', '2026-10-20', '2026-10-21', f)
+    expect(days).toEqual({ '2026-10-20': { spend: 10.5, impr: 300, reach: 200, clicks: 4, allClicks: 9, msgconv: 2 }, '2026-10-21': { spend: 7, impr: 100, reach: 90, clicks: 1, allClicks: 2, msgconv: 0 } })
+    expect(String((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0])).toContain('time_increment=1')
+  })
+  it('answers null for an ad the token cannot see, or a bad id', async () => {
+    expect(await metaAdDaily('111111', 'T', '2026-10-20', '2026-10-21', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
+    expect(await metaAdDaily('abc', 'T', '2026-10-20', '2026-10-21')).toBeNull()
   })
 })

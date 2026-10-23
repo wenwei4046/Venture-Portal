@@ -42,7 +42,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const saved: Record<string, boolean> = Object.fromEntries(teams.flatMap(t => t.people).map(p => [p.id, p.fullTime]));
   const on = ui.mwt ?? saved;
   const dirty = !!ui.mwt && Object.keys(on).some(id => !!on[id] !== !!saved[id]);
-  const mwtTeams = teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], count: `${t.people.filter(p => on[p.id]).length} of ${t.people.length} full time`,
+  // A team folds to its head (2026-10-23, the owner: "这些名单做可收缩及展开的功能").
+  const mwtTeams = teams.map((t, k) => ({ name: t.name, shut: !!ui.teamShut[t.name], fold: () => set(u => ({ ...u, teamShut: { ...u.teamShut, [t.name]: !u.teamShut[t.name] } })), color: teamColours(k)[0], count: `${t.people.filter(p => on[p.id]).length} of ${t.people.length} full time`,
     people: t.people.map(p => ({ name: p.name, role: jobTitle(p), wt: on[p.id] ? "Full time" : "Part time", wtBg: on[p.id] ? "var(--crm-tint-follow)" : "var(--crm-field)", wtFg: on[p.id] ? "var(--crm-brown)" : "var(--crm-muted)",
       ini: initials(p.name), track: on[p.id] ? "var(--crm-brown)" : "var(--crm-line)", knob: on[p.id] ? 19 : 3,
       toggle: () => set(u => ({ ...u, mwt: { ...(u.mwt ?? saved), [p.id]: !(u.mwt ?? saved)[p.id] }, mwtSaved: false })) })) }));

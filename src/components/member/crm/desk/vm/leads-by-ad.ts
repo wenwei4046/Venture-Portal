@@ -6,7 +6,9 @@
 import type { CrmCustomer } from "@/lib/member/crm-data";
 
 export type LbaPeriod = "month" | "all";
-export interface LbaRow { name: string; team: string; n: number; pct: number }
+/** One lead in a person's list (2026-10-23, the owner: "点成员名单要可以看到他们得到的 list"), newest first. */
+export interface LbaLead { id: string; name: string; at: string }
+export interface LbaRow { who: string; name: string; team: string; n: number; pct: number; leads: LbaLead[] }
 export interface LbaAd { id: string; name: string; total: number; rows: LbaRow[] }
 
 export function leadsByAd(
@@ -17,9 +19,10 @@ export function leadsByAd(
   const inPeriod = (c: CrmCustomer) => new Date(c.createdAt).getTime() >= from;
   const ads = adIds.map(id => {
     const cs = customers.filter(c => c.adId === id && inPeriod(c));
-    const by = new Map<string, number>();
-    cs.forEach(c => by.set(c.assignedTo ?? "", (by.get(c.assignedTo ?? "") ?? 0) + 1));
-    const rows = [...by].map(([who, n]) => ({ name: who ? nameOf(who) : "Not assigned yet", team: who ? teamOf(who) ?? "" : "", n, pct: cs.length ? n / cs.length : 0 }))
+    const by = new Map<string, CrmCustomer[]>();
+    cs.forEach(c => by.set(c.assignedTo ?? "", [...(by.get(c.assignedTo ?? "") ?? []), c]));
+    const rows = [...by].map(([who, list]) => ({ who, name: who ? nameOf(who) : "Not assigned yet", team: who ? teamOf(who) ?? "" : "", n: list.length, pct: cs.length ? list.length / cs.length : 0,
+      leads: list.map(c => ({ id: c.id, name: c.name, at: c.createdAt })).sort((a, b) => b.at.localeCompare(a.at)) }))
       .sort((a, b) => Number(a.name === "Not assigned yet") - Number(b.name === "Not assigned yet") || b.n - a.n || a.name.localeCompare(b.name));
     return { id, name: nameOfAd(id), total: cs.length, rows };
   });

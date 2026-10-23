@@ -6,6 +6,7 @@
  * the dealer is the database's (crm_assign_contact), unchanged.
  */
 import type { CrmAdRule } from "@/lib/member/crm-data";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
 import { urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
 import { first, initials, shortName, teamNameOf } from "./data";
@@ -79,7 +80,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const adIds = [...new Set([...data.customers.map(c => c.adId).filter((x): x is string => !!x), ...added])];
   const adOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id); return { id, label: cs[0]?.ad ?? data.adNames?.[id]?.name ?? `Ad ${id}`, leads: cs.length, wa: !cs.length || cs.some(c => c.channel === "whatsapp") }; };
   const ads = adIds.map(adOf).sort((a, b) => b.leads - a.leads);
-  const statusOf = (_id: string): string | null => null; // Meta's delivery status (waits for the Meta connection, PROPOSALS.md C).
+  // Running · Paused · Pending: Ads Manager's status (crm_ad_names, hourly), else the last lead (adStatusOf; 2026-10-23).
+  const statusOf = (id: string): string | null => adStatusOf(data.adNames?.[id], data.customers.filter(c => c.adId === id).map(c => c.createdAt).sort().at(-1) ?? null, now);
   const adSt = ui.adSt;
   const shownAds = ads.filter(a => adSt === "all" || statusOf(a.id) === adSt);
   const ruleOf = (id: string): CrmAdRule | undefined => data.adRules.find(r => r.adId === id);

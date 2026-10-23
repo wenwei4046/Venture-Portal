@@ -183,11 +183,38 @@ export async function metaAdInsights(adId: string, token: string, since: string,
       headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;
-    const row = (((await res.json()) as { data?: Record<string, unknown>[] }).data ?? [])[0] ?? {};
-    const num = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? Number(v) || 0 : 0);
-    const actions = Array.isArray(row.actions) ? (row.actions as { action_type?: unknown; value?: unknown }[]) : [];
-    const msg = actions.find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
-    return { spend: num(row.spend), impr: num(row.impressions), reach: num(row.reach), clicks: num(row.inline_link_clicks), allClicks: num(row.clicks), msgconv: num(msg?.value) };
+    return figOf((((await res.json()) as { data?: Record<string, unknown>[] }).data ?? [])[0] ?? {});
+  } catch {
+    return null;
+  }
+}
+
+/** One insights row as our figures (messaging conversations started = Meta's 7-day attribution, as Ads Manager shows). */
+function figOf(row: Record<string, unknown>): MetaFig {
+  const num = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? Number(v) || 0 : 0);
+  const actions = Array.isArray(row.actions) ? (row.actions as { action_type?: unknown; value?: unknown }[]) : [];
+  const msg = actions.find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
+  return { spend: num(row.spend), impr: num(row.impressions), reach: num(row.reach), clicks: num(row.inline_link_clicks), allClicks: num(row.clicks), msgconv: num(msg?.value) };
+}
+
+/**
+ * An ad's figures DAY BY DAY over a range (2026-10-23, Ads Performance's chart — the owner: "加一个数据图（参考谷歌广告的成效
+ * 显示）"): Graph's insights with time_increment=1, keyed by the day ("2026-10-21"); a day with no delivery has no row.
+ * Null when the ad cannot be read (the token cannot see it, a timeout).
+ */
+export async function metaAdDaily(adId: string, token: string, since: string, until: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, MetaFig> | null> {
+  if (!AD_ID.test(adId) || !/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  try {
+    const range = encodeURIComponent(JSON.stringify({ since, until }));
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}/insights?fields=spend,impressions,reach,inline_link_clicks,clicks,actions&time_increment=1&limit=500&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const out: Record<string, MetaFig> = {};
+    for (const row of ((await res.json()) as { data?: Record<string, unknown>[] }).data ?? []) {
+      if (typeof row.date_start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date_start)) out[row.date_start] = figOf(row);
+    }
+    return out;
   } catch {
     return null;
   }

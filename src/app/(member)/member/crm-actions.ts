@@ -11,7 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { crmAdNumbers, listMetaAds, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, listMetaAds, metaAdDaily, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -426,6 +426,29 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
       part.forEach((id, k) => { figs[id] = got[k]; });
     }
     return { ok: true, figs };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "Meta's figures could not be read.") };
+  }
+}
+
+/**
+ * The same figures DAY BY DAY, for Ads Performance's chart (2026-10-23, the owner: "加一个数据图（参考谷歌广告的成效显示）"):
+ * ad by ad, keyed by the day (null = one the token cannot see). CRM · Manage; the token stays on the server. At most 40
+ * ads, four asked at a time.
+ */
+export async function fetchAdDaily(ids: string[], since: string, until: string): Promise<{ ok: true; days: Record<string, Record<string, MetaFig> | null> } | { ok: false; error: string }> {
+  try {
+    await session();
+    await requireCrm("manage");
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("Meta is not connected on this server.");
+    const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), days: Record<string, Record<string, MetaFig> | null> = {};
+    for (let i = 0; i < ads.length; i += 4) {
+      const part = ads.slice(i, i + 4);
+      const got = await Promise.all(part.map(id => metaAdDaily(id, token, since, until)));
+      part.forEach((id, k) => { days[id] = got[k]; });
+    }
+    return { ok: true, days };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's figures could not be read.") };
   }
