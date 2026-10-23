@@ -11,7 +11,7 @@ import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -739,147 +739,19 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              {!!(v.splitShut) && (<DeskFoldRail v={v.splitRail} />)}<aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: v.splitShut ? "none" : "flex", flexDirection: "column" }}>
+              {!!(v.splitShut) && (<DeskFoldRail v={v.splitRail} />)}<aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: v.splitShut || !v.paneOn.split ? "none" : "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <DeskAdTabs4a v={v} which="split" />
-                <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 4px" }}>
-                  <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</span>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "42px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-ink)" }}>
-                    {v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ flex: "1", minWidth: "0", margin: "0", padding: "0", border: "0", background: "transparent", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} />) : (<span style={{ flex: "1", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>{v.ad.name}</span>)}
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"></path></svg>
-                  </label>
-                </div>
-                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", overflowX: "hidden", padding: "0 20px 20px", display: "flex", flexDirection: "column" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                    <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>SPLIT METHOD</span>
-                    <div style={{ display: "flex", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                      {(v.adModes).map((o, o_i) => (<Fragment key={o_i}>
-                        {!!(o.on) && (<>
-                          <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "34px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "13.5px", fontWeight: "650", boxShadow: "0 1px 2px rgba(42,22,12,.12)", cursor: "pointer", whiteSpace: "nowrap" }}>{o.label}</button>
-                        </>)}
-                        {!!(o.off) && (<>
-                          <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "34px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "13.5px", fontWeight: "550", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h2}>{o.label}</button>
-                        </>)}
-                      </Fragment>))}
-                    </div>
-                  </div>
-                  {!!(v.adEvenly) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", padding: "18px 0" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "8px", paddingBottom: "8px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", flex: "1" }}>TEAMS</span>
-                        <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}><b style={{ fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.evenTotal}</b> people share equally</span>
-                      </div>
-                      {(v.evenTeams).map((t, t_i) => (<Fragment key={t_i}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-field)" }}>
-                          <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                          </span>
-                          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                            <strong style={{ fontSize: "13.5px", fontWeight: "650" }}>{t.name}</strong>
-                            <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.names}</span>
-                          </span>
-                          <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>Equal share</span>
-                        </div>
-                      </Fragment>))}
-                    </div>
-                  </>)}
-                  {!!(v.adByTeam) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", flex: "1" }}>SPLIT ACROSS TEAMS</span>
-                        <span style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-brown)", fontVariantNumeric: "tabular-nums" }}>100%</span>
-                        <button type="button" onClick={v.resetSplit} style={{ border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }} className={DH.h25}>Reset</button>
-                      </div>
-                      <div style={{ display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden" }}>
-                        {(v.adSplit).map((t, t_i) => (<Fragment key={t_i}>
-                          <span style={{ flex: `${t.pct} 0 0`, background: t.color }}>
-                          </span>
-                        </Fragment>))}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        {(v.adSplit).map((t, t_i) => (<Fragment key={t_i}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "8px 0" }}>
-                            <span style={{ flex: "0 0 132px", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: "650", lineHeight: "1.25", overflowWrap: "anywhere" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                              </span>{t.name}</span>
-                            <span style={{ flex: "1", position: "relative", height: "4px", borderRadius: "2px", background: "var(--crm-field)" }}>
-                              <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: `${t.pct}%`, background: t.color, borderRadius: "2px" }}>
-                              </span>
-                              <span style={{ position: "absolute", top: "50%", left: `${t.pct}%`, width: "16px", height: "16px", margin: "-8px 0 0 -8px", boxSizing: "border-box", borderRadius: "50%", background: "#fff", border: `2px solid ${t.color}`, pointerEvents: "none" }}>
-                              </span>
-                              <input type="range" min="0" max="100" step="5" value={t.pct} onChange={t.onRange} aria-label={`${t.name} share`} style={{ position: "absolute", left: "-8px", right: "-8px", top: "-12px", bottom: "-12px", width: "calc(100% + 16px)", margin: "0", opacity: "0", cursor: "pointer" }} />
-                            </span>
-                            <span style={{ flex: "0 0 64px", height: "34px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
-                              <input type="text" inputMode="decimal" value={t.pctStr} onChange={t.onRange} style={{ width: "50px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
-                              <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>%</span>
-                            </span>
-                          </div>
-                        </Fragment>))}
-                      </div>
-                    </div>
-                    {(v.adTeams).map((t, t_i) => (<Fragment key={t_i}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                          </span>
-                          <strong style={{ flex: "1", fontSize: "14px", fontWeight: "650" }}>{t.name}</strong>
-                          <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{t.share} of leads</span>
-                        </div>
-                        <div style={{ display: "flex", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                          {(t.opts).map((o, o_i) => (<Fragment key={o_i}>
-                            {!!(o.on) && (<>
-                              <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "30px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "12.5px", fontWeight: "650", boxShadow: "0 1px 2px rgba(42,22,12,.12)", cursor: "pointer", whiteSpace: "nowrap" }}>{o.label}</button>
-                            </>)}
-                            {!!(o.off) && (<>
-                              <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "30px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "12.5px", fontWeight: "550", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h2}>{o.label}</button>
-                            </>)}
-                          </Fragment>))}
-                        </div>
-                        {!!(t.evenShut) && (<>
-                          <button type="button" onClick={t.toggleList} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 0", border: "0", background: "transparent", font: "inherit", color: "var(--crm-muted)", textAlign: "left", cursor: "pointer" }} className={DH.h2}>
-                            <span style={{ flex: "1", fontSize: "12.5px" }}>{t.memberCount} members · each gets an equal share</span>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)" }}>Show<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m6 9 6 6 6-6">
-                                </path>
-                              </svg></span>
-                          </button>
-                        </>)}
-                        {!!(t.listShown) && (<>
-                          {!!(t.evenOpen) && (<>
-                            <button type="button" onClick={t.toggleList} style={{ alignSelf: "flex-end", display: "inline-flex", alignItems: "center", gap: "3px", padding: "0", border: "0", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Hide<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m18 15-6-6-6 6">
-                                </path>
-                              </svg></button>
-                          </>)}
-                          <div style={{ display: "flex", flexDirection: "column" }}>
-                            {(t.members).map((m, m_i) => (<Fragment key={m_i}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "44px", padding: "4px 0", borderTop: "1px solid var(--crm-field)" }}>
-                                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                                  <span style={{ fontSize: "13.5px", fontWeight: "600", color: m.locked ? "var(--crm-faint)" : undefined }}>{m.name}</span>
-                                  <span style={{ fontSize: "12px", color: m.subColor }}>{m.sub}</span>
-                                </span>
-                                {!!(m.locked) && (<span aria-label="Locked" style={{ flex: "0 0 auto", width: "56px", height: "32px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>)}{!!(t.field && !m.locked) && (<>
-                                  <span style={{ flex: "0 0 auto", height: "32px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "4px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
-                                    <input type="text" inputMode="numeric" value={m.valueStr} onChange={m.onVal} style={{ width: "28px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
-                                    <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.unit}</span>
-                                  </span>
-                                </>)}
-                              </div>
-                            </Fragment>))}
-                            <span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>
-                          </div>
-                        </>)}
-                      </div>
-                    </Fragment>))}
-                  </>)}
-                </div>
-                <div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
+                <DeskSplit4a v={v} />
+                <div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
                   <button type="button" onClick={v.saveOne4} style={{ flex: "0 0 auto", height: "38px", padding: "0 18px", borderRadius: "7px", border: "0", background: "var(--crm-rust)", font: "500 13px Inter, sans-serif", color: "#fff", cursor: "pointer" }} className="crm4a-primary">Save</button>
                   <button type="button" onClick={v.saveAll4} style={{ flex: "1", height: "38px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">{v.applyLabel}</button>
                 </div>
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              {!(v.perfShut) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
+              {!!(v.paneOn.perf) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragPerf} onDoubleClick={v.resetPerf} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <DeskAdTabs4a v={v} which="perf" />
@@ -983,9 +855,9 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </path>
                     </svg></button>
                 </div>
-              </aside></>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}
-              {!!(v.adLogClosed) && (<DeskFoldRail v={{ title: "Audit log", open: v.adLogToggle }} />)}
-              {!!(v.adLogOpen) && (<>
+              </aside></>)}
+              
+              {!!(v.paneOn.audit) && (<>
                 <aside className={DX.slideIn} style={v.adLogStyle}>
                   <div onPointerDown={v.dragAudit} onDoubleClick={v.resetAudit} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                   </div>

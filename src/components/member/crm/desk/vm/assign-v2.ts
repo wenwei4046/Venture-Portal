@@ -106,7 +106,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   // the page is narrow, opening it folds Ad performance to its strip so the two never cover each other. White, lifted
   // off the sand of Ad performance by its shadow.
   const perfShut = ui.adPerfShut || (logOpen && !dock);
-  const adLogStyle: CSSProperties = { position: "relative", flex: `0 1 ${frame.sheetW}px`, width: frame.sheetW, minWidth: 220, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", boxShadow: "-10px 0 24px rgba(42,22,12,.08)", display: "flex", flexDirection: "column" };
+  const adLogStyle: CSSProperties = { position: "relative", flex: `0 1 ${frame.sheetW}px`, width: frame.sheetW, minWidth: 220, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" };
 
   // ── Member work type's Audit log: full time / part time changes (crm_staff.full_time).
   const mwtEv: LogEv[] = hist.filter(h => h.table === "crm_staff" && (h.op !== "UPDATE" || h.changes.some(c => c.field === "Full time")))
@@ -201,7 +201,11 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     // 2026-10-18: "ads performance, audit log 分开"); both start folded so the split keeps its room.
     perfShut, perfFold: () => patch({ adPerfShut: true }),
     // Split folds to its strip too (2026-10-22, the owner: "做可收缩式").
-    splitShut: !!ui.adSplitShut, splitFold: () => patch({ adSplitShut: true }), splitRail: { title: "Split", open: () => patch({ adSplitShut: false }) },
+    splitShut: !!ui.adSplitShut, splitFold: () => patch({ adSplitShut: true }),
+    // v2 frame 06 (note 04 / 08): Split, Ad performance and the Audit log are one panel's three tabs; › folds it to the rail.
+    paneOn: { split: (ui.adPane ?? "split") === "split", perf: ui.adPane === "perf", audit: ui.adPane === "audit" },
+    adPanes: ([["split", "Split"], ["perf", "Ad performance"], ["audit", "Audit log"]] as const).map(([k, label]) => ({ label, on: (ui.adPane ?? "split") === k, pick: () => patch({ adPane: k }) })),
+    splitRail: { title: ui.adPane === "perf" ? "Ad performance" : ui.adPane === "audit" ? "Audit log" : "Split", open: () => patch({ adSplitShut: false }) },
     perfRail: { title: "Ad performance", open: () => patch({ adPerfShut: false, ...(dock ? {} : { adLog: false }) }) },
     adLogOpen: logOpen, adLogClosed: !logOpen, adLogToggle: () => patch({ adLog: !logOpen }), adLog: adL.rows, adLogRail: adL.rail, adLogStyle,
     mwtLogOpen: mwtOpen, mwtLogClosed: mwtShow && !mwtOpen, mwtLogW: ui.mwtLogW ?? 280, mwtLogToggle: () => patch({ mwtLog: !ui.mwtLog }), mwtLog: mwtL.rows, mwtLogRail: mwtL.rail,

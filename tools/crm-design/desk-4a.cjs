@@ -288,6 +288,20 @@ module.exports = function desk4a(body) {
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: customer form");
     body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
   }
+  // v2 frame 06 (2026-10-23, note 04 / 06 / 08): Split, Ad performance and Audit log are ONE panel with three tabs
+  // (DeskAdTabs4a), one shown at a time (v.paneOn) — the two strips they folded to are gone; › folds the whole panel to
+  // the 44 px rail. Split's body is Desk4a.tsx › DeskSplit4a: team rows with a slider under each and an 84 px box.
+  body = once(body, "{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}", "", "v2 perf strip");
+  body = once(body, '{!!(v.adLogClosed) && (<DeskFoldRail v={{ title: "Audit log", open: v.adLogToggle }} />)}', "", "v2 audit strip");
+  body = once(body, "{!(v.perfShut) && (<><aside style={{ position: \"relative\", flex: `0 1 ${v.perfW}px`", "{!!(v.paneOn.perf) && (<><aside style={{ position: \"relative\", flex: `0 1 ${v.perfW}px`", "v2 perf pane");
+  body = once(body, "{!!(v.adLogOpen) && (<>\n                <aside className={DX.slideIn} style={v.adLogStyle}>", "{!!(v.paneOn.audit) && (<>\n                <aside className={DX.slideIn} style={v.adLogStyle}>", "v2 audit pane");
+  body = once(body, 'display: v.splitShut ? "none" : "flex"', 'display: v.splitShut || !v.paneOn.split ? "none" : "flex"', "v2 split pane");
+  {
+    const start = '<DeskAdTabs4a v={v} which="split" />', a = body.indexOf(start);
+    const end = '<div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>', b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: split body");
+    body = body.slice(0, a) + start + "\n                <DeskSplit4a v={v} />\n                " + '<div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>' + body.slice(b + end.length);
+  }
   return body;
 };
 module.exports.el = el;

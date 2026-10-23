@@ -75,7 +75,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "assignment", "forms", "adsperf"].includes(tab) && tab !== "adsperf" ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "assignment", "forms", "adsperf"].includes(tab) && tab !== "adsperf" ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -131,6 +131,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },
     // Reports (2026-10-23): its categories as the head's tabs, Export CSV of the one on screen.
-    reports: { tabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.canCsv ? { label: "Export CSV", icon: "download", act: v.reports.csv } : null },
+    // v2 frame 12: the categories are the second row of tabs; Ads performance is frame 05's body and its Export menu.
+    reports: { tabs: [], subTabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.cats.find(c => c.on)?.label === "Ads performance"
+      ? { label: "Export", icon: "download", act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } }
+      : v.reports?.canCsv ? { label: "Export", icon: "download", act: v.reports.csv } : null },
   };
 }

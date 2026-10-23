@@ -116,6 +116,10 @@ export interface DeskUi {
   splitTyping: { id: string; text: string } | null;
   /** Ads to teams' Split folded to its strip. */
   adSplitShut: boolean;
+  /** The ad panel's tab (v2 frame 06): Split · Ad performance · Audit log, one panel. */
+  adPane: "split" | "perf" | "audit";
+  /** Split rows set by hand (note 06: dragging one re-balances only the rows not touched) and the teams opened to their people. */
+  splitTouched: string[]; splitOpen: Record<string, boolean>; mvTyping: { key: string; text: string } | null;
   /** Assignment › Leads by ad: this month or all time. */
   lbaPer: "month" | "all";
   /** Leads by ad: an ad's card folded (by ad id), a person's list of leads opened ("ad|person"). */
@@ -216,7 +220,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

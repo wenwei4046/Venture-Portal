@@ -1,8 +1,6 @@
 H
 W
 actVM
-ad
-adByTeam
 adCalApply
 adCalBack
 adCalDays
@@ -12,16 +10,11 @@ adCalList
 adCalOpen
 adCards
 adCosts
-adEvenly
 adFunnel
 adGrid
 adList
 adLog
-adLogClosed
-adLogOpen
 adLogStyle
-adLogToggle
-adModes
 adNone
 adNoneW
 adOpen
@@ -30,9 +23,7 @@ adPerLabel
 adPerOpen
 adPerOpts
 adPerToggle
-adSplit
 adSum
-adTeams
 addAd
 alertsP
 apCmpLabel
@@ -210,8 +201,6 @@ emojiToggle
 emptyHint
 emptyIcon
 emptyText
-evenTeams
-evenTotal
 f4
 firstDay
 frameRadius
@@ -347,11 +336,10 @@ pagePad
 paneDrag
 paneEmpty
 paneFull
+paneOn
 paneShown
 paneStyle
 people
-perfRail
-perfShut
 perfW
 personChats
 ph
@@ -376,7 +364,6 @@ resetMwtLog
 resetPane
 resetPerf
 resetSheet
-resetSplit
 returnApp
 saveAll4
 saveMetrics

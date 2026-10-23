@@ -1294,19 +1294,142 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
   );
 }
 
-/** Frame 06 · each docked panel's head — Split (× closes the ad), Ad performance and Audit log (» folds each to its strip):
- *  three panels side by side, as the Inbox's Customer info and Audit log (the owner, 2026-10-18: "ads performance, audit log 分开"). */
-export function DeskAdTabs4a({ v, which }: { v: { closeAd: () => void; perfFold: () => void; adLogToggle: () => void; splitFold?: () => void; ad?: { name?: string } | null }; which: "split" | "perf" | "audit" }) {
-  const title = which === "split" ? "Split" : which === "perf" ? "Ad performance" : "Audit log";
-  const act = which === "split" ? v.closeAd : which === "perf" ? v.perfFold : v.adLogToggle;
+/** Frame 06 (v2, note 04 / 08): the ad panel's head — Split · Ad performance · Audit log as underline tabs, then the 24 px
+ *  collapse (folds the panel to the 44 px rail) and × (closes the ad). The three were side-by-side panels until v2. */
+export function DeskAdTabs4a({ v }: { v: { closeAd: () => void; splitFold?: () => void; adPanes?: F4TabLike[] }; which?: "split" | "perf" | "audit" }) {
   return (
-    <div style={{ flex: "none", height: "48px", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 0 24px", borderBottom: "1px solid var(--crm-rule)" }}>
-      <span style={{ font: `500 15px ${TIGHT}`, color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{title}</span>
-      {which === "audit" && v.ad?.name && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{v.ad.name}</span>}
-      {which === "split" && v.splitFold && <button type="button" onClick={v.splitFold} title="Fold Split" aria-label="Fold Split" style={{ ...BTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5" /></svg></button>}
-      <button type="button" onClick={act} title={which === "split" ? "Close (Esc)" : `Fold ${title}`} aria-label={which === "split" ? "Close" : `Fold ${title}`} style={{ ...BTN, marginLeft: which === "split" && v.splitFold ? "0" : "auto", display: "flex", color: "var(--crm-faint)" }}>
-        {which === "split" ? <Ic name="x" size={16} /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 17 5-5-5-5M6 17l5-5-5-5" /></svg>}
-      </button>
+    <div style={{ flex: "none", display: "flex", gap: "22px", padding: "14px 24px 0", font: "500 13px Inter, sans-serif", borderBottom: "1px solid var(--crm-rule)" }}>
+      {(v.adPanes ?? []).map(t => (
+        <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "6px 0 10px", font: "inherit", whiteSpace: "nowrap", marginBottom: "-1px",
+          borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>
+      ))}
+      <span style={{ marginLeft: "auto", alignSelf: "center", display: "flex", gap: "8px", paddingBottom: "4px" }}>
+        {v.splitFold && <CollapseBtn4a onClick={v.splitFold} />}
+        <button type="button" onClick={v.closeAd} title="Close (Esc)" aria-label="Close" style={{ ...BTN, width: "16px", height: "16px", alignSelf: "center", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={16} /></button>
+      </span>
+    </div>
+  );
+}
+type F4TabLike = { label: string; on: boolean; pick: () => void };
+
+interface SplitBits {
+  ad: { name: string; headline: string; canName: boolean; nameDraft: string; onName: (e: { target: { value: string } }) => void; saveName: () => void; nameKey: (e: { key: string; currentTarget: { blur(): void } }) => void };
+  adModes: { label: string; on: boolean; pick: () => void }[];
+  evenTeams: { name: string; color: string; names: string }[];
+  split4: null | { total: string; ok: boolean; rows: {
+    id: string; name: string; color: string; sub: string; subColor: string; pct: number; pctStr: string; onType: (e: { target: { value: string } }) => void;
+    open: boolean; toggle: () => void; modes: { label: string; on: boolean; pick: () => void }[]; isPct: boolean; isMax: boolean; unit: string; note: string;
+    members: { id: string; name: string; locked: boolean; val: number; pctW: number; valStr: string; onType: (e: { target: { value: string } }) => void }[];
+  }[] };
+}
+
+/** A share's slider (note 06): a 4 px track, the fill and the thumb's ring in the row's colour; drags in steps of .5 (typing in
+ *  the box allows decimals). The thumb stays inside the track. */
+function SplitSlider({ pct, color, thumb, onChange, label }: { pct: number; color: string; thumb: number; onChange: (e: { target: { value: string } }) => void; label: string }) {
+  const p = Math.max(0, Math.min(100, pct));
+  return (
+    <div style={{ position: "relative", height: "16px", display: "flex", alignItems: "center", cursor: "pointer" }}>
+      <span style={{ flex: 1, height: "4px", borderRadius: "2px", background: "var(--crm-track-2)", position: "relative" }}>
+        <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${p}%`, borderRadius: "2px", background: color }} />
+      </span>
+      <span style={{ position: "absolute", left: `calc(${p}% - ${(thumb * p) / 100}px)`, width: `${thumb}px`, height: `${thumb}px`, borderRadius: "50%", background: "#fff", border: `2px solid ${color}`, boxSizing: "border-box", boxShadow: "0 1px 3px rgba(42,22,12,.2)", pointerEvents: "none" }} />
+      <input type="range" min="0" max="100" step="0.5" value={p} onChange={onChange} aria-label={label} style={{ position: "absolute", inset: "-6px 0", width: "100%", margin: 0, opacity: 0, cursor: "pointer" }} />
+    </div>
+  );
+}
+
+/** The % / max box (note 04): 84 px, right-aligned, the unit inside. Teams 34 px tall, people 26. */
+function SplitBox({ value, unit, onChange, small, label }: { value: string; unit: string; onChange: (e: { target: { value: string } }) => void; small?: boolean; label: string }) {
+  return (
+    <label style={{ marginLeft: small ? 0 : "auto", flex: "none", width: "84px", height: small ? "26px" : "34px", padding: "0 10px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px",
+      boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", font: `500 ${small ? 13 : 14}px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
+      <input type="text" inputMode={unit === "%" ? "decimal" : "numeric"} value={value} onChange={onChange} aria-label={label}
+        style={{ width: "100%", minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "inherit", color: "inherit", textAlign: "right" }} />
+      <span style={{ color: "var(--crm-faint)", fontSize: small ? "11px" : "12px" }}>{unit}</span>
+    </label>
+  );
+}
+
+/** Frame 06 · the Split tab's body (v2): the ad's name (typed in place) and Meta's headline, Evenly | By team, then every team —
+ *  the director's row first — with its line, an 84 px box and a slider under it; a team opens (its name) to its own Evenly ·
+ *  By % · By max and its people. Total last. The body scrolls; Save sits in the panel's foot. */
+export function DeskSplit4a({ v }: { v: SplitBits }) {
+  const S = v.split4;
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "14px", padding: "18px 24px", overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</div>
+        <label style={{ height: "42px", padding: "0 12px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-ink)", font: `500 16px ${TIGHT}`, color: "var(--crm-ink)" }}>
+          {v.ad.canName
+            ? <input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120}
+                style={{ flex: 1, minWidth: 0, margin: 0, padding: 0, border: 0, outline: "none", background: "transparent", font: "inherit", color: "inherit" }} />
+            : <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</span>}
+          <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-muted)" }}><Ic name="pencil" size={15} /></span>
+        </label>
+        {v.ad.headline && <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Meta sends only the headline: “{v.ad.headline}”.</div>}
+      </div>
+      <div style={{ display: "flex", padding: "3px", borderRadius: "8px", background: "var(--crm-field)" }}>
+        {v.adModes.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center",
+          font: "500 13px Inter, sans-serif", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)", background: o.on ? "#fff" : "transparent", boxShadow: o.on ? "0 1px 3px rgba(42,22,12,.12)" : "none" }}>{o.label}</button>)}
+      </div>
+      {!S && (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {v.evenTeams.map(t => (
+            <div key={t.name} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "11px 0", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+              <span style={{ width: "9px", height: "9px", borderRadius: "2px", flex: "none", background: t.color }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+                <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.names}</span>
+              </div>
+              <span style={{ marginLeft: "auto", flex: "none", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Equal share</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {S && (<>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {S.rows.map(r => (
+            <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "11px 0", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                <span style={{ width: "9px", height: "9px", borderRadius: "2px", flex: "none", background: r.color }} />
+                <button type="button" onClick={r.toggle} aria-expanded={r.open} title={r.open ? "Hide its people" : "Show its people"} style={{ ...BTN, display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+                  <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                  <span style={{ font: "400 11px Inter, sans-serif", color: r.subColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.sub}</span>
+                </button>
+                <SplitBox value={r.pctStr} unit="%" onChange={r.onType} label={`${r.name} share`} />
+              </div>
+              <div style={{ paddingLeft: "19px" }}><SplitSlider pct={r.pct} color={r.color} thumb={14} onChange={r.onType} label={`${r.name} share`} /></div>
+              {r.open && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingLeft: "19px" }}>
+                  <div style={{ display: "flex", gap: "16px", font: "500 12px Inter, sans-serif" }}>
+                    {r.modes.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, paddingBottom: "3px", font: "inherit",
+                      borderBottom: `2px solid ${o.on ? "var(--crm-rust)" : "transparent"}`, color: o.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{o.label}</button>)}
+                  </div>
+                  {r.members.map(m => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", font: "400 13px Inter, sans-serif", color: m.locked ? "var(--crm-faint)" : "var(--crm-ink-soft)" }}>
+                      <span style={{ flex: "none", width: "92px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        {r.isPct && !m.locked && <SplitSlider pct={m.pctW} color="var(--crm-rust)" thumb={12} onChange={m.onType} label={`${m.name} share`} />}
+                        {m.locked && <span style={{ font: "400 12px Inter, sans-serif" }}>Locked · no new leads</span>}
+                      </span>
+                      {m.locked
+                        ? <span aria-label="Locked" style={{ flex: "none", width: "84px", display: "flex", justifyContent: "flex-end", color: "var(--crm-faint)" }}><Ic name="lock" size={14} /></span>
+                        : r.isPct || r.isMax ? <SplitBox small value={m.valStr} unit={r.unit} onChange={m.onType} label={`${m.name} ${r.isMax ? "most leads" : "share"}`} />
+                        : <span style={{ flex: "none", width: "84px", textAlign: "right", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Equal share</span>}
+                    </div>
+                  ))}
+                  {r.note && <div style={{ font: "500 12px Inter, sans-serif", color: r.note.includes("needs") ? "var(--crm-oxblood)" : "var(--crm-muted)" }}>{r.note}</div>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
+          Total
+          <span style={{ marginLeft: "auto", font: `500 16px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: S.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{S.total}%</span>
+          <span style={{ display: "flex", color: S.ok ? "var(--crm-brown)" : "var(--crm-oxblood)" }}><Ic name={S.ok ? "circle-check" : "triangle-alert"} size={15} /></span>
+        </div>
+      </>)}
     </div>
   );
 }

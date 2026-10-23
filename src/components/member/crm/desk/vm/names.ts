@@ -11,3 +11,6 @@ export const titleName = (name: string) => name.toLowerCase().replace(/(^|[^\p{L
 const person = <P extends CrmPerson>(p: P): P => ({ ...p, name: titleName(p.name) });
 export const titleData = (d: CrmData): CrmData => ({ ...d, people: d.people.map(person) });
 export const titleTeams = (ts: Team[]): Team[] => ts.map(t => ({ ...t, name: titleName(t.name), who: titleName(t.who).replace(/\bTl\b/g, "TL"), tl: person(t.tl), people: t.people.map(person) }));
+/** A team's own lead as the v2 design writes it after the team ("TL Priya Menon"): its TL, or the person heading a team of
+ *  their own. (`who` names the Senior TL above where there is one — the phone's line.) */
+export const teamLead = (t: Pick<Team, "tl" | "who">) => (t.tl ? (t.tl.role === "tl" ? `TL ${t.tl.name}` : t.tl.name) : t.who);

@@ -6,7 +6,6 @@
  * & status their figures over cards of bars. A period for the last three.
  */
 import type { ComponentProps, CSSProperties } from "react";
-import { Ic } from "../shared/icons4a";
 import { DeskAdsTable4a } from "./Desk4a";
 import { DeskLeadsByAd } from "./DeskExtras";
 import type { reportsVM } from "./vm/reports-page";
@@ -93,18 +92,10 @@ function SalesTable({ s }: { s: R["sales"] }) {
   );
 }
 
-export function DeskReports({ r, ads, lba }: { r: R; ads: AdsV; lba: LbaV }) {
+export function DeskReports({ r, lba }: { r: R; ads?: AdsV; lba: LbaV }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
-      {r.cat === "ads" && (<>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          <Seg opts={ads.ap4.tabs.filter(t => !t.custom)} />
-          <button type="button" onClick={r.openAds} style={{ ...BTN, marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", font: "500 13px Inter, sans-serif", color: "var(--crm-rust)" }}>
-            Open Ads Performance for dates, filters and export<Ic name="chevron-right" size={13} />
-          </button>
-        </div>
-        <DeskAdsTable4a v={ads} />
-      </>)}
+      {/* Ads performance (v2 frame 12) is Ads Performance's own body — toolbar, chart, table, pager — drawn by kAdsPerf. */}
       {r.cat === "lba" && <div style={{ display: "flex", flexDirection: "column", gap: "22px", paddingTop: "10px" }}><DeskLeadsByAd v={lba} /></div>}
       {(r.cat === "sales" || r.cat === "appt" || r.cat === "src") && <Seg opts={r.periods} />}
       {r.cat === "sales" && <SalesTable s={r.sales} />}
