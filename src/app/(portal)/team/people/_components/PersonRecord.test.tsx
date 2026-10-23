@@ -195,7 +195,7 @@ describe('Employment Status', () => {
     openEditor()
     const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
     expect(status).toHaveValue('permanent')
-    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Permanent', 'Part time'])
+    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Contract', 'Permanent', 'Part time'])
     expect(screen.queryByLabelText('Probation period')).toBeNull()
     fireEvent.change(status, { target: { value: 'probation' } })
     expect(screen.getByLabelText('Probation period')).toHaveValue('3')
@@ -219,6 +219,28 @@ describe('Employment Status', () => {
     expect(Array.from(months.options).map(o => o.value)).toEqual(['1', '2', '3', '4', '5', '6', '9'])
     fireEvent.change(months, { target: { value: '6' } })
     expect(await save()).toEqual({ employment_status: 'probation', probation_months: '6' })
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('edited: Contract brings its period — 12 months to start, 6 to 36 — sent with its status, the probation’s not', async () => {
+    openEditor()
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    fireEvent.change(status, { target: { value: 'contract' } })
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months).toHaveValue('12')
+    expect(Array.from(months.options).map(o => o.value)).toEqual(['6', '12', '18', '24', '30', '36'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    fireEvent.change(months, { target: { value: '24' } })
+    expect(await save()).toEqual({ employment_status: 'contract', contract_months: '24' })
+  })
+
+  it('a contract’s period changed alone goes with its status', async () => {
+    openEditor(view(), editor({ employment_status: 'contract', contract_months: 12 }))
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months).toHaveValue('12')
+    fireEvent.change(months, { target: { value: '18' } })
+    expect(await save()).toEqual({ employment_status: 'contract', contract_months: '18' })
   })
 
   it('nothing changed, nothing of it is sent', async () => {

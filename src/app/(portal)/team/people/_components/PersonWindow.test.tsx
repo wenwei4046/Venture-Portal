@@ -120,6 +120,12 @@ describe('the window’s employment chip', () => {
     expect((await open(card({}, { employment_status: null }))).dialog).toHaveTextContent('Not set')
   })
 
+  // Contract (2026-10-24): names its end too.
+  it('a contract names its end', async () => {
+    const { dialog } = await open(card({}, { employment_status: 'contract', contract_months: 12, contract_end: '2027-09-30' }))
+    expect(dialog).toHaveTextContent('Contract · ends 30 Sep 2027')
+  })
+
   it('an inactive person keeps Resigned', async () => {
     const { dialog } = await open(card({ active: false, resignedOn: '30 Sep 2026' }, { employment_status: 'permanent' }))
     expect(dialog).toHaveTextContent('Resigned 30 Sep 2026')

@@ -45,6 +45,8 @@ import { EMPTY_ADDRESS, addressOf, addressRefusal, isEmptyAddress, sameAddress, 
 import { addressFormEntries } from '@/lib/address/address-form'
 import { loadMalaysia } from '@/lib/address/malaysia'
 import {
+  CONTRACT_MONTH_CHOICES,
+  DEFAULT_CONTRACT_MONTHS,
   DEFAULT_PROBATION_MONTHS,
   EMPLOYMENT_STATUSES,
   EMPLOYMENT_STATUS_LABEL,
@@ -467,6 +469,7 @@ export default function PersonRecord({
                   <EmploymentStatusField
                     current={e.staff.employment_status ?? null}
                     months={e.staff.probation_months ?? null}
+                    contractMonths={e.staff.contract_months ?? null}
                     onSwitch={() => {
                       if (form.current) setChanged(changedFields(form.current))
                     }}
@@ -969,25 +972,30 @@ function UplineField({ current, groups }: { current: string | null; groups: Upli
 }
 
 /**
- * Employment Status (2026-10-23): Probation, Permanent or Part time — a probation with its period beside it. "— Not
- * set" is offered only while it is (a record filed before the status existed). The two are saved together whenever
- * either changed (lib/person-record.ts › SAVED_TOGETHER); `onSwitch` counts the changes again once the period comes
- * or goes.
+ * Employment Status (2026-10-23): Probation, Contract, Permanent or Part time — a probation or a contract (2026-10-24)
+ * with its period beside it. "— Not set" is offered only while it is (a record filed before the status existed). The
+ * three are saved together whenever any changed (lib/person-record.ts › SAVED_TOGETHER); `onSwitch` counts the changes
+ * again once a period comes or goes.
  */
-function EmploymentStatusField({ current, months, onSwitch }: { current: EmploymentStatus | null; months: number | null; onSwitch: () => void }) {
+function EmploymentStatusField({ current, months, contractMonths, onSwitch }: {
+  current: EmploymentStatus | null; months: number | null; contractMonths: number | null; onSwitch: () => void
+}) {
   const [status, setStatus] = useState<string>(current ?? '')
   const onProbation = status === 'probation'
+  const onContract = status === 'contract'
   const statusDirty = useChanged('employment_status')
   const monthsDirty = useChanged('probation_months')
+  const contractDirty = useChanged('contract_months')
   const switched = useRef(false)
   useLayoutEffect(() => {
     if (switched.current) onSwitch()
     switched.current = true
-    // Only when the period comes or goes.
+    // Only when a period comes or goes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onProbation])
+  }, [onProbation, onContract])
   // An extended probation may run past the periods Add Staff offers: theirs stays a choice.
   const periods = [...new Set<number>([...PROBATION_MONTH_CHOICES, ...(months ? [months] : [])])].sort((a, b) => a - b)
+  const contractPeriods = [...new Set<number>([...CONTRACT_MONTH_CHOICES, ...(contractMonths ? [contractMonths] : [])])].sort((a, b) => a - b)
   return (
     <span className={s.pair}>
       <Select
@@ -1015,6 +1023,22 @@ function EmploymentStatusField({ current, months, onSwitch }: { current: Employm
           aria-label="Probation period"
         >
           {periods.map(n => (
+            <option key={n} value={String(n)}>
+              {monthsLabel(n)}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+      {onContract ? (
+        <Select
+          id={fieldId('contract_months')}
+          name="contract_months"
+          defaultValue={String(contractMonths ?? DEFAULT_CONTRACT_MONTHS)}
+          data-dirty={contractDirty}
+          className={s.select}
+          aria-label="Contract period"
+        >
+          {contractPeriods.map(n => (
             <option key={n} value={String(n)}>
               {monthsLabel(n)}
             </option>

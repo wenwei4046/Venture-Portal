@@ -196,14 +196,20 @@ export default function PersonWindow({
   )
 }
 
-/** Their employment's chip — a probation's names its end ("Probation · ends 31 Dec 2026"), which the window has room for. */
+/**
+ * Their employment's chip — a probation's or a contract's names its end ("Probation · ends 31 Dec 2026", "Contract · ends
+ * 30 Sep 2027"), which the window has room for.
+ */
 function EmploymentChip({ staff }: { staff: PersonCardData['staff'] }) {
   const end = staff.employment_status === 'probation' ? (staff.probation_end ?? null) : null
+  const contractEnd = staff.employment_status === 'contract' ? (staff.contract_end ?? null) : null
   const chip = statusChip(
-    { status: staff.employment_status, probationEnd: end, probationAcked: !!end && staff.probation_ack_end === end, ackName: staff.probation_ack_name },
+    { status: staff.employment_status, probationEnd: end, probationAcked: !!end && staff.probation_ack_end === end, ackName: staff.probation_ack_name, contractEnd },
     officeToday(),
   )
-  const label = chip.label === 'Probation' && end ? `Probation · ends ${dayLabel(end)}` : chip.label
+  const label = chip.label === 'Probation' && end ? `Probation · ends ${dayLabel(end)}`
+    : chip.label === 'Contract' && contractEnd ? `Contract · ends ${dayLabel(contractEnd)}`
+    : chip.label
   return (
     <Chip tone={chip.tone} style={{ gap: 5, fontSize: 10.5 }} title={chip.title}>
       {label}

@@ -122,6 +122,7 @@ clSorts
 clistEmpty
 clistN
 clistRows
+closeAd
 closeAw
 closeFt
 closeMenu

@@ -745,6 +745,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 <DeskAdTabs4a v={v} which="split" />
                 <DeskSplit4a v={v} />
                 <div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
+                  <button type="button" onClick={v.closeAd} style={{ flex: "0 0 auto", height: "38px", padding: "0 16px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">Cancel</button>
                   <button type="button" onClick={v.saveOne4} style={{ flex: "0 0 auto", height: "38px", padding: "0 18px", borderRadius: "7px", border: "0", background: "var(--crm-rust)", font: "500 13px Inter, sans-serif", color: "#fff", cursor: "pointer" }} className="crm4a-primary">Save</button>
                   <button type="button" onClick={v.saveAll4} style={{ flex: "1", height: "38px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">{v.applyLabel}</button>
                 </div>

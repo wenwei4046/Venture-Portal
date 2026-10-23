@@ -42,9 +42,10 @@ export interface RawStaffForm {
    * employment status.
    */
   hireDate?: string | null
-  /** Probation, Permanent or Part time (2026-10-23) — and, for a probation, its period in months. */
+  /** Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — and, for a probation or a contract, its period in months. */
   employmentStatus?: string | null
   probationMonths?: string | null
+  contractMonths?: string | null
   basicSalary?: string | null
   allowances?: string | null
   nonStatutoryAllowance?: string | null
@@ -68,6 +69,7 @@ export interface ValidStaffForm {
   hireDate: string
   employmentStatus: EmploymentStatus
   probationMonths: number | null
+  contractMonths: number | null
   employmentType: StaffEmploymentType
   basicSalary: number
   allowances: number
@@ -118,7 +120,7 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
 
   const hireDate = clean(raw.hireDate)
   if (!hireDate || !isCalendarDay(hireDate)) throw new Error('Pick the hire date')
-  const status = statusColumns(raw.employmentStatus, raw.probationMonths)
+  const status = statusColumns(raw.employmentStatus, raw.probationMonths, raw.contractMonths)
 
   const fullCommission = raw.fullCommission === true
   // The form offers one tick or the other, never both; should both arrive,
@@ -151,6 +153,7 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     hireDate,
     employmentStatus: status.employment_status,
     probationMonths: status.probation_months,
+    contractMonths: status.contract_months,
     employmentType: fullCommission ? 'commission_eligible' : variablePay ? 'variable' : 'salaried',
     basicSalary,
     allowances,
@@ -291,6 +294,9 @@ export interface StaffRow {
   employment_status?: EmploymentStatus | null
   probation_months?: number | null
   probation_end?: string | null
+  /** A contract's period and its last day (2026-10-24, mig 20261025013000 — the database's, generated). */
+  contract_months?: number | null
+  contract_end?: string | null
   probation_ack_end?: string | null
   probation_ack_name?: string | null
   probation_ack_at?: string | null

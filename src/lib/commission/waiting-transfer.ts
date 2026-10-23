@@ -86,9 +86,13 @@ export interface TransferInput {
   titleId: string
   reportsTo: string | null
   hireDate: string
-  /** Probation, Permanent or Part time (2026-10-23) — '' until picked — and a probation's period in months. */
+  /**
+   * Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — '' until picked — and a
+   * probation's or a contract's period in months.
+   */
   employmentStatus: string
   probationMonths: number | null
+  contractMonths: number | null
   nric: string
   bankName: string
   bankAccountNo: string
@@ -119,7 +123,7 @@ export function transferRefusal(input: TransferInput): string | null {
   if (!input.titleId) return 'Pick the joining title.'
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.hireDate)) return 'Pick the hire date.'
   try {
-    statusColumns(input.employmentStatus, input.probationMonths)
+    statusColumns(input.employmentStatus, input.probationMonths, input.contractMonths)
   } catch (e) {
     return e instanceof Error ? e.message : 'Pick the employment status.'
   }

@@ -245,10 +245,13 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       infotech_code: row.infotech_code ?? null,
       hire_date: row.hire_date ?? null,
       resignation_date: row.resignation_date ?? null,
-      // Probation, Permanent or Part time (2026-10-23) — the staff table's; a directory row carries none (undefined).
+      // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — the staff table's; a directory
+      // row carries none (undefined).
       employment_status: row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status),
       probation_months: row.probation_months ?? null,
       probation_end: row.probation_end ?? null,
+      contract_months: row.contract_months ?? null,
+      contract_end: row.contract_end ?? null,
       probation_ack_end: row.probation_ack_end ?? null,
       probation_ack_name: row.probation_ack_name ?? null,
       probation_ack_at: row.probation_ack_at ?? null,

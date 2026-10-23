@@ -325,6 +325,9 @@ function teamInbox(body) {
     `gap: "8px", fontSize: "${F(12)}", lineHeight: "16px" }}>`, "team card foot");
   b = once(b, 'display: "flex", alignItems: "center", gap: "6px", fontWeight: "600", color: "var(--crm-ink)" }}>', 'display: "flex", alignItems: "center", gap: "8px", fontWeight: "400", color: r.toAssign ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>', "team card owner");
   b = once(b, '<span style={{ flex: "none", fontWeight: "700", color: r.uc, whiteSpace: "nowrap" }}>{r.state}</span>', '<span style={{ flex: "none", fontWeight: "400", color: r.uc, whiteSpace: "nowrap" }}>{r.state}</span>', "team card state");
+  // The status tabs wrap onto a second line rather than slide (the owner, 2026-10-24: "還是能移動"), as the desktop's do.
+  b = once(b, '<div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "20px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>',
+    '<div style={{ flex: "0 0 auto", display: "flex", flexWrap: "wrap", columnGap: "16px", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>', "team status tabs wrap");
   // The board shows the status picked above it, full width, and no longer pans sideways (the owner, 2026-10-24: "怎麼可以隨意
   // 拖動" — the tabs and the board's columns drifted apart).
   b = once(b, '<div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden",',

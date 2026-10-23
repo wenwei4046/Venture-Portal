@@ -173,6 +173,13 @@ describe('a column head sorts each band', () => {
     expect(order({ key: 'employment', dir: 'asc' })).toEqual(['GONE', 'INTERN', 'ANTHONY', 'CHEA HUAN', 'Bella', 'zack'])
   })
 
+  // Contract (2026-10-24): the other status with an end — right after probation.
+  it('Employment: a contract comes right after the probations', () => {
+    const withContract = [...band, sp({ name: 'CONTRACTOR', code: 'HV031', title: 'Revenue Specialist', levelRank: 3, employmentStatus: 'contract', hireDate: '2026-10-10' })]
+    expect(withContract.sort(rosterCompare({ key: 'employment', dir: 'desc' }, compareByLadder)).map(p => p.name))
+      .toEqual(['zack', 'CONTRACTOR', 'Bella', 'CHEA HUAN', 'ANTHONY', 'INTERN', 'GONE'])
+  })
+
   it('Last seen: the latest sign-in first — then the oldest; never signed in last either way', () => {
     expect(order({ key: 'seen', dir: 'desc' })).toEqual(['CHEA HUAN', 'ANTHONY', 'GONE', 'Bella', 'zack', 'INTERN'])
     expect(order({ key: 'seen', dir: 'asc' })).toEqual(['GONE', 'ANTHONY', 'CHEA HUAN', 'Bella', 'zack', 'INTERN'])

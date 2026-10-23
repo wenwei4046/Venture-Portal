@@ -702,8 +702,9 @@ hr_staff_costs (
     eis_er          decimal(15,2)
     total_ctc       decimal(15,2)                    -- 系统加总
     status          enum ('active','inactive') DEFAULT 'active'
-    employment_status text NULL                      -- 'probation' | 'permanent' | 'part_time'（2026-10-23）；NULL = 还没设
-                                                     --   （那天之前的人都是 NULL，HR 逐个设）。不是 employment_type（那是 pay basis）
+    employment_status text NULL                      -- 'probation' | 'contract' | 'permanent' | 'part_time'（2026-10-23；contract
+                                                     --   2026-10-24）；NULL = 还没设（那天之前的人都是 NULL，HR 逐个设）。
+                                                     --   不是 employment_type（那是 pay basis）
     probation_months smallint NULL                   -- 试用期几个月，1–24；只在 probation 时有（CHECK）
     probation_end   date GENERATED ALWAYS             -- 试用期最后一天 = hire_date + months − 1 天（1 Oct + 3 → 31 Dec）；
                                                      --   不是 probation 或没 hire_date 就 NULL
@@ -711,6 +712,9 @@ hr_staff_costs (
     probation_ack_by uuid FK → users NULL            --   谁、几时、名字（probation_acknowledge() 写，trigger 拒绝直接写；不是 probation 就清空）
     probation_ack_name text NULL
     probation_ack_at timestamptz NULL
+    contract_months smallint NULL                    -- 合约几个月，1–36（表单给 6/12/18/24/30/36）；只在 contract 时有（CHECK，2026-10-24）
+    contract_end    date GENERATED ALWAYS             -- 合约最后一天 = hire_date + months − 1 天（1 Oct + 12 → 30 Sep）；
+                                                     --   不是 contract 或没 hire_date 就 NULL；没有提醒
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()
     updated_at      timestamptz DEFAULT now()
@@ -721,7 +725,7 @@ Add Staff and the waiting list's Transfer ask the status (and a probation's
 period); a person's page edits it, *Confirm as permanent* and *Extend* are its
 updates. HR view's bell reads `probation_reviews()` (DEFINER, STABLE: People ·
 Edit with the HR scope — everybody active on probation, their end and its
-acknowledgement) and lists those ending within 14 days or past
+acknowledgement) and lists those ending within 15 days (14 until 2026-10-24) or past
 (`lib/employment-status.ts` › `PROBATION_NOTICE_DAYS`); `probation_acknowledge(staff)`
 (DEFINER, the person page's box via `tab_write_guard`) writes the
 acknowledgement for the end it stands at, under `app.probation_ack`, the one
@@ -729,12 +733,22 @@ door trigger `hr_staff_costs_probation_ack` leaves open. `member_transfer_waitin
 has a 12-argument overload (production's body with the two columns in its
 INSERT); the 10-argument one calls it with neither.
 
+**Contract (2026-10-24, migration `20261025013000_people_contract_status`).**
+A fourth status with its period: `contract_months` (CHECK
+`hr_staff_costs_contract_months_check` — 1–36 while on a contract, NULL
+otherwise) and `contract_end` generated as `probation_end` is; both granted to
+`authenticated` column by column. Nobody is reminded of a contract's end.
+`member_transfer_waiting` has a 13-argument overload (production's 12-argument
+body with `contract_months` in its INSERT); the 12-argument one now calls it with
+none. The same day `notify_probation_due` counts 15 days, not 14 (migration
+`20261025012000_probation_notice_15_days`).
+
 **…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
 `notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly
 sweep, `app/api/member-queue`) writes `app_notifications` (kind `people`, ref
 `hr_staff` → the person, `data.due = 'probation:<staff>:<end>'`, once per
 person told per end; from 9:00 the office's time) for a probation whose last day
-is 14 days away or nearer, not past, not acknowledged for that end — to each
+is 15 days away or nearer (14 until `20261025012000`), not past, not acknowledged for that end — to each
 holder of the topic `people.probation` whom `probation_notice_may(user)` (DEFINER,
 the service role's) still finds able to acknowledge it, asked as them: the HR
 scope, People · Edit and `tab_write_open('/team/people/[id]', team.edit)`, with

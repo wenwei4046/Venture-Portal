@@ -121,7 +121,7 @@ describe('MemoBell', () => {
 })
 
 // HR view's Notifications (2026-10-23 — the user, circling the bell: "at least show up in this notification side, in
-// desktop view"): a probation ending within 14 days, or past and still open, for whoever may act on it.
+// desktop view"): a probation ending within 15 days (14 until 2026-10-24), or past and still open, for whoever may act on it.
 describe('MemoBell in HR’s view — probations ending', () => {
   /** YYYY-MM-DD, n days from the office's today — the reminders are read against the real one. */
   const plus = (n: number) => {
@@ -198,7 +198,7 @@ describe('MemoBell in HR’s view — probations ending', () => {
     db.rpc.mockImplementation(async () => ({ data: null, error: { code: '42501', message: 'Probation reminders need People · Edit.' } }))
     render(<MemoBell memos={false} probation />)
     fireEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
-    expect(await screen.findByText('No probation ends in the next 14 days.')).toBeInTheDocument()
+    expect(await screen.findByText('No probation ends in the next 15 days.')).toBeInTheDocument()
     expect(screen.queryByText('Reading…')).toBeNull()
   })
 
@@ -206,6 +206,6 @@ describe('MemoBell in HR’s view — probations ending', () => {
     answers([review({ endsOn: plus(30) })])
     render(<MemoBell memos={false} probation />)
     fireEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
-    expect(await screen.findByText('No probation ends in the next 14 days.')).toBeInTheDocument()
+    expect(await screen.findByText('No probation ends in the next 15 days.')).toBeInTheDocument()
   })
 })

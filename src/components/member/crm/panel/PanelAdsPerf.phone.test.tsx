@@ -16,7 +16,7 @@ describe("Ads performance on the phone", () => {
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
     await tap(screen.getByRole("button", { name: "Ads performance" }));
-    for (const l of ["Today", "7 days", "This month", "Last month"]) expect(screen.getByRole("button", { name: l })).toBeInTheDocument();
+    for (const l of ["Today", "This week", "This month"]) expect(screen.getByRole("button", { name: l })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Day by day" })).toBeInTheDocument();
     expect(screen.getByText("By ad")).toBeInTheDocument();
     expect(screen.getByText("Akemi Mattress · October Fair")).toBeInTheDocument();

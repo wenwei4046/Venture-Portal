@@ -33,7 +33,7 @@ describe('what the bell lists and counts', () => {
     row({ id: 'no-hire', endsOn: null, hireDate: null }),
   ])
 
-  it('ending within 14 days or past — waiting ones first, soonest first', () => {
+  it('ending within 15 days or past — waiting ones first, soonest first', () => {
     expect(dueReviews(list, today).map(r => r.id)).toEqual(['ended', 'soon', 'extended', 'acked'])
   })
 
@@ -62,10 +62,10 @@ describe('who is told', () => {
   })
 })
 
-// The phone (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送，以及 HR Overview 首页上的数字").
+// The phone (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送，以及 HR Overview 首页上的数字"); its window 15 days since mig 20261025012000.
 describe('the sweep and the summary lines', () => {
   it('the hourly sweep tells within the window the bell lists — the SQL keeps PROBATION_NOTICE_DAYS', () => {
-    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261024223000_probation_push.sql'), 'utf8')
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261025012000_probation_notice_15_days.sql'), 'utf8')
     expect(sql).toContain(`s.probation_end - ${PROBATION_NOTICE_DAYS} <= v_today AND v_today <= s.probation_end`)
   })
 

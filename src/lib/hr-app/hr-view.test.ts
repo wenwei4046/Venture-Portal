@@ -153,7 +153,7 @@ describe('a probation ending', () => {
       review({ id: 'a', name: 'LATER ONE', endsOn: '2026-11-05' }),
       review({ id: 'b', name: 'SOONER ONE', endsOn: '2026-10-25', department: null }),
       review({ id: 'c', name: 'TOLD ALREADY', endsOn: '2026-10-28', ackEnd: '2026-10-28', ackName: 'HR Manager' }),
-      review({ id: 'd', name: 'NOT YET', endsOn: '2026-11-07' }),
+      review({ id: 'd', name: 'NOT YET', endsOn: '2026-11-08' }), // 16 days: past the 15
       review({ id: 'e', name: 'ENDED', endsOn: '2026-10-20' }),
       review({ id: 'f', name: 'NO END', endsOn: null }),
     ], TODAY)
