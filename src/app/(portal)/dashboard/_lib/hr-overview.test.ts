@@ -46,7 +46,7 @@ describe('HR’s Overview and the probations ending', () => {
       data: [
         review('a', '2026-10-31'), review('b', '2026-10-20'), // waiting: 8 days, ended 3 days ago
         review('c', '2026-10-28', '2026-10-28'), // acknowledged for its end
-        review('d', '2026-11-07'), // 15 days: not yet
+        review('d', '2026-11-08'), // 16 days: not yet (the window is 15 days since 2026-10-24, 14 before)
       ],
       error: null,
     })
