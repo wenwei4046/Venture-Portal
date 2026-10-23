@@ -19,10 +19,19 @@ const context = {
   fillText: vi.fn(), measureText: vi.fn(() => ({ width: 80 })),
 }
 
+const SIGNED = 'https://storage.example/signed-original.png'
+const fetched = vi.fn()
+const bytes = () => ({ ok: true, status: 200, blob: async () => new Blob(['png bytes'], { type: 'image/png' }) })
+
 beforeEach(() => {
   vi.clearAllMocks()
   Screenshot.instances = []
   vi.stubGlobal('Image', Screenshot)
+  fetched.mockReset()
+  fetched.mockResolvedValue(bytes())
+  vi.stubGlobal('fetch', fetched)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fresh-copy')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D)
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(new Blob(['marked pixels'], { type: 'image/png' })))
 })
@@ -33,9 +42,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function loaded(props: Partial<Parameters<typeof ImageAnnotator>[0]> = {}) {
+async function loaded(props: Partial<Parameters<typeof ImageAnnotator>[0]> = {}) {
   const onSave = vi.fn(), onClose = vi.fn()
-  render(<ImageAnnotator src="https://storage.example/signed-original.png" fileName="original.jpg" onSave={onSave} onClose={onClose} {...props} />)
+  render(<ImageAnnotator src={SIGNED} fileName="original.jpg" onSave={onSave} onClose={onClose} {...props} />)
+  await waitFor(() => expect(Screenshot.instances.at(-1)?.src).toBe('blob:fresh-copy'))
   act(() => Screenshot.instances.at(-1)!.onload?.())
   const canvas = screen.getByLabelText('Screenshot annotation canvas') as HTMLCanvasElement
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 600, height: 300, right: 600, bottom: 300, x: 0, y: 0, toJSON: () => ({}) })
@@ -49,9 +59,8 @@ function draw(canvas: HTMLCanvasElement, pointerType = 'mouse') {
 }
 
 describe('ImageAnnotator', () => {
-  it('loads a CORS image and saves a bounded new PNG after a mouse circle without changing the source', async () => {
-    const { canvas, onSave, onClose } = loaded({ theme: 'revenue' })
-    expect(Screenshot.instances[0].crossOrigin).toBe('anonymous')
+  it('saves a bounded new PNG after a mouse circle without changing the source', async () => {
+    const { canvas, onSave, onClose } = await loaded({ theme: 'revenue' })
     expect(canvas.width).toBe(2400)
     expect(canvas.height).toBe(1200)
     expect(canvas.closest('[data-image-annotator]')).toHaveAttribute('data-revenue-app')
@@ -63,12 +72,25 @@ describe('ImageAnnotator', () => {
     const saved = onSave.mock.calls[0][0] as File
     expect(saved.name).toBe('original-marked.png')
     expect(saved.type).toBe('image/png')
-    expect(Screenshot.instances[0].src).toBe('https://storage.example/signed-original.png')
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
-  it('discards a cancelled touch and allows a fresh pen stroke, then undo removes it', () => {
-    const { canvas } = loaded()
+  // 2026-10-24 (IT-0008, "this cant be use"): the request's thumbnail had loaded the same R2 link as a plain <img>;
+  // R2 answers that with no Access-Control-Allow-Origin and no Vary: Origin, so a CORS image load of the link got the
+  // cached copy and was blocked — "The image could not be opened" every time.
+  it('never loads the shown link as a CORS image: it fetches the bytes afresh and draws its own blob: copy', async () => {
+    await loaded()
+    expect(fetched).toHaveBeenCalledExactlyOnceWith(SIGNED, { cache: 'no-store' })
+    expect(Screenshot.instances).toHaveLength(1)
+    expect(Screenshot.instances[0].src).toBe('blob:fresh-copy')
+    expect(Screenshot.instances[0].crossOrigin).toBeNull()
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+    cleanup()
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:fresh-copy')
+  })
+
+  it('discards a cancelled touch and allows a fresh pen stroke, then undo removes it', async () => {
+    const { canvas } = await loaded()
     fireEvent.click(screen.getByRole('button', { name: 'Pen' }))
     fireEvent.pointerDown(canvas, { pointerId: 2, pointerType: 'touch', button: 0, clientX: 20, clientY: 30 })
     fireEvent.pointerMove(canvas, { pointerId: 2, pointerType: 'touch', clientX: 80, clientY: 60 })
@@ -82,8 +104,8 @@ describe('ImageAnnotator', () => {
     expect(screen.getByRole('button', { name: 'Save marked copy' })).toBeDisabled()
   })
 
-  it('places literal text and arrows and can clear the marked copy', () => {
-    const { canvas } = loaded()
+  it('places literal text and arrows and can clear the marked copy', async () => {
+    const { canvas } = await loaded()
     fireEvent.click(screen.getByRole('button', { name: 'Text' }))
     fireEvent.pointerDown(canvas, { pointerId: 1, button: 0, clientX: 20, clientY: 20 })
     expect(screen.getByRole('alert')).toHaveTextContent('Type the text first')
@@ -101,7 +123,7 @@ describe('ImageAnnotator', () => {
   it('locks save and cancellation while the host uploads, and preserves marks when upload fails', async () => {
     let fail!: (reason: Error) => void
     const onSave = vi.fn(() => new Promise<void>((_resolve, reject) => { fail = reject }))
-    const { canvas, onClose } = loaded({ onSave })
+    const { canvas, onClose } = await loaded({ onSave })
     draw(canvas)
     fireEvent.click(screen.getByRole('button', { name: 'Save marked copy' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
@@ -118,7 +140,7 @@ describe('ImageAnnotator', () => {
   })
 
   it('shows a useful cross-origin export error without calling the host or losing the editor', async () => {
-    const { canvas, onSave, onClose } = loaded()
+    const { canvas, onSave, onClose } = await loaded()
     draw(canvas)
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(() => { throw new DOMException('Tainted canvas', 'SecurityError') })
     fireEvent.click(screen.getByRole('button', { name: 'Save marked copy' }))
@@ -131,7 +153,7 @@ describe('ImageAnnotator', () => {
   it('does not begin an upload if navigation unmounts the editor while PNG encoding finishes', async () => {
     let finish!: BlobCallback
     vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => { finish = callback })
-    const { canvas, onSave, onClose } = loaded()
+    const { canvas, onSave, onClose } = await loaded()
     draw(canvas)
     fireEvent.click(screen.getByRole('button', { name: 'Save marked copy' }))
     cleanup()
@@ -140,13 +162,13 @@ describe('ImageAnnotator', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('owns Escape without closing the parent sheet and restores focus when unmounted', () => {
+  it('owns Escape without closing the parent sheet and restores focus when unmounted', async () => {
     const trigger = document.createElement('button')
     document.body.append(trigger)
     trigger.focus()
     const parentEscape = vi.fn()
     window.addEventListener('keydown', parentEscape)
-    const { onClose } = loaded()
+    const { onClose } = await loaded()
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(parentEscape).not.toHaveBeenCalled()
@@ -156,13 +178,26 @@ describe('ImageAnnotator', () => {
     window.removeEventListener('keydown', parentEscape)
   })
 
-  it('reports expired or unreadable images and leaves cancellation available', () => {
+  it.each([
+    ['an expired link (R2 answers 403)', () => fetched.mockResolvedValue({ ok: false, status: 403, blob: async () => new Blob() })],
+    ['a fetch the browser refuses', () => fetched.mockRejectedValue(new TypeError('Failed to fetch'))],
+  ])('reports %s and leaves cancellation available', async (_case, arrange) => {
+    arrange()
     const onClose = vi.fn()
     render(<ImageAnnotator src="expired" fileName="original.png" onSave={vi.fn()} onClose={onClose} />)
-    act(() => Screenshot.instances[0].onerror?.())
-    expect(screen.getByRole('alert')).toHaveTextContent('refresh its link')
+    expect(await screen.findByRole('alert')).toHaveTextContent('refresh its link')
+    expect(Screenshot.instances[0].src).toBe('')
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Save marked copy' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports bytes that are not a picture', async () => {
+    render(<ImageAnnotator src={SIGNED} fileName="original.png" onSave={vi.fn()} onClose={vi.fn()} />)
+    await waitFor(() => expect(Screenshot.instances[0].src).toBe('blob:fresh-copy'))
+    act(() => Screenshot.instances[0].onerror?.())
+    expect(screen.getByRole('alert')).toHaveTextContent('could not be opened')
+    expect(screen.getByRole('button', { name: 'Save marked copy' })).toBeDisabled()
   })
 })

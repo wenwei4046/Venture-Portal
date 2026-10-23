@@ -186,8 +186,11 @@ describe('shared white IT support', () => {
     const request = row({ files: [picture] })
     render(<ItSupport app="finance" initialRequests={[request]} initialRequest={request} initialFileUrls={{ 'file-1': 'https://example.invalid/shot.png' }} />)
     const dialog = await screen.findByRole('dialog', { name: request.title })
+    expect(api.sign).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annotate shot.png' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Save marked copy' }))
+    // The page's preloaded link may have run out (ten minutes): a fresh one is made at the press (2026-10-24).
+    expect(api.sign).toHaveBeenCalledExactlyOnceWith(['file-1'])
     await waitFor(() => expect(api.upload).toHaveBeenCalledOnce())
     expect(api.upload.mock.calls[0][0].name).toBe('shot-marked.png')
     expect(api.note).not.toHaveBeenCalled()

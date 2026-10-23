@@ -47,6 +47,7 @@ export default function ImageAnnotator({ src, fileName, theme = 'portal', onSave
 
   useEffect(() => {
     let current = true
+    let local: string | null = null
     setLoading(true)
     setPicture(null)
     setMarks([])
@@ -54,7 +55,11 @@ export default function ImageAnnotator({ src, fileName, theme = 'portal', onSave
     setError('')
     stroke.current = null
     const image = new Image()
-    image.crossOrigin = 'anonymous'
+    const unopened = () => {
+      if (!current) return
+      setLoading(false)
+      setError('The image could not be opened. Close this window and open it again to refresh its link.')
+    }
     image.onload = () => {
       if (!current) return
       const size = annotationSize(image.naturalWidth, image.naturalHeight)
@@ -62,13 +67,25 @@ export default function ImageAnnotator({ src, fileName, theme = 'portal', onSave
       if (!size) { setError('This image could not be read. Try another screenshot.'); return }
       setPicture({ image, size })
     }
-    image.onerror = () => {
-      if (!current) return
-      setLoading(false)
-      setError('The image could not be opened. Close this window and open it again to refresh its link.')
+    image.onerror = unopened
+    // The bytes are fetched afresh and drawn from this page's own blob: link, so the canvas can be exported.
+    // An <img crossOrigin> on the shown link broke when files moved to R2 (2026-10-24): R2 answers the thumbnail's
+    // plain load with no Access-Control-Allow-Origin and no Vary: Origin, and the browser handed that cached copy to
+    // the CORS load of the same link, which it then blocked.
+    void fetch(src, { cache: 'no-store' })
+      .then(response => (response.ok ? response.blob() : Promise.reject(new Error(`HTTP ${response.status}`))))
+      .then(blob => {
+        if (!current) return
+        local = URL.createObjectURL(blob)
+        image.src = local
+      })
+      .catch(unopened)
+    return () => {
+      current = false
+      image.onload = null
+      image.onerror = null
+      if (local) URL.revokeObjectURL(local)
     }
-    image.src = src
-    return () => { current = false; image.onload = null; image.onerror = null }
   }, [src])
 
   // Capture Escape before a host sheet sees it. Keep focus inside this window and return it on close.
