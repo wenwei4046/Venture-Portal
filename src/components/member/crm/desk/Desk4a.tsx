@@ -468,7 +468,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
       </aside>
     )}
     {!v.ibCpOpen ? <Strip label="Audit log" icon="history" bg="var(--crm-audit)" onOpen={v.ibCpToggle} /> : (
-      // v2 (frame 02b, note 06): #FBF7F3 under a #F5F0EA head, #E6DCD2 lines, dragged at its left edge (240–520 px).
+      // v2 (frame 02b, note 06): --crm-hover under a --crm-sel head, --crm-sum-div lines, dragged at its left edge (240–520 px).
       <aside style={{ position: "relative", width: `${v.ibCpW ?? 290}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-sum-div)", background: "var(--crm-hover)" }}>
         {v.dragCp && <span onPointerDown={v.dragCp as never} onDoubleClick={v.resetCp} title="Drag to resize" style={{ position: "absolute", top: 0, bottom: 0, left: "-5px", width: "10px", zIndex: 2, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none" }}>
           <span style={{ width: "3px", height: "36px", borderRadius: "2px", background: "var(--crm-audit-line)" }} /></span>}

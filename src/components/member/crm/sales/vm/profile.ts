@@ -5,7 +5,7 @@
  * with the chat's + and "/").
  */
 import type { ChangeEvent } from "react";
-import { DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
+import { autoReplySet, DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
 import { downlineOf, jobTitle, teamName, teamOf, titleOf } from "../../shared/people";
 import { CHANNEL, firstName, ini, stop, type SalesCtx } from "./common";
 import { openSummary } from "../../shared/notif-summary";
@@ -45,8 +45,9 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
   const setQ = (i: number, p: { shortcut?: string; message?: string }) => act.editQuickReplies(qrs.map((q, j) => (j === i ? { ...q, ...p } : q)));
 
   // Auto-replies.
-  const AR = data.autoReplies;
-  const setAR = (f: (a: CrmAutoReplySet) => CrmAutoReplySet) => act.saveAutoReplies(f(AR));
+  // Viewing somebody: their auto-replies, read only (the owner, 2026-10-24: "View as 时读被查看的那个人的设定，只看不能改").
+  const AR = viewingOther ? (data.autoRepliesOf?.[owner.id] ?? autoReplySet(undefined)) : data.autoReplies;
+  const setAR = (f: (a: CrmAutoReplySet) => CrmAutoReplySet) => (viewingOther ? act.toast(`Read only · ${firstName(owner.name)}'s auto-reply`) : act.saveAutoReplies(f(AR)));
   const imgOf = (o: { img?: string | null; imgName?: string }, put: (p: { img: string | null; imgName: string }) => void) => ({
     img: o.img || "", imgBg: o.img ? `url(${o.img})` : "", imgName: o.imgName || "", noImg: !o.img,
     pickImg: async (e: ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const url = await act.uploadAutoReplyImage(file); if (url) put({ img: url, imgName: file.name }); },
