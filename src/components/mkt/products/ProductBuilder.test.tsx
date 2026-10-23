@@ -17,6 +17,9 @@ const actions = vi.hoisted(() => ({
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
+// The open template goes into the URL with history.replaceState(null, …) — never a navigation, which remounts the page
+// and drops an edit made before the server answered (2026-10-24).
+const replaceState = vi.spyOn(window.history, 'replaceState')
 
 import ProductBuilder from './ProductBuilder'
 
@@ -37,6 +40,7 @@ const BOOK = {
 
 beforeEach(() => {
   for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
+  replaceState.mockClear()
   let rev = 4
   actions.saveMktProduct.mockImplementation(async (id: string | null) => ({ ok: true, id: id ?? 'p9', code: 'PRD-26003', rev: id ? ++rev : 1, book: null }))
 })
@@ -64,7 +68,8 @@ describe('the Product Builder', () => {
     })
     expect(actions.saveMktProduct).toHaveBeenCalledWith(null, null, { kind: 'one' })
     expect(await screen.findByText('PRD-26003')).toBeTruthy()
-    expect(router.replace).toHaveBeenCalledWith('/marketing/products?p=p9', { scroll: false })
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/marketing/products?p=p9')
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('a change undone before its save goes sends nothing and says Saved', async () => {
@@ -139,7 +144,7 @@ describe('the Product Builder', () => {
     expect(actions.deleteMktProduct).toHaveBeenCalledWith('p2', 1)
     expect(await screen.findByText('Deleted Brand Book')).toBeTruthy()
     expect(screen.getByRole('tab', { name: /All\s*2/ })).toBeTruthy()
-    expect(router.replace).toHaveBeenLastCalledWith('/marketing/products', { scroll: false })
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/marketing/products')
   })
 
   it('retired: read-only, Reactivate', async () => {

@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cloneMktWorkflow, deleteMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
 import { canvasProblems, canvasRemap, stageMap } from '@/lib/marketing/canvas'
@@ -47,7 +46,6 @@ export default function WorkflowBuilder({
   /** Marketing's roster now: whoever a version names must be on it. */
   team: string[]
 }) {
-  const router = useRouter()
   const start = (first ? initial.find(t => t.id === first) : undefined) ?? initial[0] ?? null
   const [wfs, setWfs] = useState<WfTemplate[]>(initial)
   const [selId, setSelId] = useState<string | null>(start?.id ?? null)
@@ -147,8 +145,10 @@ export default function WorkflowBuilder({
     setEdit(e)
     setStageAt(0)
     setSave({ state: 'saved' })
-    // Through the router: a URL changed behind its back is put back by the next save's refresh.
-    router.replace(`/marketing/workflows?w=${id}`, { scroll: false })
+    // In the URL without a navigation (2026-10-24): router.replace remounts the page — Next keys a page by its search
+    // params — so an edit made before the server answered was lost. A null state is Next's to sync: it keeps the URL
+    // through the next save's refresh (handing back window.history.state did not — #644).
+    window.history.replaceState(null, '', `/marketing/workflows?w=${id}`)
   }
 
   const create = async (action: string, tname: string, emoji: string | null, done: string) => {
@@ -248,7 +248,7 @@ export default function WorkflowBuilder({
       setSelId(null)
       setEdit(null)
       if (list[0]) await open(list[0].id, list)
-      else router.replace('/marketing/workflows', { scroll: false })
+      else window.history.replaceState(null, '', '/marketing/workflows')
       flash(`Deleted “${sel.action} · ${sel.tname}”`)
     } finally {
       setBusy(false)

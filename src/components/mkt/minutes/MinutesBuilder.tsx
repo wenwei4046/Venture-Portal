@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteMktMinutes, publishMktMinutes, saveMktMinutes } from '@/lib/marketing/actions'
 import {
@@ -30,7 +29,6 @@ export default function MinutesBuilder({ initial, first, attendees }: {
   /** Who the Preview's sample minutes list as attending. */
   attendees: string[]
 }) {
-  const router = useRouter()
   const start = (first ? initial.find(t => t.id === first) : undefined) ?? initial[0] ?? null
   const [list, setList] = useState<MinutesTemplate[]>(initial)
   const [selId, setSelId] = useState<string | null>(start?.id ?? null)
@@ -128,8 +126,10 @@ export default function MinutesBuilder({ initial, first, attendees }: {
     setEdit(e)
     setCol(null)
     setSave({ state: 'saved' })
-    // Through the router: a URL changed behind its back is put back by the next save's refresh.
-    router.replace(`/marketing/minutes?t=${id}`, { scroll: false })
+    // In the URL without a navigation (2026-10-24): router.replace remounts the page — Next keys a page by its search
+    // params — so an edit made before the server answered was lost. A null state is Next's to sync: it keeps the URL
+    // through the next save's refresh (handing back window.history.state did not — #644).
+    window.history.replaceState(null, '', `/marketing/minutes?t=${id}`)
   }
 
   const newTemplate = async () => {
@@ -204,7 +204,7 @@ export default function MinutesBuilder({ initial, first, attendees }: {
       setSelId(null)
       setEdit(null)
       if (fresh[0]) await open(fresh[0].id, fresh)
-      else router.replace('/marketing/minutes', { scroll: false })
+      else window.history.replaceState(null, '', '/marketing/minutes')
       flash(`Deleted “${sel.name}”`)
     } finally {
       setBusy(false)

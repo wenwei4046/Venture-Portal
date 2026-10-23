@@ -16,6 +16,9 @@ const actions = vi.hoisted(() => ({
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
+// The open template goes into the URL with history.replaceState(null, …) — never a navigation, which remounts the page
+// and drops an edit made before the server answered (2026-10-24).
+const replaceState = vi.spyOn(window.history, 'replaceState')
 
 import WorkflowBuilder from './WorkflowBuilder'
 
@@ -50,6 +53,7 @@ const list = (...rows: object[]): WfTemplate[] => workflowsFromRow({ workflows: 
 
 beforeEach(() => {
   for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
+  replaceState.mockClear()
   let rev = 5
   actions.saveMktWorkflow.mockImplementation(async (id: string | null) => ({ ok: true, id: id ?? 'w9', rev: id ? ++rev : 1, workflows: null }))
 })
@@ -178,7 +182,8 @@ describe('the Workflow Builder', () => {
     expect([id, rev, patch.action, patch.tname, patch.stages.length]).toEqual([null, null, 'Design photo', 'Standard', 1])
     expect(await screen.findByText('Action “Design photo” created with a Standard template')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Standard')
-    expect(router.replace).toHaveBeenCalledWith('/marketing/workflows?w=w9', { scroll: false })
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/marketing/workflows?w=w9')
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('Clone: a new template of the action, open to be renamed', async () => {
@@ -205,7 +210,7 @@ describe('the Workflow Builder', () => {
     expect(await screen.findByText('Deleted “Brand book · Standard”')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Full production')
     expect(screen.queryByRole('button', { name: 'Delete draft' })).toBeNull()
-    expect(router.replace).toHaveBeenLastCalledWith('/marketing/workflows?w=w1', { scroll: false })
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/marketing/workflows?w=w1')
   })
 
   it('a delete the database refuses says why and keeps the template; Keep takes the question back', async () => {

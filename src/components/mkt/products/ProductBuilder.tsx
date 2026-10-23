@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductStatus } from '@/lib/marketing/actions'
 import {
@@ -31,7 +30,6 @@ const day = (d: string | null) => (d ? d.split('-').reverse().join('/') : '—')
 const wfLabel = (w: ProductWorkflowOption) => `${w.action} · ${w.tname} · ${w.version ? `v${w.version}` : 'draft'}`
 
 export default function ProductBuilder({ initial, first }: { initial: ProductBook; first: string | null }) {
-  const router = useRouter()
   const start = (first ? initial.products.find(p => p.id === first) : undefined) ?? null
   const [book, setBook] = useState<ProductBook>(initial)
   const [filter, setFilter] = useState<Filter>('all')
@@ -131,7 +129,10 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
     setSelId(p?.id ?? null)
     setEdit(e)
     setSave({ state: 'saved' })
-    router.replace(p ? `/marketing/products?p=${p.id}` : '/marketing/products', { scroll: false })
+    // In the URL without a navigation (2026-10-24): router.replace remounts the page — Next keys a page by its search
+    // params — so an edit made before the server answered was lost. A null state is Next's to sync: it keeps the URL
+    // through the next save's refresh (handing back window.history.state did not — #644).
+    window.history.replaceState(null, '', p ? `/marketing/products?p=${p.id}` : '/marketing/products')
   }
 
   const newProduct = async () => {

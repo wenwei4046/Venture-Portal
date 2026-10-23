@@ -15,6 +15,9 @@ const actions = vi.hoisted(() => ({
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
+// The open template goes into the URL with history.replaceState(null, …) — never a navigation, which remounts the page
+// and drops an edit made before the server answered (2026-10-24).
+const replaceState = vi.spyOn(window.history, 'replaceState')
 
 import MinutesBuilder from './MinutesBuilder'
 
@@ -34,6 +37,7 @@ const list = (...rows: object[]): MinutesTemplate[] => minutesTemplatesFromRow({
 
 beforeEach(() => {
   for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
+  replaceState.mockClear()
   let rev = 3
   actions.saveMktMinutes.mockImplementation(async (id: string | null) => ({ ok: true, id: id ?? 't9', rev: id ? ++rev : 1, templates: null }))
 })
@@ -126,7 +130,8 @@ describe('the Minutes Builder', () => {
     const [id, rev, patch] = actions.saveMktMinutes.mock.calls[0]
     expect([id, rev, patch.name, patch.fields.map((f: { type: string }) => f.type)]).toEqual([null, null, 'New minutes', ['Project link', 'Date', 'People', 'Signature']])
     expect(await screen.findByDisplayValue('New minutes')).toBeTruthy()
-    expect(router.replace).toHaveBeenCalledWith('/marketing/minutes?t=t9', { scroll: false })
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/marketing/minutes?t=t9')
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('deletes a template never published, asked first; a published one offers no delete (the user’s answer 8)', async () => {
