@@ -126,6 +126,12 @@ const file = (await readFile(new URL('20261024223000_probation_push.sql', migrat
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
 
+// ── The bodies are production's, as applied on 2026-10-23 ───────────────────────
+check(await md5('public.notification_topics_sync(text[])'), '29b2feb9e4d2dfdc242de41a3fc15891', 'the sync as production runs it now')
+check(await md5('public.notification_topics_forget()'), '0d5d4691acc6054822870ec1e140d66f', 'the forget as production runs it now')
+check(await md5('public.notify_probation_due(timestamptz)'), '582befa4a2f7e0296f1a9bdd2a244113', 'the sweep as production runs it')
+check(await md5('public.probation_notice_may(uuid)'), '684261a7856b0d223ee60e5ef185b7c7', 'the helper as production runs it')
+
 // ── The kind, the reference and the topic: widened, nothing dropped ─────────────
 const def = name => one(`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = $1`, [name])
 const vals = async name => [...(await def(name)).matchAll(/'([^']+)'/g)].map(m => m[1]).sort()

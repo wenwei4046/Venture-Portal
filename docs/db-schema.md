@@ -729,6 +729,22 @@ door trigger `hr_staff_costs_probation_ack` leaves open. `member_transfer_waitin
 has a 12-argument overload (production's body with the two columns in its
 INSERT); the 10-argument one calls it with neither.
 
+**…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
+`notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly
+sweep, `app/api/member-queue`) writes `app_notifications` (kind `people`, ref
+`hr_staff` → the person, `data.due = 'probation:<staff>:<end>'`, once per
+person told per end; from 9:00 the office's time) for a probation whose last day
+is 14 days away or nearer, not past, not acknowledged for that end — to each
+holder of the topic `people.probation` whom `probation_notice_may(user)` (DEFINER,
+the service role's) still finds able to acknowledge it, asked as them: the HR
+scope, People · Edit and `tab_write_open('/team/people/[id]', team.edit)`, with
+`auth.uid()` pointed at them and put back. Never the person on probation.
+`notification_topics_sync` keeps `people.probation` (by that helper) and now
+deletes only the topics it manages (it took `it.requests` before);
+`notification_topics_forget` spares `people.probation`. Checks widened:
+`app_notifications` kind + `people`, ref_kind + `hr_staff`; `notification_topics`
+topic + `people.probation`.
+
 **Employee codes (2026-09-12, migration `20260915040000_staff_code_sequence`).**
 `employee_code` is `HV` + at least three digits, and the database hands it
 out: `hr_staff_costs_assign_code` (BEFORE INSERT OR UPDATE OF employee_code)
