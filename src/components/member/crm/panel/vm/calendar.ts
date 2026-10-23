@@ -36,15 +36,17 @@ export function calendarVM(ctx: PanelCtx) {
   const item = (a: typeof all[number], k: number) => ({ name: a.name, who: nameOf(a.who), room: a.room, time: tm(a.at), tc: a.seat.c, rule: k ? "1px solid var(--crm-rule)" : "0", ...statusOf(a),
     // rev 1011 §5.1: a visit opens Customer info first (Open chat there), as RS rev 1010 §3.
     open: () => patch({ calInfo: a.v.customerId }) });
-  const days: { day: string; color: string; items: ReturnType<typeof item>[] }[] = [];
+  const days: { day: string; color: string; head: string; sub: string; items: ReturnType<typeof item>[] }[] = [];
   shown.forEach(a => {
     const lab = (day0(a.at) === T ? "Today · " : "") + gb(a.at, { weekday: "short", day: "numeric", month: "short" });
-    let g = days.find(x => x.day === lab); if (!g) days.push(g = { day: lab, color: lab.startsWith("Today") ? "var(--crm-rust)" : "var(--crm-muted)", items: [] });
+    const dd = day0(a.at), rel = dd === T ? "Today" : dd === T - DAY ? "Yesterday" : dd === T + DAY ? "Tomorrow" : "", date = gb(a.at, { weekday: "short", day: "numeric", month: "short" });
+    let g = days.find(x => x.day === lab); if (!g) days.push(g = { day: lab, color: lab.startsWith("Today") ? "var(--crm-rust)" : "var(--crm-muted)", head: rel || date, sub: rel ? date : "", items: [] });
     g.items.push(item(a, g.items.length));
   });
+  days.forEach(g => { const n = `${g.items.length} visit${g.items.length === 1 ? "" : "s"}`; g.sub = g.sub ? `${g.sub} · ${n}` : n; });
   const gm = ui.cGM ?? [new Date(rg.a).getFullYear(), new Date(rg.a).getMonth()], g1 = new Date(gm[0], gm[1], 1), lead0 = (g1.getDay() + 6) % 7, rows = Math.ceil((lead0 + new Date(gm[0], gm[1] + 1, 0).getDate()) / 7);
   const teamKeys = [...(ctx.directors.length ? ["hod"] : []), ...ctx.teams.map(t => t.id)];
-  const seatName = (id: string) => (id === "hod" ? "Director" : ctx.teams.find(t => t.id === id)?.name ?? "");
+  const seatName = (id: string) => (id === "hod" ? "Revenue Director" : ctx.teams.find(t => t.id === id)?.name ?? "");
   const seatC = (id: string) => (id === "hod" ? "var(--crm-brown)" : ctx.teams.find(t => t.id === id)?.c ?? "var(--crm-muted)");
   // The person sheet: everyone in the chosen team (TAs book no visits).
   const inTeam = (id: string) => ts === "all" || (seatOf(ctx, id)?.id ?? "") === ts;
@@ -63,15 +65,16 @@ export function calendarVM(ctx: PanelCtx) {
     cCameV: list.filter(a => a.v.state === "attended").map(a => ({ cid: a.v.customerId, start: a.v.start })),
     onCal: ui.tab === "calendar" && !ui.lead, stop,
     cRangeLabel: `${list.length} visits · ${up} upcoming`, cRangeBtn: `${f(rg.a)} – ${f(rg.b)}`,
-    cTeams: [["all", "All teams", ""], ...(ctx.directors.length ? [["hod", "Director", "var(--crm-brown)"]] : []), ...ctx.teams.map(t => [t.id, t.name, t.c])].map(([k, label, dot]) => ({ label, dot,
+    cTeams: [["all", "All", ""], ...(ctx.directors.length ? [["hod", "Director", "var(--crm-brown)"]] : []), ...ctx.teams.map(t => [t.id, t.name.replace(/^Team /, ""), t.c])].map(([k, label, dot]) => ({ label, dot,
       pick: () => patch({ cTeam: k, cPerson: "" }), on: ts === k, bg: ts === k ? "var(--crm-rust)" : "var(--crm-field)", fg: ts === k ? "#fff" : "var(--crm-ink)", bd: ts === k ? "var(--crm-rust)" : "var(--crm-field)" })),
     cPersonLabel: pp ? nameOf(pp) : "Everyone",
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
     cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-sel)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
     cViews: [segv("grid", "Month"), segv("list", "List")], cIsGrid: view === "grid",
     // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
-    cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
-      open: label === "Show-up" ? undefined : () => patch({ cLs: label === "Leads" ? "leads" as const : label === "Upcoming" ? "up" as const : "came" as const }),
+    cStats: ([["Visits", list.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
+      // Visits shows them as the List; Upcoming and Showed up open their lists; Show-up % opens nothing.
+      open: label === "Show-up" ? undefined : label === "Visits" ? () => patch({ cView: "list", cDay: null }) : () => patch({ cLs: label === "Upcoming" ? "up" as const : "came" as const }),
       cur: label === "Show-up" ? "default" : "pointer", deco: label === "Show-up" ? "none" : "underline dotted rgba(255,255,255,.5)" })),
     cByTeam: (ts === "all" ? teamKeys : [ts]).map(id => {
       const L = list.filter(a => a.seat.id === id), c = L.filter(a => a.v.state === "attended").length, n = L.filter(a => a.v.state === "no_show").length;

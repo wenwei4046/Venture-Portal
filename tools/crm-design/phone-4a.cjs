@@ -438,7 +438,29 @@ function teamCalendar(body) {
   b = once(b, '<strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{a.name}</strong>\n                    <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)",',
     `<strong style={{ fontSize: "${F(17)}", fontWeight: "500" }}>{a.name}</strong>\n                    <small style={{ fontSize: "${F(14)}", color: "var(--crm-muted)",`, "team cal name");
   b = once(b, '<span style={{ flex: "none", padding: "3px 8px", borderRadius: "6px", background: a.sBg, color: a.sFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700" }}>{a.status}</span>',
-    `<span style={{ flex: "none", color: a.sFg, fontSize: "${F(14)}", fontWeight: "500" }}>{a.status}</span>`, "team cal state");
+    `<span style={{ flex: "none", color: a.sFg, fontSize: "${F(13)}", fontWeight: "500" }}>{a.status}</span>`, "team cal state");
+  // v3 T05: the summary card a step quieter — 16px radius, a ring per team, the name column 118px, the bars peach.
+  b = once(b, 'padding: "18px", borderRadius: "22px", background: "linear-gradient(155deg, var(--crm-ink) 0%, var(--crm-ink) 60%)", boxShadow: "0 10px 24px rgba(42,22,12,.22)", color: "#fff", display: "flex", flexDirection: "column", gap: "14px" }}>',
+    'padding: "16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", display: "flex", flexDirection: "column", gap: "12px" }}>', "team cal summary");
+  b = once(b, '<strong style={{ fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>',
+    `<strong style={{ fontFamily: "${TIGHT}", fontSize: "${F(22)}", fontWeight: "500", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>`, "team cal stat");
+  b = once(b, '<div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>\n                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-rule-soft)" }}>{b.name}</span>',
+    `<div style={{ display: "grid", gridTemplateColumns: "118px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>\n                  <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: "0", fontSize: "${F(12)}", fontWeight: "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "none", width: "9px", height: "9px", boxSizing: "border-box", borderRadius: "50%", border: \`2px solid \${b.c}\` }} />{b.name}</span>`, "team cal bar name");
+  b = once(b, '<span style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,.12)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "4px", background: b.c }}>',
+    '<span style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.14)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "3px", background: "var(--crm-peach)" }}>', "team cal bar");
+  // v3 T05: the list — "Today  Sun 18 Oct · 5 visits", compact cards, no chevron.
+  b = swap(b, `<span style={{ padding: "6px 2px 2px", fontFamily: "${TIGHT}", fontSize: "${F(18)}", fontWeight: "500", color: d.color }}>{d.day}</span>`, "span",
+    `<span style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "8px 2px 0" }}><span style={{ fontFamily: "${TIGHT}", fontSize: "${F(17)}", fontWeight: "500", color: "var(--crm-ink)" }}>{d.head}</span><span style={{ fontSize: "${F(12)}", color: "var(--crm-faint)" }}>{d.sub}</span></span>`, "team cal day head v3");
+  b = once(b, '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", cursor: "pointer" }}>',
+    '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "14px", border: "1px solid var(--crm-rule)", background: "#fff", cursor: "pointer" }}>', "team cal item v3");
+  b = once(b, '<span style={{ flex: "none", width: "4px", alignSelf: "stretch", borderRadius: "2px", background: a.tc }}>', '<span style={{ flex: "none", width: "3px", height: "34px", borderRadius: "2px", background: a.tc }}>', "team cal bar v3");
+  b = once(b, `<strong style={{ fontSize: "${F(17)}", fontWeight: "500" }}>{a.name}</strong>`, `<strong style={{ fontSize: "${F(15)}", fontWeight: "500" }}>{a.name}</strong>`, "team cal name v3");
+  b = once(b, `<small style={{ fontSize: "${F(14)}", color: "var(--crm-muted)",`, `<small style={{ fontSize: "${F(12)}", color: "var(--crm-muted)",`, "team cal sub v3");
+  {
+    const i = b.indexOf("{a.status}</span>"), sv = b.indexOf("<svg", i), se = b.indexOf("</svg>", sv);
+    if (i < 0 || sv < 0 || sv - i > 200) throw new Error("phone-4a: team cal chevron");
+    b = b.slice(0, sv) + b.slice(se + 6);
+  }
   return body.slice(0, at) + b;
 }
 

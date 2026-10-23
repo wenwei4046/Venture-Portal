@@ -1182,21 +1182,21 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </Fragment>))}
             </div>
           </div>
-          <div style={{ flex: "none", padding: "18px", borderRadius: "22px", background: "linear-gradient(155deg, var(--crm-ink) 0%, var(--crm-ink) 60%)", boxShadow: "0 10px 24px rgba(42,22,12,.22)", color: "#fff", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ flex: "none", padding: "16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", display: "flex", flexDirection: "column", gap: "12px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "6px" }}>
               {(v.cal.cStats).map((s, s_i) => (<Fragment key={s_i}>
                 <div onClick={s.open} style={{ display: "flex", flexDirection: "column", gap: "2px", cursor: s.cur }}>
-                  <strong style={{ fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>
+                  <strong style={{ fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(23.91px * var(--rv-type, 1))", fontWeight: "500", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>
                   <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-line)", textDecoration: s.deco, textUnderlineOffset: "3px" }}>{s.label}</span>
                 </div>
               </Fragment>))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,.14)" }}>
               {(v.cal.cByTeam).map((b, b_i) => (<Fragment key={b_i}>
-                <div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-rule-soft)" }}>{b.name}</span>
-                  <span style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,.12)", overflow: "hidden" }}>
-                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "4px", background: b.c }}>
+                <div style={{ display: "grid", gridTemplateColumns: "118px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: "0", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "none", width: "9px", height: "9px", boxSizing: "border-box", borderRadius: "50%", border: `2px solid ${b.c}` }} />{b.name}</span>
+                  <span style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.14)", overflow: "hidden" }}>
+                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "3px", background: "var(--crm-peach)" }}>
                     </i>
                   </span>
                   <span style={{ textAlign: "right", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{b.n} · {b.rate}</span>
@@ -1249,21 +1249,18 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           </>)}
           {(v.cal.cDays).map((d, d_i) => (<Fragment key={d_i}>
             <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <span style={{ padding: "6px 2px 2px", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(19.57px * var(--rv-type, 1))", fontWeight: "500", color: d.color }}>{d.day}</span>
+              <span style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "8px 2px 0" }}><span style={{ fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-ink)" }}>{d.head}</span><span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{d.sub}</span></span>
               {(d.items).map((a, a_i) => (<Fragment key={a_i}>
-                <div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", cursor: "pointer" }}>
-                  <span style={{ flex: "none", width: "4px", alignSelf: "stretch", borderRadius: "2px", background: a.tc }}>
+                <div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "14px", border: "1px solid var(--crm-rule)", background: "#fff", cursor: "pointer" }}>
+                  <span style={{ flex: "none", width: "3px", height: "34px", borderRadius: "2px", background: a.tc }}>
                   </span>
                   <span style={{ flex: "none", order: "-1", minWidth: "70px", whiteSpace: "nowrap", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500", fontVariantNumeric: "tabular-nums" }}>{a.time}</span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <strong style={{ fontSize: "calc(18.48px * var(--rv-type, 1))", fontWeight: "500" }}>{a.name}</strong>
-                    <small style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.who} · {a.room}</small>
+                    <strong style={{ fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "500" }}>{a.name}</strong>
+                    <small style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.who} · {a.room}</small>
                   </span>
-                  <span style={{ flex: "none", color: a.sFg, fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: "500" }}>{a.status}</span>
-                  <svg style={{ flex: "none", color: "var(--crm-faint)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m9 6 6 6-6 6">
-                    </path>
-                  </svg>
+                  <span style={{ flex: "none", color: a.sFg, fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500" }}>{a.status}</span>
+                  
                 </div>
               </Fragment>))}
             </div>
