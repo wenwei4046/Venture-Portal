@@ -699,7 +699,7 @@ const KICK: CSSProperties = { font: "500 10px Inter, sans-serif", letterSpacing:
 const HOT = new Set(["Attention", "Overdue", "Urgent", "Reply soon"]);
 
 /**
- * The shared folded rail (v2 note 04 / 08): 44 px on #FBF4EC with the rule on its left; top to bottom a 16 px icon in
+ * The shared folded rail (v2 note 04 / 08): 44 px on the cream nav (--crm-cream-nav) with the rule on its left; top to bottom a 16 px icon in
  * brown, the panel's name running down (12 px, 500, ink-soft) and one chevron-left (13 px, faint). A click anywhere opens it.
  */
 export function FoldedRail4a({ icon, label, open, side = "left" }: { icon: Icon4a; label: string; open: () => void; side?: "left" | "right" }) {
