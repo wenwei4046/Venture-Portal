@@ -165,7 +165,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 112. **The window** (⑦-2). The handoff's window is always day (its hour is fixed at 10) unless the wall is Night; built on the office's clock (UTC+8) — the evening sky from 18:00, read once the page is drawn, so the server and the browser agree.
 113. **The room's limits** (⑦-2). The handoff has none; the database keeps at most 30 pieces of the sixteen, each between 4% and 96% across.
 
-## 5. Open questions (for the user)
+## 5. Open questions (for the user) — all answered 2026-10-24, §6
 
 1. A title's default team: SENIOR MARKETING EXECUTIVE and TELEMARKETER → **Ads**; EVENT SPECIALIST CUM VISUAL MERCHANDISER → **Brand** — right? (The manager can change anyone's team.)
 2. When is an unaccepted stage red — after how many working hours? What are the PIC's "working hours"?
@@ -207,3 +207,52 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 38. Visiting a teammate: their Notes shown, their Photo private (as the handoff draws it)? Built private for now (gap 100).
 39. A new direct message: a sound, or a push to the phone? Suggested: not yet — an unread dot until the phone app.
 40. The avatar: the one uploaded in My Space, or HR's profile photo from Me (colleagues cannot read it today)? Built: My Space's own.
+
+## 6. The user's answers (2026-10-24 — the questionnaire, artifact `M5qBkHQbztb9zhpgKVGLPv`, then four questions asked again)
+
+Every question of §5 has its answer here; what is built from each says so in `.claude/rules/marketing/marketing-view.md`.
+
+| # | Answer |
+|---|---|
+| 1 | **Each People title is a group** — no Content / Design / Ads layer of Marketing's own: a stage's group is a title of the Marketing department as People Management writes it, the map's lanes and the colours too (asked again: "每个 title 就是一组"). |
+| 2 | A stage not accepted turns red after **4 working hours**; the PIC's wait the same (HR's schedule when set, else 09:00–18:00 Monday–Friday). |
+| 4 | HR invites Marketing's people once Marketing's setup is done ("wait marketing set up done"). |
+| 5 | Only MM / AMM approve. |
+| 6 | Nudge in the portal only. |
+| 7 | **Selangor**'s holidays. |
+| 8 | A workflow template, a minutes template or a product **never published** may be deleted (mig `20261025004100`). |
+| 9 | A shared option list (Locations) as a dropdown — **the person filling it in adds a missing option on the spot**. |
+| 10 | **One product project, a sub-task per deliverable** (an action × its quantity: four posters are four sub-tasks), each on its action's workflow with its own day; the product shows deliverables done ÷ all. The day is the **start** day (stage 1's owner gets it then; the SLAs run forward). |
+| 11 | A one-time product project bills (a draft) in the month it **starts**; a recurring one each month. |
+| 12 | A recurring product picks its **run day** (opened on the 1st, it may run every 5th). |
+| 13 | A **campaign is a product project with a run period**: its stages prepare it (a truck event's script, sourcing, approval, decoration …), then it runs a week or a month; the timeline shows which campaign runs when. |
+| 14 | Key dates are **each company's own**. |
+| 15 | A post is a deliverable with a **📣 Post day** date; done = Scheduled, its owner marks it Posted (with its link). |
+| 16 | A canvas date picks **a fixed kind** (Post day, Shoot day, Meeting, Ads go-live, Ads end, Report day). |
+| 17 | Progress = stages done ÷ stages (a product: deliverables done ÷ deliverables). |
+| 18 | **All of Marketing** may export a trail. |
+| 19 | Corrections **annotate** a record, never change the project; the manager's. |
+| 20 | The formal log lists the Free space's edits. |
+| 21 | **Both PDFs** — a formal document and the table as on screen. |
+| 22 | Map and Audit trail on every project. |
+| 23 | **Both**: a project may be opened from inside another (its source kept, a line on the map), and the intake is drawn on the map. |
+| 24 | Replace Person **publishes a new version** of a template at once. |
+| 25 | The replacement: **anybody on the roster**. |
+| 26 | Everything is replaced — approvals waiting, approval levels, projects owned. |
+| 27 | Told: the person replaced, the one taking over, the projects' owners. |
+| 28 | **No swap for leave** ("cancel this"). |
+| 29 | Clients may be renamed, their PIC changed; **a company may carry one or two PICs**; one PIC's approval is enough unless a step needs both — set per approval (any / all). |
+| 30 | An outside client's projects are billed: "proceed invoice, then Finance receives". |
+| 31 | A manager may make a **link** folder type (mig `20261025004000`). |
+| L1 | Share links stay Marketing · Edit's. |
+| L2 | A brand profile is **everybody's to change, with its history** — who, before, what (mig `20261025004000`). |
+| L3 | The Dustbin keeps **60 days and empties itself** (mig `20261025004000`, the hourly cron). |
+| 32 | XP: +10 a stage finished, +20 a product project's stage; nothing taken back; approvals and subtasks do not count. |
+| 33 | Energy does not fall over time. |
+| 34 | Trophies: projects finished this quarter **where you did any stage**, six at most. |
+| 35 | Direct messages: the two people; on a complaint **a personal account holding the full-access (Ultimate / Full) template** may open one, a reason typed first, the opening logged under that person's name — never the shared Principal login (amended after a side agent's note: that login is several people). |
+| 36 | Messages kept for good; nobody edits or deletes one. |
+| 37 | The lobby: Marketing · View reads it; the roster writes in it and has pets. |
+| 38 | A visitor sees **both** Notes and Photo. |
+| 39 | No sound or push for a direct message yet — an unread dot. |
+| 40 | The avatar is My Space's own. |

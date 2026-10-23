@@ -67,6 +67,10 @@ export async function GET(request: Request) {
     else if (dataCenterBin.expired) console.info('Data center bin let go', dataCenterBin.expired, 'after 30 days; files deleted', dataCenterBin.deleted)
     // …and (2026-10-14) objects nobody recorded a day after they went up — an upload or a copy whose record never came.
     if (dataCenterBin?.orphans) console.info('Data center unrecorded objects removed', dataCenterBin.orphans)
+    // Marketing's Library Dustbin (mig 20261025004000 — the user: "60 days , auto clean"): what waited 60 days goes, its
+    // bytes' rows with it (the R2 sweep below takes the bytes), even when nobody touches the Library.
+    const marketingBin = await db.rpc('mkt_lib_purge')
+    if (marketingBin.error) console.error('Marketing Dustbin purge failed', marketingBin.error.code ?? 'unknown')
     // The buckets in R2 (2026-10-23): a row whose file never arrived, a file no row names, a file sent ahead that no
     // Server Action took (2026-10-23) — a day old. Counts only.
     const files = await sweepFileObjects(db).catch(() => null)

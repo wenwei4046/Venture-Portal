@@ -173,3 +173,16 @@
   .wbGrid { grid-template-columns: minmax(0, 1fr); }
   .wbPanel { border-left: 0; border-top: 1px solid rgb(var(--mk-line-2)); }
 }
+
+/* A builder's template or product never published, deleted (2026-10-24, DeleteDraft): asked once, beside Publish. */
+.delBtn {
+  height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white));
+  color: rgb(var(--mk-red)); font: inherit; font-size: .88em; cursor: pointer; white-space: nowrap;
+}
+.delBtn:hover { border-color: rgb(var(--mk-red-line)); background: rgb(var(--mk-red-soft)); }
+.delBtn:disabled { opacity: .45; cursor: not-allowed; }
+.delAsk { display: flex; align-items: center; gap: 6px; font-size: .88em; color: rgb(var(--mk-red)); white-space: nowrap; }
+.delYes, .delNo { height: 30px; padding: 0 10px; border-radius: 7px; font: inherit; cursor: pointer; }
+.delYes { border: 0; background: rgb(var(--mk-red)); color: rgb(var(--mk-white)); }
+.delYes:disabled { opacity: .45; cursor: not-allowed; }
+.delNo { border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); }

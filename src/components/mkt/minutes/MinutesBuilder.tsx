@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { publishMktMinutes, saveMktMinutes } from '@/lib/marketing/actions'
+import { deleteMktMinutes, publishMktMinutes, saveMktMinutes } from '@/lib/marketing/actions'
 import {
   ADDABLE_TYPES, COL_GLYPH, MAX_MINUTES_FIELDS, MINUTES_COL_TYPES, RULES, addMinutesField, colTypeOf, minutesFieldsPayload, minutesPatch,
   minutesProblems, minutesSummary, minutesWarnings, newMinutesFields, newMinutesName, NEW_RULES, type MinutesEdit, type MinutesField,
   type MinutesTemplate, type MinutesType,
 } from '@/lib/marketing/minutes'
+import DeleteDraft from '../builder/DeleteDraft'
 import MinutesPreview from './MinutesPreview'
 import m from './minutes.module.css'
 
@@ -186,6 +187,29 @@ export default function MinutesBuilder({ initial, first, attendees }: {
   }
   const publishOff = !sel || !changed || problems.length > 0 || save.state === 'error' || busy
   const publishWhy = !sel ? undefined : !changed ? `Nothing has changed since v${sel.version}` : problems[0] ?? (save.state === 'error' ? save.reason : undefined)
+
+  /** A template never published, deleted (the user's answer 8) — the next one opens, or none is left. */
+  const remove = async () => {
+    if (!sel || busy) return
+    setBusy(true)
+    try {
+      if (!(await flush())) return
+      const r = await deleteMktMinutes(sel.id, revRef.current)
+      if (!r.ok) return flash(r.reason)
+      const fresh = r.templates ?? list.filter(t => t.id !== sel.id)
+      setList(fresh)
+      selRef.current = null
+      editRef.current = null
+      savedRef.current = null
+      setSelId(null)
+      setEdit(null)
+      if (fresh[0]) await open(fresh[0].id, fresh)
+      else router.replace('/marketing/minutes', { scroll: false })
+      flash(`Deleted “${sel.name}”`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const colOpen = col && fields[col[0]]?.type === 'Table' && fields[col[0]].cols?.[col[1]] ? col : null
 
@@ -409,6 +433,7 @@ export default function MinutesBuilder({ initial, first, attendees }: {
           <span>{minutesSummary(fields)}</span>
           {warnings.map(w => <span key={w} className={m.warn}>⚠️ {w}</span>)}
           <span className={m.grow} />
+          {sel.version ? null : <DeleteDraft key={sel.id} what="template" busy={busy} onDelete={() => void remove()} />}
           <button type="button" className={m.publish} disabled={publishOff} title={publishWhy} onClick={() => void publish()}>
             {changed ? `Publish v${sel.version + 1}` : 'Published ✓'}
           </button>

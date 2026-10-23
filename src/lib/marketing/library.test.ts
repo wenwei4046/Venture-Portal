@@ -87,13 +87,14 @@ describe('the Library', () => {
 
   it('keeps the Dustbin’s days — a folder from its subsidiary, a file from its folder', () => {
     const now = Date.parse('2026-10-23T00:00:00Z')
+    // 60 days since 2026-10-24 (the user: "60 days , auto clean"; mig 20261025004000).
     expect(binRows(lib, now).map(r => `${r.kind} ${r.name} · ${r.from} · ${r.left}d`)).toEqual([
-      'file Old logo draft · Carres / Brandbook · 23d',
-      'folder Meeting minutes · 2990 Home · 2d',
+      'file Old logo draft · Carres / Brandbook · 53d',
+      'folder Meeting minutes · 2990 Home · 32d',
     ])
-    // Binned a moment ago by the database's clock, a second ahead of the browser's: 30 days, never 31.
+    // Binned a moment ago by the database's clock, a second ahead of the browser's: 60 days, never 61.
     const fresh = { ...lib, trash: [{ ...lib.trash[0], at: '2026-10-23T00:00:01Z' }] }
-    expect(binRows(fresh, now).map(r => r.left)).toEqual([30])
+    expect(binRows(fresh, now).map(r => r.left)).toEqual([60])
   })
 
   it('moves a file to any folder holding files, a folder to a subsidiary without one of its type', () => {

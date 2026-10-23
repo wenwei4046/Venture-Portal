@@ -11,7 +11,7 @@ import {
   addMktLibFolder, addMktLibType, binMktLib, deleteMktLib, fileMktLib, moveMktLib,
 } from '@/lib/marketing/actions'
 import {
-  binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
+  BIN_DAYS, binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
   libraryPath, libView, listedName, moveTargets, railCounts, shareOf, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
   type LibFile, type LibSub, type LibView, type SchedItem, type AttachTask,
 } from '@/lib/marketing/library'
@@ -24,8 +24,8 @@ import s from './library.module.css'
 // page — everything (a card per subsidiary, the newest files), a subsidiary (its banner, its folders, its newest files),
 // a folder (its files, ⬆ Upload); search across every folder; + New (a folder, an upload, a link folder). A file's ···:
 // Download, Move to…, Move to Dustbin; a folder's: Open, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
-// (the manager's). Each subsidiary's brand profile — its card and banner, ✎ the manager's — and its next dates, the
-// Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
+// (the manager's), 60 days. Each subsidiary's brand profile — its card and banner, ✎ Marketing · Edit's, its history —
+// and its next dates, the Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
 
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
@@ -80,7 +80,7 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
   const [modal, setModal] = useState<Modal>(null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [newType, setNewType] = useState({ name: '', color: LIB_TYPE_COLORS[0] as string, cat: 'Content' as LibCat })
+  const [newType, setNewType] = useState({ name: '', color: LIB_TYPE_COLORS[0] as string, cat: 'Content' as LibCat, link: false })
   const [link, setLink] = useState({ type: '', url: '', error: '' })
   const picker = useRef<HTMLInputElement>(null)
   // "auto-deletes in n days" only once in the browser — the server's clock and the browser's differ — and counted
@@ -187,8 +187,8 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
             Attach to task<span className={s.menuHint}>send</span>
           </button>
           <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'file', id: f.id, name: f.name }) }}>Move to…</button>
-          <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), 'Moved to Dustbin · deletes automatically in 30 days')}>
-            Move to Dustbin<span className={s.menuHint}>30 days</span>
+          <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), `Moved to Dustbin · deletes automatically in ${BIN_DAYS} days`)}>
+            Move to Dustbin<span className={s.menuHint}>{BIN_DAYS} days</span>
           </button>
         </>
       ) : null}
@@ -305,7 +305,7 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
                 <div className={`${s.bannerName}${subLook.font ? ` ${s.brandName}` : ''}`} style={brandFace(subLook.font)}>{subLook.name}</div>
                 <div className={s.bannerSub}>{subLook.caption}</div>
               </div>
-              {can.manage ? (
+              {can.edit ? (
                 <button type="button" className={s.editBtn} title="Edit brand profile" aria-label="Edit brand profile"
                   onClick={() => { setMenu(null); setModal({ kind: 'profile' }) }}>✎</button>
               ) : null}
@@ -357,6 +357,12 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
                           {LIB_CATS.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
+                      <button type="button" role="switch" aria-checked={newType.link} className={s.toggleRow}
+                        title="Each subsidiary's folder of this type is a link — kept on Google Drive or Dropbox"
+                        onClick={() => setNewType(t => ({ ...t, link: !t.link }))}>
+                        <span className={`${s.track}${newType.link ? ` ${s.trackOn}` : ''}`}><span className={s.knob} /></span>
+                        🔗 Link folder
+                      </button>
                       <div className={s.addNewRow}>
                         <div className={s.swatches} role="radiogroup" aria-label="Colour">
                           {LIB_TYPE_COLORS.map(c => (
@@ -368,8 +374,9 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
                         <button type="button" className={s.btnPrimary} disabled={!newType.name.trim() || busy}
                           onClick={async () => {
                             const name = newType.name.trim()
-                            const ok = await run(() => addMktLibType(name, newType.color, newType.cat), `New folder type "${name}" saved for every subsidiary`)
-                            if (ok) setNewType(t => ({ ...t, name: '' }))
+                            const ok = await run(() => addMktLibType(name, newType.color, newType.cat, newType.link),
+                              `New ${newType.link ? 'link ' : ''}folder type "${name}" saved for every subsidiary`)
+                            if (ok) setNewType(t => ({ ...t, name: '', link: false }))
                           }}>Create</button>
                       </div>
                     </div>
@@ -413,8 +420,8 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
                             ) : null}
                             <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'folder', id: t.folder.id, name: t.type.name }) }}>Move to…</button>
                             <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`}
-                              onClick={() => void run(() => binMktLib('folder', t.folder.id), 'Folder moved to Dustbin · 30 days')}>
-                              Move to Dustbin<span className={s.menuHint}>30 days</span>
+                              onClick={() => void run(() => binMktLib('folder', t.folder.id), `Folder moved to Dustbin · ${BIN_DAYS} days`)}>
+                              Move to Dustbin<span className={s.menuHint}>{BIN_DAYS} days</span>
                             </button>
                           </>
                         ) : null}
@@ -517,7 +524,7 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
         return <AttachToTask file={modal.id} name={modal.name} sub={owner?.name ?? ''} tasks={owner ? tasks[owner.id] ?? [] : []} onClose={() => setModal(null)} />
       })() : null}
 
-      {modal?.kind === 'profile' && sub && can.manage ? (
+      {modal?.kind === 'profile' && sub && can.edit ? (
         <BrandProfile sub={sub} onClose={() => setModal(null)} onSaved={l => { setLib(l); setModal(null) }} />
       ) : null}
 
