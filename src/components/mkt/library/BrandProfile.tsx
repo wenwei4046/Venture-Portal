@@ -18,6 +18,9 @@ import s from './library.module.css'
 
 /** A brand picture: an image, and a small one. */
 const PICTURE_MAX = 10 * 1024 * 1024
+/** What a screen reader calls each colour (the handoff names none), in LIB_AVATAR_COLORS' and LIB_BANNER_COLORS' order. */
+const AVATAR_NAMES = ['Walnut', 'Navy', 'Charcoal', 'Olive', 'Teal', 'Rust', 'Plum']
+const BANNER_NAMES = ['Sand', 'Mist', 'Stone', 'Sage', 'Peach', 'Blush', 'Charcoal']
 
 export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; onClose: () => void; onSaved: (lib: Library) => void }) {
   const [draft, setDraft] = useState<LibProfile>(sub.profile)
@@ -82,7 +85,7 @@ export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; o
 
         <div className={s.preview} data-dark={look.banner.dark ? '' : undefined}
           style={look.banner.img ? { backgroundImage: `url("${fileRoute('marketing', look.banner.img)}")` } : { background: look.banner.bg ?? undefined }}>
-          <span className={s.previewAvatar} style={look.avatar.bg ? { background: look.avatar.bg } : undefined} aria-hidden="true">
+          <span className={`${s.previewAvatar}${look.avatar.bg ? ` ${s.avatarColour}` : ''}`} style={look.avatar.bg ? { background: look.avatar.bg } : undefined} aria-hidden="true">
             {look.avatar.img ? <img src={fileRoute('marketing', look.avatar.img)} alt="" /> : look.avatar.text}
           </span>
           <div className={s.ellipsis}>
@@ -95,8 +98,8 @@ export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; o
           <div className={s.field}>
             <span className={s.profileHead}>Profile picture</span>
             <div className={s.swatches} role="radiogroup" aria-label="Profile picture colour">
-              {LIB_AVATAR_COLORS.map(c => (
-                <button key={c} type="button" role="radio" aria-checked={!draft.avatarPath && draft.avatar === c} aria-label={c}
+              {LIB_AVATAR_COLORS.map((c, i) => (
+                <button key={c} type="button" role="radio" aria-checked={!draft.avatarPath && draft.avatar === c} aria-label={AVATAR_NAMES[i]}
                   className={`${s.swatch24} ${!draft.avatarPath && draft.avatar === c ? s.swatchOn : ''}`} style={{ background: c }}
                   onClick={() => set({ avatar: c, avatarPath: null })} />
               ))}
@@ -110,8 +113,8 @@ export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; o
           <div className={s.field}>
             <span className={s.profileHead}>Background picture</span>
             <div className={s.swatches} role="radiogroup" aria-label="Background colour">
-              {LIB_BANNER_COLORS.map(c => (
-                <button key={c} type="button" role="radio" aria-checked={!draft.bannerPath && draft.banner === c} aria-label={c}
+              {LIB_BANNER_COLORS.map((c, i) => (
+                <button key={c} type="button" role="radio" aria-checked={!draft.bannerPath && draft.banner === c} aria-label={BANNER_NAMES[i]}
                   className={`${s.swatch24} ${s.swatchEdge} ${!draft.bannerPath && draft.banner === c ? s.swatchOn : ''}`} style={{ background: c }}
                   onClick={() => set({ banner: c, bannerPath: null })} />
               ))}

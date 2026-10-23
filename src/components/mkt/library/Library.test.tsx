@@ -207,7 +207,7 @@ describe('a brand in the Library', () => {
     render(<Library initial={lib} can={{ edit: true, manage: true }} at={{ ...AT, co: 'CAR' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit brand profile' }))
     const dlg = screen.getByRole('dialog', { name: 'Edit Carres profile' })
-    fireEvent.click(within(dlg).getByRole('radio', { name: 'rgb(240 228 236)' }))
+    fireEvent.click(within(within(dlg).getByRole('radiogroup', { name: 'Background colour' })).getByRole('radio', { name: 'Blush' }))
     fireEvent.click(within(dlg).getByRole('radio', { name: /DM Serif/ }))
     fireEvent.change(within(dlg).getByLabelText('Display name'), { target: { value: 'Carres Living' } })
     fireEvent.change(within(dlg).getByLabelText('Caption'), { target: { value: 'Sofa & living' } })
