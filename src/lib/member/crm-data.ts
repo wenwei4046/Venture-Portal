@@ -115,6 +115,10 @@ export interface CrmRoom {
   photo?: string | null;
   mapGoogle?: string | null;
   mapWaze?: string | null;
+  /** v2 frame 07: staff only — never sent to a customer; shown to sales in Book visit. */
+  remarks?: string;
+  /** Deleted (soft): left out of every list, kept so past visits keep the showroom's name. */
+  deleted?: boolean;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
@@ -340,6 +344,8 @@ export interface CrmRoomRow {
   address?: string | null; slots?: string[] | null; cap?: number | null; weekly?: number[] | null; blocks?: CrmBlock[] | null;
   /** CRM Desktop rev 1 (B4): the photo's signed link (made by the read), the map links typed over the address's own. */
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
+  /** v2 frame 07 (mig 20261024150000): staff-only remarks; a deleted showroom stays for its past visits' names. */
+  remarks?: string; deleted?: boolean;
 }
 export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null; marked_unread?: boolean }
 export interface CrmInviteRow {
@@ -452,6 +458,7 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   id: r.id, name: r.name, active: r.active, address: r.address ?? "",
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
   ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
+  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => ({

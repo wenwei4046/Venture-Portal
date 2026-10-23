@@ -206,6 +206,8 @@ export interface HistRow { at: string; who: string; table: string; op: string; w
 export interface SrDraft {
   id: string | null; dispName: string; addr: string; gmap: string; waze: string; manual: boolean; photo: string; photoFile: File | null;
   limit: number; times: string[]; off: Record<string, 1>; weekDays: number[]; blocks: SrBlock[];
+  /** v2 frame 07: staff-only remarks (crm_save_showroom_remarks). */
+  remarks: string;
 }
 export interface SrBlock { kind: "date"; from: string; to: string; allDay: boolean; ranges: { f: string; t: string }[]; reason: string }
 export interface SrBlk { days: number[]; from: string; to: string; allDay: boolean; ranges: { f: string; t: string }[]; reason: string; wkReason: string }
@@ -274,6 +276,9 @@ export interface DeskActions {
   saveForm(form: { id: string | null; name: string; sections: FormSection[] }): Promise<string | false>;
   deleteForm(id: string): Promise<boolean>;
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
+  /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
+  saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;
+  deleteRoom(roomId: string): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */

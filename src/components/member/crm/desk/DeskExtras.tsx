@@ -35,6 +35,9 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
       <div style={{ display: "inline-flex", alignSelf: "flex-start", background: "var(--crm-field)", borderRadius: "11px", padding: "3px", gap: "2px", flexWrap: "wrap" }}>
         {v.rooms.map((r, i) => <span key={i} onClick={r.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: r.bg, color: r.fg, fontSize: "13px", fontWeight: "650", boxShadow: r.sh, cursor: "pointer", whiteSpace: "nowrap" }}>{r.label}</span>)}
       </div>
+      {/* v2 frame 07: the showroom's staff-only remarks, for whoever books (never sent to the customer). */}
+      {v.remarks && <div style={{ display: "flex", gap: "8px", padding: "10px 12px", borderRadius: "10px", background: "var(--crm-field)", font: "400 12px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+        <span style={{ display: "flex", flex: "none", paddingTop: "2px", color: "var(--crm-muted)" }}><Ic name="lock" size={12} /></span><span style={{ whiteSpace: "pre-wrap" }}>{v.remarks}</span></div>}
       {/* Day: the month chip and Week | Month, as the salesperson's sheet (the owner, 2026-10-13). */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ ...LABEL, flex: "none" }}>Day</span>

@@ -83,7 +83,7 @@ export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
       pick: () => { if (!off) put({ slot: label }); } }; }) : [];
   const ok = !!room && !!b.slot && !!c;
   return {
-    name: c?.name ?? "", ini: initials(c?.name ?? "?"), has: !!visit,
+    name: c?.name ?? "", ini: initials(c?.name ?? "?"), has: !!visit, remarks: room?.remarks ?? "",
     current: visit ? `${new Date(visit.start).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
     rooms: rooms.map((r, i) => ({ label: r.name, on: i === b.room, bg: i === b.room ? "#fff" : "transparent", fg: i === b.room ? "var(--crm-ink)" : "var(--crm-muted)", sh: i === b.room ? "0 1px 3px rgba(42,22,12,.14)" : "none", pick: () => put({ room: i, slot: null }) })),
     weekLabel: `${new Date(days[0] ? T + b.week * 7 * DAY : T).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} – ${new Date(T + (b.week * 7 + 6) * DAY).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`,

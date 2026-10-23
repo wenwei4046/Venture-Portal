@@ -157,6 +157,16 @@ export default function DeskScreens(p: DeskScreensProps) {
         setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id) }));
         return true;
       },
+      async saveRoomRemarks(roomId, remarks) {
+        if (!(await call("crm_save_showroom_remarks", { p_id: roomId, p_remarks: remarks }))) return false;
+        setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, remarks } : r)) }));
+        return true;
+      },
+      async deleteRoom(roomId) {
+        if (!(await call("crm_delete_showroom", { p_id: roomId }))) return false;
+        setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, active: false, deleted: true } : r)) }));
+        return true;
+      },
       async saveShowroomExtras(roomId, x) {
         if (live) {
           const form = new FormData();

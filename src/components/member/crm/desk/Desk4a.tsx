@@ -1434,12 +1434,67 @@ export function DeskSplit4a({ v }: { v: SplitBits }) {
   );
 }
 
+/** A typed hour ("10:00"): kept as typed while the box has focus, applied on blur or Enter when it reads as a whole hour. */
+const hourOf = (s: string) => { const m = s.trim().match(/^(\d{1,2})(?::(\d{2}))?$/); if (!m) return null; const h = Number(m[1]); return h >= 0 && h <= 24 && (!m[2] || m[2] === "00") ? h : null; };
+const HOUR_BOX: CSSProperties = { flex: "1 1 0%", minWidth: 0, height: "32px", padding: "0 10px", borderRadius: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff",
+  font: `500 13px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", outline: "none" };
+function HourBox({ value, onDone, label }: { value: string; onDone: (h: number) => void; label: string }) {
+  const [txt, setTxt] = useState<string | null>(null);
+  const done = () => { if (txt != null) { const h = hourOf(txt); if (h != null) onDone(h); setTxt(null); } };
+  return <input value={txt ?? value} onChange={e => setTxt(e.target.value)} onBlur={done} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} aria-label={label} inputMode="numeric" style={HOUR_BOX} />;
+}
+function AllDaysHours({ f, t, apply }: { f: string; t: string; apply: (f: number, t: number) => void }) {
+  const [a, setA] = useState<string | null>(null), [b, setB] = useState<string | null>(null);
+  const fa = hourOf(a ?? f), tb = hourOf(b ?? t), ok = fa != null && tb != null && tb > fa;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px", borderRadius: "8px", background: "var(--crm-cream)" }}>
+      <span style={{ flex: "none", width: "44px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>All days</span>
+      <input value={a ?? f} onChange={e => setA(e.target.value)} aria-label="All days from" inputMode="numeric" style={HOUR_BOX} />
+      <span style={{ color: "var(--crm-faint)" }}>–</span>
+      <input value={b ?? t} onChange={e => setB(e.target.value)} aria-label="All days to" inputMode="numeric" style={HOUR_BOX} />
+      <button type="button" disabled={!ok} onClick={() => { if (ok) { apply(fa!, tb!); setA(null); setB(null); } }} style={{ ...BTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center",
+        background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap" }} className={ok ? "crm4a-primary" : undefined}>Apply to all</button>
+    </div>
+  );
+}
+function DayHours({ d }: { d: { l: string; open: boolean; f: string; t: string; set: (f: number, t: number) => void; toggle: () => void } }) {
+  const fh = hourOf(d.f) ?? 10, th = hourOf(d.t) ?? 21;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <button type="button" role="switch" aria-checked={d.open} aria-label={`${d.l} open`} onClick={d.toggle} style={{ ...BTN, flex: "none", width: "32px", height: "18px", borderRadius: "9px", position: "relative", background: d.open ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .16s" }}>
+        <span style={{ position: "absolute", top: "2px", left: d.open ? "16px" : "2px", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", transition: "left .16s" }} />
+      </button>
+      <span style={{ flex: "none", width: "34px", font: "500 13px Inter, sans-serif", color: d.open ? "var(--crm-ink)" : "var(--crm-faint)" }}>{d.l}</span>
+      {d.open ? (<>
+        <HourBox value={d.f} onDone={h => d.set(h, Math.max(th, h + 1))} label={`${d.l} from`} />
+        <span style={{ color: "var(--crm-faint)" }}>–</span>
+        <HourBox value={d.t} onDone={h => d.set(Math.min(fh, h - 1), h)} label={`${d.l} to`} />
+      </>) : <span style={{ flex: "1 1 0%", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Closed</span>}
+    </div>
+  );
+}
+/** Delete showroom (note 04): asked again; the database refuses it while visits are upcoming and says how many. */
+function DeleteRoom({ name, del }: { name: string; del: () => void }) {
+  const [ask, setAsk] = useState(false);
+  return ask ? (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "20px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+      <span style={{ flex: 1, minWidth: 0 }}>Delete {name || "this showroom"}? Past visits keep its name.</span>
+      <button type="button" onClick={() => setAsk(false)} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>Cancel</button>
+      <button type="button" onClick={() => { setAsk(false); del(); }} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setAsk(true)} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", marginTop: "20px", paddingTop: "4px", font: "500 13px Inter, sans-serif", color: "var(--crm-oxblood)" }}><Ic name="trash-2" size={14} />Delete showroom</button>
+  );
+}
+
 interface RoomsBits {
   sr4: {
     has: boolean; isNew: boolean; pager: { at: number; n: number; prev: () => void; next: () => void; prevOff: boolean; nextOff: boolean }; add: () => void;
     name: string; setName: (e: { target: { value: string } }) => void; addr: string; setAddr: (e: { target: { value: string } }) => void; links: { g: string; w: string };
     limit: number; down: () => void; up: () => void; closures: { when: string; sub: string; remove: () => void }[];
     grid: { label: string; cells: { on: boolean; toggle: () => void }[] }[]; dirty: boolean;
+    hours: { all: { f: string; t: string; apply: (f: number, t: number) => void }; days: { l: string; open: boolean; f: string; t: string; set: (f: number, t: number) => void; toggle: () => void }[] };
+    remarks: string; setRemarks: (e: { target: { value: string } }) => void; canDelete: boolean; del: () => void;
   };
   srBlkOpen: boolean; srBlkToggle: () => void; srBlk: { from: string; to: string; reason: string };
   srBlkFrom: (e: { target: { value: string } }) => void; srBlkTo: (e: { target: { value: string } }) => void; srBlkReason: (e: { target: { value: string } }) => void;
@@ -1466,7 +1521,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
   );
   return (
     <div style={{ display: "flex", minHeight: "100%", margin: "-16px -36px -32px" }}>
-      <div style={{ width: "400px", flex: "none", padding: "20px 32px 32px 36px", display: "flex", flexDirection: "column", boxSizing: "content-box", borderRight: "1px solid var(--crm-rule)" }}>
+      <div style={{ width: "420px", flex: "none", padding: "20px 28px 24px 36px", display: "flex", flexDirection: "column", boxSizing: "border-box", borderRight: "1px solid var(--crm-rule)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button type="button" onClick={S.pager.prev} disabled={S.pager.prevOff} title="Previous showroom" style={round(S.pager.prevOff)}><Ic name="chevron-left" size={14} /></button>
           <span style={{ font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{S.pager.at} / {S.pager.n}</span>
@@ -1498,7 +1553,7 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
         <div style={{ display: "flex", alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Visits per slot</span>
-            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>How many may book the same time</span>
+            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Each slot is one hour</span>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", height: "36px", border: "1px solid var(--crm-line)", borderRadius: "7px" }}>
             <button type="button" onClick={S.down} aria-label="Fewer" style={{ ...BTN, width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-ink-soft)" }}>−</button>
@@ -1547,6 +1602,27 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           ))}
           {!S.closures.length && !v.srBlkOpen && <span style={{ padding: "12px 0", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>No closures</span>}
         </div>
+        {/* v2 frame 07 (note 04): opening hours typed in — All days + Apply to all, then each day; the grid shows the same. */}
+        <div style={{ height: "1px", background: "var(--crm-rule)", margin: "20px 0" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "baseline" }}>
+            <div style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Opening hours</div>
+            <div style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Type, or drag on the grid</div>
+          </div>
+          <AllDaysHours f={S.hours.all.f} t={S.hours.all.t} apply={S.hours.all.apply} />
+          {S.hours.days.map(d => <DayHours key={d.l} d={d} />)}
+        </div>
+        <div style={{ height: "1px", background: "var(--crm-rule)", margin: "20px 0" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Remarks</div>
+            <span style={{ height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", gap: "4px", background: "var(--crm-tint-lost)", color: "var(--crm-muted)", font: "500 11px Inter, sans-serif" }}><Ic name="lock" size={10} />Staff only</span>
+          </div>
+          <textarea value={S.remarks} onChange={S.setRemarks} aria-label="Remarks" placeholder="Parking, which lift, what to show first…" rows={3} style={{ minHeight: "72px", padding: "10px 12px", borderRadius: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)",
+            font: "400 13px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)", resize: "vertical", outline: "none", background: "#fff" }} />
+          <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Customers never see this. It shows to sales when they book a visit here.</div>
+        </div>
+        {S.canDelete && <DeleteRoom name={S.name} del={S.del} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: "20px 36px 32px 28px", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", paddingBottom: "14px" }}>
