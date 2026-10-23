@@ -1,16 +1,17 @@
-// My Space's own side (⑦-1, `My Space Bento.dc.html`; migs 20261024007500 and 20261024007600): the board its owner
-// lays out — tiles moved and resized anywhere, added and taken off — the page's background, the accent and the
-// corners, the cover (one of four, or a picture), the avatar, the status, and the Notes and Photo tiles. The prototype
-// kept it in the browser; here it is the login's row (`mkt_space()` / `mkt_space_save(patch)`). Pure: the page draws
-// what this returns, and sends what it makes.
+// My Space's own side (`My Space Bento.dc.html`; ⑦-1, migs 20261024007500 and 20261024007600; ⑦-2, mig
+// 20261024007700): the board its owner lays out — tiles moved and resized anywhere, added and taken off — the page's
+// background, the accent and the corners, the cover (one of four, or a picture), the avatar, the status, the Notes and
+// Photo tiles; the room (its wall, its floor, its furniture) and the pet's look (its kind or one's own animal, its name,
+// its colour). The prototype kept it in the browser; here it is the login's row (`mkt_space()` /
+// `mkt_space_save(patch)`). Pure: the page draws what this returns, and sends what it makes.
 //
 // The board's measures are the prototype's: x and w are fractions of its width, y and h pixels; a column is a quarter
 // (CW), a row 182 px (RW), 12 px between tiles (a tile is drawn 12 px narrower and lower than its place).
 
 import { tidyFileName } from './library'
 
-/** The tiles a board offers today (the room, the pet, the chat, the lobby and the trophies come later). */
-export type TileKind = 'turn' | 'waiting' | 'delegated' | 'week' | 'notes' | 'photo'
+/** The tiles a board offers today (the pet's own tile, the chat, the lobby and the trophies come later). */
+export type TileKind = 'room' | 'turn' | 'waiting' | 'delegated' | 'week' | 'notes' | 'photo'
 export interface TilePlace { id: string; x: number; y: number; w: number; h: number }
 
 export const RW = 182
@@ -21,6 +22,7 @@ export const GAP = 12
 const MAXH = 2000
 
 export const TILES: Record<TileKind, { emoji: string; label: string; size: [number, number] }> = {
+  room: { emoji: '🏠', label: 'Room', size: [2, 2] },
   turn: { emoji: '👉', label: 'My turn', size: [1, 2] },
   waiting: { emoji: '⏳', label: 'Waiting', size: [1, 1] },
   delegated: { emoji: '📤', label: 'Delegated', size: [1, 1] },
@@ -33,15 +35,17 @@ export const KINDS = Object.keys(TILES) as TileKind[]
 /** Always on the board, "so nobody hides their work". */
 export const LOCKED: readonly string[] = ['turn', 'waiting']
 /** On a board until its owner takes them off — a kind shipped later joins a saved board once (tilesKnown). */
-const DEFAULT_ON: TileKind[] = ['turn', 'waiting', 'delegated', 'week']
+const DEFAULT_ON: TileKind[] = ['room', 'turn', 'waiting', 'delegated', 'week']
 
 export const isKind = (id: string): id is TileKind => (KINDS as string[]).includes(id)
 
 const place = (id: TileKind, c: number, r: number, w: number, h: number): TilePlace => ({ id, x: c * CW, y: r * RW, w: w * CW, h: h * RW })
-/** Before the first save, the page as it stood: My turn on the left half, two rows high (its cards two abreast),
- * Waiting and Delegated beside it, This week under them. The prototype's DEFAULT_POS begins with the room and the pet,
- * which are not here yet. */
-export const DEFAULT_LAYOUT: TilePlace[] = [place('turn', 0, 0, 2, 2), place('waiting', 2, 0, 1, 1), place('delegated', 3, 0, 1, 1), place('week', 2, 1, 2, 1)]
+/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the pet's tile, the chat, the
+ * trophies, the lobby) — the room top left, two by two; My turn beside it, two rows high; Waiting and Delegated on the
+ * right; This week under the room. */
+export const DEFAULT_LAYOUT: TilePlace[] = [
+  place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('waiting', 3, 0, 1, 1), place('delegated', 3, 1, 1, 1), place('week', 0, 2, 2, 1),
+]
 
 // ── The look: keys, never colours (the colours are tokens in globals.css) ───────────
 export const BGS = ['linen', 'mint', 'lilac', 'sand', 'white'] as const
@@ -58,6 +62,87 @@ export const ACCENT_NAMES: Record<AccentKey, string> = { orange: 'Orange', walnu
 export const CORNER_NAMES: Record<CornerKey, string> = { square: 'Square', soft: 'Soft', round: 'Round' }
 export const COVERS = 4
 
+// ── ⑦-2: the room and the pet's look (mig 20261024007700) ───────────────────────────
+export const WALLS = ['peach', 'sage', 'sky', 'blush', 'cream', 'night'] as const
+export const FLOORS = ['oak', 'walnut', 'tile', 'grass', 'carpet'] as const
+export type WallKey = (typeof WALLS)[number]
+export type FloorKey = (typeof FLOORS)[number]
+export const WALL_NAMES: Record<WallKey, string> = { peach: 'Peach', sage: 'Sage', sky: 'Sky', blush: 'Blush', cream: 'Cream', night: 'Night' }
+export const FLOOR_NAMES: Record<FloorKey, string> = { oak: 'Oak', walnut: 'Walnut', tile: 'Tile', grass: 'Grass', carpet: 'Carpet' }
+/** The furniture — the prototype's CATALOG: its emoji, its name, its size (px at full scale), whether it hangs on the wall. */
+export const CATALOG = {
+  bed: { emoji: '🛏️', label: 'Bed', size: 64, wall: false }, sofa: { emoji: '🛋️', label: 'Sofa', size: 58, wall: false },
+  plant: { emoji: '🪴', label: 'Plant', size: 46, wall: false }, desk: { emoji: '🖥️', label: 'Computer', size: 48, wall: false },
+  chair: { emoji: '🪑', label: 'Chair', size: 42, wall: false }, books: { emoji: '📚', label: 'Books', size: 34, wall: false },
+  teddy: { emoji: '🧸', label: 'Teddy', size: 36, wall: false }, guitar: { emoji: '🎸', label: 'Guitar', size: 46, wall: false },
+  cactus: { emoji: '🌵', label: 'Cactus', size: 40, wall: false }, tv: { emoji: '📺', label: 'TV', size: 48, wall: false },
+  candle: { emoji: '🕯️', label: 'Candle', size: 30, wall: false }, game: { emoji: '🕹️', label: 'Arcade', size: 38, wall: false },
+  tree: { emoji: '🎄', label: 'Tree', size: 56, wall: false }, frame: { emoji: '🖼️', label: 'Art', size: 36, wall: true },
+  clock: { emoji: '🕰️', label: 'Clock', size: 32, wall: true }, trophy: { emoji: '🏆', label: 'Trophy', size: 28, wall: true },
+} as const
+export type PieceKind = keyof typeof CATALOG
+export const PIECES = Object.keys(CATALOG) as PieceKind[]
+export interface Piece { id: string; k: PieceKind; x: number; flip: 1 | -1 }
+export interface Room { wall: WallKey; floor: FloorKey; items: Piece[] }
+const piece = (k: PieceKind, x: number): Piece => ({ id: `${k}-${x}`, k, x, flip: 1 })
+/** A room before its owner decorates it: the prototype's first person's (peach, oak, a bed, a plant, art, a computer, a
+ * chair and a clock). */
+export const DEFAULT_ROOM: Room = {
+  wall: 'peach', floor: 'oak', items: [piece('bed', 14), piece('plant', 32), piece('frame', 48), piece('desk', 66), piece('chair', 80), piece('clock', 86)],
+}
+export const ROOM_MAX_PIECES = 30
+
+export const SPECIES = {
+  cat: { label: 'Cat', forms: ['🐱', '🐈', '🦁'], names: ['Kitten', 'Cat', 'Lion'] },
+  dog: { label: 'Dog', forms: ['🐶', '🐕', '🐺'], names: ['Puppy', 'Dog', 'Wolf'] },
+  bird: { label: 'Bird', forms: ['🐣', '🐦', '🦅'], names: ['Chick', 'Bird', 'Eagle'] },
+  dragon: { label: 'Dragon', forms: ['🥚', '🦎', '🐉'], names: ['Egg', 'Lizard', 'Dragon'] },
+} as const
+export type SpeciesKey = keyof typeof SPECIES
+export const SPECIES_KEYS = Object.keys(SPECIES) as SpeciesKey[]
+export const PET_COLORS = ['original', 'cocoa', 'snow', 'rose', 'mint', 'sky', 'midnight'] as const
+export type PetColor = (typeof PET_COLORS)[number]
+export const PET_COLOR_NAMES: Record<PetColor, string> = {
+  original: 'Original', cocoa: 'Cocoa', snow: 'Snow', rose: 'Rose', mint: 'Mint', sky: 'Sky', midnight: 'Midnight',
+}
+export interface Pet { species: SpeciesKey; name: string; color: PetColor; onboarded: boolean }
+export const NO_PET: Pet = { species: 'cat', name: '', color: 'original', onboarded: false }
+export const NAME_IDEAS = ['Mochi', 'Bao', 'Kopi', 'Sambal', 'Teh Tarik', 'Durian']
+export const PET_NAME_MAX = 16
+/** The prototype's sizes by level (px); its levels, XP and energy come with ⑦-5 — until then a pet is at level 1. */
+export const PET_SIZE = [30, 34, 38, 42, 46, 52]
+export const formOf = (level: number) => (level <= 2 ? 0 : level <= 4 ? 1 : 2)
+export const FORM_LEVELS = ['Lv 1–2', 'Lv 3–4', 'Lv 5–6']
+
+export type PetState = 'idle' | 'newTask' | 'busy' | 'overload' | 'sleeping' | 'eating' | 'exercising' | 'levelUp' | 'hungry'
+/** Each state's words and the bubble over the pet (the prototype's STATES). */
+export const PET_STATES: Record<PetState, { label: string; bubble: string }> = {
+  idle: { label: 'Chilling', bubble: '' }, newTask: { label: 'New task!', bubble: '❗' }, busy: { label: 'Working', bubble: '💻' },
+  overload: { label: 'Overloaded', bubble: '💦' }, sleeping: { label: 'Sleeping', bubble: '💤' }, eating: { label: 'Eating', bubble: '🍙' },
+  exercising: { label: 'Working out', bubble: '💪' }, levelUp: { label: 'Level up!', bubble: '✨' }, hungry: { label: 'Hungry', bubble: '🍽️' },
+}
+
+/** How the pet looks with what is on its owner's plate (the prototype's myState, energy aside until ⑦-5): overloaded
+ * with two things late or four on the plate, a new stage to accept, working, or asleep with nothing on it. */
+export function petState(plate: { count: number; red: number; fresh: boolean }): PetState {
+  if (plate.red >= 2 || plate.count >= 4) return 'overload'
+  if (plate.fresh) return 'newTask'
+  if (plate.count >= 1) return 'busy'
+  return 'sleeping'
+}
+
+/** The room's furniture as drawn in a tile so big: smaller in a short or narrow room (the prototype's buildRoom). */
+export function roomScale(t: TilePlace): number {
+  return t.h < 240 ? 0.55 : t.w < 0.4 ? 0.75 : 1
+}
+
+let pieceSerial = 0
+/** A new piece, somewhere in the middle of the room. */
+export function newPiece(k: PieceKind, at = 20 + Math.round(Math.random() * 60)): Piece {
+  pieceSerial = (pieceSerial + 1) % 1000
+  return { id: `${k}-${Date.now().toString(36)}${pieceSerial.toString(36)}`, k, x: at, flip: 1 }
+}
+
 export interface Space {
   layout: TilePlace[]
   theme: SpaceTheme
@@ -70,6 +155,10 @@ export interface Space {
   photoPath: string | null
   /** The kinds the saved board has seen. */
   tilesKnown: string[]
+  room: Room
+  pet: Pet
+  /** One's own animal, in place of the four kinds. */
+  petPath: string | null
   /** Saved at least once. */
   saved: boolean
 }
@@ -134,7 +223,38 @@ export function spaceFromRow(row: unknown): Space {
     notes: text(r.notes),
     photoPath: path(r.photoPath),
     tilesKnown: known,
+    room: roomFromRow(r.room),
+    pet: petFromRow(r.pet),
+    petPath: path(r.petPath),
     saved,
+  }
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+/** A room as kept — never set (`{}`) is the default room. */
+export function roomFromRow(v: unknown): Room {
+  if (!isObject(v) || !Object.keys(v).length) return { ...DEFAULT_ROOM, items: DEFAULT_ROOM.items.map(i => ({ ...i })) }
+  const seen = new Set<string>()
+  const items: Piece[] = []
+  for (const x of Array.isArray(v.items) ? v.items : []) {
+    if (!isObject(x) || typeof x.id !== 'string' || seen.has(x.id) || !(PIECES as string[]).includes(String(x.k))) continue
+    const at = num(x.x)
+    if (at == null) continue
+    seen.add(x.id)
+    items.push({ id: x.id, k: x.k as PieceKind, x: Math.min(96, Math.max(4, Math.round(at))), flip: x.flip === -1 ? -1 : 1 })
+  }
+  return { wall: oneOf(WALLS, v.wall, DEFAULT_ROOM.wall), floor: oneOf(FLOORS, v.floor, DEFAULT_ROOM.floor), items: items.slice(0, ROOM_MAX_PIECES) }
+}
+
+/** A pet as kept — never set (`{}`) is a cat with no name yet, not set up. */
+export function petFromRow(v: unknown): Pet {
+  if (!isObject(v)) return { ...NO_PET }
+  return {
+    species: oneOf(SPECIES_KEYS, v.species, NO_PET.species),
+    name: typeof v.name === 'string' ? v.name.slice(0, PET_NAME_MAX) : '',
+    color: oneOf(PET_COLORS, v.color, NO_PET.color),
+    onboarded: v.onboarded === true,
   }
 }
 
@@ -223,8 +343,11 @@ export interface SpacePatch {
   photoPath?: string | null
   status?: string
   notes?: string
+  room?: Room
+  pet?: Pet
+  petPath?: string | null
 }
-const PATCH_PATHS = ['coverPath', 'avatarPath', 'photoPath'] as const
+const PATCH_PATHS = ['coverPath', 'avatarPath', 'photoPath', 'petPath'] as const
 
 /** Only the parts sent, as `mkt_space_save` takes them — whatever else came in left out (the database checks the rest). */
 export function spacePatchOf(p: SpacePatch): Record<string, unknown> {
@@ -240,13 +363,21 @@ export function spacePatchOf(p: SpacePatch): Record<string, unknown> {
   for (const k of PATCH_PATHS) if (k in p) out[k] = typeof p[k] === 'string' && p[k] ? p[k] : null
   if ('status' in p) out.status = String(p.status ?? '').slice(0, 80)
   if ('notes' in p) out.notes = String(p.notes ?? '').slice(0, 4000)
+  if (p.room && typeof p.room === 'object') {
+    const r = roomFromRow({ ...p.room, items: Array.isArray(p.room.items) ? p.room.items : [] })
+    out.room = { wall: r.wall, floor: r.floor, items: r.items }
+  }
+  if (p.pet && typeof p.pet === 'object') {
+    const pet = petFromRow(p.pet)
+    out.pet = { species: pet.species, name: pet.name, color: pet.color, onboarded: pet.onboarded }
+  }
   return out
 }
 
 // ── Pictures ───────────────────────────────────────────────────────────────────────
-/** The cover and the avatar — space/<uuid>/<name>, which Marketing sees; the photo — mine/<uuid>/<name>, which only
- * its owner does (the bucket's policies, mig 20261024007600). */
-export const spacePicturePath = (kind: 'cover' | 'avatar' | 'photo', fileName: string, uuid: string) =>
+/** The cover, the avatar and one's own animal — space/<uuid>/<name>, which Marketing sees; the photo —
+ * mine/<uuid>/<name>, which only its owner does (the bucket's policies, mig 20261024007600). */
+export const spacePicturePath = (kind: 'cover' | 'avatar' | 'photo' | 'pet', fileName: string, uuid: string) =>
   `${kind === 'photo' ? 'mine' : 'space'}/${uuid}/${tidyFileName(fileName)}`
 
 /** A space's picture: an image, and not a large one. */

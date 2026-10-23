@@ -7266,6 +7266,20 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-sp-cover-2: linear-gradient(135deg, oklch(0.38 0.06 280), oklch(0.52 0.09 320));
   --mk-sp-cover-3: linear-gradient(135deg, oklch(0.92 0.06 95), oklch(0.85 0.08 55));
   --mk-sp-notes: 255 249 222;
+  /* ⑦-2 — the room's walls, its floors (two tones each), the window's frame and skies, the line under the wall, and the
+     pet's colour swatches (its colour itself is a filter on the pet, in myspace.module.css). */
+  --mk-room-peach: #f3dcc8; --mk-room-sage: #dfe6d3; --mk-room-sky: #d9e6f0; --mk-room-blush: #f1d9df; --mk-room-cream: #efe6d8;
+  --mk-room-night: #2f2b3d;
+  --mk-floor-oak: #e9cfa8; --mk-floor-oak-2: #dcbd92; --mk-floor-walnut: #b98a62; --mk-floor-walnut-2: #a57650;
+  --mk-floor-tile: #f2efe9; --mk-floor-tile-2: #e0d9cd; --mk-floor-grass: #cfe3b5; --mk-floor-grass-2: #b9d49c;
+  --mk-floor-carpet: #d9cfe6; --mk-floor-carpet-2: #c8bcda;
+  --mk-room-frame: #ffffff; --mk-room-frame-night: #4b4560; --mk-room-base: rgb(255 255 255 / .5); --mk-room-base-night: #1f1c2b;
+  --mk-sky-day: linear-gradient(#fbe3b0, #cfe4f2); --mk-sky-evening: linear-gradient(#f5a97f, #6f6aa8);
+  --mk-sky-night: linear-gradient(#2c3a66, #56679c);
+  --mk-pet-original: linear-gradient(135deg, #f2c48d, #d99a5b); --mk-pet-cocoa: linear-gradient(135deg, #9a6a48, #5e3b25);
+  --mk-pet-snow: linear-gradient(135deg, #ffffff, #d9d9d9); --mk-pet-rose: linear-gradient(135deg, #f6b6cf, #e07aa3);
+  --mk-pet-mint: linear-gradient(135deg, #b8ecd0, #6cc79a); --mk-pet-sky: linear-gradient(135deg, #bfe0fb, #6faee6);
+  --mk-pet-midnight: linear-gradient(135deg, #5b5f99, #2b2d52);
   --mk-today-ink: 246 238 230;
   --mk-shadow-sm: 0 1px 2px rgb(51 36 27 / .04);
   --mk-shadow-seg: 0 1px 2px rgb(51 36 27 / .14);

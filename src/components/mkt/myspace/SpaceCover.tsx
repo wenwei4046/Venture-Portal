@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { fileRoute } from '@/lib/storage/browser'
 import { COVERS } from '@/lib/marketing/space'
 import s from './myspace.module.css'
@@ -22,6 +22,8 @@ export interface SpaceCoverProps {
   onPop: (open: boolean) => void
   onPreset: (cover: number) => void
   onPick: (kind: 'cover' | 'avatar') => void
+  /** The pet, sitting beside the avatar (⑦-2). */
+  pet?: ReactNode
 }
 
 export default function SpaceCover(p: SpaceCoverProps) {
@@ -76,6 +78,7 @@ export default function SpaceCover(p: SpaceCoverProps) {
       ) : (
         <div className={s.avatar} style={{ background: p.avatarBg }} aria-hidden="true">{face}</div>
       )}
+      {p.pet ? <div className={s.coverPet}>{p.pet}</div> : null}
     </div>
   )
 }

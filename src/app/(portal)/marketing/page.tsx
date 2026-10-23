@@ -30,7 +30,9 @@ export default async function MarketingMySpacePage() {
   const board = await readBoard()
   const me = indexBoard(board).person(board.me)
   const columns = plateColumns(board)
-  const turn = columns.find(c => c.key === 'turn')?.cards.length ?? 0
+  const turnCards = columns.find(c => c.key === 'turn')?.cards ?? []
+  const waitingCards = columns.find(c => c.key === 'waiting')?.cards ?? []
+  const turn = turnCards.length
   const name = me?.full || user.name || 'Marketing'
   const first = me?.first || (user.name ?? '').split(/\s+/)[0] || 'there'
   const plans = (await notices).filter(n => !n.read && n.type === 'plan').slice(0, 3)
@@ -46,6 +48,9 @@ export default async function MarketingMySpacePage() {
       columns={columns}
       week={weekRows(columns, board.today)}
       plans={plans}
+      plate={{ count: turn, red: [...turnCards, ...waitingCards].filter(c => c.tone === 'red').length, fresh: turnCards.some(c => c.isNew) }}
+      // A pet lives in the room of somebody on Marketing's roster (not the Principal's shared login — question 37).
+      hasPet={!!me}
       canEdit={canDo(user, 'marketing', 'edit')}
       space={await space}
     />
