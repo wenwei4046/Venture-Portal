@@ -114,6 +114,33 @@ describe('a product project, for the manager who writes its minutes', () => {
     expect(await screen.findByText('Resent to Kelvin')).toBeTruthy()
   })
 
+  it('a second PIC: their fields when asked for, their WhatsApp before the link goes, then a link each (the user’s answer 29)', async () => {
+    render(<ProductProject initial={page(RACHEL, {}, ready)} can={MANAGER} />)
+    expect(screen.queryByRole('textbox', { name: /^Second PIC\W*$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '+ Second PIC' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /^Second PIC\W*$/ }), { target: { value: 'Hana' } })
+    await waitFor(() => expect(actions.fillMktMinutes).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.fillMktMinutes.mock.calls[0]).toEqual(['m1', 'p1', 3, { pic2: 'Hana' }])
+    expect(await screen.findByText('5/6')).toBeTruthy()
+    expect(screen.getByRole('tooltip').textContent).toBe('Still missing• Add the second PIC’s WhatsApp')
+
+    fireEvent.change(screen.getByRole('textbox', { name: /^Second PIC WhatsApp/ }), { target: { value: '+60 13-222 1111' } })
+    await waitFor(() => expect(actions.fillMktMinutes).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    expect(actions.fillMktMinutes.mock.calls[1]).toEqual(['m1', 'p1', 4, { whatsapp2: '+60 13-222 1111' }])
+    expect(await screen.findByText('6/6')).toBeTruthy()
+
+    actions.sendMktMinutes.mockResolvedValue({ ok: true,
+      page: page(RACHEL, { ...waiting, pic2: 'Hana', whatsapp2: '+60 13-222 1111', link2: 'def456' }, { ...ready, status: 'sent', rev: 6 }) })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Generate tracking link' }))
+    })
+    expect(await screen.findByText('Tracking link ready · share it with Kelvin and Hana')).toBeTruthy()
+    expect([screen.getByText(/\/t\/abc123$/), screen.getByText(/\/t\/def456$/)].every(Boolean)).toBe(true)
+    const shares = screen.getAllByRole('link', { name: 'Share via WhatsApp' }).map(a => a.getAttribute('href') ?? '')
+    expect(shares[0]).toMatch(/^https:\/\/wa\.me\/60123456789\?text=Hi%20Kelvin%2C.*abc123$/)
+    expect(shares[1]).toMatch(/^https:\/\/wa\.me\/60132221111\?text=Hi%20Hana%2C.*def456$/)
+  })
+
   it('starts before the PIC approves only with a reason, kept on the page', async () => {
     render(<ProductProject initial={page(RACHEL, waiting, ready)} can={MANAGER} />)
     fireEvent.click(screen.getByRole('button', { name: 'Start before approval…' }))

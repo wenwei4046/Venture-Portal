@@ -172,3 +172,19 @@ describe('the work on the PIC’s link (②b-2d)', () => {
     expect(answerPicStage).toHaveBeenCalledWith(CODE, 'd1', 2, 'changes', '', 'Make the logo bigger')
   })
 })
+
+describe('two PICs — the second one’s link (②b-2d-2a, the user’s answer 29)', () => {
+  it('the minutes and a stage answered by the first PIC: said in their name, never “You”', () => {
+    render(<PicPage code={CODE} initial={page({
+      you: 2, pic: 'Hana Lee', other: 'Kelvin Tan', status: 'active',
+      reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-24T03:00:00Z', pic: 1 },
+      work: [{ id: 'd1', title: 'Image post 1/2', status: 'active', stages: 2, done: 1,
+        stage: { idx: 1, name: 'Caption', status: 'todo', ver: 0, waiting: false, fields: [], links: [] },
+        last: { action: 'pic approved', name: 'Kelvin Tan (PIC)', reason: null, stage: 'Design', version: 'v2', at: '2026-10-24T05:00:00Z', pic: 1 } }],
+    })} />)
+    expect(screen.getByText('Kelvin Tan approved the meeting minutes. The team has been told.')).toBeTruthy()
+    expect(screen.getByText('Kelvin Tan approved the minutes')).toBeTruthy()
+    expect(screen.getByText('Kelvin Tan approved Design v2 · signed by Kelvin Tan · 24 Oct 2026, 13:00')).toBeTruthy()
+    expect(screen.queryByText(/^You approved/)).toBeNull()
+  })
+})

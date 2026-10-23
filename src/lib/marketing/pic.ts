@@ -30,8 +30,13 @@ export interface PicPage {
   owner: string | null
   startedAt: string | null
   sentAt: string | null
-  /** The PIC's last answer. */
-  reply: { decision: 'approved' | 'changes'; name: string; reason: string; at: string | null } | null
+  /** Which of the project's PICs holds this link (the user's answer 29: one or two, each their own link — mig
+   * 20261025034000), their name, and the other PIC's when there is one. */
+  you: PicNo
+  pic: string | null
+  other: string | null
+  /** The last answer on the minutes — either PIC's, `pic` saying whose. */
+  reply: { decision: 'approved' | 'changes'; name: string; reason: string; at: string | null; pic: PicNo } | null
   /** Waiting again because something they see changed after they approved: which fields. */
   updated: { fields: string; at: string | null } | null
   /** Waiting again after the changes they asked for: what they asked. */
@@ -69,9 +74,15 @@ export interface PicWork {
     fields: PicWorkField[]
     links: { url: string; label: string }[]
   } | null
-  /** Their last answer on it. */
-  last: { action: 'pic approved' | 'pic changes'; name: string; reason: string; stage: string; version: string; at: string | null } | null
+  /** The last answer on it — either PIC's. */
+  last: { action: 'pic approved' | 'pic changes'; name: string; reason: string; stage: string; version: string; at: string | null; pic: PicNo } | null
 }
+
+/** The first PIC or the second. An answer from before there were two is the first's. */
+export type PicNo = 1 | 2
+const picNo = (v: unknown): PicNo => (v === 2 ? 2 : 1)
+/** "Kelvin Tan (PIC)" as the trail names a PIC — their name alone. */
+const bare = (name: string) => name.replace(/ \(PIC\)$/, '')
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -125,7 +136,8 @@ function workFromRow(w: Record<string, unknown>): PicWork {
       links: (Array.isArray(s.links) ? s.links : []).filter(isObj).filter(l => /^https:\/\//i.test(str(l.url))).map(l => ({ url: str(l.url), label: str(l.label) })),
     } : null,
     last: last && (last.action === 'pic approved' || last.action === 'pic changes')
-      ? { action: last.action, name: str(last.name), reason: str(last.reason), stage: str(last.stage), version: str(last.version), at: strOrNull(last.at) }
+      ? { action: last.action, name: str(last.name), reason: str(last.reason), stage: str(last.stage), version: str(last.version), at: strOrNull(last.at),
+          pic: picNo(last.pic) }
       : null,
   }
 }
@@ -147,7 +159,13 @@ export function picPageFromRow(v: unknown): PicPage | null {
     owner: strOrNull(v.owner),
     startedAt: strOrNull(v.startedAt),
     sentAt: strOrNull(v.sentAt),
-    reply: reply ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at) } : null,
+    you: picNo(v.you),
+    pic: strOrNull(v.pic),
+    other: strOrNull(v.other),
+    reply: reply
+      ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at),
+          pic: picNo(reply.pic) }
+      : null,
     updated: updated ? { fields: str(updated.fields), at: strOrNull(updated.at) } : null,
     asked: asked ? { reason: str(asked.reason), at: strOrNull(asked.at) } : null,
     minutes: {
@@ -159,14 +177,24 @@ export function picPageFromRow(v: unknown): PicPage | null {
   }
 }
 
-/** Where a deliverable stands, in the PIC's words. */
-export function workState(w: PicWork, today: string): { label: string; tone: Tone } {
+/** Where a deliverable stands, in the PIC's words — the changes theirs, or the other PIC's (`you` — whose link). */
+export function workState(w: PicWork, today: string, you: PicNo = 1): { label: string; tone: Tone } {
   if (w.status === 'done') return { label: 'Done', tone: 'done' }
   if (w.status === 'paused') return { label: 'Paused', tone: 'draft' }
   if (w.startsOn && today && w.startsOn > today) return { label: `Starts ${shortDay(w.startsOn)}`, tone: 'draft' }
   if (w.stage?.waiting) return { label: 'Waiting for your approval', tone: 'waiting' }
-  if (w.stage?.status === 'changes' && w.last?.action === 'pic changes') return { label: 'The team is making your changes', tone: 'draft' }
+  if (w.stage?.status === 'changes' && w.last?.action === 'pic changes') {
+    return { label: w.last.pic === you ? 'The team is making your changes' : `The team is making ${bare(w.last.name)}’s changes`, tone: 'draft' }
+  }
   return { label: w.stage ? `In progress · ${w.stage.name}` : 'In progress', tone: 'draft' }
+}
+
+/** A deliverable's last answer in a line: theirs ("You approved …") or the other PIC's ("Hana Lee approved …"). */
+export function workLastLine(last: NonNullable<PicWork['last']>, you: PicNo): string {
+  const who = last.pic === you ? 'You' : bare(last.name)
+  return last.action === 'pic approved'
+    ? `${who} approved ${last.stage} ${last.version} · signed by ${bare(last.name)} · ${receiptTime(last.at)}`
+    : `${who} asked for changes on ${last.stage}: “${last.reason}” · ${receiptTime(last.at)}`
 }
 
 /** How many wait for the PIC now. */
@@ -196,12 +224,14 @@ export function picStatus(status: PicStatus): { label: string; tone: Tone } {
 
 /** The banner under the title: why it waits for them, or that nothing does — red, the handoff's *Overdue — please
  * review*, once it has waited 4 working hours (2026-10-24 — the user's answer 2). */
-export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'>, overdue = false): { tone: Tone; title: string; text: string } | null {
+export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'> & Partial<Pick<PicPage, 'you' | 'reply'>>, overdue = false): { tone: Tone; title: string; text: string } | null {
   if (p.status === 'waiting_pic') {
     const late = (title: string) => (overdue ? 'Overdue — please review' : title)
     const tone: Tone = overdue ? 'red' : 'waiting'
     if (p.updated) return { tone, title: late('Updated after your approval — please review again'), text: `The team changed ${p.updated.fields || 'the minutes'}.` }
-    if (p.asked) return { tone, title: late('Updated — please review again'), text: `You asked: “${p.asked.reason}”` }
+    // The changes were theirs, or the other PIC's (the reply resent still says whose).
+    const asker = p.reply && p.reply.pic !== (p.you ?? 1) ? p.reply.name : 'You'
+    if (p.asked) return { tone, title: late('Updated — please review again'), text: `${asker} asked: “${p.asked.reason}”` }
     return { tone, title: late('Waiting for your approval'), text: 'The meeting minutes are ready. Please review them below.' }
   }
   if (p.status === 'approved') return { tone: 'done', title: 'Approved', text: 'Thank you. Nothing else needs your action right now.' }
@@ -212,7 +242,7 @@ export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: str
 
 /** The progress: the meeting, the minutes sent, their approval, the work. Minutes that asked no sign-off never went to
  * the PIC (no sending, no answer) — the team completed them; the link is theirs for the work (②b-2d). */
-export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & { work?: readonly PicWork[] }): PicStep[] {
+export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you'>> & { work?: readonly PicWork[] }): PicStep[] {
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
   if (approved && !p.sentAt && !p.reply) {
     return [
@@ -221,9 +251,11 @@ export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' |
       workStep(p.work ?? [], approved),
     ]
   }
+  // The answer was theirs, or the other PIC's (either one's counts — the user's answer 29).
+  const other = p.reply && p.reply.pic !== (p.you ?? 1) ? p.reply.name : null
   const yours: PicStep = p.status === 'waiting_pic' ? { label: 'Your approval', state: 'cur', date: '', sub: 'Waiting for you' }
-    : p.status === 'changes' ? { label: 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
-    : { label: 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
+    : p.status === 'changes' ? { label: other ? `The team is making ${other}’s changes` : 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
+    : { label: other ? `${other} approved the minutes` : 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
   return [
     { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
     { label: 'Minutes sent to you', state: 'done', date: day(p.sentAt), sub: '' },
@@ -240,15 +272,20 @@ function workStep(work: readonly PicWork[], approved: boolean): PicStep {
   return { label: 'The work', state: done >= work.length ? 'done' : 'cur', date: '', sub: `${done} of ${work.length} done${waiting ? ` · ${waiting} waiting for you` : ''}` }
 }
 
-/** The card once they have answered. */
-export function picAnswered(p: Pick<PicPage, 'status' | 'reply'>): { approved: boolean; title: string; text: string; quote: string; receipt: string } | null {
+/** The card once the minutes are answered — by them, or by the other PIC (either one's answer counts). */
+export function picAnswered(p: Pick<PicPage, 'status' | 'reply'> & Partial<Pick<PicPage, 'you'>>): { approved: boolean; title: string; text: string; quote: string; receipt: string } | null {
   const r = p.reply
   if (!r) return null
+  const theirs = r.pic === (p.you ?? 1)
   if (r.decision === 'approved' && p.status !== 'waiting_pic' && p.status !== 'changes') {
-    return { approved: true, title: 'Approved', text: 'You approved the meeting minutes. The team has been told.', quote: '', receipt: `Signed by ${r.name} · ${receiptTime(r.at)}` }
+    return { approved: true, title: 'Approved', text: `${theirs ? 'You' : r.name} approved the meeting minutes. The team has been told.`, quote: '',
+      receipt: `Signed by ${r.name} · ${receiptTime(r.at)}` }
   }
   if (r.decision === 'changes' && p.status === 'changes') {
-    return { approved: false, title: 'Changes sent', text: 'The team has your notes and will send the new minutes to this link. You do not need to do anything else for now.',
+    return { approved: false, title: 'Changes sent',
+      text: theirs
+        ? 'The team has your notes and will send the new minutes to this link. You do not need to do anything else for now.'
+        : `The team has ${r.name}’s notes and will send the new minutes to this link. You do not need to do anything else for now.`,
       quote: r.reason, receipt: `Sent ${receiptTime(r.at)}` }
   }
   return null
