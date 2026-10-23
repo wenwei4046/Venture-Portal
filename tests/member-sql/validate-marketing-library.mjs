@@ -1,11 +1,12 @@
-// Local PostgreSQL regression for 20261024007000 and 007100 (2026-10-23 — Marketing ⑥-1, the Library: `Library.dc.html` of the Claude
+// Local PostgreSQL regression for 20261024007000, 007100 and 007200 (2026-10-23 — Marketing ⑥-1, the Library: `Library.dc.html` of the Claude
 // Design handoff "HOUZS Marketing Module Setup"). The R2 move's table (20261023150000: file_objects, its stamp, its grants)
 // and Marketing's migrations run, then these, each twice. What is under test: the bucket — in R2, 50 MB, then 2 GB — and its three
 // policies (Marketing reads; Edit puts files under library/; Manage deletes, and a sender takes back a file never filed);
 // the folder types (the handoff's thirteen, a new one the manager's, never twice, never a colour of its own); one folder
 // of a type in a subsidiary; a file filed only when its bytes' row is there and the caller's; move, bin, restore,
 // delete for good (the bytes' rows with them) and the Dustbin's 30 days; who may each; the page in the tab registry.
-// No live I/O.
+// Then ⑥-2 (007200): a subsidiary's brand profile — the manager's, only the handoff's colours and fonts, its words tidied,
+// a picture only one's own just sent (an image), the one a profile shows filed, the one replaced taken off. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -279,5 +280,63 @@ check([await peek1(`SELECT count(*)::int FROM public.mkt_lib_files WHERE id = $1
   await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [P2])], [0, 0],
   'and gone with the next write — its row and its bytes’ row')
 await refuses(`SELECT public.mkt_lib_restore('file', $1)`, [f2], /not in the Dustbin/, 'too late to restore')
+
+// ── ⑥-2: a subsidiary's brand profile (20261024007200) ────────────────────────────
+await db.exec('RESET ROLE')
+const profiles = await sql('20261024007200_marketing_brand_profiles.sql')
+await db.exec(profiles)
+await db.exec(profiles) // twice: nothing changes, nothing breaks
+check(await peek1(`SELECT count(*)::int FROM pg_policies WHERE tablename = 'file_objects' AND policyname = 'mkt_library_brand_upload'`), 1,
+  'a policy of its own for brand pictures')
+check([await one(`SELECT has_function_privilege('anon', 'public.mkt_lib_profile_save(uuid,jsonb)', 'EXECUTE')`),
+  await one(`SELECT has_function_privilege('authenticated', 'public.mkt_lib_profile_save(uuid,jsonb)', 'EXECUTE')`)],
+  [false, true], 'the profile’s writer: a sign-in’s, never the publishable key’s')
+const save = (sub, profile) => one(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [sub, JSON.stringify(profile)])
+const profileOf = sub => peek1(`SELECT profile FROM public.mkt_subsidiaries WHERE id = $1`, [sub])
+const LOGO = `brand/${id(951)}/carres-logo.png`
+const COVER = `brand/${id(952)}/carres-cover.jpg`
+const ALIS = `brand/${id(953)}/ali.png`
+const DOC = `brand/${id(954)}/brief.pdf`
+
+await as(U.mei, STAFF)
+await assert.rejects(put(`brand/${id(955)}/logo.png`, 1000, 'image/png'), /row-level security|violates/, 'a brand picture is the manager’s to send'); checks++
+await refuses(`SELECT public.mkt_lib_profile_save($1, '{}'::jsonb)`, [CAR], /Brand profiles are the manager's/, 'a profile is the manager’s')
+await as(U.ali, MANAGER)
+await put(ALIS, 1000, 'image/png')
+await as(U.josiah, MANAGER)
+await put(LOGO, 1000, 'image/png')
+await put(COVER, 5000, 'image/jpeg')
+await put(DOC, 900, 'application/pdf')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ avatar: 'url(https://x)' })], /seven colours/, 'only the handoff’s colours')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ banner: 'rgb(1 2 3)' })], /seven backgrounds/, 'only the handoff’s backgrounds')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ font: 'Comic Sans' })], /six fonts/, 'only the six fonts')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ name: 'x'.repeat(41) })], /at most 40/, 'a display name of 40 at most')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ caption: 'x'.repeat(81) })], /at most 80/, 'a caption of 80 at most')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ avatar_path: ALIS })], /has not arrived/, 'never a picture another sent')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ avatar_path: `brand/${id(956)}/x.png` })], /has not arrived/, 'never one not there')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, JSON.stringify({ banner_path: DOC })], /is an image/, 'a picture is an image')
+await refuses(`SELECT public.mkt_lib_profile_save($1, $2::jsonb)`, [CAR, '[1]'], /Send the profile/, 'a profile is an object')
+await save(CAR, { avatar_path: LOGO, banner_path: COVER, banner: 'rgb(40 34 30)', font: 'Playfair', name: '  Carres   Living ', caption: ' Sofa & living · KJ, PCH ', style: 'x' })
+check(await profileOf(CAR), { avatar_path: LOGO, banner_path: COVER, banner: 'rgb(40 34 30)', font: 'Playfair', name: 'Carres Living', caption: 'Sofa & living · KJ, PCH' },
+  'saved whole: the words tidied, nothing it does not know')
+await as(U.ali, VIEW)
+check((await one(`SELECT public.mkt_library()`)).subs.find(s => s.code === 'CAR').profile.font, 'Playfair', 'the Library reads each subsidiary’s profile')
+
+// A picture a profile shows is filed: its sender cannot take it back; replaced or taken off, its bytes’ row goes.
+await as(U.josiah, STAFF)
+check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [LOGO])).length, 0,
+  'its sender cannot take back a picture a profile shows')
+await as(U.ali, MANAGER)
+await save(CAR, { ...(await profileOf(CAR)) })
+check((await profileOf(CAR)).avatar_path, LOGO, 'another manager saves it again — the picture it shows stays')
+await as(U.josiah, MANAGER)
+await save(H2990, { banner_path: COVER })
+await save(CAR, { avatar: 'rgb(44 82 130)', font: 'Playfair' })
+check(await profileOf(CAR), { avatar: 'rgb(44 82 130)', font: 'Playfair' }, 'pictures taken off, a colour instead')
+check([await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [LOGO]),
+  await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [COVER])], [0, 1],
+  'the logo’s bytes’ row gone; the cover another profile shows kept')
+await save(H2990, {})
+check(await peek1(`SELECT count(*)::int FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1`, [COVER]), 0, '…until nothing shows it')
 
 console.log(`marketing library: ${checks} checks passed`)

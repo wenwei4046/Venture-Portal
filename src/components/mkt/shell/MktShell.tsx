@@ -14,7 +14,7 @@ import { ToastHost } from '@/components/hrv/toast'
 import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import RouteFreshener from '@/components/layout/RouteFreshener'
-import { lookFamily, nunito, plex } from '../fonts'
+import { dmSerif, grotesk, lookFamily, nunito, playfair, plex } from '../fonts'
 import MktSidebar from './MktSidebar'
 import MktTopBar from './MktTopBar'
 import MktAccountMenu, { type MktAccountWindow } from './MktAccountMenu'
@@ -115,7 +115,7 @@ export default function MktShell({
   } as CSSProperties
 
   return (
-    <div className={`mkt-shell ${s.root} ${nunito.variable} ${plex.variable} print:h-auto print:overflow-visible`} style={style} data-mkt-shell="">
+    <div className={`mkt-shell ${s.root} ${nunito.variable} ${plex.variable} ${playfair.variable} ${dmSerif.variable} ${grotesk.variable} print:h-auto print:overflow-visible`} style={style} data-mkt-shell="">
       <div className="print:hidden contents">
         <MktSidebar
           rows={rows}

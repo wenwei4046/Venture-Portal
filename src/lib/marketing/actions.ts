@@ -12,7 +12,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
-import { libraryFromRow, type Library } from './library'
+import { libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, type Library, type LibProfile } from './library'
 
 /**
  * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900, 20261024002000 and
@@ -437,4 +437,16 @@ export async function deleteMktLib(kind: 'file' | 'folder', id: string): Promise
   const db = await client()
   const { error } = await db.rpc('mkt_lib_delete', { p_kind: kind, p_id: id })
   return libraryAfter(db, error, 'It could not be deleted. Please try again.')
+}
+
+/** A subsidiary's brand profile, saved whole (⑥-2, mig 20261024007200) — the manager's. */
+export async function saveMktLibProfile(sub: string, profile: LibProfile): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'manage')
+  if (!isId(sub)) return { ok: false, reason: 'That subsidiary is not on the list.' }
+  const db = await client()
+  // Whatever came in, read as a stored profile would be (only the handoff's colours and fonts, words as text).
+  const p = profile ?? NO_PROFILE
+  const clean = profileFromRow({ avatar: p.avatar, avatar_path: p.avatarPath, banner: p.banner, banner_path: p.bannerPath, font: p.font, name: p.name, caption: p.caption })
+  const { error } = await db.rpc('mkt_lib_profile_save', { p_sub: sub, p_profile: profileToRow(clean) })
+  return libraryAfter(db, error, 'The brand profile could not be saved. Please try again.')
 }

@@ -8,6 +8,7 @@ import { libraryFromRow } from '@/lib/marketing/library'
 
 const actions = vi.hoisted(() => ({
   addMktLibFolder: vi.fn(), addMktLibType: vi.fn(), binMktLib: vi.fn(), deleteMktLib: vi.fn(), fileMktLib: vi.fn(), moveMktLib: vi.fn(),
+  saveMktLibProfile: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const replace = vi.fn()
@@ -172,5 +173,68 @@ describe('the Library', () => {
     expect(screen.queryByRole('button', { name: 'Add folder' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Download20.0 MB'])
+    expect(screen.queryByRole('button', { name: 'Edit brand profile' })).toBeNull()
+  })
+})
+
+// 2026-10-24 — ⑥-2: a subsidiary's brand profile (the manager's ✎) and its Schedule.
+describe('a brand in the Library', () => {
+  const LOGO = 'brand/00000000-0000-4000-8000-000000000009/carres-logo.png'
+  const dressed = {
+    ...lib,
+    subs: lib.subs.map(x => (x.id === CAR
+      ? { ...x, profile: { ...x.profile, avatar: 'rgb(44 82 130)', banner: 'rgb(40 34 30)', font: 'Playfair' as const, name: 'Carres Living', caption: 'Sofa & living' } }
+      : x)),
+  }
+  const schedules = { [CAR]: [{ id: 's:p1:1', day: '2026-11-05', label: 'Thu 5 Nov', title: 'Year-End Video · Shoot', trackId: 'MKT-CAR-2610-001' }] }
+
+  it('wears it on its card and its banner; its next dates link to their projects', () => {
+    const { unmount } = render(<Library initial={dressed} schedules={schedules} can={{ edit: true, manage: false }} at={AT} />)
+    const card = screen.getByRole('button', { name: /Carres Living/ })
+    expect(card.textContent).toContain('Sofa & living')
+    expect((card.querySelector('[class*="cardName"]') as HTMLElement).style.fontFamily).toContain('--font-mk-playfair')
+    unmount()
+    render(<Library initial={dressed} schedules={schedules} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    const banner = document.querySelector('[class*="banner"][data-dark]') as HTMLElement
+    expect(banner.textContent).toContain('Carres Living')
+    expect(banner.querySelector('[class*="bannerAvatar"]')?.textContent).toBe('C')
+    expect(screen.queryByRole('button', { name: 'Edit brand profile' })).toBeNull()
+    expect(screen.getByRole('link', { name: /Thu 5 Nov.*Year-End Video · Shoot/ }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001')
+  })
+
+  it('lets the manager edit it: colours, a logo uploaded, a font, the words — saved whole', async () => {
+    actions.saveMktLibProfile.mockResolvedValueOnce({ ok: true, library: dressed })
+    render(<Library initial={lib} can={{ edit: true, manage: true }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit brand profile' }))
+    const dlg = screen.getByRole('dialog', { name: 'Edit Carres profile' })
+    fireEvent.click(within(within(dlg).getByRole('radiogroup', { name: 'Background colour' })).getByRole('radio', { name: 'Blush' }))
+    fireEvent.click(within(dlg).getByRole('radio', { name: /DM Serif/ }))
+    fireEvent.change(within(dlg).getByLabelText('Display name'), { target: { value: 'Carres Living' } })
+    fireEvent.change(within(dlg).getByLabelText('Caption'), { target: { value: 'Sofa & living' } })
+    const inputs = dlg.querySelectorAll('input[type=file]')
+    await act(async () => { fireEvent.change(inputs[0], { target: { files: [new File(['png'], 'Logo.png', { type: 'image/png' })] } }) })
+    const [logo] = bucket.upload.mock.calls[0]
+    expect(logo).toMatch(/^brand\/[0-9a-f-]{36}\/Logo\.png$/)
+    expect(within(dlg).getByRole('button', { name: '✓ Logo.png · remove' })).toBeTruthy()
+    await act(async () => { fireEvent.change(inputs[1], { target: { files: [new File(['%PDF'], 'cover.pdf', { type: 'application/pdf' })] } }) })
+    expect(within(dlg).getByRole('status').textContent).toBe('A brand picture is an image — PNG, JPG, WebP or GIF.')
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Save profile' }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Brand profile saved'))
+    expect(actions.saveMktLibProfile).toHaveBeenCalledWith(CAR, {
+      avatar: null, avatarPath: logo, banner: 'rgb(240 228 236)', bannerPath: null, font: 'DM Serif', name: 'Carres Living', caption: 'Sofa & living',
+    })
+    expect(bucket.remove).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'Edit Carres profile' })).toBeNull()
+  })
+
+  it('takes back a picture sent and not saved', async () => {
+    render(<Library initial={lib} can={{ edit: true, manage: true }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit brand profile' }))
+    const dlg = screen.getByRole('dialog', { name: 'Edit Carres profile' })
+    await act(async () => { fireEvent.change(dlg.querySelectorAll('input[type=file]')[1], { target: { files: [new File(['jpg'], 'cover.jpg', { type: 'image/jpeg' })] } }) })
+    const [cover] = bucket.upload.mock.calls[0]
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(bucket.remove).toHaveBeenCalledWith([cover]))
+    expect(actions.saveMktLibProfile).not.toHaveBeenCalled()
   })
 })
