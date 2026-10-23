@@ -10,7 +10,8 @@ import type { Icon4a } from "../../shared/icons4a";
 
 export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => void; badge: string }
 export interface F4Tab { label: string; on: boolean; pick: () => void }
-export interface F4Head { title: string; tabs: F4Tab[]; sub: string; cta: { label: string; icon: Icon4a; act: () => void } | null }
+export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
+export interface F4Head { title: string; tabs: F4Tab[]; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null }
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
@@ -74,7 +75,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "assignment", "forms", "adsperf"].includes(tab) && tab !== "adsperf" ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "assignment", "forms", "adsperf"].includes(tab) && tab !== "adsperf" ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -93,7 +94,8 @@ interface HeadBits {
   calTitle: string;
   listCards: { title: string; pick: () => void; titleColor: string }[];
   opItem: string;
-  apDl: { v: string; pick: () => void }[];
+  apDl: { v: string; tag: string; label: string; bg: string; fg: string; pick: () => void }[];
+  apDlOpen: boolean; apToggleDl: () => void;
   sr4: { save: () => void; dirty: boolean };
   cfSave: () => void;
   cfSummary: string;
@@ -117,7 +119,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     inbox: { tabs: [], sub: "", cta: null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
     calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },
-    adsperf: { tabs: v.ap4.tabs.map(t => ({ label: t.label, on: t.on, pick: t.custom ? v.dpOpen : t.pick })), sub: "", cta: null }, // the owner, 2026-10-18: "删掉download，已经有export了" — PDF is in Export (PDF report)
+    // v2 (frame 05, note 02): no period tabs (the range button under the title does it); Export is the head's primary, its
+    // menu Excel / CSV / PDF report as before.
+    adsperf: { tabs: [], sub: "", cta: { label: "Export", icon: null, act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } } },
     assignment: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
     showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },

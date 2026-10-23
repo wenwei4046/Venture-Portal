@@ -23,7 +23,7 @@ const BASE = process.env.CRM_BASE ?? "http://localhost:3107";
 const APP_URL = `${BASE}/member/preview?app=proto&role=principal&device=desktop&page=account&view=crm&crmAs=hod`;
 // The app's way to each frame: clicks by exact visible text (the CRM nav, then the page's own tabs).
 const APP = {
-  p01: [["Insight"]], p01b: [["Insight"], ["Ads performance"]], p02: [["Inbox"]], p03: [["Contacts"]], p04: [["Calendar"]],
+  p01: [["Insight"]], p01b: [["Insight"], ["Ads performance"]], p02: [["Inbox"], ["Lim Wei Jie"]], p02b: [["Inbox"], ["Lim Wei Jie"], ["Audit log"]], p03: [["Contacts"]], p04: [["Calendar"]],
   p05: [["Ads Performance"]], p06: [["Assignment"]], p06b: [["Assignment"], ["Leads by ad"]], p06c: [["Assignment"], ["Active members"]],
   p07: [["Showrooms"]], p08: [["Customer form"]], p09: [["Channels"]], p10: [["Settings"]], p11: [["Audit log"]],
   p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]],
@@ -46,7 +46,7 @@ const js = async e => (await send("Runtime.evaluate", { expression: e, awaitProm
 
 async function click(text) {
   const c = await js(`(() => { const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && e.children.length < 12 && (e.innerText || "").trim() === ${JSON.stringify(text)});
-    const el = all.at(-1); if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    const el = all.at(0); if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   if (!c) { console.log("  not found:", text); return; }
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c.x, y: c.y, button: "left", clickCount: 1 });

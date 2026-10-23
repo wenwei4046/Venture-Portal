@@ -449,14 +449,22 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-brand-waze: #33CCFF;
   --crm-brand-maps: #34A853;
   --crm-brand-instagram: #C13584;
-  /* Ads Performance's chart (2026-10-23): one hue a metric, in this fixed order — the dataviz reference's categorical
-     slots 1–6, validated together on white (adjacent CVD ΔE ≥ 9.1; under 3:1 contrast, so each line has its labelled tile) */
-  --crm-series-1: #2a78d6;
-  --crm-series-2: #eb6834;
-  --crm-series-3: #1baf7a;
-  --crm-series-4: #eda100;
-  --crm-series-5: #e87ba4;
-  --crm-series-6: #008300;
+  /* Ads Performance's chart and its cards (redesign v2 note 02, 2026-10-23 — replaces the first cut's blue/orange/green):
+     the CRM palette in a fixed order, each with its card tint; text on every card stays ink */
+  --crm-series-1: #422315;
+  --crm-series-2: #BD4A19;
+  --crm-series-3: #6F402C;
+  --crm-series-4: #FFA91F;
+  --crm-series-5: #C29C88;
+  --crm-series-6: #9A6B55;
+  --crm-series-7: #DCC6B8;
+  --crm-series-tint-1: #F3EBE5;
+  --crm-series-tint-2: #FDE3D2;
+  --crm-series-tint-3: #F1E3DA;
+  --crm-series-tint-4: #FFF0D1;
+  --crm-series-tint-5: #F7F0EB;
+  --crm-series-tint-6: #F7F0EB;
+  --crm-series-tint-7: #F7F0EB;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───

@@ -181,8 +181,17 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
           <span style={{ position: "relative" }}>
             <button type="button" onClick={h.cta.act} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
               font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">
-              <Ic name={h.cta.icon} size={15} />{h.cta.label}
+              {h.cta.icon && <Ic name={h.cta.icon} size={15} />}{h.cta.label}
             </button>
+            {h.cta.menu?.open && (<>
+              <div onClick={h.cta.menu.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
+              <div style={{ position: "absolute", top: "42px", right: 0, zIndex: 8, minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+                {h.cta.menu.items.map(o => (
+                  <button key={o.tag} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-row">
+                    <span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>
+                ))}
+              </div>
+            </>)}
             {f4.bookPick.open && h.cta.label === "Book a visit" && (<>
               <div onClick={f4.bookPick.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
               <div style={{ position: "absolute", top: "42px", right: 0, zIndex: 8, width: "300px", maxHeight: "420px", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", overflow: "hidden" }}>
@@ -396,17 +405,18 @@ interface InboxSideBits {
   ibHas: boolean; ibNone: boolean; ibInfoShut: boolean; ibInfoFold: () => void; ibInfoRail: { open: () => void }; ibInfoW: number;
   dragInfo: (e: never) => void; resetInfo: () => void;
   ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string }[] }[] };
-  ibCpOpen: boolean; ibCpToggle: () => void;
+  ibCpOpen: boolean; ibCpToggle: () => void; ibCpW?: number; dragCp?: (e: never) => void; resetCp?: () => void;
   ibCp: { audit4: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] };
   ibBook: () => void; editInfo: () => void;
 }
 
 function Strip({ label, icon, bg, onOpen }: { label: string; icon: "user-round" | "history"; bg: string; onOpen: () => void }) {
   return (
-    <button type="button" onClick={onOpen} title={`Open ${label}`} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
-      borderLeft: "1px solid var(--crm-rule)", background: bg }}>
+    // v2 (note 04): every folded rail is the one style — #FBF4EC, whatever its panel's colour (bg kept for the call sites).
+    <button type="button" onClick={onOpen} title={`Open ${label}`} data-bg={bg} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
+      borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
       <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={icon} size={16} /></span>
-      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", letterSpacing: "0.04em", color: "var(--crm-ink-soft)" }}>{label}</span>
+      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>{label}</span>
       <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
     </button>
   );
@@ -446,8 +456,11 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
       </aside>
     )}
     {!v.ibCpOpen ? <Strip label="Audit log" icon="history" bg="var(--crm-audit)" onOpen={v.ibCpToggle} /> : (
-      <aside style={{ width: "290px", flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-audit-line)", background: "var(--crm-audit)" }}>
-        <button type="button" onClick={v.ibCpToggle} title="Fold the Audit log" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0 20px", borderBottom: "1px solid var(--crm-audit-line)", color: "var(--crm-ink)" }}>
+      // v2 (frame 02b, note 06): #FBF7F3 under a #F5F0EA head, #E6DCD2 lines, dragged at its left edge (240–520 px).
+      <aside style={{ position: "relative", width: `${v.ibCpW ?? 290}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-sum-div)", background: "var(--crm-hover)" }}>
+        {v.dragCp && <span onPointerDown={v.dragCp as never} onDoubleClick={v.resetCp} title="Drag to resize" style={{ position: "absolute", top: 0, bottom: 0, left: "-5px", width: "10px", zIndex: 2, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none" }}>
+          <span style={{ width: "3px", height: "36px", borderRadius: "2px", background: "var(--crm-audit-line)" }} /></span>}
+        <button type="button" onClick={v.ibCpToggle} title="Fold the Audit log" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0 20px", borderBottom: "1px solid var(--crm-sum-div)", background: "var(--crm-sum)", color: "var(--crm-ink)" }}>
           <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="history" size={15} /></span>
           <span style={{ font: `500 16px ${TIGHT}` }}>Audit log</span><span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>this chat</span>
           <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={15} /></span>
@@ -1107,6 +1120,7 @@ interface AdsBits {
   apNameArrow: string; apSortName: () => void; openMetrics: () => void;
   /** The chart over the table and the table's own fold (2026-10-23); absent in the prototype harness, which keeps 4a's table alone. */
   apChartV?: AdsChartBits & { tableShut: boolean; foldTable: () => void; adsN: number };
+  apPager?: { range: string; per: number; sizes: number[]; setPer: (n: number) => void; pages: number; cur: number; go: (i: number) => void };
 }
 
 /** Frame 05 · Ads Performance's table: the ad (channel, the name managers typed, Meta's headline), the CRM's figures, Meta's "—", the total under an ink rule. */
@@ -1117,7 +1131,9 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
   const [colW, setColW] = useState<Record<string, number>>(() => { try { return JSON.parse(localStorage.getItem("crm-ads-cols") ?? "{}") as Record<string, number>; } catch { return {}; } });
   const keepW = (next: Record<string, number>) => { setColW(next); try { localStorage.setItem("crm-ads-cols", JSON.stringify(next)); } catch { /* private window */ } };
   const widthOf = (id: string, dflt: string) => (colW[id] ? `${colW[id]}px` : dflt);
-  const grid = `${widthOf("ad", "minmax(180px,2.4fr)")} ${A.cols.map(c => widthOf(c.id, "minmax(48px,0.8fr)")).join(" ")} 28px`;
+  // v2 (frame 05): Ad 2.8fr (180 px at least — note 05), Leads · Appts .7, the rates and Won .75, Spend · Per lead .8, the + 28 px.
+  const FR: Record<string, number> = { leads: 0.7, appt: 0.7, spend: 0.8, cpl: 0.8 };
+  const grid = `${widthOf("ad", "minmax(180px,2.8fr)")} ${A.cols.map(c => widthOf(c.id, `minmax(48px,${FR[c.id] ?? 0.75}fr)`)).join(" ")} 28px`;
   const Resize = ({ id }: { id: string }) => (
     <span role="separator" aria-orientation="vertical" title="Drag to resize · double-click to reset" className="crm4a-colgrip"
       onDoubleClick={() => { const n = { ...colW }; delete n[id]; keepW(n); }}
@@ -1138,7 +1154,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     return (
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: 0 }}>
         {/* Appt rate is its figure alone, no bar (the owner, 2026-10-18). */}
-        {<span style={{ color: meta && !total ? "var(--crm-faint-2)" : undefined, whiteSpace: "nowrap" }}>{/%$/.test(c.v) ? (id === "showrate" ? c.v.replace(/\.\d+%$/, "%") : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v}</span>}
+        {<span style={{ color: meta && !total ? "var(--crm-faint-2)" : undefined, whiteSpace: "nowrap" }}>{/%$/.test(c.v) ? (id === "showrate" || id === "apptrate" ? `${Math.round(parseFloat(c.v))}%` : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v}</span>}
         {A.cmp && c.d && <span style={{ alignSelf: "flex-end", font: "500 10px Inter, sans-serif", padding: "0 5px", borderRadius: "4px", background: c.db, color: c.dc }}>{c.d}</span>}
       </span>
     );
@@ -1146,14 +1162,14 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
   const C = v.apChartV;
   const table = (
     <div style={{ display: "flex", flexDirection: "column", overflowX: "auto", minWidth: 0 }}>
-      <div style={{ display: "grid", gridTemplateColumns: grid, gap: "12px", alignItems: "center", minHeight: "44px", padding: "0 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)",
+      <div style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", padding: "9px 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)", borderBottom: "1px solid var(--crm-nav-line)",
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
         <span style={{ position: "relative", minWidth: 0, display: "flex" }}><button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button><Resize id="ad" /></span>
         {A.cols.map(c => <span key={c.id} style={{ position: "relative", minWidth: 0, display: "flex", justifyContent: "flex-end" }}><button type="button" onClick={c.sort} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", textAlign: "right", lineHeight: 1.25 }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button><Resize id={c.id} /></span>)}
         <button type="button" onClick={v.openMetrics} title="Add columns" style={{ ...BTN, justifySelf: "end", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px dashed var(--crm-rust)", color: "var(--crm-rust)" }}><Ic name="plus" size={12} /></button>
       </div>
       {A.rows.map((r, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: grid, gap: "12px", alignItems: "center", minHeight: "55px", padding: "6px 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)",
+        <div key={i} style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", height: "44px", padding: "0 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)",
           font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }} className="crm4a-row">
           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
@@ -1166,7 +1182,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
           <span />
         </div>
       ))}
-      <div style={{ display: "grid", gridTemplateColumns: grid, gap: "12px", alignItems: "center", minHeight: "52px", padding: "0 12px", borderTop: "1px solid var(--crm-ink)", marginTop: "-1px",
+      <div style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", minHeight: "44px", padding: "0 12px", borderTop: "1px solid var(--crm-ink)", marginTop: "-1px",
         font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
         <span>{A.total.label}</span>
         {A.total.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} total />)}
@@ -1179,8 +1195,31 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
       <DeskAdsChart v={C} />
-      <FoldHead title="By ad" sub={`${C.adsN} ads`} shut={C.tableShut} fold={C.foldTable} />
+      <div style={{ paddingBottom: "10px" }}><FoldHead title="By ad" sub={`${C.adsN} ads`} shut={C.tableShut} fold={C.foldTable} /></div>
       {!C.tableShut && table}
+      {!C.tableShut && v.apPager && <AdsPager4a p={v.apPager} />}
+    </div>
+  );
+}
+
+/** Frame 05's pager: "1–5 of 10 ads · Show [5 ▾] per page", the pages on the right (the one on in ink). */
+function AdsPager4a({ p }: { p: NonNullable<AdsBits["apPager"]> }) {
+  const sq = (on: boolean): CSSProperties => ({ ...BTN, width: "28px", height: "28px", borderRadius: "6px", display: "grid", placeItems: "center", font: `500 12px ${TIGHT}`, background: on ? "var(--crm-ink)" : "transparent", color: on ? "#fff" : "var(--crm-ink-soft)", textAlign: "center" });
+  return (
+    <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "14px", padding: "8px 4px 0", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{p.range}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>Show
+        <span style={{ position: "relative", height: "28px", padding: "0 8px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>
+          {p.per}<span style={{ display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={10} /></span>
+          <select value={p.per} onChange={e => p.setPer(Number(e.target.value))} aria-label="Ads per page" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}>
+            {p.sizes.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </span>per page</span>
+      <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" }}>
+        <button type="button" onClick={() => p.cur > 0 && p.go(p.cur - 1)} disabled={p.cur === 0} aria-label="Previous page" style={{ ...sq(false), color: p.cur === 0 ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}><Ic name="chevron-left" size={12} /></button>
+        {Array.from({ length: p.pages }, (_, i) => <button key={i} type="button" onClick={() => p.go(i)} aria-current={i === p.cur} style={sq(i === p.cur)}>{i + 1}</button>)}
+        <button type="button" onClick={() => p.cur < p.pages - 1 && p.go(p.cur + 1)} disabled={p.cur >= p.pages - 1} aria-label="Next page" style={{ ...sq(false), color: p.cur >= p.pages - 1 ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}><Ic name="chevron-right" size={12} /></button>
+      </span>
     </div>
   );
 }

@@ -182,8 +182,9 @@ export function frameVM(ctx: DeskCtx) {
     ibCols: ibOn, ibInfoW, ibCpW, ibHas, ibNone: !ibHas,
     // Customer info folds to a strip and back (the owner, 2026-10-16: "右邊的 customer info 做也能收起的功能，但是 default 是開著的").
     ibInfoShut: infoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false, ...(BOTH ? {} : { ibCp: false }) }) },
-    dragList: edgeDrag(set, "ibListW", ibListW, 1, 260, ibListW + ibSpare), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
-    dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(440, ibCpW + ibSpare) : 440),
+    // v2 (note 06): the list 300–480 px, the Audit log 240–520 px, the chat keeping at least 420 (ibSpare).
+    dragList: edgeDrag(set, "ibListW", ibListW, 1, 290, Math.min(480, ibListW + ibSpare)), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
+    dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(520, ibCpW + ibSpare) : 520),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),
     ibCpOpen: ibOn && ibCpOpen, ibCpClosed: ibOn && !ibCpDock,
     ibCpStyle: (ibCpDock ? { position: "relative", flex: `0 0 ${ibCpW}px`, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", minHeight: 0 }

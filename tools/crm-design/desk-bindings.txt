@@ -41,15 +41,12 @@ alertsP
 apCmpLabel
 apCmpOn
 apCmpShort
-apDl
-apDlOpen
 apMainShort
 apRangeLabel
 apStCur
 apStOpen
 apStOpts
 apStToggle
-apToggleDl
 applyLabel
 assignGroups
 attachClose
@@ -128,7 +125,6 @@ chWa
 chatFromList
 chatFromTeam
 chatMenuItems
-chatOwner
 chatReply
 ci
 clSortLabel

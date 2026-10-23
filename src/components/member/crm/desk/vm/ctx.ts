@@ -129,6 +129,8 @@ export interface DeskUi {
   /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
   apDaily: Record<string, Record<string, Record<string, MetaFig> | null>>;
   /** The chart's metrics (its tiles), the ones whose line is hidden, and the chart / the table folded. */
+  /** Ads Performance's table a page at a time (v2 frame 05: "5 rows + pager (Show 5/10/20)"). */
+  apPer: number; apPg: number;
   apChart: (string | null)[] | null; apChartOff: Record<string, boolean>; apChartShut: boolean; apTableShut: boolean;
   addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;
@@ -212,7 +214,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

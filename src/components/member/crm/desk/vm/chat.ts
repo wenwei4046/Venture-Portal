@@ -164,7 +164,8 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     photo: () => pick("image/*,video/*", true),
     // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
     // "沒有顯示他是從什麼平台過來".
-    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · ${adKindLabel(c)} · ${c.ad}` : c.ad, subColor: "var(--crm-brown)", menu: true } : null,
+    // v2 (frame 02): the ad, then the channel — "Mattress Fair · Mid Valley · Messenger"; a video or image ad keeps its kind first.
+    head: c ? { avatar: initials(c.name), title: c.name, sub: [c.adId && c.adMedia ? adKindLabel(c).replace(/ · .*$/, "") : "", c.ad, c.channel === "whatsapp" ? "WhatsApp" : "Messenger"].filter(Boolean).join(" · "), subColor: "var(--crm-brown)", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },
