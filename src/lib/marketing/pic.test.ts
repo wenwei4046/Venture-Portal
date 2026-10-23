@@ -192,6 +192,17 @@ describe('an approval that asks both PICs (②b-2d-2b, the user’s answer 29)',
     expect(picBanner(theirs)?.text).toBe('Kelvin Tan approved the minutes. They go ahead once you approve too.')
     expect(picTimeline(theirs)[2].sub).toBe('Kelvin Tan approved — waiting for you')
   })
+  it('the minutes both approved: each reads “You and <the other>”, never the last one alone (found on the preview walk)', () => {
+    const both = { both: true, ok: { ...ok1, '2': { name: 'Hana Lee', at: '2026-10-25T02:10:00Z' } }, status: 'approved',
+      reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z', pic: 1 } }
+    const hana = page({ you: 2, pic: 'Hana Lee', other: 'Kelvin', ...both })
+    expect(picAnswered(hana)).toMatchObject({ text: 'You and Kelvin Tan approved the meeting minutes. The team has been told.',
+      receipt: expect.stringMatching(/^Signed by Kelvin Tan and Hana Lee · /) })
+    expect(picTimeline(hana)[2].label).toBe('You and Kelvin Tan approved the minutes')
+    expect(picAnswered(page({ you: 1, pic: 'Kelvin', other: 'Hana Lee', ...both }))?.text).toBe('You and Hana Lee approved the meeting minutes. The team has been told.')
+    // Either PIC's counted (one approval kept): as before.
+    expect(picAnswered(page({ you: 2, other: 'Kelvin', ...both, both: false }))?.text).toBe('Kelvin Tan approved the meeting minutes. The team has been told.')
+  })
   it('a stage: waiting no longer for the PIC whose approval is in — for the other', () => {
     const p = page({ you: 1, other: 'Hana Lee', status: 'active', work: [{ id: 'd1', title: 'Poster', status: 'active', stages: 1, done: 0,
       stage: { name: 'Design', status: 'review', ver: 2, waiting: false, both: true, ok: ok1 } }] })

@@ -103,6 +103,13 @@ export function bothState(both: boolean, ok: PicOk | null, you: PicNo, other: st
   return null
 }
 
+/** Minutes both PICs approved (②b-2d-2b): the other PIC's name, for "You and <name>" — else null. */
+function bothApproved(p: Partial<Pick<PicPage, 'both' | 'ok' | 'other' | 'you'>>): string | null {
+  const ok = p.both ? p.ok : null
+  if (!ok?.['1'] || !ok['2']) return null
+  return ok[String(3 - (p.you ?? 1)) as '1' | '2']?.name || p.other || 'the other PIC'
+}
+
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
@@ -288,13 +295,14 @@ export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' |
   }
   // The answer was theirs, or the other PIC's (either one's counts — the user's answer 29).
   const other = p.reply && p.reply.pic !== (p.you ?? 1) ? p.reply.name : null
+  const pair = bothApproved(p)
   // Both PICs sign off (②b-2d-2b): whose approval is in while the minutes wait.
   const both = bothState(!!p.both, p.ok ?? null, p.you ?? 1, p.other ?? null)
   const yours: PicStep = p.status === 'waiting_pic'
     ? both?.mine ? { label: `Waiting for ${both.other}`, state: 'cur', date: '', sub: 'You approved the minutes' }
       : { label: 'Your approval', state: 'cur', date: '', sub: both ? `${both.theirs} approved — waiting for you` : 'Waiting for you' }
     : p.status === 'changes' ? { label: other ? `The team is making ${other}’s changes` : 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
-    : { label: other ? `${other} approved the minutes` : 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
+    : { label: pair ? `You and ${pair} approved the minutes` : other ? `${other} approved the minutes` : 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
   return [
     { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
     { label: 'Minutes sent to you', state: 'done', date: day(p.sentAt), sub: '' },
@@ -312,11 +320,17 @@ function workStep(work: readonly PicWork[], approved: boolean): PicStep {
 }
 
 /** The card once the minutes are answered — by them, or by the other PIC (either one's answer counts). */
-export function picAnswered(p: Pick<PicPage, 'status' | 'reply'> & Partial<Pick<PicPage, 'you'>>): { approved: boolean; title: string; text: string; quote: string; receipt: string } | null {
+export function picAnswered(p: Pick<PicPage, 'status' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other'>>): { approved: boolean; title: string; text: string; quote: string; receipt: string } | null {
   const r = p.reply
   if (!r) return null
   const theirs = r.pic === (p.you ?? 1)
   if (r.decision === 'approved' && p.status !== 'waiting_pic' && p.status !== 'changes') {
+    // Both PICs signed off (②b-2d-2b): theirs counted as much as the last one's.
+    const pair = bothApproved(p)
+    if (pair && p.ok?.['1'] && p.ok['2']) {
+      return { approved: true, title: 'Approved', text: `You and ${pair} approved the meeting minutes. The team has been told.`, quote: '',
+        receipt: `Signed by ${p.ok['1'].name} and ${p.ok['2'].name} · ${receiptTime(r.at)}` }
+    }
     return { approved: true, title: 'Approved', text: `${theirs ? 'You' : r.name} approved the meeting minutes. The team has been told.`, quote: '',
       receipt: `Signed by ${r.name} · ${receiptTime(r.at)}` }
   }
