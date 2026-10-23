@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// 2026-10-24 — ⑥-3: a share link's file, signed at the click as the stranger. The code decides (the database's two
+// 2026-10-23 — ⑥-3: a share link's file, signed at the click as the stranger. The code decides (the database's two
 // asks are the PGlite checks'); this is what the route does with the answer.
 
 const db = vi.hoisted(() => ({ rpc: vi.fn(), sign: vi.fn(), signedFor: [] as unknown[] }))

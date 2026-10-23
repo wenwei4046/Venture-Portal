@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { sharedFromRow } from '@/lib/marketing/share'
 
-// 2026-10-24 — ⑥-3: a Library share link's page — closed, a folder's files, one file, view only.
+// 2026-10-23 — ⑥-3: a Library share link's page — closed, a folder's files, one file, view only.
 
 vi.mock('@/components/mkt/fonts', () => ({ nunito: { variable: 'n' }, playfair: { variable: 'p' }, dmSerif: { variable: 'd' }, grotesk: { variable: 'g' } }))
 

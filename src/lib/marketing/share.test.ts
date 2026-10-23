@@ -3,7 +3,7 @@ import { boardFromRow } from './board'
 import { attachTasks, libraryFromRow, shareAddress, shareEnds, shareOf, taskFilesFromRow } from './library'
 import { sharedBrandHref, sharedFileHref, sharedFromRow } from './share'
 
-// 2026-10-24 — ⑥-3: a Library file's or folder's guest link — Marketing's side (mkt_library's shares) and the stranger's
+// 2026-10-23 — ⑥-3: a Library file's or folder's guest link — Marketing's side (mkt_library's shares) and the stranger's
 // page (mkt_lib_shared).
 
 const CODE = '0123456789abcdef0123456789abcdef'
@@ -53,7 +53,7 @@ describe('the stranger’s page', () => {
   })
 })
 
-// 2026-10-24 — ⑥-4: a Library file on a task.
+// 2026-10-23 — ⑥-4: a Library file on a task.
 describe('a Library file on a task', () => {
   it('reads a task’s files — only the Library’s own places', () => {
     expect(taskFilesFromRow([

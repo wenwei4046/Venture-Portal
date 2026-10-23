@@ -3,7 +3,7 @@ import {
   dateWords, isPicCode, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
 } from './pic'
 
-// 2026-10-24 — the PIC's link (⑤-1, `PIC Link.dc.html`): what mkt_pic_page answers the stranger holding a product
+// 2026-10-23 — the PIC's link (⑤-1, `PIC Link.dc.html`): what mkt_pic_page answers the stranger holding a product
 // project's code, read; where it stands, why it waits again, the progress, the card after an answer, what an answer
 // asks, and the refusals a stranger may read. The database's side is tests/member-sql/validate-marketing-pic-link.mjs.
 

@@ -20,7 +20,7 @@
 -- A section's ⭐ and a field's ⭐ both stand: a field is required when its section is too; the PIC sees a field when he
 -- sees its section too. A stage moved or taken out is followed by the builder; here an index out of range is dropped
 -- (null) in a draft and refused when published, as every name left blank and a choice with no options.
--- Changed (each from production's body, compared by md5 on 2026-10-24 — equal to 20261023235500's copies; one
+-- Changed (each from production's body, compared by md5 on 2026-10-23 — equal to 20261023235500's copies; one
 -- statement added each): mkt_workflow_check keeps a stage's section and a field's settings; mkt_workflows() answers the
 -- canvas; mkt_workflow_save(id, rev, patch) takes it (`canvas`) and keeps it in step with the stages; publishing checks
 -- it whole and keeps it with the version; a clone copies it.
@@ -213,7 +213,7 @@ GRANT EXECUTE ON FUNCTION public.mkt_canvas_check(jsonb, integer, boolean) TO se
 -- As a draft (p_publish false): the shapes and limits; each stage kept as typed, names half-typed included. As
 -- published: every stage, field and column named, each field once; each 🔓 stage with its candidates and a stage
 -- before it; everybody named on Marketing's team — and the lock applied (no 🔓 hand-offs, no subtasks).
--- Answers the stages written clean — each with its section on the canvas, each field with its settings (2026-10-24).
+-- Answers the stages written clean — each with its section on the canvas, each field with its settings (2026-10-23).
 CREATE OR REPLACE FUNCTION public.mkt_workflow_check(p_stages jsonb, p_publish boolean, p_locked boolean)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER

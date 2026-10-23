@@ -1,4 +1,4 @@
--- Marketing ⑥-2 (2026-10-24): each subsidiary's brand profile in the Library — the handoff's *Edit … profile*
+-- Marketing ⑥-2 (2026-10-23): each subsidiary's brand profile in the Library — the handoff's *Edit … profile*
 -- (`Library.dc.html`): its profile picture (one of seven colours, or a logo uploaded), its background (one of seven
 -- colours, or a cover uploaded), its brand font (one of six), a display name and a caption. Kept in
 -- `mkt_subsidiaries.profile` (the column ① left for it); drawn on the Library's cards and a subsidiary's banner.

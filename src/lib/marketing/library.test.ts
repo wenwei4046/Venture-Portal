@@ -115,7 +115,7 @@ describe('the Library', () => {
   })
 })
 
-// 2026-10-24 — ⑥-2: a subsidiary's brand profile and its schedule.
+// 2026-10-23 — ⑥-2: a subsidiary's brand profile and its schedule.
 describe('a brand profile', () => {
   const LOGO = 'brand/00000000-0000-4000-8000-000000000009/carres-logo.png'
   const car = (profile: unknown) => libraryFromRow({ subs: [{ id: CAR, code: 'CAR', name: 'Carres', emoji: '🛋️', dot: 'x', client: false, profile }] }).subs[0]

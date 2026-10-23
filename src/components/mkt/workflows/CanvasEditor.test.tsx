@@ -4,7 +4,7 @@ import { canvasFromRow, type WfCanvas } from '@/lib/marketing/canvas'
 import { newWfStage, type WfStage } from '@/lib/marketing/workflows'
 import CanvasEditor from './CanvasEditor'
 
-// 2026-10-24 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, the Workflow Builder's Canvas template tab):
+// 2026-10-23 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, the Workflow Builder's Canvas template tab):
 // the task page laid out — 📋 Requirements, a section per stage with its fields, the manager's own sections, the Free
 // space; a section's and a field's settings; the Preview as the staff and as the PIC see it. The editor hands back the
 // stages and the canvas changed; the Workflow Builder saves them (WorkflowBuilder.test.tsx).
