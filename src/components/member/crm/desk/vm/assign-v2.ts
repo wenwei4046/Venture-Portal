@@ -17,7 +17,8 @@ import { MON } from "./insight";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
 import { adRunLine, adRunning } from "@/lib/member/crm-ad-running";
 import { leadsByAd } from "./leads-by-ad";
-import { teamNameOf } from "./data";
+import { chatRows, teamNameOf } from "./data";
+import { STATUS, type StatusName } from "../../shared/palette";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -164,9 +165,18 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   };
   // Assignment › Leads by ad (2026-10-22): each ad, who got how many of its leads (vm/leads-by-ad.ts).
   const lbaPer = ui.lbaPer ?? "month";
+  const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
   const leadsByAdV = {
     periods: ([["month", "This month"], ["all", "All time"]] as const).map(([k, label]) => ({ label, on: lbaPer === k, pick: () => patch({ lbaPer: k }) })),
-    ads: leadsByAd(data.customers, adIds, id => adOf(id).label, id => ctx.nameOf(id), id => teamNameOf(ctx, id), lbaPer, now),
+    // An ad's card folds to its head; a person opens to the leads they got — status as Contacts says it, a tap opens the chat
+    // (2026-10-23, the owner: "点成员名单要可以看到他们得到的 list", "这些名单做可收缩及展开的功能").
+    ads: leadsByAd(data.customers, adIds, id => adOf(id).label, id => ctx.nameOf(id), id => teamNameOf(ctx, id), lbaPer, now).map(a => ({ ...a,
+      shut: !!ui.lbaShut[a.id], fold: () => set(u => ({ ...u, lbaShut: { ...u.lbaShut, [a.id]: !u.lbaShut[a.id] } })),
+      rows: a.rows.map(r => { const k = `${a.id}|${r.who}`, open = !!ui.lbaOpen[k];
+        return { ...r, open, toggle: () => set(u => ({ ...u, lbaOpen: { ...u.lbaOpen, [k]: !u.lbaOpen[k] } })),
+          leads: r.leads.map(l => { const st = STATUS[(stOf.get(l.id) ?? "") as StatusName];
+            return { ...l, when: new Date(l.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }), status: stOf.get(l.id) ?? "", stBg: st?.tint ?? "var(--crm-field)", stFg: st?.text ?? "var(--crm-muted)", stDot: st?.dot ?? null,
+              open: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: l.id, fromTeam: false, inbF: "All", whoSel: [] }) }; }) }; }) })),
   };
   return {
     leadsByAd: leadsByAdV,

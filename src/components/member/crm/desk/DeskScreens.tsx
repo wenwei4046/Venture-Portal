@@ -8,7 +8,7 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchAdDaily, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
 import { fetchCrmChannels, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
@@ -257,6 +257,22 @@ export default function DeskScreens(p: DeskScreensProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui.tab, live, data.can.manage, apNeedKey]);
+
+  // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
+  const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;
+  const dayNeedKey = JSON.stringify(dayNeed ?? null);
+  const askedDays = useRef(new Set<string>());
+  useEffect(() => {
+    if (ui.tab !== "adsperf" || !live || !data.can.manage || !dayNeed) return;
+    const ids = dayNeed.ids.filter(id => !askedDays.current.has(`${dayNeed.key}|${id}`));
+    if (!ids.length) return;
+    ids.forEach(id => askedDays.current.add(`${dayNeed.key}|${id}`));
+    void fetchAdDaily(ids, dayNeed.since, dayNeed.until).then(r => {
+      const days = r.ok ? r.days : Object.fromEntries(ids.map(id => [id, null]));
+      setUi(u => ({ ...u, apDaily: { ...u.apDaily, [dayNeed.key]: { ...(u.apDaily[dayNeed.key] ?? {}), ...days } } }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.tab, live, data.can.manage, dayNeedKey]);
 
   // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
   const seeded = useRef("");

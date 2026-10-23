@@ -7,6 +7,7 @@
  */
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Ic } from "../shared/icons4a";
+import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
 import { avatarTint } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
 
@@ -566,13 +567,13 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
             font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
             <span style={{ position: "relative", whiteSpace: "nowrap" }}>
               {v.ppSortCols0.map((c, i) => <button key={i} type="button" onClick={c.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", display: "inline-flex", gap: "4px" }}>Name <span>{c.arrow === "↕" ? "" : c.arrow}</span></button>)}
-              <span onPointerDown={v.ppDragC as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-11px", width: "9px", cursor: "col-resize" }} />
+              <span onPointerDown={v.ppDragC as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-12px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
             </span>
             {v.ppHead.map(h => (
               <span key={h.label} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", minWidth: 0 }} className="crm4a-th">
                 <button type="button" onClick={h.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", overflow: "hidden", textOverflow: "ellipsis" }}>{h.label}{h.arrow !== "↕" ? ` ${h.arrow}` : ""}</button>
                 <button type="button" onClick={h.remove} title="Hide column" style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }} className="crm4a-th-x"><Ic name="x" size={10} /></button>
-                <span onPointerDown={h.drag as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-11px", width: "9px", cursor: "col-resize" }} />
+                <span onPointerDown={h.drag as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-12px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
               </span>
             ))}
             <span style={{ position: "relative", display: "flex", justifyContent: "flex-end" }}>
@@ -992,6 +993,8 @@ interface AdsBits {
     cmp: boolean;
   };
   apNameArrow: string; apSortName: () => void; openMetrics: () => void;
+  /** The chart over the table and the table's own fold (2026-10-23); absent in the prototype harness, which keeps 4a's table alone. */
+  apChartV?: AdsChartBits & { tableShut: boolean; foldTable: () => void; adsN: number };
 }
 
 /** Frame 05 · Ads Performance's table: the ad (channel, the name managers typed, Meta's headline), the CRM's figures, Meta's "—", the total under an ink rule. */
@@ -1017,7 +1020,9 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
       style={{ position: "absolute", top: "-10px", bottom: "-10px", right: "-8px", width: "10px", cursor: "col-resize", zIndex: 2, touchAction: "none" }} />
   );
   const Cell = ({ c, id, total }: { c: AdsCell; id: string; total?: boolean }) => {
-    const meta = id === "spend" || id === "cpl" || c.v === "—";
+    // Faint only when there is no figure: Spend and Per lead were drawn faint as "Meta not connected", which they are since
+    // 2026-10-22 (Ads Manager's own figures) — the owner, 2026-10-23: "数据浅灰色的原因？".
+    const meta = c.v === "—";
     return (
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: 0 }}>
         {/* Appt rate is its figure alone, no bar (the owner, 2026-10-18). */}
@@ -1026,7 +1031,8 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
       </span>
     );
   };
-  return (
+  const C = v.apChartV;
+  const table = (
     <div style={{ display: "flex", flexDirection: "column", overflowX: "auto", minWidth: 0 }}>
       <div style={{ display: "grid", gridTemplateColumns: grid, gap: "12px", alignItems: "center", minHeight: "44px", padding: "0 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)",
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
@@ -1054,6 +1060,15 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
         {A.total.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} total />)}
         <span />
       </div>
+    </div>
+  );
+  if (!C) return table;
+  // The chart, then the ads one by one — each folds to its head (the owner, 2026-10-23: "下方的个别数据及图片做成可展开收缩").
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <DeskAdsChart v={C} />
+      <FoldHead title="By ad" sub={`${C.adsN} ads`} shut={C.tableShut} fold={C.foldTable} />
+      {!C.tableShut && table}
     </div>
   );
 }

@@ -52,3 +52,21 @@ export function adRunLine(meta: { status?: string | null; startAt?: string | nul
   if (st === "ACTIVE" || st === "WITH_ISSUES") return `Running${meta.startAt ? ` · since ${day(meta.startAt)}` : ""}${ends}`;
   return "";
 }
+
+/**
+ * An ad's place in the desktop's Running · Paused · Pending filter (2026-10-23, the owner: "assignment 选择 running 不会被
+ * 筛选出来" — the filter asked a status that was never read and found nothing): ended or stopped = Paused; in Meta's
+ * review, or set to start later = Pending; else as `adRunning` (Meta's fresh status, or a lead in the last 7 days).
+ */
+export function adStatusOf(
+  meta: { status?: string | null; statusAt?: string | null; startAt?: string | null; endAt?: string | null } | undefined,
+  lastLeadAt: string | null | undefined,
+  now: Date,
+): "Running" | "Paused" | "Pending" {
+  const st = (meta?.status ?? "").toUpperCase(), t = now.getTime();
+  const end = meta?.endAt ? new Date(meta.endAt).getTime() : NaN, start = meta?.startAt ? new Date(meta.startAt).getTime() : NaN;
+  if (Number.isFinite(end) && end < t) return "Paused";
+  if (STOPPED.has(st)) return "Paused";
+  if (PENDING.has(st) || (Number.isFinite(start) && start > t)) return "Pending";
+  return adRunning(meta, lastLeadAt, now) ? "Running" : "Paused";
+}

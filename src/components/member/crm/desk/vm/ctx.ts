@@ -118,8 +118,16 @@ export interface DeskUi {
   adSplitShut: boolean;
   /** Assignment › Leads by ad: this month or all time. */
   lbaPer: "month" | "all";
+  /** Leads by ad: an ad's card folded (by ad id), a person's list of leads opened ("ad|person"). */
+  lbaShut: Record<string, boolean>; lbaOpen: Record<string, boolean>;
+  /** Active members / Member work type: a team's card folded (by team name). */
+  teamShut: Record<string, boolean>;
   /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
   apMeta: Record<string, Record<string, MetaFig | null>>;
+  /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
+  apDaily: Record<string, Record<string, Record<string, MetaFig> | null>>;
+  /** The chart's metrics (its tiles), the ones whose line is hidden, and the chart / the table folded. */
+  apChart: (string | null)[] | null; apChartOff: Record<string, boolean>; apChartShut: boolean; apTableShut: boolean;
   addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;
   cltF: string; cltFOpen: boolean; cltEdit: string | null; cltDraft: string | null; cltDN: string | null; cltDC: "WhatsApp" | "Messenger" | null; cltIsNew: boolean; cltAsk: string | null; cltMore: boolean; cltVars: string[];
@@ -202,7 +210,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", apMeta: {}, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, apMeta: {}, apDaily: {}, apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

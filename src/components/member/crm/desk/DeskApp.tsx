@@ -566,13 +566,13 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
                   {(v.mwtTeams).map((g, g_i) => (<Fragment key={g_i}>
                     <div style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
+                      <button type="button" onClick={g.fold} aria-expanded={!g.shut} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", border: "0", borderBottom: g.shut ? "0" : "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }}><span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: g.shut ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></span>
                         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }}>
                         </span>
                         <strong style={{ flex: "1", fontSize: "14.5px", fontWeight: "700", color: g.color }}>{g.name}</strong>
                         <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
-                      </div>
-                      {(g.people).map((p, p_i) => (<Fragment key={p_i}>
+                      </button>
+                      {!g.shut && (g.people).map((p, p_i) => (<Fragment key={p_i}>
                         <button type="button" onClick={p.toggle} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h12}>
                           <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "12px", fontWeight: "700", display: "grid", placeItems: "center" }}>{p.ini}</span>
                           <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>

@@ -441,6 +441,14 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-brand-waze: #33CCFF;
   --crm-brand-maps: #34A853;
   --crm-brand-instagram: #C13584;
+  /* Ads Performance's chart (2026-10-23): one hue a metric, in this fixed order — the dataviz reference's categorical
+     slots 1–6, validated together on white (adjacent CVD ΔE ≥ 9.1; under 3:1 contrast, so each line has its labelled tile) */
+  --crm-series-1: #2a78d6;
+  --crm-series-2: #eb6834;
+  --crm-series-3: #1baf7a;
+  --crm-series-4: #eda100;
+  --crm-series-5: #e87ba4;
+  --crm-series-6: #008300;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───

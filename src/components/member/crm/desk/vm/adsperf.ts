@@ -7,9 +7,11 @@
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
 import { INS_CARDS, MON } from "./insight";
 import { columnSizer } from "./columns";
+import { CHART_DEF, CHART_MAX, CHART_METRICS, chartFmt, dailySeries, dayLabel, daysOf, SERIES } from "./adschart";
 import { ST_META } from "./tokens";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
@@ -23,10 +25,11 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
 export const ALL = METRICS.flatMap(g => g[2]);
-// 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +.
+// 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
+// lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
 export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
 /** 4a's short headers (frame 05) for the columns it draws; others keep their names. */
-const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend", cpl: "Per lead" };
+const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend (RM)", cpl: "Per lead (RM)" };
 const COSTY = /^(cpr|cpm|cpc|cpl|spend|cpp|cpmsg|cpcall|cpe|cpthru|cpappt|cpwon|blocks)$/;
 const DAY = 86_400_000;
 const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -87,8 +90,8 @@ export function adsPerfVM(ctx: DeskCtx) {
         : [ra - len * DAY, ra - DAY];
   const rangeTxt = (a: number, b: number) => (a === b ? dfmt(isoOf(a)) : `${dfmt(isoOf(a))} – ${dfmt(isoOf(b))}`);
   // Meta's delivery, as Ads Manager last said (crm_ad_names.meta_status, hourly).
-  const status = (adId: string): string | null => { const st = (data.adNames?.[adId]?.status ?? "").toUpperCase();
-    return !st ? null : st === "ACTIVE" || st === "WITH_ISSUES" ? "Running" : /PAUSED|ARCHIVED|DELETED|DISAPPROVED/.test(st) ? "Paused" : "Pending"; };
+  // …else by its last lead, as Assignment's filter (adStatusOf, 2026-10-23).
+  const status = (adId: string): string | null => adStatusOf(data.adNames?.[adId], data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === adId).map(c => c.createdAt).sort().at(-1) ?? null, now);
   // Meta's figures for a range (read by DeskScreens through fetchAdInsights into ui.apMeta, keyed "from|to").
   const rkey = (a: number, b: number) => `${isoOf(a)}|${isoOf(b)}`;
   const metaOf = (ids: string[], a: number, b: number) => ids.map(id => ui.apMeta?.[rkey(a, b)]?.[id]);
@@ -161,8 +164,36 @@ export function adsPerfVM(ctx: DeskCtx) {
   // The ranges whose Meta figures the table needs (DeskScreens reads the missing ones; numeric ad ids only).
   const metaIds = AD.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
   const apNeed = (cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ key: rkey(a, b), since: isoOf(a), until: isoOf(b), ids: metaIds.filter(id => !(id in (ui.apMeta?.[rkey(a, b)] ?? {}))) })).filter(n => n.ids.length);
+
+  // The chart over the table (vm/adschart.ts): the range's days, a tile a metric — its total as the table's — and its line.
+  const dayKey = rkey(ra, rb), daily = ui.apDaily?.[dayKey] ?? {};
+  const apDayNeed = metaIds.filter(id => !(id in daily)).length ? { key: dayKey, since: isoOf(ra), until: isoOf(rb), ids: metaIds.filter(id => !(id in daily)) } : null;
+  const slots = ui.apChart ?? CHART_DEF, chosen = slots.filter((k): k is string => !!k);
+  const days = daysOf(ra, rb);
+  const series = dailySeries(chosen, days, allCs, data.visits, metaIds.map(id => daily[id]));
+  const total = (k: string) => val(allCs, AD.map(x => x.id), k, ra, rb);
+  const setSlot = (i: number, k: string | null) => set(u => { const s = [...(u.apChart ?? CHART_DEF)]; while (s.length <= i) s.push(null); s[i] = k; return { ...u, apChart: s }; });
+  const apChartV = {
+    shut: ui.apChartShut, fold: () => set(u => ({ ...u, apChartShut: !u.apChartShut })),
+    tableShut: ui.apTableShut, foldTable: () => set(u => ({ ...u, apTableShut: !u.apTableShut })), adsN: AD.length,
+    reading: !!apDayNeed && metaIds.length > 0, range: rangeTxt(ra, rb),
+    days: days.map(d => ({ iso: d, label: dayLabel(d) })),
+    tiles: slots.map((k, i) => {
+      if (!k) return null;
+      const m = CHART_METRICS.find(x => x[0] === k)!, on = !ui.apChartOff[k];
+      return { key: k, label: m[1], total: chartFmt(total(k), m[2]), color: SERIES[i], on,
+        toggle: () => set(u => ({ ...u, apChartOff: { ...u.apChartOff, [k]: !u.apChartOff[k] } })),
+        options: CHART_METRICS.filter(x => x[0] === k || !chosen.includes(x[0])).map(x => ({ v: x[0], label: x[1] })),
+        change: (e: { target: { value: string } }) => setSlot(i, e.target.value),
+        remove: chosen.length > 1 ? () => setSlot(i, null) : null };
+    }),
+    canAdd: chosen.length < CHART_MAX && chosen.length < CHART_METRICS.length,
+    add: () => { const k = CHART_METRICS.find(x => !chosen.includes(x[0]))?.[0]; if (!k) return; const free = slots.findIndex(s => !s); setSlot(free >= 0 ? free : slots.length, k); },
+    lines: slots.map((k, i) => (k && !ui.apChartOff[k] ? { key: k, color: SERIES[i], fmt: CHART_METRICS.find(x => x[0] === k)![2], label: CHART_METRICS.find(x => x[0] === k)![1], values: series[k] } : null))
+      .filter((l): l is NonNullable<typeof l> => !!l),
+  };
   return {
-    apNeed,
+    apNeed, apDayNeed, apChartV,
     kAdsPerf: ui.tab === "adsperf",
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
     ap4: {
