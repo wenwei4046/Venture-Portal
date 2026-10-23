@@ -8,7 +8,7 @@
  * here is the frame's px scaled up by the phone's type step through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
 import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
@@ -99,7 +99,7 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
   periods: { label: string; on: boolean; pick: () => void }[]; range: string;
   hero: { label: string; value: string; delta: string; good: boolean }[];
   counts: { label: string; n: number; open: MouseH }[]; reply: { n: string; unit: string };
-  status: { label: string; n: number; c: string; hot: boolean }[]; total: number } } }) {
+  status: { label: string; n: number; c: string; hot: boolean; open: () => void }[]; total: number } } }) {
   const P = v.p4;
   return (
     <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -125,18 +125,21 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
           <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17) }}>Leads by status</span>
           <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17), fontVariantNumeric: "tabular-nums" }}>{P.total}</span>
         </div>
-        <div style={{ display: "flex", gap: "3px", height: "8px", borderRadius: "4px", overflow: "hidden", background: "var(--crm-track)" }}>
+        <div style={{ display: "flex", gap: "2px", height: "8px", borderRadius: "4px", overflow: "hidden", background: "var(--crm-track)" }}>
           {P.status.filter(s => s.n).map(s => <span key={s.label} style={{ flex: s.n, background: s.c }} />)}
         </div>
+        {/* v3 (M Insight): each row has its chevron and opens Inbox filtered by that status. */}
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: "20px" }}>
           {P.status.map(s => (
-            <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "10px", height: "35px", borderBottom: "1px solid var(--crm-rule)", fontSize: fs(14) }}>
+            <button key={s.label} type="button" onClick={s.open} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", borderBottom: "1px solid var(--crm-rule-soft)", fontSize: fs(13) }}>
               <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: s.c, flex: "none" }} />
-              <span style={{ flex: 1, color: s.hot ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{s.label}</span>
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>{s.n}</span>
-            </div>
+              <span style={{ color: s.hot ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{s.label}</span>
+              <span style={{ marginLeft: "auto", fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{s.n}</span>
+              <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={11} /></span>
+            </button>
           ))}
         </div>
+        <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>Tap a status to open those leads in Inbox</span>
       </div>
     </main>
   );
@@ -177,7 +180,7 @@ export function Phone4aCalMonth({ v }: { v: { cal4: { month: string; prev: () =>
         {v.calCells.map((c, i) => (
           <button key={i} type="button" onClick={c.pick} style={{ ...BTN, height: "42px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", visibility: c.inM ? "visible" : "hidden" }}>
             <span style={{ width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: fs(16), fontVariantNumeric: "tabular-nums", fontWeight: c.isT ? 500 : 400,
-              background: c.isT ? "var(--crm-rust)" : c.isS ? "var(--crm-cream)" : "transparent", color: c.isT ? "#fff" : "var(--crm-ink)" }}>{c.n}</span>
+              background: c.isT ? "var(--crm-rust)" : c.isS ? "var(--crm-sel)" : "transparent", color: c.isT ? "#fff" : "var(--crm-ink)" }}>{c.n}</span>
             <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: c.has ? c.evC : "transparent" }} />
           </button>
         ))}
@@ -187,44 +190,52 @@ export function Phone4aCalMonth({ v }: { v: { cal4: { month: string; prev: () =>
 }
 
 type CalItem = { name: string; room: string; open: unknown; t: string; ap: string; kick: string };
-/** M10 · Today, Did they come? and Upcoming on the pale cream, a white card each — every button production's. */
+type CalBtn = { label: string; kind?: "main" | "green"; on: () => void };
+/** M10 (v3) · two-part cards on the pale cream, grouped by day — the name and room on top, the buttons below in equal
+ * widths. Today's is green (its 4 px bar, TODAY tag and "in 2 h"): Change · No show · Show up (green). Did they come?:
+ * Change · No show · Show up. Upcoming: Change · Send reminder (Send again once sent) — every button production's. */
 export function Phone4aCalLists({ v }: { v: {
   hasToday: boolean; todayCount: string; noUpcoming: boolean; upTitle: string; upCount: string;
-  todayList: (CalItem & { due: boolean; change: unknown; came: () => void; noShow: () => void })[];
-  upList: (CalItem & { done: boolean; remind: () => void; rLabel: string })[]; cal4: { today: string } } }) {
-  const Kick = ({ children }: { children: ReactNode }) => <span style={{ fontSize: fs(12), fontWeight: 500, letterSpacing: "0.12em", color: "var(--crm-faint)", padding: "4px 4px 0" }}>{children}</span>;
-  const Card = ({ a, children }: { a: CalItem; children: ReactNode }) => (
-    <div style={{ display: "flex", gap: "12px", padding: "16px 14px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff" }}>
-      <button type="button" onClick={a.open as () => void} style={{ ...BTN, width: "50px", flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-        <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(18), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{a.t}</span>
-        <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{a.ap}</span>
-      </button>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-        <button type="button" onClick={a.open as () => void} style={{ ...BTN, display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
-          <span style={{ fontSize: fs(17), fontWeight: 500, color: "var(--crm-ink)" }}>{a.name}</span>
-          <span style={{ fontSize: fs(14), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
+  todayList: (CalItem & { due: boolean; soon: string; change: unknown; came: () => void; noShow: () => void })[];
+  upList: (CalItem & { done: boolean; remind: () => void; rLabel: string; change: unknown })[]; cal4: { today: string } } }) {
+  const Kick = ({ children }: { children: ReactNode }) => <span style={{ padding: "4px 4px 0", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{children}</span>;
+  const Card = ({ a, today, btns }: { a: CalItem; today?: boolean; btns: CalBtn[] }) => {
+    const bg = today ? "var(--crm-today-bg)" : "#fff", bd = today ? "var(--crm-today-line)" : "var(--crm-nav-line)", bar = `inset 4px 0 0 ${today ? "var(--crm-today)" : "transparent"}`;
+    return (<div>
+      <div style={{ display: "flex", gap: "12px", padding: "12px 14px 10px", borderRadius: "16px 16px 0 0", background: bg, border: `1px solid ${bd}`, borderBottom: 0, boxShadow: bar }}>
+        <button type="button" onClick={a.open as () => void} style={{ ...BTN, width: "52px", flex: "none", display: "flex", flexDirection: "column", gap: "1px", alignItems: "flex-start" }}>
+          <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(17), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{a.t}</span>
+          <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>{a.ap}</span>
         </button>
-        <div style={{ display: "flex", flexWrap: "nowrap", gap: "6px" }}>{children}</div>
+        <button type="button" onClick={a.open as () => void} style={{ ...BTN, flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+            <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+            {today && <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", gap: "4px", background: "var(--crm-today)", color: "#fff", fontSize: fs(10), fontWeight: 600, letterSpacing: ".04em" }}><span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#fff" }} />TODAY</span>}
+          </span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
+        </button>
       </div>
-    </div>
-  );
+      <div style={{ display: "flex", gap: "6px", marginTop: "-6px", padding: "6px 14px 12px", background: bg, border: `1px solid ${bd}`, borderTop: 0, borderRadius: "0 0 16px 16px", boxShadow: bar }}>
+        {btns.map(x => {
+          const fill = x.kind === "green" ? "var(--crm-today)" : x.kind === "main" ? "var(--crm-rust)" : "";
+          return <button key={x.label} type="button" onClick={x.on} style={{ ...BTN, flex: "1 1 0", minWidth: 0, height: "36px", borderRadius: "18px", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", fontSize: fs(13), fontWeight: 500, whiteSpace: "nowrap",
+            background: fill || "#fff", color: fill ? "#fff" : "var(--crm-ink)", border: `1px solid ${fill || "var(--crm-line)"}` }}>{x.label}</button>;
+        })}
+      </div>
+    </div>);
+  };
+  // One head a day, as the prototype ("Did they come? · Sat 17 Oct", "Upcoming · Sat 24 Oct").
+  const byDay = <T extends CalItem>(xs: T[]) => xs.reduce<[string, T[]][]>((g, x) => { const l = g[g.length - 1]; if (l && l[0] === x.kick) l[1].push(x); else g.push([x.kick, [x]]); return g; }, []);
   const today = v.todayList.filter(a => !a.due), due = v.todayList.filter(a => a.due);
-  const marks = (a: (typeof v.todayList)[number]) => (<>
-    <button type="button" onClick={a.came} style={MAIN}>Show up</button>
-    <button type="button" onClick={a.noShow} style={OUT}>No show</button>
-    <button type="button" onClick={a.change as () => void} style={OUT}><Ic name="pencil" size={13} />Change</button>
-  </>);
+  const marks = (a: (typeof v.todayList)[number], green: boolean): CalBtn[] => [
+    { label: "Change", on: a.change as () => void }, { label: "No show", on: a.noShow }, { label: "Show up", kind: green ? "green" : "main", on: a.came }];
   return (
-    <section style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "4px 0 -24px", padding: "18px 16px 28px", background: "var(--crm-hover)", flex: "1 0 auto" }}>
-      {v.hasToday && today.length > 0 && (<><Kick>TODAY · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={a}>{marks(a)}</Card>)}</>)}
-      {v.hasToday && due.length > 0 && (<><Kick>DID THEY COME?</Kick>{due.map((a, i) => <Card key={"d" + i} a={{ ...a, room: `${a.kick} · ${a.room}` }}>{marks(a)}</Card>)}</>)}
-      <Kick>{v.upTitle.toUpperCase()}{v.upCount ? ` · ${v.upCount.toUpperCase()}` : ""}</Kick>
-      {v.noUpcoming && <span style={{ padding: "6px 4px", fontSize: fs(14), color: "var(--crm-muted)" }}>No upcoming appointments.</span>}
-      {v.upList.map((a, i) => (
-        <Card key={"u" + i} a={{ ...a, room: `${a.kick} · ${a.room}` }}>
-          <button type="button" onClick={a.remind} style={a.done ? OUT : MAIN}>{a.done ? "Reminder sent · Send again" : a.rLabel}</button>
-        </Card>
-      ))}
+    <section style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "4px 0 -24px", padding: "14px 16px 28px", background: "var(--crm-hover)", flex: "1 0 auto" }}>
+      {v.hasToday && today.length > 0 && (<><Kick>Today · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={{ ...a, room: a.soon ? `${a.room} · ${a.soon}` : a.room }} today btns={marks(a, true)} />)}</>)}
+      {v.hasToday && byDay(due).map(([d, xs]) => (<Fragment key={"d" + d}><Kick>Did they come? · {d}</Kick>{xs.map((a, i) => <Card key={"d" + d + i} a={a} btns={marks(a, false)} />)}</Fragment>))}
+      {v.noUpcoming && (<><Kick>{v.upTitle}</Kick><span style={{ padding: "6px 4px", fontSize: fs(14), color: "var(--crm-muted)" }}>No upcoming appointments.</span></>)}
+      {byDay(v.upList).map(([d, xs]) => (<Fragment key={"u" + d}><Kick>Upcoming · {d}</Kick>{xs.map((a, i) => (
+        <Card key={"u" + d + i} a={a} btns={[{ label: "Change", on: a.change as () => void }, { label: a.done ? "Send again" : a.rLabel, kind: "main", on: a.remind }]} />))}</Fragment>))}
     </section>
   );
 }

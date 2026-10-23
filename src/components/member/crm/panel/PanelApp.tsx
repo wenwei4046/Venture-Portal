@@ -387,7 +387,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </div>
             </>)}
-            <div data-chat-list="1" onClick={v.ld.lx.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: "var(--crm-cream)" }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div data-chat-list="1" onClick={v.ld.lx.dismiss} style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "calc(0px - var(--safe-bottom, 0px))", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", boxSizing: "border-box", padding: "calc(var(--chat-top, 55px) + 25px) 16px calc(var(--chat-foot, 64px) + 6px)", backgroundColor: "var(--crm-field)" }}><div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
               {(v.ld.ld.msgs).map((m, m_i) => (<Fragment key={m_i}>
                 {!!(m.sep) && (<>
                   <span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>

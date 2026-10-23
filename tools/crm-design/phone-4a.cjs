@@ -38,7 +38,7 @@ function inbox(body) {
     `<h1 style={{ flex: "1 0 auto", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Inbox</h1>`, "inbox title");
   // All ads leaves the title row for the search row (M01: "All ads ▾ + search").
   body = swap(body, '<span onClick={v.openAd} style={{', "span", "", "inbox ad pill");
-  const adPill = `<span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "${F(13)}", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-cream)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span>`;
+  const adPill = `<span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "${F(13)}", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-sel)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span>`;
   body = swap(body, '<label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px"', "label", s => {
     s = once(s, 'style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "22px", background: "var(--crm-field)", color: "var(--crm-muted)" }}',
       'style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", boxSizing: "border-box", borderRadius: "20px", background: "var(--crm-field)", color: "var(--crm-faint)" }}', "search box");
@@ -235,10 +235,10 @@ function panelChat(body) {
   body = body.slice(0, row + rowEnd) + "<Phone4aStrip s={v.ld.ld.strip} />" + body.slice(row + rowEnd);
   body = once(body, '<span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>',
     `<span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "${F(12)}", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>`, "team chat day");
-  // 4a (M04): a plain cream wall, as Mine's (sales/wall.ts).
+  // v3: the wall is #F7F3EF (--crm-field), as Mine's (sales/wall.ts).
   const wall = /backgroundColor: "var\(--crm-cream\)", backgroundImage: "url\('data:image\/svg\+xml[^"]*", backgroundSize: "240px 240px"/;
   if (!wall.test(body)) throw new Error("phone-4a: team chat wall");
-  body = body.replace(wall, 'backgroundColor: "var(--crm-cream)"');
+  body = body.replace(wall, 'backgroundColor: "var(--crm-field)"');
   // M04: the message words 15 px (the frame), as Mine's chat (vm/chat.ts).
   body = once(body, 'fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45" }}>{m.text}</p>', `fontSize: "${F(15)}", lineHeight: "1.45" }}>{m.text}</p>`, "panel bubble words");
   // M04: the Team chat's header as Mine's — the name 16 px / 600, its line 12 px (the owner, 2026-10-18).

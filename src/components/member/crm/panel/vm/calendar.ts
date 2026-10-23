@@ -67,7 +67,7 @@ export function calendarVM(ctx: PanelCtx) {
       pick: () => patch({ cTeam: k, cPerson: "" }), on: ts === k, bg: ts === k ? "var(--crm-rust)" : "var(--crm-field)", fg: ts === k ? "#fff" : "var(--crm-ink)", bd: ts === k ? "var(--crm-rust)" : "var(--crm-field)" })),
     cPersonLabel: pp ? nameOf(pp) : "Everyone",
     cpIsOpen: ui.cpSheet, cpOpen: () => patch({ cpSheet: true }), cpClose: () => patch({ cpSheet: false }), cpGroups: groups,
-    cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-cream)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
+    cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-sel)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
     cViews: [segv("grid", "Month"), segv("list", "List")], cIsGrid: view === "grid",
     // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
     cStats: ([["Leads", leadsIn.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,

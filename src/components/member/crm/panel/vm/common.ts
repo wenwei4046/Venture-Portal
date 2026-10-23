@@ -222,7 +222,7 @@ export interface PickGroup { name: string; c: string; n: number; people: PickRow
 export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: string | null; pick: (id: string) => void; hodLabel?: string; only?: CrmPerson[] }): PickGroup[] {
   const row = (p: CrmPerson, c: string): PickRow => {
     const on = o.sel === p.id;
-    return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", dot: on ? "var(--crm-rust)" : "transparent", bg: on ? "var(--crm-cream)" : "transparent", r: "12px", pick: () => o.pick(p.id) };
+    return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", dot: on ? "var(--crm-rust)" : "transparent", bg: on ? "var(--crm-sel)" : "transparent", r: "12px", pick: () => o.pick(p.id) };
   };
   // `only`: a leader's own people (2026-10-23 — the chat's Assign to, as Mine's): those people, under their team's name.
   if (o.only) {
