@@ -8,6 +8,7 @@ import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/DrawerParts'
 import { BA_CARDS, BA_TITLE, calcOf, type BaCard, type BaHubModel, type BaListRow, type BaRecordModel } from '@/lib/fin-app/ba-model'
 import { f2 } from '@/lib/fin-app/page-model'
+import { stageInto } from '@/lib/storage/stage'
 import type { CompanyOption, LimitRow } from '@/app/(portal)/ba/_components/BaView'
 import { deleteBa, deleteBaAttachment, generateBaInvoice, getBaAttachmentUrl, setBaStatus, uploadBaAttachment } from '@/app/(portal)/ba/actions'
 import { openBaFinancing } from '@/app/(portal)/ba/page-actions'
@@ -316,8 +317,15 @@ export default function BaApp({
   const upload = (file: File | null) => {
     if (!file || !r) return
     const fd = new FormData()
-    fd.set('file', file)
-    run(() => uploadBaAttachment(r.id, fd), () => 'Document filed')
+    // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+    run(
+      () =>
+        stageInto(fd, 'file', file).then(
+          () => uploadBaAttachment(r.id, fd),
+          (err: unknown) => ({ error: err instanceof Error ? err.message : 'The document could not be sent.' }),
+        ),
+      () => 'Document filed',
+    )
   }
   const confirmAsked = () => {
     if (!r) return

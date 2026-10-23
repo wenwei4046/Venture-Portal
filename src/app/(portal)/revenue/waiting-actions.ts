@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { dropStaged, formFile } from '@/lib/storage/staged'
 import {
   letterFile,
   signedFormRefusal,
@@ -152,23 +153,30 @@ export async function saveReplacementForm(draft: FormDraft): Promise<WaitingForm
 
 async function uploadTemplate(kind: MemberFormKind, formData: FormData): Promise<WaitingFormOutcome> {
   if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
-  const file = formData.get('file')
-  if (!(file instanceof File)) return { ok: false, reason: 'Choose a file to upload.' }
-  const refused = templateRefusal(file)
-  if (refused) return { ok: false, reason: refused }
-  const current = await loadMemberForm(kind)
-  if (!current.ok) return current
-
   const supabase = await client()
-  const path = templateObjectPath(file.name, randomUUID())
-  const { error: upErr } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: templateContentType(file.name) ?? undefined, upsert: false })
-  if (upErr) return { ok: false, reason: `The form could not be uploaded: ${upErr.message}` }
+  // Sent ahead to the uploader's own folder (2026-10-24, lib/storage/staging.ts), or the File itself from an older page.
+  const read = await formFile(supabase, formData, 'file')
+  if (!read.ok) return { ok: false, reason: read.reason }
+  const file = read.file
+  if (!file) return { ok: false, reason: 'Choose a file to upload.' }
+  try {
+    const refused = templateRefusal(file)
+    if (refused) return { ok: false, reason: refused }
+    const current = await loadMemberForm(kind)
+    if (!current.ok) return current
 
-  const saved = await saveVersion(supabase, kind, current.form.fields, current.form.requireUpload, path, file.name.trim().slice(0, 160))
-  if (!saved.ok) await supabase.storage.from(BUCKET).remove([path]).then(() => undefined, () => undefined)
-  return saved
+    const path = templateObjectPath(file.name, randomUUID())
+    const { error: upErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, await file.bytes(), { contentType: templateContentType(file.name) ?? undefined, upsert: false })
+    if (upErr) return { ok: false, reason: `The form could not be uploaded: ${upErr.message}` }
+
+    const saved = await saveVersion(supabase, kind, current.form.fields, current.form.requireUpload, path, file.name.trim().slice(0, 160))
+    if (!saved.ok) await supabase.storage.from(BUCKET).remove([path]).then(() => undefined, () => undefined)
+    return saved
+  } finally {
+    await dropStaged(supabase, [file])
+  }
 }
 
 /**
@@ -283,8 +291,19 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
   const input = waitingAddInputFrom(raw)
   if (!input) return { ok: false, reason: 'Reload the page and try again.' }
 
-  const file = formData.get('signedForm')
-  const attached = file instanceof File && file.size > 0
+  // The signed form is sent ahead to the adder's own folder (2026-10-24, lib/storage/staging.ts), or comes as the
+  // File itself from an older page. Its bytes are read here once — the staged copy goes straight after.
+  const supabase = await client()
+  const sent = await formFile(supabase, formData, 'signedForm')
+  if (!sent.ok) return { ok: false, reason: sent.reason }
+  const file = sent.file && sent.file.size > 0 ? sent.file : null
+  let fileBytes: Uint8Array | null = null
+  try {
+    if (file && !signedFormRefusal(file)) fileBytes = await file.bytes().catch(() => null)
+  } finally {
+    await dropStaged(supabase, [sent.file])
+  }
+  const attached = file !== null
   const form = await loadMemberForm('waiting')
   if (!form.ok) return form
   const refused = waitingAddRefusal(input, form.form, attached)
@@ -294,7 +313,8 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
   if (attached) {
     const tooBig = signedFormRefusal(file)
     if (tooBig) return { ok: false, reason: tooBig }
-    const bytes = new Uint8Array(await file.arrayBuffer())
+    const bytes = fileBytes
+    if (!bytes) return { ok: false, reason: 'The signed form could not be read. Attach it again.' }
     // A Word file too since 2026-10-20 (`letterFile`); `member_waiting_add_form` takes it (mig 20261020160000).
     const read = letterFile(bytes, file.type)
     if (!read.ok) return read
@@ -302,7 +322,6 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
     signed = { name: file.name.trim() || `Signed form.${kind.extension}`, hash: createHash('sha256').update(bytes).digest('hex'), bytes, ...kind }
   }
 
-  const supabase = await client()
   const { data, error } = await supabase.rpc('member_waiting_add', {
     p_sub: input.subDepartmentId,
     p_staff: input.submittedBy,
@@ -384,8 +403,8 @@ export type SignedFormOutcome = { ok: true; form: SignedForm } | { ok: false; re
  * Upload, in an applicant's drawer (2026-10-20, the user: "i want here can be view for the letter they submit,
  * then can be upload as well, the file"): the signed form for somebody already on the list — added with "+" and
  * no form, or a better copy of a member's (it replaces the one on file; that one stays, attested). "+"'s rule: a
- * PDF, PNG or JPG — or, since 2026-10-20 ("want word file as well"), a Word .docx / .doc without macros — of 3 MB
- * or less, looked at byte by byte (`letterFile`). The file goes into the
+ * PDF, PNG or JPG — or, since 2026-10-20 ("want word file as well"), a Word .docx / .doc without macros — of 100 MB
+ * or less (3 MB until 2026-10-24), looked at byte by byte (`letterFile`). The file goes into the
  * uploader's own folder of the request under this session (`member_invoice_waiting_form_insert`), then
  * `member_waiting_attach_form` (mig 20261020130000) finds it, attests it and makes it the request's signed form;
  * refused, the file is removed again (`member_invoice_unattested_manager_delete`).
@@ -397,17 +416,27 @@ export async function uploadSignedForm(formData: FormData): Promise<SignedFormOu
   if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
   const requestId = String(formData.get('requestId') ?? '')
   if (!UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
-  const file = formData.get('file')
-  if (!(file instanceof File)) return { ok: false, reason: 'Choose the signed form to upload.' }
-  const refused = signedFormRefusal(file)
-  if (refused) return { ok: false, reason: refused }
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  // Sent ahead to the uploader's own folder (2026-10-24, lib/storage/staging.ts), or the File itself from an older
+  // page. Its bytes are read here once — the staged copy goes straight after.
+  const supabase = await client()
+  const sent = await formFile(supabase, formData, 'file')
+  if (!sent.ok) return { ok: false, reason: sent.reason }
+  const file = sent.file
+  if (!file) return { ok: false, reason: 'Choose the signed form to upload.' }
+  let bytes: Uint8Array | null = null
+  try {
+    const refused = signedFormRefusal(file)
+    if (refused) return { ok: false, reason: refused }
+    bytes = await file.bytes().catch(() => null)
+  } finally {
+    await dropStaged(supabase, [file])
+  }
+  if (!bytes) return { ok: false, reason: 'The signed form could not be read. Attach it again.' }
   const read = letterFile(bytes, file.type)
   if (!read.ok) return read
   const kind = read.kind
   const name = (file.name.trim() || `Signed form.${kind.extension}`).slice(0, 200)
 
-  const supabase = await client()
   const path = `${user.id}/${requestId}/${randomUUID()}.${kind.extension}`
   const upload = await supabase.storage.from(SIGNED_BUCKET).upload(path, bytes, { contentType: kind.mime, upsert: false })
   if (upload.error) return { ok: false, reason: `The signed form could not be uploaded: ${upload.error.message}` }

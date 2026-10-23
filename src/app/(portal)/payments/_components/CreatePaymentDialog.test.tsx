@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 

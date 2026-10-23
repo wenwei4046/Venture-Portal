@@ -74,6 +74,7 @@ import { LiveBrandMarginList, hasCompleteLiveOrders, hasNoGoodsMargin } from "./
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import MemberArena from "./MemberArena";
+import { stageFiles } from "@/lib/storage/stage";
 
 const s = memberStyles;
 // Shared presentation classes keep the approved C design consistent across roles.
@@ -2791,9 +2792,9 @@ function RequestForm({
         setError("Please attach an invoice.");
         return;
       }
-      if (file.size > 3 * 1024 * 1024) {
+      if (file.size > 100 * 1024 * 1024) {
         setError(
-          "Invoices must be 3 MB or smaller. Please compress the file and retry.",
+          "Invoices must be 100 MB or smaller. Please compress the file and retry.",
         );
         return;
       }
@@ -2886,7 +2887,12 @@ function RequestForm({
         });
         return;
       }
-      const response = await submitMemberRequest(saved);
+      // The invoice goes ahead of the request (2026-10-24, lib/storage/stage.ts) — from a copy, so a retry after a
+      // refusal sends the kept file again.
+      const sending = new FormData();
+      saved.forEach((v, k) => sending.append(k, v));
+      await stageFiles(sending);
+      const response = await submitMemberRequest(sending);
       if (response.ok) onDone(response.data);
       else
         setError(
@@ -3018,7 +3024,7 @@ function RequestForm({
               </div>
             )}
             <p className={s.caption}>
-              JPG, PNG or PDF, up to 3 MB each. Choose a photo or take a clear
+              JPG, PNG or PDF, up to 100 MB each. Choose a photo or take a clear
               picture of your receipt.
             </p>
             <label className={s.field}>

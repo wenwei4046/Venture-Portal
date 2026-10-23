@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { dropStaged, formFile } from '@/lib/storage/staged'
 import { requireActionOn, requirePermission } from '@/lib/auth'
 import { calcBa } from '@/lib/ba'
 import { createMultiLineInvoice } from '../billing/actions'
@@ -249,7 +250,13 @@ const ATTACHMENT_TYPES = new Set([
   'image/webp',
   'image/gif',
 ])
-const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
+// The bucket's own 100 MB (mig 20261024006700): the file is sent ahead of the action (lib/storage/staging.ts) —
+// 15 MB said here until 2026-10-24, though the Server Action's body stopped it at 4.
+const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
+// What Auto-read hands the reader: a request is at most 32 MB and the file goes in it as base64, a third bigger —
+// so a PDF up to 20 MB; a picture up to 5 MB.
+const READ_PDF_BYTES = 20 * 1024 * 1024
+const READ_IMAGE_BYTES = 5 * 1024 * 1024
 
 export async function uploadBaAttachment(
   baId: string,
@@ -259,33 +266,40 @@ export async function uploadBaAttachment(
     const user = await requireActionOn('/ba', 'treasury', 'edit')
     const supabase = await baClient()
 
-    const file = formData.get('file') as File | null
+    // Sent ahead to the sender's own folder (2026-10-24), or the File itself from an older page.
+    const read = await formFile(supabase, formData, 'file')
+    if (!read.ok) return { error: read.reason }
+    const file = read.file
     if (!file || file.size === 0) return { error: 'No file selected' }
-    if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'File too large (max 15 MB)' }
-    if (!ATTACHMENT_TYPES.has(file.type)) return { error: 'Only PDF or image files are accepted' }
+    try {
+      if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'File too large (max 100 MB)' }
+      if (!ATTACHMENT_TYPES.has(file.type)) return { error: 'Only PDF or image files are accepted' }
 
-    const ext = file.name.split('.').pop() ?? 'bin'
-    const key = `ba/${baId}/${Date.now()}.${ext}`
-    const buf = Buffer.from(await file.arrayBuffer())
-    const { error: upErr } = await supabase.storage
-      .from('payment-attachments')
-      .upload(key, buf, { contentType: file.type, upsert: false })
-    if (upErr) return { error: `Upload failed: ${upErr.message}` }
+      const ext = file.name.split('.').pop() ?? 'bin'
+      const key = `ba/${baId}/${Date.now()}.${ext}`
+      const buf = await file.bytes()
+      const { error: upErr } = await supabase.storage
+        .from('payment-attachments')
+        .upload(key, buf, { contentType: file.type, upsert: false })
+      if (upErr) return { error: `Upload failed: ${upErr.message}` }
 
-    const { error: insErr } = await supabase.from('ba_attachments').insert({
-      ba_id: baId,
-      storage_path: key,
-      file_name: file.name,
-      content_type: file.type,
-      uploaded_by: user.id,
-    })
-    if (insErr) {
-      await supabase.storage.from('payment-attachments').remove([key]).catch(() => {})
-      return { error: `Attachment record failed: ${insErr.message}` }
+      const { error: insErr } = await supabase.from('ba_attachments').insert({
+        ba_id: baId,
+        storage_path: key,
+        file_name: file.name,
+        content_type: file.type,
+        uploaded_by: user.id,
+      })
+      if (insErr) {
+        await supabase.storage.from('payment-attachments').remove([key]).catch(() => {})
+        return { error: `Attachment record failed: ${insErr.message}` }
+      }
+
+      revalidatePath('/ba')
+      return {}
+    } finally {
+      await dropStaged(supabase, [file])
     }
-
-    revalidatePath('/ba')
-    return {}
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Upload failed' }
   }
@@ -401,12 +415,17 @@ export async function extractBaFromDocument(
       }
     }
 
-    const file = formData.get('file') as File | null
+    // Sent ahead (2026-10-24) — and left there: the save that follows keeps the same copy on the financing.
+    const read = await formFile(await baClient(), formData, 'file')
+    if (!read.ok) return { error: read.reason }
+    const file = read.file
     if (!file || file.size === 0) return { error: 'No file selected' }
-    if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'File too large (max 15 MB)' }
     if (!ATTACHMENT_TYPES.has(file.type)) return { error: 'Only PDF or image files are accepted' }
+    if (file.size > (file.type === 'application/pdf' ? READ_PDF_BYTES : READ_IMAGE_BYTES)) {
+      return { error: 'Too big to read automatically (a PDF up to 20 MB, a photo up to 5 MB) — fill the fields in; the document is still kept when you save.' }
+    }
 
-    const b64 = Buffer.from(await file.arrayBuffer()).toString('base64')
+    const b64 = Buffer.from(await file.bytes()).toString('base64')
     const docBlock =
       file.type === 'application/pdf'
         ? {

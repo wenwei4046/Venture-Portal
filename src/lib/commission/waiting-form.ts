@@ -275,8 +275,11 @@ const TEMPLATE_TYPES: Readonly<Record<string, string>> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
 }
-/** Under the 4 MB a Server Action may carry (next.config.ts), with room for the form around it. */
-export const TEMPLATE_MAX_BYTES = 3_800_000
+/**
+ * The bucket's own 100 MB (mig 20261024006700): since 2026-10-24 the file is sent ahead of its Server Action
+ * (lib/storage/stage.ts) — until then it rode in the action's body, which stops at 4 MB (so 3.8 MB here).
+ */
+export const TEMPLATE_MAX_BYTES = 100 * 1024 * 1024
 
 /** The file's type as the bucket wants it — from its name, since browsers leave Word's blank. */
 export function templateContentType(name: string): string | null {
@@ -288,7 +291,7 @@ export function templateContentType(name: string): string | null {
 export function templateRefusal(file: { name: string; size: number }): string | null {
   if (!file.name || file.size <= 0) return 'Choose a file to upload.'
   if (!templateContentType(file.name)) return 'Upload a PDF, Word, HTML, PNG or JPEG file.'
-  if (file.size > TEMPLATE_MAX_BYTES) return 'The form must be smaller than 3.8 MB.'
+  if (file.size > TEMPLATE_MAX_BYTES) return 'The form must be 100 MB or smaller.'
   return null
 }
 

@@ -5,6 +5,7 @@ import { btn } from '@/components/hrv/kit'
 import { flash } from '@/components/hrv/toast'
 import { dayLabel, type SignedForm } from '@/lib/commission/sales-group-requests'
 import { SIGNED_FORM_ACCEPT, signedFormRefusal } from '@/lib/commission/waiting-add'
+import { stageInto } from '@/lib/storage/stage'
 import { signedFormDownload, uploadSignedForm, viewSignedForm } from '../../../waiting-actions'
 import FormFileIcon from './FormFileIcon'
 import FormFileViewer from './FormFileViewer'
@@ -17,7 +18,7 @@ import w from './waiting.module.css'
  * the uploaded form's View uses; *Replace* uploads another in its place. With none on file, the dashed *Upload
  * the signed form* (a file can be dropped on it too). Uploading is Member services · Edit's, as "+" is; the
  * file is what "+" takes: a PDF, PNG or JPG, or a Word file (2026-10-20, the user: "want word file as well"),
- * of 3 MB or less. A Word .docx is read in the viewer; an old .doc is Download only.
+ * of 100 MB or less (3 MB until 2026-10-24). A Word .docx is read in the viewer; an old .doc is Download only.
  */
 export default function SignedFormPanel({
   requestId,
@@ -57,8 +58,11 @@ export default function SignedFormPanel({
     setError(null)
     const data = new FormData()
     data.set('requestId', requestId)
-    data.set('file', file)
-    const done = await uploadSignedForm(data)
+    // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB.
+    const done = await stageInto(data, 'file', file).then(
+      () => uploadSignedForm(data),
+      (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The signed form could not be sent.' }),
+    )
     setUploading(false)
     clear()
     if (!done.ok) {
@@ -123,7 +127,7 @@ export default function SignedFormPanel({
           onDrop={drop}
         >
           <span className={w.signedDropTitle}>{uploading ? 'Uploading…' : 'Upload the signed form'}</span>
-          <span className={w.signedDropHint}>PDF, Word, PNG or JPG · 3 MB or smaller</span>
+          <span className={w.signedDropHint}>PDF, Word, PNG or JPG · 100 MB or smaller</span>
           {input}
         </label>
       ) : (

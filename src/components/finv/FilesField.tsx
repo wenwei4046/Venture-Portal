@@ -6,7 +6,8 @@ import f from './form.module.css'
 
 // The files a new voucher carries (2026-10-14, the Finance revamp v2): a white
 // card of the files chosen — name, size, *Remove* — then a dashed *+ Add files*.
-// They go with the save, in the Server Action's body (under 4 MB in all).
+// On save each is sent ahead to its sender's own folder (lib/storage/stage.ts),
+// up to 100 MB a file (2026-10-24; until then the Server Action's 4 MB for all).
 
 export function FilesField({ files, onChange }: { files: File[]; onChange: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null)

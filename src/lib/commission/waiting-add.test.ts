@@ -140,9 +140,10 @@ describe('the signed application form', () => {
     expect(signedFormKind(bytes(37, 80, 68, 70, 45), 'image/png')).toBeNull()
   })
 
-  it('is 3 MB or smaller, and not empty', () => {
-    expect(signedFormRefusal({ size: 3 * 1024 * 1024 })).toBeNull()
-    expect(signedFormRefusal({ size: 3 * 1024 * 1024 + 1 })).toBe('The signed form must be 3 MB or smaller.')
+  it('is 100 MB or smaller (sent ahead of its action since 2026-10-24), and not empty', () => {
+    expect(signedFormRefusal({ size: 3 * 1024 * 1024 + 1 })).toBeNull()
+    expect(signedFormRefusal({ size: 100 * 1024 * 1024 })).toBeNull()
+    expect(signedFormRefusal({ size: 100 * 1024 * 1024 + 1 })).toBe('The signed form must be 100 MB or smaller.')
     expect(signedFormRefusal({ size: 0 })).toMatch(/empty/)
   })
 })

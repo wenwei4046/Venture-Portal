@@ -10,6 +10,7 @@ import { DrawerGroup as Group, DrawerLine as Line } from '@/components/finv/Draw
 import { Select } from '@/components/hrv/select'
 import { matchState, signed, type ReconGroupView, type ReconHubModel, type ReconLine, type ReconReportView, type ReconSessionModel } from '@/lib/fin-app/recon-model'
 import { dayWords } from '@/lib/fin-app/page-model'
+import { stageInto } from '@/lib/storage/stage'
 import {
   contraBookLines,
   contraStatementLines,
@@ -524,8 +525,9 @@ function ReconUploadSheet({
     const fd = new FormData()
     fd.set('bank_account_id', bankId)
     fd.set('period_month', month)
-    fd.set('file', file)
     try {
+      // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
+      await stageInto(fd, 'file', file)
       const res = await uploadStatementInWords(fd)
       if (!res.ok) return setError(res.reason)
       onDone(res.id)

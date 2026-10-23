@@ -6,6 +6,8 @@ import { getMemberUser } from "@/lib/auth";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { dropStaged, formFile } from "@/lib/storage/staged";
+import { parseStagedRef } from "@/lib/storage/staging";
 import { calculateQuote, cents, customerQuote } from "./calculator";
 import { quoteCostRules, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
@@ -108,7 +110,9 @@ export interface AdminMemberData {
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_INVOICE = 3 * 1024 * 1024;
+// 100 MB since 2026-10-24 (3 MB until then): the file goes ahead of the request (lib/storage/stage.ts), and
+// member_request_attachments keeps up to that much (mig 20261024006800).
+const MAX_INVOICE = 100 * 1024 * 1024;
 const uuid = (value: unknown, label: string): string => {
   if (typeof value !== "string" || !UUID.test(value))
     throw new Error(`Invalid ${label}. Refresh and try again.`);
@@ -1056,12 +1060,23 @@ async function invoice(form: FormData): Promise<VerifiedInvoice> {
  * uploads keep). An invoice stays a JPG, PNG or PDF.
  */
 async function verifiedUpload(form: FormData, fieldName: string, noun: string, word = false): Promise<VerifiedInvoice> {
-  const file = form.get(fieldName);
-  if (!file || typeof file === "string" || file.size < 1)
+  // Sent ahead to the member's own folder since 2026-10-24 (lib/storage/staging.ts — a Server Action's body stops at
+  // 4 MB), or the File itself from an older page. Read here once; the staged copy goes straight after.
+  const db = (await createClient()) as unknown as SupabaseClient;
+  const sent = await formFile(db, form, fieldName);
+  if (!sent.ok) throw new Error(sent.reason);
+  const file = sent.file;
+  if (!file || file.size < 1)
     throw new Error(noun === "invoice" ? "Upload an invoice." : `Upload the ${noun}.`);
-  if (file.size > MAX_INVOICE)
-    throw new Error(`The ${noun} must be 3 MB or smaller.`);
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let read: Uint8Array | null = null;
+  try {
+    if (file.size > MAX_INVOICE)
+      throw new Error(`The ${noun} must be 100 MB or smaller.`);
+    read = await file.bytes();
+  } finally {
+    await dropStaged(db, [file]);
+  }
+  const bytes = read;
   if (word) {
     const kind = letterKind(bytes, file.type);
     if (kind === "macros") throw new Error(WORD_MACROS_REFUSAL);
@@ -1336,8 +1351,9 @@ export async function submitMemberRequest(
       answers = waitingAnswersFrom(field(form, "answers", 40000));
       const version = Number(field(form, "formVersion"));
       if (Number.isInteger(version) && version > 0) detail.formVersion = version;
+      // A file in the form, or (2026-10-24) the line of one sent ahead.
       const signedFile = form.get("signedForm");
-      if (signedFile && typeof signedFile !== "string" && signedFile.size > 0) {
+      if (signedFile && (typeof signedFile === "string" ? parseStagedRef(signedFile) !== null : signedFile.size > 0)) {
         signedForm = await verifiedUpload(form, "signedForm", kind === "waiting" ? "signed application form" : "signed replacement form", true);
         detail.signedFormName = signedForm.name;
         detail.signedFormHash = createHash("sha256").update(signedForm.bytes).digest("hex");

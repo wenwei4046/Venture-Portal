@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReconSessionRead } from '@/app/(portal)/reconciliation/_lib/recon-read'
 import { reconHubModel, reconSessionModel } from '@/lib/fin-app/recon-model'

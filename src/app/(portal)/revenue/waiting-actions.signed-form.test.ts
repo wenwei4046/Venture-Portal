@@ -119,18 +119,19 @@ describe('Upload', () => {
     expect(mocks.rpc.mock.calls[0][1].p_name).toBe('Joan')
   })
 
-  it('refuses before anything is uploaded: another kind, an empty file, one over 3 MB, no file', async () => {
+  it('refuses before anything is uploaded: another kind, an empty file, one over 100 MB, no file', async () => {
     const html = new TextEncoder().encode('<html><body>Joan</body></html>')
     expect(await uploadSignedForm(sent(new File([html], 'Joan.pdf', { type: 'application/pdf' })))).toEqual({
       ok: false,
       reason: 'The signed form must be a PDF, Word, PNG or JPG file.',
     })
     expect(await uploadSignedForm(sent(new File([], 'Joan.pdf')))).toEqual({ ok: false, reason: 'That file is empty — attach the signed form again.' })
-    const big = new Uint8Array(3 * 1024 * 1024 + 1)
-    big.set(PDF)
-    expect(await uploadSignedForm(sent(new File([big], 'Joan.pdf', { type: 'application/pdf' })))).toEqual({
+    // A File the form holds as it is (no name given to set), so its size may be said without 100 MB of bytes.
+    const big = new File([PDF], 'Joan.pdf', { type: 'application/pdf' })
+    Object.defineProperty(big, 'size', { value: 100 * 1024 * 1024 + 1 })
+    expect(await uploadSignedForm(sent(big))).toEqual({
       ok: false,
-      reason: 'The signed form must be 3 MB or smaller.',
+      reason: 'The signed form must be 100 MB or smaller.',
     })
     expect(await uploadSignedForm(sent(null))).toEqual({ ok: false, reason: 'Choose the signed form to upload.' })
     expect(await uploadSignedForm(sent('not a file'))).toEqual({ ok: false, reason: 'Choose the signed form to upload.' })

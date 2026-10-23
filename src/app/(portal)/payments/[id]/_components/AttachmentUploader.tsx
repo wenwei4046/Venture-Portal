@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useFinView } from '@/components/layout/fin-view'
+import { stageInto } from '@/lib/storage/stage'
 import { uploadVoucherAttachment } from '../../actions'
 
 interface Props {
@@ -14,7 +15,8 @@ interface Props {
 }
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.docx,.doc,.csv'
-const CLIENT_MAX_BYTES = 10 * 1024 * 1024
+// Sent ahead of the action since 2026-10-24 (lib/storage/staging.ts), so the bucket's 100 MB, not a body's 4 MB.
+const CLIENT_MAX_BYTES = 100 * 1024 * 1024
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
 
 export default function AttachmentUploader({ voucherId, voucherStatus, canUpload, late = false }: Props) {
@@ -42,7 +44,7 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
     const files = Array.from(e.target.files ?? [])
     for (const f of files) {
       if (f.size > CLIENT_MAX_BYTES) {
-        setError(`File "${f.name}" is larger than 10 MB`)
+        setError(`File "${f.name}" is larger than 100 MB`)
         return
       }
       const lower = f.name.toLowerCase()
@@ -68,7 +70,7 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
         const fd = new FormData()
         fd.set('voucher_id', voucherId)
         if (description.trim()) fd.set('description', description.trim())
-        for (const f of selected) fd.append('files', f)
+        await stageInto(fd, 'files', selected)
 
         const result = await uploadVoucherAttachment(fd)
         setSuccess(
@@ -87,7 +89,7 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
     <div className="border border-hairline rounded-md bg-paper p-4">
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="font-serif text-md text-ink">Add attachments</h3>
-        <span className="font-mono text-xs text-muted">PDF, image, Excel, Word, CSV · ≤ 10 MB</span>
+        <span className="font-mono text-xs text-muted">PDF, image, Excel, Word, CSV · ≤ 100 MB</span>
       </div>
       {late ? (
         <p className="mb-3 font-sans text-sm text-graphite" data-testid="late-note">

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import type { SubDeptRequest } from '@/lib/commission/sales-group-requests'
 import { BUILT_FORM_NAME, type WaitingForm } from '@/lib/commission/waiting-form'
 import type { SubDepartmentCapacity } from '@/lib/commission/capacity'
@@ -278,7 +279,7 @@ describe('"+" — straight onto the list', () => {
     show({ canAdd: true, subDepartmentId: SUB, submitters })
     fireEvent.click(plus())
     const win = screen.getByRole('dialog', { name: WINDOW })
-    expect(win).toHaveTextContent('PDF, Word, PNG or JPG, 3 MB or smaller.')
+    expect(win).toHaveTextContent('PDF, Word, PNG or JPG, 100 MB or smaller.')
     const input = within(win).getByLabelText('Attach the signed form')
     expect(input.getAttribute('accept')).toContain('.docx')
     fill(win)
@@ -581,7 +582,7 @@ describe('an applicant’s signed form', () => {
     actions.uploadSignedForm.mockResolvedValue({ ok: true, form: ON_FILE })
     const drawer = open()
     expect(drawer).toHaveTextContent('Upload the signed form')
-    expect(drawer).toHaveTextContent('PDF, Word, PNG or JPG · 3 MB or smaller')
+    expect(drawer).toHaveTextContent('PDF, Word, PNG or JPG · 100 MB or smaller')
     expect(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form").getAttribute('accept')).toBe('.pdf,.png,.jpg,.jpeg,.doc,.docx')
     const file = pdf()
     await act(async () => {
@@ -620,9 +621,9 @@ describe('an applicant’s signed form', () => {
   it('says what is wrong before sending, and keeps the database’s refusal in the drawer', async () => {
     const drawer = open()
     await act(async () => {
-      fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [pdf('Joan.pdf', 3 * 1024 * 1024 + 1)] } })
+      fireEvent.change(within(drawer).getByLabelText("Upload JOAN QUEK XIAO's signed form"), { target: { files: [pdf('Joan.pdf', 100 * 1024 * 1024 + 1)] } })
     })
-    expect(within(drawer).getByRole('alert')).toHaveTextContent('The signed form must be 3 MB or smaller.')
+    expect(within(drawer).getByRole('alert')).toHaveTextContent('The signed form must be 100 MB or smaller.')
     expect(actions.uploadSignedForm).not.toHaveBeenCalled()
 
     actions.uploadSignedForm.mockResolvedValue({ ok: false, reason: 'This applicant is no longer on the waiting list. Reload the page.' })
