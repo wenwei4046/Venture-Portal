@@ -43,6 +43,9 @@ export default function CorrectionsView({ brands, brandId, days, corrections, mo
   const p = Math.min(page, pages - 1)
   const shown = corrections.slice(p * size, (p + 1) * size)
   const fresh = (c: Correction) => Date.now() - Date.parse(c.at) < 2 * 864e5
+  // The page's Save (as drawn): the edited rows, each saved through the same question as its own Save.
+  const pending = corrections.filter(c => edits[c.id] !== undefined && edits[c.id] !== (answerOf(c)?.answer ?? c.right))
+  const saveNext = () => { if (pending[0]) setAsking(pending[0]) }
 
   const saveAsAnswer = (c: Correction, raw: string) => {
     if (!more) return
@@ -78,6 +81,7 @@ export default function CorrectionsView({ brands, brandId, days, corrections, mo
           <h1 className={s.title}>AI corrections</h1>
         </div>
         <span className={s.status}><span className={s.dot} aria-hidden="true" />Meta not connected · auto replies run in test conversations only</span>
+        {canManage ? <button type="button" className={s.btn} data-strong="" disabled={!pending.length || busy || !ready} onClick={saveNext}>Save changes</button> : null}
       </div>
       <div className={s.panel}>
         <div className={s.agentHead}>
@@ -158,6 +162,12 @@ export default function CorrectionsView({ brands, brandId, days, corrections, mo
             <button type="button" className={s.cardIcon} disabled={p >= pages - 1} onClick={() => setPage(p + 1)} title="Next page">›</button>
           </div>
         ) : null}
+        <div className={s.foot}>
+          <span className={s.hint} data-dirty={pending.length || undefined}>{pending.length ? `${pending.length} unsaved ${pending.length === 1 ? 'change' : 'changes'}` : 'No changes yet'}</span>
+          <span className={s.fill} />
+          <button type="button" className={s.btn} data-quiet="" disabled={!pending.length || busy} onClick={() => setEdits({})}>Discard</button>
+          <button type="button" className={s.btn} data-strong="" disabled={!pending.length || busy || !ready || !canManage} onClick={saveNext}>Save</button>
+        </div>
       </div>
       {asking ? (
         <div className={s.modalScrim} onClick={e => { if (e.target === e.currentTarget && !busy) setAsking(null) }}>

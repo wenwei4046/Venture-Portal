@@ -158,6 +158,11 @@ export function readable(f: Pick<DataFile, 'kind' | 'mime' | 'name'>): 'pdf' | '
   return null
 }
 
+/** What a brand's agent reads, as drawn: every file and link in its brand's folder and in Shared; a paused one waits. */
+export function agentReads(files: DataFile[], brandId: string): AgentSource[] {
+  return files.filter(f => f.brandId === null || f.brandId === brandId).map(f => ({ fileId: f.id, paused: f.status === 'paused', file: f }))
+}
+
 /** "Reads 5 sources from the 2990s and Shared folders · 1 expired · 1 ending soon". */
 export function sourcesSummary(sources: AgentSource[], brandName: string, today: string): { main: string; warn: string } {
   const on = sources.filter(s => !s.paused)

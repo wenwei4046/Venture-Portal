@@ -89,6 +89,7 @@ export default function LibraryView({ items, ready, initialId, canEdit }: { item
           <h1 className={s.title}>Step library</h1>
         </div>
         <span className={s.status}><span className={s.dot} aria-hidden="true" />Meta not connected · auto replies run in test conversations only</span>
+        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>
         <div className={s.libSplit}>

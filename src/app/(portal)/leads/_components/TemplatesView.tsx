@@ -54,7 +54,15 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
   const [sel, setSel] = useState<string | null>(draft.steps[0]?.id ?? null)
-  const [panel, setPanel] = useState<'edit' | 'test' | null>('edit')
+  // Folded as drawn; whether it was left open is the viewer's (localStorage `ar-test-open`, the handoff's key).
+  const [panel, setPanelState] = useState<'edit' | 'test' | null>(null)
+  const setPanel = (p: 'edit' | 'test' | null) => {
+    setPanelState(p)
+    try { localStorage.setItem('ar-test-open', p ?? '') } catch { /* private window */ }
+  }
+  useEffect(() => {
+    try { const v = localStorage.getItem('ar-test-open'); if (v === 'edit' || v === 'test') setPanelState(v) } catch { /* private window */ }
+  }, [])
   const [toast, setToast] = useState('')
 
   useEffect(() => {
@@ -177,6 +185,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
           <h1 className={s.title}>Reply templates</h1>
         </div>
         <span className={s.status}><span className={s.dot} aria-hidden="true" />Meta not connected · auto replies run in test conversations only</span>
+        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>
         <div className={s.split}>
@@ -330,8 +339,15 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
     setZoom(Math.round(z * 100) / 100)
     setPan({ x: -minX * z, y: -minY * z + 48 })
   }
+  // A template opens at 100%, its first steps at the top left, as drawn; Fit is the button's.
+  const place = () => {
+    if (draft.steps.length === 0) return
+    const minX = Math.min(...draft.steps.map(x => x.pos?.x ?? 0)) - 30, minY = Math.min(...draft.steps.map(x => x.pos?.y ?? 0)) - 50
+    setZoom(1)
+    setPan({ x: -minX, y: -minY + 48 })
+  }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fit() }, [draft.id])
+  useEffect(() => { place() }, [draft.id])
 
   const onBgDown = (e: ReactMouseEvent) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('[data-card],[data-ui]')) return

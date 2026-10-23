@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { saveAgent, saveAgentPersona, tryAgent } from '@/lib/leads/actions'
 import type { Persona } from '@/lib/leads/ai'
 import {
-  APPROACHES, AVOIDS, BLOCK_PRESETS, GOALS, INSTRUCTIONS, LENGTHS, PHONE_WORDS, SALES_HABITS, TONES, fileStatus, settingsOf, sourcesSummary,
+  APPROACHES, AVOIDS, BLOCK_PRESETS, GOALS, INSTRUCTIONS, LENGTHS, PHONE_WORDS, SALES_HABITS, TONES, agentReads, settingsOf, sourcesSummary,
   type AgentMore, type AgentSettings, type DataFile, type FixedAnswer, type PlaySituation,
 } from '@/lib/leads/agent'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -15,19 +15,18 @@ import s from './replies.module.css'
 /**
  * Lead View › AI Agent v2 (2026-10-23, the redesign v2 handoff `Auto Reply.dc.html?view=ai`): one brand's agent at a
  * time — How it replies (nine settings: goal, tone, instructions, sales approach, what it avoids, what it does not
- * answer, length, the mobile number, limits), Sources (Data Center files and links it reads, on or paused), Fixed
- * answers, Sales playbook and Memory — saved together (lead_save_ai), and TEST THE AGENT on the right, which runs the
- * page as it stands. "AI drafts in the Inbox" is the soul's mode (copilot / off), saved at once. Memory is drawn and
- * held: the agent learns once it answers on its own.
+ * answer, length, the mobile number, limits), Fixed answers, Sales playbook and Memory — saved together (lead_save_ai),
+ * and TEST THE AGENT on the right, which runs the page as it stands. As drawn, an agent reads every file and link in its
+ * brand's folder and Shared (`agentReads`); pausing one is the Data Center's. Saving the page turns the brand's Inbox
+ * drafts on (the soul's mode, copilot). Memory is drawn and held: the agent learns once it answers on its own.
  */
 
-type Draft = { settings: AgentSettings; answers: FixedAnswer[]; playbook: PlaySituation[]; sources: Array<{ fileId: string; paused: boolean }> }
-type Tab = 'how' | 'sources' | 'answers' | 'playbook' | 'memory'
+type Draft = { settings: AgentSettings; answers: FixedAnswer[]; playbook: PlaySituation[] }
+type Tab = 'how' | 'answers' | 'playbook' | 'memory'
 const draftOf = (m: AgentMore | undefined, p: Persona | undefined): Draft => ({
   settings: settingsOf(m?.settings, p?.goal ?? ''),
   answers: m?.answers ?? [],
   playbook: m?.playbook ?? [],
-  sources: (m?.sources ?? []).map(x => ({ fileId: x.fileId, paused: x.paused })),
 })
 let seq = 0
 const newId = () => `new-${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -70,25 +69,22 @@ export default function AgentView({ personas, more, files, today, connected, rea
   const other = personas.find(p => p.brandId !== brandId)
   const dis = !canManage
   const save = () => start(async () => {
-    const r = await saveAgent(brandId, d)
+    const r = await saveAgent(brandId, { ...d, sources: [] })
     if (!r.ok) { setError(r.reason); return }
+    // A brand whose agent is set up drafts in the Inbox (copilot).
+    if (persona && persona.mode !== 'copilot') {
+      const m = await saveAgentPersona(brandId, { agentName: persona.agentName, personality: persona.personality, tone: persona.tone, goal: d.settings.goal, dos: persona.dos, donts: persona.donts, examples: persona.examples, mode: 'copilot' })
+      if (!m.ok) { setError(m.reason); return }
+    }
     setSaved(x => ({ ...x, [brandId]: d }))
     setNote('Saved · just now')
     router.refresh()
   })
-  const setMode = (on: boolean) => start(async () => {
-    if (!persona) return
-    const r = await saveAgentPersona(brandId, { agentName: persona.agentName, personality: persona.personality, tone: persona.tone, goal: persona.goal, dos: persona.dos, donts: persona.donts, examples: persona.examples, mode: on ? 'copilot' : 'off' })
-    if (!r.ok) setError(r.reason)
-    else router.refresh()
-  })
 
-  const fileById = useMemo(() => new Map(files.map(f => [f.id, f])), [files])
-  const mySources = d.sources.map(x => ({ ...x, file: fileById.get(x.fileId) })).filter((x): x is { fileId: string; paused: boolean; file: DataFile } => !!x.file)
+  const mySources = useMemo(() => agentReads(files, brandId), [files, brandId])
   const summary = sourcesSummary(mySources, brandName, today)
   const tabs: Array<{ id: Tab; label: string; count?: string }> = [
     { id: 'how', label: 'How it replies' },
-    { id: 'sources', label: 'Sources', count: String(mySources.filter(x => !x.paused).length) },
     { id: 'answers', label: 'Fixed answers', count: String(d.answers.length) },
     { id: 'playbook', label: 'Sales playbook', count: String(d.playbook.length) },
     { id: 'memory', label: 'Memory' },
@@ -102,6 +98,7 @@ export default function AgentView({ personas, more, files, today, connected, rea
           <h1 className={s.title}>AI Agent</h1>
         </div>
         <span className={s.status}><span className={s.dot} aria-hidden="true" />{connected ? 'Copilot · it drafts, CS sends' : 'AI not connected (no API key)'} · Meta not connected</span>
+        {canManage ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>
         <div className={s.agentSplit} data-closed={testOpen ? undefined : ''}>
@@ -113,7 +110,7 @@ export default function AgentView({ personas, more, files, today, connected, rea
                   {personas.map(p => <button key={p.brandId} type="button" aria-pressed={p.brandId === brandId} onClick={() => setBrandId(p.brandId)}>{p.brandName}</button>)}
                 </span>
                 {canManage && other ? (
-                  <button type="button" className={s.link} onClick={() => { if (window.confirm(`Copy ${other.brandName}’s settings into ${brandName}? Fixed answers, playbook and sources stay.`)) set(x => ({ ...x, settings: drafts[other.brandId]?.settings ?? x.settings })) }}>Copy settings from {other.brandName}</button>
+                  <button type="button" className={s.link} onClick={() => { if (window.confirm(`Copy ${other.brandName}’s settings into ${brandName}? Fixed answers and playbook stay.`)) set(x => ({ ...x, settings: drafts[other.brandId]?.settings ?? x.settings })) }}>Copy settings from {other.brandName}</button>
                 ) : null}
               </span>
             </div>
@@ -122,12 +119,6 @@ export default function AgentView({ personas, more, files, today, connected, rea
             </div>
             <div className={s.scroll} style={{ paddingTop: 0 }}>
               {!ready ? <div className={s.note}>Waiting for the database update — you can try the page, but nothing is saved yet.</div> : null}
-              <div className={s.banner}>
-                <span className={s.toggleLine} style={{ flex: 1 }}>
-                  <button type="button" role="switch" aria-checked={persona?.mode === 'copilot'} className={s.switch} disabled={dis || busy || !persona} onClick={() => setMode(persona?.mode !== 'copilot')} aria-label="AI drafts in the Inbox" />
-                  <span>AI drafts in the Inbox <span className={s.small}>· {persona?.mode === 'copilot' ? 'on — CS asks for a draft, reads and sends it' : 'off'}</span></span>
-                </span>
-              </div>
 
               {tab === 'how' ? (
                 <>
@@ -195,11 +186,6 @@ export default function AgentView({ personas, more, files, today, connected, rea
                     </span>
                   </Setting>
                 </>
-              ) : null}
-
-              {tab === 'sources' ? (
-                <Sources brandId={brandId} brandName={brandName} files={files} sources={d.sources} today={today} disabled={dis}
-                  onChange={sources => set(x => ({ ...x, sources }))} />
               ) : null}
 
               {tab === 'answers' ? (
@@ -338,79 +324,6 @@ function Words({ words, onChange, suggest, disabled }: { words: string[]; onChan
     </span>
   )
 }
-
-function Sources({ brandId, brandName, files, sources, today, onChange, disabled }: {
-  brandId: string
-  brandName: string
-  files: DataFile[]
-  sources: Array<{ fileId: string; paused: boolean }>
-  today: string
-  onChange: (s: Array<{ fileId: string; paused: boolean }>) => void
-  disabled: boolean
-}) {
-  const [picking, setPicking] = useState(false)
-  const [picked, setPicked] = useState<string[]>([])
-  const [view, setView] = useState<'all' | 'on' | 'paused'>('all')
-  const mine = files.filter(f => f.brandId === null || f.brandId === brandId)
-  const notYet = mine.filter(f => !sources.some(x => x.fileId === f.id))
-  const rows = sources.map(x => ({ ...x, file: files.find(f => f.id === x.fileId) })).filter(x => x.file && (view === 'all' || (view === 'on') !== x.paused))
-  return (
-    <>
-      <div className={s.banner}><LeadIcon name="library" size={14} /><span style={{ flex: 1 }}>Files and links are uploaded and updated in Data Center. Here you choose which ones this agent reads. Pause or resume here; Data Center shows the same.</span><Link className={s.link} href="/leads/knowledge">Open Data Center ↗</Link></div>
-      <span className={s.chipRow}>
-        <span className={s.kicker}>SOURCES</span>
-        {(['all', 'on', 'paused'] as const).map(v => <button key={v} type="button" className={s.choice} aria-pressed={view === v} onClick={() => setView(v)}>{v === 'all' ? 'All' : v === 'on' ? 'Reading' : 'Paused'} <span className={s.count}>{v === 'all' ? sources.length : sources.filter(x => (v === 'on') !== x.paused).length}</span></button>)}
-        <span className={s.fill} />
-        {disabled ? null : <button type="button" className={s.toolBtn} onClick={() => { setPicking(p => !p); setPicked([]) }}><LeadIcon name="plus" size={12} />Add from Data Center</button>}
-      </span>
-      {picking ? (
-        <div className={s.box} style={{ maxWidth: 'none', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={s.small}>In Data Center · {brandName} and Shared folders</span>
-          {notYet.map(f => {
-            const on = picked.includes(f.id)
-            const st = fileStatus(f, today)
-            return (
-              <button key={f.id} type="button" className={s.ddItem} onClick={() => setPicked(p => (on ? p.filter(x => x !== f.id) : [...p, f.id]))}>
-                <span className={s.tick} data-on={on || undefined}>{on ? '✓' : ''}</span>
-                <span className={s.ext}>{f.kind === 'link' ? 'URL' : (f.name.split('.').pop() ?? 'FILE').slice(0, 4).toUpperCase()}</span>
-                <span className={s.ddText} style={{ flex: 1 }}>{f.name}<span className={s.ddHint}>{f.brandId ? brandName : 'Shared'} · {st.label}</span></span>
-              </button>
-            )
-          })}
-          {notYet.length === 0 ? <span className={s.small}>Everything in these folders is already added. Upload new files in <Link className={s.link} href="/leads/knowledge">Data Center</Link>.</span> : null}
-          <span style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" className={s.btn} data-quiet="" onClick={() => setPicking(false)}>Cancel</button>
-            <button type="button" className={s.btn} data-strong="" disabled={picked.length === 0} onClick={() => { onChange([...sources, ...picked.map(fileId => ({ fileId, paused: false }))]); setPicking(false) }}>{picked.length ? `Add ${picked.length}` : 'Add'}</button>
-          </span>
-        </div>
-      ) : null}
-      <div className={s.box} style={{ maxWidth: 'none' }}>
-        <div className={s.srcRow}><span /><span className={s.ruleHead}>SOURCE</span><span className={s.ruleHead}>FOLDER</span><span className={s.ruleHead}>VALID UNTIL</span><span className={s.ruleHead}>STATUS</span><span className={s.ruleHead}>IN THIS AGENT</span></div>
-        {rows.map(x => {
-          const f = x.file!
-          const st = fileStatus(f, today)
-          return (
-            <div key={x.fileId} className={s.srcRow}>
-              <span className={s.ext}>{f.kind === 'link' ? 'URL' : (f.name.split('.').pop() ?? 'FILE').slice(0, 4).toUpperCase()}</span>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.kind === 'link' ? <a className={s.link} href={f.url ?? '#'} target="_blank" rel="noopener noreferrer">{f.name}</a> : f.name}</span>
-              <span className={s.small}>{f.brandId ? brandName : 'Shared'}</span>
-              <span className={s.small}>{f.validUntil ?? '—'}</span>
-              <span className={s.status} data-tone={st.tone}>{st.label}</span>
-              <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button type="button" className={s.choice} aria-pressed={!x.paused} disabled={disabled} title={x.paused ? 'Resume reading it' : 'Pause: it stays in the list'} onClick={() => onChange(sources.map(y => (y.fileId === x.fileId ? { ...y, paused: !y.paused } : y)))}>{x.paused ? 'Paused' : 'Reading'}</button>
-                {x.paused && !disabled ? <button type="button" className={s.x} title="Remove from this agent. The file stays in Data Center." onClick={() => onChange(sources.filter(y => y.fileId !== x.fileId))}>×</button> : null}
-              </span>
-            </div>
-          )
-        })}
-        {rows.length === 0 ? <div className={s.srcRow}><span /><span className={s.small} style={{ gridColumn: '2 / -1' }}>{sources.length ? 'Nothing here with this filter.' : 'This agent reads no files yet — add them from Data Center.'}</span></div> : null}
-      </div>
-      <span className={s.small}>Pause stops this agent from reading a source but keeps it in the list. × removes a paused source from this agent. Nothing is deleted from Data Center. The agent reads PDFs, pictures and text files itself; for a link it sees the address.</span>
-    </>
-  )
-}
-
-type Line = { who: 'customer' | 'us'; text: string; flag?: string; meta?: string }
 
 function TestAgent({ brandId, brandName, persona, draft, connected, canManage, onClose }: {
   brandId: string

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
-import { draftLeadReply, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { draftLeadReply, quickReplyUsed, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
@@ -46,6 +47,7 @@ export default function InboxView({
   aiBrands,
   aiConnected,
   info,
+  quick = [],
 }: {
   config: LeadConfig
   contacts: LeadContact[]
@@ -62,6 +64,8 @@ export default function InboxView({
   aiConnected: boolean
   /** General info (null before its migration): the composer's menu. */
   info: LeadInfo | null
+  /** The Data Center's quick replies: typing "/" in the reply box offers them. */
+  quick?: QuickReply[]
 }) {
   const [brand, setBrand] = useState<string>('all')
   const [filter, setFilter] = useState<Filter>(initialQuery ? 'all' : 'waiting')
@@ -191,7 +195,7 @@ export default function InboxView({
         <section className={s.chat} aria-label="Chat">
           {contact ? (
             <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
-              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} today={config.today}
+              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
               loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
             <div className={s.empty}>Pick a conversation.</div>
@@ -235,7 +239,7 @@ function useDrag(layout: InboxLayout, setLayout: (next: InboxLayout | ((l: Inbox
   }
 }
 
-function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, info, today, loading, onSent }: {
+function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, info, quick, today, loading, onSent }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
@@ -244,11 +248,19 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
   aiOn: boolean
   aiConnected: boolean
   info: LeadInfo | null
+  quick: QuickReply[]
   today: string
   loading: boolean
   onSent: () => void
 }) {
   const [text, setText] = useState('')
+  // "/word" at the end of the reply box: the quick replies it may mean (the handoff's Data Center › Quick replies).
+  const qm = useMemo(() => quickMatches(text, quick, contact.brandId), [text, quick, contact.brandId])
+  const putQuick = (r: QuickReply) => {
+    if (!qm) return
+    setText(t => insertQuick(t, qm.typed, r.body))
+    void quickReplyUsed(r.id)
+  }
   const [sending, startSending] = useTransition()
   const [error, setError] = useState<string | null>(null)
   // The AI draft on offer, and the one put in the reply box (its outcome is kept when the reply goes).
@@ -405,9 +417,22 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
             </div>
           ) : null}
           <div className={s.composer}>
+            {qm && qm.matches.length && !botOn ? (
+              <div className={s.quickMenu} role="listbox" aria-label="Quick replies">
+                {qm.matches.slice(0, 6).map(r => (
+                  <button key={r.id} type="button" role="option" aria-selected={false} className={s.quickItem} onMouseDown={e => e.preventDefault()} onClick={() => putQuick(r)}>
+                    <span className={s.quickKey}>{r.shortcut}</span><span className={s.quickText}>{r.body}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <textarea className={s.reply} rows={3} value={text} onChange={e => setText(e.target.value)} maxLength={2000} disabled={botOn}
               aria-label="Reply" placeholder={botOn ? 'A template is replying. Switch to CS from “Now” above to reply yourself.' : `Reply as ${csName}…`}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send() } }} />
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); return }
+                // Tab takes the first quick reply offered.
+                if (e.key === 'Tab' && qm?.matches.length && !botOn) { e.preventDefault(); putQuick(qm.matches[0]) }
+              }} />
             <div className={s.tools}>
               <span className={s.row6} style={{ gap: 2 }}>
                 <button type="button" className={s.iconBtn} disabled title="Camera — photos come with Meta"><LeadIcon name="camera" /></button>
@@ -416,10 +441,11 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
               <span className={s.rule} aria-hidden="true" />
               <InfoMenu info={info} brandId={contact.brandId} today={today} disabled={botOn}
                 onInsert={(v, whole) => setText(t => (whole ? (t ? t.replace(/\s*$/, '') + '\n\n' : '') + v : t + (t && !/\s$/.test(t) ? ' ' : '') + v))} />
-              {aiOn && aiConnected && !draft ? (
-                <button type="button" className={s.aiBtn} onClick={askDraft} disabled={drafting || botOn}>{drafting ? 'Drafting…' : '✦ AI draft'}</button>
+              {/* Always drawn, as the handoff; it says why when it cannot draft. */}
+              {!draft ? (
+                <button type="button" className={s.aiBtn} onClick={askDraft} disabled={drafting || botOn || !aiOn || !aiConnected}
+                  title={!aiConnected ? 'AI not connected (no API key)' : !aiOn ? 'Set up this brand’s AI Agent first (AI Agent › Save)' : 'The AI writes a draft into the box; you edit and send it'}>{drafting ? 'Drafting…' : '✦ AI draft'}</button>
               ) : null}
-              {aiOn && !aiConnected ? <span className={s.aiMissing}>AI not connected (no API key)</span> : null}
               <span className={s.hint}>{used ? 'From an AI draft — check it before sending.' : ''}</span>
               <button type="button" className={s.send} onClick={send} disabled={sending || botOn || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
             </div>

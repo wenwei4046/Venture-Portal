@@ -268,3 +268,18 @@
 /* ── Data Center (step 5) ── */
 .fileRow { display: grid; grid-template-columns: 44px minmax(180px, 1.6fr) 100px 120px 120px 120px minmax(140px, 1fr) 56px; gap: 10px; align-items: center; padding: 9px 14px; border-bottom: 1px solid rgb(var(--lv-hair)); font-size: 13px; min-width: 980px; }
 .two2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+
+/* Data Center (2026-10-23, fixes to the handoff): the header's two tabs, the categories' glyphs, the list's title, and
+   Quick replies. */
+.lineTabs { display: flex; gap: 18px; margin-right: 6px; }
+.lineTab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 4px 0; font: inherit; font-size: 14px; color: rgb(var(--lv-text-2)); cursor: pointer; display: flex; gap: 6px; align-items: baseline; }
+.lineTab[aria-pressed='true'] { color: rgb(var(--lv-ink)); border-bottom-color: rgb(var(--lv-ink)); }
+.libRow[data-glyph] { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; }
+.catGlyph { display: flex; color: rgb(var(--lv-text-3)); }
+.libRow[aria-current='true'] .catGlyph { color: rgb(var(--lv-accent-text)); }
+.filesTitle { padding: 14px 14px 6px; font-size: 14px; font-weight: 600; color: rgb(var(--lv-ink)); }
+.quickPage { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.quickRow { display: grid; grid-template-columns: 130px 140px minmax(0, 1fr) 70px 24px; gap: 12px; align-items: start; padding: 10px 14px; border-bottom: 1px solid rgb(var(--lv-hair)); background: rgb(var(--lv-white)); }
+.quickRow[data-head] { padding: 9px 14px; font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-text-2)); border-bottom-color: rgb(var(--lv-border)); border-radius: 8px 8px 0 0; }
+.quickRow .faqIn { border-color: rgb(var(--lv-frame)); }
+.quickFoot { max-width: 1000px; display: flex; align-items: center; gap: 12px; }

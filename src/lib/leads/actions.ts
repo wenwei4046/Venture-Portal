@@ -6,8 +6,9 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel, type AgentDocument } from './ai-model'
-import { agentCards, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
+import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
+import { quickProblem, type QuickReply } from './quick'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -162,6 +163,20 @@ export async function removeDataFile(fileId: string) {
   return call<null>('lead_remove_data_file', { p_id: fileId }, 'The file was not removed.')
 }
 
+/** The Data Center's Quick replies tab: the whole list as it stands. */
+export async function saveQuickReplies(rows: Array<Pick<QuickReply, 'id' | 'brandId' | 'shortcut' | 'body'>>) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  const problem = quickProblem(rows)
+  if (problem) return { ok: false as const, reason: problem }
+  return call<null>('lead_save_quick_replies', { p_rows: rows }, 'The quick replies were not saved.')
+}
+
+/** The Inbox: CS put a quick reply in the reply box — counted (quietly: a reply never waits on it). */
+export async function quickReplyUsed(id: string) {
+  await requireActionOn('/leads', 'leads', 'create')
+  return quiet<null>('lead_quick_reply_used', { p_id: id }, '')
+}
+
 /** The Data Center: a short-lived link to open a file (the session's own storage access). */
 export async function openDataFile(path: string): Promise<LeadOutcome<string>> {
   await requireActionOn('/leads/knowledge', 'leads', 'view')
@@ -310,13 +325,16 @@ export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, se
  * 24 MB, read with the session's own storage access. Null before mig 20261023200000 (the draft runs as before).
  */
 async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook'>) {
-  const [more, info] = await Promise.all([
+  const [more, info, dataFiles, quick] = await Promise.all([
     quiet<AgentMore>('lead_ai_more', { p_brand: brandId }, ''),
     quiet<LeadInfo>('lead_info', {}, ''),
+    quiet<DataFile[]>('lead_data_files', {}, ''),
+    quiet<QuickReply[]>('lead_quick_replies', {}, ''),
   ])
   if (!more.ok) return null
   const m = { ...more.data, ...(override ?? {}) }
-  const files: DataFile[] = more.data.sources.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
+  // As drawn: everything in the brand's folder and Shared that is on and in date.
+  const files: DataFile[] = agentReads(dataFiles.ok ? dataFiles.data : [], brandId).filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
   const documents: AgentDocument[] = []
   const supabase = (await createClient()) as unknown as SupabaseClient
   let total = 0
@@ -332,11 +350,14 @@ async function agentMore(brandId: string, today: string, override?: Pick<AgentMo
     else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
   }
   const links = files.filter(f => f.kind === 'link').map(f => `- ${f.name}: ${f.url}`)
+  // The Data Center's quick replies are CS's own words; the agent may use them as fixed answers (the handoff).
+  const quickLines = (quick.ok ? quick.data : []).filter(q => q.brandId === null || q.brandId === brandId).map(q => `- ${q.body}`)
   const system = [
     settingsPrompt(settingsOf(m.settings)),
     answersPrompt(m.answers, m.playbook),
     documents.length ? `# Files you read\nThe documents attached before the conversation are the brand's files; cite one by its card id (file-…).` : '',
     links.length ? `# Web pages (you see the address, not the page)\n${links.join('\n')}` : '',
+    quickLines.length ? `# Quick replies Customer Service uses (reuse them word for word when they answer the question)\n${quickLines.join('\n')}` : '',
   ].filter(Boolean).join('\n\n')
   return {
     ask: { system, documents },

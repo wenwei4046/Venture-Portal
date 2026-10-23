@@ -26,6 +26,8 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',
   lead_ai_more: 'a read: the agent’s settings, answers, playbook and sources, for the draft about to be written',
   lead_info: 'a read: General info, for the draft about to be written',
+  lead_data_files: 'a read: the Data Center files the agent reads, for the draft about to be written',
+  lead_quick_replies: 'a read: the quick replies the agent may reuse, for the draft about to be written',
   mint_invoice_no:
     'a number for an invoice made on any of four pages (Invoice, BA, Billing Allocator, the Invoice list): ' +
     'asking all four narrows nothing, and the invoice it numbers is written by the gated write that asked for it',

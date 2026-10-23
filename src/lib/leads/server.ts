@@ -8,6 +8,7 @@ import type { LeadFlow } from './flow'
 import type { BusinessHours, LeadInfo } from './info'
 import type { LibraryItem, ReplyRules } from './template'
 import type { AgentMore, Correction, DataFile } from './agent'
+import type { QuickReply } from './quick'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -94,6 +95,11 @@ export function loadAiMore(brandId: string): Promise<Read<AgentMore>> {
 /** The Data Center's files and links. */
 export function loadDataFiles(): Promise<Read<DataFile[]>> {
   return rpc<DataFile[]>('lead_data_files', undefined, 'The Data Center')
+}
+
+/** The Data Center's quick replies (mig 20261023300000). */
+export function loadQuickReplies(): Promise<Read<QuickReply[]>> {
+  return rpc<QuickReply[]>('lead_quick_replies', undefined, 'The quick replies')
 }
 
 /** A brand's AI corrections, the last `days` days (null = all). */

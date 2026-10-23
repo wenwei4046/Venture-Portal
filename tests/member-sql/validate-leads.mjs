@@ -704,4 +704,29 @@ await as(CS_USER, ALL)
 check((await q(`select count(*)::int n from information_schema.role_table_grants
   where table_name in ('lead_ai_answers','lead_ai_playbook','lead_data_files','lead_ai_sources') and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on the new tables')
 
+// ── Data Center › Quick replies (mig 20261023300000) ──
+await db.exec((await readFile(new URL('../../supabase/migrations/20261023300000_lead_quick_replies.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+await db.exec((await readFile(new URL('../../supabase/migrations/20261023300100_lead_quick_replies_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+const saveQuick = rows => q('select public.lead_save_quick_replies($1::jsonb)', [JSON.stringify(rows)])
+await saveQuick([{ shortcut: '/instal', body: '0% for 12 months.' }, { shortcut: '/kl', brandId: b2990, body: 'Our KL showroom.' }])
+let quickList = (await q('select public.lead_quick_replies() r'))[0].r
+check(quickList.map(r => [r.shortcut, r.brandId, r.used]), [['/instal', null, 0], ['/kl', b2990, 0]], 'quick replies saved, in order')
+await q('select public.lead_quick_reply_used($1)', [quickList[0].id])
+await saveQuick([{ id: quickList[1].id, shortcut: '/kl', brandId: b2990, body: 'KL, open 10–10.' }, { id: quickList[0].id, shortcut: '/instal', body: '0% for 12 months.' }])
+quickList = (await q('select public.lead_quick_replies() r'))[0].r
+check(quickList.map(r => [r.shortcut, r.body, r.used]), [['/kl', 'KL, open 10–10.', 0], ['/instal', '0% for 12 months.', 1]], 'edited and reordered; a use is counted and kept')
+await saveQuick([{ id: quickList[1].id, shortcut: '/instal', body: '0% for 12 months.' }, { shortcut: '/kl', body: 'Every brand.' }])
+check((await q('select count(*)::int n from public.lead_quick_replies'))[0].n, 2, 'one left out is removed; the same shortcut for every brand is another row')
+await refuses('select public.lead_save_quick_replies($1::jsonb)', [JSON.stringify([{ shortcut: 'instal', body: 'x' }])], /shortcut like/, 'a shortcut starts with /')
+await refuses('select public.lead_save_quick_replies($1::jsonb)', [JSON.stringify([{ shortcut: '/a', body: 'x' }, { shortcut: '/a', body: 'y' }])], /same shortcut/, 'one shortcut once per brand')
+for (const [fn, pages, want] of [['lead_save_quick_replies', "'/leads/knowledge'", 'leads.manage'], ['lead_quick_reply_used', "'/leads'", 'leads.create']]) {
+  const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY[${pages}], ARRAY['${want}']);`), true, `${fn} asks ${pages}`)
+}
+await as(CS_USER, ['leads.view', 'leads.create', 'leads.edit'])
+await refuses('select public.lead_save_quick_replies($1::jsonb)', ['[]'], /Lead View · Manage/, 'quick replies need Manage')
+await q('select public.lead_quick_reply_used($1)', [quickList[1].id])
+await as(CS_USER, ALL)
+check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_quick_replies' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on quick replies')
+
 console.log(`validate-leads: ${checks} checks passed`)

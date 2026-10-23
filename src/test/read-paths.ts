@@ -335,7 +335,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'att_file', 'att_remind',
   // Lead View (mig 20261016300200): each asks has_any_action(leads.*).
   'lead_config', 'lead_inbox', 'lead_thread', 'lead_list', 'lead_reply', 'lead_simulate', 'lead_save_card',
-  'lead_handoff', 'lead_set_outcome', 'lead_leads', 'lead_set_stage', 'lead_info', 'lead_save_info', 'lead_business_hours', 'lead_save_hours', 'lead_save_template', 'lead_reply_rules', 'lead_save_reply_rules', 'lead_library', 'lead_save_library_item', 'lead_remove_library_item', 'lead_data_files', 'lead_ai_more', 'lead_ai_corrections', 'lead_save_ai', 'lead_ai_draft_kept', 'lead_save_data_file', 'lead_remove_data_file', 'lead_mark_lost', 'lead_reopen', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
+  'lead_handoff', 'lead_set_outcome', 'lead_leads', 'lead_set_stage', 'lead_info', 'lead_save_info', 'lead_business_hours', 'lead_save_hours', 'lead_save_template', 'lead_reply_rules', 'lead_save_reply_rules', 'lead_library', 'lead_save_library_item', 'lead_remove_library_item', 'lead_data_files', 'lead_ai_more', 'lead_ai_corrections', 'lead_save_ai', 'lead_ai_draft_kept', 'lead_save_data_file', 'lead_remove_data_file', 'lead_quick_replies', 'lead_save_quick_replies', 'lead_quick_reply_used', 'lead_mark_lost', 'lead_reopen', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
   'lead_flows', 'lead_save_flow', 'lead_remove_flow', 'lead_auto_categories', 'lead_save_auto_category', 'lead_remove_auto_category',
   'lead_knowledge', 'lead_save_knowledge', 'lead_remove_knowledge', 'lead_personas', 'lead_save_persona', 'lead_ai_context',
   'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience',
