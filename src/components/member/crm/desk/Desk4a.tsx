@@ -11,6 +11,8 @@ import { usePanelOpen } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
 import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
+import { DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
+import { WA_VERTICALS } from "@/lib/meta/channels";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, boxSizing: "border-box" };
@@ -778,10 +780,10 @@ const AdLinkInline = ({ ad, url }: { ad: string; url: string | null }) => (url ?
 
 /** Frames 03 / 04 · the page's right rail: Contacts' Breakdown and Selected customer (264 px), the Calendar's figures (248 px). Folds to a strip. */
 export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
+  const [byOpen, setByOpen] = useState(false);
   // v2 (frame 03, note 01): Contacts' rail is the Selected panel alone — Breakdown and its figures are gone.
   if (v.side) return <ContactSelected4a s={v.side} />;
   const people = !!(v.side as RailSide | null), W = people ? 304 : 288; // 264 / 248 inside, 20 px a side (the frames' content-box)
-  const [byOpen, setByOpen] = useState(false);
   if (!v.open) return (
     <button type="button" onClick={v.toggle} title={`Open ${v.title.toLowerCase()}`} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
       borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}>
@@ -1650,7 +1652,7 @@ interface ChRow { title: string; sub: string; linked: boolean; act: () => void; 
 interface ChannelsBits {
   ch4: {
     cards: { number: string; label: string; route: string; edit: () => void; wa: ChRow; page: ChRow }[];
-    loose: (ChRow & { id: string })[]; n: number; newTemplate: () => void;
+    loose: (ChRow & { id: string })[]; n: number; newTemplate: () => void; profile: ProfileDrawerV | null;
     tpls: { name: string; body: string; cat: string; lang: string; st: string; dot: string; fg: string }[];
   };
 }
@@ -1679,6 +1681,7 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
   );
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: "40px", alignItems: "start" }}>
+      {C4.profile && <DeskProfileDrawer key={C4.profile.key} v={C4.profile} verticals={WA_VERTICALS} />}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "16px", paddingBottom: "12px", borderBottom: "1px solid var(--crm-ink)" }}>
           <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>Phone numbers</span>

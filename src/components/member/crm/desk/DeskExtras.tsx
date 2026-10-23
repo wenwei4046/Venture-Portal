@@ -15,7 +15,7 @@ import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
-import { Ic } from "../shared/icons4a";
+import { Ic, type Icon4a } from "../shared/icons4a";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -869,6 +869,133 @@ export function DeskLeadsByAd({ v }: { v: LbaV }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * v2 frame 09b · Channels › a number's Business profile (note 07): Update on WhatsApp and / or its Facebook Page (both
+ * ticked when there is a Page), the photo, display name, about, description, address, email, website and category, Save —
+ * sent to Meta from the server (saveCrmBusinessProfile), each channel answered on its own, a failed one with Retry. A new
+ * WhatsApp name is a request Meta reviews; the Page's photo, name, category and address are Facebook's to change.
+ */
+type ProfileInit = { name: string; about: string; description: string; address: string; email: string; website: string; vertical: string };
+type ProfileRes = { wa?: { ok: true; nameInReview: boolean; photo: boolean } | { ok: false; error: string }; page?: { ok: true } | { ok: false; error: string } };
+export interface ProfileDrawerV {
+  key: string; title: string; waId: string; waLabel: string; waName: string; pageId: string; pageLabel: string; photo: string | null; nameStatus: string; can: boolean;
+  init: ProfileInit; synced: string; close: () => void; save: (form: FormData) => Promise<ProfileRes | null>;
+}
+const PF_BOX: CSSProperties = { height: "34px", padding: "0 10px", borderRadius: "7px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "400 13px/1.45 Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none", width: "100%" };
+const PF_LABEL: CSSProperties = { display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" };
+export function DeskProfileDrawer({ v, verticals }: { v: ProfileDrawerV; verticals: readonly (readonly [string, string])[] }) {
+  const [f, setF] = useState<ProfileInit>(v.init);
+  const [toWa, setToWa] = useState(true), [toPage, setToPage] = useState(!!v.pageId);
+  const [photo, setPhoto] = useState<File | null>(null), [busy, setBusy] = useState(false), [res, setRes] = useState<ProfileRes | null>(null);
+  const preview = photo ? URL.createObjectURL(photo) : v.photo;
+  const set = (k: keyof ProfileInit) => (e: { target: { value: string } }) => setF(x => ({ ...x, [k]: k === "about" ? e.target.value.slice(0, 139) : e.target.value }));
+  const label = toWa && toPage ? "Save to WhatsApp & Facebook" : toPage ? "Save to Facebook" : "Save to WhatsApp";
+  const send = async (only?: "wa" | "page") => {
+    const wa = only ? only === "wa" : toWa, pg = only ? only === "page" : toPage;
+    if (!wa && !pg) return;
+    const fd = new FormData();
+    Object.entries(f).forEach(([k, val]) => fd.set(k, val));
+    fd.set("curName", v.init.name); fd.set("wa", v.waId); fd.set("waName", v.waName); fd.set("page", v.pageId); fd.set("pageName", v.pageLabel);
+    fd.set("toWa", wa ? "1" : ""); fd.set("toPage", pg ? "1" : "");
+    if (wa && photo) fd.set("photo", photo);
+    setBusy(true);
+    const r = await v.save(fd);
+    setBusy(false);
+    if (r) setRes(x => ({ ...x, ...r }));
+  };
+  const chip = (on: boolean, toggle: () => void, icon: Icon4a, color: string, name: string, sub: string, off?: boolean) => (
+    <button type="button" onClick={off ? undefined : toggle} aria-pressed={on} disabled={off} style={{ ...XBTN, flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", boxSizing: "border-box",
+      border: `1.5px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, background: on ? "#fff" : "var(--crm-hover)", cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1 }}>
+      <span style={{ flex: "none", width: "18px", height: "18px", borderRadius: "4px", boxSizing: "border-box", display: "grid", placeItems: "center", color: "#fff",
+        background: on ? "var(--crm-rust)" : "#fff", border: on ? "0" : "1.5px solid var(--crm-faint-2)" }}>{on && <Ic name="check" size={12} />}</span>
+      <span style={{ display: "flex", flex: "none", color }}><Ic name={icon} size={16} /></span>
+      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{name}</span>
+        <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>
+      </span>
+    </button>
+  );
+  const outcome = (k: "wa" | "page", name: string) => { const r = res?.[k]; if (!r) return null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "7px", font: "400 12px Inter, sans-serif",
+        background: r.ok ? "var(--crm-tint-new)" : "var(--crm-tint-attention)", color: r.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>
+        <Ic name={r.ok ? "circle-check" : "triangle-alert"} size={13} />
+        <span style={{ flex: 1, minWidth: 0 }}>{r.ok ? `${name} updated${"nameInReview" in r && r.nameInReview ? " · new name in review (1–2 days)" : ""}` : `${name}: ${r.error}`}</span>
+        {!r.ok && <button type="button" onClick={() => void send(k)} disabled={busy} style={{ ...XBTN, font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>Retry</button>}
+      </div>
+    ); };
+  const ini = (v.waName || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "flex", justifyContent: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} className={DX.slideIn} style={{ width: "460px", height: "100%", display: "flex", flexDirection: "column", background: "#fff", boxShadow: "-12px 0 32px rgba(42,22,12,.18)" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "16px 22px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+            <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>Business profile</span>
+            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.title}</span>
+          </div>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent", display: "flex", flexDirection: "column", gap: "14px", padding: "18px 22px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>Update on <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>· tick one or both</span></div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {chip(toWa, () => setToWa(x => !x), "phone", "var(--crm-whatsapp)", "WhatsApp", v.waLabel)}
+              {chip(toPage, () => setToPage(x => !x), "message-circle", "var(--crm-messenger)", "Facebook Page", v.pageLabel || "No Page linked to this number", !v.pageId)}
+            </div>
+            <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Saved here and sent to Meta for you. Fields a channel doesn’t have are skipped.</div>
+          </div>
+          {outcome("wa", "WhatsApp")}{outcome("page", "Facebook Page")}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            {preview
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={preview} alt="" style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover" }} />
+              : <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-ink)", color: "var(--crm-cream)", font: `500 20px ${TIGHT_X}` }}>{ini}</span>}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>Profile photo</span>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <label style={{ ...XBTN, height: "30px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>
+                  Upload<input type="file" accept="image/jpeg,image/png" onChange={e => setPhoto(e.target.files?.[0] ?? null)} style={{ display: "none" }} /></label>
+                {photo && <button type="button" onClick={() => setPhoto(null)} style={{ ...XBTN, height: "30px", padding: "0 4px", font: "500 12px Inter, sans-serif", color: "var(--crm-oxblood)" }}>Remove</button>}
+              </div>
+              <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Square JPG or PNG, at least 640 px{toPage ? " · Facebook’s photo is changed on Facebook" : ""}</span>
+            </div>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Display name<span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>{/PENDING|REVIEW/i.test(v.nameStatus) ? "In review" : "WhatsApp reviews name changes · 1–2 days"}</span></span>
+            <input value={f.name} onChange={set("name")} style={PF_BOX} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>About<span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>139 characters max</span></span>
+            <input value={f.about} onChange={set("about")} style={PF_BOX} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Description</span>
+            <textarea value={f.description} onChange={set("description")} rows={2} style={{ ...PF_BOX, height: "auto", minHeight: "56px", padding: "8px 10px", resize: "vertical" }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Address{toPage && <span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>WhatsApp only</span>}</span>
+            <input value={f.address} onChange={set("address")} style={PF_BOX} />
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}><span style={PF_LABEL}>Email</span><input value={f.email} onChange={set("email")} style={PF_BOX} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}><span style={PF_LABEL}>Website</span><input value={f.website} onChange={set("website")} style={PF_BOX} /></label>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Category{toPage && <span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>WhatsApp only</span>}</span>
+            <select value={f.vertical || "OTHER"} onChange={set("vertical")} style={PF_BOX}>{verticals.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          </label>
+        </div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "14px 22px", borderTop: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.synced}</span>
+          <button type="button" onClick={v.close} style={{ ...XBTN, marginLeft: "auto", height: "36px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void send()} disabled={busy || !v.can || (!toWa && !toPage)} title={v.can ? "" : "Only CRM · Manage may change the profile"} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", display: "flex", alignItems: "center",
+            background: busy || !v.can || (!toWa && !toPage) ? "var(--crm-line)" : "var(--crm-rust)", color: "#fff", font: "500 13px Inter, sans-serif" }} className="crm4a-primary">{busy ? "Sending…" : label}</button>
+        </div>
+      </div>
     </div>
   );
 }

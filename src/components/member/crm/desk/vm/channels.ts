@@ -215,13 +215,26 @@ export function channelsVM(ctx: DeskCtx) {
         const pg = pages.find(p => !used.has(p.id) && same(p.phone, n.number))
           ?? (n.verifiedName ? pages.find(p => !used.has(p.id) && nm(p.name) === nm(n.verifiedName!)) : undefined);
         if (pg) used.add(pg.id);
-        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chTab: "wa" }),
+        return { number: n.number, label: n.verifiedName || "WhatsApp", route: n.on ? `Inbox${linkOf("wa", n.id)?.isDefault ? " · default" : ""}` : "Not in Inbox", edit: () => patch({ chProf: n.id }),
           wa: { title: "WhatsApp Business", sub: `${n.verifiedName ? "Verified · " : ""}message quality ${qualityWords(n.quality)}`, linked: n.on,
             act: n.on ? () => patch({ chTab: "wa" }) : () => setLink("wa", n.id, n.number, true, false, `${n.number} linked · its chats come into Inbox`), actLabel: n.on ? "Manage" : "Link" },
           page: pg ? pageRow(pg) : { id: "", title: "Facebook Page", sub: "Link a Page to receive its Messenger chats here", linked: false, act: () => open(META_SUITE), actLabel: "Link" } };
       });
       const loose = pages.filter(p => !used.has(p.id)).map(pageRow);
-      return { cards, loose, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
+      // v2 frame 09b (note 07): the number's Business profile drawer — the WhatsApp profile Meta holds, its Page beside it.
+      const pn = nums.find(n => n.id === ui.chProf);
+      const pp = pn ? pages.find(p => same(p.phone, pn.number)) ?? (pn.verifiedName ? pages.find(p => p.name.trim().toLowerCase() === pn.verifiedName!.trim().toLowerCase()) : undefined) : undefined;
+      const synced = pn ? linkOf("wa", pn.id)?.updatedAt : undefined;
+      const profile = pn ? {
+        key: pn.id, title: `${pn.number}${pn.verifiedName ? ` · ${pn.verifiedName}` : ""}`, waId: pn.id, waLabel: pn.number, waName: pn.verifiedName || pn.number,
+        pageId: pp?.id ?? "", pageLabel: pp?.name ?? "", photo: pp?.picture ?? null, nameStatus: pn.nameStatus, can,
+        init: { name: pn.verifiedName ?? "", about: pn.profile?.about ?? pp?.about ?? "", description: pn.profile?.description ?? "", address: pn.profile?.address ?? "",
+          email: pn.profile?.email ?? pp?.email ?? "", website: pn.profile?.websites?.[0] ?? pp?.website ?? "", vertical: pn.profile?.vertical ?? "" },
+        synced: synced ? `Last synced ${new Date(synced).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, ${new Date(synced).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}` : "Not synced from here yet",
+        close: () => patch({ chProf: null }),
+        save: (form: FormData) => ctx.deskAct.saveProfile(form).then(r => { if (r) meta.reload(); return r; }),
+      } : null;
+      return { cards, loose, profile, n: nums.length, newTemplate: () => patch({ chTab: "tpl" }),
         tpls: (M?.templates ?? []).map(t => { const st = stWord(t.status), mine = data.templates?.find(x => x.metaName === t.name);
           return { name: t.name, body: mine?.body ?? "", cat: t.category.charAt(0) + t.category.slice(1).toLowerCase(), lang: LANG_WORDS[t.language] ?? t.language, st,
             dot: st === "Approved" ? "var(--crm-brown)" : st === "Pending" ? "var(--crm-amber)" : "var(--crm-orange)", fg: st === "Rejected" ? "var(--crm-oxblood)" : "var(--crm-ink)" }; }) };

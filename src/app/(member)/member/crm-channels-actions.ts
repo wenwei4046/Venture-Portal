@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { pageToken } from "@/lib/messenger/send";
 import {
   graph, hoursBody, messengerProfileBody, postJson, readMessengerProfile, readPage, readPermissions, readTemplates, readWaAutomation, readWaNumbers, readWaProfile,
-  templateBody, type MessengerProfile, type MetaPermission, type MetaTemplate, type PageInfo, type WaAutomation, type WaNumber, type WaProfile,
+  templateBody, pageProfileBody, uploadWaPhoto, waProfileBody, type BusinessProfile, type MessengerProfile, type MetaPermission, type MetaTemplate, type PageInfo, type WaAutomation, type WaNumber, type WaProfile,
 } from "@/lib/meta/channels";
 
 export interface ChannelLink { kind: "page" | "wa" | "ig" | "ads"; externalId: string; name: string; linked: boolean; isDefault: boolean; updatedAt: string }
@@ -121,5 +121,65 @@ export async function saveCrmChannel(s: Save): Promise<{ ok: true } | { ok: fals
     return r.ok ? { ok: true } : r;
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message.slice(0, 250) : "That could not be saved." };
+  }
+}
+
+export interface ProfileSaveResult {
+  wa?: { ok: true; nameInReview: boolean; photo: boolean } | { ok: false; error: string };
+  page?: { ok: true } | { ok: false; error: string };
+}
+/**
+ * v2 frame 09b (note 07): one business profile to the number's WhatsApp and / or its Facebook Page, each answered on its
+ * own (one may fail while the other went — the drawer says so per channel and offers Retry). CRM · Manage; the token
+ * stays here. A new WhatsApp display name is a request Meta reviews; the Page's name, category, address and picture are
+ * not changed by the API. Every channel that took it is recorded (crm_note_channel_save → the Audit log).
+ */
+export async function saveCrmBusinessProfile(form: FormData): Promise<{ ok: true; result: ProfileSaveResult } | { ok: false; error: string }> {
+  try {
+    const db = await crmMay("manage");
+    const { token, waba, pages } = env();
+    if (!token) throw new Error("Meta is not connected on this server yet.");
+    const s = (k: string) => String(form.get(k) ?? "").trim();
+    const p: BusinessProfile = { name: s("name"), about: s("about"), description: s("description"), address: s("address"), email: s("email"), website: s("website"), vertical: s("vertical") };
+    const waId = s("wa"), pageId = s("page"), toWa = s("toWa") === "1", toPage = s("toPage") === "1";
+    if (!toWa && !toPage) throw new Error("Tick WhatsApp, Facebook Page or both.");
+    const note = (kind: "page" | "wa", id: string, name: string, saved: Record<string, unknown>) =>
+      db.rpc("crm_note_channel_save", { p_kind: kind, p_external: id, p_name: name, p_saved: saved }).then(() => undefined, () => undefined);
+    const result: ProfileSaveResult = {};
+    if (toWa) result.wa = await (async () => {
+      if (!waba) return { ok: false as const, error: "The WhatsApp account is not set on this server yet." };
+      if (!/^\d{5,32}$/.test(waId)) return { ok: false as const, error: "Choose the number again." };
+      let handle: string | null = null;
+      const photo = form.get("photo");
+      if (photo instanceof File && photo.size > 0) {
+        if (!/^image\/(jpeg|png)$/.test(photo.type) || photo.size > 3.5 * 1024 * 1024) return { ok: false as const, error: "The photo must be a JPG or PNG under 3.5 MB." };
+        const up = await uploadWaPhoto(token, await photo.arrayBuffer(), photo.type);
+        if (!up.ok) return up;
+        handle = up.handle;
+      }
+      const r = await postJson(graph(`${waId}/whatsapp_business_profile`), token, waProfileBody(p, handle));
+      if (!r.ok) return r;
+      let nameInReview = false;
+      if (p.name && p.name !== s("curName")) {
+        const n = await postJson(graph(waId), token, { new_display_name: p.name.slice(0, 120) });
+        if (!n.ok) return { ok: false as const, error: `Profile saved, but the new name was refused — ${n.error}` };
+        nameInReview = true;
+      }
+      await note("wa", waId, s("waName") || waId, { about: p.about, description: p.description, address: p.address, email: p.email, website: p.website, vertical: p.vertical, ...(handle ? { photo: "new" } : {}), ...(nameInReview ? { name_request: p.name } : {}) });
+      return { ok: true as const, nameInReview, photo: !!handle };
+    })();
+    if (toPage) result.page = await (async () => {
+      if (!pages.includes(pageId)) return { ok: false as const, error: "That Page is not one of ours." };
+      const pt = await pageToken(pageId, token);
+      if (!pt) return { ok: false as const, error: "Meta did not give the Page's access. Reconnect it in Meta Business Suite." };
+      const body = pageProfileBody(p);
+      const r = await postJson(graph(pageId), pt, body);
+      if (!r.ok) return r;
+      await note("page", pageId, s("pageName") || pageId, body);
+      return { ok: true as const };
+    })();
+    return { ok: true, result };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message.slice(0, 250) : "The profile could not be saved." };
   }
 }

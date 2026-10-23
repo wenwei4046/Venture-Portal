@@ -195,7 +195,9 @@ export interface DeskUi {
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
   cfPage: number; cfDrag: { k: "f" | "s"; si: number; fi?: number } | null; cfOver: string | null;
   // Channels
-  chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
+  chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string;
+  /** v2 frame 09b: the number whose Business profile drawer is open. */
+  chProf: string | null; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
   chDlg: { kind: string; id: string } | null; chNewOpen: boolean; chNew: { name: string; cat: string; lang: string; body: string } | null; chWaNum: string | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
@@ -240,7 +242,7 @@ export const initialDeskUi = (): DeskUi => ({
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
   cfDraft: null, cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
-  chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
+  chTab: "conn", chProf: null, chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 
 /** The Revenue app around the CRM: its sidebar pages, top bar and who is signed in. */
@@ -286,6 +288,8 @@ export interface DeskActions {
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
+  /** v2 frame 09b: one business profile to the number's WhatsApp and / or Facebook Page, each answered on its own. */
+  saveProfile(form: FormData): Promise<import("@/app/(member)/member/crm-channels-actions").ProfileSaveResult | null>;
 }
 
 export interface DeskCtx {

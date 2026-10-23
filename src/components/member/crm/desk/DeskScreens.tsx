@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { crmWrite, fetchAdDaily, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
-import { fetchCrmChannels, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
+import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
 import type { Team } from "../panel/vm/common";
@@ -191,6 +191,12 @@ export default function DeskScreens(p: DeskScreensProps) {
         let timer: ReturnType<typeof setTimeout> | null = null;
         return (list: string[]) => { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void call("crm_save_recent_emoji", { p_emoji: list }); }, 1200); };
       })(),
+      async saveProfile(form) {
+        if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return null; }
+        const r = await saveCrmBusinessProfile(form);
+        if (!r.ok) { patch({ toast: r.error }); return null; }
+        return r.result;
+      },
       async saveMeta(s) {
         if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return false; }
         const r = await saveCrmChannel(s);
