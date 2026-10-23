@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
+export { Phone4aAdsPerf } from "./phone-ads-perf";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
