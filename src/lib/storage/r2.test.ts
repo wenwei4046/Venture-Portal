@@ -83,16 +83,50 @@ describe('R2 (lib/storage/r2.ts)', () => {
   })
 
   it('puts from the server with the key, never over a file already there', async () => {
-    const fetchMock = vi.fn(async (_req: Request) => new Response(null, { status: 200 }))
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const { r2Put } = await import('./r2')
-    expect(await r2Put({ r2Bucket: 'houzs-venture-files', key: 'payment-attachments/v/slip.pdf' }, new Uint8Array([1, 2, 3]), 'application/pdf')).toEqual({ ok: true })
-    const req = fetchMock.mock.calls[0][0]
-    expect(req.method).toBe('PUT')
-    expect(req.url).toBe('https://acc0123456789.r2.cloudflarestorage.com/houzs-venture-files/payment-attachments/v/slip.pdf')
-    expect(req.headers.get('if-none-match')).toBe('*')
-    expect(req.headers.get('content-type')).toBe('application/pdf')
-    expect(req.headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\//)
+    const bytes = new Uint8Array([1, 2, 3])
+    expect(await r2Put({ r2Bucket: 'houzs-venture-files', key: 'payment-attachments/v/slip.pdf' }, bytes, 'application/pdf')).toEqual({ ok: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    const headers = new Headers(init.headers)
+    expect(init.method).toBe('PUT')
+    expect(url).toBe('https://acc0123456789.r2.cloudflarestorage.com/houzs-venture-files/payment-attachments/v/slip.pdf')
+    expect(headers.get('if-none-match')).toBe('*')
+    expect(headers.get('content-type')).toBe('application/pdf')
+    expect(headers.get('x-amz-content-sha256')).toBe('UNSIGNED-PAYLOAD')
+    expect(headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\//)
+  })
+
+  // 2026-10-24: handed to fetch inside a Request (aws4fetch's own fetch), the body became a stream that Next's server
+  // sends chunked, without a length — R2 refused every such PUT, 411 MissingContentLength (Finance's attachments).
+  it('sends the bytes themselves, never a Request around them, so fetch says their length', async () => {
+    const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) => new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { r2Put } = await import('./r2')
+    const bytes = new Uint8Array(200 * 1024).fill(7)
+    const blob = new Blob([new Uint8Array([1, 2])], { type: 'application/pdf' })
+    await r2Put({ r2Bucket: 'b', key: 'big.pdf' }, bytes, 'application/pdf')
+    await r2Put({ r2Bucket: 'b', key: 'blob.pdf' }, blob, 'application/pdf')
+    for (const [input, init] of fetchMock.mock.calls) {
+      expect(typeof input).toBe('string')
+      expect(input).not.toBeInstanceOf(Request)
+      expect(init?.body === bytes || init?.body === blob).toBe(true)
+    }
+    expect(fetchMock.mock.calls.map(([, init]) => init?.body)).toEqual([bytes, blob])
+  })
+
+  it('tries again on an R2 hiccup, signed afresh; answers what R2 last said', async () => {
+    const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) => new Response('<Error><Code>SlowDown</Code></Error>', { status: 503 }))
+    fetchMock.mockResolvedValueOnce(new Response('<Error><Code>InternalError</Code></Error>', { status: 500 }))
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { r2Put } = await import('./r2')
+    expect(await r2Put({ r2Bucket: 'b', key: 'k' }, new Uint8Array([1]), 'image/png')).toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    fetchMock.mockClear()
+    expect(await r2Put({ r2Bucket: 'b', key: 'k' }, new Uint8Array([1]), 'image/png')).toEqual({ ok: false, status: 503, message: 'SlowDown (503)' })
+    expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 
   it('says why R2 refused', async () => {
