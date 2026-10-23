@@ -73,8 +73,28 @@ describe("HR's sidebar", () => {
     expect(rev.items.map(i => i.label)).toEqual(['Requests', 'Brand weeks', 'Transport claim', 'Food claim'])
   })
 
+  // 2026-10-24 (the user): Hiring requests' Listing tab is a row of its own, under Requests; a request's page
+  // is Listing's, as its "‹ All requests" back link says.
+  it('lists Hiring’s rows with Listing under Requests', () => {
+    const hiring = withActions({ id: 'h', role: 'hr', permissions: ['hiring'] }) as unknown as NavViewer
+    const rows = visibleHrNav(hrNavSections(null), hiring).find(s => s.label === 'Hiring')!.items
+    expect(rows.map(i => [i.label, i.href])).toEqual([
+      ['Requests', '/hiring/requests'],
+      ['Listing', '/hiring/requests?tab=listing'],
+      ['Insights', '/hiring/insights'],
+      ['Talent Bank', '/hiring/talent'],
+    ])
+  })
+
   it.each([
     ['/dashboard', '', 'overview'],
+    ['/hiring/requests', '', 'hire'],
+    ['/hiring/requests', 'tab=form', 'hire'],
+    ['/hiring/requests', 'tab=nonsense', 'hire'],
+    ['/hiring/requests', 'tab=listing', 'hireList'],
+    ['/hiring/requests/HR-010', '', 'hireList'],
+    ['/hiring/insights', '', 'hireIns'],
+    ['/hiring/talent/TB-001', '', 'talent'],
     ['/attendance/today', '', 'today'],
     ['/attendance/records', 'm=2026-09', 'records'],
     ['/attendance/readiness', '', 'ready'],
