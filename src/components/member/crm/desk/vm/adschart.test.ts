@@ -23,6 +23,15 @@ describe("the chart's day-by-day figures", () => {
     expect(s.spend).toEqual([30, 0, 9]);
     expect(s.cpl).toEqual([15, null, 9]);
     expect(s.ctr).toEqual([5, null, null]);
+    // The table's other metrics, day by day (2026-10-23: the chart picks from the same list).
+    const t = dailySeries(["reach", "freq", "cpr", "apptrate", "winrate", "cpwon", "eng"], days, cs, visits, meta);
+    expect(t.reach).toEqual([100, 0, 0]);
+    expect(t.freq).toEqual([2, null, null]);
+    expect(t.cpr).toEqual([10, null, null]);
+    expect(t.apptrate).toEqual([50, null, 100]);
+    expect(t.winrate).toEqual([50, null, 0]);
+    expect(t.cpwon).toEqual([30, null, null]);
+    expect(t.eng).toEqual([null, null, null]);
   });
   it("leaves Meta's metrics empty until an ad has been read", () => {
     expect(dailySeries(["spend", "leads"], days, [], [], [undefined, null]).spend).toEqual([null, null, null]);
