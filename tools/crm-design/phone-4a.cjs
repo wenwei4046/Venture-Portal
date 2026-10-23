@@ -325,6 +325,14 @@ function teamInbox(body) {
     `gap: "8px", fontSize: "${F(12)}", lineHeight: "16px" }}>`, "team card foot");
   b = once(b, 'display: "flex", alignItems: "center", gap: "6px", fontWeight: "600", color: "var(--crm-ink)" }}>', 'display: "flex", alignItems: "center", gap: "8px", fontWeight: "400", color: r.toAssign ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>', "team card owner");
   b = once(b, '<span style={{ flex: "none", fontWeight: "700", color: r.uc, whiteSpace: "nowrap" }}>{r.state}</span>', '<span style={{ flex: "none", fontWeight: "400", color: r.uc, whiteSpace: "nowrap" }}>{r.state}</span>', "team card state");
+  // The board shows the status picked above it, full width, and no longer pans sideways (the owner, 2026-10-24: "怎麼可以隨意
+  // 拖動" — the tabs and the board's columns drifted apart).
+  b = once(b, '<div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden",',
+    '<div data-inb-board="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "hidden", overflowY: "hidden",', "team board still");
+  { const i = b.indexOf('<div data-inb-board="1"'), m = b.indexOf("{(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}>", i);
+    if (i < 0 || m < 0) throw new Error("phone-4a: team board columns");
+    b = b.slice(0, m) + "{(v.ib.inbCols).filter(g => g.on).map((g, g_i) => (<Fragment key={g_i}>" + b.slice(m + "{(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}>".length); }
+  b = once(b, '<div style={{ flex: "0 0 300px", height: "100%", scrollSnapAlign: "start",', '<div style={{ flex: "1 1 auto", minWidth: "0", height: "100%", scrollSnapAlign: "start",', "team board column");
   return body.slice(0, at) + b + body.slice(end);
 }
 
@@ -374,12 +382,12 @@ function teamSplit(body) {
   b = once(b, 'padding: "12px 20px 26px", borderTop: "1px solid var(--crm-tint-cold)", background: "#fff", display: "grid", gridTemplateColumns: "1fr 2fr", gap: "8px" }}>',
     'padding: "12px 20px 26px", borderTop: "1px solid var(--crm-rule)", background: "#fff", display: "flex", flexDirection: "column-reverse", gap: "8px" }}>', "split foot");
   b = swap(b, '<span onClick={v.as.ae.close} style={{ height: "48px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-tint-cold)"', "span", "", "split cancel");
-  b = once(b, '<span onClick={v.as.ae.save} style={{ height: "48px", borderRadius: "24px", background: v.as.ae.saveBg,', '<span onClick={v.as.ae.save} style={{ height: "50px", borderRadius: "25px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)",', "split save");
+  b = once(b, '<span onClick={v.as.ae.save} style={{ height: "48px", borderRadius: "24px", background: v.as.ae.saveBg,', '<span style={{ display: "flex", gap: "10px" }}><span onClick={v.as.ae.close} role="button" style={{ flex: "1", height: "44px", boxSizing: "border-box", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", display: "grid", placeItems: "center", fontSize: "' + F(14) + '", fontWeight: "500", cursor: "pointer" }}>Cancel</span><span onClick={v.as.ae.save} style={{ flex: "2", height: "44px", borderRadius: "22px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)",', "split save");
   // Why Save is off, above it (the owner, 2026-10-18: "为什么我调整后，save处于灰色？" — a team's own split was the reason, out of sight).
   {
     const i = b.indexOf("<span onClick={v.as.ae.save}");
     const [, e] = el(b.slice(i), "<span onClick={v.as.ae.save}", "span", "split save end");
-    b = b.slice(0, i + e) + `{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "${F(13)}", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}` + b.slice(i + e);
+    b = b.slice(0, i + e) + "</span>" + `{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "${F(13)}", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}` + b.slice(i + e);
   }
   // A locked person stays in the list, grey with a lock instead of the box (the owner, 2026-10-22: "不要消失在 assignment list
   // 里面，而是改成小锁头，灰色，不能 edit"; vm/assign-1011.ts appends them with `locked`).
@@ -452,6 +460,9 @@ function teamCalendar(body) {
     `<div style={{ display: "grid", gridTemplateColumns: "118px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>\n                  <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: "0", fontSize: "${F(12)}", fontWeight: "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "none", width: "9px", height: "9px", boxSizing: "border-box", borderRadius: "50%", border: \`2px solid \${b.c}\` }} />{b.name}</span>`, "team cal bar name");
   b = once(b, '<span style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,.12)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "4px", background: b.c }}>',
     '<span style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.14)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "3px", background: "var(--crm-peach)" }}>', "team cal bar");
+  // The team bars fold under a "By team" line (2026-10-24), folded at first.
+  b = once(b, '<div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,.14)" }}>',
+    `<div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,.14)" }}><span onClick={v.cal.cTeamsToggle} role="button" aria-expanded={v.cal.cTeamsOpen} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "${F(12)}", fontWeight: "500", color: "var(--crm-peach-soft)", cursor: "pointer" }}>By team<span style={{ display: "flex", marginLeft: "auto", transform: \`rotate(\${v.cal.cTeamsChev})\`, transition: "transform 160ms" }}><Ic name="chevron-down" size={14} /></span></span>`, "team cal bars fold");
   // v3 T05: the list — "Today  Sun 18 Oct · 5 visits", compact cards, no chevron.
   b = swap(b, `<span style={{ padding: "6px 2px 2px", fontFamily: "${TIGHT}", fontSize: "${F(18)}", fontWeight: "500", color: d.color }}>{d.day}</span>`, "span",
     `<span style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "8px 2px 0" }}><span style={{ fontFamily: "${TIGHT}", fontSize: "${F(17)}", fontWeight: "500", color: "var(--crm-ink)" }}>{d.head}</span><span style={{ fontSize: "${F(12)}", color: "var(--crm-faint)" }}>{d.sub}</span></span>`, "team cal day head v3");

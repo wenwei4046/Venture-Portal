@@ -25,6 +25,9 @@ async function openTeamChat(name = "Lim Wei Jie") {
   render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
   await act(async () => {});
   await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")) ?? null);
+  // The board shows one status at a time (2026-10-24): step through the status tabs to the customer.
+  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
+  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; await tap(t); }
   await tap(screen.getAllByText(name, { exact: true })[0]);
   expect(document.querySelector('main[data-chat-screen] [title="Back to Inbox"]')).not.toBeNull();
 }
@@ -43,6 +46,12 @@ async function type(text: string) {
   await act(async () => {});
 }
 const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style*="repeat(8"] > span')];
+
+/** The board shows one status at a time (2026-10-24): step through the status tabs until `name` shows. */
+async function toCustomer(name: string) {
+  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
+  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; fireEvent.click(t); await act(async () => {}); }
+}
 
 describe("the Team chat is Mine's", () => {
   it("the header (4a, M04): back and ⋮ with no ring, no dot on the avatar, whose customer it is under the row, the status strip", async () => {
@@ -157,9 +166,11 @@ describe("the Team chat is Mine's", () => {
     await openTeamChat();
     await type("For Lim only");
     await tap(head().querySelector('[title="Back to Inbox"]'));
+    await toCustomer("Tan Mei Ling");
     await tap(screen.getAllByText("Tan Mei Ling", { exact: true })[0]);
     expect(box().value).toBe("");
     await tap(head().querySelector('[title="Back to Inbox"]'));
+    await toCustomer("Lim Wei Jie");
     await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
     expect(box().value).toBe("For Lim only");
   });

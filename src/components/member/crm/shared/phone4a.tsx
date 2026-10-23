@@ -155,10 +155,10 @@ export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitR
                   <span style={{ fontSize: fs(11.5), color: g?.held ? "var(--crm-oxblood)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{line}</span>
                 </span>
               </button>
-              <label style={{ flex: "none", width: "76px", height: "34px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+              <label style={{ flex: "none", width: "88px", height: "34px", padding: "0 8px 0 6px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
                 <input type="text" inputMode="decimal" aria-label={`${r.team} share`} value={r.v} onChange={r.setN} onFocus={r.selAll} enterKeyHint="next" onKeyDown={enterNext}
-                  style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
-                <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>%</span>
+                  style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
+                <span style={{ flex: "none", fontSize: fs(11), color: "var(--crm-faint)" }}>%</span>
               </label>
             </div>
             <input type="range" data-crm-range="" aria-label={`${r.team} slider`} min="0" max="100" step="5" value={r.range} onChange={r.set} style={SLIDER(r.range, r.c)} />
@@ -195,46 +195,46 @@ export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: s
   const pct = s.modeLbl === "By %", even = s.modeLbl === "Evenly";
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(42,22,12,.38)" }} onClick={s.cancel}>
-      <div role="dialog" aria-label={`Adjust split · ${s.name}`} onClick={e => e.stopPropagation()} style={{ maxHeight: "88%", display: "flex", flexDirection: "column", borderRadius: "24px 24px 0 0", background: "#fff" }}>
+      <div role="dialog" aria-label={`Adjust split · ${s.name}`} onClick={e => e.stopPropagation()} style={{ maxHeight: "78%", display: "flex", flexDirection: "column", borderRadius: "24px 24px 0 0", background: "#fff" }}>
         <span style={{ alignSelf: "center", width: "36px", height: "4px", margin: "8px 0 4px", borderRadius: "2px", background: "var(--crm-line)" }} />
-        <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 20px 12px" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "10px", padding: "4px 20px 10px" }}>
           <span style={{ flex: "none", width: "9px", height: "9px", marginTop: "8px", borderRadius: "2px", background: s.c }} />
           <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-            <span style={{ fontFamily: TIGHT, fontSize: fs(18), fontWeight: 500, color: "var(--crm-ink)" }}>{s.name}</span>
-            <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{s.sub}</span>
+            <span style={{ fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)" }}>{s.name}</span>
+            <span style={{ fontSize: fs(11.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</span>
           </span>
           <button type="button" aria-label="Close" onClick={s.cancel} style={{ ...BTN, display: "flex", padding: "4px", color: "var(--crm-faint)" }}><Ic name="x" size={18} /></button>
         </div>
         <div style={{ flex: "none", display: "flex", gap: "2px", margin: "0 20px 6px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{s.modes.map(m => (
-          <button key={m.label} type="button" onClick={m.pick} aria-pressed={m.w > 500} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", fontSize: fs(13), fontWeight: 500,
+          <button key={m.label} type="button" onClick={m.pick} aria-pressed={m.w > 500} style={{ ...BTN, flex: 1, height: "30px", borderRadius: "15px", fontSize: fs(12.5), fontWeight: 500,
             background: m.w > 500 ? "#fff" : "transparent", boxShadow: m.w > 500 ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: m.w > 500 ? "var(--crm-ink)" : "var(--crm-muted)" }}>{m.label}</button>))}</div>
         <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "0 20px" }}>
           {s.people.map(p => (
-            <div key={p.name} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 0", borderTop: "1px solid var(--crm-rule-soft)", opacity: p.locked ? 0.55 : 1 }}>
+            <div key={p.name} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px 0", borderTop: "1px solid var(--crm-rule-soft)", opacity: p.locked ? 0.55 : 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: fs(11), fontWeight: 500 }}>{p.ini}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: fs(14.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                <span style={{ flex: "none", width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: fs(10), fontWeight: 500 }}>{p.ini}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                 <span style={{ flex: "none", width: "14px", display: "flex", justifyContent: "center", color: "var(--crm-faint)" }}>{(p.mine || p.locked) && <Ic name="lock" size={12} />}</span>
                 {even ? <span style={{ flex: "none", width: "88px", textAlign: "right", fontSize: fs(13), color: "var(--crm-muted)" }}>In turn</span>
                   : p.locked ? <span style={{ flex: "none", width: "88px", textAlign: "right", fontSize: fs(12), color: "var(--crm-faint)" }}>Locked</span>
-                  : <label style={{ flex: "none", width: "88px", height: "40px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: `1px solid ${p.mine ? "var(--crm-rust)" : "var(--crm-line)"}`, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                  : <label style={{ flex: "none", width: "78px", height: "32px", padding: "0 8px", boxSizing: "border-box", borderRadius: "10px", border: `1px solid ${p.mine ? "var(--crm-rust)" : "var(--crm-line)"}`, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
                       <input type="text" inputMode={pct ? "decimal" : "numeric"} aria-label={`${p.name} share`} value={p.v} onChange={p.set} onFocus={e => e.currentTarget.select()}
-                        style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
+                        style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(14.5), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
                       <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>{s.unit}</span>
                     </label>}
               </div>
-              {!even && !p.locked && <input type="range" data-crm-range="" aria-label={`${p.name} slider`} min="0" max={p.max} step={pct ? 0.5 : 1} value={p.range} onChange={p.slide} style={{ ...SLIDER((p.range / p.max) * 100, "var(--crm-rust)"), marginLeft: "38px", width: "calc(100% - 38px)" }} />}
+              {!even && !p.locked && <input type="range" data-crm-range="" aria-label={`${p.name} slider`} min="0" max={p.max} step={pct ? 0.5 : 1} value={p.range} onChange={p.slide} style={{ ...SLIDER((p.range / p.max) * 100, "var(--crm-rust)"), marginLeft: "34px", width: "calc(100% - 34px)" }} />}
             </div>
           ))}
         </div>
-        {!even && <div style={{ flex: "none", margin: "8px 20px 0", padding: "12px 14px", borderRadius: "12px", background: "var(--crm-sel)", display: "flex", alignItems: "center", gap: "8px" }}>
+        {!even && <div style={{ flex: "none", margin: "8px 20px 0", padding: "9px 14px", borderRadius: "12px", background: "var(--crm-sel)", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ flex: 1, fontSize: fs(13), color: "var(--crm-muted)" }}>Total</span>
-          <span style={{ fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: s.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{pct ? s.total : `up to ${s.total}`}</span>
+          <span style={{ fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: s.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{pct ? s.total : `up to ${s.total}`}</span>
           {s.ok && <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="check" size={14} /></span>}
         </div>}
-        <div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))" }}>
-          <button type="button" onClick={s.cancel} style={{ ...BTN, flex: 1, height: "48px", borderRadius: "24px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
-          <button type="button" onClick={s.apply} disabled={!s.apply} style={{ ...BTN, flex: 1.6, height: "48px", borderRadius: "24px", background: s.apply ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>Apply</button>
+        <div style={{ flex: "none", display: "flex", gap: "10px", padding: "10px 20px calc(12px + var(--safe-bottom, 0px))" }}>
+          <button type="button" onClick={s.cancel} style={{ ...BTN, flex: 1, height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
+          <button type="button" onClick={s.apply} disabled={!s.apply} style={{ ...BTN, flex: 1.6, height: "44px", borderRadius: "22px", background: s.apply ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>Apply</button>
         </div>
       </div>
     </div>
@@ -521,15 +521,15 @@ function RoomHours({ h }: { h: Room4["hours"] }) {
 export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
   const q = r.q4;
   const [editName, setEditName] = useState(false), [grid, setGrid] = useState(false);
-  const chip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 14px", borderRadius: "18px", background: "var(--crm-field)", color: "var(--crm-ink)", fontSize: fs(14), textDecoration: "none" };
+  const chip: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "6px", height: "30px", padding: "0 12px", borderRadius: "15px", background: "var(--crm-field)", color: "var(--crm-ink)", fontSize: fs(12.5), textDecoration: "none" };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "18px", paddingBottom: q.dirty ? "70px" : "0" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px", paddingBottom: q.dirty ? "70px" : "0" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         {/* A phone field is 16 px (the app's rule, so iOS does not zoom): the name is the title until tapped, then a field. */}
         {editName || !q.name
           ? <input autoFocus={editName} value={q.name} onChange={q.setName} onBlur={() => setEditName(false)} placeholder="Showroom name" aria-label="Showroom name" style={{ height: "40px", padding: "0 12px", border: "1px solid var(--crm-line)", borderRadius: "10px", background: "#fff", outline: "none", fontWeight: 500, color: "var(--crm-ink)" }} />
-          : <button type="button" onClick={() => setEditName(true)} title="Rename" style={{ ...BTN, textAlign: "left", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(26), letterSpacing: "-0.02em", lineHeight: 1.15, color: "var(--crm-ink)" }}>{q.name}</button>}
-        <input value={q.addr} onChange={q.setAddr} placeholder="Add the address" aria-label="Address" style={{ border: 0, padding: 0, background: "transparent", outline: "none", fontSize: fs(15), color: q.addr ? "var(--crm-ink-soft)" : "var(--crm-faint)" }} />
+          : <button type="button" onClick={() => setEditName(true)} title="Rename" style={{ ...BTN, textAlign: "left", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(20), letterSpacing: "-0.01em", lineHeight: 1.2, color: "var(--crm-ink)" }}>{q.name}</button>}
+        <input value={q.addr} onChange={q.setAddr} placeholder="Add the address" aria-label="Address" style={{ border: 0, padding: 0, background: "transparent", outline: "none", fontSize: fs(13), color: q.addr ? "var(--crm-ink-soft)" : "var(--crm-faint)" }} />
       </div>
       <div style={{ display: "flex", gap: "8px", opacity: q.hasAddr ? 1 : 0.45 }}>
         <a href={q.gmaps} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Google Maps</a>
