@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { acceptMktStage, decideMktStage, putMktFree, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
 import { nameOf, seriesView, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
 import { missingWork, type FormField, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
-import FormalLogSheet from '../audit/FormalLogSheet'
+import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import s from './task.module.css'
 
@@ -26,7 +26,7 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
-  const [logOpen, setLogOpen] = useState(false)
+  const [sheet, setSheet] = useState<'map' | 'audit' | null>(null)
   const [reason, setReason] = useState('')
   const [linkDraft, setLinkDraft] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -455,7 +455,10 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
         <aside className={s.trail} aria-label="Audit trail">
           <div className={s.trailHead}>
             <span>Audit trail</span>
-            <button type="button" className={a.open} onClick={() => setLogOpen(true)}>Formal log</button>
+            <span className={a.opens}>
+              {page.stages.length ? <button type="button" className={a.open} onClick={() => setSheet('map')}>Map</button> : null}
+              <button type="button" className={a.open} onClick={() => setSheet('audit')}>Formal log</button>
+            </span>
           </div>
           {lines.map(l => (
             <div key={l.id} className={s.trailLine}>
@@ -464,7 +467,9 @@ export default function TaskPage({ initial, can }: { initial: MktTaskPage; can: 
             </div>
           ))}
         </aside>
-        {logOpen ? <FormalLogSheet project={page.project.id} track={page.project.trackId} onClose={() => setLogOpen(false)} /> : null}
+        {sheet ? (
+          <ProjectSheet project={page.project.id} track={page.project.trackId} title={page.project.title} page={page} tab={sheet} onClose={() => setSheet(null)} />
+        ) : null}
       </div>
 
       {modal && cur ? (
