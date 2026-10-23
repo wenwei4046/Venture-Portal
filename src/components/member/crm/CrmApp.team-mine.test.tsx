@@ -79,8 +79,9 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     expect(screen.getByRole("heading", { name: "Calendar" })).toBeInTheDocument();
     noButtons();
     expect(screen.queryByText(/visits · \d+ upcoming/)).toBeNull();
+    // v3 T06 (2026-10-23): Team's Profile has the house top-right, as the prototype.
     await go("Profile");
-    noButtons();
+    onlyHouse();
   });
 
   it("Mine's other pages have none of them either — Contacts, Calendar, Insight, Profile and its Notifications", async () => {

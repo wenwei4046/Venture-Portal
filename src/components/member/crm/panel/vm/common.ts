@@ -48,7 +48,7 @@ export interface PanelCtx {
   /** Open someone's own CRM (View as / a tapped chat): the salesperson screens, on their customers. */
   openCrmOf: (staffId: string, customerId?: string) => void;
   /** The Director: Control panel ⇄ My CRM — on `tab` (the phone's round button: Mine's first page), else the same page. */
-  toMyCrm?: (tab?: SalesTab) => void;
+  toMyCrm?: (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => void;
   exitApp: () => void;
   slotCounts: Record<string, number>;
   /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */

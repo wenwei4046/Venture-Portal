@@ -24,12 +24,7 @@ const SIDES = [
     ini: "{v.meIniX}", name: "{v.meNameX}", facts: ["{v.meTitleX}", "{v.meRankX}"],
     banner: "View my team", rows: ["Notifications", "Auto-reply", "Quick replies"],
   },
-  {
-    side: "Team",
-    page: mainPage("src/components/member/crm/panel/PanelApp.tsx", "{!!(v.pf.onProfile) && (<>", "</main>"),
-    ini: "{v.pf.meIni}", name: "{v.pf.meName}", facts: ["{v.pf.meTitle}", "{v.pf.meAccess}"],
-    banner: "View as a team member", rows: ["Notifications", "Showrooms", "Cold lead templates", "Ads Performance"],
-  },
+  // Team's Profile is the v3 prototype's since 2026-10-23 (the owner: "我的profile 應該長這樣才對") — Phone4aProfileTeam.
 ] as const;
 
 /** A declaration of one of the app Profile's classes, from its own rule (`.h2 { … }`, not `.work > .h2 { … }`). */

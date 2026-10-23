@@ -397,6 +397,8 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-today-bg: #EEF5F0;
   --crm-today-line: #BFD9C8;
   --crm-today: #387557;
+  /* v3: the deep sand at the top of the Profile and Insight gradients. */
+  --crm-sand: #EADFD4;
   --crm-audit: #F6E7D8;
   /* redesign v2 (2026-10-23, docs/design_handoff_crm_redesign_v2 › Global rules): ONE selected colour on white, the nav's
      active item a step darker on its cream, a selected parent row, and the large summary blocks — cream #FCEEE2 stays for

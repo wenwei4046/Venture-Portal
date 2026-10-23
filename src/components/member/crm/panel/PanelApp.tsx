@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfileTeam, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -1462,126 +1462,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
-        <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div data-prof-glow="1" style={{ margin: "-14px -20px 0", padding: "56px 20px 0", background: "radial-gradient(130% 100% at 50% 0%, var(--crm-peach) 0%, var(--crm-peach-soft) 48%, var(--crm-page) 100%) top / 100% 150px no-repeat" }}>
-          <div style={{ position: "relative", borderRadius: "22px", background: "#fff", boxShadow: "0 6px 24px rgba(42,22,12,.10)", padding: "18px 18px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-            {!!(v.bellIn) && (<>
-              <span onClick={v.bl.openNotifs} title="Notifications" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", boxShadow: "0 2px 8px rgba(42,22,12,.06)", cursor: "pointer", position: "absolute", top: "14px", right: "14px" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Zm4 11a2 2 0 0 0 4 0">
-                  </path>
-                </svg>
-                {!!(v.bl.notifUnread) && (<>
-                  <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", background: "var(--crm-rust)", border: "2px solid #fff", color: "#fff", display: "grid", placeItems: "center", fontSize: "max(10px, calc(10px * var(--rv-type, 1)))", fontWeight: "700" }}>{v.bl.notifUnread}</span>
-                </>)}
-              </span>
-            </>)}
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <span style={{ flex: "none", width: "56px", height: "56px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meIni}</span>
-              <div style={{ flex: "1", minWidth: "0" }}>
-                <h1 style={{ margin: "0", fontFamily: "var(--font-display-rv)", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.pf.meName}</h1>
-                <p style={{ margin: "2px 0 0", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>HOUZS Venture · CRM</p>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid var(--crm-rule)", borderRadius: "14px", background: "#fff" }}>
-              <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>Title</span>
-                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meTitle}</strong>
-              </div>
-              <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: "2px", borderLeft: "1px solid var(--crm-rule)" }}>
-                <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>Access</span>
-                <strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{v.pf.meAccess}</strong>
-              </div>
-            </div>
-          </div>
-          </div>
-          {!!(v.pf.isFull) && (<>
-            <div onClick={v.pf.openViewAs} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "18px", background: "var(--crm-ink)", color: "#fff", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "12px", background: "rgba(255,255,255,.12)", color: "var(--crm-peach)", display: "grid", placeItems: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>View as a team member</strong>
-              </span>
-              <svg style={{ flex: "none", color: "var(--crm-tint-attention)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 5 7 7-7 7">
-                </path>
-              </svg>
-            </div>
-          </>)}
-          <div style={{ display: "flex", flexDirection: "column", marginTop: "8px" }}>
-            <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-rv)", fontSize: "calc(18px * var(--rv-type, 1))", fontWeight: "650", letterSpacing: "-.02em" }}>Your workspace</h2>
-            <div onClick={v.pf.openNotifs} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer" }}>
-              <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4">
-                  </path>
-                </svg>
-              </span>
-              <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Notifications</strong>
-              </span>
-              {!!(v.pf.notifUnread) && (<>
-                <span style={{ flex: "none", marginRight: "-4px", padding: "1px 7px", borderRadius: "9px", background: "var(--crm-rust)", color: "#fff", fontSize: "calc(10.9px * var(--rv-type, 1))", fontWeight: "700" }}>{v.pf.notifUnread}</span>
-              </>)}
-              <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 5 7 7-7 7">
-                </path>
-              </svg>
-            </div>
-            {!!(v.pfAdmin) && (<>
-              
-              <div onClick={v.pf.openRooms} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z">
-                    </path>
-                  </svg>
-                </span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Showrooms</strong>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m9 5 7 7-7 7">
-                  </path>
-                </svg>
-              </div>
-              <div onClick={v.tp.openPage} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 8h8M8 12h5">
-                    </path>
-                  </svg>
-                </span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Cold lead templates</strong>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m9 5 7 7-7 7">
-                  </path>
-                </svg>
-              </div>
-              <div onClick={v.pf.openAdsPerf} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 0", cursor: "pointer", borderTop: "1px solid var(--crm-field)" }}>
-                <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12">
-                    </path>
-                  </svg>
-                </span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650" }}>Ads Performance</strong>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m9 5 7 7-7 7">
-                  </path>
-                </svg>
-              </div>
-            </>)}
-          </div>
-        </main>
+        {!!(v.pf6) && (<Phone4aProfileTeam p={v.pf6} />)}
       </>)}
     </>)}
     {!!(v.rm.rmDelOpen) && (<>

@@ -523,6 +523,10 @@ function panel(body) {
     const [, e] = el(body.slice(s0, end > 0 ? end : undefined), S, "div", "work type list");
     body = body.slice(0, s0 + e) + `{!!(v.fts.dirty) && (<div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.fts.cancel} role="button" style={{ flex: "0 0 auto", height: "48px", padding: "0 20px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "500", color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</span><span onClick={v.fts.save} role="button" style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "600", cursor: "pointer" }}>{v.fts.saveLabel}</span></div>)}` + body.slice(s0 + e);
   }
+    // v3 T06 (the owner, 2026-10-23: "我的profile 應該長這樣才對"): Profile is the prototype's — Phone4aProfileTeam.
+  { const a = body.indexOf("{!!(v.pf.onProfile) && (<>"); if (a < 0) throw new Error("phone-4a: team profile");
+    const m = body.indexOf("<main ", a); const [x, y] = el(body.slice(m), body.slice(m, m + 60), "main", "team profile main");
+    body = body.slice(0, m + x) + "{!!(v.pf6) && (<Phone4aProfileTeam p={v.pf6} />)}" + body.slice(m + y); }
   return nameCase(body);
 }
 

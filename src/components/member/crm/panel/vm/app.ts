@@ -17,6 +17,7 @@ import { roomsVM } from "./rooms";
 import { overlaysVM } from "./overlays";
 import { navVM } from "./nav";
 import { calendarInfoVM, calendarListVM } from "./calendar-list";
+import { notifsVM } from "./notifs";
 import { assignExtraVM } from "./assign-1011";
 import { memberWorkTypeVM, templatesVM } from "./profile-1011";
 import { jobTitle, teamName, teamOf } from "../../shared/people";
@@ -38,6 +39,29 @@ export function enterNext(e: KeyboardEvent<HTMLInputElement>) {
 
 /** A group whose screen is off: never read by the markup (it sits behind show.*), typed as the group. */
 const off = <T,>() => undefined as unknown as T;
+
+/** v3 T06 · the Team side's Profile: the avatar centred, View as, MANAGE (CRM · Manage) and ME. */
+function profile6(ctx: PanelCtx, house: boolean) {
+  const { me, patch, data } = ctx, boss = me.role === "boss", ar = data.autoReplies;
+  const n = (k: number) => (k ? String(k) : "");
+  const notifs = notifsVM(ctx).notifUnread;
+  return {
+    ini: ini(me.name), name: boss ? "Principal" : me.name,
+    sub: `${boss ? "Principal" : jobTitle(me)} · ${data.can.viewAll ? "everyone" : teamName(teamOf(me.id, data.people)) || "my team"}`,
+    house, exit: () => ctx.exitApp(), viewAs: () => patch({ viewAs: true }),
+    manage: data.can.manage ? [
+      { label: "Member work type", icon: "user-check", open: () => patch({ ftsOpen: true, ftsDraft: null }), n: "", badge: false },
+      { label: "Showrooms", icon: "map-pin", open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
+      { label: "Cold lead templates", icon: "message-square-text", open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
+      { label: "Ads Performance", icon: "arrow-up-right", open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
+    ] : [],
+    me: [
+      { label: "Notifications", icon: "bell", open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
+      // Auto-reply is each person's own, kept on Mine's Profile; whoever also sells opens it there.
+      ...(ctx.toMyCrm ? [{ label: "Auto-reply", icon: "bot", open: () => ctx.toMyCrm?.("profile", "auto"), n: ar.welcome.on || ar.after.on || ar.kws.some(k => k.on) ? "On" : "Off", badge: false }] : []),
+    ],
+  };
+}
 
 /** v3 T01 · Insight's head, on both of its sides. */
 function insightHead(ctx: PanelCtx, house: boolean, ads: boolean) {
@@ -86,6 +110,8 @@ export function panelAppVM(ctx: PanelCtx) {
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
     th: insightHead(ctx, !!bl.showBell, ovAds),
+    // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
+    pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

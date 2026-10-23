@@ -246,6 +246,52 @@ export function Phone4aRoomRemarks({ text }: { text: string }) {
   );
 }
 
+type ProfRow = { label: string; icon: string; open: () => void; n: string; badge: boolean };
+/** v3 T06 · the Team side's Profile: the house top-right, the avatar centred with its name and line, View as a team member
+ * (the dark card), then MANAGE and ME as white cards of rows — each a solid rust tile, a count or state, a chevron. */
+export function Phone4aProfileTeam({ p }: { p: { ini: string; name: string; sub: string; house: boolean; exit: () => void; viewAs: () => void; manage: ProfRow[]; me: ProfRow[] } }) {
+  const Group = ({ title, rows }: { title: string; rows: ProfRow[] }) => rows.length ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <span style={{ padding: "0 6px", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{title}</span>
+      <div style={{ borderRadius: "16px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", overflow: "hidden" }}>
+        {rows.map((r, i) => (
+          <button key={r.label} type="button" onClick={r.open} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "12px 16px", boxSizing: "border-box", borderTop: i ? "1px solid var(--crm-rule-soft)" : 0, textAlign: "left" }}>
+            <span style={{ flex: "none", width: "34px", height: "34px", borderRadius: "10px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }}><Ic name={r.icon} size={17} /></span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>{r.label}</span>
+            {r.n && (r.badge
+              ? <span style={{ minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "11px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", fontSize: fs(12), fontWeight: 600 }}>{r.n}</span>
+              : <span style={{ fontSize: fs(14), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{r.n}</span>)}
+            <span style={{ display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+  return (
+    <main data-prof-glow="1" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px",
+      background: "linear-gradient(180deg, var(--crm-sand) 0%, var(--crm-sel) 18%, #fff 42%)" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", minHeight: "40px" }}>
+        {p.house && <button type="button" onClick={p.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.7)", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", marginTop: "-6px" }}>
+        <span style={{ width: "92px", height: "92px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", border: "4px solid #fff", boxShadow: "0 4px 14px rgba(42,22,12,.12)", fontFamily: TIGHT, fontSize: fs(32), fontWeight: 500 }}>{p.ini}</span>
+        <h1 style={{ margin: "6px 0 0", fontFamily: TIGHT, fontSize: fs(22), fontWeight: 500, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>{p.name}</h1>
+        <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{p.sub}</span>
+      </div>
+      <button type="button" onClick={p.viewAs} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", textAlign: "left" }}>
+        <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.12)", color: "var(--crm-peach)" }}><Ic name="users" size={17} /></span>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span style={{ fontSize: fs(15), fontWeight: 600 }}>View as a team member</span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-peach-soft)" }}>Open anyone's CRM · reply and book for them</span>
+        </span>
+        <span style={{ display: "flex", color: "var(--crm-peach-soft)" }}><Ic name="chevron-right" size={15} /></span>
+      </button>
+      <Group title="Manage" rows={p.manage} />
+      <Group title="Me" rows={p.me} />
+    </main>
+  );
+}
+
 /** M11 · Mine's Insight: Month / Week / Day / Range, the rust hero, the counts, Avg. reply time and Leads by status. */
 export function Phone4aInsightMine({ v }: { v: { p4: {
   periods: { label: string; on: boolean; pick: () => void }[]; range: string;

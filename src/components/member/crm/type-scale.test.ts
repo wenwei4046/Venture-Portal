@@ -73,12 +73,7 @@ describe("the CRM's type scale", () => {
       value: sizeOf("sales/SalesProfile.tsx", "{v.meRankX}"), h2: sizeOf("sales/SalesProfile.tsx", "Your workspace"),
       row: sizeOf("sales/SalesProfile.tsx", "Notifications"),
     }).toEqual(want);
-    expect({
-      avatar: sizeOf("panel/PanelApp.tsx", "{v.pf.meIni}"), name: sizeOf("panel/PanelApp.tsx", "{v.pf.meName}"),
-      sub: sizeOf("panel/PanelApp.tsx", "HOUZS Venture · CRM"), label: sizeOf("panel/PanelApp.tsx", "Access"),
-      value: sizeOf("panel/PanelApp.tsx", "{v.pf.meAccess}"), h2: sizeOf("panel/PanelApp.tsx", "Your workspace"),
-      row: sizeOf("panel/PanelApp.tsx", "Showrooms"),
-    }).toEqual(want);
+    // Team's Profile is the v3 prototype's since 2026-10-23 (Phone4aProfileTeam), not the app's.
   });
 
   it("scales the CRM's own stylesheet too", () => {
