@@ -14,7 +14,7 @@ vi.mock("@/lib/it-requests/upload", () => ({
   removeItUpload: bucket.remove,
 }));
 vi.mock("@/components/it-requests/ImageAnnotator", () => ({
-  default: ({ onSave, onClose }: { onSave: (file: File) => void; onClose: () => void }) => <div role="dialog" aria-label="Annotate screenshot">
+  default: ({ src, onSave, onClose }: { src: string; onSave: (file: File) => void; onClose: () => void }) => <div role="dialog" aria-label="Annotate screenshot" data-src={src}>
     <button onClick={() => onSave(new File(["marked"], "shot-marked.png", { type: "image/png" }))}>Save marked copy</button>
     <button onClick={onClose}>Cancel annotation</button>
   </div>,
@@ -47,7 +47,12 @@ describe("screenshot annotation in the Revenue thread", () => {
     const sign = vi.fn(async () => ({ ok: true as const, data: { f1: "https://example.invalid/signed-shot" } }));
     render(<ItRequestSheet open request={request({ mine: false, files: [file({})] })} canEdit readOnly={false}
       onNote={onNote} onClose={vi.fn()} sign={sign} upload={upload} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Annotate shot.png" }));
+    const annotate = await screen.findByRole("button", { name: "Annotate shot.png" });
+    // The preview's link may have run out while the sheet stayed open: a fresh one is made at the press (2026-10-24).
+    sign.mockResolvedValueOnce({ ok: true as const, data: { f1: "https://example.invalid/signed-at-the-press" } });
+    fireEvent.click(annotate);
+    expect(await screen.findByRole("dialog", { name: "Annotate screenshot" })).toHaveAttribute("data-src", "https://example.invalid/signed-at-the-press");
+    expect(sign).toHaveBeenLastCalledWith(["f1"]);
     fireEvent.click(screen.getByRole("button", { name: "Save marked copy" }));
     await waitFor(() => expect(upload).toHaveBeenCalledOnce());
     expect(onNote).not.toHaveBeenCalled();

@@ -103,11 +103,12 @@ export function FiledFiles({ files, onAnnotate, onOpen, active = null, disabled 
     const problem = await openInNewTab(file.id)
     if (problem) setError(problem)
   }
+  // A link made at the press: the shown one may have run out (ten minutes) while the request stayed open.
   const annotate = async (file: ItFile) => {
     if (!onAnnotate || disabled) return
     setError('')
     try {
-      const result = shownUrls[file.id] ? { ok: true as const, data: shownUrls } : await signItFiles([file.id])
+      const result = await signItFiles([file.id])
       if (result.ok && result.data[file.id]) onAnnotate(result.data[file.id], file.name)
       else setError('The picture could not be opened. Please try again.')
     } catch {
