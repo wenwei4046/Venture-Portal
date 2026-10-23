@@ -42,24 +42,22 @@ const off = <T,>() => undefined as unknown as T;
 
 /** v3 T06 · the Team side's Profile: the avatar centred, View as, MANAGE (CRM · Manage) and ME. */
 function profile6(ctx: PanelCtx, house: boolean) {
-  const { me, patch, data } = ctx, boss = me.role === "boss", ar = data.autoReplies;
+  const { me, patch, data } = ctx, boss = me.role === "boss";
   const n = (k: number) => (k ? String(k) : "");
   const notifs = notifsVM(ctx).notifUnread;
   return {
     ini: ini(me.name), name: boss ? "Principal" : me.name,
     sub: `${boss ? "Principal" : jobTitle(me)} · ${data.can.viewAll ? "everyone" : teamName(teamOf(me.id, data.people)) || "my team"}`,
     house, exit: () => ctx.exitApp(), viewAs: () => patch({ viewAs: true }),
-    manage: data.can.manage ? [
-      { label: "Member work type", icon: "user-check", open: () => patch({ ftsOpen: true, ftsDraft: null }), n: "", badge: false },
+    // ME first, then MANAGE; no Auto-reply on the Team side (the owner, 2026-10-23: "principal 在team的時候不會有auto reply
+    // 就不用；然後me 和manage 調換，me在上面"). Member work type lives on Assignment alone ("Member work type 只需要在assignment").
+    groups: [{ title: "Me", rows: [
+      { label: "Notifications", icon: "bell", open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
+    ] }, { title: "Manage", rows: data.can.manage ? [
       { label: "Showrooms", icon: "map-pin", open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
       { label: "Cold lead templates", icon: "message-square-text", open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
       { label: "Ads Performance", icon: "arrow-up-right", open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
-    ] : [],
-    me: [
-      { label: "Notifications", icon: "bell", open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
-      // Auto-reply is each person's own, kept on Mine's Profile; whoever also sells opens it there.
-      ...(ctx.toMyCrm ? [{ label: "Auto-reply", icon: "bot", open: () => ctx.toMyCrm?.("profile", "auto"), n: ar.welcome.on || ar.after.on || ar.kws.some(k => k.on) ? "On" : "Off", badge: false }] : []),
-    ],
+    ] : [] }],
   };
 }
 

@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfileTeam, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -873,9 +873,9 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           </>)}
           {!!(v.asx.onAds) && (<>
             {!!(v.as.notTL) && (<>
-              <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
                 
-                <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", margin: "-2px 0 2px" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>
+                <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div data-drag-scroll="1" style={{ display: "flex", gap: "12px", margin: "-2px -20px 0", padding: "0 20px", overflowX: "auto", scrollbarWidth: "none", whiteSpace: "nowrap" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>
                 {!!(v.asx.heldAny) && (<>
                   <div onClick={v.asx.openHeld} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderRadius: "14px", background: "var(--crm-cream)", border: "1px solid var(--crm-tint-attention)", cursor: "pointer" }} className={H.hov12}>
                     <svg style={{ flex: "none", marginTop: "1px", color: "var(--crm-oxblood)" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -898,9 +898,9 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </section>
             </>)}
             {!!(v.as.isTL) && (<>
-              <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
                 
-                <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", margin: "-2px 0 2px" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>
+                <div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "calc(13.04px * var(--rv-type, 1))" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "calc(14.13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div data-drag-scroll="1" style={{ display: "flex", gap: "12px", margin: "-2px -20px 0", padding: "0 20px", overflowX: "auto", scrollbarWidth: "none", whiteSpace: "nowrap" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>
                 {(v.as.tlAds).map((a, a_i) => (<Fragment key={a_i}>
                   <div style={{ padding: "14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)", display: "flex", flexDirection: "column", gap: "10px" }}>
                     <span style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
@@ -1462,7 +1462,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
-        {!!(v.pf6) && (<Phone4aProfileTeam p={v.pf6} />)}
+        {!!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}
       </>)}
     </>)}
     {!!(v.rm.rmDelOpen) && (<>
@@ -2117,13 +2117,13 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         <div style={{ flex: "1", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "4px 20px 32px", display: "flex", flexDirection: "column", gap: "14px" }}>
           {(v.fts.groups).map((g, g_i) => (<Fragment key={g_i}>
             <div style={{ flex: "none", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+              <div onClick={g.fold} role="button" aria-expanded={g.open} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: g.headRule, cursor: "pointer" }}>
                 <span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                 </span>
-                <strong style={{ flex: "1", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}>{g.name}</strong>
-                <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{g.count}</small>
+                <strong style={{ flex: "1", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)" }}>{g.name}</strong>
+                <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{g.count}</small><span style={{ display: "flex", color: "var(--crm-faint)", transform: `rotate(${g.chev})`, transition: "transform 160ms" }}><Ic name="chevron-down" size={15} /></span>
               </div>
-              {(g.people).map((p, p_i) => (<Fragment key={p_i}>
+              {(g.open ? g.people : []).map((p, p_i) => (<Fragment key={p_i}>
                 <div onClick={p.toggle} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderTop: p.rule, cursor: "pointer" }}>
                   <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650" }}>{p.ini}</span>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
 
 // v3 T06 (the owner, 2026-10-23: "我的profile 應該長這樣才對"): Team's Profile — the avatar centred, View as, MANAGE
-// (Member work type, Showrooms, Cold lead templates, Ads Performance) and ME (Notifications, Auto-reply, which is Mine's).
+// and ME — ME first, no Auto-reply, Member work type on Assignment alone (the owner, the same night).
 vi.mock("@/app/(member)/member/crm-actions", () => ({}));
 class NoResize { observe() {} unobserve() {} disconnect() {} }
 beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
@@ -21,15 +21,13 @@ describe("Team's Profile (v3)", () => {
   it("shows MANAGE and ME, and each row opens its page", async () => {
     await openProfile();
     expect(screen.getByRole("heading", { name: "Principal" })).toBeInTheDocument();
-    for (const l of ["View as a team member", "Manage", "Member work type", "Showrooms", "Cold lead templates", "Ads Performance", "Me", "Notifications", "Auto-reply"])
+    for (const l of ["View as a team member", "Me", "Notifications", "Manage", "Showrooms", "Cold lead templates", "Ads Performance"])
       expect(screen.getByText(l, { exact: true })).toBeInTheDocument();
-    await tap(screen.getByRole("button", { name: /Member work type/ }));
-    expect(screen.getAllByText("Member work type").length).toBeGreaterThan(1);
+    // Member work type is Assignment's alone; no Auto-reply on the Team side; ME above MANAGE.
+    expect(screen.queryByText("Member work type")).toBeNull();
+    expect(screen.queryByText("Auto-reply")).toBeNull();
+    const page = document.body.textContent ?? "";
+    expect(page.indexOf("Notifications")).toBeLessThan(page.indexOf("Showrooms"));
   });
 
-  it("Auto-reply opens Mine's Auto-reply", async () => {
-    await openProfile();
-    await tap(screen.getByRole("button", { name: /Auto-reply/ }));
-    expect(screen.getByRole("heading", { name: "Auto-reply" })).toBeInTheDocument();
-  });
 });

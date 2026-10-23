@@ -88,10 +88,13 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     await open("lkv");
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     expect(swapToTeam()).not.toBeNull();
-    for (const page of ["Contacts", "Calendar", "Insight", "Profile"]) {
+    for (const page of ["Contacts", "Calendar", "Insight"]) {
       await go(page);
       noButtons();
     }
+    // v3 M12 (2026-10-23): Mine's Profile has the house top-right, as the prototype.
+    await go("Profile");
+    onlyHouse();
     await tap(screen.getByText("Notifications", { exact: true }));
     expect(screen.getByRole("heading", { name: "Notifications" })).toBeInTheDocument();
     noButtons();

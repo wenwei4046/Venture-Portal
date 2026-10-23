@@ -247,9 +247,10 @@ export function Phone4aRoomRemarks({ text }: { text: string }) {
 }
 
 type ProfRow = { label: string; icon: string; open: () => void; n: string; badge: boolean };
-/** v3 T06 · the Team side's Profile: the house top-right, the avatar centred with its name and line, View as a team member
- * (the dark card), then MANAGE and ME as white cards of rows — each a solid rust tile, a count or state, a chevron. */
-export function Phone4aProfileTeam({ p }: { p: { ini: string; name: string; sub: string; house: boolean; exit: () => void; viewAs: () => void; manage: ProfRow[]; me: ProfRow[] } }) {
+/** v3 T06 / M12 · a Profile as the prototype draws it: the house top-right, the avatar centred with its name and line, on
+ * the Team side View as a team member (the dark card), then groups of rows (MANAGE · ME, or MESSAGES) as white cards —
+ * each row a solid rust tile, a count or state, a chevron. */
+export function Phone4aProfile({ p }: { p: { ini: string; name: string; sub: string; house: boolean; exit: () => void; viewAs?: () => void; groups: { title: string; rows: ProfRow[] }[]; flush?: boolean } }) {
   const Group = ({ title, rows }: { title: string; rows: ProfRow[] }) => rows.length ? (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <span style={{ padding: "0 6px", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{title}</span>
@@ -268,7 +269,8 @@ export function Phone4aProfileTeam({ p }: { p: { ini: string; name: string; sub:
     </div>
   ) : null;
   return (
-    <main data-prof-glow="1" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px",
+    // flush: drawn inside a page that pads itself (Mine's Profile) — it takes that padding back.
+    <main data-prof-glow="1" style={{ flex: "1 1 auto", minHeight: 0, margin: p.flush ? "-14px -20px -24px" : 0, overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px",
       background: "linear-gradient(180deg, var(--crm-sand) 0%, var(--crm-sel) 18%, #fff 42%)" }}>
       <div style={{ display: "flex", justifyContent: "flex-end", minHeight: "40px" }}>
         {p.house && <button type="button" onClick={p.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.7)", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
@@ -278,16 +280,15 @@ export function Phone4aProfileTeam({ p }: { p: { ini: string; name: string; sub:
         <h1 style={{ margin: "6px 0 0", fontFamily: TIGHT, fontSize: fs(22), fontWeight: 500, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>{p.name}</h1>
         <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{p.sub}</span>
       </div>
-      <button type="button" onClick={p.viewAs} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", textAlign: "left" }}>
+      {p.viewAs && <button type="button" onClick={p.viewAs} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", textAlign: "left" }}>
         <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.12)", color: "var(--crm-peach)" }}><Ic name="users" size={17} /></span>
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
           <span style={{ fontSize: fs(15), fontWeight: 600 }}>View as a team member</span>
           <span style={{ fontSize: fs(12), color: "var(--crm-peach-soft)" }}>Open anyone's CRM · reply and book for them</span>
         </span>
         <span style={{ display: "flex", color: "var(--crm-peach-soft)" }}><Ic name="chevron-right" size={15} /></span>
-      </button>
-      <Group title="Manage" rows={p.manage} />
-      <Group title="Me" rows={p.me} />
+      </button>}
+      {p.groups.map(g => <Group key={g.title} title={g.title} rows={g.rows} />)}
     </main>
   );
 }
@@ -439,25 +440,22 @@ export function Phone4aCalLists({ v }: { v: {
 /** T03 · an ad on Assignment: its channel, name and headline, the leads, the split bar in team colours, a chevron (the card opens
  * its split) and, unset, "Not set up" (v3). */
 export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: boolean; leads: number; setUp: boolean; held?: boolean; heldTxt?: string; bar: { w: string; c: string; op?: number }[]; edit: () => void } }) {
+  // Compact (the owner, 2026-10-23: "下方的廣告也是有沒有可能小一點，如果同時打很多廣告就很亂"): one line — channel, name,
+  // leads, chevron — and a thin split bar under it; the headline is the title tooltip.
   return (
-    <div onClick={a.edit} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 14px", borderRadius: "14px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-        <span style={{ display: "flex", paddingTop: "2px", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={16} /></span>
-        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-          {a.head && <span style={{ fontSize: fs(12.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.head}</span>}
-        </span>
-        <span style={{ flex: "none", fontSize: fs(13), color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", paddingTop: "2px" }}>{a.leads} leads</span>
+    <div onClick={a.edit} title={a.head || undefined} style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "9px 12px", borderRadius: "12px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ flex: "none", display: "flex", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={14} /></span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+        {a.held && <span style={{ flex: "none", padding: "2px 7px", borderRadius: "9px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(10.5), fontWeight: 600 }}>{a.heldTxt}</span>}
+        {/* v3 T03: the whole card opens the split; an unset ad says "Not set up". */}
+        {a.setUp && <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: fs(11), fontWeight: 500, whiteSpace: "nowrap" }}>Not set up</span>}
+        <span style={{ flex: "none", fontSize: fs(12), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{a.leads} leads</span>
+        <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={13} /></span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingLeft: "0" }}>
-        <span style={{ flex: 1, display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden", background: "var(--crm-track)" }}>
-          {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
-        </span>
-        {a.held && <span style={{ flex: "none", padding: "3px 8px", borderRadius: "10px", background: "var(--crm-oxblood)", color: "#fff", fontSize: fs(11), fontWeight: 600 }}>{a.heldTxt}</span>}
-        {/* v3 T03: no Edit split / Set up buttons — the whole card opens the split; an unset ad says "Not set up". */}
-        {a.setUp && <span style={{ flex: "none", height: "26px", padding: "0 10px", borderRadius: "13px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: fs(12), fontWeight: 500, whiteSpace: "nowrap" }}>Not set up</span>}
-        <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>
-      </div>
+      <span style={{ display: "flex", gap: "2px", height: "4px", borderRadius: "2px", overflow: "hidden", background: "var(--crm-track)" }}>
+        {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
+      </span>
     </div>
   );
 }
