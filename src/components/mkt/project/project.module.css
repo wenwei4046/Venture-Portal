@@ -140,6 +140,7 @@
 .ghost:hover { background: rgb(var(--mk-surface)); }
 .ghostWide { flex: 1.4; }
 .wait { font-size: .84em; color: rgb(var(--mk-muted)); }
+.waitLate { color: rgb(var(--mk-red)); font-weight: 500; }
 .approved { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .overrideRow { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgb(var(--mk-line-4)); }
 .textBtn { font: inherit; font-size: .86em; font-weight: 500; color: rgb(var(--mk-ink)); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

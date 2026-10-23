@@ -22,12 +22,12 @@ const page = taskFromRow({
   project: { id: 'p1', trackId: 'TSK-CAR-2610-001', kind: 'quick', sub: 'sub', title: 'Price update', status: 'active', owner: RACHEL, cur: 1,
     createdAt: '2026-10-20T01:00:00Z', free: [] },
   stages: [
-    { project: 'p1', idx: 0, name: 'First draft', dept: 'social', owner: MEI, appr: [], mode: 'person', status: 'done', dueOn: '2026-10-21',
+    { project: 'p1', idx: 0, name: 'First draft', dept: 'SOCIAL MEDIA SPECIALIST', owner: MEI, appr: [], mode: 'person', status: 'done', dueOn: '2026-10-21',
       doneAt: '2026-10-21T08:00:00Z', work: { notes: '', links: [] } },
-    { project: 'p1', idx: 1, name: 'Redesign', dept: 'design', owner: SITI, appr: [{ kind: 'person', staff: RACHEL }, { kind: 'pic' }], mode: 'prev',
+    { project: 'p1', idx: 1, name: 'Redesign', dept: 'GRAPHIC DESIGNER', owner: SITI, appr: [{ kind: 'person', staff: RACHEL }, { kind: 'pic' }], mode: 'prev',
       status: 'review', apprIdx: 1, ver: 2, dueOn: '2026-10-24', submittedAt: '2026-10-25T01:30:00Z',
       work: { notes: '', links: [{ url: 'https://canva.com/x', label: 'Draft' }] } },
-    { project: 'p1', idx: 2, name: 'Publish', dept: 'social', owner: MEI, appr: [], mode: 'person', status: 'planned', dueOn: '2026-10-28',
+    { project: 'p1', idx: 2, name: 'Publish', dept: 'SOCIAL MEDIA SPECIALIST', owner: MEI, appr: [], mode: 'person', status: 'planned', dueOn: '2026-10-28',
       work: { notes: '', links: [] } },
   ],
   events: [
@@ -49,15 +49,15 @@ const page = taskFromRow({
 const map = taskMap(page)
 
 describe('the task map', () => {
-  it('lays the road on swim lanes — Approvals on top, then the teams as the stages meet them', () => {
-    expect(map.lanes.map(l => `${l.emoji} ${l.name}`)).toEqual(['🛡️ Approvals', '📣 Social Media', '🎨 Design'])
+  it('lays the road on swim lanes — Approvals on top, then the groups (People titles) as the stages meet them', () => {
+    expect(map.lanes.map(l => `${l.emoji} ${l.name} ${l.tone}`)).toEqual(['🛡️ Approvals appr', '📣 SOCIAL MEDIA SPECIALIST social', '🎨 GRAPHIC DESIGNER design'])
     expect(map.nodes.map(n => `${n.id} ${n.lane}@${n.col} ${n.tone}${n.current ? ' HERE' : ''} · ${n.full} · ${n.person} · ${n.date}${n.tag ? ` · ${n.tag}` : ''} | ${n.status}`)).toEqual([
-      'start social@0 done · Created by Rachel · Rachel · 20 Oct | Done',
-      's0 social@1 done · First draft · Mei · 21 Oct | Done',
-      's1 design@2 done · Redesign · Siti · 25 Oct · returned ×1 | Submitted',
+      'start SOCIAL MEDIA SPECIALIST@0 done · Created by Rachel · Rachel · 20 Oct | Done',
+      's0 SOCIAL MEDIA SPECIALIST@1 done · First draft · Mei · 21 Oct | Done',
+      's1 GRAPHIC DESIGNER@2 done · Redesign · Siti · 25 Oct · returned ×1 | Submitted',
       'g1-0 appr@3 done · Rachel approves Redesign · Rachel · 25 Oct | Done',
       'g1-1 appr@4 red HERE · Kelvin approves Redesign · Kelvin · Since 25 Oct | Waiting for PIC',
-      's2 social@5 draft · Publish · Mei · Due 28 Oct | Planned',
+      's2 SOCIAL MEDIA SPECIALIST@5 draft · Publish · Mei · Due 28 Oct | Planned',
     ])
     expect(map.nodes.filter(n => n.kind === 'gate').map(n => n.icon)).toEqual(['👤', '🔗'])
   })
@@ -98,12 +98,12 @@ describe('the task map', () => {
 
   it('lists the stations along the road', () => {
     expect(mapRows(map).map(r => `${r.no} ${r.icon} ${r.title} · ${r.lane} · ${r.handoff} · ${r.status}`)).toEqual([
-      '01 📣 Created by Rachel · Social Media · Created · Done',
-      '02 📣 First draft · Social Media · 🔒 Assigned · Done',
-      '03 🎨 Redesign · Design · 🔓 Picked by Mei · returned ×1 · Submitted',
+      '01 📣 Created by Rachel · SOCIAL MEDIA SPECIALIST · Created · Done',
+      '02 📣 First draft · SOCIAL MEDIA SPECIALIST · 🔒 Assigned · Done',
+      '03 🎨 Redesign · GRAPHIC DESIGNER · 🔓 Picked by Mei · returned ×1 · Submitted',
       '04 👤 Rachel approves Redesign · Approvals · Internal approver · Done',
       '05 🔗 Kelvin approves Redesign · Approvals · PIC via link · Waiting for PIC',
-      '06 📣 Publish · Social Media · 🔒 Assigned · Planned',
+      '06 📣 Publish · SOCIAL MEDIA SPECIALIST · 🔒 Assigned · Planned',
     ])
   })
 

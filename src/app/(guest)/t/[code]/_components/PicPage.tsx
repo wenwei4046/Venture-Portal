@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
   dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
@@ -40,6 +41,9 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
+  // How long it has waited for them, only once in the browser (the server's clock and the browser's differ).
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => setNow(new Date()), [page])
 
   const top = (
     <header className={s.top}>
@@ -63,7 +67,8 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
   }
 
   const status = picStatus(page.status)
-  const banner = picBanner(page)
+  const overdue = !!now && page.status === 'waiting_pic' && !!page.sentAt && workingHours(page.sentAt, now, new Set()) >= ACCEPT_HOURS
+  const banner = picBanner(page, overdue)
   const answered = picAnswered(page)
   const steps = picTimeline(page)
   const waiting = page.status === 'waiting_pic'

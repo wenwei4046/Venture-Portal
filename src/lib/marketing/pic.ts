@@ -106,12 +106,15 @@ export function picStatus(status: PicStatus): { label: string; tone: Tone } {
   }
 }
 
-/** The banner under the title: why it waits for them, or that nothing does. */
-export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'>): { tone: Tone; title: string; text: string } | null {
+/** The banner under the title: why it waits for them, or that nothing does — red, the handoff's *Overdue — please
+ * review*, once it has waited 4 working hours (2026-10-24 — the user's answer 2). */
+export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'>, overdue = false): { tone: Tone; title: string; text: string } | null {
   if (p.status === 'waiting_pic') {
-    if (p.updated) return { tone: 'waiting', title: 'Updated after your approval — please review again', text: `The team changed ${p.updated.fields || 'the minutes'}.` }
-    if (p.asked) return { tone: 'waiting', title: 'Updated — please review again', text: `You asked: “${p.asked.reason}”` }
-    return { tone: 'waiting', title: 'Waiting for your approval', text: 'The meeting minutes are ready. Please review them below.' }
+    const late = (title: string) => (overdue ? 'Overdue — please review' : title)
+    const tone: Tone = overdue ? 'red' : 'waiting'
+    if (p.updated) return { tone, title: late('Updated after your approval — please review again'), text: `The team changed ${p.updated.fields || 'the minutes'}.` }
+    if (p.asked) return { tone, title: late('Updated — please review again'), text: `You asked: “${p.asked.reason}”` }
+    return { tone, title: late('Waiting for your approval'), text: 'The meeting minutes are ready. Please review them below.' }
   }
   if (p.status === 'approved') return { tone: 'done', title: 'Approved', text: 'Thank you. Nothing else needs your action right now.' }
   return null

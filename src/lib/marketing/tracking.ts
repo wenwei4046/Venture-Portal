@@ -4,15 +4,16 @@
 // flagged). Five counts on top: Ongoing, Needs you (overdue or waiting for an OK), Overdue, At risk, On track.
 //
 // A task's state, the first that holds:
-//   red      its stage's date has passed; or a delivery came back 3 times or more
+//   red      its stage's date has passed; a delivery came back 3 times or more; or its stage has waited 4 working
+//            hours for its owner to Accept (2026-10-24 — the user: "4 个工作小时")
 //   waiting  the stage waits for an approval (a person, or the PIC through the link)
-//   risk     due today; not accepted after a working day; or the stages left need more working days than remain
-//            before the project's own date
+//   risk     due today; or the stages left need more working days than remain before the project's own date
 //   ok       moving as planned
-// Working days are Monday to Friday, less HR's holidays (Attendance › Holidays). Pure.
+// Working days are Monday to Friday, less HR's holidays that Selangor keeps (Attendance › Holidays); working hours
+// those days' 09:00–13:00 and 14:00–18:00, office time (board.ts › workingHours). Pure.
 
 import {
-  addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, weekdayOf, type MktBoard, type MktSub,
+  ACCEPT_HOURS, addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, weekdayOf, workingHours, type MktBoard, type MktSub,
 } from './board'
 
 export type TrackTone = 'red' | 'waiting' | 'risk' | 'ok'
@@ -88,6 +89,9 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
     } else if (returns >= 3) {
       tone = 'red'
       why = `Delivery returned ${plural(returns, 'time')}`
+    } else if (s.status === 'todo' && s.enteredAt && workingHours(s.enteredAt, now, holidays) >= ACCEPT_HOURS) {
+      tone = 'red'
+      why = `Not accepted · ${plural(Math.floor(workingHours(s.enteredAt, now, holidays)), 'working hour')}`
     } else if (appr) {
       tone = 'waiting'
       const wait = waited(s.submittedAt, now)
@@ -97,9 +101,6 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
     } else if (s.dueOn && s.dueOn === today) {
       tone = 'risk'
       why = 'Due today'
-    } else if (s.status === 'todo' && s.enteredAt && today && workingDays(s.enteredAt.slice(0, 10), today, holidays) >= 1) {
-      tone = 'risk'
-      why = `Not accepted · ${waited(s.enteredAt, now)}`
     } else if (p.dueOn && today) {
       const need = stages.filter(x => x.idx >= s.idx && x.status !== 'done').reduce((n, x) => n + x.sla, 0)
       const left = workingDays(today, p.dueOn, holidays)

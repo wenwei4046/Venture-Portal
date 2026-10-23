@@ -34,7 +34,7 @@
 .wbBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wbNameRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wbName { font-size: 1.04em; font-weight: 600; }
-.wbTag { font-size: .75em; padding: 2px 7px; border-radius: 5px; }
+.wbTag { font-size: .75em; padding: 2px 7px; border-radius: 5px; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wbForm { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); }
 .wbFacts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .88em; color: rgb(var(--mk-text-2)); align-items: center; }
 .wbFact { display: flex; align-items: center; gap: 6px; }

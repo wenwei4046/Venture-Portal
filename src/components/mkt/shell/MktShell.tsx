@@ -9,6 +9,7 @@ import { canDo } from '@/lib/permission-actions'
 import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE } from '@/lib/marketing-view'
 import { densityOf, lookToCookie, LOOK_SIZES, type Look } from '@/lib/marketing/look'
 import { mktCrumb, mktNavActive, mktNavRows, type MktNavKey } from '@/lib/marketing/nav'
+import { groupTone, toneBg } from '@/lib/marketing/groups'
 import { initialOf } from '@/lib/marketing/shell'
 import { ToastHost } from '@/components/hrv/toast'
 import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
@@ -29,15 +30,6 @@ import s from './shell.module.css'
 // so the server draws it as chosen; the sidebar's fold the same.
 
 type Panel = 'none' | 'notifications' | 'appearance' | 'menu'
-
-const TEAM_BG: Record<string, string> = {
-  manager: 'var(--mk-team-manager-bg)',
-  content: 'var(--mk-team-content-bg)',
-  social: 'var(--mk-team-social-bg)',
-  design: 'var(--mk-team-design-bg)',
-  ads: 'var(--mk-team-ads-bg)',
-  brand: 'var(--mk-team-brand-bg)',
-}
 
 export default function MktShell({
   user,
@@ -90,7 +82,7 @@ export default function MktShell({
   const name = me?.full || user.name || 'Marketing'
   const avatar = {
     letter: initialOf(me?.first || user.name),
-    bg: (me?.team && TEAM_BG[me.team]) || 'var(--mk-team-manager-bg)',
+    bg: me ? toneBg(groupTone(me.title)) : toneBg('manager'),
     title: me ? [me.first || me.full, me.role || me.title].filter(Boolean).join(' · ') : user.canSwitchView ? `${name} · Marketing view` : name,
   }
 

@@ -2,30 +2,32 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, type MktBoard, type MktDept, type MktSub } from '@/lib/marketing/board'
+import { addDays, type MktBoard, type MktSub } from '@/lib/marketing/board'
 import { addMonths, calendarEvents, monthCells, monthLabel, monthOf, weekCells, weekLabel, type CalEvent, type CalTone } from '@/lib/marketing/calendar'
 import {
   agoLabel, feedLine, filterCount, keyDates, NO_FILTER, passesSub, SUB_STATUSES, SUB_TYPES, subProjects, subStats, timelineBars,
   timelineHeads, timelineLeft, timelineTitle, timelineWindow, type SubFeedEvent, type SubFilter, type SubType,
 } from '@/lib/marketing/subsidiary'
 import { trailTime } from '@/lib/marketing/task'
-import { DEPT_LABEL } from '@/lib/marketing/tasks'
+import { groupLabel, groupTone, rosterGroups, sameGroup, type MktTone } from '@/lib/marketing/groups'
 import s from './subsidiary.module.css'
 
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PIC; where its work stands (five cards);
-// its dates by Month, Week or Timeline — coloured by team, red once passed undone, done faded — with HR's holidays as
-// ⚑ key dates and the handoff's filter (type, team, status); ⚡ Recent activity from its projects' trails; and its
+// its dates by Month, Week or Timeline — coloured by group (a People title), red once passed undone, done faded — with
+// HR's holidays as ⚑ key dates and the handoff's filter (type, group, status); ⚡ Recent activity from its projects' trails; and its
 // projects with how far each has come. Every item opens its project.
 
-const TEAM: Record<MktDept, string> = { content: s.team_content, social: s.team_social, design: s.team_design, ads: s.team_ads, brand: s.team_brand }
+const TONE_CLASS: Record<MktTone, string> = {
+  content: s.team_content, social: s.team_social, design: s.team_design, ads: s.team_ads, brand: s.team_brand, manager: s.team_manager, none: s.team_none,
+}
+const TEAM = (g: string) => TONE_CLASS[groupTone(g)]
 const TONE: Record<string, string> = { red: s.red, waiting: s.waiting, done: s.done, draft: s.draft }
-const TEAMS = Object.keys(DEPT_LABEL) as MktDept[]
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const KIND_EMOJI = { product: '📦', quick: '⚡', recurring: '🔁' } as const
 type View = 'month' | 'week' | 'timeline'
 
 const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encodeURIComponent(trackId)}` : '/marketing/projects')
-const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM[e.team] : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
+const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM(e.team) : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
 const evEmoji = (e: CalEvent) => (e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
 
 export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; sub: MktSub; feed: SubFeedEvent[] }) {
@@ -47,7 +49,9 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
   const flagsOn = (day: string) => flags.filter(f => f.day === day)
   const tw = timelineWindow(board.today)
   const heads = timelineHeads(tw)
-  const bars = timelineBars(board, rows.filter(r => !filter.teams.length || (!!r.team && filter.teams.includes(r.team))), tw)
+  const bars = timelineBars(board, rows.filter(r => !filter.teams.length || filter.teams.some(g => sameGroup(g, r.team))), tw)
+  // The groups to filter by: the roster's titles (2026-10-24 — the user: each title is a group).
+  const groups = rosterGroups(board.team)
   const n = filterCount(filter)
 
   const toggle = <K extends keyof SubFilter>(k: K, v: SubFilter[K][number]) =>
@@ -126,11 +130,11 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                   </div>
                 </div>
                 <div>
-                  <div className={s.popHead}>Department</div>
+                  <div className={s.popHead}>Group</div>
                   <div className={s.chips}>
-                    {TEAMS.map(t => (
+                    {groups.map(t => (
                       <button key={t} type="button" aria-pressed={filter.teams.includes(t)} className={`${s.chip}${filter.teams.includes(t) ? ` ${s.chipOn}` : ''}`} onClick={() => toggle('teams', t)}>
-                        <span className={`${s.chipDot} ${TEAM[t]}`} aria-hidden="true" />{DEPT_LABEL[t]}
+                        <span className={`${s.chipDot} ${TEAM(t)}`} aria-hidden="true" />{groupLabel(t)}
                       </button>
                     ))}
                   </div>
@@ -210,7 +214,7 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                   <div key={b.id} className={s.tlRow}>
                     <div className={s.tlLabel}><span className={s.tlLabelText}>{b.title}</span></div>
                     <div className={s.tlTrack}>
-                      <Link href={href(b.trackId)} className={`${s.tlBar} ${b.tone === 'red' ? s.red : b.team ? TEAM[b.team] : s.draft}${b.tone === 'done' ? ` ${s.faded}` : ''}`}
+                      <Link href={href(b.trackId)} className={`${s.tlBar} ${b.tone === 'red' ? s.red : b.team ? TEAM(b.team) : s.draft}${b.tone === 'done' ? ` ${s.faded}` : ''}`}
                         style={{ left: `${b.left}%`, width: `${b.width}%` }} title={`${b.title} · ${b.range}`}>
                         {b.label}
                       </Link>
@@ -266,7 +270,7 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
                 <span className={s.tdProject} role="cell">
                   <span aria-hidden="true">{KIND_EMOJI[r.kind]}</span>
                   <span className={s.tdTitle}>{r.title}</span>
-                  {r.team ? <span className={`${s.teamChip} ${TEAM[r.team]}`}>{DEPT_LABEL[r.team]}</span> : null}
+                  {r.team ? <span className={`${s.teamChip} ${TEAM(r.team)}`} title={r.team}>{groupLabel(r.team)}</span> : null}
                 </span>
                 <span role="cell"><span className={`${s.pill} ${TONE[r.tone]}`}><span className={s.pillDot} aria-hidden="true" />{r.label}</span></span>
                 <span className={s.tdProgress} role="cell">

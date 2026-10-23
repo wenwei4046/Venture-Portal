@@ -7243,13 +7243,16 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-tone-mist: 230 237 241;
   --mk-tone-peach: 249 231 216;
   --mk-tone-cream: 246 238 222;
-  /* Teams (Content · Social Media · Design · Ads · Brand): a chip's ground and words. */
+  /* A group's colour — a chip's ground and words (since 2026-10-24 a group is a People title, its tone read from its
+     words: lib/marketing/groups.ts › groupTone; the names below are the tones, not teams). */
   --mk-team-content-bg: oklch(0.94 0.04 295); --mk-team-content: oklch(0.40 0.12 295); --mk-team-content-bar: oklch(0.87 0.07 295);
   --mk-team-social-bg: oklch(0.94 0.04 235); --mk-team-social: oklch(0.40 0.10 235); --mk-team-social-bar: oklch(0.88 0.06 235);
   --mk-team-design-bg: oklch(0.94 0.04 350); --mk-team-design: oklch(0.43 0.13 350); --mk-team-design-bar: oklch(0.88 0.07 350);
   --mk-team-ads-bg: oklch(0.94 0.04 270); --mk-team-ads: oklch(0.40 0.12 270); --mk-team-ads-bar: oklch(0.86 0.07 270);
   --mk-team-brand-bg: oklch(0.94 0.04 195); --mk-team-brand: oklch(0.38 0.08 195); --mk-team-brand-bar: oklch(0.86 0.06 195);
   --mk-team-manager-bg: oklch(0.94 0.03 60); --mk-team-manager: oklch(0.42 0.06 60); --mk-team-manager-bar: oklch(0.88 0.04 60);
+  /* A group whose title says nothing the tones know (2026-10-24: groups are People's titles) — a neutral one. */
+  --mk-team-none-bg: oklch(0.95 0.005 60); --mk-team-none: oklch(0.45 0.01 60); --mk-team-none-bar: oklch(0.88 0.008 60);
   --mk-meet-bg: oklch(0.96 0.025 235); --mk-meet-line: oklch(0.88 0.04 235); --mk-meet: oklch(0.42 0.10 235); --mk-meet-dot: oklch(0.60 0.12 235);
   /* The Library's six categories (`Library.dc.html`). */
   --mk-cat-brand: oklch(0.55 0.12 300); --mk-cat-product: oklch(0.50 0.08 175); --mk-cat-photo: oklch(0.58 0.12 50);

@@ -5,11 +5,12 @@
 // Submits it (`review`, through its approvers in turn — a person in the portal or the PIC through the link) or
 // Completes it; an approver Approves or Requests changes (`changes`, back to the owner).
 //
-// Red is what is late: a stage, subtask or approval past its due date, and changes asked for. Pure: the page draws
-// what this returns.
+// Red is what is late: a stage, subtask or approval past its due date, changes asked for, and a stage not accepted
+// after 4 working hours (2026-10-24 — the user's answer 2). Pure: the page draws what this returns.
 
 import {
-  addDays, approverNow, daysBetween, indexBoard, runsStages, shortDay, weekdayOf, type MktBoard, type MktDept, type MktStage,
+  ACCEPT_HOURS, addDays, approverNow, daysBetween, indexBoard, runsStages, shortDay, weekdayOf, workingHours, type MktBoard, type MktGroup,
+  type MktStage,
   type MktSub,
 } from './board'
 
@@ -34,7 +35,8 @@ export interface PlateCard {
   action: CardAction
   /** Just put on the viewer's plate: a stage to Accept. */
   isNew: boolean
-  dept: MktDept
+  /** The stage's group — a People title. */
+  dept: MktGroup
 }
 
 export interface PlateColumn {
@@ -67,7 +69,7 @@ function inOrder(cards: PlateCard[]): PlateCard[] {
     .map(x => x.c)
 }
 
-export function plateColumns(board: MktBoard, me: string | null = board.me): PlateColumn[] {
+export function plateColumns(board: MktBoard, me: string | null = board.me, now: Date = new Date()): PlateColumn[] {
   const turn: PlateCard[] = []
   const delegated: PlateCard[] = []
   const waiting: PlateCard[] = []
@@ -75,6 +77,7 @@ export function plateColumns(board: MktBoard, me: string | null = board.me): Pla
     const ix = indexBoard(board)
     const first = (id: string | null | undefined) => ix.person(id)?.first || ix.person(id)?.full || 'someone'
     const today = board.today
+    const holidays = new Set(board.holidays.map(h => h.day))
     for (const p of board.projects) {
       if (!runsStages(p)) continue
       const stages = ix.stagesOf(p.id)
@@ -99,7 +102,10 @@ export function plateColumns(board: MktBoard, me: string | null = board.me): Pla
       const appr = approverNow(s)
 
       if (owner && s.status === 'todo') {
-        turn.push(base({ key: `${p.id}:${s.idx}:todo`, tone: overdue ? 'red' : 'waiting', label: overdue ?? 'New · just assigned', action: 'accept', isNew: !overdue }))
+        // Not accepted after 4 working hours: red, as a date passed is.
+        const slow = !overdue && !!s.enteredAt && workingHours(s.enteredAt, now, holidays) >= ACCEPT_HOURS
+        const label = overdue ?? (slow ? 'Not accepted · 4+ working hours' : 'New · just assigned')
+        turn.push(base({ key: `${p.id}:${s.idx}:todo`, tone: overdue || slow ? 'red' : 'waiting', label, action: 'accept', isNew: !overdue && !slow }))
       } else if (owner && s.status === 'accepted') {
         turn.push(base({ key: `${p.id}:${s.idx}:accepted`, tone: overdue ? 'red' : 'waiting', label: overdue ?? 'In progress', action: 'open' }))
       } else if (owner && s.status === 'changes') {

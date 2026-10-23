@@ -51,7 +51,7 @@
 .chipOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
 .chipDot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 
-/* Team colours: an item on its team's ground, a bar on its team's bar colour, a dot of it. */
+/* A group's colours (its People title's tone — lib/marketing/groups.ts): an item on its ground, a bar on its bar colour, a dot of it. */
 .team_content { background: var(--mk-team-content-bg); color: var(--mk-team-content); }
 .team_social { background: var(--mk-team-social-bg); color: var(--mk-team-social); }
 .team_design { background: var(--mk-team-design-bg); color: var(--mk-team-design); }
@@ -62,6 +62,10 @@
 .chipDot.team_design, .tlBar.team_design { background: var(--mk-team-design-bar); }
 .chipDot.team_ads, .tlBar.team_ads { background: var(--mk-team-ads-bar); }
 .chipDot.team_brand, .tlBar.team_brand { background: var(--mk-team-brand-bar); }
+.team_manager { background: var(--mk-team-manager-bg); color: var(--mk-team-manager); }
+.team_none { background: var(--mk-team-none-bg); color: var(--mk-team-none); }
+.chipDot.team_manager, .tlBar.team_manager { background: var(--mk-team-manager-bar); }
+.chipDot.team_none, .tlBar.team_none { background: var(--mk-team-none-bar); }
 .red { background: rgb(var(--mk-red-bg)); color: rgb(var(--mk-red)); border-color: rgb(var(--mk-red-line)); }
 .waiting { background: rgb(var(--mk-wait-bg)); color: rgb(var(--mk-wait)); border-color: rgb(var(--mk-wait-line)); }
 .done { background: rgb(var(--mk-done-bg)); color: rgb(var(--mk-done)); border-color: rgb(var(--mk-done-line)); }
@@ -161,7 +165,7 @@ a.tr:hover { background: rgb(var(--mk-surface)); }
 .trRed { background: rgb(var(--mk-red-soft)); }
 .tdProject { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .tdTitle { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.teamChip { flex: none; font-size: .8em; padding: 1px 7px; border-radius: 5px; }
+.teamChip { flex: none; font-size: .8em; padding: 1px 7px; border-radius: 5px; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: .86em; font-weight: 500; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .pillDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .tdProgress { display: flex; align-items: center; gap: 10px; }
