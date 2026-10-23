@@ -19,6 +19,8 @@ async function openSheet() {
   await tap(screen.getAllByText("Assignment", { exact: true }).find(e => e.closest("nav"))!);
   await tap(screen.getByText("Akemi Mattress · October Fair"));
   await tap(screen.getByText("By team", { exact: true }));
+  // Every team is folded at first (2026-10-24): open Team Kelvin.
+  await tap(screen.getByText("Team Kelvin", { exact: true }));
   await tap(screen.getAllByRole("button", { name: "Adjust split" })[0]);
   return screen.getByRole("dialog", { name: /^Adjust split/ });
 }

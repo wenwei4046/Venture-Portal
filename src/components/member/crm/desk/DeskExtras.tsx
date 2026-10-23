@@ -585,10 +585,12 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
  */
 const ACT_GRID = "minmax(0, 1.8fr) minmax(0, 1.3fr) 120px 130px 80px";
 export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, number> } }) {
-  const [shut, setShut] = useState<Record<string, boolean>>({});
+  // Folded at first (the owner, 2026-10-24: "member work type & active 默認收起"); `opened` keeps the opened, a search opens all.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState(""), [f, setF] = useState<"all" | "active" | "locked">("all");
   const all = v.groups.flatMap(g => g.people), nOn = all.filter(p => p.active).length;
   const ql = q.trim().toLowerCase();
+  const shut = (name: string) => !opened[name] && !ql;
   const groups = v.groups.map(g => ({ ...g, rows: g.people.filter(p => (f === "all" || (f === "active") === p.active) && (!ql || p.name.toLowerCase().includes(ql) || g.name.toLowerCase().includes(ql))) })).filter(g => g.rows.length);
   return (
     <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", marginTop: "1px", marginBottom: "-12px", boxSizing: "border-box" }}>
@@ -613,14 +615,14 @@ export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, numbe
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
           {groups.map(g => (
             <Fragment key={g.name}>
-              <button type="button" onClick={() => setShut(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut[g.name]} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 16px",
+              <button type="button" onClick={() => setOpened(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut(g.name)} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 16px",
                 background: "var(--crm-hover)", borderTop: "1px solid var(--crm-nav-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
-                <span style={{ display: "flex", color: "var(--crm-muted)", transform: shut[g.name] ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
+                <span style={{ display: "flex", color: "var(--crm-muted)", transform: shut(g.name) ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.color }} />
                 <span style={{ color: "var(--crm-ink)" }}>{g.name}</span>
                 <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{g.count}</span>
               </button>
-              {!shut[g.name] && g.rows.map(p => {
+              {!shut(g.name) && g.rows.map(p => {
                 const n = v.leads?.[p.id];
                 return (
                   <div key={p.id} style={{ display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "46px", padding: "0 16px", borderTop: "1px solid var(--crm-rule-soft)", font: "400 14px Inter, sans-serif" }}>

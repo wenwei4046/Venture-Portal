@@ -104,7 +104,7 @@ export interface PanelUi {
   adNameDraft: string | null;
   /** Assignment › Ads to teams: running ads or paused ones (2026-10-22; the desktop lists both). */
   adTab: "running" | "paused";
-  /** Work type: the teams folded to their head (the owner, 2026-10-23: "這個也可收起"). */
+  /** Work type: the teams opened (folded at first — the owner, 2026-10-23 "這個也可收起", 2026-10-24 "默認收起"). */
   ftsShut: Record<string, boolean>;
   /** Insight's Team performance | Ads performance switch (v3 T01): true = Ads performance, drawn on Insight. */
   ovAds: boolean;

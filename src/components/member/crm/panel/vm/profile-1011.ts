@@ -31,8 +31,8 @@ export function memberWorkTypeVM(ctx: PanelCtx) {
     }),
     groups: teams.map(t => ({
       name: t.name, c: t.c, count: t.people.filter(cur).length + " of " + t.people.length + " full time",
-      // A team folds to its head and opens again (the owner, 2026-10-23); all open at first.
-      open: !ui.ftsShut[t.id], fold: () => patch({ ftsShut: { ...ui.ftsShut, [t.id]: !ui.ftsShut[t.id] } }), chev: ui.ftsShut[t.id] ? "0deg" : "180deg", headRule: ui.ftsShut[t.id] ? "0" : "1px solid var(--crm-rule-soft)",
+      // A team folds to its head and opens again (the owner, 2026-10-23); folded at first (2026-10-24: "默認收起").
+      open: !!ui.ftsShut[t.id], fold: () => patch({ ftsShut: { ...ui.ftsShut, [t.id]: !ui.ftsShut[t.id] } }), chev: ui.ftsShut[t.id] ? "180deg" : "0deg", headRule: ui.ftsShut[t.id] ? "1px solid var(--crm-rule-soft)" : "0",
       people: t.people.map((p, k) => ({
         name: p.name, ini: ini(p.name), title: jobTitle(p), rule: k ? "1px solid var(--crm-rule-soft)" : "0",
         swBg: cur(p) ? "var(--crm-brown)" : "var(--crm-line)", swX: cur(p) ? "21px" : "3px",

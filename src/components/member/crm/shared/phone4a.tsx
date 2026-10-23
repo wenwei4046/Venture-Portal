@@ -134,7 +134,8 @@ const SLIDER = (pct: number, c: string): CSSProperties => ({ width: "100%", heig
 /** T04 (v3) · By team: a row a team — its dot, name (ink) and line, the share in an 84px decimal box, the slider under the row.
  * A team opens to its member breakdown — results only (name, bar, share) — and Adjust split, which opens T04b's sheet. */
 export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitRow[] }; inner: InnerVM[]; enterNext: (e: KeyboardEvent<HTMLInputElement>) => void }) {
-  const [open, setOpen] = useState<string | null>(() => inner.find(g => !/director/i.test(g.name))?.id ?? null);
+  // Every team folded at first (the owner, 2026-10-24: "點進split leads , anthony 的會是開著，全部默認收起").
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div style={{ display: "flex", flexDirection: "column", margin: "0 -20px", borderTop: "1px solid var(--crm-rule-soft)" }}>
       {s.splits.map((r, i) => {
@@ -618,13 +619,14 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
  */
 export function Phone4aActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
-  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); all open at first.
-  const [shut, setShut] = useState<Record<string, boolean>>({});
+  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); folded at first (2026-10-24:
+  // "member work type & active 默認收起") — `opened` keeps the ones opened.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      {groups.map(g => { const off = !!shut[g.name]; return (
+      {groups.map(g => { const off = !opened[g.name]; return (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
-          <button type="button" aria-expanded={!off} onClick={() => setShut(x => ({ ...x, [g.name]: !off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
+          <button type="button" aria-expanded={!off} onClick={() => setOpened(x => ({ ...x, [g.name]: off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
             <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-ink)" }}>{g.name}</strong>
             <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
