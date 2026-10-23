@@ -10,7 +10,7 @@ import { EXTEND_MONTH_CHOICES, MAX_PROBATION_MONTHS } from '@/lib/employment-sta
  * A probation's three steps (2026-10-23 — the user: "if the probation is almost end, then it will notification hr
  * acknowledge for further action"): Acknowledge the reminder (HR view's bell, or the person's page), then Confirm as
  * permanent or Extend it — or end their employment, which Deactivate already does. People · Edit on the person's page,
- * the box Acknowledge asks in the database too (`probation_acknowledge`, mig 20261024031500). Each answers in words:
+ * the box Acknowledge asks in the database too (`probation_acknowledge`, mig 20261024214500). Each answers in words:
  * production hands a thrown message to the browser only as a digest.
  */
 export type ProbationOutcome = { ok: true } | { ok: false; reason: string }

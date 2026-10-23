@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261024031500_people_employment_status.sql
+-- 20261024214500_people_employment_status.sql
 -- Employment status — Probation, Permanent or Part time — and HR's reminder before a probation ends (2026-10-23 — the
 -- user, circling the roster's EMPLOYMENT chip: "for the employment status, i want go with permenant, part time and
 -- probation status follow by the hire date start. then if the probation is almost end, then it will notification hr

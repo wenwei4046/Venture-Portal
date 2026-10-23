@@ -40,7 +40,7 @@ describe('probationEnd — the database’s probation_end to the day', () => {
   })
 
   it('is the arithmetic the migration generates the column with', () => {
-    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261024031500_people_employment_status.sql'), 'utf8')
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261024214500_people_employment_status.sql'), 'utf8')
     expect(sql).toMatch(/\(hire_date \+ make_interval\(months => probation_months::integer\)\)::date - 1/)
   })
 })
@@ -109,7 +109,7 @@ describe('what a form sends', () => {
 
   it('knows the three the database allows', () => {
     expect(EMPLOYMENT_STATUSES).toEqual(['probation', 'permanent', 'part_time'])
-    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261024031500_people_employment_status.sql'), 'utf8')
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261024214500_people_employment_status.sql'), 'utf8')
     expect(sql).toContain("employment_status IN ('probation', 'permanent', 'part_time')")
     expect(employmentStatusOf('probation')).toBe('probation')
     expect(employmentStatusOf('Permanent')).toBeNull()

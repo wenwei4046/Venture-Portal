@@ -1,7 +1,7 @@
 /**
  * HR's reminder before a probation ends (2026-10-23 — the user: "if the probation is almost end, then it will
  * notification hr acknowledge for further action"; then, circling HR view's bell: "at least show up in this
- * notification side, in desktop view"). The bell asks `probation_reviews()` (mig 20261024031500) for everybody active
+ * notification side, in desktop view"). The bell asks `probation_reviews()` (mig 20261024214500) for everybody active
  * on probation and lists those ending within PROBATION_NOTICE_DAYS or past; each waits for Acknowledge until HR
  * acknowledges it, then stays listed until they are confirmed, extended past the window or their employment ends.
  * Computed when the bell reads, never stored as notices: whoever may act sees it, on whichever computer.

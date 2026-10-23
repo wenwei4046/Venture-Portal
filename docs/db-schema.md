@@ -702,11 +702,33 @@ hr_staff_costs (
     eis_er          decimal(15,2)
     total_ctc       decimal(15,2)                    -- 系统加总
     status          enum ('active','inactive') DEFAULT 'active'
+    employment_status text NULL                      -- 'probation' | 'permanent' | 'part_time'（2026-10-23）；NULL = 还没设
+                                                     --   （那天之前的人都是 NULL，HR 逐个设）。不是 employment_type（那是 pay basis）
+    probation_months smallint NULL                   -- 试用期几个月，1–24；只在 probation 时有（CHECK）
+    probation_end   date GENERATED ALWAYS             -- 试用期最后一天 = hire_date + months − 1 天（1 Oct + 3 → 31 Dec）；
+                                                     --   不是 probation 或没 hire_date 就 NULL
+    probation_ack_end date NULL                      -- HR 在铃铛 / 个人页按 Acknowledge 时的那个 end；延长后 ≠ probation_end → 再提醒
+    probation_ack_by uuid FK → users NULL            --   谁、几时、名字（probation_acknowledge() 写，trigger 拒绝直接写；不是 probation 就清空）
+    probation_ack_name text NULL
+    probation_ack_at timestamptz NULL
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()
     updated_at      timestamptz DEFAULT now()
 )
 ```
+**Employment status and the probation reminder (2026-10-23, migration `20261024214500_people_employment_status`).**
+Add Staff and the waiting list's Transfer ask the status (and a probation's
+period); a person's page edits it, *Confirm as permanent* and *Extend* are its
+updates. HR view's bell reads `probation_reviews()` (DEFINER, STABLE: People ·
+Edit with the HR scope — everybody active on probation, their end and its
+acknowledgement) and lists those ending within 14 days or past
+(`lib/employment-status.ts` › `PROBATION_NOTICE_DAYS`); `probation_acknowledge(staff)`
+(DEFINER, the person page's box via `tab_write_guard`) writes the
+acknowledgement for the end it stands at, under `app.probation_ack`, the one
+door trigger `hr_staff_costs_probation_ack` leaves open. `member_transfer_waiting`
+has a 12-argument overload (production's body with the two columns in its
+INSERT); the 10-argument one calls it with neither.
+
 **Employee codes (2026-09-12, migration `20260915040000_staff_code_sequence`).**
 `employee_code` is `HV` + at least three digits, and the database hands it
 out: `hr_staff_costs_assign_code` (BEFORE INSERT OR UPDATE OF employee_code)
