@@ -78,6 +78,8 @@
 }
 .cardBody { padding: 24px 14px 14px; }
 .cardName { font-size: 18px; font-weight: 600; line-height: 1.15; }
+.cardName.brandName { font-size: 20px; }
+.cardCaption { font-size: 12px; color: rgb(var(--mk-muted)); margin-top: 3px; }
 .cardMeta { margin-top: 10px; }
 
 /* A subsidiary's banner. */
@@ -87,7 +89,62 @@
   font-size: 32px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: rgb(var(--mk-white));
 }
 .bannerName { font-size: 30px; font-weight: 600; line-height: 1.1; }
+.bannerName.brandName { font-size: 36px; }
 .bannerSub { font-size: 13px; color: rgb(var(--mk-text-2)); margin-top: 4px; }
+
+/* A brand profile (⑥-2): its cover, its picture, its font — the name in a brand font at its own weight; the dark
+   background's words light. */
+.cardBanner, .banner, .preview { background-size: cover; background-position: center; }
+.cardAvatar, .bannerAvatar, .previewAvatar { overflow: hidden; }
+.cardAvatar img, .bannerAvatar img, .previewAvatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatarColour { color: rgb(var(--mk-white)); font-weight: 700; }
+.cardAvatar.avatarColour { font-size: 18px; }
+.bannerAvatar.avatarColour { font-size: 30px; }
+.brandName { font-weight: 400; }
+.banner[data-dark] .bannerName, .preview[data-dark] .previewName { color: rgb(var(--mk-white)); }
+.banner[data-dark] .bannerSub, .preview[data-dark] .previewCap { color: rgb(var(--mk-white) / .8); }
+.editBtn {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgb(var(--mk-line));
+  background: rgb(var(--mk-white) / .85); color: rgb(var(--mk-ink)); font: inherit; font-size: 13px; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.editBtn:hover { background: rgb(var(--mk-white)); }
+.sched { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.schedItem {
+  display: flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line-2));
+  background: rgb(var(--mk-white)); font-size: 12.5px; color: inherit; text-decoration: none; max-width: 100%; min-width: 0;
+}
+.schedItem:hover { background: rgb(var(--mk-surface)); }
+.schedDay { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-rust)); white-space: nowrap; }
+
+/* The profile's dialog. */
+.dialogWide { width: 600px; }
+.preview { border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; background: rgb(var(--mk-surface-2)); }
+.previewAvatar {
+  width: 52px; height: 52px; flex: none; border-radius: 12px; border: 3px solid rgb(var(--mk-white)); background: rgb(var(--mk-white));
+  font-size: 22px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+}
+.previewAvatar.avatarColour { color: rgb(var(--mk-white)); font-weight: 700; }
+.previewName { font-size: 26px; line-height: 1.1; font-weight: 600; }
+.previewCap { font-size: 12px; color: rgb(var(--mk-muted)); }
+.profileGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.profileHead { font-size: 12.5px; font-weight: 600; }
+.swatch24 { width: 24px; height: 24px; border-radius: 7px; border: 0; cursor: pointer; padding: 0; }
+.swatchEdge { border: 1px solid rgb(var(--mk-line)); }
+.dashBtn {
+  align-self: flex-start; height: 28px; padding: 0 10px; border-radius: 7px; border: 1px dashed rgb(var(--mk-field-hover)); background: transparent;
+  display: flex; align-items: center; font: inherit; font-size: 12px; cursor: pointer; color: rgb(var(--mk-text-3)); max-width: 100%;
+}
+.dashBtn:disabled { opacity: .5; cursor: wait; }
+.fontGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fontTile {
+  padding: 10px 8px; border-radius: 8px; border: 1.5px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); cursor: pointer; text-align: center;
+  font: inherit; color: inherit; display: flex; flex-direction: column; min-width: 0;
+}
+.fontTileOn { border-color: rgb(var(--mk-brown)); background: rgb(var(--mk-surface)); }
+.fontSample { font-size: 20px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fontName { font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 3px; }
+.dialogFoot { border-top: 1px solid rgb(var(--mk-line-3)); padding-top: 12px; }
 
 /* Folders. */
 .secHead { position: relative; display: flex; align-items: center; margin-top: 20px; gap: 8px; }

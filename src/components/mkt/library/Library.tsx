@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
@@ -10,21 +11,24 @@ import {
   addMktLibFolder, addMktLibType, binMktLib, deleteMktLib, fileMktLib, moveMktLib,
 } from '@/lib/marketing/actions'
 import {
-  binRows, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex, libraryPath, libView,
-  listedName, moveTargets, railCounts, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib, type LibFile, type LibView,
+  binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
+  libraryPath, libView, listedName, moveTargets, railCounts, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
+  type LibFile, type LibSub, type LibView, type SchedItem,
 } from '@/lib/marketing/library'
+import BrandProfile from './BrandProfile'
 import s from './library.module.css'
 
 // The Library (`Library.dc.html`, ⑥-1): the rail — every subsidiary with its files, the categories, the Dustbin; the
 // page — everything (a card per subsidiary, the newest files), a subsidiary (its banner, its folders, its newest files),
 // a folder (its files, ⬆ Upload); search across every folder; + New (a folder, an upload, a link folder). A file's ···:
 // Download, Move to…, Move to Dustbin; a folder's: Open, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
-// (the manager's). Its brand profiles, guest share links and Attach to task come next (⑥-2…⑥-4).
+// (the manager's). Each subsidiary's brand profile — its card and banner, ✎ the manager's — and its next dates, the
+// Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
 
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
 type Menu = { kind: 'file' | 'folder'; id: string } | 'new' | 'add' | null
-type Modal = { kind: 'move'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | null
+type Modal = { kind: 'move'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | { kind: 'profile' } | null
 
 const CAT_CLASS: Record<LibCat, string> = { Brand: s.cat_Brand, Product: s.cat_Product, Photo: s.cat_Photo, Video: s.cat_Video, Content: s.cat_Content, Minutes: s.cat_Minutes }
 const asCat = (v: string | null): LibCat | null => ((LIB_CATS as readonly string[]).includes(v ?? '') ? (v as LibCat) : null)
@@ -38,7 +42,25 @@ function FolderGlyph({ color }: { color: string }) {
   )
 }
 
-export default function Library({ initial, can, at }: { initial: Lib; can: Can; at: At }) {
+/** A brand's banner, or its card's top: its cover, its colour, or the subsidiary's own tint. */
+const bannerStyle = (x: LibSub, pct: number) => {
+  const b = brandLook(x).banner
+  return b.img ? { backgroundImage: `url("${fileRoute('marketing', b.img)}")` } : { background: b.bg ?? tint(x.dot, pct) }
+}
+
+/** A brand's picture: its logo, its colour with the name's first letter, or the subsidiary's emoji (on its tint, given
+ * one — else on the tile's own white). */
+function Avatar({ x, className, pct }: { x: LibSub; className: string; pct?: number }) {
+  const a = brandLook(x).avatar
+  const bg = a.img ? undefined : a.bg ?? (pct ? tint(x.dot, pct) : undefined)
+  return (
+    <span className={`${className}${a.bg ? ` ${s.avatarColour}` : ''}`} style={bg ? { background: bg } : undefined} aria-hidden="true">
+      {a.img ? <img src={fileRoute('marketing', a.img)} alt="" /> : a.text}
+    </span>
+  )
+}
+
+export default function Library({ initial, schedules = {}, can, at }: { initial: Lib; schedules?: Record<string, SchedItem[]>; can: Can; at: At }) {
   const router = useRouter()
   const [lib, setLib] = useState(initial)
   useEffect(() => setLib(initial), [initial])
@@ -63,6 +85,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
   const sub = view.t === 'co' || view.t === 'folder' ? ix.sub(view.sub) ?? null : null
   const folder = view.t === 'folder' ? ix.folder(view.folder) ?? null : null
   const folderType = folder ? ix.type(folder.type) : undefined
+  const subLook = sub ? brandLook(sub) : null
 
   /** Where the page is: at once, its address after (the server's answer only refreshes the Library). A search stays on
    * the page — typing never asks the server. */
@@ -242,13 +265,15 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
             {lib.subs.map(x => {
               const nf = lib.folders.filter(f => f.sub === x.id).length
               const nx = lib.files.filter(f => ix.subOf(f) === x.id).length
+              const look = brandLook(x)
               return (
                 <button key={x.id} type="button" className={s.card} onClick={() => go({ t: 'co', sub: x.id })}>
-                  <div className={s.cardBanner} style={{ background: tint(x.dot, 22) }}>
-                    <span className={s.cardAvatar} style={{ background: tint(x.dot, 40) }} aria-hidden="true">{x.emoji}</span>
+                  <div className={s.cardBanner} style={bannerStyle(x, 22)}>
+                    <Avatar x={x} className={s.cardAvatar} pct={40} />
                   </div>
                   <div className={s.cardBody}>
-                    <div className={s.cardName}>{x.name}</div>
+                    <div className={`${s.cardName}${look.font ? ` ${s.brandName}` : ''}`} style={brandFace(look.font)}>{look.name}</div>
+                    <div className={`${s.cardCaption} ${s.ellipsis}`}>{look.caption}</div>
                     <div className={`${s.mono} ${s.cardMeta}`}>{nf} folder{nf === 1 ? '' : 's'} · {nx} file{nx === 1 ? '' : 's'}</div>
                   </div>
                 </button>
@@ -257,14 +282,30 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
           </div>
         ) : null}
 
-        {sub && view.t !== 'bin' ? (
-          <div className={s.banner} style={{ background: tint(sub.dot, 22) }}>
-            <span className={s.bannerAvatar} aria-hidden="true">{sub.emoji}</span>
-            <div className={s.ellipsis}>
-              <div className={s.bannerName}>{sub.name}</div>
-              <div className={s.bannerSub}>{sub.client ? 'Client' : sub.code}</div>
+        {sub && subLook && view.t !== 'bin' ? (
+          <>
+            <div className={s.banner} style={bannerStyle(sub, 22)} data-dark={subLook.banner.dark ? '' : undefined}>
+              <Avatar x={sub} className={s.bannerAvatar} />
+              <div className={s.ellipsis}>
+                <div className={`${s.bannerName}${subLook.font ? ` ${s.brandName}` : ''}`} style={brandFace(subLook.font)}>{subLook.name}</div>
+                <div className={s.bannerSub}>{subLook.caption}</div>
+              </div>
+              {can.manage ? (
+                <button type="button" className={s.editBtn} title="Edit brand profile" aria-label="Edit brand profile"
+                  onClick={() => { setMenu(null); setModal({ kind: 'profile' }) }}>✎</button>
+              ) : null}
             </div>
-          </div>
+            {schedules[sub.id]?.length ? (
+              <div className={s.sched}>
+                <span className={s.secLabel}>Schedule</span>
+                {schedules[sub.id].map(e => (
+                  <Link key={e.id} className={s.schedItem} href={e.trackId ? `/marketing/projects/${encodeURIComponent(e.trackId)}` : '/marketing/projects'}>
+                    <span className={s.schedDay}>{e.label}</span>{e.title}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {sub && view.t === 'co' && !q.trim() ? (
@@ -444,6 +485,10 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
             </div>
           </div>
         </div>
+      ) : null}
+
+      {modal?.kind === 'profile' && sub && can.manage ? (
+        <BrandProfile sub={sub} onClose={() => setModal(null)} onSaved={l => { setLib(l); setModal(null) }} />
       ) : null}
 
       {modal?.kind === 'link' && sub ? (

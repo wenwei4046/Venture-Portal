@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  binRows, extOf, fileKind, folderTiles, libHref, libraryFromRow, libraryPath, libView, linkHost, listedName, moveTargets, railCounts,
-  sizeLabel, tidyFileName, typeChoices, viewFiles,
+  binRows, brandFace, brandLook, brandPath, extOf, fileKind, folderTiles, libHref, libraryFromRow, libraryPath, libSchedule, libView, linkHost,
+  listedName, moveTargets, NO_PROFILE, profileToRow, railCounts, sizeLabel, tidyFileName, typeChoices, viewFiles,
 } from './library'
+import type { CalEvent } from './calendar'
 
 // 2026-10-23 — ⑥-1: the Library (`Library.dc.html`), read from mkt_library().
 
@@ -111,5 +112,56 @@ describe('the Library', () => {
     expect(tidyFileName('日本語.pdf')).toBe('file.pdf')
     expect(libraryPath('Logo pack.zip', '00000000-0000-4000-8000-000000000001')).toBe('library/00000000-0000-4000-8000-000000000001/Logo-pack.zip')
     expect(listedName('Brand  book v3.pdf')).toBe('Brand book v3')
+  })
+})
+
+// 2026-10-24 — ⑥-2: a subsidiary's brand profile and its schedule.
+describe('a brand profile', () => {
+  const LOGO = 'brand/00000000-0000-4000-8000-000000000009/carres-logo.png'
+  const car = (profile: unknown) => libraryFromRow({ subs: [{ id: CAR, code: 'CAR', name: 'Carres', emoji: '🛋️', dot: 'x', client: false, profile }] }).subs[0]
+
+  it('keeps only what the handoff offers — its colours, its six fonts, a picture under brand/', () => {
+    expect(car({ avatar: 'rgb(94 60 40)', banner: 'rgb(40 34 30)', font: 'Playfair', name: 'Carres Living', caption: 'Sofa & living', avatar_path: LOGO }).profile)
+      .toEqual({ avatar: 'rgb(94 60 40)', avatarPath: LOGO, banner: 'rgb(40 34 30)', bannerPath: null, font: 'Playfair', name: 'Carres Living', caption: 'Sofa & living' })
+    expect(car({ avatar: 'url(x)', banner: 'red', font: 'Comic Sans', avatar_path: 'library/x/y.png' }).profile).toEqual(NO_PROFILE)
+    expect(car(undefined).profile).toEqual(NO_PROFILE)
+    expect(profileToRow({ ...NO_PROFILE, font: 'Inter', name: '  Carres  ', caption: ' ' })).toEqual({ font: 'Inter', name: 'Carres' })
+    expect(brandPath('Logo (final).PNG', '00000000-0000-4000-8000-000000000001')).toBe('brand/00000000-0000-4000-8000-000000000001/Logo-final.png')
+  })
+
+  it('draws its card and banner: a logo, a colour and a letter, or the emoji; a cover, a colour, or its own tint', () => {
+    expect(brandLook(car({}))).toEqual({
+      name: 'Carres', caption: 'CAR', avatar: { img: null, bg: null, text: '🛋️' }, banner: { img: null, bg: null, dark: false }, font: null,
+    })
+    const dressed = brandLook(car({ avatar: 'rgb(44 82 130)', banner: 'rgb(40 34 30)', font: 'Space Grotesk', name: ' 2990 Home ', caption: 'Everyday prices' }))
+    expect(dressed).toEqual({
+      name: '2990 Home', caption: 'Everyday prices', avatar: { img: null, bg: 'rgb(44 82 130)', text: '2' }, banner: { img: null, bg: 'rgb(40 34 30)', dark: true }, font: 'Space Grotesk',
+    })
+    expect(brandLook(car({ avatar: 'rgb(44 82 130)', avatar_path: LOGO, banner_path: LOGO, banner: 'rgb(40 34 30)' }))).toMatchObject({
+      avatar: { img: LOGO, bg: null, text: '' }, banner: { img: LOGO, bg: null, dark: false },
+    })
+    expect(brandLook({ ...car({}), client: true }).caption).toBe('Client')
+    expect(brandFace('Space Grotesk')).toEqual({ fontFamily: 'var(--font-mk-grotesk), system-ui, sans-serif', letterSpacing: '-0.02em' })
+    expect(brandFace('Newsreader').fontFamily).toMatch(/^var\(--font-newsreader\), Georgia/)
+    expect(brandFace(null)).toEqual({})
+  })
+
+  it('lists its next dates — from today, not done, its own, the first three', () => {
+    const ev = (id: string, day: string, extra: Partial<CalEvent> = {}): CalEvent => ({
+      id, kind: 'due', day, title: 'Year-End Video', sub: { id: CAR } as CalEvent['sub'], trackId: 'MKT-CAR-2610-001', line2: 'Stage 2 · Shoot',
+      people: [], who: 'Mei', tone: 'waiting', label: '', icon: '⏱', kindLabel: '', time: null, quick: false, recur: false, ...extra,
+    })
+    const events = [
+      ev('a', '2026-10-20', { tone: 'red' }),
+      ev('b', '2026-10-24', { tone: 'done' }),
+      ev('c', '2026-10-24'),
+      ev('d', '2026-10-25', { sub: { id: H2990 } as CalEvent['sub'] }),
+      ev('e', '2026-11-05', { title: 'Weekly reel', recur: true, line2: 'Run 3 opens · Plan', trackId: 'MKT-CAR-2610-002' }),
+      ev('f', '2026-11-09', { line2: 'Stage 3 · Ads go live' }),
+      ev('g', '2026-11-11'),
+    ]
+    expect(libSchedule(events, CAR, '2026-10-23').map(e => `${e.label} · ${e.title}`))
+      .toEqual(['Sat 24 Oct · Year-End Video · Shoot', 'Thu 5 Nov · Weekly reel · run 3', 'Mon 9 Nov · Year-End Video · Ads go live'])
+    expect(libSchedule(events, 'nobody', '2026-10-23')).toEqual([])
   })
 })
