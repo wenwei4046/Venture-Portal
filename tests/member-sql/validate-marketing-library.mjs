@@ -1,6 +1,6 @@
-// Local PostgreSQL regression for 20261024007000 (2026-10-23 — Marketing ⑥-1, the Library: `Library.dc.html` of the Claude
+// Local PostgreSQL regression for 20261024007000 and 007100 (2026-10-23 — Marketing ⑥-1, the Library: `Library.dc.html` of the Claude
 // Design handoff "HOUZS Marketing Module Setup"). The R2 move's table (20261023150000: file_objects, its stamp, its grants)
-// and Marketing's migrations run, then this one, twice. What is under test: the bucket — in R2, 50 MB — and its three
+// and Marketing's migrations run, then these, each twice. What is under test: the bucket — in R2, 50 MB, then 2 GB — and its three
 // policies (Marketing reads; Edit puts files under library/; Manage deletes, and a sender takes back a file never filed);
 // the folder types (the handoff's thirteen, a new one the manager's, never twice, never a colour of its own); one folder
 // of a type in a subsidiary; a file filed only when its bytes' row is there and the caller's; move, bin, restore,
@@ -134,10 +134,15 @@ for (const m of MIGS) await db.exec(await sql(m))
 const mig = await sql('20261024007000_marketing_library.sql')
 await db.exec(mig)
 await db.exec(mig) // twice: nothing changes, nothing breaks
+const bigger = await sql('20261024007100_marketing_library_bigger_uploads.sql')
 
 // ── The bucket, the types, the registry ─────────────────────────────────────────
-check(await peek(`SELECT public, file_size_limit::int AS cap, backend FROM public.file_buckets WHERE id = 'marketing'`),
-  [{ public: false, cap: 52428800, backend: 'r2' }], 'Marketing’s bucket: private, in R2 from the start, 50 MB a file')
+check(await peek(`SELECT public, (file_size_limit / 1048576)::int AS mb, backend FROM public.file_buckets WHERE id = 'marketing'`),
+  [{ public: false, mb: 50, backend: 'r2' }], 'Marketing’s bucket: private, in R2 from the start, 50 MB a file')
+await db.exec(bigger)
+await db.exec(bigger) // twice: nothing changes
+check(await peek(`SELECT (file_size_limit / 1048576)::int AS mb, allowed_mime_types FROM public.file_buckets WHERE id = 'marketing'`),
+  [{ mb: 2048, allowed_mime_types: null }], '…then 2 GB a file (007100 — the user: "make the size more bigger for all"), any type')
 check(await peek1(`SELECT count(*)::int FROM pg_policies WHERE tablename = 'file_objects' AND policyname LIKE 'mkt_library_%'`), 3,
   'its three policies')
 check((await peek(`SELECT name, cat, link FROM public.mkt_lib_types ORDER BY sort_order`)).map(t => `${t.name}:${t.cat}${t.link ? ':link' : ''}`), [
@@ -195,7 +200,11 @@ await as(U.mei, VIEW)
 await assert.rejects(put(P1), /row-level security|violates/, 'Marketing · Edit puts a file in'); checks++
 await as(U.mei, STAFF)
 await assert.rejects(put(`elsewhere/${id(904)}/x.pdf`), /row-level security|violates/, 'only under library/'); checks++
-await assert.rejects(put(`library/${id(905)}/huge.mp4`, 60 * 1024 * 1024, 'video/mp4'), /maximum allowed size/, '50 MB a file'); checks++
+await assert.rejects(put(`library/${id(905)}/huge.mp4`, 2147483649, 'video/mp4'), /maximum allowed size/, '2 GB a file'); checks++
+const TOUR = `library/${id(906)}/showroom-tour.mp4`
+await put(TOUR, 600 * 1024 * 1024, 'video/mp4')
+check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [TOUR])).length, 1,
+  'a 600 MB video taken — and, never filed, taken back by its sender')
 await put(P1)
 await put(P2, 4096, 'image/jpeg')
 await put(P3)

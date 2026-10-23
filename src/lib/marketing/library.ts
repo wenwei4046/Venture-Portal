@@ -1,5 +1,5 @@
 // The Library (`Library.dc.html`, ⑥-1): each subsidiary's folders — one of each folder type, the types shared by every
-// subsidiary — their files (in R2, ≤ 50 MB) and link folders (Google Drive …); every file under its folder type's
+// subsidiary — their files (in R2, ≤ 2 GB) and link folders (Google Drive …); every file under its folder type's
 // category; search across every folder; the Dustbin's 30 days. Read from mkt_library(); its writes are the actions'.
 // Pure.
 
@@ -8,8 +8,9 @@ import { shortDay } from './board'
 
 export type LibCat = 'Brand' | 'Product' | 'Photo' | 'Video' | 'Content' | 'Minutes'
 export const LIB_CATS: readonly LibCat[] = ['Brand', 'Product', 'Photo', 'Video', 'Content', 'Minutes']
-/** A file up to 50 MB is uploaded; a bigger one goes in as a link folder (the user's answer). */
-export const LIB_MAX_BYTES = 50 * 1024 * 1024
+/** A file up to 2 GB is uploaded (the bucket's limit, mig 20261024007100 — the user: "make the size more bigger for all");
+ * a bigger one goes in as a link folder. */
+export const LIB_MAX_BYTES = 2 * 1024 * 1024 * 1024
 /** A new folder type's colours (the handoff's six; the database takes no other). */
 export const LIB_TYPE_COLORS = [
   'oklch(0.55 0.12 300)', 'oklch(0.58 0.12 50)', 'oklch(0.50 0.08 175)', 'oklch(0.52 0.09 260)', 'oklch(0.62 0.10 80)', 'oklch(0.55 0.12 340)',

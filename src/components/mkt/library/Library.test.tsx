@@ -114,13 +114,13 @@ describe('the Library', () => {
     await waitFor(() => expect(actions.binMktLib).toHaveBeenCalledWith('file', 'x2'))
   })
 
-  it('uploads into the folder: over 50 MB refused, each file filed — one refused taken back out of the bucket', async () => {
+  it('uploads into the folder: over 2 GB refused, each file filed — one refused taken back out of the bucket', async () => {
     actions.fileMktLib.mockResolvedValueOnce({ ok: false, reason: 'That folder is not there.' })
     render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
     const input = document.querySelector('input[type=file]') as HTMLInputElement
     const small = new File(['%PDF'], 'Brief v2.pdf', { type: 'application/pdf' })
     const big = new File(['x'], 'Rushes.mp4', { type: 'video/mp4' })
-    Object.defineProperty(big, 'size', { value: 60 * 1024 * 1024 })
+    Object.defineProperty(big, 'size', { value: 2 * 1024 * 1024 * 1024 + 1 })
     await act(async () => { fireEvent.change(input, { target: { files: [small, big] } }) })
     await waitFor(() => expect(bucket.remove).toHaveBeenCalled())
     const [path] = bucket.upload.mock.calls[0]
@@ -128,14 +128,19 @@ describe('the Library', () => {
     expect(bucket.upload).toHaveBeenCalledTimes(1)
     expect(actions.fileMktLib).toHaveBeenCalledWith(F.brandCar, 'Brief v2', path)
     expect(bucket.remove).toHaveBeenCalledWith([path])
-    expect(flash.mock.calls.map(c => c[0])).toEqual(['That folder is not there.', 'Rushes.mp4 is over 50 MB — add it as a link folder.'])
+    expect(flash.mock.calls.map(c => c[0])).toEqual(['That folder is not there.', 'Rushes.mp4 is over 2 GB — add it as a link folder.'])
   })
 
-  it('says where an upload went — the handoff’s words', async () => {
+  it('says it is uploading, then where the file went — the handoff’s words', async () => {
+    let arrive: (v: unknown) => void = () => undefined
+    bucket.upload.mockReturnValueOnce(new Promise(r => { arrive = r }))
     render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
     const input = document.querySelector('input[type=file]') as HTMLInputElement
     await act(async () => { fireEvent.change(input, { target: { files: [new File(['%PDF'], 'Brief.pdf', { type: 'application/pdf' })] } }) })
+    expect((screen.getByRole('button', { name: 'Uploading…' }) as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { arrive({ data: {}, error: null }) })
     await waitFor(() => expect(flash).toHaveBeenCalledWith('Uploaded to Carres / Brandbook'))
+    expect(screen.getByRole('button', { name: '⬆ Upload' })).toBeTruthy()
     expect(bucket.remove).not.toHaveBeenCalled()
   })
 

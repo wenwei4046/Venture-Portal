@@ -48,6 +48,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
   const [menu, setMenu] = useState<Menu>(null)
   const [modal, setModal] = useState<Modal>(null)
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [newType, setNewType] = useState({ name: '', color: LIB_TYPE_COLORS[0] as string, cat: 'Content' as LibCat })
   const [link, setLink] = useState({ type: '', url: '', error: '' })
   const picker = useRef<HTMLInputElement>(null)
@@ -94,16 +95,17 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
     }
   }
 
-  // ── Uploads: the bytes to the bucket (≤ 50 MB), then filed — a file refused is taken back ──
+  // ── Uploads: the bytes to the bucket (≤ 2 GB), then filed — a file refused is taken back ──
   const upload = async (list: FileList | null) => {
     if (!list?.length || !folder || busy) return
     setBusy(true)
+    setUploading(true)
     const db = createClient() as unknown as SupabaseClient
     let filed = 0
     try {
       for (const file of Array.from(list)) {
         if (file.size > LIB_MAX_BYTES) {
-          flash(`${file.name} is over 50 MB — add it as a link folder.`)
+          flash(`${file.name} is over 2 GB — add it as a link folder.`)
           continue
         }
         const path = libraryPath(file.name, crypto.randomUUID())
@@ -125,6 +127,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
       if (filed) flash(filed === 1 ? `Uploaded to ${into}` : `${filed} files uploaded to ${into}`)
     } finally {
       setBusy(false)
+      setUploading(false)
       if (picker.current) picker.current.value = ''
     }
   }
@@ -370,7 +373,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
               <span className={s.secLabel}>{filesTitle}</span>
               <span className={s.grow} />
               {view.t === 'folder' && can.edit && !folderType?.link ? (
-                <button type="button" className={s.upload} disabled={busy} onClick={() => picker.current?.click()}>⬆ Upload</button>
+                <button type="button" className={s.upload} disabled={busy} onClick={() => picker.current?.click()}>{uploading ? 'Uploading…' : '⬆ Upload'}</button>
               ) : null}
             </div>
             {files.length ? (

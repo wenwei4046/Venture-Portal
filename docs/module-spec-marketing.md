@@ -13,7 +13,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | "+ Add subsidiary" | Marketing's own client list (not Finance's `companies`). |
 | Punching from a phone | Not from Marketing for now — "cause last once desktop view done, i will do marketing app mobile". |
 | Scope | Everything as designed, in order ① → ⑦ below. |
-| Big files | ≤ 50 MB uploaded; bigger as links. Storage is moving to Cloudflare R2 (another session) — Marketing's files wait for it. |
+| Big files | ≤ 50 MB uploaded; bigger as links. Then, once every bucket was in R2 (to the storage session): "make sure in future i can upload all big file, video and etc", "make the size more bigger for all" — the Library takes 2 GB a file (mig `20261024007100`), a folder kept elsewhere a link. |
 
 ## 2. Build order
 
@@ -34,7 +34,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | #657, live 2026-10-23 |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
-| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 50 MB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (mig `20261024007000`) | this PR |
+| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | this PR |
 | ⑥-2 | A subsidiary's brand profile (avatar, banner, font, caption) and its schedule | next |
 | ⑥-3 | The guest share link — a file or a folder, its expiry, Allow download; a stranger's page | |
 | ⑥-4 | Attach to task (a file's menu) and Attach from Library (a stage's files) | |
@@ -53,7 +53,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 5. **CRM.** The CRM has leads, appointments and wins per ad, but no Page → subsidiary map, and spend lives only in Meta. A production-only Leads module (`lead_*`) also exists. Not wired (the user's answer).
 6. **Holidays.** The prototype hard-codes Deepavali and Christmas; the portal reads HR's `att_holidays` — empty on production today, so working days skip weekends only until HR fills them.
 7. **Leave.** The Assignment plan and Tracking's load ignore approved leave (Attendance has it) — to wire in ②.
-8. **Storage.** The handoff shows 84 MB–1.2 GB videos and data-URL uploads; the portal will keep ≤ 50 MB uploads on R2 and links beyond.
+8. **Storage.** The handoff shows 84 MB–1.2 GB videos and data-URL uploads; the portal keeps files on R2 — the Library's up to 2 GB each (⑥-1) — and links beyond.
 9. **Persistence.** My Space's layout, room and pet live in `localStorage` in the prototype → the database in ⑦.
 10. **Chat.** No staff chat exists in the portal (DM + lobby) — tables and Realtime in ⑦.
 11. **Public links.** The prototype's `houzs.link` domain does not exist; the PIC is not a portal user (approve = a typed name) — ⑤.
@@ -132,7 +132,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 
 1. A title's default team: SENIOR MARKETING EXECUTIVE and TELEMARKETER → **Ads**; EVENT SPECIALIST CUM VISUAL MERCHANDISER → **Brand** — right? (The manager can change anyone's team.)
 2. When is an unaccepted stage red — after how many working hours? What are the PIC's "working hours"?
-3. The Library takes uploads up to 50 MB, bigger files as link folders (your answer). Another session has since raised every other bucket on your word (HR's and IT's files 2 GB, the rest 100 MB) — should the Library's rise too (2 GB takes videos)?
+3. *(Answered 2026-10-24 — your words to the storage session, "make sure in future i can upload all big file, video and etc" and "make the size more bigger for all": the Library takes 2 GB a file, as HR's documents.)*
 4. HR invites Marketing's 12 people (no logins yet) — when?
 5. Does anybody besides MM / AMM approve stages (the handoff's content Director)?
 6. Nudge on WhatsApp too (from People's phone numbers)?
