@@ -388,6 +388,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // attendee (Edit).
   'mkt_product_picker', 'mkt_product_start', 'mkt_product_project', 'mkt_minutes_fill', 'mkt_minutes_sign', 'mkt_minutes_send',
   'mkt_project_override', 'mkt_project_resend',
+  // A product project's deliverables (mig 20261025032000): the work started — its deliverables made — and each one's
+  // Assignment Plan saved, both by Marketing · Manage.
+  'mkt_product_begin', 'mkt_deliverable_plan',
   // The PIC's link (mig 20261024003000): anon's by name, as the guest link's — each checks the project's link code
   // instead (a product project's, sent; an answer only while it waits for the PIC).
   'mkt_pic_page', 'mkt_pic_answer',

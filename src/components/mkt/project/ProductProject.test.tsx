@@ -14,6 +14,7 @@ const actions = vi.hoisted(() => ({
   sendMktMinutes: vi.fn(),
   overrideMktProject: vi.fn(),
   resendMktProject: vi.fn(),
+  beginMktProduct: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }))
@@ -31,7 +32,7 @@ const FIELDS = [
   { name: 'Signatures', type: 'Signature', req: true, pic: true, lock: false },
 ]
 
-function page(me: string, project: Record<string, unknown> = {}, minutes: Record<string, unknown> = {}, trail: object[] = []): ProductProjectPage {
+function page(me: string, project: Record<string, unknown> = {}, minutes: Record<string, unknown> = {}, trail: object[] = [], deliverables: object[] = []): ProductProjectPage {
   return productProjectFromRow({
     today: '2026-10-24',
     me,
@@ -50,6 +51,7 @@ function page(me: string, project: Record<string, unknown> = {}, minutes: Record
       ...minutes,
     }],
     trail: [...trail, { at: '2026-10-24T01:00:00Z', actor: 'Rachel', action: 'created', reason: null }],
+    deliverables,
   }) as ProductProjectPage
 }
 const MANAGER = { edit: true, manage: true }
@@ -129,10 +131,44 @@ describe('a product project, for the manager who writes its minutes', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('approved: Plan assignments waits for the Assignment Plan', () => {
-    render(<ProductProject initial={page(RACHEL, { status: 'approved', link: 'abc123', picReply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T08:05:00Z' } }, ready)} can={MANAGER} />)
-    expect(screen.getByRole('button', { name: 'Plan assignments →' })).toHaveProperty('disabled', true)
+  it('approved: Plan assignments starts the work — its deliverables listed, each to plan (②b-2a)', async () => {
+    const approved = { status: 'approved', link: 'abc123', picReply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T08:05:00Z' } }
+    render(<ProductProject initial={page(RACHEL, approved, ready)} can={MANAGER} />)
     expect(screen.getByText('Approved by Kelvin Tan via link · 25 Oct 16:05')).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Deliverables' })).toBeNull()
+    const made = [
+      { id: 'd1', trackId: 'MKT-CAR-2610-001-D01', title: 'Image post 1/2', status: 'planning', cur: 0, deliv: { group: 'Graphic design', item: 'Image post', n: 1, of: 2 },
+        workflow: 'Image post · Standard', stages: 3, done: 0, stage: { idx: 0, name: 'Design', status: 'planned', owner: null } },
+      { id: 'd2', trackId: 'MKT-CAR-2610-001-D02', title: 'Image post 2/2', status: 'active', cur: 1, deliv: { group: 'Graphic design', item: 'Image post', n: 2, of: 2 },
+        workflow: 'Image post · Standard', startsOn: '2026-10-24', stages: 3, done: 1, stage: { idx: 1, name: 'Caption', status: 'accepted', owner: SITI, dueOn: '2026-10-28' } },
+      { id: 'd3', trackId: 'MKT-CAR-2610-001-D03', title: 'Reel', status: 'done', cur: 1, deliv: { group: 'Video', item: 'Reel', n: 1, of: 1 },
+        workflow: 'Reel · Locked', stages: 2, done: 2, stage: { idx: 1, name: 'Edit', status: 'done', owner: RACHEL } },
+    ]
+    actions.beginMktProduct.mockResolvedValue({ ok: true, deliverables: 3, page: page(RACHEL, { ...approved, status: 'active' }, ready, [], made) })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Plan assignments →' }))
+    })
+    await waitFor(() => expect(actions.beginMktProduct).toHaveBeenCalledWith('p1'))
+    const list = await screen.findByRole('region', { name: 'Deliverables' })
+    expect(list.textContent).toContain('1/3 done')
+    expect(list.textContent).toContain('1 to plan')
+    const rows = [...list.querySelectorAll('[class*="delRow"]')].map(r => r.textContent)
+    expect(rows).toEqual([
+      'D01Image post 1/2Image post · StandardNot plannedPlan',
+      'D02Image post 2/2Image post · StandardStage 2 of 3 · Caption · SitiEdit plan',
+      'D03ReelReel · LockedDone',
+    ])
+    expect(screen.getByRole('link', { name: 'Plan' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001-D01?plan=1')
+    expect(screen.getByText('Deliverables made · plan each one')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Plan assignments →' })).toBeNull()
+  })
+
+  it('the staff read the deliverables, and plan none', () => {
+    const made = [{ id: 'd1', trackId: 'MKT-CAR-2610-001-D01', title: 'Reel', status: 'planning', stages: 2, done: 0, stage: null }]
+    render(<ProductProject initial={page(SITI, { status: 'active' }, ready, [], made)} can={{ edit: true, manage: false }} />)
+    expect(screen.getByRole('region', { name: 'Deliverables' }).textContent).toContain('Not planned')
+    expect(screen.queryByRole('link', { name: 'Plan' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Plan assignments →' })).toBeNull()
   })
 
   it('a change the PIC sees after they approved goes back to them, and says so', async () => {

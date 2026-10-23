@@ -2,15 +2,16 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import { fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
+import { beginMktProduct, fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
 import {
-  editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems, stepsOf, whatsappUrl,
-  type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
+  canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
+  stepsOf, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
+import Deliverables from './Deliverables'
 import MinutesForm from './MinutesForm'
 import p from './project.module.css'
 import t from '../task/task.module.css'
@@ -19,7 +20,8 @@ import t from '../task/task.module.css'
 // and on what; the PIC's name and WhatsApp and the product's intake minutes, written with the PIC and saved as they
 // are typed (only what changed, never over another's save); the attendees' signatures; the internal meeting notes;
 // and at the side where it stands — what is still missing, the tracking link made and shared, the PIC's answer, the
-// manager starting before approval — with the trail. Plan assignments waits for the Assignment Plan.
+// manager starting before approval — with the trail. Then the work: *Plan assignments →* makes its deliverables (②b-2a),
+// listed above the minutes, each planned on its own Assignment Plan.
 
 const TONE = { red: t.red, waiting: t.waiting, done: t.done, draft: t.draft } as const
 
@@ -159,10 +161,14 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const wa = url ? whatsappUrl(edit.whatsapp, `Hi ${edit.pic.trim() || 'there'}, the minutes of our meeting for ${pr.title} — please review and approve: ${url}`) : null
   const waiting = pr.status === 'waiting_pic' || pr.status === 'changes'
   const lines = productTrail(page)
+  const begin = canBeginWork(page)
+  const progress = deliverableProgress(page.deliverables)
 
   const sign = () => act(() => signMktMinutes(doc.id, pr.id), 'Signed')
   const send = () => act(() => sendMktMinutes(doc.id, pr.id, revRef.current), rules.pic ? `Tracking link ready · share it with ${picName}` : 'Minutes complete · approved')
   const resend = () => act(() => resendMktProject(pr.id), `Resent to ${picName}`)
+  // The work starts: each action × its quantity a deliverable, each to plan (②b-2a).
+  const beginWork = () => act(() => beginMktProduct(pr.id), 'Deliverables made · plan each one')
   const override = () => act(() => overrideMktProject(pr.id, reason.trim()), 'Started before approval · kept in the trail', () => {
     setModal(false)
     setReason('')
@@ -254,6 +260,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
 
       <div className={p.grid}>
         <div className={p.main}>
+          <Deliverables page={page} manage={can.manage} />
           <section className={p.card}>
             <div className={p.cardHead}><span className={p.cardTitle}>Meeting</span></div>
             <div className={p.meeting}>
@@ -356,9 +363,28 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </div>
             ) : null}
 
+            {page.deliverables.length ? (
+              <>
+                <div className={p.reqRow}>
+                  <span className={p.reqLabel}>Deliverables done</span>
+                  <span className={`${p.reqCount}${progress.all && progress.done >= progress.all ? ` ${p.reqDone}` : ''}`}>{progress.done}/{progress.all}</span>
+                </div>
+                <div className={p.bar}>
+                  <div className={`${p.barFill}${progress.all && progress.done >= progress.all ? ` ${p.barDone}` : ''}`}
+                    style={{ width: `${progress.all ? Math.round((progress.done / progress.all) * 100) : 0}%` }} />
+                </div>
+              </>
+            ) : null}
+
+            {begin && can.manage && pr.status !== 'approved' ? (
+              <div className={p.approved}>
+                <button type="button" className={p.primary} disabled={pending} onClick={beginWork}>Plan assignments →</button>
+              </div>
+            ) : null}
+
             {pr.status === 'approved' ? (
               <div className={p.approved}>
-                <button type="button" className={p.primary} disabled title="The Assignment Plan comes next">Plan assignments →</button>
+                {can.manage ? <button type="button" className={p.primary} disabled={pending} onClick={beginWork}>Plan assignments →</button> : null}
                 <div className={p.wait}>
                   {pr.picReply?.decision === 'approved'
                     ? `Approved by ${pr.picReply.name || 'the PIC'} via link${pr.picReply.at ? ` · ${trailTime(pr.picReply.at)}` : ''}`

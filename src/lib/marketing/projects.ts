@@ -28,7 +28,7 @@ export interface ProjectRow {
   updatedAt: string
 }
 
-const KIND_LABEL: Record<MktProjectKind, string> = { product: 'Project', quick: 'Quick Task', recurring: 'Recurring' }
+const KIND_LABEL: Record<MktProjectKind, string> = { product: 'Project', quick: 'Quick Task', recurring: 'Recurring', deliverable: 'Deliverable' }
 
 export function projectRows(board: MktBoard): ProjectRow[] {
   const ix = indexBoard(board)

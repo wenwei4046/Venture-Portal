@@ -155,6 +155,21 @@
 .outline:disabled { opacity: .45; cursor: not-allowed; }
 .trail { border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); padding: 12px 14px; }
 
+/* The deliverables (②b-2a): by category, each a row — its -Dnn, its name and workflow, where it stands, Plan. */
+.delCount { margin-left: auto; font-family: var(--mk-mono); font-size: 12px; color: rgb(var(--mk-ink)); }
+.delToPlan { font-size: .8em; font-weight: 600; color: rgb(var(--mk-wait)); }
+.delBody { padding: 6px 18px 12px; display: flex; flex-direction: column; gap: 10px; }
+.delGroup { display: flex; flex-direction: column; }
+.delGroupName { font-size: .74em; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgb(var(--mk-muted)); padding: 8px 0 4px; }
+.delRow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgb(var(--mk-line-4)); min-width: 0; }
+.delGroup .delRow:first-of-type { border-top: 0; }
+.delMain { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; color: inherit; text-decoration: none; }
+.delMain:hover .delTitle { text-decoration: underline; text-underline-offset: 2px; }
+.delTrack { font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-muted)); flex: none; }
+.delTitle { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delWf { font-size: .84em; color: rgb(var(--mk-text-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delPlan { flex: none; height: 30px; padding: 0 12px; }
+
 .dialogField { display: flex; flex-direction: column; gap: 6px; }
 .dialogLabel { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
 
@@ -164,4 +179,6 @@
   .side { position: static; }
   .meeting { grid-template-columns: minmax(0, 1fr); }
   .stepLabel:not(.stepLabelCur) { display: none; }
+  .delRow { flex-wrap: wrap; }
+  .delMain { flex-basis: 100%; }
 }

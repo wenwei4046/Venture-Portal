@@ -23,7 +23,7 @@ const TONE_CLASS: Record<MktTone, string> = {
 const TEAM = (g: string) => TONE_CLASS[groupTone(g)]
 const TONE: Record<string, string> = { red: s.red, waiting: s.waiting, done: s.done, draft: s.draft }
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const KIND_EMOJI = { product: '📦', quick: '⚡', recurring: '🔁' } as const
+const KIND_EMOJI = { product: '📦', quick: '⚡', recurring: '🔁', deliverable: '📦' } as const
 type View = 'month' | 'week' | 'timeline'
 
 const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encodeURIComponent(trackId)}` : '/marketing/projects')

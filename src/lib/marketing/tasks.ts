@@ -39,6 +39,8 @@ export interface FormField {
   cal?: FieldCal | null
   /** …a choice's options. */
   opts?: string[]
+  /** A deliverable's field from one of its canvas's own sections (②b-2a): that section's title. */
+  section?: string
 }
 
 /** The kinds of date a field may put on the calendar (2026-10-24 — the user's answer 16: "要，固定种类"; 15: a post is a
@@ -129,6 +131,8 @@ export function missingWork(form: readonly FormField[], work: StageWork): string
   const inputs = form.filter(f => f.type !== 'Note' && f.type !== 'Table')
   const out = inputs
     .filter(f => {
+      // A field its template marks not required is never asked for (as mkt_stage_missing).
+      if (f.req === false) return false
       const v = work.vals[f.label]
       return v === undefined || v === false || (typeof v === 'string' && !v.trim())
     })
@@ -161,6 +165,7 @@ export function formFromRow(v: unknown): FormField[] {
       if (cal) extras.cal = cal
     }
     if ((type === 'Select' || type === 'Multi-select') && Array.isArray(f.opts)) extras.opts = f.opts.filter((o): o is string => typeof o === 'string')
+    if (typeof f.section === 'string' && f.section) extras.section = f.section
     return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}), ...extras }]
   })
 }

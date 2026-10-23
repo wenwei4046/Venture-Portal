@@ -390,6 +390,32 @@ export async function resendMktProject(project: string): Promise<Done<{ page: Pr
   return { ok: true, page: await freshProject(db, project) }
 }
 
+/** The work starts (②b-2a): the product's deliverables made — each action × its quantity — each to be planned. */
+export async function beginMktProduct(project: string): Promise<Done<{ page: ProductProjectPage | null; deliverables: number }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_begin', { p_project: project })
+  if (error) return { ok: false, reason: words(error, 'The work could not be started. Please try again.') }
+  freshen()
+  const made = data && typeof data === 'object' ? Number((data as { deliverables?: unknown }).deliverables) || 0 : 0
+  return { ok: true, page: await freshProject(db, project), deliverables: made }
+}
+
+/** A deliverable's Assignment Plan saved (②b-2a): its start day, each stage's person, approvals, days and subtasks —
+ * and, once it has opened, why a stage changes hands. */
+export async function planMktDeliverable(project: string, plan: Record<string, unknown>): Promise<Done<{ page: MktTaskPage | null; reassigned: number }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That deliverable is not there.' }
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.stages)) return { ok: false, reason: 'Reload the page and try again.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_deliverable_plan', { p_project: project, p_plan: plan })
+  if (error) return { ok: false, reason: words(error, 'The plan could not be saved. Please try again.') }
+  freshen()
+  const moved = data && typeof data === 'object' ? Number((data as { reassigned?: unknown }).reassigned) || 0 : 0
+  return { ok: true, page: await fresh(db, project), reassigned: moved }
+}
+
 /** Marketing's own client (+ Add subsidiary): its name and PIC; its code made by the database. */
 export async function addMktClient(name: string, pic: string): Promise<Done<{ sub: MktSub }>> {
   await requireActionOn('/marketing/new', 'marketing', 'manage')
