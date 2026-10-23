@@ -78,8 +78,21 @@ export function Phone4aSeg({ items }: { items: { label: string; on: boolean; pic
 }
 
 /** Change list 19 · the rust hero: three rates in white, an amber mark over the first, each one's change readable on rust. */
-export function Phone4aHero({ items, cols }: { items: { label: string; value: string; delta: string; good: boolean }[]; cols?: number }) {
+/** `compact` = v3 T01's smaller hero: 14px padding, 24px figures. */
+export function Phone4aHero({ items, cols, compact }: { items: { label: string; value: string; delta: string; good: boolean }[]; cols?: number; compact?: boolean }) {
   const n = cols ?? items.length;
+  if (compact) return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, rowGap: "12px", padding: "14px 0", borderRadius: "16px", background: "var(--crm-rust)", color: "#fff" }}>
+      {items.map((m, i) => (
+        <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "0 16px", borderLeft: i % n ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", minWidth: 0 }}>
+          <span style={{ width: "18px", height: "2px", background: i ? "transparent" : "var(--crm-amber)" }} />
+          <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}</span>
+          <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(24), letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
+          <span style={{ minHeight: "14px", fontSize: fs(11), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)" }}>{m.delta}</span>
+        </div>
+      ))}
+    </div>
+  );
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, rowGap: "22px", padding: n === 2 ? "20px 20px 22px" : "20px 16px", borderRadius: "20px", background: "var(--crm-rust)", color: "#fff" }}>
       {items.map((m, i) => (
@@ -92,6 +105,25 @@ export function Phone4aHero({ items, cols }: { items: { label: string; value: st
       ))}
     </div>
   );
+}
+
+/** T01 (v3) · Team Insight's head: the avatar left, "Hello, …" and the line under it, the house right; then, for CRM ·
+ * Manage, Team performance | Ads performance (the Ads side is the Ads Performance page drawn under this head). */
+export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; team: () => void; adsPick: () => void } | null } }) {
+  const seg = (label: string, on: boolean, pick: () => void) => (
+    <button type="button" onClick={pick} aria-pressed={on} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(13), fontWeight: 500,
+      background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>);
+  return (<>
+    <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px" }}>
+      <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", display: "grid", placeItems: "center", fontFamily: TIGHT, fontSize: fs(14), fontWeight: 500 }}>{h.ini}</span>
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <h1 style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.greet}</h1>
+        <span style={{ fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.sub}</span>
+      </span>
+      {h.house && <button type="button" onClick={h.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
+    </div>
+    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team performance", !h.sw.ads, h.sw.team)}{seg("Ads performance", h.sw.ads, h.sw.adsPick)}</div>}
+  </>);
 }
 
 /** M11 · Mine's Insight: Month / Week / Day / Range, the rust hero, the counts, Avg. reply time and Leads by status. */

@@ -90,7 +90,7 @@ export function periodRange(per: Period, custom: Range | null, now: Date): Range
 }
 export const inRange = (iso: string, r: Range) => { const t = day0(new Date(iso)); return t >= r.a && t <= r.b; };
 
-export interface Numbers { leads: number; booked: number; came: number; due: number; noshow: number; replied24: number; waits: number }
+export interface Numbers { leads: number; won: number; booked: number; came: number; due: number; noshow: number; replied24: number; waits: number }
 
 /** The numbers of some customers over a range. */
 export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range, now: Date): Numbers {
@@ -109,7 +109,7 @@ export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range
       if (m.from === "me" && !m.auto && wait != null) { if (inRange(new Date(wait).toISOString(), r) && t - wait <= DAY) replied24++; wait = null; }
     }
   }
-  return { leads: leads.length, booked, came: vs.filter(v => v.state === "attended").length, due: due.length, noshow: vs.filter(v => v.state === "no_show").length, replied24, waits };
+  return { leads: leads.length, won: leads.filter(c => c.status === "won").length, booked, came: vs.filter(v => v.state === "attended").length, due: due.length, noshow: vs.filter(v => v.state === "no_show").length, replied24, waits };
 }
 
 /* ── The date sheet: Period and Compare to (Overview, Ads Performance) ──── */
