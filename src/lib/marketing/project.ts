@@ -284,21 +284,22 @@ export function productStatus(status: ProductStatus): { label: string; tone: Ton
   }
 }
 
-/** The trail newest first, in the store's words (mkt_log's actions on a product project). */
+/** One line of a product project's trail in the store's words (mkt_log's actions on a product project). */
+export function productEventText(e: { actor: string; action: string; reason: string | null }, product: { name: string; version: number } | null): string {
+  const who = e.actor || 'Somebody'
+  return e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
+    : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
+    : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`
+    : e.action === 'minutes completed' ? `${who} completed ${e.reason || 'the minutes'}`
+    : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
+    : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason ?? ''}"`
+    : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
+    : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link`
+    : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason ?? ''}"`
+    : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
+}
+
+/** The trail newest first, in the store's words. */
 export function productTrail(page: Pick<ProductProjectPage, 'project' | 'trail'>): { key: string; t: string; text: string }[] {
-  const product = page.project.product
-  return page.trail.map((e, i) => {
-    const who = e.actor || 'Somebody'
-    const text = e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
-      : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
-      : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`
-      : e.action === 'minutes completed' ? `${who} completed ${e.reason || 'the minutes'}`
-      : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
-      : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason}"`
-      : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
-      : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link`
-      : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason}"`
-      : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
-    return { key: `${e.at}:${i}`, t: trailTime(e.at), text }
-  })
+  return page.trail.map((e, i) => ({ key: `${e.at}:${i}`, t: trailTime(e.at), text: productEventText(e, page.project.product) }))
 }

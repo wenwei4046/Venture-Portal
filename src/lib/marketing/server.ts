@@ -7,6 +7,7 @@ import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
+import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
@@ -70,6 +71,14 @@ export async function readProductProject(key: string): Promise<ProductProjectPag
   const { data, error } = await db.rpc('mkt_product_project', { p_key: key })
   if (error) throw new Error(error.message)
   return productProjectFromRow(data)
+}
+
+/** A subsidiary's ⚡ Recent activity: the newest lines of its projects' trails (mig 20261024005000). */
+export async function readSubFeed(sub: string, limit = 20): Promise<SubFeedEvent[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_sub_feed', { p_sub: sub, p_limit: limit })
+  if (error) throw new Error(error.message)
+  return subFeedFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

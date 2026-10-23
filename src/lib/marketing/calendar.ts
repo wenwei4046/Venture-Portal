@@ -5,7 +5,7 @@
 // are drawn, empty, until then. Pure.
 
 import {
-  addDays, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktSub,
+  addDays, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktDept, type MktSub,
 } from './board'
 
 export type CalKind = 'post' | 'due' | 'meet'
@@ -31,6 +31,8 @@ export interface CalEvent {
   time: string | null
   quick: boolean
   recur: boolean
+  /** The stage's team — a subsidiary's page colours and filters by it (④-2). */
+  team?: MktDept | null
 }
 
 export const LAYERS: readonly { key: CalKind; icon: string; label: string }[] = [
@@ -79,6 +81,7 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
         time: null,
         quick,
         recur: false,
+        team: s.dept,
       })
     }
     // A recurring series: the runs it will open, after the one already open.
@@ -105,6 +108,7 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
           time: null,
           quick: false,
           recur: true,
+          team: s0?.dept ?? null,
         })
       })
     }

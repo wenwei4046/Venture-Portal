@@ -151,7 +151,7 @@ export default function MktSidebar(p: MktSidebarProps) {
                   return (
                     <Link
                       key={sub.id}
-                      href={`/marketing/projects?sub=${encodeURIComponent(sub.code)}`}
+                      href={`/marketing/subsidiaries/${encodeURIComponent(sub.code)}`}
                       className={`${s.sub}${on ? ` ${s.subOn}` : ''}`}
                       title={sub.name}
                       aria-current={on ? 'page' : undefined}

@@ -60,6 +60,9 @@ const under = (path: string, prefix: string) => path === prefix || path.startsWi
 export function mktNavActive(pathname: string, search: URLSearchParams | null): MktNavKey | `sub:${string}` | null {
   const path = pathname.split('?')[0]
   if (path === '/marketing/projects' && search?.get('sub')) return `sub:${search.get('sub')}`
+  // A subsidiary's own page lights its row (④-2).
+  const subPage = /^\/marketing\/subsidiaries\/([^/]+)$/.exec(path)
+  if (subPage) return `sub:${decodeURIComponent(subPage[1]).toUpperCase()}`
   // New Project is the Projects tab's page.
   if (path === '/marketing/new') return 'projects'
   let best: MktNavRow | null = null

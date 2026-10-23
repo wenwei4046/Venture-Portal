@@ -81,6 +81,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_products',
   // Marketing's product projects (mig 20261024002000): the products on sale, a product project's page — STABLE.
   'mkt_product_picker', 'mkt_product_project',
+  // A Marketing subsidiary's page (mig 20261024005000): its projects' newest trail lines — STABLE.
+  'mkt_sub_feed',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

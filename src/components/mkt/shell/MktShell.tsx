@@ -80,8 +80,9 @@ export default function MktShell({
   const own = pathname === '/marketing' || pathname.startsWith('/marketing/')
   const personal = user.personalLogin === true && !user.viewingAs
 
-  // The crumb: the row's own, or a subsidiary's when its projects are open.
-  const subCode = pathname === '/marketing/projects' ? search?.get('sub') : null
+  // The crumb: the row's own, or a subsidiary's when its page or its projects are open.
+  const subPage = /^\/marketing\/subsidiaries\/([^/]+)$/.exec(pathname)
+  const subCode = pathname === '/marketing/projects' ? search?.get('sub') : subPage ? decodeURIComponent(subPage[1]).toUpperCase() : null
   const sub = subCode ? shell?.subs.find(x => x.code === subCode) : null
   const crumb = sub ? { emoji: sub.emoji, label: sub.name } : mktCrumb(pathname)
 

@@ -44,7 +44,7 @@ const sidebar = (manager: boolean, subsOpen = true) =>
 describe('the sidebar’s + Add subsidiary', () => {
   it('sits under the open Subsidiaries list for the manager, opening New Project’s client form', () => {
     sidebar(true)
-    expect(screen.getByRole('link', { name: /Acme Furniture/ }).getAttribute('href')).toBe('/marketing/projects?sub=ACME')
+    expect(screen.getByRole('link', { name: /Acme Furniture/ }).getAttribute('href')).toBe('/marketing/subsidiaries/ACME')
     expect(screen.getByRole('link', { name: /Add subsidiary/ }).getAttribute('href')).toBe('/marketing/new?add=1')
   })
 
