@@ -15,6 +15,9 @@ describe("CRM photos, videos and voice notes", () => {
     expect(mediaLimit("whatsapp", "image")).toBe(5 * 1024 * 1024);
     expect(mediaLimit("whatsapp", "video")).toBe(16 * 1024 * 1024);
     expect(mediaLimit("messenger", "video")).toBe(25 * 1024 * 1024);
+    // R2 (2026-10-23): the bucket takes 100 MB, so a WhatsApp document has WhatsApp's whole 100 MB; Messenger stays 25.
+    expect(mediaLimit("whatsapp", "document")).toBe(100 * 1024 * 1024);
+    expect(mediaLimit("messenger", "document")).toBe(25 * 1024 * 1024);
   });
 
   it("puts a file in its customer's folder, with a safe name", () => {
