@@ -424,7 +424,7 @@ interface InboxSideBits {
 
 function Strip({ label, icon, bg, onOpen }: { label: string; icon: "user-round" | "history"; bg: string; onOpen: () => void }) {
   return (
-    // v2 (note 04): every folded rail is the one style — #FBF4EC, whatever its panel's colour (bg kept for the call sites).
+    // v2 (note 04): every folded rail is the one style — the cream nav, whatever its panel's colour (bg kept for the call sites).
     <button type="button" onClick={onOpen} title={`Open ${label}`} data-bg={bg} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
       borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
       <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={icon} size={16} /></span>
@@ -434,7 +434,7 @@ function Strip({ label, icon, bg, onOpen }: { label: string; icon: "user-round" 
   );
 }
 
-/** Frames 02 / 02b / 02c · Customer info (white) and this chat's Audit log (#F6E7D8), each folding to a 44 px strip. */
+/** Frames 02 / 02b / 02c · Customer info (white) and this chat's Audit log, each folding to a 44 px strip. */
 export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: string, href: string | null) => ReactNode }) {
   return (<>
     {v.ibInfoShut ? <Strip label="Customer info" icon="user-round" bg="var(--crm-page)" onOpen={v.ibInfoRail.open} /> : (
