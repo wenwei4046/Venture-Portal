@@ -250,9 +250,9 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           <div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "20px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>
             {(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}><span onClick={g.jump} style={{ flex: "none", height: "36px", display: "inline-flex", alignItems: "center", gap: "6px", marginBottom: "-1px", borderBottom: g.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: g.on ? "500" : "400", color: g.on ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", cursor: "pointer" }}>{g.title} <span style={{ fontVariantNumeric: "tabular-nums" }}>{g.n}</span></span></Fragment>))}
           </div>
-          <div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", margin: "-14px -20px -14px", padding: "14px 16px 14px", background: "var(--crm-hover)", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
-            {(v.ib.inbCols).map((g, g_i) => (<Fragment key={g_i}>
-              <div style={{ flex: "0 0 300px", height: "100%", scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: "10px", boxSizing: "border-box", overflowY: "auto", scrollbarWidth: "none" }}>
+          <div data-inb-board="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "hidden", overflowY: "hidden", scrollbarWidth: "none", margin: "-14px -20px -14px", padding: "14px 16px 14px", background: "var(--crm-hover)", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
+            {(v.ib.inbCols).filter(g => g.on).map((g, g_i) => (<Fragment key={g_i}>
+              <div style={{ flex: "1 1 auto", minWidth: "0", height: "100%", scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: "10px", boxSizing: "border-box", overflowY: "auto", scrollbarWidth: "none" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "2px 4px" }}>
                   <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: g.c }}>
                   </span>
@@ -1069,7 +1069,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </path>
                   </svg>{v.as.ae.applyLabel}</span>
                 
-                <span onClick={v.as.ae.save} style={{ height: "50px", borderRadius: "25px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Save</span>{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}
+                <span style={{ display: "flex", gap: "10px" }}><span onClick={v.as.ae.close} role="button" style={{ flex: "1", height: "44px", boxSizing: "border-box", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", display: "grid", placeItems: "center", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: "500", cursor: "pointer" }}>Cancel</span><span onClick={v.as.ae.save} style={{ flex: "2", height: "44px", borderRadius: "22px", background: v.as.ae.save ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Save</span></span>{!!(v.as.ae.why) && (<span role="status" style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", lineHeight: "1.4", color: "var(--crm-oxblood)", textAlign: "center" }}>{v.as.ae.why}</span>)}
               </div>
             </div>
           </div>
@@ -1191,7 +1191,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </div>
               </Fragment>))}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,.14)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,.14)" }}><span onClick={v.cal.cTeamsToggle} role="button" aria-expanded={v.cal.cTeamsOpen} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", color: "var(--crm-peach-soft)", cursor: "pointer" }}>By team<span style={{ display: "flex", marginLeft: "auto", transform: `rotate(${v.cal.cTeamsChev})`, transition: "transform 160ms" }}><Ic name="chevron-down" size={14} /></span></span>
               {(v.cal.cByTeam).map((b, b_i) => (<Fragment key={b_i}>
                 <div style={{ display: "grid", gridTemplateColumns: "118px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: "0", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "none", width: "9px", height: "9px", boxSizing: "border-box", borderRadius: "50%", border: `2px solid ${b.c}` }} />{b.name}</span>

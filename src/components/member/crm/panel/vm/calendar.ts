@@ -76,7 +76,8 @@ export function calendarVM(ctx: PanelCtx) {
       // Visits shows them as the List; Upcoming and Showed up open their lists; Show-up % opens nothing.
       open: label === "Show-up" ? undefined : label === "Visits" ? () => patch({ cView: "list", cDay: null }) : () => patch({ cLs: label === "Upcoming" ? "up" as const : "came" as const }),
       cur: label === "Show-up" ? "default" : "pointer", deco: label === "Show-up" ? "none" : "underline dotted rgba(255,255,255,.5)" })),
-    cByTeam: (ts === "all" ? teamKeys : [ts]).map(id => {
+    cTeamsOpen: ui.cTeamsOpen, cTeamsToggle: () => patch({ cTeamsOpen: !ui.cTeamsOpen }), cTeamsChev: ui.cTeamsOpen ? "180deg" : "0deg",
+    cByTeam: (ui.cTeamsOpen ? (ts === "all" ? teamKeys : [ts]) : []).map(id => {
       const L = list.filter(a => a.seat.id === id), c = L.filter(a => a.v.state === "attended").length, n = L.filter(a => a.v.state === "no_show").length;
       return { name: seatName(id), n: L.length, rate: c + n ? `${Math.round((c / (c + n)) * 100)}%` : "—", w: `${list.length ? (L.length / list.length) * 100 : 0}%`, c: seatC(id) };
     }),
