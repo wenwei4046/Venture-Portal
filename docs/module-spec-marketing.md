@@ -28,9 +28,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | #644, live 2026-10-23 |
 | ③c | The Product Builder: products one-time or recurring monthly, their code made by the database, categories of actions (quantity, unit price, each on a workflow — or a new one made there), the intake minutes template, list price, cost and margin (the manager's alone), versions taking effect on a day, retire / reactivate (mig `20261023235900`) | #646, live 2026-10-23 |
 | ③d | The Canvas Template Editor (the Workflow Builder's Canvas template tab): the task page laid out — Requirements, a section per stage, the manager's own sections, the Free space; a section's 🔒 / ⭐ / 👁 and stage; a field's ⭐ / 👁, stage, a date on the calendar, a choice's options; the Preview as the staff and as the PIC; kept with the draft and published with the version (mig `20261024001000`) | #648, live 2026-10-23 |
-| ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | this PR |
-| ④-2 | The Subsidiary page (stats, Month / Week / Timeline, key dates, the feed, the projects) — what exists; campaigns, posts, shoots and ads wait for questions 13–17 | next |
-| ④-3 | The Audit trail tab: the formal log, its filters; export waits for question 18 | |
+| ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | #653 |
+| ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | this PR |
+| ④-3 | The Audit trail tab: the formal log, its filters; export waits for question 18 | next |
 | ④-4 | The Task map and Replay | |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
@@ -100,6 +100,11 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 54. **A client's code** (④-1). The handoff's (the name's first four letters and digits, else OTH) can collide or fall under two characters, and a Track ID keeps it for good: the database makes it, numbered when taken.
 55. **A client's WhatsApp** (④-1). The handoff's form has the PIC's name, no WhatsApp; a product project's Meeting card takes it.
 56. **Editing or hiding a client** (④-1). The handoff adds clients and never renames, edits or hides one — not built (question 29). Its sidebar row has no click: built as New Project with the form open.
+57. **The cards** (④-2). The handoff's are *Campaigns running*, *Posts* (n posted), *Shoots*, *Ads live* and *Overdue*, from sample data with no source in the portal (questions 13, 15). Built from what exists: *Projects running*, *Waiting for PIC*, *Due this week*, *Done this month*, *Overdue*.
+58. **What the dates are** (④-2). The handoff's items are posts (Reels, Post, Tip, Launch, Offer, Testimonial), shoot days, ads go-live and end, report days and PIC deadlines; the portal has stage due dates and a series' runs to come — its Type filter offers those two until questions 15–16 are answered.
+59. **Key dates** (④-2). The handoff's are typed into its sample (Payday, 11.11, *Carres showroom opens*); built from HR's holidays (gap 6) until question 14.
+60. **The timeline's bars** (④-2). The handoff's are campaigns; built as projects — from their start (else the day made) to their due day, ten weeks from the Monday two weeks back.
+61. **Progress** (④-2). The handoff's n/m is never defined: built as stages done (or passed) ÷ stages (question 17).
 
 ## 5. Open questions (for the user)
 
