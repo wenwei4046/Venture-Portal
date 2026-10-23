@@ -144,7 +144,7 @@ function FormBody({ readOnly, onSubmit, onClose, upload }: {
         </label>
         <div className={s.field}><span className={s.fieldLabel}>Screenshots and files</span>
           <ItFileList items={files.items} full={files.full} disabled={readOnly || busy} onAdd={files.add} onRemove={files.remove} />
-          <span className={t.hint}>Pictures, videos, PDF, Office, zip — up to 10, 50 MB each.</span>
+          <span className={t.hint}>Pictures, videos, PDF, Office, zip — up to 10, 2 GB each.</span>
         </div>
         {error && <p className={s.formError} role="alert">{error}</p>}
       </div>

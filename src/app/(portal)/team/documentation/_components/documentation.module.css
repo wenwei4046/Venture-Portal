@@ -821,6 +821,7 @@ textarea.input { resize: vertical; }
 }
 .vwFrame { width: 100%; flex: 1; min-height: 640px; border: 0; background: rgb(255 255 255); }
 .vwImg { width: 100%; height: auto; background: rgb(255 255 255); box-shadow: 0 1px 3px rgba(43, 31, 23, 0.12); }
+.vwVideo { width: 100%; max-height: 640px; background: rgb(0 0 0); box-shadow: 0 1px 3px rgba(43, 31, 23, 0.12); }
 .vwNone { margin: auto; text-align: center; color: rgb(var(--hv-body-2)); font-size: 13px; line-height: 1.6; }
 /* An Excel or CSV file (the handoff's `isSheet`): a white page, the column
    letters on a grey band, each row's number down the side, the first row the

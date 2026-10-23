@@ -571,10 +571,10 @@ export function hireAnswers(answers: Readonly<Record<string, string>>): Record<s
   return Object.fromEntries(Object.entries(answers).filter(([k, v]) => !k.startsWith('_') && String(v ?? '').trim() !== ''))
 }
 
-/** A file a guest may attach: PDF, Word or a photo, under 10 MB (the bucket's own limits). */
+/** A file a guest may attach: PDF, Word or a photo, up to 100 MB (the bucket's own limits, mig 20261024006700). */
 export function attachable(name: string, size: number): { ext: string } | { reason: string } {
   const ext = (name.split('.').pop() ?? '').toLowerCase()
   if (!['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg', 'webp'].includes(ext)) return { reason: 'Attach a PDF, a Word file or a photo.' }
-  if (size > 10 * 1024 * 1024) return { reason: 'Attach a file under 10 MB.' }
+  if (size > 100 * 1024 * 1024) return { reason: 'Attach a file up to 100 MB.' }
   return { ext }
 }

@@ -234,7 +234,7 @@ function NewRequest({ open, app, readOnly, onClose, onSaved }: {
         </div>
         <Field label="Title" htmlFor={`${fields}-title`}><Input id={`${fields}-title`} value={title} onChange={event => setTitle(event.target.value)} maxLength={IT_LIMITS.title} disabled={busy} aria-required="true" /></Field>
         <Field label="Details" htmlFor={`${fields}-details`}><TextArea id={`${fields}-details`} value={details} onChange={event => setDetails(event.target.value)} maxLength={IT_LIMITS.details} rows={5} disabled={busy} placeholder="What happened, where in the app, and what you expected" /></Field>
-        <div><SecLabel>Screenshots and files</SecLabel><Uploads files={files} disabled={busy || readOnly} onAnnotate={readOnly ? undefined : annotate} /><p className={s.meta}>Up to 10 files, 50 MB each.</p></div>
+        <div><SecLabel>Screenshots and files</SecLabel><Uploads files={files} disabled={busy || readOnly} onAnnotate={readOnly ? undefined : annotate} /><p className={s.meta}>Up to 10 files, 2 GB each.</p></div>
         {error && <p className={s.error} role="alert">{error}</p>}
       </div>
     </DialogForm>}

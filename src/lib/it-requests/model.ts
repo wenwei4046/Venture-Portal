@@ -33,8 +33,8 @@ export const STATUS_LABEL: Readonly<Record<ItStatus, string>> = { new: 'New', in
 /** A status's chip, in the app's tones: waiting, being worked on, done, put away. */
 export const STATUS_TONE: Readonly<Record<ItStatus, 'pending' | 'warn' | 'good' | 'none'>> = { new: 'pending', in_progress: 'warn', fixed: 'good', closed: 'none' }
 
-/** The database's limits (mig 20261021020100), said before anything is sent. */
-export const IT_LIMITS = { title: 120, details: 5000, note: 3000, files: 10, fileBytes: 50 * 1024 * 1024 } as const
+/** The database's limits (mig 20261021020100; a file 2 GB since mig 20261024006700), said before anything is sent. */
+export const IT_LIMITS = { title: 120, details: 5000, note: 3000, files: 10, fileBytes: 2 * 1024 * 1024 * 1024 } as const
 
 export interface ItFile {
   id: string
@@ -189,7 +189,7 @@ export function itContentType(name: string, type: string): string | null {
 export function itFileRefusal(file: { name: string; size: number; type: string }): string | null {
   if (!itContentType(file.name, file.type)) return `${file.name || 'That file'}: a picture, a video, a PDF, an Office file, a zip or a text file.`
   if (file.size < 1) return `${file.name || 'That file'} is empty.`
-  if (file.size > IT_LIMITS.fileBytes) return `${file.name || 'That file'} is over 50 MB.`
+  if (file.size > IT_LIMITS.fileBytes) return `${file.name || 'That file'} is over 2 GB.`
   return null
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ackLine, audienceGroups, audienceLabel, contentTypeOf, dataCenterPeople, deptLabel, documentationFromRow, fileExt, fileRefusal,
+  ackLine, audienceGroups, audienceLabel, contentTypeOf, dataCenterPeople, deptLabel, DOC_ACCEPT, documentationFromRow, fileExt, fileRefusal,
   LETTER_STATUS, letterStatus, letterTrail, liveLetters, missingCount, missingFor, nameFromFile, objectPath, previewKind, publishRefusal, publishSummary,
   publishedAudience, safeFileName, withdrawnLine, type DocPerson, type LetterType, type PersonLetter, type Published,
 } from './model'
@@ -172,12 +172,24 @@ describe('a withdrawn memo', () => {
 })
 
 describe('files', () => {
-  it('knows the bucket’s kinds and its 25 MB', () => {
+  it('knows the bucket’s kinds and its 2 GB (mig 20261024006700)', () => {
     expect(contentTypeOf('a.XLSX', '')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     expect(contentTypeOf('scan.jpg', 'image/jpeg')).toBe('image/jpeg')
     expect(fileRefusal({ name: 'a.exe', size: 10 })).toMatch(/cannot be kept here/)
-    expect(fileRefusal({ name: 'a.pdf', size: 26 * 1024 * 1024 })).toBe('That file is larger than 25 MB.')
+    expect(fileRefusal({ name: 'page.html', size: 10, type: 'text/html' })).toMatch(/cannot be kept here/)
+    expect(fileRefusal({ name: 'a.pdf', size: 26 * 1024 * 1024 })).toBeNull()
+    expect(fileRefusal({ name: 'training.mp4', size: 2 * 1024 * 1024 * 1024 })).toBeNull()
+    expect(fileRefusal({ name: 'training.mp4', size: 2 * 1024 * 1024 * 1024 + 1 })).toBe('That file is larger than 2 GB.')
     expect(fileRefusal({ name: 'a.pdf', size: 10 })).toBeNull()
+  })
+
+  it('takes videos, PowerPoint and zip as the bucket does', () => {
+    expect([contentTypeOf('clip.MOV'), contentTypeOf('clip.mp4'), contentTypeOf('clip.webm')]).toEqual(['video/quicktime', 'video/mp4', 'video/webm'])
+    expect(contentTypeOf('Deck.pptx')).toBe('application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    expect(contentTypeOf('Old deck.ppt')).toBe('application/vnd.ms-powerpoint')
+    // Windows says x-zip-compressed; the name decides, and the bucket takes both.
+    expect(contentTypeOf('scans.zip', 'application/x-zip-compressed')).toBe('application/zip')
+    expect(DOC_ACCEPT.split(',')).toEqual(expect.arrayContaining(['.mp4', '.mov', '.webm', '.ppt', '.pptx', '.zip']))
   })
 
   it('names the object safely, under its folder', () => {
@@ -187,10 +199,14 @@ describe('files', () => {
     expect(objectPath('publish', 'u3', '../x.pdf')).toBe('publish/u3/x.pdf')
   })
 
-  it('previews a PDF and a picture, nothing else', () => {
+  it('previews a PDF, a picture, a video and a sheet, nothing else', () => {
     expect(previewKind('a.pdf', null)).toBe('pdf')
     expect(previewKind('a.png', 'image/png')).toBe('image')
     expect(previewKind('a.heic', 'image/heic')).toBe('none')
+    expect(previewKind('Training.MP4', null)).toBe('video')
+    expect(previewKind('clip.mov', 'video/quicktime')).toBe('video')
+    expect(previewKind('scans.zip', null)).toBe('none')
+    expect(previewKind('Deck.pptx', null)).toBe('none')
     expect(previewKind('Price.xlsx', null)).toBe('sheet')
     expect(previewKind('Old prices.XLS', null)).toBe('sheet')
     expect(previewKind('claims.csv', 'text/csv')).toBe('sheet')
