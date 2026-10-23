@@ -133,6 +133,11 @@
 .linkUrl { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgb(var(--mk-surface-2)); border: 1px solid rgb(var(--mk-line-2)); min-width: 0; }
 .linkUrl span { flex: 1; font-family: var(--mk-mono); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all; }
 .linkBtns { display: flex; gap: 8px; }
+/* Each PIC their own link (②b-2d-2a): with two, each under its PIC's name, a hairline between. */
+.linkOne { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.linkOne + .linkOne { padding-top: 10px; border-top: 1px solid rgb(var(--mk-line-4)); }
+.linkWho { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.addPic { justify-self: start; align-self: center; }
 .ghost {
   flex: 1; height: 34px; border-radius: 8px; border: 1px solid rgb(var(--mk-line)); display: flex; align-items: center; justify-content: center; font: inherit;
   font-size: .9em; font-weight: 500; cursor: pointer; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); text-decoration: none; white-space: nowrap;

@@ -38,6 +38,11 @@ export interface MktSub {
   emoji: string
   client: boolean
   pic: string | null
+  /** The board's own (mig 20261025034000 — the user's answer 29: one or two PICs): the PIC's WhatsApp, the second PIC
+   * and theirs; a project's page reads its own. */
+  whatsapp?: string | null
+  pic2?: string | null
+  whatsapp2?: string | null
 }
 
 /** A recurring series' rule as the database keeps it — its runs' opening days and whether it still runs. */
@@ -180,6 +185,7 @@ export function subFromRow(s: Record<string, unknown>): MktSub {
     emoji: str(s.emoji) || '🏢',
     client: s.client === true,
     pic: strOrNull(s.pic),
+    ...('pic2' in s || 'whatsapp' in s ? { whatsapp: strOrNull(s.whatsapp), pic2: strOrNull(s.pic2), whatsapp2: strOrNull(s.whatsapp2) } : {}),
   }
 }
 
