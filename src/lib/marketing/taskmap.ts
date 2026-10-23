@@ -217,11 +217,11 @@ export function taskMap(page: MktTaskPage): TaskMap {
 
   // ── The stations as the database has them now ─────────────────────────────────
   const lanesUsed: MapLaneId[] = []
-  const useLane = (l: MapLaneId) => { if (!lanesUsed.includes(l)) lanesUsed.push(l) }
-  if (stages.some(s => s.appr.length)) useLane('appr')
+  const addLane = (l: MapLaneId) => { if (!lanesUsed.includes(l)) lanesUsed.push(l) }
+  if (stages.some(s => s.appr.length)) addLane('appr')
   const startLane: MapLaneId = stages[0]?.dept ?? 'social'
-  useLane(startLane)
-  stages.forEach(s => useLane(s.dept))
+  addLane(startLane)
+  stages.forEach(s => addLane(s.dept))
 
   const returnsTo = (idx: number) => [...backs.values()].filter(b => b.to === `s${idx}`).reduce((n, b) => n + b.n, 0)
   const nodes: MapNode[] = road.map((r, col) => {

@@ -8,7 +8,7 @@ import {
   type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { trailTime } from '@/lib/marketing/task'
-import FormalLogSheet from '../audit/FormalLogSheet'
+import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import MinutesForm from './MinutesForm'
 import p from './project.module.css'
@@ -385,7 +385,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </div>
         </aside>
       </div>
-      {logOpen ? <FormalLogSheet project={pr.id} track={pr.track} onClose={() => setLogOpen(false)} /> : null}
+      {logOpen ? <ProjectSheet project={pr.id} track={pr.track} title={pr.title} page={null} tab="audit" onClose={() => setLogOpen(false)} /> : null}
 
       {modal ? (
         <div className={t.scrim} onClick={() => !pending && setModal(false)}>
