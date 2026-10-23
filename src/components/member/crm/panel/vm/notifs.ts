@@ -11,7 +11,7 @@ import { openSummary } from "../../shared/notif-summary";
 import { downlineOf } from "../../shared/people";
 import { summaryFor } from "../../shared/notif-summary-data";
 
-type Kind = "assign" | "move" | "share" | "won" | "lost" | "overdue";
+type Kind = "assign" | "move" | "share" | "won" | "lost" | "overdue" | "adsetup";
 const K: Record<Kind, [string, string, string, string]> = {
   assign: ["Assign", "var(--crm-muted)", "var(--crm-tint-cold)", "M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M16 11h6"],
   move: ["Move", "var(--crm-ink-soft)", "var(--crm-tint-cold)", "M5 12h14m-5-5 5 5-5 5"],
@@ -19,9 +19,10 @@ const K: Record<Kind, [string, string, string, string]> = {
   won: ["Won", "var(--crm-brown)", "var(--crm-tint-follow)", "M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM17 6h3a3 3 0 0 1-3 4M7 6H4a3 3 0 0 0 3 4"],
   lost: ["Lost", "var(--crm-muted)", "var(--crm-field)", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM15 9l-6 6M9 9l6 6"],
   overdue: ["Overdue", "var(--crm-oxblood)", "var(--crm-tint-attention)", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v5l3 2"],
+  adsetup: ["Ad not set", "var(--crm-rust)", "var(--crm-tint-attention)", "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm14-2a4 4 0 0 1 0 6"],
 };
 
-export interface PanelNotif { key: string; kind: Kind; at: string; who: string; text: string; lead: string; tail: string; extra: string; /** The customer it is about: a tap opens that chat. */ customerId?: string }
+export interface PanelNotif { key: string; kind: Kind; at: string; who: string; text: string; lead: string; tail: string; extra: string; /** The customer it is about: a tap opens that chat. */ customerId?: string; /** An ad with no split yet: a tap opens Assignment. */ adId?: string }
 
 /** The last 14 days of it, newest first. */
 export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
@@ -64,6 +65,19 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
     out.push({ key: `o${c.id}@${c.lastCustomerAt}`, customerId: c.id, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
       extra: `Last message ${last.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}` });
   }
+  // An ad with no split yet (the owner, 2026-10-24: "還沒set的要有提示，包含notification"): CRM · Manage hears of every ad a lead
+  // came from, or Ads Manager lists as running, that nobody has split — its leads all go to the Revenue Director meanwhile.
+  if (data.can?.manage) {
+    const firstAt = new Map<string, string>();
+    for (const c of data.customers) if (c.adId && (!firstAt.has(c.adId) || c.createdAt < firstAt.get(c.adId)!)) firstAt.set(c.adId, c.createdAt);
+    for (const [id, a] of Object.entries(data.adNames ?? {})) if (a.added && !firstAt.has(id)) firstAt.set(id, a.startAt ?? now.toISOString());
+    for (const [id, at] of firstAt) {
+      if ((data.adRules ?? []).some(r => r.adId === id)) continue;
+      const name = data.adNames?.[id]?.name ?? data.customers.find(c => c.adId === id)?.ad ?? "An ad";
+      const n = data.customers.filter(c => c.adId === id).length;
+      out.push({ key: `ad${id}`, kind: "adsetup", adId: id, at, who: name, text: "has no split yet", lead: "", tail: "", extra: n ? `${n} lead${n === 1 ? "" : "s"} · all to the Revenue Director until it is set` : "Its leads go to the Revenue Director until it is set" });
+    }
+  }
   // Deleted on the computer (CRM Desktop rev 1, B3): gone from their phone too — they are the same person's.
   const gone = new Set(data.notifDeleted ?? []);
   return out.filter(n => !gone.has(n.key)).sort((a, b) => b.at.localeCompare(a.at));
@@ -88,6 +102,7 @@ export function notifsVM(ctx: PanelCtx) {
       // chat it is about (the owner, 2026-10-14: "我點進去看到更多才去 chat"; until then a tap opened the chat at once).
       tap: () => {
         if (!read) act.readNotifs([n.key]);
+        if (n.adId) { patch({ nfOpen: false, tab: "assign", asSec: null, lead: null }); return; }
         const go = n.customerId && data.customers.some(c => c.id === n.customerId)
           ? () => patch({ nfOpen: false, lead: n.customerId!, pick: "", toast: "", ...(["overview", "calendar", "assign", "inbox"].includes(ui.tab) ? {} : { tab: "inbox" as const }) })
           : undefined;
@@ -101,7 +116,7 @@ export function notifsVM(ctx: PanelCtx) {
     notifUnread: unread.length ? String(unread.length) : "", notifOpen: ui.nfOpen,
     openNotifs: () => patch({ nfOpen: true }), closeNotifs: () => patch({ nfOpen: false }),
     readAll: () => { if (unread.length) act.readNotifs(unread.map(n => n.key), true); }, readAllFg: unread.length ? "var(--crm-rust)" : "var(--crm-faint-2)",
-    nfChips: ([["", "All", "var(--crm-ink)"], ["assign", "Assign", K.assign[1]], ["move", "Move", K.move[1]], ["share", "Share", K.share[1]], ["won", "Won", K.won[1]], ["lost", "Lost", K.lost[1]], ["overdue", "Overdue 9 h+", K.overdue[1]]] as const).map(([k, label, dot]) => {
+    nfChips: ([["", "All", "var(--crm-ink)"], ["assign", "Assign", K.assign[1]], ["move", "Move", K.move[1]], ["share", "Share", K.share[1]], ["won", "Won", K.won[1]], ["lost", "Lost", K.lost[1]], ["overdue", "Overdue 9 h+", K.overdue[1]], ["adsetup", "Ad not set", K.adsetup[1]]] as const).map(([k, label, dot]) => {
       const on = f === k;
       return { label, dot: on ? "#fff" : dot, n: all.filter(n => inTab(n) && (!k || n.kind === k)).length, bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-rule)", pick: () => patch({ nfF: k }) };
     }),

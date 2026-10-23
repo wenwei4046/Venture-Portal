@@ -1246,7 +1246,7 @@ interface AdListBits {
   stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
 }
 // The name keeps 136 px (the channel icon and "Not named yet"); the split bar gives way first on a narrow screen (the owner, 2026-10-18: "调一下 Split 宽度").
-const AD_GRID = "minmax(136px,1fr) 44px minmax(0,106px) 64px";
+const AD_GRID = "minmax(136px,1fr) 44px minmax(0,106px) 84px";
 
 /** Frame 06 · Assignment › Ads to teams: the summary and team legend, then every ad — channel, name, headline, leads, its split, Edit split / Set up. */
 export function DeskAdList4a({ v }: { v: AdListBits }) {
@@ -1294,8 +1294,10 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
             {!r.set ? <span style={{ flex: 1, background: "var(--crm-rule-soft)", borderRadius: "2px" }} /> : r.segs.map((g, j) => <span key={j} style={{ flex: g.pct, background: g.color }} />)}
           </span>
           <span style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button type="button" onClick={e => { e.stopPropagation(); r.open(); }} style={{ ...BTN, height: "30px", padding: "0 10px", borderRadius: "6px", font: "500 12px Inter, sans-serif", lineHeight: 1.1, textAlign: "center",
-              ...(!r.set ? { background: "var(--crm-rust)", color: "#fff" } : { border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }) }} className={!r.set ? "crm4a-primary" : "crm4a-outline"}>{!r.set ? "Set up" : "Edit split"}</button>
+            {/* No Edit split / Set up button: the row opens the split (the owner, 2026-10-24: "點廣告名就能進到assign 版面"); an ad
+                nobody split says "Not set up" ("還沒set的要有提示"). */}
+            {!r.set ? <span style={{ height: "24px", padding: "0 9px", borderRadius: "12px", display: "inline-flex", alignItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", font: "500 11.5px Inter, sans-serif", whiteSpace: "nowrap" }}>Not set up</span>
+              : <span style={{ display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={15} /></span>}
           </span>
         </div>
       </Fragment>))}
@@ -1364,6 +1366,7 @@ function SplitBox({ value, unit, onChange, small, label }: { value: string; unit
  *  By % · By max and its people. Total last. The body scrolls; Save sits in the panel's foot. */
 export function DeskSplit4a({ v }: { v: SplitBits }) {
   const S = v.split4;
+  const [adj, setAdj] = useState<Record<string, boolean>>({});
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "14px", padding: "18px 24px", overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1375,7 +1378,6 @@ export function DeskSplit4a({ v }: { v: SplitBits }) {
             : <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</span>}
           <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-muted)" }}><Ic name="pencil" size={15} /></span>
         </label>
-        {v.ad.headline && <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Meta sends only the headline: “{v.ad.headline}”.</div>}
       </div>
       <div style={{ display: "flex", padding: "3px", borderRadius: "8px", background: "var(--crm-field)" }}>
         {v.adModes.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center",
@@ -1396,6 +1398,10 @@ export function DeskSplit4a({ v }: { v: SplitBits }) {
         </div>
       )}
       {S && (<>
+        {/* The split at a glance, as the phone's Split leads (2026-10-24). */}
+        <div style={{ display: "flex", gap: "2px", height: "8px", borderRadius: "4px", overflow: "hidden", background: "var(--crm-rule-soft)" }}>
+          {S.rows.filter(r => r.pct > 0).map(r => <span key={r.id} style={{ flex: `${r.pct} 1 0px`, background: r.color, transition: "flex-grow 200ms" }} />)}
+        </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           {S.rows.map(r => (
             <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "11px 0", borderBottom: "1px solid var(--crm-rule-soft)" }}>
@@ -1409,12 +1415,21 @@ export function DeskSplit4a({ v }: { v: SplitBits }) {
               </div>
               <div style={{ paddingLeft: "19px" }}><SplitSlider pct={r.pct} color={r.color} thumb={14} onChange={r.onType} label={`${r.name} share`} /></div>
               {r.open && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", paddingLeft: "19px" }}>
-                  <div style={{ display: "flex", gap: "16px", font: "500 12px Inter, sans-serif" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginLeft: "19px", padding: "10px 12px 12px", borderRadius: "10px", background: "var(--crm-sel)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", font: "500 12px Inter, sans-serif" }}>
                     {r.modes.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, paddingBottom: "3px", font: "inherit",
                       borderBottom: `2px solid ${o.on ? "var(--crm-rust)" : "transparent"}`, color: o.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{o.label}</button>)}
+                    {/* Results first, as the phone; the icon opens each person's box and slider (the phone's Adjust split). */}
+                    {(r.isPct || r.isMax) && <button type="button" onClick={() => setAdj(a => ({ ...a, [r.id]: !a[r.id] }))} aria-pressed={!!adj[r.id]} aria-label="Adjust split" title="Adjust split" style={{ ...BTN, marginLeft: "auto", width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: adj[r.id] ? "var(--crm-ink)" : "#fff", color: adj[r.id] ? "#fff" : "var(--crm-ink)" }}><Ic name="sliders-horizontal" size={13} /></button>}
                   </div>
-                  {r.members.map(m => (
+                  {!adj[r.id] && r.members.map(m => (
+                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 90px 56px", alignItems: "center", gap: "10px", font: "400 13px Inter, sans-serif", color: m.locked ? "var(--crm-faint)" : "var(--crm-ink)" }}>
+                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                      <span style={{ height: "4px", borderRadius: "2px", background: "var(--crm-track)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${r.isPct ? Math.min(100, m.val) : 0}%`, background: "var(--crm-rust)" }} /></span>
+                      <span style={{ display: "flex", justifyContent: "flex-end", fontVariantNumeric: "tabular-nums" }}>{m.locked ? <Ic name="lock" size={12} /> : r.isPct ? `${m.valStr}%` : r.isMax ? (m.val ? `up to ${m.valStr}` : "none") : "Even"}</span>
+                    </div>
+                  ))}
+                  {adj[r.id] && r.members.map(m => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", font: "400 13px Inter, sans-serif", color: m.locked ? "var(--crm-faint)" : "var(--crm-ink-soft)" }}>
                       <span style={{ flex: "none", width: "92px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
