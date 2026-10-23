@@ -351,9 +351,15 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       // crm-media straight from the browser (no 4 MB Server Action), then sent by the server from there.
       const kind0 = mediaKindOf((file.type || "").split(";")[0]);
       // A video may be picked bigger: it is shrunk to fit its channel below (shared/video-fit.ts, 2026-10-14).
-      if (kind0 === "video" ? file.size > VIDEO_PICK_MAX : file.size > 25 * 1024 * 1024) { toast(kind0 === "video" ? "A video can be up to 400 MB to start with." : "A photo or file can be up to 25 MB."); return false; }
-      const kind = kind0, shown = kind === "document" ? "file" : kind;
       const channel = data().customers.find(c => c.id === customerId)?.channel ?? "whatsapp";
+      // A document goes as it is, so its channel's own limit (WhatsApp 100 MB since the bucket moved to R2, 2026-10-23;
+      // Messenger 25 MB); a photo is made smaller before it goes, so 25 MB to start with.
+      const pickMax = kind0 === "video" ? VIDEO_PICK_MAX : kind0 === "document" ? mediaLimit(channel, "document") : 25 * 1024 * 1024;
+      if (file.size > pickMax) {
+        toast(kind0 === "video" ? "A video can be up to 400 MB to start with." : kind0 === "document" ? `A file can be up to ${Math.round(pickMax / 1048576)} MB on ${channel === "messenger" ? "Messenger" : "WhatsApp"}.` : "A photo can be up to 25 MB.");
+        return false;
+      }
+      const kind = kind0, shown = kind === "document" ? "file" : kind;
       const local = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "";
       const draft: CrmChatMessage = { id: `sending-${uid()}`, from: "me", kind, text: kind === "document" ? file.name : caption, at: new Date().toISOString(), status: live ? "sending" : "sent", by: me,
         ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name, mime: file.type } : {}) } } : {}) };
