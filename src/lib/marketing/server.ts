@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
+import { libraryFromRow, type Library } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
@@ -79,6 +80,14 @@ export async function readSubFeed(sub: string, limit = 20): Promise<SubFeedEvent
   const { data, error } = await db.rpc('mkt_sub_feed', { p_sub: sub, p_limit: limit })
   if (error) throw new Error(error.message)
   return subFeedFromRow(data)
+}
+
+/** The Library — its folder types, folders, files and the Dustbin's last 30 days (mig 20261024007000). */
+export async function readLibrary(): Promise<Library> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_library')
+  if (error) throw new Error(error.message)
+  return libraryFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

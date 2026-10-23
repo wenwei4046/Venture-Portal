@@ -387,6 +387,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_sub_feed',
   // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View.
   'mkt_project_log',
+  // Marketing's Library (mig 20261024007000): read by View; folders added, files filed, moved, binned and restored by
+  // Edit; folder types made and the Dustbin emptied for good by Manage.
+  'mkt_library', 'mkt_lib_type_add', 'mkt_lib_folder_add', 'mkt_lib_file_add', 'mkt_lib_move', 'mkt_lib_bin', 'mkt_lib_restore',
+  'mkt_lib_delete',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
