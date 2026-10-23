@@ -36,7 +36,7 @@ const APP = {
 /** The phone app's way to each frame: taps by visible text or aria-label. Filled in frame by frame. */
 const PHONE_APP = {
   M01: [], M04: [["Lim Wei Jie"]], M09: [["Contacts"]], M10: [["Calendar"]], M11: [["Insight"]], M12: [["Profile"]], M13: [["Profile"], ["Notifications"]],
-  T01: [], T02: [["Inbox"]], T03: [["Assignment"]], T05: [["Calendar"]], T06: [["Profile"]], T07: [["Profile"], ["Showrooms"]],
+  T01: [], T02: [["Inbox"]], T03: [["Assignment"]], T04: [["Assignment"], ["Akemi Mattress · October Fair"], ["By team"]], T04b: [["Assignment"], ["Akemi Mattress · October Fair"], ["By team"], ["Adjust split"]], T05: [["Calendar"]], T06: [["Profile"]], T07: [["Profile"], ["Showrooms"]],
 };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".svg": "image/svg+xml" };

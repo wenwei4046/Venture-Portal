@@ -10,11 +10,14 @@ import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
 import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
-import { is100, pctShow } from "../../shared/pct";
+import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
+type SheetVM = { name: string; c: string; sub: string; ok: boolean; total: string; unit: string; modes: { label: string; pick: () => void; w: number }[]; modeLbl: string;
+  people: { name: string; ini: string; mine: boolean; range: number; max: number; v: string; slide: (e: ChangeEvent<HTMLInputElement>) => void; set: (e: ChangeEvent<HTMLInputElement>) => void; locked: boolean }[];
+  cancel: () => void; apply: (() => void) | undefined };
 type CrmRuleIn = Parameters<PanelCtx["act"]["saveAdRule"]>[2];
 const dig = (e: ChangeEvent<HTMLInputElement>) => parseInt(String(e.target.value).replace(/\D/g, "")) || 0;
 
@@ -139,7 +142,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const isSp = !!E && (E.mode === "split" || E.mode === "people");
   const B = isSp && E ? (ui.bp && ui.bp.adId === E.id ? ui.bp : { adId: E.id, tm: { ...(rule?.tm ?? {}) }, pv: { ...(rule?.pp ?? {}) }, touch: {} as Record<string, string[]> }) : null;
   const takenOf = (adId: string, pid: string) => data.customers.filter(c => c.adId === adId && c.assignedTo === pid).length;
-  const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[] };
+  const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[], sheet: null as SheetVM | null };
   let aeSave: { why: string; saveBg: string; save: (() => void) | undefined } | null = null;
   let byTeamRule: CrmRuleIn | null = null;
   function innerOf(t: Team, B0: NonNullable<typeof B>, split: Record<string, number>) {
@@ -154,8 +157,8 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const val = (p: Team["people"][number], k: number) => (scaled ? scaled[p.id] ?? 0 : stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
     const sum = ps.reduce((x, p, k) => x + val(p, k), 0);
     // A team with nobody in it has nothing to split.
-    const ok = !ps.length || mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
-    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + sum + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
+    const ok = !ps.length || mode === "even" || (mode === "pct" ? is100(sum) : sum > 0);
+    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + pctShow(sum) + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
     const setMode = (m: Mode) => { const pv = { ...B0.pv }; ps.forEach((p, k) => { if (m === "even") delete pv[p.id]; else pv[p.id] = m === "pct" ? es(k) : 0; }); putB({ tm: { ...B0.tm, [t.id]: m }, pv, touch: { ...B0.touch, [t.id]: [] } }); };
     const ftr = data.ftRules.find(f => f.tlId === t.id);
     const ftDays = ftr ? [...new Set(Object.entries(ftr.vals).flatMap(([, v]) => Object.entries(v).filter(([, n]) => Number(n) > 0).map(([d]) => Number(d))))].sort((a, b) => a - b) : [];
@@ -176,18 +179,30 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
           if (free.length) {
             let left = 100 - n - fixedSum;
             if (left < 0) { let over = -left; for (const q of fixed) { const cut = Math.min(cur[q.id], over); cur[q.id] -= cut; over -= cut; } left = 0; }
-            const es2 = evenShare(free.length); free.forEach((q, j) => { cur[q.id] = Math.round(left * es2(j) / 100); });
-            const diff = 100 - ps.reduce((x, q) => x + cur[q.id], 0); if (diff && free.length) cur[free[0].id] += diff;
+            const es2 = evenShare(free.length); free.forEach((q, j) => { cur[q.id] = Math.round(left * es2(j)) / 100; });
+            const diff = r2(100 - ps.reduce((x, q) => x + cur[q.id], 0)); if (diff && free.length) cur[free[0].id] = r2(cur[free[0].id] + diff);
           } else if (others.length) {
-            let diff = 100 - ps.reduce((x, q) => x + cur[q.id], 0);
-            if (diff > 0) cur[fixed[0].id] += diff; else for (const q of fixed) { if (!diff) break; const cut = Math.min(cur[q.id], -diff); cur[q.id] -= cut; diff += cut; }
+            let diff = r2(100 - ps.reduce((x, q) => x + cur[q.id], 0));
+            if (diff > 0) cur[fixed[0].id] = r2(cur[fixed[0].id] + diff); else for (const q of fixed) { if (!diff) break; const cut = Math.min(cur[q.id], -diff); cur[q.id] = r2(cur[q.id] - cut); diff = r2(diff + cut); }
           }
-          putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] } });
+          putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] }, ty: typed });
         };
-        return { name: p.name, v: String(v), set: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(dig(e)) : putB({ pv: { ...B0.pv, [p.id]: dig(e) } }),
+        let typed: { id: string; text: string } | null = null;
+        const mine = (B0.touch[t.id] ?? []).includes(p.id), max = mode === "pct" ? 100 : Math.max(20, v * 2);
+        return { name: p.name, ini: ini(p.name), mine, range: v, max, w: `${Math.min(100, (v / (mode === "pct" ? 100 : Math.max(1, ...ps.map((q, j) => val(q, j))))) * 100)}%`,
+          txt: mode === "pct" ? pctShow(v) + "%" : v ? "up to " + v : "none",
+          // The box keeps what is typed ("40.") — two decimals for By % (shared/pct.ts); By max is whole leads.
+          v: mode === "pct" && B0.ty?.id === p.id ? B0.ty.text : pctShow(v),
+          slide: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(+e.target.value) : putB({ pv: { ...B0.pv, [p.id]: +e.target.value } }),
+          set: (e: ChangeEvent<HTMLInputElement>) => { if (mode !== "pct") return putB({ pv: { ...B0.pv, [p.id]: dig(e) } }); const tx = pctText(e.target.value); typed = { id: p.id, text: tx }; setPct(pctOf(tx)); },
           note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "var(--crm-oxblood)" : "var(--crm-muted)", locked: false };
-      }).concat(lockedHere.map(p => ({ name: p.name, v: "", set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
-      sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
+      }).concat(lockedHere.map(p => ({ name: p.name, ini: ini(p.name), mine: false, range: 0, max: 100, w: "0%", txt: "locked", v: "", slide: () => {}, set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
+      // v3 T04 / T04b: the row's line, Adjust split and its sheet.
+      id: t.id, modeLbl: mode === "even" ? "Evenly" : mode === "pct" ? "By %" : "By max",
+      held: E ? data.customers.filter(c => c.held && c.adId === E.id && c.teamId === t.id && !c.assignedTo).length : 0,
+      count: ps.length, total: mode === "pct" ? pctShow(sum) + "%" : String(sum),
+      adjust: () => patch({ bpSheet: t.id, bpSnap: B0 }),
+      sum: mode === "pct" ? (is100(sum) ? "Adds up to 100%" : "Adds up to " + pctShow(sum) + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
       sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
     };
   }
@@ -198,6 +213,9 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const split = E.split;
     bp.inner = T.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
     const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = is100(tot) && bp.inner.every(x => x.ok);
+    const sg = ui.bpSheet ? bp.inner.find(x => x.id === ui.bpSheet) : undefined;
+    if (sg) bp.sheet = { ...sg, sub: `${sg.pct} of ${E.label} · ${sg.count} ${sg.count === 1 ? "person" : "people"}`,
+      cancel: () => patch({ bp: ui.bpSnap, bpSheet: null, bpSnap: null }), apply: sg.ok ? () => patch({ bpSheet: null, bpSnap: null, bp: ui.bp ? { ...ui.bp, ty: null } : ui.bp }) : undefined };
     const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
     T.forEach(t => {
       const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;

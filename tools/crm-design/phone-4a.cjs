@@ -399,6 +399,20 @@ function teamSplit(body) {
     const head = b.lastIndexOf("<strong", from);
     b = b.slice(0, head) + b.slice(head, from).replace('fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700"', 'fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600"') + mid + b.slice(to);
   }
+  // v3 T04: By team is a row a team (dot, name, line, 84px decimal box, the slider under it); a team opens to its member
+  // breakdown, results only, with Adjust split → T04b's sheet (shared/phone4a.tsx). Everything above still runs first, so
+  // the markup it replaces is checked before it goes.
+  {
+    const i = b.indexOf("{!!(v.as.ae.isSplit) && (<>"), j = b.indexOf("{(v.bp.inner).map((g, g_i) => (<Fragment key={g_i}>", i);
+    if (i < 0 || j < 0) throw new Error("phone-4a: by team body");
+    const [, je] = el(b.slice(j), "{(v.bp.inner).map((g, g_i) => (<Fragment key={g_i}>", "Fragment", "by team inner");
+    const close = b.indexOf("))}", j + je);
+    if (close < 0 || close - (j + je) > 40) throw new Error("phone-4a: by team inner end");
+    b = b.slice(0, i) + "{!!(v.as.ae.isSplit) && (<><Phone4aSplitTeams s={v.as.ae} inner={v.bp.inner} enterNext={v.enterNext} />" + b.slice(close + 3);
+    const f = b.indexOf('<div style={{ flex: "none", padding: "12px 20px 26px"');
+    if (f < 0) throw new Error("phone-4a: split foot for sheet");
+    b = b.slice(0, f) + "{!!(v.bp.sheet) && (<Phone4aAdjustSheet s={v.bp.sheet} />)}" + b.slice(f);
+  }
   return body.slice(0, at) + b;
 }
 
@@ -464,13 +478,7 @@ function panel(body) {
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
   body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
-  body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
-    '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.range} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.range}%, #fff ${r.range}%)`, ["--thumb" as string]: r.c }} />', "split slider");
-  // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00"): the decimal keypad and room for "33.33".
-  body = once(body, 'inputMode="numeric" pattern="[0-9]*" value={r.v} onChange={r.setN}', 'inputMode="decimal" value={r.v} onChange={r.setN}', "split share decimal");
-  { const i = body.indexOf('inputMode="decimal" value={r.v} onChange={r.setN}'), w = body.indexOf('width: "30px"', i);
-    if (w < 0 || w - i > 400) throw new Error("phone-4a: split share width");
-    body = body.slice(0, w) + 'width: "54px"' + body.slice(w + 'width: "30px"'.length); }
+  // The team split's slider and 84px decimal box are Phone4aSplitTeams' own since v3 T04 (teamSplit).
   body = teamRooms(body);
   // T07 · Showrooms: the title in 4a's face (the page keeps production's card and Edit — see CHECKLIST).
   body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>`, "showrooms title");

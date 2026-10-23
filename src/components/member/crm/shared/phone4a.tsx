@@ -7,7 +7,7 @@
  * Sizes: the handoff's phone sizes are final on-screen px. The app scales type by --rv-type (.92 on a phone), so a size
  * here is the frame's px scaled up by the phone's type step through typePx (`fs`) — on a phone it lands on the frame's px exactly.
  */
-import type { ChangeEvent as RChangeEvent, CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
+import type { ChangeEvent as RChangeEvent, CSSProperties, FocusEvent, KeyboardEvent, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
 import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
@@ -124,6 +124,115 @@ export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: s
     </div>
     {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team performance", !h.sw.ads, h.sw.team)}{seg("Ads performance", h.sw.ads, h.sw.adsPick)}</div>}
   </>);
+}
+
+type SplitRow = { team: string; c: string; v: string; range: number; set: (e: RChangeEvent<HTMLInputElement>) => void; setN: (e: RChangeEvent<HTMLInputElement>) => void; selAll: (e: FocusEvent<HTMLInputElement>) => void };
+type InnerVM = { id: string; name: string; c: string; ok: boolean; modeLbl: string; held: number; count: number; custom: boolean; isEven: boolean; sum: string; sumFg: string; evenLine: string;
+  modes: { label: string; pick: () => void; w: number }[]; people: { name: string; txt: string; w: string; locked: boolean }[]; adjust: () => void };
+const SLIDER = (pct: number, c: string): CSSProperties => ({ width: "100%", height: "6px", margin: 0, appearance: "none", WebkitAppearance: "none", borderRadius: "3px", border: 0, boxSizing: "border-box",
+  background: `linear-gradient(to right, ${c} ${pct}%, var(--crm-track) ${pct}%)`, ["--thumb" as string]: c });
+/** T04 (v3) · By team: a row a team — its dot, name (ink) and line, the share in an 84px decimal box, the slider under the row.
+ * A team opens to its member breakdown — results only (name, bar, share) — and Adjust split, which opens T04b's sheet. */
+export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitRow[] }; inner: InnerVM[]; enterNext: (e: KeyboardEvent<HTMLInputElement>) => void }) {
+  const [open, setOpen] = useState<string | null>(() => inner.find(g => !/director/i.test(g.name))?.id ?? null);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", margin: "0 -20px", borderTop: "1px solid var(--crm-rule-soft)" }}>
+      {s.splits.map((r, i) => {
+        const g = inner.find(x => x.name === r.team), dir = /director/i.test(r.team), on = !!g && open === g.id;
+        const line = g?.held ? `Over the limit · holding ${g.held} lead${g.held === 1 ? "" : "s"}` : g ? (dir ? `${g.people.map(p => p.name).join(", ")} · always first` : `${g.count} ${g.count === 1 ? "person" : "people"} · ${g.modeLbl}`) : "No share";
+        return (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <button type="button" onClick={() => g && setOpen(on ? null : g.id)} style={{ ...BTN, flex: 1, minWidth: 0, display: "flex", gap: "10px", alignItems: "flex-start", textAlign: "left" }}>
+                <span style={{ flex: "none", width: "9px", height: "9px", marginTop: "6px", borderRadius: "2px", background: r.c }} />
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                  <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.team}</span>
+                  <span style={{ fontSize: fs(12), color: g?.held ? "var(--crm-oxblood)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{line}</span>
+                </span>
+              </button>
+              <label style={{ flex: "none", width: "84px", height: "38px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                <input type="text" inputMode="decimal" aria-label={`${r.team} share`} value={r.v} onChange={r.setN} onFocus={r.selAll} enterKeyHint="next" onKeyDown={enterNext}
+                  style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
+                <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>%</span>
+              </label>
+            </div>
+            <input type="range" data-crm-range="" aria-label={`${r.team} slider`} min="0" max="100" step="5" value={r.range} onChange={r.set} style={SLIDER(r.range, r.c)} />
+            {on && g && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px 12px", borderRadius: "12px", background: "var(--crm-sel)" }}>
+                <div style={{ display: "flex", gap: "16px" }}>{g.modes.map(m => (
+                  <button key={m.label} type="button" onClick={m.pick} style={{ ...BTN, padding: "2px 0 4px", fontSize: fs(13), color: m.w > 500 ? "var(--crm-ink)" : "var(--crm-muted)", fontWeight: m.w > 500 ? 600 : 500, borderBottom: `2px solid ${m.w > 500 ? "var(--crm-rust)" : "transparent"}` }}>{m.label}</button>))}</div>
+                {g.isEven && <span style={{ fontSize: fs(12), lineHeight: 1.45, color: "var(--crm-muted)" }}>{g.evenLine}</span>}
+                {g.custom && g.people.map(p => (
+                  <div key={p.name} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 72px 56px", alignItems: "center", gap: "10px", fontSize: fs(13), color: p.locked ? "var(--crm-faint)" : "var(--crm-ink)" }}>
+                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    <span style={{ height: "4px", borderRadius: "2px", background: "var(--crm-track)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: p.w, background: "var(--crm-rust)" }} /></span>
+                    <span style={{ display: "flex", justifyContent: "flex-end", fontVariantNumeric: "tabular-nums" }}>{p.locked ? <Ic name="lock" size={12} /> : p.txt}</span>
+                  </div>))}
+                {g.custom && !g.ok && <span style={{ fontSize: fs(12), color: g.sumFg }}>{g.sum}</span>}
+                {g.custom && <button type="button" onClick={g.adjust} style={{ ...BTN, alignSelf: "flex-end", height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: fs(12.5), fontWeight: 500, color: "var(--crm-ink)" }}><Ic name="sliders-horizontal" size={13} />Adjust split</button>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** T04b (v3) · Adjust split: a bottom sheet over Split leads — Evenly / By % / By max; a row a person (initials, name, a
+ * fixed 14px lock slot — set by you —, an 88px decimal box, the slider under it); Total 100% ✓; Cancel / Apply. The list
+ * scrolls inside the sheet, so a keyboard never covers the foot. */
+export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: string; ok: boolean; total: string; unit: string; modeLbl: string; modes: { label: string; pick: () => void; w: number }[];
+  people: { name: string; ini: string; mine: boolean; range: number; max: number; v: string; slide: (e: RChangeEvent<HTMLInputElement>) => void; set: (e: RChangeEvent<HTMLInputElement>) => void; locked: boolean }[];
+  cancel: () => void; apply: (() => void) | undefined } }) {
+  const pct = s.modeLbl === "By %", even = s.modeLbl === "Evenly";
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(42,22,12,.38)" }} onClick={s.cancel}>
+      <div role="dialog" aria-label={`Adjust split · ${s.name}`} onClick={e => e.stopPropagation()} style={{ maxHeight: "88%", display: "flex", flexDirection: "column", borderRadius: "24px 24px 0 0", background: "#fff" }}>
+        <span style={{ alignSelf: "center", width: "36px", height: "4px", margin: "8px 0 4px", borderRadius: "2px", background: "var(--crm-line)" }} />
+        <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 20px 12px" }}>
+          <span style={{ flex: "none", width: "9px", height: "9px", marginTop: "8px", borderRadius: "2px", background: s.c }} />
+          <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+            <span style={{ fontFamily: TIGHT, fontSize: fs(18), fontWeight: 500, color: "var(--crm-ink)" }}>{s.name}</span>
+            <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{s.sub}</span>
+          </span>
+          <button type="button" aria-label="Close" onClick={s.cancel} style={{ ...BTN, display: "flex", padding: "4px", color: "var(--crm-faint)" }}><Ic name="x" size={18} /></button>
+        </div>
+        <div style={{ flex: "none", display: "flex", gap: "2px", margin: "0 20px 6px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{s.modes.map(m => (
+          <button key={m.label} type="button" onClick={m.pick} aria-pressed={m.w > 500} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", fontSize: fs(13), fontWeight: 500,
+            background: m.w > 500 ? "#fff" : "transparent", boxShadow: m.w > 500 ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: m.w > 500 ? "var(--crm-ink)" : "var(--crm-muted)" }}>{m.label}</button>))}</div>
+        <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "0 20px" }}>
+          {s.people.map(p => (
+            <div key={p.name} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 0", borderTop: "1px solid var(--crm-rule-soft)", opacity: p.locked ? 0.55 : 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-ink)", fontSize: fs(11), fontWeight: 500 }}>{p.ini}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: fs(14.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                <span style={{ flex: "none", width: "14px", display: "flex", justifyContent: "center", color: "var(--crm-faint)" }}>{(p.mine || p.locked) && <Ic name="lock" size={12} />}</span>
+                {even ? <span style={{ flex: "none", width: "88px", textAlign: "right", fontSize: fs(13), color: "var(--crm-muted)" }}>In turn</span>
+                  : p.locked ? <span style={{ flex: "none", width: "88px", textAlign: "right", fontSize: fs(12), color: "var(--crm-faint)" }}>Locked</span>
+                  : <label style={{ flex: "none", width: "88px", height: "40px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: `1px solid ${p.mine ? "var(--crm-rust)" : "var(--crm-line)"}`, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                      <input type="text" inputMode={pct ? "decimal" : "numeric"} aria-label={`${p.name} share`} value={p.v} onChange={p.set} onFocus={e => e.currentTarget.select()}
+                        style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
+                      <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>{s.unit}</span>
+                    </label>}
+              </div>
+              {!even && !p.locked && <input type="range" data-crm-range="" aria-label={`${p.name} slider`} min="0" max={p.max} step={pct ? 0.5 : 1} value={p.range} onChange={p.slide} style={{ ...SLIDER((p.range / p.max) * 100, "var(--crm-rust)"), marginLeft: "38px", width: "calc(100% - 38px)" }} />}
+            </div>
+          ))}
+        </div>
+        {!even && <div style={{ flex: "none", margin: "8px 20px 0", padding: "12px 14px", borderRadius: "12px", background: "var(--crm-sel)", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ flex: 1, fontSize: fs(13), color: "var(--crm-muted)" }}>Total</span>
+          <span style={{ fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: s.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{pct ? s.total : `up to ${s.total}`}</span>
+          {s.ok && <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="check" size={14} /></span>}
+        </div>}
+        {pct && <span style={{ flex: "none", padding: "8px 20px 0", fontSize: fs(11), lineHeight: 1.45, color: "var(--crm-faint)" }}>Drag, or tap a box to type (e.g. 40.5). The lock = set by you; the others re-balance to keep 100%.</span>}
+        <div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))" }}>
+          <button type="button" onClick={s.cancel} style={{ ...BTN, flex: 1, height: "48px", borderRadius: "24px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
+          <button type="button" onClick={s.apply} disabled={!s.apply} style={{ ...BTN, flex: 1.6, height: "48px", borderRadius: "24px", background: s.apply ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>Apply</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** M11 · Mine's Insight: Month / Week / Day / Range, the rust hero, the counts, Avg. reply time and Leads by status. */

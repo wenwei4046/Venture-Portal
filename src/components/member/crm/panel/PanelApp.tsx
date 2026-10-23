@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aRoom, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -1060,69 +1060,10 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </Fragment>))}
                   </div>
                 </>)}
-                {!!(v.as.ae.isSplit) && (<>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "14px", borderRadius: "16px", background: "var(--crm-page)", border: "1px solid var(--crm-rule)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <strong style={{ flex: "1", fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600" }}>Split across teams</strong>
-                      <span style={{ padding: "3px 10px", borderRadius: "10px", background: v.as.ae.sumBg, color: v.as.ae.sumFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", fontVariantNumeric: "tabular-nums" }}>{v.as.ae.sumTot}</span>
-                      <span onClick={v.as.ae.splitReset} style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Reset</span>
-                    </div>
-                    <div style={{ display: "flex", height: "10px", borderRadius: "5px", overflow: "hidden", gap: "2px", background: "var(--crm-rule-soft)" }}>
-                      {(v.as.ae.splits).map((b, b_i) => (<Fragment key={b_i}>
-                        <span style={{ width: b.w, background: b.c, transition: "width 200ms" }}>
-                        </span>
-                      </Fragment>))}
-                    </div>
-                    {(v.as.ae.splits).map((r, r_i) => (<Fragment key={r_i}>
-                      <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0, 1fr) 58px", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "12px", background: "#fff" }}>
-                        <span style={{ minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
-                          <strong style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600", color: r.c, lineHeight: "1.2", overflowWrap: "anywhere" }}>{r.team}</strong>
-                        </span>
-                        <input type="range" data-crm-range="" min="0" max="100" step="5" value={r.range} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.range}%, #fff ${r.range}%)`, ["--thumb" as string]: r.c }} />
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "34px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9px", background: "var(--crm-tint-cold)", border: "1px solid var(--crm-tint-cold)" }}>
-                          <input type="text" inputMode="decimal" value={r.v} onChange={r.setN} onFocus={r.selAll} data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "54px", border: "0", background: "transparent", textAlign: "center", font: "inherit", fontSize: "calc(13.5px * var(--rv-type, 1))", fontWeight: "600", color: r.c, outline: "none", padding: "0" }} />
-                          <span style={{ fontSize: "calc(11.5px * var(--rv-type, 1))", fontWeight: "600", color: r.c }}>%</span>
-                        </span>
-                      </div>
-                    </Fragment>))}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "6px 2px 0" }}>
-                    <strong style={{ fontSize: "calc(13.5px * var(--rv-type, 1))", fontWeight: "600" }}>Inside each team</strong>
-                  </div>
-                  {(v.bp.inner).map((g, g_i) => (<Fragment key={g_i}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "14px", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-tint-cold)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
-                        </span>
-                        <strong style={{ flex: "1", minWidth: "0", fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600", color: g.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</strong>
-                        <span style={{ flex: "none", fontSize: "calc(11.5px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{g.pct}</span>
-                      </div>
-                      <div style={{ display: "flex", gap: "2px", padding: "2px", borderRadius: "9px", background: "var(--crm-tint-cold)" }}>
-                        {(g.modes).map((m, m_i) => (<Fragment key={m_i}>
-                          <span onClick={m.pick} style={{ flex: "1", textAlign: "center", padding: "6px 9px", borderRadius: "7px", background: m.bg, color: m.fg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: m.w, boxShadow: m.sh, cursor: "pointer", whiteSpace: "nowrap" }}>{m.label}</span>
-                        </Fragment>))}
-                      </div>
-                      {!!(g.isEven) && (<>
-                        <span style={{ paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)", fontSize: "calc(11px * var(--rv-type, 1))", lineHeight: "1.45", color: "var(--crm-muted)" }}>{g.evenLine}</span>
-                      </>)}
-                      {!!(g.custom) && (<>
-                        {(g.people).map((p, p_i) => (<Fragment key={p_i}>
-                          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "8px", paddingTop: "8px", borderTop: "1px solid var(--crm-tint-cold)", opacity: p.locked ? 0.55 : 1 }}>
-                            <span style={{ minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                              <strong style={{ fontSize: "calc(12.5px * var(--rv-type, 1))", lineHeight: "18px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
-                              <small style={{ fontSize: "calc(11px * var(--rv-type, 1))", lineHeight: "14px", color: p.noteFg, fontVariantNumeric: "tabular-nums" }}>{p.note}</small>
-                            </span>
-                            {p.locked ? (<span aria-label="Locked" style={{ width: "46px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><Ic name="lock" size={15} /></span>) : (<input value={p.v} onChange={p.set} onFocus={v.bp.selAll} inputMode="numeric" data-num-step="1" enterKeyHint="next" onKeyDown={v.enterNext} style={{ width: "46px", height: "34px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-tint-cold)", background: "var(--crm-tint-cold)", textAlign: "center", font: "inherit", fontSize: "calc(13.5px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)", outline: "none", padding: "0" }} />)}
-                            <span style={{ width: "30px", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{p.locked ? "" : g.unit}</span>
-                          </div>
-                        </Fragment>))}
-                        <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", color: g.sumFg }}>{g.sum}</span>
-                      </>)}
-                    </div>
-                  </Fragment>))}
+                {!!(v.as.ae.isSplit) && (<><Phone4aSplitTeams s={v.as.ae} inner={v.bp.inner} enterNext={v.enterNext} />
                 </>)}
               </div>
-              <div style={{ flex: "none", padding: "12px 20px 26px", borderTop: "1px solid var(--crm-rule)", background: "#fff", display: "flex", flexDirection: "column-reverse", gap: "8px" }}>
+              {!!(v.bp.sheet) && (<Phone4aAdjustSheet s={v.bp.sheet} />)}<div style={{ flex: "none", padding: "12px 20px 26px", borderTop: "1px solid var(--crm-rule)", background: "#fff", display: "flex", flexDirection: "column-reverse", gap: "8px" }}>
                 <span onClick={v.as.ae.applyAll} style={{ gridColumn: "1 / -1", height: "44px", boxSizing: "border-box", borderRadius: "22px", border: `1px solid ${v.as.ae.applyBd}`, background: "#fff", color: v.as.ae.applyFg, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", cursor: v.as.ae.applyCur }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 8h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2zM16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3">
                     </path>
