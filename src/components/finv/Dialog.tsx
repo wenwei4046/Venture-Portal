@@ -35,6 +35,7 @@ export function FinDialog({
   locked = false,
   tall = false,
   wide = false,
+  aside = null,
   children,
 }: {
   open: boolean
@@ -49,6 +50,12 @@ export function FinDialog({
   tall?: boolean
   /** 680px on a desktop for a form with fields side by side (Create payment, 2026-10-22); a phone's sheet ignores it. */
   wide?: boolean
+  /**
+   * A panel beside the window (2026-10-24 — IT support's file preview, the user: "直接在这个 floating window 的右边出现
+   * 一个 preview"): on a desktop the two stand centred together, the window moving left by half of what the panel takes;
+   * with no room beside it — a narrow window, the phone's sheet — the panel lies over the window. Null: none.
+   */
+  aside?: ReactNode
   children: ReactNode
 }) {
   const id = useId()
@@ -92,6 +99,7 @@ export function FinDialog({
         className={s.dialog}
         data-tall={sheet && tall ? '' : undefined}
         data-wide={!sheet && wide ? '' : undefined}
+        data-aside={aside ? '' : undefined}
       >
         {sheet ? (
           <div className={s.sheetHead}>
@@ -119,7 +127,10 @@ export function FinDialog({
             </button>
           </div>
         )}
-        <DialogCtx.Provider value={{ close, sheet, ios }}>{children}</DialogCtx.Provider>
+        <DialogCtx.Provider value={{ close, sheet, ios }}>
+          {children}
+          {aside ? <div className={s.dialogAside}>{aside}</div> : null}
+        </DialogCtx.Provider>
       </div>
     </div>,
     document.body,

@@ -56,7 +56,33 @@
 .noteHead time { flex: none; }
 .noteStatus { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--ds-ink-3); font-size: 12px; }
 .composer { border-top: 1px solid var(--ds-border); padding-top: 20px; }
+/* Files dragged in from the computer (2026-10-24): the text box says where they land. */
+.dropBox { position: relative; display: flex; flex-direction: column; }
+[data-drop] .dropBox > textarea { border-style: dashed; border-color: var(--ds-accent); }
+.dropHint { position: absolute; inset: 1px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: var(--ds-accent-soft); color: var(--ds-ink-2); font-size: 12px; font-weight: 500; pointer-events: none; }
+/* The file shown beside the window now. */
+.filedFile[data-active] { border-color: var(--ds-accent); background: var(--ds-surface-2); }
+/* A filed file beside the request's window (2026-10-24): the window's head, the file on the soft field, its actions at the foot. */
+.preview { display: flex; flex-direction: column; flex: 1; min-height: 0; color: var(--ds-ink); font: 13px/1.5 var(--ds-font-body); }
+.previewHead { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 18px 12px 22px; }
+.previewName { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.previewName strong { overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.previewClose { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ds-ink-2); font-family: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+.previewClose:hover { background: var(--ds-surface-2); }
+.previewBody { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; margin: 0 22px; border: 1px solid var(--ds-border); border-radius: 12px; background: var(--ds-surface-2); overflow: hidden; }
+.previewBody img, .previewBody video { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.previewBody iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--ds-surface); }
+.previewNone { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; color: var(--ds-ink-2); text-align: center; }
+.previewNone p { margin: 0; }
+.previewTag { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 10px; background: var(--ds-surface); color: var(--ds-ink-3); font: 13px var(--ds-font-num); }
+.previewError { margin: 10px 22px 0; }
+.previewFoot { flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px 18px; }
 @media (max-width: 767px) {
+  .previewHead { padding: 16px 14px 10px 20px; }
+  .previewClose { width: 44px; height: 44px; }
+  .previewBody { margin: 0 16px; }
+  .previewFoot { padding: 12px 16px 6px; }
+  .previewFoot > button { flex: 1; min-height: 44px; }
   .toolbar { align-items: stretch; gap: 14px; }
   .filter { flex: 1; }
   .filter > :last-child { flex: 1; }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   deviceLabel, fileSize, fileTag, isImage, itDay, itWhen, itContentType, itFileRefusal, itObjectPath, itRequestFromRow, itRequestsFromRow,
-  noteProblem, submitProblem,
+  noteProblem, previewKind, submitProblem,
 } from './model'
 
 // IT support (2026-10-20): what a request is as the app reads it, and what the app refuses before sending — the
@@ -81,6 +81,24 @@ describe('files', () => {
     expect([fileTag('shot.png', null), fileTag('x', 'application/pdf'), fileSize(900), fileSize(3.4 * 1024 * 1024), fileSize(null)])
       .toEqual(['PNG', 'PDF', '1 KB', '3.4 MB', ''])
     expect([isImage('image/png'), isImage('image/heic'), isImage('application/pdf')]).toEqual([true, false, false])
+  })
+})
+
+// A filed file opened beside its request's window (2026-10-24): what a browser draws in place, and what it cannot.
+describe('what shows beside the window', () => {
+  it('a picture, a video, a PDF or a text file in place — by its type, or its name when the type says nothing', () => {
+    expect(previewKind('shot.png', 'image/png')).toBe('image')
+    expect(previewKind('clip.mov', 'video/quicktime')).toBe('video')
+    expect(previewKind('invoice.pdf', 'application/pdf')).toBe('pdf')
+    expect(previewKind('app.log', null)).toBe('text')
+    expect(previewKind('state.json', 'application/json')).toBe('text')
+  })
+  it('an iPhone’s HEIC, an Office file, a CSV or a zip: none', () => {
+    expect(previewKind('IMG_0001.HEIC', 'image/heic')).toBeNull()
+    expect(previewKind('costs.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBeNull()
+    expect(previewKind('rows.csv', 'text/csv')).toBeNull()
+    expect(previewKind('logs.zip', 'application/zip')).toBeNull()
+    expect(previewKind('mystery', null)).toBeNull()
   })
 })
 
