@@ -194,6 +194,14 @@ describe('MemoBell in HR’s view — probations ending', () => {
     expect(within(drawer).getByText('House rules')).toBeInTheDocument()
   })
 
+  it('a refused read does not leave the drawer waiting on it', async () => {
+    db.rpc.mockImplementation(async () => ({ data: null, error: { code: '42501', message: 'Probation reminders need People · Edit.' } }))
+    render(<MemoBell memos={false} probation />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
+    expect(await screen.findByText('No probation ends in the next 14 days.')).toBeInTheDocument()
+    expect(screen.queryByText('Reading…')).toBeNull()
+  })
+
   it('nothing ending soon: says so', async () => {
     answers([review({ endsOn: plus(30) })])
     render(<MemoBell memos={false} probation />)

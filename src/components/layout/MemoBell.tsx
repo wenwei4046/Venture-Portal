@@ -77,12 +77,11 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
             () => undefined,
           )
         : null,
+      // A refusal keeps the list it had — or, never read, none, so the drawer does not wait on it.
       probationOn
         ? Promise.resolve(db.rpc('probation_reviews')).then(
-            ({ data, error: failed }) => {
-              if (!failed) setReviews(reviewsFromRow(data))
-            },
-            () => undefined,
+            ({ data, error: failed }) => setReviews(prev => (failed ? (prev ?? []) : reviewsFromRow(data))),
+            () => setReviews(prev => prev ?? []),
           )
         : null,
     ])

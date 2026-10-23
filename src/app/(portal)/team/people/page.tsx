@@ -289,6 +289,7 @@ async function DirectoryPeople({
   const rungs = new Map(
     ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
   )
+  const today = officeToday()
   void supabase.rpc('log_data_access', {
     p_resource_type: 'hr_staff_costs',
     p_action: 'view',
@@ -296,7 +297,7 @@ async function DirectoryPeople({
   })
   return (
     <PeopleManagement
-      people={directory.map(r => personRow(r, rungs, null, r, officeToday()))}
+      people={directory.map(r => personRow(r, rungs, null, r, today))}
       unattachedAccounts={[]}
       canSeeActivity={can(user, 'audit_log')}
       permissions={NO_PERMISSIONS}
