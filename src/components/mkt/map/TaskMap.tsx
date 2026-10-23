@@ -12,7 +12,11 @@ import s from './map.module.css'
 // lines lighting as they are made, a dot running along each, the caption and the scrubber under it.
 
 const TONE: Record<MapTone, string> = { done: s.done, waiting: s.waiting, draft: s.draft, red: s.red }
-const LANE: Record<string, string> = { appr: s.lane_appr, social: s.lane_social, content: s.lane_content, design: s.lane_design, ads: s.lane_ads, brand: s.lane_brand }
+// A lane's ground by its tone (a group's colour, read from its People title — lib/marketing/groups.ts).
+const LANE: Record<string, string> = {
+  appr: s.lane_appr, social: s.lane_social, content: s.lane_content, design: s.lane_design, ads: s.lane_ads, brand: s.lane_brand,
+  manager: s.lane_manager, none: s.lane_none,
+}
 const VH = 480
 const TAG_W = 132
 
@@ -163,7 +167,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
             onMouseLeave={() => setDrag(null)}
           >
             <div className={s.canvas} style={{ width: CW, height: CH, transform: `translate(${px}px, ${py}px) scale(${z})` }}>
-              {map.lanes.map((l, i) => <div key={l.id} className={`${s.lane} ${LANE[l.id]}`} style={{ top: i * LANE_H, width: CW, height: LANE_H }} />)}
+              {map.lanes.map((l, i) => <div key={l.id} className={`${s.lane} ${LANE[l.tone]}`} style={{ top: i * LANE_H, width: CW, height: LANE_H }} />)}
               <svg className={s.svg} width={CW} height={CH} aria-hidden="true">
                 <defs>
                   {(['a', 'r', 'f'] as const).map(k => (
@@ -245,7 +249,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
               })}
             </div>
             {map.lanes.map((l, i) => (
-              <div key={`${l.id}:tag`} className={`${s.laneTag} ${LANE[l.id]}`} style={{ top: py + i * LANE_H * z, height: LANE_H * z }}>
+              <div key={`${l.id}:tag`} className={`${s.laneTag} ${LANE[l.tone]}`} title={l.name} style={{ top: py + i * LANE_H * z, height: LANE_H * z }}>
                 <span className={s.laneEmoji} aria-hidden="true">{l.emoji}</span>
                 <span className={s.laneName}>{l.name}</span>
               </div>
@@ -283,7 +287,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
                 <button key={row.id} type="button" role="row" className={`${s.lr}${row.current ? ` ${s.lrHere}` : ''}${sel === row.id ? ` ${s.lrSel}` : ''}`} onClick={() => setSel(row.id)}>
                   <span className={s.lrNo} role="cell">{row.no}</span>
                   <span className={s.lrTitle} role="cell"><span aria-hidden="true">{row.icon}</span><span className={s.ellipsis}>{row.title}</span></span>
-                  <span className={s.lrLane} role="cell"><span className={`${s.lrLaneDot} ${LANE[lane?.id ?? 'appr']}`} aria-hidden="true" />{row.lane}</span>
+                  <span className={s.lrLane} role="cell"><span className={`${s.lrLaneDot} ${LANE[lane?.tone ?? 'appr']}`} aria-hidden="true" />{row.lane}</span>
                   <span className={s.ellipsis} role="cell">{row.person}</span>
                   <span className={`${s.ellipsis} ${s.soft}`} role="cell">{row.handoff}</span>
                   <span role="cell"><span className={`${s.pill} ${TONE[row.tone]}`}><span className={s.pillDot} aria-hidden="true" />{row.status}</span></span>
@@ -298,7 +302,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
           <aside className={s.panel} aria-label={node.full}>
             <div className={s.panelHead}>
               <div className={s.panelTop}>
-                <span className={`${s.panelLane} ${LANE[node.lane]}`}>{laneOf(node.lane)?.name}</span>
+                <span className={`${s.panelLane} ${LANE[laneOf(node.lane)?.tone ?? 'none']}`}>{laneOf(node.lane)?.name}</span>
                 <span className={s.grow} />
                 <button type="button" className={s.panelX} aria-label="Close the station" onClick={() => setSel(null)}>×</button>
               </div>

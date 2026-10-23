@@ -3,7 +3,8 @@
 // make, what a stage still needs before it is handed on, and the stages as mkt_task_create takes them. The dates and
 // the needs are reckoned exactly as the database reckons them (mkt_stage_dates, mkt_stage_missing). Pure.
 
-import { addDays, approverNow, longDay, runsStages, weekdayOf, type MktBoard, type MktDept, type MktPerson } from './board'
+import { addDays, approverNow, longDay, runsStages, weekdayOf, type MktBoard, type MktGroup, type MktPerson } from './board'
+import { groupOf, isManagerTitle, type MktTone } from './groups'
 
 export const FIELD_TYPES = ['Text', 'Number', 'Select', 'Multi-select', 'Date', 'Person', 'File', 'Checkbox', 'Table', 'Note'] as const
 export type FieldType = (typeof FIELD_TYPES)[number]
@@ -13,11 +14,8 @@ export const FIELD_GLYPH: Record<FieldType, string> = {
   Table: '▤', Note: '✎', Text: 'Aa', Select: '◉', 'Multi-select': '☰', Date: '▦', Person: '◎', File: '⎘', Checkbox: '☑', Number: '#',
 }
 
-export const DEPT_LABEL: Record<MktDept, string> = { content: 'Content', social: 'Social Media', design: 'Design', ads: 'Ads', brand: 'Brand' }
-export const DEPTS: readonly MktDept[] = ['content', 'social', 'design', 'ads', 'brand']
-
-/** New Project's Type: what kind of work the task is. */
-export type TaskType = MktDept | 'other'
+/** New Project's Type: what kind of work the task is (a word of the task's, not a group — groups are People's titles). */
+export type TaskType = 'ads' | 'social' | 'content' | 'brand' | 'other'
 export const TASK_TYPES: readonly { key: TaskType; label: string }[] = [
   { key: 'ads', label: 'Ads' },
   { key: 'social', label: 'Social Media' },
@@ -43,11 +41,30 @@ export interface FormField {
   opts?: string[]
 }
 
-/** A date's mark on the calendar: its name there, its colour (a team's), and whether the PIC's calendar shows it. */
+/** The kinds of date a field may put on the calendar (2026-10-24 — the user's answer 16: "要，固定种类"; 15: a post is a
+ * deliverable with a Post day) — each its name there, its glyph and its colour. */
+export type CalKind = 'post' | 'shoot' | 'meeting' | 'ads_live' | 'ads_end' | 'report'
+export const CAL_KINDS: readonly { key: CalKind; label: string; glyph: string; tone: MktTone }[] = [
+  { key: 'post', label: 'Post day', glyph: '📣', tone: 'social' },
+  { key: 'shoot', label: 'Shoot day', glyph: '🎬', tone: 'content' },
+  { key: 'meeting', label: 'Meeting', glyph: '🗓️', tone: 'manager' },
+  { key: 'ads_live', label: 'Ads go-live', glyph: '📈', tone: 'ads' },
+  { key: 'ads_end', label: 'Ads end', glyph: '🛑', tone: 'ads' },
+  { key: 'report', label: 'Report day', glyph: '📊', tone: 'brand' },
+]
+export const calKind = (k: CalKind) => CAL_KINDS.find(c => c.key === k) ?? CAL_KINDS[0]
+
+/** A date's mark on the calendar: which kind of date it is, and whether the PIC's calendar shows it. */
 export interface FieldCal {
-  label: string
-  tone: MktDept
+  kind: CalKind
   pic: boolean
+}
+
+/** A calendar mark as the database keeps it — a kind it knows, else none. */
+export function calOf(v: unknown): FieldCal | null {
+  if (!isObj(v)) return null
+  const kind = CAL_KINDS.find(c => c.key === v.kind)?.key
+  return kind ? { kind, pic: v.pic === true } : null
 }
 
 export interface WorkLink {
@@ -66,7 +83,8 @@ export interface StageWork {
 export interface DraftStage {
   key: string
   name: string
-  dept: MktDept
+  /** Its group: its person's People title. */
+  dept: MktGroup
   /** The person who does it (People id). */
   who: string | null
   sla: number
@@ -138,9 +156,9 @@ export function formFromRow(v: unknown): FormField[] {
     const extras: Partial<FormField> = {}
     if (typeof f.req === 'boolean') extras.req = f.req
     if (typeof f.pic === 'boolean') extras.pic = f.pic
-    if (type === 'Date' && isObj(f.cal)) {
-      const cal = f.cal
-      extras.cal = { label: typeof cal.label === 'string' ? cal.label : '', tone: DEPTS.find(d => d === cal.tone) ?? 'social', pic: cal.pic === true }
+    if (type === 'Date') {
+      const cal = calOf(f.cal)
+      if (cal) extras.cal = cal
     }
     if ((type === 'Select' || type === 'Multi-select') && Array.isArray(f.opts)) extras.opts = f.opts.filter((o): o is string => typeof o === 'string')
     return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}), ...extras }]
@@ -162,22 +180,23 @@ let seq = 0
 /** A fresh key for a stage on the form. */
 export const stageKey = () => `s${Date.now().toString(36)}${(seq++).toString(36)}`
 
-/** New Project's quick stages to start from (the handoff's quick template): a first draft by whoever starts it, a
- * redesign they approve, the publishing — the people of the last two picked on the form. */
-export function starterStages(me: string | null, approver: string | null): DraftStage[] {
+/** New Project's quick stages to start from (the handoff's quick template): a first draft by whoever starts it (their
+ * group, their People title), a redesign they approve, the publishing — the people of the last two picked on the form,
+ * and with them their groups. */
+export function starterStages(me: { id: string; group: string } | null, approver: string | null): DraftStage[] {
   return [
-    { key: stageKey(), name: 'First draft', dept: 'social', who: me, sla: 1, appr: [], back: null,
+    { key: stageKey(), name: 'First draft', dept: me?.group ?? '', who: me?.id ?? null, sla: 1, appr: [], back: null,
       form: [{ label: 'Canva template link', type: 'Text' }, { label: 'Draft notes', type: 'Text' }] },
-    { key: stageKey(), name: 'Redesign', dept: 'design', who: null, sla: 1, appr: approver ? [approver] : [], back: 0,
+    { key: stageKey(), name: 'Redesign', dept: '', who: null, sla: 1, appr: approver ? [approver] : [], back: 0,
       form: [{ label: 'Final artwork', type: 'File' }] },
-    { key: stageKey(), name: 'Publish', dept: 'social', who: null, sla: 1, appr: [], back: null,
+    { key: stageKey(), name: 'Publish', dept: '', who: null, sla: 1, appr: [], back: null,
       form: [{ label: 'Post link', type: 'Text' }, { label: 'Posted on', type: 'Date' }] },
   ]
 }
 
-/** A stage added at the end: the last one's team, nobody yet, a day. */
-export function newStage(after: DraftStage | undefined): DraftStage {
-  return { key: stageKey(), name: 'New stage', dept: after?.dept ?? 'content', who: null, sla: 1, appr: [], form: [], back: null }
+/** A stage added at the end: nobody yet — and so no group until its person is picked — a day. */
+export function newStage(_after?: DraftStage): DraftStage {
+  return { key: stageKey(), name: 'New stage', dept: '', who: null, sla: 1, appr: [], form: [], back: null }
 }
 
 /** A stage on a builder: its key on the form and the earlier stage changes go back to. */
@@ -238,19 +257,26 @@ export function stagesPayload(stages: readonly DraftStage[]): Record<string, unk
   }))
 }
 
-/** "Wei Lun · Ads · 2 active" — whom the stage's person picker offers, with how much is on their plate. */
+/** "Wei Lun · GRAPHIC DESIGNER · 2 active" — whom the stage's person picker offers: their People title (2026-10-24, the
+ * user: it follows People), with how much is on their plate. */
 export function personHint(p: MktPerson, load: number): string {
-  return [p.role || (p.team ? (p.team === 'manager' ? 'Manager' : DEPT_LABEL[p.team]) : p.title), `${load} active`].filter(Boolean).join(' · ')
+  return [p.role || groupOf(p.title), `${load} active`].filter(Boolean).join(' · ')
 }
 
 /** "Due Tue 27 Oct" for a stage on the form. */
 export const dueText = (d: string) => longDay(d)
 
-const TEAM_ORDER = ['manager', 'content', 'social', 'design', 'ads', 'brand']
+/** Somebody a builder's picker offers: who, their group (People title), what is on their plate. */
+export interface PickPerson {
+  id: string
+  first: string
+  hint: string
+  group: string
+}
 
-/** Whom New Project's pickers offer: Marketing's roster (the viewer first, then by team), each with what is on their
- * plate now — and, for the approval levels, its managers (the user: MM and AMM hold the manager's tools). */
-export function builderPeople(board: MktBoard): { people: { id: string; first: string; hint: string; team: string | null }[]; approvers: { id: string; first: string; hint: string; team: string | null }[] } {
+/** Whom New Project's pickers offer: Marketing's roster (the viewer first, then by group A → Z, the managers last), each
+ * with what is on their plate now — and, for the approval levels, its managers (the user: only MM and AMM approve). */
+export function builderPeople(board: MktBoard): { people: PickPerson[]; approvers: PickPerson[] } {
   const load = new Map<string, number>()
   const open = new Set(board.projects.filter(runsStages).map(p => p.id))
   const curOf = new Map(board.projects.map(p => [p.id, p.cur]))
@@ -260,9 +286,9 @@ export function builderPeople(board: MktBoard): { people: { id: string; first: s
     const who = a ? (a.kind === 'person' ? a.staff : null) : s.status === 'todo' || s.status === 'accepted' || s.status === 'changes' ? s.owner : null
     if (who) load.set(who, (load.get(who) ?? 0) + 1)
   }
-  const rank = (p: MktPerson) => (p.id === board.me ? -1 : TEAM_ORDER.indexOf(p.team ?? '') + 1 || 99)
+  const rank = (p: MktPerson) => (p.id === board.me ? 0 : isManagerTitle(p.title) ? 2 : 1)
   const people = [...board.team]
-    .sort((a, b) => rank(a) - rank(b) || a.first.localeCompare(b.first))
-    .map(p => ({ id: p.id, first: p.first || p.full, hint: personHint(p, load.get(p.id) ?? 0), team: p.team }))
-  return { people, approvers: people.filter(p => p.team === 'manager') }
+    .sort((a, b) => rank(a) - rank(b) || groupOf(a.title).localeCompare(groupOf(b.title)) || a.first.localeCompare(b.first))
+    .map(p => ({ id: p.id, first: p.first || p.full, hint: personHint(p, load.get(p.id) ?? 0), group: groupOf(p.title) }))
+  return { people, approvers: people.filter(p => isManagerTitle(p.group)) }
 }

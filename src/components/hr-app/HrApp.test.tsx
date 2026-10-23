@@ -403,6 +403,26 @@ describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
     await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'not_right_now'))
   })
 
+  // HR's list (2026-10-24, "do with same" as File types): the sheet offers the ones that are on, in HR's words.
+  it('Not selected asks why from HR’s list — renamed, turned off and added as Form settings left it', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    const hireReasons = [
+      { id: 'not_shortlisted', name: 'Not shortlisted', active: true, used: 0 },
+      { id: 'failed_interview', name: 'Interview failed', active: true, used: 2 },
+      { id: 'not_right_now', name: 'Not right now', active: false, used: 4 },
+      { id: 'r-salary', name: 'Salary too high', active: true, used: 0 },
+    ]
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [hire], hireReasons, parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    fireEvent.click(screen.getByText('Daniel Lee'))
+    fireEvent.click(screen.getByRole('button', { name: /^Not selected/ }))
+    const offered = ['Interview failed', 'Not shortlisted', 'Salary too high']
+    const words = screen.getAllByRole('button').map(b => b.textContent ?? '')
+    expect(words.filter(t => [...offered, 'Not right now', 'Failed interview'].includes(t))).toEqual(offered)
+    fireEvent.click(screen.getByRole('button', { name: 'Salary too high' }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'r-salary'))
+  })
+
   it('everybody not selected: the list says they are in the Talent Bank', () => {
     window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
     render(<HrApp data={{ ...data, hires: [{ ...hire, candidates: hire.candidates.slice(1) }], parts: { ...data.parts, hiring: true } }} actions={actions} />)

@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { DEPT_LABEL, DEPTS } from '@/lib/marketing/tasks'
+import { groupLabel, isManagerTitle, rosterGroups, sameGroup } from '@/lib/marketing/groups'
 import { WF_MAX_APPROVALS, WF_MAX_SLA, type WfAppr, type WfStage } from '@/lib/marketing/workflows'
 import FieldsEditor from '../builder/FieldsEditor'
-import { TEAM_BG, type BuilderPerson } from '../builder/people'
+import { personBg, type BuilderPerson } from '../builder/people'
 import b from '../builder/builder.module.css'
 
-// A workflow template's stage, its settings (`Workflow Builder.dc.html`, not quick): its name and team, who does it (the
+// A workflow template's stage, its settings (`Workflow Builder.dc.html`, not quick): its name and group (a People title —
+// the user, 2026-10-24: each title is a group), who does it (the
 // manager picks at assignment, or 🔓 the stage before picks from the candidates set here), who approves it (up to
 // three levels: a manager, the PIC through the link, a person picked at assignment), how long, what the PIC sees on the
 // link, whether it splits into subtasks, where changes go back to, the fields it fills in.
@@ -46,7 +47,13 @@ export default function TemplateSettings({
   const mode = locked ? 'assign' : stage.who.mode
   const split = stage.split && !locked
   const cands = stage.who.cands
-  const workers = people.filter(p => p.team !== 'manager' || cands.includes(p.id))
+  // The stage's own group first (the handoff's "Assign to · Design first"); a manager only when picked already.
+  const workers = people
+    .filter(p => !isManagerTitle(p.group) || cands.includes(p.id))
+    .sort((x, y) => Number(sameGroup(y.group, stage.dept)) - Number(sameGroup(x.group, stage.dept)))
+  // The groups to pick from: the roster's titles — and the stage's own, should nobody hold it now.
+  const groups = rosterGroups([...people, ...approvers].map(p => ({ title: p.group })))
+  if (stage.dept && !groups.some(g => sameGroup(g, stage.dept))) groups.push(stage.dept)
 
   const setLevel = (li: number, a: WfAppr | null) => {
     close()
@@ -79,13 +86,17 @@ export default function TemplateSettings({
       </label>
 
       <div className={b.field}>
-        <span className={b.wbQ}>Which team?</span>
-        <div className={b.wbTeams}>
-          {DEPTS.map(d => (
-            <button key={d} type="button" className={`${b.wbBackOpt}${stage.dept === d ? ` ${b.wbBackOn}` : ''}`} onClick={() => onChange({ dept: d })}>
-              {DEPT_LABEL[d]}
-            </button>
-          ))}
+        <span className={b.wbQ}>Which group?</span>
+        <div className={b.wbTeams} role="radiogroup" aria-label="Which group?">
+          {groups.map(g => {
+            const on = sameGroup(stage.dept, g)
+            return (
+              <button key={g} type="button" role="radio" aria-checked={on} className={`${b.wbBackOpt}${on ? ` ${b.wbBackOn}` : ''}`}
+                onClick={() => onChange({ dept: on ? '' : g })}>
+                {groupLabel(g)}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -148,7 +159,7 @@ export default function TemplateSettings({
                   <span className={b.wbAvs}>
                     {cands.slice(0, 5).map(c => {
                       const p = people.find(x => x.id === c)
-                      return <span key={c} className={b.wbAv} style={{ background: TEAM_BG[p?.team ?? 'manager'] }}>{initial(nameOf(c))}</span>
+                      return <span key={c} className={b.wbAv} style={{ background: personBg(p) }}>{initial(nameOf(c))}</span>
                     })}
                   </span>
                 ) : null}
@@ -170,7 +181,7 @@ export default function TemplateSettings({
                         onClick={() => onChange({ who: { mode: 'prev', cands: on ? cands.filter(x => x !== p.id) : [...cands, p.id] } })}
                       >
                         <span className={`${b.wbCheck}${on ? ` ${b.wbCheckOn}` : ''}`}>{on ? '✓' : ''}</span>
-                        <span className={b.wbAv} style={{ background: TEAM_BG[p.team ?? 'manager'] }}>{initial(p.first)}</span>
+                        <span className={b.wbAv} style={{ background: personBg(p) }}>{initial(p.first)}</span>
                         <span className={b.wbOptText}><span className={b.wbOptLabel}>{p.first}</span></span>
                         <span className={b.wbOptHint}>{p.hint}</span>
                       </button>
@@ -222,7 +233,7 @@ export default function TemplateSettings({
                   aria-expanded={dd === key}
                 >
                   {cur.person || (a?.kind === 'person') ? (
-                    <span className={b.wbAv} style={{ background: TEAM_BG[cur.person?.team ?? 'manager'] }}>{initial(cur.label)}</span>
+                    <span className={b.wbAv} style={{ background: personBg(cur.person ?? undefined) }}>{initial(cur.label)}</span>
                   ) : (
                     <span className={b.wbDDIcon}>{cur.icon}</span>
                   )}
@@ -236,7 +247,7 @@ export default function TemplateSettings({
                       return (
                         <button key={o.a ? `${o.a.kind}${o.a.kind === 'person' ? o.a.staff : ''}` : 'none'} type="button" className={`${b.wbOpt}${on ? ` ${b.wbOptOn}` : ''}`} onClick={() => setLevel(li, o.a)}>
                           {o.person ? (
-                            <span className={b.wbAv} style={{ background: TEAM_BG[o.person.team ?? 'manager'] }}>{initial(o.person.first)}</span>
+                            <span className={b.wbAv} style={{ background: personBg(o.person) }}>{initial(o.person.first)}</span>
                           ) : (
                             <span className={b.wbDDIcon}>{o.icon}</span>
                           )}

@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { Select } from '@/components/hrv/select'
 import {
-  addHiringFileType, addHiringSource, removeHiringSource, renameHiringFileType, saveHiringFormFields, setHiringFileTypeActive,
-  setHiringSourceActive,
+  addHiringFileType, addHiringSource, addTalentReason, removeHiringSource, renameHiringFileType, renameTalentReason, saveHiringFormFields,
+  setHiringFileTypeActive, setHiringSourceActive, setTalentReasonActive, type HiringOutcome,
 } from '@/lib/hiring/actions'
-import type { HiringBoard, HiringField, HiringFieldType, HiringFileType } from '@/lib/hiring/types'
+import type { HiringBoard, HiringField, HiringFieldType } from '@/lib/hiring/types'
 import s from './hiring.module.css'
 
 /**
@@ -16,8 +16,10 @@ import s from './hiring.module.css'
  * is required; Position and Department are Core (renamed, never removed). And
  * the hiring sources, each with its hires, On / Off, × while unused. And
  * (2026-10-11, the user: rename and turn off) the file types, each with its
- * files, ✎ to rename, On / Off — Résumé is built in. A change is kept as it is
- * made, as the handoff's are (a name or choices once typing stops).
+ * files, ✎ to rename, On / Off — Résumé is built in. And (2026-10-24, the user:
+ * "1, yes do with same") the Talent Bank's reasons, the same way, each with the
+ * people kept with it. A change is kept as it is made, as the handoff's are (a
+ * name or choices once typing stops).
  */
 const TYPES: ReadonlyArray<{ v: HiringFieldType; label: string }> = [
   { v: 'text', label: 'Short text' },
@@ -248,21 +250,69 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
         </div>
       </section>
 
-      <FileTypes types={board.fileTypes} />
+      <NamedList
+        title="File types"
+        items={board.fileTypes}
+        used={n => (n === 1 ? '1 file' : `${n} files`)}
+        placeholder="New type, e.g. Driving licence"
+        newLabel="New file type"
+        addLabel="+ Add type"
+        taken="That type is already there."
+        rename={renameHiringFileType}
+        toggle={setHiringFileTypeActive}
+        add={addHiringFileType}
+      />
+      <NamedList
+        title="Talent Bank reasons"
+        items={board.talentReasons}
+        used={n => (n === 1 ? '1 person' : `${n} people`)}
+        placeholder="New reason, e.g. Salary too high"
+        newLabel="New reason"
+        addLabel="+ Add reason"
+        taken="That reason is already there."
+        rename={renameTalentReason}
+        toggle={setTalentReasonActive}
+        add={addTalentReason}
+      />
     </>
   )
 }
 
 /**
- * File types (2026-10-11, mig 20261011210000 — the user: rename and turn
- * off): the hiring sources' cards — the name and its files, ✎ to rename (Enter
- * or leaving the field keeps it, Esc lets it be), On / Off; Résumé says *Built
- * in*. A type turned off leaves the picker and keeps the files already filed
- * under it. *+ Add type* names a new one (one that was off comes back on).
+ * A list kept by name — File types (2026-10-11, mig 20261011210000 — the user:
+ * rename and turn off) and the Talent Bank's reasons (2026-10-24, mig
+ * 20261025021500 — "do with same"): the hiring sources' cards — the name and how
+ * often it is used, ✎ to rename (Enter or leaving the field keeps it, Esc lets
+ * it be), On / Off; Résumé says *Built in*. One turned off leaves the pickers;
+ * what is already filed or kept under it keeps it. *+ Add …* names a new one
+ * (one that was off comes back on).
  */
-function FileTypes({ types }: { types: readonly HiringFileType[] }) {
+function NamedList({
+  title,
+  items,
+  used,
+  placeholder,
+  newLabel,
+  addLabel,
+  taken,
+  rename: renameIt,
+  toggle,
+  add,
+}: {
+  title: string
+  items: ReadonlyArray<{ id: string; name: string; active: boolean; used: number; builtin?: string | null }>
+  used: (n: number) => string
+  placeholder: string
+  newLabel: string
+  addLabel: string
+  /** What a name the list has on already is told. */
+  taken: string
+  rename: (id: string, name: string) => Promise<HiringOutcome>
+  toggle: (id: string, active: boolean) => Promise<HiringOutcome>
+  add: (name: string) => Promise<{ ok: true } | { ok: false; reason: string }>
+}) {
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
-  const [newType, setNewType] = useState('')
+  const [newName, setNewName] = useState('')
   const [, start] = useTransition()
   const field = useRef<HTMLInputElement>(null)
   const cancelled = useRef(false)
@@ -272,7 +322,7 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
   }, [renamingId])
 
   // Leaving the field ends a rename — Enter leaves it, Esc leaves it unkept — so a name is kept once.
-  const rename = (t: HiringFileType) => {
+  const rename = (t: (typeof items)[number]) => {
     const name = renaming?.id === t.id ? renaming.name.trim() : ''
     setRenaming(null)
     if (cancelled.current) {
@@ -281,26 +331,26 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
     }
     if (!name || name === t.name) return
     start(async () => {
-      const out = await renameHiringFileType(t.id, name)
+      const out = await renameIt(t.id, name)
       if (!out.ok) flash(out.reason)
     })
   }
-  const addType = () => {
-    const name = newType.trim()
+  const addOne = () => {
+    const name = newName.trim()
     if (!name) return
-    if (types.some(t => t.active && t.name.toLowerCase() === name.toLowerCase())) return flash('That type is already there.')
+    if (items.some(t => t.active && t.name.toLowerCase() === name.toLowerCase())) return flash(taken)
     start(async () => {
-      const out = await addHiringFileType(name)
+      const out = await add(name)
       if (!out.ok) return flash(out.reason)
-      setNewType('')
+      setNewName('')
     })
   }
 
   return (
-    <section className={s.fsCard} aria-label="File types">
-      <div className={s.fsTitle} style={{ marginBottom: 12 }}>File types</div>
+    <section className={s.fsCard} aria-label={title}>
+      <div className={s.fsTitle} style={{ marginBottom: 12 }}>{title}</div>
       <div className={s.sources}>
-        {types.map(t => (
+        {items.map(t => (
           <div key={t.id} className={s.source} data-off={t.active ? undefined : 'true'}>
             {renaming?.id === t.id ? (
               <input
@@ -319,7 +369,7 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
             ) : (
               <span className={s.sourceName}>
                 {t.name}
-                <span className={s.sourceUsed}>{t.used === 1 ? '1 file' : `${t.used} files`}</span>
+                <span className={s.sourceUsed}>{used(t.used)}</span>
               </span>
             )}
             {t.builtin ? (
@@ -338,7 +388,7 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
                   aria-label={`${t.name}: ${t.active ? 'on' : 'off'}`}
                   onClick={() =>
                     start(async () => {
-                      const out = await setHiringFileTypeActive(t.id, !t.active)
+                      const out = await toggle(t.id, !t.active)
                       if (!out.ok) flash(out.reason)
                     })
                   }
@@ -356,17 +406,17 @@ function FileTypes({ types }: { types: readonly HiringFileType[] }) {
       <div className={s.addRow}>
         <input
           className={`${s.input} ${s.addInput}`}
-          value={newType}
+          value={newName}
           maxLength={60}
-          placeholder="New type, e.g. Driving licence"
-          aria-label="New file type"
-          onChange={e => setNewType(e.target.value)}
+          placeholder={placeholder}
+          aria-label={newLabel}
+          onChange={e => setNewName(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter') addType()
+            if (e.key === 'Enter') addOne()
           }}
         />
-        <button type="button" className={`${s.btnGhost} ${s.addBtn}`} onClick={addType}>
-          + Add type
+        <button type="button" className={`${s.btnGhost} ${s.addBtn}`} onClick={addOne}>
+          {addLabel}
         </button>
       </div>
     </section>

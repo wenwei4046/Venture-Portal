@@ -2,13 +2,12 @@
 // a project started from it is laid out — 📋 Requirements first (from the intake minutes, read-only), then a section per
 // stage holding the fields that stage fills in, then the manager's own sections, then the Free space. Each section is
 // 🔒 locked (colleagues can't delete it) or not, ⭐ required before its stage submits or not, 👁 shown to the PIC or not;
-// each field is required or not, shown to the PIC or not, a date 📅 on the calendar (its name and colour there, and
-// whether the PIC's calendar shows it), a choice with its options. A stage's own fields are named and typed on the stage
+// each field is required or not, shown to the PIC or not, a date 📅 on the calendar (which kind of date — a Post day, a
+// Shoot day … since 2026-10-24 — and whether the PIC's calendar shows it), a choice with its options. A stage's own fields are named and typed on the stage
 // (the Workflow stages tab); the canvas sets how they behave. The manager's own fields each say which stage fills them
 // in. Kept with the template's draft and published with its versions, as mkt_canvas_check does. Pure.
 
-import { DEPT_LABEL, DEPTS, type FieldCal, type FieldType, type FormField } from './tasks'
-import type { MktDept } from './board'
+import { calKind, calOf, type CalKind, type FieldCal, type FieldType, type FormField } from './tasks'
 
 /** A stage's section on the canvas — its title is the stage's name. */
 export interface StageSec {
@@ -57,9 +56,6 @@ export const MAX_OPTIONS = 30
 
 /** The icons a section may take (the handoff's). */
 export const SECTION_ICONS = ['🎬', '🎞️', '📸', '🗂️', '🎯', '🧡', '🚚', '🎁', '⭐', '📍', '🛋️', '✨'] as const
-/** A date's colours on the calendar — the teams' (the handoff's order), each with its glyph. */
-export const CAL_TONES: readonly MktDept[] = ['social', 'content', 'design', 'ads', 'brand']
-export const TONE_GLYPH: Record<MktDept, string> = { social: '🖼️', content: '🎥', design: '🎨', ads: '📣', brand: '🏷️' }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : null)
@@ -82,11 +78,8 @@ export function stageSecFromRow(v: unknown): StageSec {
   }
 }
 
-/** A field's calendar mark as the database keeps it. */
-export function calFromRow(v: unknown): FieldCal | null {
-  if (!isObj(v)) return null
-  return { label: typeof v.label === 'string' ? v.label : '', tone: DEPTS.find(d => d === v.tone) ?? 'social', pic: v.pic === true }
-}
+/** A field's calendar mark as the database keeps it: a kind it knows (2026-10-24 — the user's answer 16), else none. */
+export const calFromRow = (v: unknown): FieldCal | null => calOf(v)
 
 function canvasFieldFromRow(v: unknown): CanvasField | null {
   if (!isObj(v)) return null
@@ -129,7 +122,7 @@ export function fieldExtras(f: FormField): Record<string, unknown> {
   return {
     req: fieldReq(f),
     pic: fieldPic(f),
-    ...(f.type === 'Date' && f.cal ? { cal: { label: f.cal.label, tone: f.cal.tone, pic: f.cal.pic } } : {}),
+    ...(f.type === 'Date' && f.cal ? { cal: { kind: f.cal.kind, pic: f.cal.pic } } : {}),
     ...(isChoice(f.type) ? { opts: f.opts ?? [] } : {}),
   }
 }
@@ -270,7 +263,7 @@ export function staffView(stages: readonly StageLike[], c: WfCanvas, at: number,
 
 export interface PicPreview {
   sections: { key: string; title: string; cols: string[] | null; fields: string[] }[]
-  calendar: { label: string; tone: MktDept; from: string }[]
+  calendar: { label: string; kind: CalKind; from: string }[]
   /** "Hidden: Internal notes, 2 internal fields." — what the link leaves out. */
   hidden: string
 }
@@ -296,9 +289,8 @@ export function picView(stages: readonly StageLike[], c: WfCanvas): PicPreview {
   c.sections.forEach(s => take(s.key, s.title || 'New section', s.pic, s.fields))
   const calendar = everyField(stages, c)
     .filter(p => p.field.type === 'Date' && p.field.cal && p.field.cal.pic)
-    .map(p => ({ label: p.field.cal!.label || p.field.label, tone: p.field.cal!.tone, from: p.field.label }))
+    .map(p => ({ label: calKind(p.field.cal!.kind).label, kind: p.field.cal!.kind, from: p.field.label }))
   const parts = [...hiddenSecs, ...(hiddenFields ? [`${hiddenFields} internal field${hiddenFields === 1 ? '' : 's'}`] : [])]
   return { sections, calendar, hidden: parts.length ? `Hidden: ${parts.join(', ')}.` : '' }
 }
 
-export const toneLabel = (t: MktDept) => DEPT_LABEL[t]

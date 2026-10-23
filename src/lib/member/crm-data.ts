@@ -215,6 +215,8 @@ export interface CrmData {
   customerLabels: Record<string, string[]>;
   quickReplies: CrmQuickReply[];
   autoReplies: CrmAutoReplySet;
+  /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
+  autoRepliesOf?: Record<string, CrmAutoReplySet>;
   invites: CrmInvite[];
   shares: CrmShare[];
   events: CrmEvent[];
@@ -371,7 +373,7 @@ export interface CrmDataRows {
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
-  autoReplies: { settings: Partial<CrmAutoReplySet> }[];
+  autoReplies: { staff_id?: string; settings: Partial<CrmAutoReplySet> }[];
   invites: CrmInviteRow[];
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
@@ -514,7 +516,9 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,
     quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),
-    autoReplies: autoReplySet(rows.autoReplies[0]?.settings),
+    // One's own; whoever sees everybody's CRM reads everybody's rows too (mig 20261025010000), kept for View as, read only.
+    autoReplies: autoReplySet((rows.autoReplies.find(r => !r.staff_id || r.staff_id === rows.people.me) ?? (rows.autoReplies.some(r => r.staff_id) ? undefined : rows.autoReplies[0]))?.settings),
+    autoRepliesOf: Object.fromEntries(rows.autoReplies.filter(r => r.staff_id && r.staff_id !== rows.people.me).map(r => [r.staff_id!, autoReplySet(r.settings)])),
     invites: rows.invites.map(i => ({ id: i.id, kind: i.kind, customerId: i.contact_id, customerName: i.contact_name, from: i.from_staff, to: i.to_staff, state: i.state, createdAt: i.created_at, decidedAt: i.decided_at })),
     shares: rows.shares.map(s => ({ customerId: s.contact_id, staffId: s.staff_id, invitedBy: s.invited_by, joinedAt: s.joined_at })),
     events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),

@@ -24,10 +24,10 @@ const log = projectLogFromRow({
 
 const task = taskFromRow({
   today: '2026-10-22', me: 's-mei',
-  team: [{ id: 's-sia', user: 'u1', full: 'SIA JOSIAH', first: 'SIA', team: 'manager' }, { id: 's-mei', user: 'u2', full: 'MEI LING', first: 'Mei', team: 'social' }],
+  team: [{ id: 's-sia', user: 'u1', full: 'SIA JOSIAH', first: 'SIA', title: 'MARKETING MANAGER' }, { id: 's-mei', user: 'u2', full: 'MEI LING', first: 'Mei', title: 'SOCIAL MEDIA SPECIALIST' }],
   sub: { id: 'sub', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, pic: null },
   project: { id: 'p1', trackId: 'TSK-CAR-2610-001', kind: 'quick', sub: 'sub', title: 'Price update', status: 'active', owner: 's-sia', cur: 0, free: [] },
-  stages: [{ project: 'p1', idx: 0, name: 'First draft', dept: 'social', owner: 's-mei', appr: [{ kind: 'person', staff: 's-sia' }], status: 'changes',
+  stages: [{ project: 'p1', idx: 0, name: 'First draft', dept: 'SOCIAL MEDIA SPECIALIST', owner: 's-mei', appr: [{ kind: 'person', staff: 's-sia' }], status: 'changes',
     dueOn: '2026-10-23', work: { notes: '', links: [] } }],
   events: log!.rows,
 }) as MktTaskPage
@@ -99,8 +99,9 @@ describe('a task’s map and replay (④-4)', () => {
     expect(within(panel).getByText('v1')).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '☰ List view' }))
     expect(screen.getAllByRole('row').slice(1).map(r => r.textContent)).toEqual([
-      '01📣Created by SIASocial MediaSIACreatedDone20 Oct',
-      '02📣First draftSocial MediaMei🔒 Assigned · returned ×1Changes requestedDue 23 Oct',
+      // A lane is the stage's group — its person's People title (2026-10-24).
+      '01📣Created by SIASOCIAL MEDIA SPECIALISTSIACreatedDone20 Oct',
+      '02📣First draftSOCIAL MEDIA SPECIALISTMei🔒 Assigned · returned ×1Changes requestedDue 23 Oct',
       '03👤SIA approves First draftApprovalsSIAInternal approverPlanned',
     ])
   })

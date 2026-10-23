@@ -5,9 +5,10 @@
 // in, and its section on the canvas (lib/marketing/canvas.ts, mig 20261024001000). The lock as a version runs it, what
 // the foot warns of and what publishing refuses — as the database checks it (mkt_workflow_check). Pure.
 
-import type { MktDept } from './board'
+import type { MktGroup } from './board'
 import { canvasFromRow, canvasPayload, DEFAULT_STAGE_SEC, fieldExtras, stageSecFromRow, type StageSec, type WfCanvas } from './canvas'
-import { DEPTS, formFromRow, stageKey, type FormField } from './tasks'
+import { groupOf } from './groups'
+import { formFromRow, stageKey, type FormField } from './tasks'
 
 /** One approval level of a template's stage. */
 export type WfAppr = { kind: 'person'; staff: string } | { kind: 'pic' } | { kind: 'assign' }
@@ -16,7 +17,8 @@ export interface WfStage {
   /** The stage's key on the page (not kept). */
   key: string
   name: string
-  dept: MktDept
+  /** Its group — a People title, '' for none (2026-10-24). */
+  dept: MktGroup
   /** assign: the manager picks when planning each project; prev: 🔓 the stage before picks from `cands`. */
   who: { mode: 'assign' | 'prev'; cands: string[] }
   sla: number
@@ -85,7 +87,7 @@ function apprFromRow(v: unknown): WfAppr[] {
 export function wfStageFromRow(v: unknown): WfStage {
   const s = isObj(v) ? v : {}
   const who = isObj(s.who) ? s.who : {}
-  const dept = DEPTS.find(d => d === s.dept) ?? 'content'
+  const dept = groupOf(str(s.dept))
   return {
     key: stageKey(),
     name: str(s.name),
@@ -186,14 +188,15 @@ export function wfApprText(appr: readonly WfAppr[], nameOf: (staff: string) => s
   return appr.map(a => (a.kind === 'pic' ? '🔗 PIC' : a.kind === 'assign' ? '👤 Pick at assignment' : `👤 ${nameOf(a.staff)}`)).join(' → ')
 }
 
-/** A stage added at the end: the last one's team, picked at assignment, a day. */
+/** A stage added at the end: the last one's group, picked at assignment, a day. */
 export function newWfStage(after: WfStage | undefined): WfStage {
-  return { key: stageKey(), name: 'New stage', dept: after?.dept ?? 'content', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '', form: [], sec: { ...DEFAULT_STAGE_SEC } }
+  return { key: stageKey(), name: 'New stage', dept: after?.dept ?? '', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '', form: [], sec: { ...DEFAULT_STAGE_SEC } }
 }
 
-/** A new template's one stage (the handoff's): named for its action, Design's, picked at assignment, two days, the PIC approves. */
+/** A new template's one stage (the handoff's): named for its action, picked at assignment, two days, the PIC approves —
+ * its group picked in the builder (the handoff's Design is no group of People's). */
 export function firstWfStage(action: string): WfStage {
-  return { ...newWfStage(undefined), name: action.trim().slice(0, 80), dept: 'design', sla: 2, appr: [{ kind: 'pic' }] }
+  return { ...newWfStage(undefined), name: action.trim().slice(0, 80), dept: '', sla: 2, appr: [{ kind: 'pic' }] }
 }
 
 /** "Template 3" — a new template's name under an action, one not taken. */

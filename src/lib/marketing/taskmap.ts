@@ -1,18 +1,19 @@
-// The task map (`Task Map.dc.html`, ④-4): a project's road as swim lanes — Approvals on top, then each team its stages
-// are on — its stations (a stage's card; each approver's gate, 👤 a person or 🔗 the PIC) joined by its hand-offs: solid
+// The task map (`Task Map.dc.html`, ④-4): a project's road as swim lanes — Approvals on top, then each group its stages
+// are on (a People title since 2026-10-24) — its stations (a stage's card; each approver's gate, 👤 a person or 🔗 the PIC) joined by its hand-offs: solid
 // once made, dashed when the stage before picked who, red when sent back (returned ×n), faint while planned. A line
 // says when, who and what; a station its facts, versions and own records. Replay walks the trail record by record.
 // Drawn from the task page (its stages, approvers and trail) — subtasks have no writer yet, so none is drawn. Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { shortDay, type MktDept } from './board'
+import { shortDay } from './board'
+import { groupEmoji, groupLabel, groupTone, type MktTone } from './groups'
 import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent } from './task'
-import { DEPT_LABEL } from './tasks'
 
-export type MapLaneId = 'appr' | MktDept
+/** 'appr', or a group (a People title; '—' for a stage of none). */
+export type MapLaneId = string
 export type MapTone = 'done' | 'waiting' | 'draft' | 'red'
 
-export interface MapLane { id: MapLaneId; name: string; emoji: string }
+export interface MapLane { id: MapLaneId; name: string; emoji: string; tone: MktTone | 'appr' }
 
 export interface MapNode {
   id: string
@@ -62,7 +63,6 @@ export interface TaskMap {
   stations: Record<string, Station>
 }
 
-export const LANE_EMOJI: Record<MktDept, string> = { social: '📣', content: '🎬', design: '🎨', ads: '📈', brand: '✨' }
 const TONE_LABEL: Record<MapTone, string> = { done: 'Done', waiting: 'Waiting', draft: 'Planned', red: 'Overdue' }
 
 const day = (at: string | null | undefined) => {
@@ -219,9 +219,10 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const lanesUsed: MapLaneId[] = []
   const addLane = (l: MapLaneId) => { if (!lanesUsed.includes(l)) lanesUsed.push(l) }
   if (stages.some(s => s.appr.length)) addLane('appr')
-  const startLane: MapLaneId = stages[0]?.dept ?? 'social'
+  const laneOf = (dept: string | undefined) => dept || '—'
+  const startLane: MapLaneId = laneOf(stages[0]?.dept)
   addLane(startLane)
-  stages.forEach(s => addLane(s.dept))
+  stages.forEach(s => addLane(laneOf(s.dept)))
 
   const returnsTo = (idx: number) => [...backs.values()].filter(b => b.to === `s${idx}`).reduce((n, b) => n + b.n, 0)
   const nodes: MapNode[] = road.map((r, col) => {
@@ -246,7 +247,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
       const handoff = s.mode === 'prev' ? `🔓 Picked by ${prev ? who(prev.owner) : 'the stage before'}` : s.mode === 'assign' ? '🔒 Picked at assignment' : '🔒 Assigned'
       const n = returnsTo(s.idx)
       return {
-        id: r.id, kind: 'card', lane: s.dept, col, title: s.name, full: s.name, person: who(s.owner), icon: '',
+        id: r.id, kind: 'card', lane: laneOf(s.dept), col, title: s.name, full: s.name, person: who(s.owner), icon: '',
         date: stageDone ? day(s.doneAt) || (s.dueOn ? shortDay(s.dueOn) : '') : handedIn ? day(s.submittedAt) : s.dueOn ? `Due ${shortDay(s.dueOn)}` : '',
         tone, current, future: tone === 'draft', tag: n ? `returned ×${n}` : null, stage: s.idx, handoff,
         status: current ? (s.status === 'changes' ? 'Changes requested' : late ? 'Overdue' : 'Waiting · now here') : handedIn ? 'Submitted' : TONE_LABEL[tone],
@@ -308,9 +309,9 @@ export function taskMap(page: MktTaskPage): TaskMap {
     }
   }
 
-  const lanes: MapLane[] = lanesUsed.map(id => ({
-    id, name: id === 'appr' ? 'Approvals' : DEPT_LABEL[id], emoji: id === 'appr' ? '🛡️' : LANE_EMOJI[id],
-  }))
+  const lanes: MapLane[] = lanesUsed.map(id => (id === 'appr'
+    ? { id, name: 'Approvals', emoji: '🛡️', tone: 'appr' as const }
+    : { id, name: groupLabel(id === '—' ? '' : id), emoji: groupEmoji(id === '—' ? '' : id), tone: groupTone(id === '—' ? '' : id) }))
   return { lanes, nodes, edges, steps, stations }
 }
 

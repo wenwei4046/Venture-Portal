@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { CANVAS_TYPES, CAL_TONES, fieldPic, fieldReq, isChoice, MAX_OPTIONS, TONE_GLYPH, withType } from '@/lib/marketing/canvas'
-import { DEPT_LABEL, FIELD_GLYPH, type FormField } from '@/lib/marketing/tasks'
+import { CANVAS_TYPES, fieldPic, fieldReq, isChoice, MAX_OPTIONS, withType } from '@/lib/marketing/canvas'
+import { CAL_KINDS, FIELD_GLYPH, type FormField } from '@/lib/marketing/tasks'
 import c from './canvas.module.css'
 
 // The canvas's two settings panels (`Canvas Template Editor.dc.html`): a section's (🔒 / ⭐ / 👁, which stage fills it in)
 // and a field's (its name and kind of answer, a choice's options, ⭐ / 👁, which stage fills it in, a date on the
-// calendar — its name there, its colour, the PIC's calendar). Each answers the whole thing changed; the editor keeps it.
+// calendar — which kind of date, one of six since 2026-10-24 (the user's answer 16: "要，固定种类"), the PIC's calendar).
+// Each answers the whole thing changed; the editor keeps it.
 
 function Switch({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
   return (
@@ -203,31 +204,26 @@ export function FieldPop<T extends FormField>({
           <Switch
             on={!!cal}
             label="📅 Show on calendar"
-            onChange={on => onChange({ ...field, cal: on ? { label: field.label, tone: 'social', pic: false } : null })}
+            onChange={on => onChange({ ...field, cal: on ? { kind: 'post', pic: false } : null })}
           />
           {cal ? (
             <>
-              <label className={c.popPart}>
-                <span className={c.popSmall}>Name on the calendar</span>
-                <input className={c.popInput} value={cal.label} maxLength={40} onChange={e => onChange({ ...field, cal: { ...cal, label: e.target.value } })} />
-              </label>
-              <div className={c.tones}>
-                <span className={c.popSmall}>Colour</span>
-                {CAL_TONES.map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    title={DEPT_LABEL[t]}
-                    aria-label={DEPT_LABEL[t]}
-                    aria-pressed={cal.tone === t}
-                    className={`${c.tone} ${c[`tone_${t}`]}${cal.tone === t ? ` ${c.toneOn}` : ''}`}
-                    onClick={() => onChange({ ...field, cal: { ...cal, tone: t } })}
-                  />
-                ))}
-              </div>
-              <div className={c.tones}>
-                <span className={c.popSmall}>Preview</span>
-                <span className={`${c.calChip} ${c[`cal_${cal.tone}`]}`}>{TONE_GLYPH[cal.tone]} {cal.label || field.label}</span>
+              <div className={c.popPart}>
+                <span className={c.popSmall}>Which date is it?</span>
+                <div className={c.calKinds} role="radiogroup" aria-label="Which date is it?">
+                  {CAL_KINDS.map(k => (
+                    <button
+                      key={k.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={cal.kind === k.key}
+                      className={`${c.calChip} ${c[`cal_${k.tone}`]}${cal.kind === k.key ? ` ${c.calChipOn}` : ''}`}
+                      onClick={() => onChange({ ...field, cal: { ...cal, kind: k.key } })}
+                    >
+                      {k.glyph} {k.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {showPic ? <Switch on={cal.pic} label="Visible on PIC calendar" onChange={pic => onChange({ ...field, cal: { ...cal, pic } })} /> : null}
             </>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { hiringFileLink, setCandidateStage } from '@/lib/hiring/actions'
 import { resumeOf } from '@/lib/hiring/files'
-import { REASONS, outReason, reasonLabel } from '@/lib/hiring/reasons'
+import { reasonLabel, whyOrder } from '@/lib/hiring/reasons'
 import { STAGE, STAGE_ORDER, candidateInfo, candidateMeta, initials } from '@/lib/hiring/view'
 import type { HiringBoard, HiringCandidate, HiringRequest, TalentReason } from '@/lib/hiring/types'
 import { STAGE_COLOURS, StageChip } from './bits'
@@ -27,7 +27,7 @@ import s from './hiring.module.css'
  *
  * Not selected leaves the list for the Talent Bank (2026-10-24 — IT-0008: "after the candidate is failed with interview
  * or not shortlisted, the candidate will be dissapear within the table ish view … placed within the Talent Bank"):
- * Change status ▸ Not selected asks why (the five reasons, the one their stage says first) and the database keeps them
+ * Change status ▸ Not selected asks why (HR's reasons that are on, the one their stage says first) and the database keeps them
  * in the bank; the card counts and lists the ones still in the running, the rest folded under "Not selected · N" at
  * its foot — each with their reason, their ⋯ to open them in the bank or bring them back.
  */
@@ -69,7 +69,7 @@ export default function Candidates({
     })
   }
   /** Why they were not selected, in words — what the Talent Bank keeps on them. */
-  const whyOut = (c: HiringCandidate) => reasonLabel(board.talents.find(t => t.id === c.talentId)?.reason)
+  const whyOut = (c: HiringCandidate) => reasonLabel(board.talentReasons, board.talents.find(t => t.id === c.talentId)?.reason)
   const download = (c: HiringCandidate) => {
     setMenu(null)
     start(async () => {
@@ -174,10 +174,10 @@ export default function Candidates({
                   // Not selected keeps them in the Talent Bank: why, the one their stage says first.
                   <div className={s.statusList} role="group" aria-label="Why not selected" style={{ animation: 'none' }}>
                     <span className={s.whyHead}>Not selected · why?</span>
-                    {[...REASONS].sort((a, b) => Number(b.id === outReason(c.stage)) - Number(a.id === outReason(c.stage))).map(x => (
+                    {whyOrder(board.talentReasons, c.stage).map(x => (
                       <button key={x.id} type="button" role="menuitem" className={s.statusItem} onClick={() => stage(c, 'rejected', x.id)}>
                         <span className={s.statusDot} style={{ background: STAGE_COLOURS.rejected.fg }} aria-hidden="true" />
-                        {x.label}
+                        {x.name}
                       </button>
                     ))}
                   </div>
@@ -279,13 +279,14 @@ export default function Candidates({
         request={r}
         state={form}
         canAddType={can.edit}
+        canAddReason={can.edit}
         onClose={() => setForm(null)}
         onFields={() => setFieldsOpen(true)}
       />
       <CandidateFieldsWindow board={board} open={fieldsOpen} onClose={() => setFieldsOpen(false)} />
       <FilesDrawer request={r} candidate={cv ? (r.candidates.find(x => x.id === cv.id) ?? cv) : null} onClose={() => setCv(null)} />
       <PickTalentWindow board={board} request={r} open={pickOpen} onClose={() => setPickOpen(false)} />
-      <MoveToTalentWindow board={board} request={r} candidate={toBank} onClose={() => setToBank(null)} />
+      <MoveToTalentWindow board={board} request={r} candidate={toBank} canAddReason={can.edit} onClose={() => setToBank(null)} />
     </section>
   )
 }

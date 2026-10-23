@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { longDay, type MktDept } from '@/lib/marketing/board'
-import { DEPTS, MAX_APPROVALS, MAX_SLA, MAX_STAGES, moveStage, newStage, removeStage, stageDates, stageProblems, type DraftStage } from '@/lib/marketing/tasks'
+import { longDay } from '@/lib/marketing/board'
+import { MAX_APPROVALS, MAX_SLA, MAX_STAGES, moveStage, newStage, removeStage, stageDates, stageProblems, type DraftStage } from '@/lib/marketing/tasks'
 import FieldsEditor from '../builder/FieldsEditor'
-import { TEAM_BG, type BuilderPerson } from '../builder/people'
+import { personBg, type BuilderPerson } from '../builder/people'
 import StageList, { Fact } from '../builder/StageList'
 import b from '../builder/builder.module.css'
 
@@ -53,8 +53,8 @@ export default function StageBuilder({
 
   const pickWho = (id: string) => {
     const p = people.find(x => x.id === id)
-    const team = p?.team && (DEPTS as readonly string[]).includes(p.team) ? (p.team as MktDept) : st.dept
-    upd({ who: id, dept: team })
+    // The stage's group is its person's People title (2026-10-24 — the user: "每个 title 就是一组").
+    upd({ who: id, dept: p?.group ?? '' })
     setDd(null)
   }
   const setLevel = (li: number, id: string | null) => {
@@ -148,7 +148,7 @@ export default function StageBuilder({
                       {people.map(p => (
                         <button key={p.id} type="button" className={`${b.wbOpt}${st.who === p.id ? ` ${b.wbOptOn}` : ''}`} onClick={() => pickWho(p.id)}>
                           <span className={b.wbTick}>{st.who === p.id ? '✓' : ''}</span>
-                          <span className={b.wbAv} style={{ background: TEAM_BG[p.team ?? 'manager'] }}>{p.first.charAt(0).toUpperCase()}</span>
+                          <span className={b.wbAv} style={{ background: personBg(p) }}>{p.first.charAt(0).toUpperCase()}</span>
                           <span className={b.wbOptText}>
                             <span className={b.wbOptLabel} style={{ display: 'block' }}>{p.id === me ? `Me (${p.first})` : p.first}</span>
                             <span className={b.wbOptHint} style={{ display: 'block' }}>{p.hint}</span>
@@ -184,7 +184,7 @@ export default function StageBuilder({
                           }}
                           aria-expanded={dd === key}
                         >
-                          {cur ? <span className={b.wbAv} style={{ background: TEAM_BG[cur.team ?? 'manager'] }}>{cur.first.charAt(0).toUpperCase()}</span> : <span className={b.wbDDIcon}>—</span>}
+                          {cur ? <span className={b.wbAv} style={{ background: personBg(cur) }}>{cur.first.charAt(0).toUpperCase()}</span> : <span className={b.wbDDIcon}>—</span>}
                           <span className={b.wbDDText}><span className={b.wbDDLabel}>{cur ? cur.first : 'No approval'}</span></span>
                           <span className={b.wbCaret}>▼</span>
                         </button>
@@ -199,7 +199,7 @@ export default function StageBuilder({
                             ) : null}
                             {approvers.filter(x => x.id === a || !st.appr.includes(x.id)).map(x => (
                               <button key={x.id} type="button" className={`${b.wbOpt}${a === x.id ? ` ${b.wbOptOn}` : ''}`} onClick={() => setLevel(li, x.id)}>
-                                <span className={b.wbAv} style={{ background: TEAM_BG[x.team ?? 'manager'] }}>{x.first.charAt(0).toUpperCase()}</span>
+                                <span className={b.wbAv} style={{ background: personBg(x) }}>{x.first.charAt(0).toUpperCase()}</span>
                                 <span className={b.wbOptText}><span className={b.wbOptLabel}>{x.id === me ? `Me (${x.first})` : x.first}</span></span>
                                 <span className={b.wbOptHint}>{x.hint}</span>
                                 <span className={b.wbTick}>{a === x.id ? '✓' : ''}</span>

@@ -1,7 +1,7 @@
 // The handoff's own sample data (Revenue App.dc.html: HIRES, TALENTS, HIRE_FIELDS,
 // HIRE_SOURCES, STAFF) as a HiringBoard — the Hiring tests' one board. Instants are
 // noon in the office (04:00 UTC) of the prototype's days.
-import type { HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringFile, HiringFileType, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringFile, HiringFileType, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 
 const MON: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 const iso = (d: string) => {
@@ -98,6 +98,15 @@ const talents: HiringTalent[] = [
   T({ id: 'T-101', name: 'Aisyah Rahman', phone: '013-901 2234', email: 'aisyah.r@gmail.com', position: 'Account Executive', dept: 'Finance', from: '', when: '18 Jul 2026', by: 'jason', file: 'Aisyah_Rahman_CV.pdf', notes: 'Walk-in CV. ACCA part-qualified. Jason met her briefly; worth a proper interview for the next Finance role.', events: [['Added to Talent Bank', '18 Jul 2026', 'Jason Ong', 'Walk-in CV']] }),
 ]
 
+/** HR's reasons as the list began (mig 20261025021500), with the people kept with each above. */
+export const TALENT_REASONS: HiringBankReason[] = [
+  { id: 'not_shortlisted', name: 'Not shortlisted', active: true, used: 0 },
+  { id: 'failed_interview', name: 'Failed interview', active: true, used: 1 },
+  { id: 'not_right_now', name: 'Not right now', active: true, used: 1 },
+  { id: 'declined_offer', name: 'Declined offer', active: true, used: 0 },
+  { id: 'other', name: 'Other', active: true, used: 1 },
+]
+
 export const HIRING_BOARD: HiringBoard = {
   fields: FIELDS,
   sources: [['Jobstreet', 2], ['LinkedIn', 1], ['Social Media', 1], ['Referral', 1], ['Walk-in', 0], ['Other', 0]].map(([name, used], i) => ({ id: 's' + i, name: String(name), active: true, used: Number(used) })),
@@ -107,6 +116,7 @@ export const HIRING_BOARD: HiringBoard = {
     { id: 'transport', label: 'Own transport', type: 'choice', options: 'Yes, No' },
   ],
   fileTypes: FILE_TYPES,
+  talentReasons: TALENT_REASONS,
   people: STAFF,
   requests,
   talents,

@@ -167,7 +167,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       read<CrmDataRows["labels"]>(db.from("crm_labels").select("id, name, color, sort_order")),
       read<CrmDataRows["contactLabels"]>(db.from("crm_contact_labels").select("label_id, contact_id")),
       read<CrmDataRows["quickReplies"]>(db.from("crm_quick_replies").select("id, shortcut, message, sort_order")),
-      read<CrmDataRows["autoReplies"]>(db.from("crm_auto_replies").select("settings")),
+      read<CrmDataRows["autoReplies"]>(db.from("crm_auto_replies").select("staff_id, settings")),
       read<CrmDataRows["invites"]>(db.from("crm_invites").select("id, kind, contact_id, contact_name, from_staff, to_staff, state, created_at, decided_at").order("created_at", { ascending: false }).limit(200)),
       read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
       read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").in("kind", LISTED_EVENTS).order("at", { ascending: false }).limit(500)),

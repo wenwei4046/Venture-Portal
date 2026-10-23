@@ -11,7 +11,7 @@ import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
 import { reasonLabel } from '@/lib/hiring/reasons'
-import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import { noticesFromRow } from '@/lib/push/notices'
 import { bookerName, type Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
@@ -128,11 +128,11 @@ export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): Hr
   }
 }
 
-/** Somebody in the Talent Bank as the app draws them. */
-export function talentOf(t: HiringTalent): HrTalent {
+/** Somebody in the Talent Bank as the app draws them — why they are kept in the words of HR's `reasons`. */
+export function talentOf(t: HiringTalent, reasons: readonly HiringBankReason[]): HrTalent {
   return {
     id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined, position: t.position, dept: t.department,
-    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes, reason: reasonLabel(t.reason) || undefined,
+    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes, reason: reasonLabel(reasons, t.reason) || undefined,
   }
 }
 
@@ -320,11 +320,12 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     rooms,
     bookings,
     sources: board ? board.sources.filter(x => x.active).map(x => x.name) : [],
-    talents: board && parts.talent ? board.talents.map(talentOf) : [],
+    talents: board && parts.talent ? board.talents.map(t => talentOf(t, board.talentReasons)) : [],
     docTypes: center?.docTypes ?? [],
     letters: center?.letters ?? [],
     documents: center?.documents ?? [],
     hireFields: board && parts.hiring ? board.fields : [],
+    hireReasons: board && parts.hiring ? board.talentReasons : [],
     hirePeople: board && parts.hiring ? board.people.map(p => ({ id: p.id, name: p.name, dept: p.department ?? '' })) : [],
     hireMe: board?.me.staffId ?? null,
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),

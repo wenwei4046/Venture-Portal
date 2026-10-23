@@ -67,6 +67,10 @@ describe('where it stands, for the PIC', () => {
     expect(picBanner(page({ asked: { reason: 'Add Penang', at: 'x' } }))?.text).toBe('You asked: “Add Penang”')
     expect(picBanner(page({ status: 'approved' }))?.title).toBe('Approved')
     expect(picBanner(page({ status: 'changes' }))).toBeNull()
+    // Unanswered 4 working hours, it says so in red (2026-10-24 — the user's answer 2); an answer given never is.
+    expect(picBanner(page(), true)).toEqual({ tone: 'red', title: 'Overdue — please review', text: 'The meeting minutes are ready. Please review them below.' })
+    expect(picBanner(page({ asked: { reason: 'Add Penang', at: 'x' } }), true)).toMatchObject({ tone: 'red', title: 'Overdue — please review' })
+    expect(picBanner(page({ status: 'approved' }), true)?.tone).toBe('done')
   })
 
   it('the progress: the meeting, the minutes sent, their approval, the work', () => {

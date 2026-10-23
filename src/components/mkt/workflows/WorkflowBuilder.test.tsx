@@ -23,18 +23,18 @@ const RACHEL = 's-rachel'
 const SITI = 's-siti'
 const AINA = 's-aina'
 const people = [
-  { id: RACHEL, first: 'Rachel', hint: 'Manager · 2 active', team: 'manager' },
-  { id: SITI, first: 'Siti', hint: 'Design · 4 active', team: 'design' },
-  { id: AINA, first: 'Aina', hint: 'Design · 2 active', team: 'design' },
+  { id: RACHEL, first: 'Rachel', hint: 'MARKETING MANAGER · 2 active', group: 'MARKETING MANAGER' },
+  { id: SITI, first: 'Siti', hint: 'GRAPHIC DESIGNER · 4 active', group: 'GRAPHIC DESIGNER' },
+  { id: AINA, first: 'Aina', hint: 'GRAPHIC DESIGNER · 2 active', group: 'GRAPHIC DESIGNER' },
 ]
-const approvers = people.filter(p => p.team === 'manager')
+const approvers = people.filter(p => p.group === 'MARKETING MANAGER')
 const team = people.map(p => p.id)
 
 const REELS = {
   id: 'w1', action: 'Reels video', tname: 'Full production', emoji: '🎞️', note: 'Used by Ads and Social Media', promise: 10, locked: false,
   draft: [
     { name: 'Script', dept: 'content', who: { mode: 'assign', cands: [] }, sla: 2, appr: [{ kind: 'person', staff: RACHEL }], split: false, back: null, picText: '', form: [] },
-    { name: 'Edit', dept: 'content', who: { mode: 'prev', cands: [SITI, AINA] }, sla: 3, appr: [], split: true, back: null, picText: '', form: [
+    { name: 'Edit', dept: 'VIDEOGRAPHER', who: { mode: 'prev', cands: [SITI, AINA] }, sla: 3, appr: [], split: true, back: null, picText: '', form: [
       { label: 'Shot list', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }], rows: [] },
     ] },
     { name: 'Final', dept: 'content', who: { mode: 'assign', cands: [] }, sla: 1, appr: [{ kind: 'person', staff: RACHEL }, { kind: 'pic' }], split: false, back: 1, picText: '', form: [] },
@@ -168,7 +168,7 @@ describe('the Workflow Builder', () => {
     const name = screen.getByRole('textbox', { name: 'New action' })
     fireEvent.change(name, { target: { value: 'Design photo' } })
     const made = { id: 'w9', action: 'Design photo', tname: 'Standard', emoji: '✨', note: null, promise: null, locked: false,
-      draft: [{ name: 'Design photo', dept: 'design', who: { mode: 'assign', cands: [] }, sla: 2, appr: [{ kind: 'pic' }], split: false, back: null, picText: '', form: [] }],
+      draft: [{ name: 'Design photo', dept: '', who: { mode: 'assign', cands: [] }, sla: 2, appr: [{ kind: 'pic' }], split: false, back: null, picText: '', form: [] }],
       rev: 1, version: 0, changed: true, live: 0 }
     actions.saveMktWorkflow.mockResolvedValue({ ok: true, id: 'w9', rev: 1, workflows: list(BROKEN, made, REELS) })
     await act(async () => {
@@ -220,6 +220,21 @@ describe('the Workflow Builder', () => {
     })
     expect(await screen.findByText('The product "Social Media Package A" links this template — unlink it there first.')).toBeTruthy()
     expect(screen.getByRole('textbox', { name: 'Template name' })).toHaveProperty('value', 'Standard')
+  })
+
+  it('a stage’s group: the roster’s titles, the managers’ last, its own kept should nobody hold it; picked again, none (2026-10-24)', async () => {
+    builder()
+    fireEvent.click(screen.getByText('Edit'))
+    const groups = () => screen.getByRole('radiogroup', { name: 'Which group?' })
+    expect(within(groups()).getAllByRole('radio').map(r => `${r.textContent}${r.getAttribute('aria-checked') === 'true' ? '*' : ''}`))
+      .toEqual(['GRAPHIC DESIGNER', 'MARKETING MANAGER', 'VIDEOGRAPHER*'])
+    fireEvent.click(within(groups()).getByRole('radio', { name: 'GRAPHIC DESIGNER' }))
+    await waitFor(() => expect(actions.saveMktWorkflow).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.saveMktWorkflow.mock.calls[0][2].stages[1].dept).toBe('GRAPHIC DESIGNER')
+    expect(within(groups()).getAllByRole('radio').map(r => r.textContent)).toEqual(['GRAPHIC DESIGNER', 'MARKETING MANAGER'])
+    fireEvent.click(within(groups()).getByRole('radio', { name: 'GRAPHIC DESIGNER' }))
+    await waitFor(() => expect(actions.saveMktWorkflow).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    expect(actions.saveMktWorkflow.mock.calls[1][2].stages[1].dept).toBe('')
   })
 
   it('a table keeps preset rows: a cell filled in is the team’s to read, a blank one theirs to fill in', async () => {

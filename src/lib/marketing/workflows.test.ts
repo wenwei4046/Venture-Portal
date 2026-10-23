@@ -117,12 +117,12 @@ describe('the words on a stage’s card', () => {
 })
 
 describe('making and moving', () => {
-  it('a new template starts with one stage named for its action — Design’s, two days, the PIC approves', () => {
-    expect(firstWfStage('Design photo')).toMatchObject({ name: 'Design photo', dept: 'design', sla: 2, appr: [{ kind: 'pic' }], who: { mode: 'assign', cands: [] } })
+  it('a new template starts with one stage named for its action — its group picked in the builder, two days, the PIC approves', () => {
+    expect(firstWfStage('Design photo')).toMatchObject({ name: 'Design photo', dept: '', sla: 2, appr: [{ kind: 'pic' }], who: { mode: 'assign', cands: [] } })
   })
 
-  it('a stage added takes the last one’s team', () => {
-    expect(newWfStage(stage({ dept: 'ads' }))).toMatchObject({ name: 'New stage', dept: 'ads', sla: 1, appr: [], split: false, back: null })
+  it('a stage added takes the last one’s group — a People title', () => {
+    expect(newWfStage(stage({ dept: 'SENIOR MARKETING EXECUTIVE' }))).toMatchObject({ name: 'New stage', dept: 'SENIOR MARKETING EXECUTIVE', sla: 1, appr: [], split: false, back: null })
   })
 
   it('a new template under an action is “Template n”, one not taken', () => {
