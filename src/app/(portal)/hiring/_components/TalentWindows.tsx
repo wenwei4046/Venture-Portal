@@ -9,7 +9,7 @@ import { savedIn } from '@/lib/hiring/bank'
 import { NEW_REASON, startReason } from '@/lib/hiring/reasons'
 import { answerOf, departmentNames, pickRows } from '@/lib/hiring/view'
 import type { HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
-import { ReasonSelect, sendReason } from './ReasonPick'
+import { ReasonSelect, sendReason } from './ReasonSelect'
 import s from './hiring.module.css'
 
 /** Pick from Talent Bank (README §11): the bank's people not already on this request, matching ones first; Add invites them. */

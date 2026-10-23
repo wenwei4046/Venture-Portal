@@ -9,7 +9,7 @@ import { NEW_REASON, outReason, startReason } from '@/lib/hiring/reasons'
 import { STAGE, STAGE_ORDER, answerOf } from '@/lib/hiring/view'
 import type { CandidateStage, HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
 import { FileRow, WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
-import { ReasonSelect, sendReason } from './ReasonPick'
+import { ReasonSelect, sendReason } from './ReasonSelect'
 import s from './hiring.module.css'
 
 /**
