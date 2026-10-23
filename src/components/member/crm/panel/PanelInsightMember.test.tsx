@@ -25,3 +25,15 @@ describe("a member on Team Insight", () => {
     expect(screen.queryByText(/Viewing .*CRM/)).toBeNull();
   });
 });
+
+describe("Insight's Leads", () => {
+  it("opens the period's leads (the owner, 2026-10-24: 點20，可以看到list)", async () => {
+    window.history.replaceState({}, "", "/member/preview?crmAs=boss");
+    render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
+    await act(async () => {});
+    expect(screen.queryByText("Tap a team for its people")).toBeNull();
+    await tap(screen.getByRole("button", { name: /^Leads/ }));
+    expect(screen.getByText(/^Leads · /)).toBeInTheDocument();
+    expect(screen.getByText(/\d+ leads?$/)).toBeInTheDocument();
+  });
+});

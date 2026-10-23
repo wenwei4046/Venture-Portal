@@ -91,6 +91,7 @@ export function panelAppVM(ctx: PanelCtx) {
   const x = assignExtraVM(ctx, as0);
   const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
   const cal = show.cal ? calendarVM(ctx) : undefined;
+  const ov0 = show.ov ? overviewVM(ctx) : undefined;
   // The top bar shows only for a back link ("‹ Profile" on Ads Performance, "‹ Assignment" in a section). The bell — the
   // prototype's bellIn / bellTop — with the house and Team | Mine left of it, sits on Insight alone, the first page of the
   // bottom bar, as the Revenue app keeps its header to Today (2026-10-14, the owner: "principal view … 只存在于 Insight 界面";
@@ -117,8 +118,8 @@ export function panelAppVM(ctx: PanelCtx) {
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.
     pfAdmin: ctx.data.can.manage,
     chromeBg: "var(--crm-page)",
-    cl: calendarListVM(ctx, cal), ci: calendarInfoVM(ctx),
-    ov: show.ov ? overviewVM(ctx) : off<ReturnType<typeof overviewVM>>(),
+    cl: calendarListVM(ctx, cal ?? (ov0 && ui.cLs === "leads" ? { cLeadIds: ov0.leadIds, cUpV: [], cCameV: [], cRangeBtn: ov0.heroLabel } : undefined)), ci: calendarInfoVM(ctx),
+    ov: ov0 ?? off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),
     ld,
     ad: show.ad ? adsVM(ctx) : off<ReturnType<typeof adsVM>>(),
