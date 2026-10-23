@@ -112,6 +112,8 @@ describe('a row', () => {
     expect(fundLine(deal({ rate: 0.0085, months: 12, fundingSource: 'HC' }))).toBe('0.850% /mo · 12 months · SC HC')
     expect(fundLine(deal({ rate: 0.02, months: null }))).toBe('2.000% /mo · no fixed term')
     expect(fundLine(deal({ side: 'in', typeLabel: 'Director loan', rate: 0.01, months: 1 }))).toBe('Director loan · 1.000% /mo · 1 month')
+    // The desktop hub has a Source column beside it (2026-10-23); the phone app's line keeps the SC.
+    expect(fundLine(deal({ rate: 0.0085, months: 12, fundingSource: 'HC' }), false)).toBe('0.850% /mo · 12 months')
   })
 
   it('says its status, an overdue loan red', () => {
