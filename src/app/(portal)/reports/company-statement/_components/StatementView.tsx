@@ -70,7 +70,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
   // no-term positions are open-ended.
   const r2 = (n: number) => Math.round(n * 100) / 100
   const totalInterestOf = (i: PositionRow) =>
-    i.kind === 'flat' && i.tenureMonths ? r2(i.tenureMonths * i.monthlyInterest) : null
+    i.kind === 'flat' && i.tenureMonths ? (i.planInterest ?? r2(i.tenureMonths * i.monthlyInterest)) : null
   const oweTotalOf = (i: PositionRow) => r2(i.principalOutstanding + i.interestOutstanding)
   const sub = items.reduce(
     (acc, i) => ({
@@ -134,7 +134,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                   {item.termsFrom ? (
                     <span
                       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5"
-                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then`}
+                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then${item.termsInterestOnOriginal ? `, interest on the original RM ${formatMoneyBare(item.principal)}` : ''}`}
                     >
                       Terms from {item.termsFrom}
                     </span>

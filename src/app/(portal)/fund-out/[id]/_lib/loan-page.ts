@@ -11,7 +11,7 @@ import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { dealChangeLine, type DealChange } from '@/lib/deal-audit'
 import { withCode } from '@/lib/fund-hub'
 import { fullDay, type FullStep } from '@/components/finv/FullParts'
-import { allTermsChanges, buildTermsSegments, currentSegment, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
+import { allTermsChanges, buildTermsSegments, currentSegment, installmentsInAll, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 import { addMonths } from '../../_lib/loan-hub'
 import type { AmendTerms } from '@/lib/fund-amend'
@@ -128,7 +128,9 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const repaymentList = repayments ?? []
-  const tenureMonths = Number(loan.tenure_months ?? 0)
+  // The whole plan's installments: a 从某月起 change left the months from its month on the record.
+  const storedTenure = Number(loan.tenure_months ?? 0)
+  const tenureMonths = storedTenure > 0 ? installmentsInAll(terms.firstDueYM, terms.current.effectiveFrom, storedTenure) : storedTenure
   // No-fixed-term loans store tenure_months=1 as a placeholder (isLoanUnscheduled reads the terms).
   const noFixedTerm = isLoanUnscheduled(loan.repayment_terms as string | null)
 

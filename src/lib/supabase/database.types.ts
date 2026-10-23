@@ -8439,6 +8439,7 @@ export type Database = {
           p_cost_rate: number | null
           p_effective_from: string
           p_fund_source_id: string
+          p_interest_on_original?: boolean
           p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
@@ -8451,6 +8452,7 @@ export type Database = {
           p_effective_from: string
           p_effective_rate: number | null
           p_loan_id: string
+          p_interest_on_original?: boolean
           p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
