@@ -51,7 +51,7 @@ export const MAX_CONTRACT_MONTHS = 36
 
 /**
  * HR is told this many days before a probation ends (the user, 2026-10-23: 14 days before; 2026-10-24: "go with 15
- * days" — the 15 their reply to LI SEAN promised). notify_probation_due (mig 20261025010000) counts the same window.
+ * days" — the 15 their reply to LI SEAN promised). notify_probation_due (mig 20261025012000) counts the same window.
  */
 export const PROBATION_NOTICE_DAYS = 15
 

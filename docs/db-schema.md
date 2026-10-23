@@ -741,14 +741,14 @@ otherwise) and `contract_end` generated as `probation_end` is; both granted to
 `member_transfer_waiting` has a 13-argument overload (production's 12-argument
 body with `contract_months` in its INSERT); the 12-argument one now calls it with
 none. The same day `notify_probation_due` counts 15 days, not 14 (migration
-`20261025010000_probation_notice_15_days`).
+`20261025012000_probation_notice_15_days`).
 
 **…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
 `notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly
 sweep, `app/api/member-queue`) writes `app_notifications` (kind `people`, ref
 `hr_staff` → the person, `data.due = 'probation:<staff>:<end>'`, once per
 person told per end; from 9:00 the office's time) for a probation whose last day
-is 15 days away or nearer (14 until `20261025010000`), not past, not acknowledged for that end — to each
+is 15 days away or nearer (14 until `20261025012000`), not past, not acknowledged for that end — to each
 holder of the topic `people.probation` whom `probation_notice_may(user)` (DEFINER,
 the service role's) still finds able to acknowledge it, asked as them: the HR
 scope, People · Edit and `tab_write_open('/team/people/[id]', team.edit)`, with

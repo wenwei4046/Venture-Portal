@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261025010000_probation_notice_15_days.sql
+-- 20261025012000_probation_notice_15_days.sql
 -- HR is told 15 days before a probation ends, not 14 (2026-10-24 — asked whether the reminder should be the 15 days
 -- the user's own reply to LI SEAN on IT-0006 promised, the user: "go with 15 days").
 -- ============================================================================

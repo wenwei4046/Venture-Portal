@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261025010000 (2026-10-24 — asked whether the probation reminder should be the 15
+// Local PostgreSQL regression for 20261025012000 (2026-10-24 — asked whether the probation reminder should be the 15
 // days the user's own reply to LI SEAN promised, the user: "go with 15 days"). notify_probation_due is loaded as
 // production runs it (20261024223000 verbatim, over 20261011180000's notification bodies — md5-checked), the migration
 // is applied VERBATIM, twice, over the same stand-ins validate-probation-push.mjs uses. No live I/O.
@@ -61,7 +61,7 @@ await db.exec(await read('20261024223000_probation_push.sql'))
 const md5 = () => one(`SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.notify_probation_due(timestamptz)'::regprocedure`)
 check(await md5(), '582befa4a2f7e0296f1a9bdd2a244113', 'the sweep is production’s body')
 
-const file = await read('20261025010000_probation_notice_15_days.sql')
+const file = await read('20261025012000_probation_notice_15_days.sql')
 await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
 check(await md5(), 'f17f28df7e64b27d8da1d6108bb4cb18', 'the sweep as production runs it now — 20261024223000’s, the 14 a 15')
