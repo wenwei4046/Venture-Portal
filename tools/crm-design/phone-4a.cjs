@@ -537,7 +537,11 @@ function panel(body) {
     const [, e] = el(body.slice(s0, end > 0 ? end : undefined), S, "div", "work type list");
     body = body.slice(0, s0 + e) + `{!!(v.fts.dirty) && (<div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.fts.cancel} role="button" style={{ flex: "0 0 auto", height: "48px", padding: "0 20px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "500", color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</span><span onClick={v.fts.save} role="button" style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "600", cursor: "pointer" }}>{v.fts.saveLabel}</span></div>)}` + body.slice(s0 + e);
   }
-    // Work type: each team folds to its head (the owner, 2026-10-23: "這個也可收起"); the team's name in ink, its colour the dot's.
+    // Ads performance (2026-10-24): the simple version of the desktop's — period, compare, metrics, a chart, every ad.
+  { const a = body.indexOf("{!!(v.ad.onAds) && (<>"); if (a < 0) throw new Error("phone-4a: ads page");
+    const m = body.indexOf("<main ", a), z = body.indexOf("{!!(v.show.as) && (<>", m); const [x, y] = el(body.slice(m, z), body.slice(m, m + 60), "main", "ads main");
+    body = body.slice(0, m + x) + '<Phone4aAdsPerf p={v.adp} head={v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontFamily: "' + TIGHT + '", fontSize: "' + F(26) + '", fontWeight: "500", letterSpacing: "-0.02em" }}>Ads Performance</h1>)} />' + body.slice(m + y); }
+  // Work type: each team folds to its head (the owner, 2026-10-23: "這個也可收起"); the team's name in ink, its colour the dot's.
   { const a = body.indexOf("{(v.fts.groups).map((g, g_i) => (<Fragment key={g_i}>"); if (a < 0) throw new Error("phone-4a: work type groups");
     let g = body.slice(a);
     g = once(g, '<div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>', '<div onClick={g.fold} role="button" aria-expanded={g.open} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: g.headRule, cursor: "pointer" }}>', "work type head");

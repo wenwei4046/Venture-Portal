@@ -111,6 +111,8 @@ export function panelAppVM(ctx: PanelCtx) {
     th: insightHead(ctx, !!bl.showBell, ovAds),
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
+    // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
+    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: ctx.data.can.manage },
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

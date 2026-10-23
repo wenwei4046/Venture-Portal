@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -634,104 +634,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.ad) && (<>
       {!!(v.ad.onAds) && (<>
-        <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          {v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>)}
-          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div onClick={v.ad.ovOpenRange} style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "12px", height: "56px", padding: "0 14px", boxSizing: "border-box", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", cursor: "pointer" }}>
-                <svg style={{ flex: "none", color: "var(--crm-rust)" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 5h14v15H5V5Zm3-3v5m8-5v5M5 10h14">
-                  </path>
-                </svg>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{v.ad.adPerT}</strong>
-                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.adPerD}</span>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6">
-                  </path>
-                </svg>
-              </div>
-              {!!(v.ad.ovCanClear) && (<>
-                <span onClick={v.ad.ovClear} style={{ flex: "none", height: "56px", padding: "0 16px", boxSizing: "border-box", borderRadius: "16px", background: "var(--crm-field)", color: "var(--crm-ink)", display: "grid", placeItems: "center", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Clear</span>
-              </>)}
-            </div>
-          </div>
-          {!!(v.ad.cmpOn) && (<>
-            <section style={{ flex: "none", padding: "18px", borderRadius: "22px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Comparison</h2>
-                {!!(v.ad.cmpHas) && (<>
-                  <span style={{ flex: "none", display: "flex", alignItems: "center", gap: "14px" }}>
-                    <span onClick={v.ad.cmpOff} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Clear</span>
-                    <span onClick={v.ad.cmpToggle} style={{ flex: "none", display: "flex", alignItems: "center", gap: "4px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-muted)", cursor: "pointer" }}>{v.ad.cmpToggleLbl}<svg style={{ transform: `rotate(${v.ad.cmpRot})` }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></span>
-                  </span>
-                </>)}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-page)", fontSize: "calc(13px * var(--rv-type, 1))" }}>
-                <span onClick={v.ad.ovOpenPeriod} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-ink)", fontWeight: "600", cursor: "pointer" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-rust)" }}>
-                  </span>
-                  <span style={{ flex: "1", minWidth: "0" }}>{v.ad.cmpA}</span>
-                  <span style={{ flex: "none", fontWeight: "650", color: "var(--crm-rust)" }}>Change</span>
-                </span>
-                {!!(v.ad.cmpHas) && (<>
-                  <span onClick={v.ad.cmpPick} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-muted)", cursor: "pointer" }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-st-won)" }}>
-                    </span>
-                    <span style={{ flex: "1", minWidth: "0" }}>vs {v.ad.cmpB}</span>
-                    <span style={{ flex: "none", fontWeight: "650", color: "var(--crm-rust)" }}>Change</span>
-                  </span>
-                </>)}
-                {!!(v.ad.cmpNone) && (<>
-                  <span onClick={v.ad.cmpPick} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-rust)", fontWeight: "650", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                      <path d="M12 5v14M5 12h14">
-                      </path>
-                    </svg>Choose a period to compare</span>
-                </>)}
-              </div>
-              {!!(v.ad.cmpOpen) && (<>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
-                  {(v.ad.adCmpRows).map((r, r_i) => (<Fragment key={r_i}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "14px", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
-                      <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".05em", textTransform: "uppercase", color: "var(--crm-muted)" }}>{r.label}</span>
-                      <strong style={{ fontSize: "calc(26px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{r.vA}</strong>
-                      <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                        <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>vs {r.vB}</span>
-                        <span style={{ padding: "1px 6px", borderRadius: "6px", background: r.dBg, color: r.dFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", whiteSpace: "nowrap" }}>{r.delta}</span>
-                      </span>
-                    </div>
-                  </Fragment>))}
-                </div>
-              </>)}
-            </section>
-          </>)}
-          {(v.ad.adPerf).map((a, a_i) => (<Fragment key={a_i}>
-            <section style={{ flex: "none", padding: "16px", borderRadius: "18px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 4px 14px rgba(42,22,12,.05)", display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{a.name}</strong>
-                <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{a.page}</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" }}>
-                {(a.mets).map((m, m_i) => (<Fragment key={m_i}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "3px", paddingLeft: m.pl, borderLeft: m.bl }}>
-                    <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "600", letterSpacing: ".04em", textTransform: "uppercase", color: "var(--crm-muted)" }}>{m.label}</span>
-                    <strong style={{ fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{m.v}</strong>
-                    {!!(a.hasCmp) && (<>
-                      <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                        <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>vs {m.b}</span>
-                        <span style={{ padding: "1px 6px", borderRadius: "6px", background: m.dBg, color: m.dc, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", whiteSpace: "nowrap" }}>{m.d}</span>
-                      </span>
-                    </>)}
-                  </div>
-                </Fragment>))}
-              </div>
-            </section>
-          </Fragment>))}
-        </main>
+        <Phone4aAdsPerf p={v.adp} head={v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(28.26px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.02em" }}>Ads Performance</h1>)} />
         {!!(v.ad.ovrOpen) && (<>
           <div onClick={v.ad.ovrClose} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(42,22,12,.32)", animation: "fadeIn 200ms ease-out", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
             <div onClick={v.ad.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", maxHeight: "94%", overflowY: "auto", scrollbarWidth: "none", boxSizing: "border-box", background: "#fff", borderRadius: "26px 26px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "16px" }}>
