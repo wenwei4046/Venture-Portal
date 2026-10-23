@@ -246,6 +246,15 @@ export default function DeskScreens(p: DeskScreensProps) {
     slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
+  // Inbox opens on its first chat, so the page is never an empty "Pick a chat" (the owner, 2026-10-24: "能不能默認打開第一個信息，
+  // 就不會顯得很空") — once each time Inbox is entered; a chat closed by hand stays closed.
+  const firstChat = ui.tab === "inbox" && !ui.chat ? v.list4?.rows[0] : undefined;
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (ui.tab !== "inbox") { autoOpened.current = false; return; }
+    if (!autoOpened.current && !ui.chat && firstChat) { autoOpened.current = true; firstChat.open(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.tab, ui.chat, firstChat?.id]);
   // The audit trail (audit_changes) is read when Assignment or the Audit log opens (their logs), and again after a
   // setting is saved (a write sets history back to null); CRM · Manage only, as History was.
   const histOn = data.can.manage && (ui.tab === "assignment" || ui.tab === "auditlog");
