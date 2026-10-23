@@ -4,7 +4,7 @@ import { canDo } from '@/lib/permission-actions'
 import { startRead } from '@/lib/start-read'
 import { indexBoard } from '@/lib/marketing/board'
 import { plateColumns, plateLine, weekRows } from '@/lib/marketing/my-space'
-import { readBoard, readNotices } from '@/lib/marketing/server'
+import { readBoard, readNotices, readSpace } from '@/lib/marketing/server'
 import { initialOf } from '@/lib/marketing/shell'
 import MySpace from '@/components/mkt/myspace/MySpace'
 
@@ -19,12 +19,14 @@ const TEAM_BG: Record<string, string> = {
   brand: 'var(--mk-team-brand-bg)',
 }
 
-/** My Space — Marketing's first page (2026-10-23, the handoff's `My Space.dc.html`). */
+/** My Space — Marketing's first page (2026-10-23, the handoff's `My Space.dc.html`; its own side, laid out by its
+ * owner, `My Space Bento.dc.html`, ⑦-1). */
 export default async function MarketingMySpacePage() {
   await requirePage('/marketing')
   // Its tab, My Space, asks no key of its own (every view's Overview): the page asks Marketing.
   const user = await requirePermission('marketing')
   const notices = startRead(readNotices(10))
+  const space = startRead(readSpace())
   const board = await readBoard()
   const me = indexBoard(board).person(board.me)
   const columns = plateColumns(board)
@@ -44,7 +46,8 @@ export default async function MarketingMySpacePage() {
       columns={columns}
       week={weekRows(columns, board.today)}
       plans={plans}
-      canAccept={canDo(user, 'marketing', 'edit')}
+      canEdit={canDo(user, 'marketing', 'edit')}
+      space={await space}
     />
   )
 }
