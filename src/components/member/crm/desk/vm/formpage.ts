@@ -110,10 +110,12 @@ export function formPageVM(ctx: DeskCtx) {
     cfForms: {
       list: forms.map((f, i) => ({ id: f.id, label: i === 0 ? `${f.name} · in use` : f.name })), cur: chosen?.id ?? "",
       pick: (e: { target: { value: string } }) => patch({ cfForm: e.target.value, cfDraft: null, cfNew: {}, cfType: null, cfPage: 0, cfPv: null, cfDelAsk: false }),
-      duplicate: () => { if (!chosen) return; void deskAct.saveForm({ id: null, name: `${chosen.name} copy`, sections: chosen.sections }).then(id => { if (id) patch({ cfForm: id, cfDraft: null, cfPage: 0, toast: `Duplicated · ${chosen.name} copy` }); }); },
+      duplicate: () => { if (!chosen) return; void deskAct.saveForm({ id: null, name: `${chosen.name} (copy)`, sections: chosen.sections }).then(id => { if (id) patch({ cfForm: id, cfDraft: null, cfPage: 0, toast: `Duplicated · ${chosen.name} (copy)` }); }); },
       // The form in use (the first) is never deleted; nor the last one.
       canDelete: !!chosen && forms.length > 1 && forms[0]?.id !== chosen.id,
-      deleteTip: !chosen || forms.length < 2 ? "The only form cannot be deleted" : forms[0]?.id === chosen.id ? "The form in use cannot be deleted" : "Delete this form",
+      deleteTip: !chosen || forms.length < 2 ? "The only form cannot be deleted" : forms[0]?.id === chosen.id ? "Set another form as active first" : "Delete this form",
+      inUse: !!chosen && forms[0]?.id === chosen.id,
+      setActive: () => { if (!chosen || forms[0]?.id === chosen.id) return; void deskAct.setActiveForm(chosen.id).then(ok => { if (ok) patch({ toast: `${chosen.name} is in use · salespeople see it in Customer info` }); }); },
       ask: ui.cfDelAsk, askDelete: () => patch({ cfDelAsk: !ui.cfDelAsk }),
       del: () => { if (!chosen || forms.length < 2 || forms[0]?.id === chosen.id) return; void deskAct.deleteForm(chosen.id).then(ok => { if (ok) patch({ cfForm: null, cfDraft: null, cfDelAsk: false, toast: `Deleted · ${chosen.name}` }); }); },
     },

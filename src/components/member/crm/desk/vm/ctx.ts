@@ -279,6 +279,8 @@ export interface DeskActions {
   addNote(customerId: string, text: string): Promise<boolean>;
   saveForm(form: { id: string | null; name: string; sections: FormSection[] }): Promise<string | false>;
   deleteForm(id: string): Promise<boolean>;
+  /** v2 frame 08: the form every Customer info asks (crm_set_active_form puts it first). */
+  setActiveForm(id: string): Promise<boolean>;
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
   /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
   saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;

@@ -8,6 +8,7 @@ import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { urgencyOf, money } from "../../sales/vm/common";
 import { day0, DAY, gb, type PanelCtx } from "./common";
 import { openSummary } from "../../shared/notif-summary";
+import { downlineOf } from "../../shared/people";
 import { summaryFor } from "../../shared/notif-summary-data";
 
 type Kind = "assign" | "move" | "share" | "won" | "lost" | "overdue";
@@ -33,10 +34,14 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
   // person's. The Team inbox still shows everybody's chats; this is what tells.
   const me = ctx.me.id;
   const ownerOf = (id: string) => data.customers.find(c => c.id === id)?.assignedTo ?? null;
+  // Team inbox alerts (v2 frame 10, a setting — off by default): a manager also hears of their own people's chats, the
+  // Inbox's scope — everybody for View at All, their line for a leader.
+  const team = !!data.settings?.teamAlerts, line = new Set(team ? downlineOf(me, data.people) : []);
+  const inLine = (id: string | null) => team && !!id && id !== me && (data.can.viewAll || line.has(id));
   for (const e of data.events) {
     if (new Date(e.at).getTime() < since) continue;
     const to = String(e.data.to ?? e.owner ?? "");
-    const mine = to === me || String(e.data.from ?? "") === me || ownerOf(e.customerId) === me;
+    const mine = to === me || String(e.data.from ?? "") === me || ownerOf(e.customerId) === me || inLine(ownerOf(e.customerId));
     if (!mine) continue;
     const base = { key: `e${e.id}`, at: e.at, who: nameOf(e.actor), lead: cust(e.customerId), customerId: e.customerId };
     // Handed on at once by CRM · Manage (crm_send_to) is an Assign; a Move is a request the superior accepted (2026-10-23).
@@ -54,7 +59,7 @@ export function panelNotifs(ctx: PanelCtx): PanelNotif[] {
   // Overdue: the moment a customer's wait passed 9 h, until someone answers.
   for (const c of data.customers) {
     const u = urgencyOf(c, now);
-    if (u.level !== "overdue" || !c.lastCustomerAt || c.assignedTo !== me) continue;
+    if (u.level !== "overdue" || !c.lastCustomerAt || (c.assignedTo !== me && !inLine(c.assignedTo))) continue;
     const last = new Date(c.lastCustomerAt), at = new Date(last.getTime() + 9 * 3_600_000);
     out.push({ key: `o${c.id}@${c.lastCustomerAt}`, customerId: c.id, kind: "overdue", at: at.toISOString(), who: c.name, text: `has waited ${Math.floor(u.waitingMinutes / 60)} h for`, lead: nameOf(c.assignedTo) === "—" ? "a reply" : nameOf(c.assignedTo), tail: "",
       extra: `Last message ${last.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}` });

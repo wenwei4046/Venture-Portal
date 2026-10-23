@@ -44,6 +44,8 @@ const CRM_WRITES = [
   "crm_save_settings",
   // v2 frame 07 · Showrooms: staff-only remarks, delete (mig 20261024150000), CRM · Manage.
   "crm_save_showroom_remarks", "crm_delete_showroom",
+  // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
+  "crm_set_active_form",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -117,7 +119,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad",
-  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",

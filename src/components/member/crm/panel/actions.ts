@@ -56,7 +56,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveSettings(st) {
-      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders }))) return false;
+      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
       return true;
     },

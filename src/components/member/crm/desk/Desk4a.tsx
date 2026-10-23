@@ -1733,8 +1733,8 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
   );
 }
 
-type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign" | "pushMessages" | "reminders";
-interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean; pushMessages: boolean; reminders: boolean }
+type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign" | "pushMessages" | "reminders" | "teamAlerts" | "sendAutoReply";
+interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean; pushMessages: boolean; reminders: boolean; teamAlerts: boolean; sendAutoReply: boolean }
 interface SettingsBits {
   set4: { title: string; sub: string; rows: { t: string; s: string; v: string; key?: SetKey }[] }[];
   settings4: { can: boolean; cur: SetVals; save: (st: SetVals) => Promise<boolean> };
@@ -1756,7 +1756,6 @@ export function DeskSettings4a({ v }: { v: SettingsBits }) {
   const put = (k: SetKey, val: number | boolean) => setDraft({ ...d, [k]: val });
   const step = (k: SetKey, by: number) => put(k, Math.min(24, Math.max(1, (d[k] as number) + by)));
   const save = () => { if (!dirty || !rising || busy) return; setBusy(true); void S.save(d).then(ok => { setBusy(false); if (ok) setDraft(null); }); };
-  const round: CSSProperties = { ...BTN, width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", columnGap: "48px", rowGap: "32px", alignItems: "start" }}>
@@ -1779,11 +1778,15 @@ export function DeskSettings4a({ v }: { v: SettingsBits }) {
                       <Ic name="lock" size={13} />{r.v}
                     </span>
                   ) : hours ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button type="button" onClick={() => step(k!, -1)} aria-label={`${r.t} one hour less`} style={round} className="crm4a-outline"><Ic name="minus" size={13} /></button>
-                      <span style={{ minWidth: "44px", textAlign: "center", font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{d[k!] as number} h{k === "replyOverdueH" ? "+" : ""}</span>
-                      <button type="button" onClick={() => step(k!, 1)} aria-label={`${r.t} one hour more`} style={round} className="crm4a-outline"><Ic name="plus" size={13} /></button>
-                    </span>
+                    // v2 frame 10: the hours typed in an 84 px box, the unit inside (as Split's boxes).
+                    <label style={{ width: "84px", height: "34px", padding: "0 10px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", boxSizing: "border-box",
+                      border: `1px solid ${rising ? "var(--crm-line)" : "var(--crm-oxblood)"}`, background: "#fff", font: `500 14px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
+                      <input type="text" inputMode="numeric" value={String(d[k!] as number)} aria-label={`${r.t} hours`}
+                        onChange={e => { const n = parseInt(e.target.value.replace(/D/g, ""), 10); if (!Number.isNaN(n)) put(k!, Math.min(24, Math.max(1, n))); }}
+                        onKeyDown={e => { if (e.key === "ArrowUp") { e.preventDefault(); step(k!, 1); } if (e.key === "ArrowDown") { e.preventDefault(); step(k!, -1); } }}
+                        style={{ width: "100%", minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "inherit", color: "inherit", textAlign: "right" }} />
+                      <span style={{ color: "var(--crm-faint)", fontSize: "12px" }}>{k === "replyOverdueH" ? "h+" : "h"}</span>
+                    </label>
                   ) : (
                     <button type="button" role="switch" aria-checked={!!d[k!]} aria-label={r.t} onClick={() => put(k!, !d[k!])}
                       style={{ ...BTN, width: "40px", height: "24px", borderRadius: "12px", position: "relative", background: d[k!] ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .15s" }}>
@@ -1915,6 +1918,7 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
           <button type="button" onClick={v.cfForms.canDelete ? v.cfForms.askDelete : undefined} title={v.cfForms.deleteTip} aria-label="Delete form" style={{ ...BTN, flex: "none", width: "34px", height: "34px", borderRadius: "7px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)",
             color: v.cfForms.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: v.cfForms.canDelete ? "pointer" : "not-allowed" }}><Ic name="trash-2" size={14} /></button>
         </div>
+        {!v.cfForms.inUse && <button type="button" onClick={v.cfForms.setActive} style={{ ...BTN, alignSelf: "flex-start", margin: "-8px 0 14px", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>Set as active</button>}
         {v.cfForms.ask && (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "-6px 0 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
             Delete this form? Answers already given stay on each customer.

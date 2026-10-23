@@ -152,6 +152,11 @@ export default function DeskScreens(p: DeskScreensProps) {
         });
         return id;
       },
+      async setActiveForm(id) {
+        if (!(await call("crm_set_active_form", { p_id: id }))) return false;
+        setData(d => { const list = d.forms ?? []; const f = list.find(x => x.id === id); return f ? { ...d, forms: [f, ...list.filter(x => x.id !== id)] } : d; });
+        return true;
+      },
       async deleteForm(id) {
         if (!(await call("crm_delete_form", { p_id: id }))) return false;
         setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id) }));
