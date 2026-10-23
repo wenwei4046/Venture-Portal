@@ -13,13 +13,14 @@ import {
 const t = (id: string, x: number, y: number, w: number, h: number): TilePlace => ({ id, x, y, w, h })
 
 describe('the board as read', () => {
-  it('before the first save: the prototype’s board without what is not here yet — the room top left, My turn beside it, the pet and the trophies on the right, the lobby across the foot', () => {
+  it('before the first save: the prototype’s board — the room top left, My turn beside it, the pet and the chat on the right, the lobby and This week at the foot', () => {
     const s = spaceFromRow(null)
     expect(s.saved).toBe(false)
     expect(s.layout).toEqual(DEFAULT_LAYOUT)
     expect(s.layout.map(x => [x.id, x.x, x.y, x.w, x.h])).toEqual([
-      ['room', 0, 0, 0.5, 364], ['turn', 0.5, 0, 0.25, 364], ['pet', 0.75, 0, 0.25, 182], ['trophies', 0.75, 182, 0.25, 182],
-      ['waiting', 0, 364, 0.25, 182], ['delegated', 0.25, 364, 0.25, 182], ['week', 0.5, 364, 0.5, 182], ['lobby', 0, 546, 1, 182],
+      ['room', 0, 0, 0.5, 364], ['turn', 0.5, 0, 0.25, 364], ['pet', 0.75, 0, 0.25, 182], ['chat', 0.75, 182, 0.25, 546],
+      ['waiting', 0, 364, 0.25, 182], ['delegated', 0.25, 364, 0.25, 182], ['trophies', 0.5, 364, 0.25, 182], ['lobby', 0, 546, 0.5, 182],
+      ['week', 0.5, 546, 0.25, 182],
     ])
     expect([s.theme, s.cover, s.coverPath, s.avatarPath, s.photoPath, s.status, s.notes]).toEqual([DEFAULT_THEME, 0, null, null, null, '', ''])
     expect([s.room, s.pet, s.petPath]).toEqual([DEFAULT_ROOM, NO_PET, null])
@@ -27,7 +28,7 @@ describe('the board as read', () => {
 
   it('a saved board as its owner left it; a kind this page does not draw yet kept as it was', () => {
     const s = spaceFromRow({
-      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['delegated', 'lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'],
+      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['chat', 'delegated', 'lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'],
       theme: { bg: 'mint', accent: 'blue', corners: 'round' }, cover: 2, coverPath: null, avatarPath: 'space/a/me.png', status: 'Shooting', notes: 'Call PIC',
       photoPath: 'mine/b/beach.jpg', at: '2026-10-23T03:00:00Z', room: {}, pet: {},
     })
@@ -41,14 +42,14 @@ describe('the board as read', () => {
   })
 
   it('a tile taken off stays off; a kind shipped since the board was saved joins it once, under the rest', () => {
-    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['chat', 'lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated'])
     expect(b[2]).toEqual(t('delegated', 0, 364, 0.25, 182))
   })
 
   it('a board saved before the room came (⑦-1) gets the room once, two by two, under the rest', () => {
     const saved = [t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182), t('delegated', 0.75, 0, 0.25, 182), t('week', 0.5, 182, 0.5, 182)]
-    const b = boardOf(saved, ['delegated', 'notes', 'photo', 'turn', 'waiting', 'week'])
+    const b = boardOf(saved, ['chat', 'delegated', 'notes', 'photo', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week', 'room', 'pet', 'lobby', 'trophies'])
     expect(b[4]).toEqual(t('room', 0, 364, 0.5, 364))
     expect(boardOf(saved, knownAfter(['delegated', 'turn', 'waiting', 'week'])).map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week'])
@@ -56,25 +57,32 @@ describe('the board as read', () => {
 
   it('a board saved before the pet’s tile and the trophies came (⑦-5) gets them once, one by one, under the rest', () => {
     const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182), t('week', 0, 364, 0.5, 182)]
-    const b = boardOf(saved, ['delegated', 'lobby', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
+    const b = boardOf(saved, ['chat', 'delegated', 'lobby', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'week', 'pet', 'trophies'])
     expect(b.slice(4)).toEqual([t('pet', 0, 546, 0.25, 182), t('trophies', 0, 728, 0.25, 182)])
   })
 
+  it('a board saved before the chat came (⑦-3) gets it once, one by two, under the rest', () => {
+    const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182)]
+    const b = boardOf(saved, ['delegated', 'lobby', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'chat'])
+    expect(b[3]).toEqual(t('chat', 0, 364, 0.25, 364))
+  })
+
   it('a board saved before the lobby came (⑦-4) gets it once, two by one, under the rest', () => {
     const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182)]
-    const b = boardOf(saved, ['delegated', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    const b = boardOf(saved, ['chat', 'delegated', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'lobby'])
     expect(b[3]).toEqual(t('lobby', 0, 364, 0.5, 182))
   })
 
   it('My turn and Waiting are always on it — whatever came back', () => {
-    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week'])
+    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'chat', 'lobby', 'trophies', 'week'])
     expect(b.map(x => x.id)).toEqual(['week', 'turn', 'waiting'])
   })
 
   it('each kind once; a tile out of bounds brought back in', () => {
-    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week'])
+    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'chat', 'lobby', 'trophies', 'week'])
     expect(b).toEqual([t('turn', 0.5, 0, 0.5, 110), t('waiting', 0, 0, 0.14, 2000)])
   })
 
@@ -117,11 +125,11 @@ describe('Edit layout', () => {
 
   it('the tile last moved goes on top (last); My turn and Waiting cannot be taken off', () => {
     const b = DEFAULT_LAYOUT
-    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'turn'])
+    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'pet', 'chat', 'waiting', 'delegated', 'trophies', 'lobby', 'week', 'turn'])
     expect(removedTile(b, 'turn')).toBe(b)
     expect(removedTile(b, 'waiting')).toBe(b)
-    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'lobby'])
-    expect(removedTile(b, 'pet').map(x => x.id)).toEqual(['room', 'turn', 'trophies', 'waiting', 'delegated', 'week', 'lobby'])
+    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'chat', 'waiting', 'delegated', 'trophies', 'lobby'])
+    expect(removedTile(b, 'chat').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'waiting', 'delegated', 'trophies', 'lobby', 'week'])
   })
 
   it('a tile added: its own size, under everything; the drawer offers only those not on the board', () => {
@@ -165,7 +173,7 @@ describe('a save', () => {
 
   it('a tile without its numbers is left out; the kinds the board has offered are remembered', () => {
     expect(spacePatchOf({ layout: [t('turn', 0, 0, 0.5, 364), { id: 'week', x: Number.NaN, y: 0, w: 0.5, h: 182 }] }).layout).toEqual([t('turn', 0, 0, 0.5, 364)])
-    expect(knownAfter(['room'])).toEqual(['delegated', 'lobby', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    expect(knownAfter(['room'])).toEqual(['chat', 'delegated', 'lobby', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
   })
 
   it('the same board — to four places and whole pixels, in its order', () => {

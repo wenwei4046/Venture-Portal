@@ -6,8 +6,9 @@ import PetNode from './PetNode'
 import s from './myspace.module.css'
 
 // The lobby (`My Space Bento.dc.html` › the lobby tile, ⑦-4 — the user's answer 37): the pets of Marketing's roster
-// wandering its floor, each with its owner's name; a teammate's opens their space, one's own the way home. Everybody
-// with Marketing · View sees it; the Principal's shared login has no pet in it.
+// wandering its floor, each with its owner's name — the lobby's last message over its sender's (⑦-3); a teammate's
+// opens their space, one's own the way home. Everybody with Marketing · View sees it; the Principal's shared login has
+// no pet in it.
 
 export interface LobbyEntry extends LobbyPet {
   /** How it feels: its owner's plate and its energy (the page reckons it). */
@@ -21,6 +22,8 @@ export interface LobbyTileProps {
   /** On one's own space: one's own pet goes nowhere. */
   home: boolean
   onVisit: (staff: string) => void
+  /** The lobby's last message, over its sender's pet (⑦-3). */
+  say?: { staff: string; text: string } | null
 }
 
 type Spot = { x: number; y: number; facing: 1 | -1 }
@@ -48,7 +51,7 @@ function useStroll(n: number): Spot[] {
   return spots
 }
 
-export default function LobbyTile({ pets, me, home, onVisit }: LobbyTileProps) {
+export default function LobbyTile({ pets, me, home, onVisit, say = null }: LobbyTileProps) {
   const spots = useStroll(pets.length)
   return (
     <div className={s.lobby} data-lobby="">
@@ -63,6 +66,7 @@ export default function LobbyTile({ pets, me, home, onVisit }: LobbyTileProps) {
         const title = `${p.name} · Lv ${level} · ${PET_STATES[p.state].label}`
         const body = (
           <>
+            {say && say.staff === p.staff ? <span className={s.lobbySay}>{say.text}</span> : null}
             <PetNode species={p.species} form={formOf(level)} img={p.petPath} size={30} state={p.state} color={p.color} facing={spot.facing} />
             <span className={s.lobbyName}>{mine ? `${p.first} (you)` : p.first}</span>
           </>

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { visitFromRow, type Visit } from '@/lib/marketing/space'
 
 // 2026-10-24 — ⑦-4: a visit to a teammate's space (`My Space Bento.dc.html` › visiting; the user's answers 37, 38 and
@@ -10,6 +10,10 @@ import { visitFromRow, type Visit } from '@/lib/marketing/space'
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
 vi.mock('@/lib/storage/browser', () => ({ fileRoute: (b: string, p: string) => `/files/${b}/${p}` }))
+const actions = vi.hoisted(() => ({ sendMktChat: vi.fn() }))
+vi.mock('@/lib/marketing/actions', () => actions)
+const flash = vi.hoisted(() => vi.fn())
+vi.mock('@/components/hrv/toast', () => ({ flash }))
 
 import VisitSpace from './VisitSpace'
 
@@ -30,11 +34,15 @@ const lobby = [
 ]
 const tile = (id: string) => document.querySelector<HTMLElement>(`[data-tile="${id}"]`)
 
-beforeEach(() => router.push.mockReset())
+beforeEach(() => {
+  router.push.mockReset()
+  actions.sendMktChat.mockReset()
+  flash.mockReset()
+})
 
 describe('a visit', () => {
   it('whose space, the way home; their look, cover, avatar, name, status and pet — nothing to change', () => {
-    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="var(--mk-team-content-bg)" lobby={lobby} me={ALI} />)
+    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="var(--mk-team-content-bg)" lobby={lobby} me={ALI} canChat={false} />)
     expect(screen.getByText("👀 You're visiting Mei's space")).toBeTruthy()
     expect(screen.getByRole('link', { name: '← Back to mine' }).getAttribute('href')).toBe('/marketing')
     const root = document.querySelector<HTMLElement>('[data-bg]') as HTMLElement
@@ -47,10 +55,23 @@ describe('a visit', () => {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
     expect(screen.queryByRole('textbox', { name: 'Status' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Message Mei/ })).toBeNull() // somebody who does not chat
+  })
+
+  it('somebody who chats (⑦-3): Message opens their chat on one’s own space; Wave sends them a 👋', async () => {
+    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} canChat />)
+    expect(screen.getByRole('link', { name: '💬 Message Mei' }).getAttribute('href')).toBe(`/marketing?chat=${MEI}`)
+    actions.sendMktChat.mockResolvedValueOnce({ ok: true, message: { id: 9, from: ALI, first: 'Ali', body: '👋', project: null, at: '' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '👋 Wave' })) })
+    expect(actions.sendMktChat).toHaveBeenCalledWith(MEI, '👋')
+    expect(flash).toHaveBeenCalledWith('You waved at Mei')
+    actions.sendMktChat.mockResolvedValueOnce({ ok: false, reason: 'Chatting is not open to your account.' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '👋 Wave' })) })
+    expect(flash).toHaveBeenLastCalledWith('Chatting is not open to your account.')
   })
 
   it('the visit’s board: their room and pet, the trophies, their Notes and Photo (answer 38), the lobby', () => {
-    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} />)
+    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} canChat={false} />)
     expect([...document.querySelectorAll<HTMLElement>('[data-tile]')].map(t => t.dataset.tile).sort()).toEqual(['lobby', 'notes', 'pet', 'photo', 'room', 'trophies'])
     expect(screen.getByText("🏠 Mei's room")).toBeTruthy()
     expect(document.querySelector('[data-room]')?.getAttribute('data-wall')).toBe('sage')
@@ -62,18 +83,18 @@ describe('a visit', () => {
   })
 
   it('no photo: the Notes twice as wide; never opened My Space: no pet, no notes yet — the design’s room', () => {
-    render(<VisitSpace visit={mei({}, { photoPath: null })} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} />)
+    render(<VisitSpace visit={mei({}, { photoPath: null })} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} canChat={false} />)
     expect(tile('photo')).toBeNull()
     expect(tile('notes')?.style.width).toBe('calc(50.000% - 12px)')
     document.body.innerHTML = ''
-    render(<VisitSpace visit={mei({ first: 'SIA', full: 'SIA JOSIAH' }, null)} state="sleeping" letter="S" avatarBg="x" lobby={lobby} me={ALI} />)
+    render(<VisitSpace visit={mei({ first: 'SIA', full: 'SIA JOSIAH' }, null)} state="sleeping" letter="S" avatarBg="x" lobby={lobby} me={ALI} canChat={false} />)
     expect(within(tile('pet') as HTMLElement).getByText('🐾 No pet')).toBeTruthy()
     expect((within(tile('notes') as HTMLElement).getByRole('textbox', { name: 'Notes' }) as HTMLTextAreaElement).placeholder).toBe('No notes yet')
     expect(document.querySelector('[data-room]')?.getAttribute('data-wall')).toBe('peach')
   })
 
   it('the lobby: another teammate’s pet opens their space; one’s own goes home', () => {
-    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} />)
+    render(<VisitSpace visit={mei()} state="busy" letter="M" avatarBg="x" lobby={lobby} me={ALI} canChat={false} />)
     const lob = within(tile('lobby') as HTMLElement)
     expect(lob.getAllByText(/^(Ali \(you\)|Mei)$/).map(e => e.textContent)).toEqual(['Ali (you)', 'Mei'])
     fireEvent.click(lob.getByRole('button', { name: "Visit Mei's space" }))

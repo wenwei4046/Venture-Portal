@@ -14,6 +14,7 @@ import { productProjectFromRow, type ProductProjectPage } from './project'
 import { replaceDoneFromRow, type ReplaceDone } from './replace'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 import { petStatsFromRow, spaceFromRow, spacePatchOf, type PetStats, type Space, type SpacePatch } from './space'
+import { chatMessageFromRow, type ChatMessage } from './chat'
 import {
   libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, taskFilesFromRow, type Library, type LibProfile, type ShareExpiry,
   type TaskFile,
@@ -622,4 +623,25 @@ export async function careMktPet(what: 'feed' | 'workout'): Promise<Done<{ pet: 
   if (!pet) return { ok: false, reason: 'Your pet could not be looked after. Please try again.' }
   revalidatePath('/marketing')
   return { ok: true, pet }
+}
+
+/** A chat message (⑦-3, mig 20261025039000) to the lobby or a teammate — its words and/or a task attached. Marketing ·
+ * Edit; the database asks that both are on the roster with a login. Nobody is told (the user's answer 39). */
+export async function sendMktChat(to: string, body: string | null, project: string | null = null): Promise<Done<{ message: ChatMessage }>> {
+  await requireActionOn('/marketing', 'marketing', 'edit')
+  if (to !== 'lobby' && !isId(to)) return { ok: false, reason: 'A message goes to the lobby or to somebody on Marketing’s roster.' }
+  const { data, error } = await (await client()).rpc('mkt_chat_send', { p_with: to.toLowerCase(), p_body: body ?? null, p_project: project && isId(project) ? project : null })
+  if (error) return { ok: false, reason: words(error, 'Your message could not be sent. Please try again.') }
+  const message = chatMessageFromRow(data)
+  if (!message) return { ok: false, reason: 'Your message could not be sent. Please try again.' }
+  return { ok: true, message }
+}
+
+/** The caller has read a thread to there (⑦-3) — their own mark, forward only. */
+export async function readMktChat(to: string, last: number): Promise<Done> {
+  await requireActionOn('/marketing', 'marketing', 'edit')
+  if ((to !== 'lobby' && !isId(to)) || !Number.isFinite(last)) return { ok: false, reason: 'Nothing to mark.' }
+  const { error } = await (await client()).rpc('mkt_chat_read', { p_with: to.toLowerCase(), p_last: Math.floor(last) })
+  if (error) return { ok: false, reason: words(error, 'Could not mark it read.') }
+  return { ok: true }
 }
