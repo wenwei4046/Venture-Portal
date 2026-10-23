@@ -376,6 +376,9 @@ describe('a probation ending (2026-10-23)', () => {
     expect(screen.getByText('PROB')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Probation ending · Nurul Huda'))
     expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+  })
+})
+
 // IT-0008 (2026-10-24): a candidate not selected leaves the list for the Talent Bank — on the phone as on the request page.
 describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
   const hire = {
