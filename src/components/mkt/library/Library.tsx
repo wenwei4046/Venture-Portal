@@ -51,9 +51,10 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
   const [newType, setNewType] = useState({ name: '', color: LIB_TYPE_COLORS[0] as string, cat: 'Content' as LibCat })
   const [link, setLink] = useState({ type: '', url: '', error: '' })
   const picker = useRef<HTMLInputElement>(null)
-  // "auto-deletes in n days" only once in the browser — the server's clock and the browser's differ.
+  // "auto-deletes in n days" only once in the browser — the server's clock and the browser's differ — and counted
+  // again whenever the Library changes (a folder binned after the page opened is counted from then).
   const [now, setNow] = useState<number | null>(null)
-  useEffect(() => setNow(Date.now()), [])
+  useEffect(() => setNow(Date.now()), [lib])
 
   const ix = useMemo(() => libIndex(lib), [lib])
   const files = viewFiles(lib, view, { cat, q })

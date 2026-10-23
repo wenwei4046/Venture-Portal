@@ -185,7 +185,8 @@ export function linkHost(url: string | null): string {
 export const typeChoices = (lib: Library, sub: string) =>
   lib.types.map(t => ({ type: t, has: lib.folders.some(f => f.sub === sub && f.type === t.id) }))
 
-/** The Dustbin's rows: where each came from and the days it has left. */
+/** The Dustbin's rows: where each came from and the days it has left — never more than BIN_DAYS, though the database's
+ * clock may run a little ahead of the browser's. */
 export function binRows(lib: Library, nowMs: number): (LibTrash & { from: string; left: number })[] {
   const ix = libIndex(lib)
   return lib.trash.map(t => {
@@ -193,7 +194,8 @@ export function binRows(lib: Library, nowMs: number): (LibTrash & { from: string
     const type = ix.type(t.type)?.name ?? ''
     const binned = Date.parse(t.at)
     const gone = Number.isFinite(binned) ? binned + BIN_DAYS * 86400000 : nowMs
-    return { ...t, from: t.kind === 'folder' ? sub : `${sub} / ${type}`, left: Math.max(0, Math.ceil((gone - nowMs) / 86400000)) }
+    const left = Math.min(BIN_DAYS, Math.max(0, Math.ceil((gone - nowMs) / 86400000)))
+    return { ...t, from: t.kind === 'folder' ? sub : `${sub} / ${type}`, left }
   })
 }
 

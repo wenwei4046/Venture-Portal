@@ -90,6 +90,9 @@ describe('the Library', () => {
       'file Old logo draft · Carres / Brandbook · 23d',
       'folder Meeting minutes · 2990 Home · 2d',
     ])
+    // Binned a moment ago by the database's clock, a second ahead of the browser's: 30 days, never 31.
+    const fresh = { ...lib, trash: [{ ...lib.trash[0], at: '2026-10-23T00:00:01Z' }] }
+    expect(binRows(fresh, now).map(r => r.left)).toEqual([30])
   })
 
   it('moves a file to any folder holding files, a folder to a subsidiary without one of its type', () => {
