@@ -5,8 +5,9 @@ import NewProject from '@/components/mkt/newproject/NewProject'
 
 export const dynamic = 'force-dynamic'
 
-/** New Project — a quick task or a recurring one (Marketing · Create), or a 📦 product project (the manager's). */
-export default async function MarketingNewPage({ searchParams }: { searchParams: Promise<{ sub?: string }> }) {
+/** New Project — a quick task or a recurring one (Marketing · Create), or a 📦 product project (the manager's); the
+ * manager adds Marketing's own clients here too (?add=1 opens the form — the sidebar's + Add subsidiary). */
+export default async function MarketingNewPage({ searchParams }: { searchParams: Promise<{ sub?: string; add?: string }> }) {
   await requirePage('/marketing/new')
   await requireActionOn('/marketing/new', 'marketing', 'create')
   const [board, sp, manages] = await Promise.all([readBoard(), searchParams, mayActOn('/marketing/new', 'marketing', 'manage')])
@@ -24,6 +25,8 @@ export default async function MarketingNewPage({ searchParams }: { searchParams:
       holidays={board.holidays.map(h => h.day)}
       firstSub={firstSub}
       products={products}
+      canAddSub={manages}
+      addFirst={sp.add === '1'}
     />
   )
 }

@@ -6,7 +6,7 @@ import type { ProductPick } from '@/lib/marketing/project'
 // pick who it is for and a product on sale, and its intake meeting minutes open next. The database's side is
 // tests/member-sql/validate-marketing-product-projects.mjs.
 
-const actions = vi.hoisted(() => ({ createMktTask: vi.fn(), startMktProduct: vi.fn() }))
+const actions = vi.hoisted(() => ({ createMktTask: vi.fn(), startMktProduct: vi.fn(), addMktClient: vi.fn() }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
@@ -23,8 +23,8 @@ const products = [
   { id: 'pr-b', code: 'P-002', name: 'Brand refresh', kind: 'one', version: 1, note: '', description: '', actions: 1,
     intake: { id: 't2', name: 'Brief', version: 2, fields: 1 } },
 ] as ProductPick[]
-const open = (p: ProductPick[] | null) =>
-  render(<NewProject today="2026-10-24" me={null} subs={subs} people={[]} approvers={[]} holidays={[]} firstSub={null} products={p} />)
+const open = (p: ProductPick[] | null, add: { canAddSub?: boolean; addFirst?: boolean } = {}) =>
+  render(<NewProject today="2026-10-24" me={null} subs={subs} people={[]} approvers={[]} holidays={[]} firstSub={null} products={p} {...add} />)
 
 beforeEach(() => {
   for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
@@ -78,5 +78,43 @@ describe('New Project’s product projects', () => {
     expect(screen.getByText('No products on sale')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Product Builder →' }).getAttribute('href')).toBe('/marketing/products')
     expect(screen.getByRole('button', { name: 'Open meeting minutes →' })).toHaveProperty('disabled', true)
+  })
+})
+
+// 2026-10-23 — ④-1: Marketing's own clients ("+ Add subsidiary", the handoff's Add & select) — the manager's.
+describe('New Project’s + Add subsidiary', () => {
+  it('is the manager’s: nobody else sees the +', () => {
+    open(products)
+    expect(screen.queryByRole('button', { name: 'Add subsidiary' })).toBeNull()
+  })
+
+  it('adds a client with its PIC and picks it at once', async () => {
+    open(products, { canAddSub: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Add subsidiary' }))
+    const save = screen.getByRole('button', { name: 'Add & select' })
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Company or client name' }), { target: { value: 'Acme Furniture' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'PIC name' }), { target: { value: 'Mr Tan' } })
+    actions.addMktClient.mockResolvedValue({ ok: true, sub: { id: 'sub-acme', code: 'ACME', name: 'Acme Furniture', dot: 'z', emoji: '🏢', client: true, pic: 'Mr Tan' } })
+    await act(async () => {
+      fireEvent.click(save)
+    })
+    await waitFor(() => expect(actions.addMktClient).toHaveBeenCalledWith('Acme Furniture', 'Mr Tan'))
+    expect(screen.getByRole('radio', { name: /Acme Furniture/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText('PIC · Mr Tan')).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'Company or client name' })).toBeNull()
+  })
+
+  it('says why when it cannot, and keeps what was typed', async () => {
+    open(products, { canAddSub: true, addFirst: true })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Company or client name' }), { target: { value: 'Carres' } })
+    actions.addMktClient.mockResolvedValue({ ok: false, reason: 'Carres is on the list already.' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add & select' }))
+    })
+    expect((await screen.findByRole('alert')).textContent).toBe('Carres is on the list already.')
+    expect((screen.getByRole('textbox', { name: 'Company or client name' }) as HTMLInputElement).value).toBe('Carres')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('textbox', { name: 'Company or client name' })).toBeNull()
   })
 })

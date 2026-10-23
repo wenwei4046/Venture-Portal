@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireActionOn } from '@/lib/auth'
 import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
+import { subFromRow, type MktSub } from './board'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
@@ -13,11 +14,12 @@ import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
 /**
- * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900 and 20261024002000) — New
- * Project's quick and recurring tasks, a stage accepted, worked, handed on, approved or sent back, Nudge, a series
- * paused or ended, the Free space; the Workflow Builder's, the Minutes Builder's and the Product Builder's drafts saved
- * and published (a workflow cloned, a product retired or reactivated); a 📦 product project started, its intake minutes
- * written, signed, sent to the PIC, started before approval, resent. Each asks its gate here and its cell again in
+ * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900, 20261024002000 and
+ * 20261024004000) — New Project's quick and recurring tasks, a stage accepted, worked, handed on, approved or sent back,
+ * Nudge, a series paused or ended, the Free space; the Workflow Builder's, the Minutes Builder's and the Product Builder's
+ * drafts saved and published (a workflow cloned, a product retired or reactivated); a 📦 product project started, its
+ * intake minutes written, signed, sent to the PIC, started before approval, resent; Marketing's own client added.
+ * Each asks its gate here and its cell again in
  * the database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production
  * masks a thrown message).
  */
@@ -344,6 +346,17 @@ export async function resendMktProject(project: string): Promise<Done<{ page: Pr
   if (error) return { ok: false, reason: words(error, 'It could not be resent. Please try again.') }
   freshen()
   return { ok: true, page: await freshProject(db, project) }
+}
+
+/** Marketing's own client (+ Add subsidiary): its name and PIC; its code made by the database. */
+export async function addMktClient(name: string, pic: string): Promise<Done<{ sub: MktSub }>> {
+  await requireActionOn('/marketing/new', 'marketing', 'manage')
+  const n = String(name ?? '').trim()
+  if (!n) return { ok: false, reason: 'Name the company or client.' }
+  const { data, error } = await (await client()).rpc('mkt_sub_add', { p_name: n.slice(0, 200), p_pic: String(pic ?? '').trim().slice(0, 200) || null })
+  if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be added. Please try again.') }
+  freshen()
+  return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */

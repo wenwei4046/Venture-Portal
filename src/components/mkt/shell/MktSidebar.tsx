@@ -168,6 +168,13 @@ export default function MktSidebar(p: MktSidebarProps) {
                   )
                 })
               : null}
+            {/* Marketing's own clients — the manager's (Manage holds the manager tools and the clients). */}
+            {r.key === 'subs' && p.subsOpen && !collapsed && manager.length ? (
+              <Link href="/marketing/new?add=1" className={`${s.sub} ${s.addSub}`}>
+                <span className={s.addPlus} aria-hidden="true">+</span>
+                <span className={s.label}>Add subsidiary</span>
+              </Link>
+            ) : null}
           </Fragment>
         ))}
         {manager.length ? (

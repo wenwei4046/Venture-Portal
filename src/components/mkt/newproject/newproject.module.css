@@ -102,3 +102,19 @@
 .kindChip { font-size: .74em; padding: 2px 8px; border-radius: 5px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); white-space: nowrap; }
 .productMeta { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 2px; }
 .noProducts { display: flex; align-items: center; gap: 12px; padding: 18px; border-radius: 12px; border: 1.5px dashed rgb(var(--mk-dash)); color: rgb(var(--mk-muted)); font-size: .92em; }
+
+/* Marketing's own clients (④-1): the "+" beside Subsidiary and its inline form (Add & select). */
+.addSubBtn {
+  width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgb(var(--mk-dash)); display: flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1; cursor: pointer; color: rgb(var(--mk-muted)); background: rgb(var(--mk-white)); padding: 0; font-family: inherit;
+}
+.addSubBtn:hover { border-color: rgb(var(--mk-hover-line)); color: rgb(var(--mk-ink)); }
+.addSub { margin-top: 10px; padding: 12px; border: 1px solid rgb(var(--mk-line)); border-radius: 10px; background: rgb(var(--mk-surface)); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; animation: mkIn .2s ease-out; }
+.addInput { height: 34px; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 7px; padding: 0 10px; font: inherit; outline: none; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); min-width: 0; }
+.addInput:focus { border-color: rgb(var(--mk-stat-hover)); }
+.addName { flex: 2; min-width: 180px; }
+.addPic { flex: 1; min-width: 140px; }
+.addCancel { height: 34px; padding: 0 14px; border-radius: 7px; display: flex; align-items: center; font: inherit; font-weight: 500; cursor: pointer; color: rgb(var(--mk-muted)); background: transparent; border: 0; }
+.addSave { height: 34px; padding: 0 14px; border-radius: 7px; display: flex; align-items: center; font: inherit; font-weight: 600; cursor: pointer; background: var(--mk-primary); color: rgb(var(--mk-ink-2)); border: 0; }
+.addSave:disabled { opacity: .45; cursor: not-allowed; }
+.addError { flex-basis: 100%; font-size: .88em; color: rgb(var(--mk-red)); }
