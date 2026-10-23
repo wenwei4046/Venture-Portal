@@ -74,7 +74,8 @@ BEGIN
        AND p_name IN (s.profile ->> 'avatar_path', s.profile ->> 'banner_path'));
 END
 $fn$;
-REVOKE ALL ON FUNCTION public.mkt_lib_share_may_read(text) FROM PUBLIC;
+-- Only the anon policy below calls it (production's default privileges hand every new function to authenticated too).
+REVOKE ALL ON FUNCTION public.mkt_lib_share_may_read(text) FROM PUBLIC, authenticated;
 GRANT EXECUTE ON FUNCTION public.mkt_lib_share_may_read(text) TO anon;
 
 DROP POLICY IF EXISTS mkt_library_files_shared ON public.file_objects;

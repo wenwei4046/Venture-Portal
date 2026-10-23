@@ -345,7 +345,8 @@ const sharesMig = await sql('20261024007300_marketing_library_shares.sql')
 await db.exec(sharesMig)
 await db.exec(sharesMig) // twice: nothing changes, nothing breaks
 for (const [fn, anon, auth] of [['mkt_lib_share(text,uuid,text,boolean)', false, true], ['mkt_lib_share_stop(text,uuid)', false, true],
-  ['mkt_lib_shared(text)', true, true], ['mkt_lib_shared_file(text,uuid)', true, true], ['mkt_lib_share_of(text,uuid)', false, false]]) {
+  ['mkt_lib_shared(text)', true, true], ['mkt_lib_shared_file(text,uuid)', true, true], ['mkt_lib_share_of(text,uuid)', false, false],
+  ['mkt_lib_share_may_read(text)', true, false]]) {
   check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
     [anon, auth], `${fn}: ${anon ? 'the stranger’s, by its code' : auth ? 'a sign-in’s' : 'nobody’s to call'}`)
 }
