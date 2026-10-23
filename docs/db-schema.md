@@ -745,6 +745,19 @@ deletes only the topics it manages (it took `it.requests` before);
 `app_notifications` kind + `people`, ref_kind + `hr_staff`; `notification_topics`
 topic + `people.probation`.
 
+**Every topic asked again when it tells (2026-10-24, migration `20261025003000_topics_asked_at_send`).**
+`notification_topic_may(user, topic)` (DEFINER, the service role's — other
+functions' helper) answers, as that account (`auth.uid()` pointed at them and put
+back), whether they may hold the topic now: `hiring.guest` Hiring · Approve +
+`tab_write_open('/hiring/requests', hiring.approve)`; `rooms.guest` Meeting rooms ·
+Edit + `tab_write_open('/admin/rooms', rooms.edit)`; `member.requests`
+`member_is_manager('member_requests_manage')` + `tab_write_open('/member-admin',
+member.manage)`; `it.requests` IT requests · View; `people.probation`
+`probation_notice_may`. `notify_topic` tells only the holders it finds able;
+`notification_topics_sync` keeps a topic by the same question;
+`notification_topics_forget` (its triggers unchanged) now deletes only the topics
+of accounts switched off — a permission change no longer empties the list.
+
 **Employee codes (2026-09-12, migration `20260915040000_staff_code_sequence`).**
 `employee_code` is `HV` + at least three digits, and the database hands it
 out: `hr_staff_costs_assign_code` (BEFORE INSERT OR UPDATE OF employee_code)

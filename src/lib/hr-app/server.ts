@@ -219,8 +219,9 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
 /**
  * What HR's new work they are told of (2026-10-11, mig 20261011180000): the parts the app shows them and may act
  * in. The database keeps only those their own actions hold (`notification_topics_sync`). A probation ending
- * (2026-10-23, mig 20261024223000): whoever may acknowledge it — a topic no permission change forgets, since the
- * sweep asks again, as them, each time it tells.
+ * (2026-10-23, mig 20261024223000): whoever may acknowledge it. Since 2026-10-24 (mig 20261025003000) every topic is
+ * asked again, as its holder, whenever it tells (`notification_topic_may`), so no permission change forgets one —
+ * a page's tab, which the database cannot ask, is asked here.
  */
 export function hrTopics(user: User): string[] {
   const { parts, may } = appAccess(user)
