@@ -121,7 +121,8 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
         setLib(r.library)
         filed++
       }
-      if (filed) flash(filed === 1 ? 'Uploaded' : `${filed} files uploaded`)
+      const into = `${sub?.name ?? ''} / ${folderType?.name ?? ''}`
+      if (filed) flash(filed === 1 ? `Uploaded to ${into}` : `${filed} files uploaded to ${into}`)
     } finally {
       setBusy(false)
       if (picker.current) picker.current.value = ''
@@ -145,7 +146,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
       {can.edit ? (
         <>
           <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'file', id: f.id, name: f.name }) }}>Move to…</button>
-          <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), 'Moved to the Dustbin · 30 days')}>
+          <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), 'Moved to Dustbin · deletes automatically in 30 days')}>
             Move to Dustbin<span className={s.menuHint}>30 days</span>
           </button>
         </>
@@ -348,7 +349,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
                           <>
                             <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'folder', id: t.folder.id, name: t.type.name }) }}>Move to…</button>
                             <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`}
-                              onClick={() => void run(() => binMktLib('folder', t.folder.id), 'Folder moved to the Dustbin · 30 days')}>
+                              onClick={() => void run(() => binMktLib('folder', t.folder.id), 'Folder moved to Dustbin · 30 days')}>
                               Move to Dustbin<span className={s.menuHint}>30 days</span>
                             </button>
                           </>
@@ -410,7 +411,7 @@ export default function Library({ initial, can, at }: { initial: Lib; can: Can; 
                 <span className={`${s.binLeft}${now !== null && r.left <= 7 ? ` ${s.binSoon}` : ''}`}>{now !== null ? `auto-deletes in ${r.left} day${r.left === 1 ? '' : 's'}` : libDay(r.at)}</span>
                 <span className={s.binBtns}>
                   {can.edit ? <button type="button" className={s.btn} disabled={busy} onClick={() => void run(() => binMktLib(r.kind, r.id, true), `Restored ${r.name}`)}>Restore</button> : null}
-                  {can.manage ? <button type="button" className={`${s.btn} ${s.danger}`} disabled={busy} onClick={() => void run(() => deleteMktLib(r.kind, r.id), 'Deleted for good')}>Delete now</button> : null}
+                  {can.manage ? <button type="button" className={`${s.btn} ${s.danger}`} disabled={busy} onClick={() => void run(() => deleteMktLib(r.kind, r.id), 'Deleted permanently')}>Delete now</button> : null}
                 </span>
               </div>
             )) : <div className={s.none} style={{ margin: 12 }}>The Dustbin is empty 🧹</div>}

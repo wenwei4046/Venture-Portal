@@ -22,19 +22,22 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ① | The permission and templates; the tables and readers; the shell (sidebar, top bar, search, bell, Appearance, account menu); My Space's task tiles; the Calendar; Projects (list + a project's stages); the Tracking Dashboard (read) | #634, live 2026-10-23 |
 | ②a | New Project's ⚡ Quick task and 🔁 Recurring task (the repeat rule, the runs) with the quick Workflow Builder; the task page (accept → work → submit / complete; approve / request changes, back to a named stage; versions; the Free space); notices; Nudge; a series paused, resumed, ended; My Space's Accept (mig `20261023234000`) | #639, live 2026-10-23 |
 | ②b-1 | 📦 Product projects up to the PIC: New Project's 📦 (a product on sale today), the project's page — the stepper, the intake minutes written with the PIC and saved as typed, signatures, notes, Generate tracking link (`/t/<random>`), copy / WhatsApp, the PIC's changes and Resend, edited after approval → back to the PIC, start before approval (mig `20261024002000`) | #650, live 2026-10-23 |
-| ⑤-1 | The PIC's minutes link `/t/<code>`: a stranger's page (the guest link's pattern) — the 👁 fields only, approve (a typed full name) or changes (5–500 characters), one answer per sending, why it waits again, the progress, the receipt; the owner (else the managers) told (mig `20261024003000`) | this PR |
+| ⑤-1 | The PIC's minutes link `/t/<code>`: a stranger's page (the guest link's pattern) — the 👁 fields only, approve (a typed full name) or changes (5–500 characters), one answer per sending, why it waits again, the progress, the receipt; the owner (else the managers) told (mig `20261024003000`) | #651, live 2026-10-23 |
 | ②b-2 | The Assignment plan (SLA, approvers ≤ 3 levels, split, 🔓 picked by the stage before) and the product task page (Canvas · Map · Audit trail · Versions); **subtasks** — ✂️ Split into subtasks by the stage's owner (the people the manager added to the stage, due by the stage's deadline, a deliverable), Review delivery (approve, or return with a reason; returned 3 times → red, the manager told), My Space's *Delegated by me* and the assignee's plate, the map's subtask station; the PIC deciding a stage on its link (`PIC Task Link.dc.html`); reassign, more minutes on a project, the billing drafts and Finance's import. The design splits only a template's stages (a quick task never: its builder has no split and no PIC approval) | after questions 10–12 |
 | ③a | The Workflow Builder: actions and their templates, the stages (who — at assignment or 🔓 by the stage before, SLA, approval levels, PIC words, subtasks, back to, fields with a table's preset rows), the lock, drafts saved as typed on their count, versions published whole, Clone (mig `20261023235500`) | #642, live 2026-10-23 |
 | ③b | The Minutes Builder: minutes templates — fields (required, PIC sees, a table's typed columns; the project and the attendees locked), completion rules, Preview as the staff and as the PIC, drafts and versions (mig `20261023235800`) | #644, live 2026-10-23 |
 | ③c | The Product Builder: products one-time or recurring monthly, their code made by the database, categories of actions (quantity, unit price, each on a workflow — or a new one made there), the intake minutes template, list price, cost and margin (the manager's alone), versions taking effect on a day, retire / reactivate (mig `20261023235900`) | #646, live 2026-10-23 |
 | ③d | The Canvas Template Editor (the Workflow Builder's Canvas template tab): the task page laid out — Requirements, a section per stage, the manager's own sections, the Free space; a section's 🔒 / ⭐ / 👁 and stage; a field's ⭐ / 👁, stage, a date on the calendar, a choice's options; the Preview as the staff and as the PIC; kept with the draft and published with the version (mig `20261024001000`) | #648, live 2026-10-23 |
-| ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | #653 |
-| ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | #654 |
-| ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | #655 |
-| ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | this PR |
+| ④-1 | Marketing's own clients: + Add subsidiary (New Project's **+**, the sidebar's row), the code made by the database (mig `20261024004000`). Tracking's actions were built in ① / ②a (Nudge — on WhatsApp waits for question 6) | #653, live 2026-10-23 |
+| ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | #654, live 2026-10-23 |
+| ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | #655, live 2026-10-23 |
+| ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | #657, live 2026-10-23 |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
-| ⑥ | The Library (per company: brand profile, folders, files, categories, upload ≤ 50 MB or a link, guest share link with expiry, attach to a task, dustbin 30 days) — on R2 | after R2 |
+| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 50 MB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (mig `20261024007000`) | this PR |
+| ⑥-2 | A subsidiary's brand profile (avatar, banner, font, caption) and its schedule | next |
+| ⑥-3 | The guest share link — a file or a folder, its expiry, Allow download; a stranger's page | |
+| ⑥-4 | Attach to task (a file's menu) and Attach from Library (a stage's files) | |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
 
 ## 3. Data (mig `20261023214100`)
@@ -57,7 +60,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 12. **Nudge on WhatsApp.** Staff phone numbers live in People; ② sends an in-app notice first.
 13. **Working hours.** "Not accepted · 5 working hours" and the PIC's "6 working hours" need a definition of working hours (the attendance schedule?) — asked, not guessed.
 14. **Projects list** — not designed; built in the Calendar's look.
-15. **"New Page"** (the staff's top-bar button) — undesigned; the dustbin purge needs a scheduled sweep (⑥).
+15. **"New Page"** (the staff's top-bar button) — undesigned; the Dustbin's 30 days are kept without a clock (gap 75).
 16. **No clock** (②a). Production has neither pg_cron nor pg_net, so a recurring run is made ahead (60 days) and opens on its day by itself (readers ask `starts_on ≤ today`); every Marketing write tops the series up. Nobody is told on the morning a run opens — it is on their plate.
 17. **Approvers** (②a). The handoff offers MM, AMM and a content Director; the database answers permissions only for the caller, so the picker offers the roster's managers (team `manager`) and the decision asks Approve. Anybody else — a question.
 18. **Files** (②a). A File field and a stage's files are links until Marketing's R2 bucket (R2 is live since 2026-10-23: `file_buckets` + `file_objects` policies in a migration of Marketing's own).
@@ -116,12 +119,20 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 70. **Ads and Brand lanes** (④-4). The handoff's lanes are Social Media 📣, Content 🎬 and Design 🎨: Ads takes 📈, Brand ✨.
 71. **"📍 You are here"** (④-4). The handoff's words for where the work stands; the viewer is rarely there — *📍 Now here*. Its corner hint (*Drag or scroll … hover a line for details*) is an instruction: the page carries none.
 72. **Replay's pace** (④-4). The handoff runs a dot along each line of a step, 0.8 s a line; built as a record every 1.1 s, a dot along each line it makes.
+73. **A file's category** (⑥-1). The handoff gives each file its own (a JPG in Brandbook is *Photo*); built as its folder type's — a folder's files share one category, and the rail's categories count what their folders hold.
+74. **Upload with only a subsidiary open** (⑥-1). The handoff drops the file into the subsidiary's first folder, whatever its type; built: *Open a folder to upload into it* — a file goes where somebody put it.
+75. **The Dustbin's 30 days** (⑥-1). Production runs nothing on a clock: every Library write first deletes what was binned 30+ days ago (`mkt_lib_purge`), so a Library nobody touches keeps its Dustbin longer; R2's hourly sweep takes the bytes.
+76. **Who may** (⑥-1). The handoff has no roles: View reads, Edit adds, uploads, moves, bins and restores, Manage makes folder types and deletes for good (the handoff's *Delete now* is anybody's).
+77. **One folder per type** (⑥-1). The handoff greys the types a subsidiary has in *Add folder* — kept, in the database too: a folder moved to a subsidiary with one of its type is refused, so is a restore over a new one.
+78. **Link folders** (⑥-1). The handoff's *Add a link* only says *Paste a Google Drive or Dropbox link…*; built as a dialog — a link type (*Raw footage*, seeded) and the https address. A manager's new type is never a link type (question 31).
+79. **Download as ZIP, Rename** (⑥-1). A folder's *Download as ZIP*: not built — files download one at a time (a ZIP made by a function stops at 4.5 MB). Nobody renames a file or a folder in the handoff, nor in the portal.
+80. **The toasts** (⑥-1). The handoff's words, but *Uploaded to …* names the folder the file was put in, never a guessed one.
 
 ## 5. Open questions (for the user)
 
 1. A title's default team: SENIOR MARKETING EXECUTIVE and TELEMARKETER → **Ads**; EVENT SPECIALIST CUM VISUAL MERCHANDISER → **Brand** — right? (The manager can change anyone's team.)
 2. When is an unaccepted stage red — after how many working hours? What are the PIC's "working hours"?
-3. Once R2 is in, should uploads go above 50 MB?
+3. The Library takes uploads up to 50 MB, bigger files as link folders (your answer). Another session has since raised every other bucket on your word (HR's and IT's files 2 GB, the rest 100 MB) — should the Library's rise too (2 GB takes videos)?
 4. HR invites Marketing's 12 people (no logins yet) — when?
 5. Does anybody besides MM / AMM approve stages (the handoff's content Director)?
 6. Nudge on WhatsApp too (from People's phone numbers)?
@@ -149,3 +160,4 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 28. "Long leave": is the swap permanent, or do the places go back after the leave?
 29. May a client be renamed, its PIC or WhatsApp changed, or hidden? And may the group companies carry a default PIC?
 30. Are an outside client's projects billed, and how?
+31. May a manager make a folder type that is a link (as *Raw footage*: a folder kept on Drive or Dropbox)? Built: only Raw footage.
