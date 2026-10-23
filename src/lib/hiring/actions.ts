@@ -6,7 +6,6 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { HIRING_BUCKET, previewKind } from './files'
-import { isReason } from './reasons'
 import type { CandidateField, CandidateStage, HiringField, TalentReason } from './types'
 
 /**
@@ -96,8 +95,8 @@ const text = (form: FormData, key: string) => {
   return typeof v === 'string' ? v : ''
 }
 
-/** Why somebody is kept in the Talent Bank (mig 20261024233700): one of the five, else none. */
-const reasonIn = (v: unknown): TalentReason | null => (isReason(v) ? v : null)
+/** Why somebody is kept in the Talent Bank: a reason's id, else none — HR's list is the database's to check (mig 20261024235300). */
+const reasonIn = (v: unknown): TalentReason | null => (typeof v === 'string' && v.trim() !== '' && v.length <= 64 ? v : null)
 const PICK_REASON = 'Pick why they are kept.'
 
 /** Uploads handed in by the browser, as the database files them, or null when not in shape. */
@@ -346,6 +345,31 @@ export async function addHiringFileType(name: string): Promise<HiringIdOutcome> 
   if (error) return { ok: false, reason: refusal(error, 'The file type could not be added. Please try again.') }
   refresh()
   return { ok: true, id: String(data) }
+}
+
+// ── Talent Bank reasons (mig 20261024235300 — the user: "1, yes do with same", as File types) ───────────
+
+/** "+ Add a new reason…" in a picker, or Form settings' + Add reason: the reason of that name — made if new, turned back on if it was off (Edit). */
+export async function addTalentReason(name: string): Promise<HiringIdOutcome> {
+  await requireActionOn(['/hiring/requests', '/hiring/requests/[id]', '/hiring/talent'], 'hiring', 'edit')
+  if (!name.trim()) return { ok: false, reason: 'Name the reason.' }
+  const { data, error } = await (await client()).rpc('hiring_bank_reason_add', { p_name: name })
+  if (error) return { ok: false, reason: refusal(error, 'The reason could not be added. Please try again.') }
+  refresh()
+  return { ok: true, id: String(data) }
+}
+
+/** Form settings › Talent Bank reasons: a new name; the people kept with it read it at once (Edit). */
+export async function renameTalentReason(reason: string, name: string): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
+  if (!name.trim()) return { ok: false, reason: 'Name the reason.' }
+  return call('hiring_bank_reason_rename', { p_reason: reason, p_name: name }, 'The reason could not be renamed. Please try again.')
+}
+
+/** Form settings › Talent Bank reasons › On / Off: off leaves the pickers, the people kept with it keep it; never the last one on (Edit). */
+export async function setTalentReasonActive(reason: string, active: boolean): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/requests', 'hiring', 'edit')
+  return call('hiring_bank_reason_set_active', { p_reason: reason, p_active: active }, 'The reason could not be changed. Please try again.')
 }
 
 /** Form settings › File types: a new name; the files under it read it at once. Résumé keeps its own (Edit). */

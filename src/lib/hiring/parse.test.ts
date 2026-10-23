@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { boardFromJson, fieldFromJson, requestFromJson } from './parse'
+import { STARTING_REASONS } from './reasons'
 
 // hiring_board()'s jsonb: whatever is missing or of the wrong kind comes back
 // empty, never a crash on the page.
 describe('boardFromJson', () => {
   it('an empty answer is an empty board read as HR', () => {
-    expect(boardFromJson(null)).toEqual({ fields: [], sources: [], candidateFields: [], fileTypes: [], people: [], requests: [], talents: [], me: { staffId: null, name: 'HR' } })
+    expect(boardFromJson(null)).toEqual({
+      fields: [], sources: [], candidateFields: [], fileTypes: [], talentReasons: [...STARTING_REASONS], people: [], requests: [], talents: [],
+      me: { staffId: null, name: 'HR' },
+    })
   })
 
   it('reads a request field by field', () => {
@@ -47,9 +51,21 @@ describe('boardFromJson', () => {
     expect(fieldFromJson({ id: 'x', label: 'X', type: 'colour', required: 'yes' })).toEqual({ id: 'x', label: 'X', type: 'text', options: '', required: false, core: false })
   })
 
-  it('why somebody is kept: one of the five, else none (2026-10-24)', () => {
-    const b = boardFromJson({ talents: [{ id: 'a', reason: 'failed_interview' }, { id: 'b', reason: 'bored' }, { id: 'c' }] })
-    expect(b.talents.map(t => t.reason)).toEqual(['failed_interview', null, null])
+  // HR's list since 2026-10-24 (mig 20261024235300): any reason the database answers — it keeps only its list's — else none.
+  it('why somebody is kept: the reason the database answers, else none', () => {
+    const b = boardFromJson({ talents: [{ id: 'a', reason: 'failed_interview' }, { id: 'b', reason: 'r-7f3a' }, { id: 'c', reason: '' }, { id: 'd' }] })
+    expect(b.talents.map(t => t.reason)).toEqual(['failed_interview', 'r-7f3a', null, null])
+  })
+
+  it('reads HR’s reasons: on unless said off, with the people kept with each; one without a name is left out', () => {
+    const b = boardFromJson({ talentReasons: [
+      { id: 'not_right_now', name: 'Not right now', active: true, used: '3' }, { id: 'r-1', name: 'Moved away', active: false }, { id: 'r-2', name: '' },
+    ] })
+    expect(b.talentReasons).toEqual([
+      { id: 'not_right_now', name: 'Not right now', active: true, used: 3 }, { id: 'r-1', name: 'Moved away', active: false, used: 0 },
+    ])
+    // A board read before the list was there: the five it began with.
+    expect(boardFromJson({ talents: [] }).talentReasons.map(r => r.id)).toEqual(STARTING_REASONS.map(r => r.id))
   })
 
   it('sources default on, with how often they were used', () => {

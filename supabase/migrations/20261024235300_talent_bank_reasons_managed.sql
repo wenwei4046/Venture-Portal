@@ -52,11 +52,13 @@ BEGIN
 END
 $fn$;
 
+-- Line endings aside: a body sent up from a Windows checkout keeps its \r (74 of production's
+-- functions do, these two among them), the same file read here does not.
 CREATE OR REPLACE FUNCTION pg_temp.body_is(p_sig regprocedure, p_md5 text)
 RETURNS void
 LANGUAGE plpgsql AS $fn$
 DECLARE
-  v_md5 text := (SELECT md5(prosrc) FROM pg_proc WHERE oid = p_sig);
+  v_md5 text := (SELECT md5(replace(prosrc, E'\r', '')) FROM pg_proc WHERE oid = p_sig);
 BEGIN
   IF v_md5 IS DISTINCT FROM p_md5 THEN
     RAISE EXCEPTION '%: its body is % now, not % — production changed since this migration was written', p_sig, v_md5, p_md5;
@@ -104,8 +106,8 @@ BEGIN
 END
 $g$;
 
-SELECT pg_temp.body_is('public.hiring_reason_label(text)', 'bdedb99e7569cd65e9df2004033415e0');
-SELECT pg_temp.body_is('public.hiring_reason_check(text)', 'b7f86db9b777010743109ddbd4c09de3');
+SELECT pg_temp.body_is('public.hiring_reason_label(text)', 'a22ea8734ece08775aec474de32a3fba');
+SELECT pg_temp.body_is('public.hiring_reason_check(text)', 'a3faba3dfacbaf2c233b53d3f91ef227');
 
 -- ── 1. The reasons, a list HR keeps ─────────────────────────────────────────
 

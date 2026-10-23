@@ -2,6 +2,7 @@ import type {
   CandidateField,
   CandidateFieldType,
   CandidateStage,
+  HiringBankReason,
   HiringBoard,
   HiringCandidate,
   HiringEvent,
@@ -15,7 +16,7 @@ import type {
   HiringStatus,
   HiringTalent,
 } from './types'
-import { isReason } from './reasons'
+import { STARTING_REASONS } from './reasons'
 
 // `hiring_board()`'s jsonb, checked field by field: anything missing or of the
 // wrong kind comes back as an empty value, never a crash on the page.
@@ -124,7 +125,7 @@ function talentFromJson(v: unknown): HiringTalent {
     department: str(o.department),
     fromRequest: strOrNull(o.fromRequest),
     notes: str(o.notes),
-    reason: isReason(o.reason) ? o.reason : null,
+    reason: strOrNull(o.reason),
     files: filesFromJson(o.files),
     savedBy: str(o.savedBy),
     savedAt: str(o.savedAt),
@@ -156,6 +157,15 @@ export function boardFromJson(v: unknown): HiringBoard {
         return { id: str(x.id), name: str(x.name), builtin: x.builtin === 'resume' ? 'resume' : null, active: x.active !== false, used: num(x.used) ?? 0 }
       })
       .filter(t => t.id && t.name),
+    // HR's list (mig 20261024235300); a board read before it was there: the five it began with.
+    talentReasons: Array.isArray(o.talentReasons)
+      ? o.talentReasons
+          .map((r): HiringBankReason => {
+            const x = obj(r)
+            return { id: str(x.id), name: str(x.name), active: x.active !== false, used: num(x.used) ?? 0 }
+          })
+          .filter(r => r.id && r.name)
+      : [...STARTING_REASONS],
     people: arr(o.people).map((p): HiringPerson => {
       const x = obj(p)
       return { id: str(x.id), name: str(x.name), title: str(x.title), department: str(x.department) }

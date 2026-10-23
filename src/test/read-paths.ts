@@ -319,6 +319,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hiring_bank_bin_restore', 'hiring_bank_bin_delete', 'hiring_bank_bin_empty',
   // …and why somebody is kept there (mig 20261024233700): changed on their page, asking Edit.
   'hiring_talent_set_reason',
+  // …the reasons themselves, HR's list (mig 20261024235300): added from a picker or Form settings, renamed and
+  // turned off there — all Edit.
+  'hiring_bank_reason_add', 'hiring_bank_reason_rename', 'hiring_bank_reason_set_active',
   // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
   'guest_link_rename_department',
   // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers, and

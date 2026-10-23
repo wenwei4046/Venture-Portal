@@ -183,6 +183,14 @@ describe('search', () => {
     expect(searchBank('walk-in', tree).map(h => h.kind)).toEqual(['file'])
     expect(searchBank('  ', tree)).toEqual([])
   })
+
+  // Why somebody is kept (2026-10-24), in HR's words — the list Form settings keeps (mig 20261024235300).
+  it('finds people by why they are kept, as HR’s list names it', () => {
+    const kept: BankTree = { ...tree, talents: tree.talents.map(t => (t.id === T_MEI ? { ...t, reason: 'r-salary' } : t)) }
+    const reasons = [{ id: 'r-salary', name: 'Salary too high', active: false, used: 1 }]
+    expect(searchBank('salary', kept, reasons).map(h => h.kind === 'talent' && h.talent.name)).toEqual(['Mei'])
+    expect(searchBank('salary', kept)).toEqual([])
+  })
 })
 
 // The Bin (2026-10-13 — the user: "make a bin, then that bin will last for 30 days. file that last for more than 30days

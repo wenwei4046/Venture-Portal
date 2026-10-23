@@ -10,7 +10,7 @@ import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
 import type { AttConfig, AttLedger, AttMonth, AttRequest } from '@/lib/attendance/types'
-import type { HiringField } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringField } from '@/lib/hiring/types'
 import type { ProbationReview } from '@/lib/probation-reviews'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
@@ -199,6 +199,8 @@ export interface HrAppData {
   meLine?: string
   /** Hiring's requester form (Form settings), for "+ New hiring request" — the desktop drawer's fields, in its order. */
   hireFields?: HiringField[]
+  /** Why somebody not selected is kept: HR's reasons (Form settings) — the why sheet offers the ones that are on. */
+  hireReasons?: HiringBankReason[]
   /** Who may be "Requested by": everybody working here today. */
   hirePeople?: Array<{ id: string; name: string; dept: string }>
   /** The reader's own roster row in Hiring (Requested by defaults to them). */

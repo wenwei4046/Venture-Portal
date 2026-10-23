@@ -14,6 +14,7 @@ import type { MemberRequest } from '@/lib/member/types'
 import type { Booking } from '@/lib/rooms/model'
 import type { User } from '@/types'
 import { appAccess, bookingOf, dataCenterOf, hireOf, hrTopics, memberRequestOf, talentOf } from './server'
+import { TALENT_REASONS } from '@/test/hiring-board'
 
 // HR's account: every Round-2 cell, the keys that open their pages.
 const HR_ACTIONS = {
@@ -116,9 +117,11 @@ describe('a hiring request, as the app draws it', () => {
       id: 't1', no: 'T-001', name: 'Joyce Tan', phone: '', email: 'joyce@example.invalid', position: 'Account Executive', department: 'Finance',
       fromRequest: 'HR-199', notes: 'Strong on AR.', reason: 'not_right_now', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
     }
-    expect(talentOf(t)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.', reason: 'Not right now' })
+    expect(talentOf(t, TALENT_REASONS)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.', reason: 'Not right now' })
     // Kept before the reason was asked (2026-10-24): none said.
-    expect(talentOf({ ...t, reason: null }).reason).toBeUndefined()
+    expect(talentOf({ ...t, reason: null }, TALENT_REASONS).reason).toBeUndefined()
+    // HR's list says it (2026-10-24, the reasons managed): a reason renamed reads its new name.
+    expect(talentOf(t, TALENT_REASONS.map(r => (r.id === 'not_right_now' ? { ...r, name: 'Maybe next year' } : r))).reason).toBe('Maybe next year')
   })
 })
 

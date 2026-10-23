@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } f
 import { useRouter } from 'next/navigation'
 import { Chip, HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { Drawer } from '@/components/hrv/overlay'
-import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import {
   addBankFolder, addBankTalent, deleteBankFile, deleteBankFolder, deleteBankItemForever, emptyBankBin, hiringFileLink, moveBankEveryone, moveBankFolder,
@@ -16,10 +15,10 @@ import {
   type Bank, type BankFile, type BankHit, type BankTree, type BinItem,
 } from '@/lib/hiring/bank'
 import { HIRING_ACCEPT, extLabel } from '@/lib/hiring/files'
-import { REASONS, cameFrom, reasonLabel } from '@/lib/hiring/reasons'
+import { NEW_REASON, cameFrom, reasonLabel, startReason } from '@/lib/hiring/reasons'
 import { uploadHiringFile } from '@/lib/hiring/upload'
 import { dayLabel, talentStatus } from '@/lib/hiring/view'
-import type { HiringBoard, HiringFile, HiringFileType, HiringTalent, TalentReason } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringBoard, HiringFile, HiringFileType, HiringTalent } from '@/lib/hiring/types'
 import { sizeLabel, type FolderCard } from '@/lib/documentation/drive'
 import { FileTile, FolderTile } from '@/app/(portal)/team/documentation/_components/drive/Cards'
 import FolderNameWindow from '@/app/(portal)/team/documentation/_components/drive/FolderNameWindow'
@@ -30,7 +29,7 @@ import {
 } from '@/app/(portal)/team/documentation/_components/drive/icons'
 import d from '@/app/(portal)/team/documentation/_components/drive/drive.module.css'
 import BankTalentTile from './BankTalentTile'
-import ReasonPick from './ReasonPick'
+import ReasonPick, { ReasonSelect, sendReason } from './ReasonPick'
 import { WaitingFiles, sendWaiting, waitingProblem, type Waiting } from './HiringFiles'
 import b from './bank.module.css'
 import s from './hiring.module.css'
@@ -102,7 +101,7 @@ export default function TalentBankView({
   const folders = folderCards(here, tree)
   const people = talentsIn(here, tree)
   const files = placeFiles(here, bank)
-  const hits = useMemo(() => searchBank(query, tree), [query, tree])
+  const hits = useMemo(() => searchBank(query, tree, board.talentReasons), [query, tree, board.talentReasons])
   const picked = board.talents.find(t => t.id === sel) ?? null
   const takesFiles = can.create && !inBin && takesFolders(here)
   const auto = folders.filter(c => !c.own)
@@ -577,6 +576,7 @@ export default function TalentBankView({
         place={here}
         placeLabel={pathLine(here, tree)}
         types={board.fileTypes}
+        reasons={board.talentReasons}
         canAddType={can.edit}
         onClose={() => setAdding(false)}
       />
@@ -703,7 +703,7 @@ function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; on
  */
 function personLine(board: HiringBoard, t: HiringTalent): string {
   const status = talentStatus(board, t)
-  return status.request || !t.reason ? status.label : reasonLabel(t.reason)
+  return status.request || !t.reason ? status.label : reasonLabel(board.talentReasons, t.reason) || status.label
 }
 
 /** A person's panel: what they fit, why they are kept, where they came from and are kept, how to reach them, HR's notes, their files, the latest step. */
@@ -721,7 +721,7 @@ function TalentFacts({ board, talent, keptIn, canEdit }: { board: HiringBoard; t
         <Pair label="Good fit for" value={talent.position} strong />
         <span className={s.factLabel}>Reason</span>
         <span className={s.factValue} data-strong="true">
-          <ReasonPick talent={talent} canEdit={canEdit} className={s.select} />
+          <ReasonPick talent={talent} reasons={board.talentReasons} canEdit={canEdit} className={s.select} />
         </span>
         {[
           ['Came from', cameFrom(board, talent), false],
@@ -791,6 +791,7 @@ function AddTalentDrawer({
   place,
   placeLabel,
   types,
+  reasons,
   canAddType,
   onClose,
 }: {
@@ -798,13 +799,16 @@ function AddTalentDrawer({
   place: string
   placeLabel: string
   types: readonly HiringFileType[]
+  /** HR's reasons; a new one is named here with the same Edit that names a file type. */
+  reasons: readonly HiringBankReason[]
   canAddType: boolean
   onClose: () => void
 }) {
   const blank = { name: '', phone: '', email: '', position: '', notes: '' }
   const [form, setForm] = useState(blank)
   // Why they are kept (2026-10-24 — the user: "包括 upload 的时候，最好能放一个 drop 掉的原因 … 做成一个 dropdown").
-  const [reason, setReason] = useState<TalentReason>('not_right_now')
+  const [reason, setReason] = useState(() => startReason(reasons, 'not_right_now'))
+  const [newReason, setNewReason] = useState('')
   const [waiting, setWaiting] = useState<Waiting[]>([])
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
@@ -814,7 +818,8 @@ function AddTalentDrawer({
   }
   const close = () => {
     setForm(blank)
-    setReason('not_right_now')
+    setReason(startReason(reasons, 'not_right_now'))
+    setNewReason('')
     setWaiting([])
     setErr('')
     onClose()
@@ -823,12 +828,15 @@ function AddTalentDrawer({
     if (!form.name.trim() || !form.position.trim()) return setErr('Add a name and the position they fit.')
     const problem = waitingProblem(waiting)
     if (problem) return setErr(problem)
+    if (reason === NEW_REASON && !newReason.trim()) return setErr('Name the new reason.')
     start(async () => {
+      const why = await sendReason(reasons, reason, newReason)
+      if (!why.ok) return setErr(why.reason)
       const sent = await sendWaiting(waiting, types)
       if (!sent.ok) return setErr(sent.reason)
       const data = new FormData()
       for (const [k, v] of Object.entries(form)) data.set(k, v)
-      data.set('reason', reason)
+      data.set('reason', why.id)
       data.set('files', JSON.stringify(sent.files))
       const out = await addBankTalent(place, data)
       if (!out.ok) return setErr(out.reason)
@@ -860,16 +868,18 @@ function AddTalentDrawer({
         <input className={s.input} value={form.email} placeholder="Email" aria-label="Email" onChange={set('email')} />
         <input className={s.input} value={form.position} placeholder="Good fit for (position)" aria-label="Good fit for (position)" onChange={set('position')} />
       </div>
-      <label className={s.label}>
-        <span className={s.labelText}>Reason *</span>
-        <Select bare className={s.select} value={reason} onChange={e => setReason(e.target.value as TalentReason)}>
-          {REASONS.map(x => (
-            <option key={x.id} value={x.id}>
-              {x.label}
-            </option>
-          ))}
-        </Select>
-      </label>
+      <ReasonSelect
+        label="Reason *"
+        reasons={reasons}
+        value={reason}
+        newName={newReason}
+        canAdd={canAddType}
+        onChange={v => {
+          setReason(v)
+          setErr('')
+        }}
+        onNewName={setNewReason}
+      />
       <div className={s.hfGroup} role="group" aria-label="Files">
         <WaitingFiles types={types} kept={[]} waiting={waiting} canAddType={canAddType} onChange={next => { setWaiting(next); setErr('') }} />
       </div>
