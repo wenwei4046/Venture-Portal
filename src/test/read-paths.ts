@@ -394,6 +394,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // The PIC's link (mig 20261024003000): anon's by name, as the guest link's — each checks the project's link code
   // instead (a product project's, sent; an answer only while it waits for the PIC).
   'mkt_pic_page', 'mkt_pic_answer',
+  // …and a deliverable's stage the PIC decides on the same link (mig 20261025033000): the code is the deliverable's product
+  // project's, the stage waits for the PIC, at the version they read.
+  'mkt_pic_stage_answer',
   // Marketing's own clients (mig 20261024004000): added by Marketing · Manage, its code made by the database.
   'mkt_sub_add',
   // A subsidiary's page (mig 20261024005000): its projects' newest trail lines, by Marketing · View.

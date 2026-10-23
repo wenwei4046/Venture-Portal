@@ -343,7 +343,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </>
             ) : null}
 
-            {url && rules.pic && pr.status !== 'minutes' ? (
+            {/* The PIC's link: for the minutes they sign off — and, once the work is under way, for the stages they approve (②b-2d). */}
+            {url && (rules.pic || page.deliverables.length > 0) && pr.status !== 'minutes' ? (
               <div className={p.linkBox}>
                 <div className={p.linkUrl}><span>{url}</span></div>
                 <div className={p.linkBtns}>

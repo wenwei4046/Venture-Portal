@@ -7,11 +7,14 @@ import {
   dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
 } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
+import PicWork from './PicWork'
 import s from './pic.module.css'
 
 // The PIC's link (⑤-1, `PIC Link.dc.html`) — the subsidiary's PIC, who has no login, reads the meeting minutes as far
 // as the template lets them see and approves (their full name typed) or asks for changes (their words, 5–500). Where
-// it stands, why it waits for them again, the progress; after an answer, the receipt. The code is the only key.
+// it stands, why it waits for them again, the progress; after an answer, the receipt. Once the work is under way, the
+// work too (②b-2d, PicWork): each deliverable, the stage waiting for them answered on the same link. The code is the
+// only key.
 
 const TONE: Record<Tone, string> = { waiting: s.waiting, done: s.done, red: s.red, draft: s.draft }
 
@@ -111,6 +114,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
 
         <div className={s.grid}>
           <div className={s.col}>
+            <PicWork code={code} page={page} onPage={p => setPage(p)} />
             {answered ? (
               <div className={s.answered}>
                 <span className={`${s.mark}${answered.approved ? ` ${s.markOk}` : ''}`} aria-hidden="true">{answered.approved ? '✓' : '↺'}</span>

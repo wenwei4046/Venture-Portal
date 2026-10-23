@@ -1,6 +1,7 @@
 // The PIC's link (⑤-1, `PIC Link.dc.html`): what mkt_pic_page answers the stranger holding a product project's code —
-// for whom and on what, where it stands, why it waits again, the intake minutes' fields the PIC sees — and, from it,
-// the status, the banner, the progress, the card after an answer, and what an answer asks. Pure.
+// for whom and on what, where it stands, why it waits again, the intake minutes' fields the PIC sees, the work (②b-2d:
+// each deliverable, the stage waiting for them and what they may see of it) — and, from it, the status, the banner,
+// the progress, the card after an answer, and what an answer asks. Pure.
 
 import { officeTime } from '@/lib/office-time'
 import { shortDay } from './board'
@@ -36,6 +37,40 @@ export interface PicPage {
   /** Waiting again after the changes they asked for: what they asked. */
   asked: { reason: string; at: string | null } | null
   minutes: { title: string; fields: PicField[] }
+  /** The work (②b-2d): each deliverable planned, and its stage now. */
+  work: PicWork[]
+}
+
+/** A stage's field as the PIC reads it: words (a date as written, Yes for a box ticked), a link, or nothing yet. */
+export interface PicWorkField {
+  name: string
+  type: string
+  value: string | null
+}
+
+export interface PicWork {
+  id: string
+  title: string
+  status: 'active' | 'paused' | 'done'
+  startsOn: string | null
+  dueOn: string | null
+  stages: number
+  done: number
+  stage: {
+    idx: number
+    name: string
+    status: string
+    dueOn: string | null
+    /** The version the team sent — their answer names it. */
+    ver: number
+    /** Waiting for the PIC's approval now. */
+    waiting: boolean
+    note: string | null
+    fields: PicWorkField[]
+    links: { url: string; label: string }[]
+  } | null
+  /** Their last answer on it. */
+  last: { action: 'pic approved' | 'pic changes'; name: string; reason: string; stage: string; version: string; at: string | null } | null
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -57,6 +92,42 @@ function valueFromRow(type: string, v: unknown): PicValue {
     return names.length ? names : null
   }
   return typeof v === 'string' && v.trim() ? v : null
+}
+
+function workValue(type: string, v: unknown): string | null {
+  if (typeof v === 'boolean') return v ? 'Yes' : null
+  if (typeof v === 'number') return String(v)
+  if (typeof v === 'string' && v.trim()) return type === 'Date' ? dateWords(v.trim()) : v.trim()
+  return null
+}
+
+function workFromRow(w: Record<string, unknown>): PicWork {
+  const s = isObj(w.stage) ? w.stage : null
+  const last = isObj(w.last) ? w.last : null
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
+  return {
+    id: str(w.id),
+    title: str(w.title),
+    status: w.status === 'done' ? 'done' : w.status === 'paused' ? 'paused' : 'active',
+    startsOn: strOrNull(w.startsOn),
+    dueOn: strOrNull(w.dueOn),
+    stages: n(w.stages),
+    done: n(w.done),
+    stage: s ? {
+      idx: n(s.idx),
+      name: str(s.name),
+      status: str(s.status),
+      dueOn: strOrNull(s.dueOn),
+      ver: n(s.ver),
+      waiting: s.waiting === true,
+      note: strOrNull(s.note),
+      fields: (Array.isArray(s.fields) ? s.fields : []).filter(isObj).map(f => ({ name: str(f.name), type: str(f.type), value: workValue(str(f.type), f.value) })),
+      links: (Array.isArray(s.links) ? s.links : []).filter(isObj).filter(l => /^https:\/\//i.test(str(l.url))).map(l => ({ url: str(l.url), label: str(l.label) })),
+    } : null,
+    last: last && (last.action === 'pic approved' || last.action === 'pic changes')
+      ? { action: last.action, name: str(last.name), reason: str(last.reason), stage: str(last.stage), version: str(last.version), at: strOrNull(last.at) }
+      : null,
+  }
 }
 
 /** mkt_pic_page(code): the page, or null — the link is closed. */
@@ -84,8 +155,25 @@ export function picPageFromRow(v: unknown): PicPage | null {
       fields: (Array.isArray(minutes.fields) ? minutes.fields : []).filter(isObj)
         .map(f => ({ name: str(f.name), type: str(f.type), value: valueFromRow(str(f.type), f.value) })),
     },
+    work: (Array.isArray(v.work) ? v.work : []).filter(isObj).map(workFromRow),
   }
 }
+
+/** Where a deliverable stands, in the PIC's words. */
+export function workState(w: PicWork, today: string): { label: string; tone: Tone } {
+  if (w.status === 'done') return { label: 'Done', tone: 'done' }
+  if (w.status === 'paused') return { label: 'Paused', tone: 'draft' }
+  if (w.startsOn && today && w.startsOn > today) return { label: `Starts ${shortDay(w.startsOn)}`, tone: 'draft' }
+  if (w.stage?.waiting) return { label: 'Waiting for your approval', tone: 'waiting' }
+  if (w.stage?.status === 'changes' && w.last?.action === 'pic changes') return { label: 'The team is making your changes', tone: 'draft' }
+  return { label: w.stage ? `In progress · ${w.stage.name}` : 'In progress', tone: 'draft' }
+}
+
+/** How many wait for the PIC now. */
+export const workWaiting = (work: readonly PicWork[]) => work.filter(w => w.stage?.waiting).length
+
+/** Changes on a stage ask what should change — as mkt_pic_stage_answer asks (5–1,000). */
+export const stageReasonOk = (reason: string) => reason.trim().length >= 5 && reason.trim().length <= 1000
 
 /** "23 Oct", on the office's clock. */
 const day = (at: string | null) => (at ? officeTime(at).format('D MMM') : '')
@@ -123,7 +211,7 @@ export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'>, over
 export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: string; sub: string }
 
 /** The progress: the meeting, the minutes sent, their approval, the work. */
-export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'>): PicStep[] {
+export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & { work?: readonly PicWork[] }): PicStep[] {
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
   const yours: PicStep = p.status === 'waiting_pic' ? { label: 'Your approval', state: 'cur', date: '', sub: 'Waiting for you' }
     : p.status === 'changes' ? { label: 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
@@ -132,8 +220,16 @@ export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' |
     { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
     { label: 'Minutes sent to you', state: 'done', date: day(p.sentAt), sub: '' },
     yours,
-    { label: 'Work starts', state: approved ? 'cur' : 'next', date: '', sub: approved ? 'The team is planning the work' : '' },
+    workStep(p.work ?? [], approved),
   ]
+}
+
+/** The last step: the work to come — or, once under way, how far it has come (②b-2d). */
+function workStep(work: readonly PicWork[], approved: boolean): PicStep {
+  if (!work.length) return { label: 'Work starts', state: approved ? 'cur' : 'next', date: '', sub: approved ? 'The team is planning the work' : '' }
+  const done = work.filter(w => w.status === 'done').length
+  const waiting = workWaiting(work)
+  return { label: 'The work', state: done >= work.length ? 'done' : 'cur', date: '', sub: `${done} of ${work.length} done${waiting ? ` · ${waiting} waiting for you` : ''}` }
 }
 
 /** The card once they have answered. */
