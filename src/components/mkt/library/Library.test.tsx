@@ -8,7 +8,7 @@ import { libraryFromRow } from '@/lib/marketing/library'
 
 const actions = vi.hoisted(() => ({
   addMktLibFolder: vi.fn(), addMktLibType: vi.fn(), binMktLib: vi.fn(), deleteMktLib: vi.fn(), fileMktLib: vi.fn(), moveMktLib: vi.fn(),
-  saveMktLibProfile: vi.fn(),
+  saveMktLibProfile: vi.fn(), shareMktLib: vi.fn(), stopMktLibShare: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const replace = vi.fn()
@@ -236,5 +236,53 @@ describe('a brand in the Library', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(bucket.remove).toHaveBeenCalledWith([cover]))
     expect(actions.saveMktLibProfile).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-24 — ⑥-3: a file's or a folder's guest link.
+describe('a guest link', () => {
+  const CODE = '0123456789abcdef0123456789abcdef'
+  const shared = { ...lib, shares: [{ kind: 'file' as const, id: 'x2', code: CODE, download: true, expiry: '7d' as const, expires: '2026-10-31T02:22:00Z' }] }
+
+  it('is made only when asked — 7 days and download by default', async () => {
+    actions.shareMktLib.mockResolvedValueOnce({ ok: true, library: shared })
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Share "Logo pack"' })
+    expect(within(dlg).queryByLabelText('Guest link')).toBeNull()
+    expect(within(dlg).getByRole('radio', { name: '7 days' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(dlg).getByRole('switch', { name: 'Allow download' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Create link' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '7d', true))
+    expect((within(dlg).getByLabelText('Guest link') as HTMLInputElement).value).toBe(`${window.location.origin}/l/${CODE}`)
+    expect(within(dlg).getByText('Expires Sat 31 Oct, 10:22')).toBeTruthy()
+    expect(flash).toHaveBeenCalledWith('Link created')
+  })
+
+  it('once live, changes at once; Stop link closes it', async () => {
+    actions.stopMktLibShare.mockResolvedValueOnce({ ok: true, library: lib })
+    actions.shareMktLib.mockResolvedValue({ ok: true, library: shared })
+    render(<Library initial={shared} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }).textContent).toContain('live')
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Share "Logo pack"' })
+    fireEvent.click(within(dlg).getByRole('radio', { name: '30 days' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', true))
+    fireEvent.click(within(dlg).getByRole('switch', { name: 'Allow download' }))
+    await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', false))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Stop link' }))
+    await waitFor(() => expect(actions.stopMktLibShare).toHaveBeenCalledWith('file', 'x2'))
+    expect(flash).toHaveBeenCalledWith('Link stopped')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('is never offered for a link folder', () => {
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Raw footage — more' }))
+    expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: /Share link/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Brandbook — more' }))
+    expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ })).toBeTruthy()
   })
 })

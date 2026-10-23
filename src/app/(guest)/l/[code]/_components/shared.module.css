@@ -1,0 +1,72 @@
+/* A Library share link, /l/<code> (⑥-3), in the stranger pages' tokens (globals.css › .mkt-pic, as the PIC's link):
+   one column up to 920px; the brand's banner, what was shared, its files. */
+
+.root { min-height: 100vh; background: rgb(var(--pk-page)); font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif; color: rgb(var(--pk-ink)); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+.main { max-width: 920px; margin: 0 auto; padding: 24px 16px 48px; box-sizing: border-box; }
+.grow { flex: 1; }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mono { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(var(--pk-muted)); }
+
+/* The brand. */
+.banner {
+  position: relative; border-radius: 14px; min-height: 110px; padding: 20px 22px; display: flex; align-items: center; gap: 16px;
+  background: rgb(var(--pk-soft-2)); background-size: cover; background-position: center; border: 1px solid rgb(var(--pk-line-2));
+}
+.avatar {
+  width: 64px; height: 64px; flex: none; border-radius: 15px; border: 3px solid rgb(var(--pk-white)); box-shadow: 0 2px 8px rgb(var(--pk-ink) / .12);
+  font-size: 28px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: rgb(var(--pk-white)); overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatarColour { color: rgb(var(--pk-white)); font-weight: 700; font-size: 26px; }
+.brandName { font-size: 26px; font-weight: 600; line-height: 1.1; }
+.brandName.inFont { font-size: 32px; font-weight: 400; }
+.caption { font-size: 13px; color: rgb(var(--pk-text-2)); margin-top: 4px; }
+.banner[data-dark] .brandName { color: rgb(var(--pk-white)); }
+.banner[data-dark] .caption { color: rgb(var(--pk-white) / .8); }
+
+/* What was shared. The portal gives every h1 its display serif; this page's title is its own face. */
+.head { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-size: 20px; min-width: 0; }
+.root .title { font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; color: inherit; margin: 0; }
+.meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; color: rgb(var(--pk-muted)); }
+.chip { font-size: 11.5px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: rgb(var(--pk-draft-bg)); border: 1px solid rgb(var(--pk-draft-line)); color: rgb(var(--pk-draft)); }
+
+/* One file: shown large. */
+.single { margin-top: 16px; background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 14px; overflow: hidden; }
+.singleFoot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid rgb(var(--pk-line-2)); }
+.primary {
+  height: 36px; padding: 0 16px; border-radius: 9px; background: var(--pk-primary); color: rgb(var(--pk-primary-ink)); display: inline-flex; align-items: center;
+  font-weight: 600; font-size: 13px; text-decoration: none;
+}
+.primary:hover { background: var(--pk-primary-hover); }
+
+/* A folder's files. */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+.tile { background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 12px; overflow: hidden; min-width: 0; }
+.tileBody { padding: 10px 12px 12px; }
+.tileName { font-size: 13px; font-weight: 500; }
+.tileFoot { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.link { font-size: 12.5px; font-weight: 500; color: rgb(var(--pk-brown)); text-decoration: underline; text-underline-offset: 2px; }
+
+.thumb { position: relative; height: 140px; display: flex; align-items: center; justify-content: center; background: rgb(var(--pk-soft)); overflow: hidden; }
+.thumbLarge { height: min(64vh, 560px); }
+.thumb img, .thumb video { width: 100%; height: 100%; object-fit: contain; display: block; background: rgb(var(--pk-soft)); }
+.thumbVideo, .thumbVideo video { background: rgb(var(--pk-ink)); }
+.ext {
+  padding: 8px 12px; border-radius: 9px; border: 1px solid rgb(var(--pk-line)); background: rgb(var(--pk-white)); font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 12px; font-weight: 600; color: rgb(var(--pk-text-2));
+}
+
+.empty { margin-top: 16px; padding: 28px; text-align: center; color: rgb(var(--pk-muted)); border: 1px dashed rgb(var(--pk-line)); border-radius: 12px; }
+.foot { margin-top: 28px; text-align: center; font-size: 12px; color: rgb(var(--pk-next)); }
+
+/* A closed link. */
+.closed { margin-top: 18vh; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.closedIcon { font-size: 32px; }
+
+@media (max-width: 520px) {
+  .banner { padding: 16px; gap: 12px; }
+  .avatar { width: 52px; height: 52px; font-size: 22px; }
+  .brandName.inFont { font-size: 26px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .thumb { height: 120px; }
+}

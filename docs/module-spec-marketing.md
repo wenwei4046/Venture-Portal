@@ -35,8 +35,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-24 |
-| ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | this PR |
-| ⑥-3 | The guest share link — a file or a folder, its expiry, Allow download; a stranger's page | |
+| ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-24 |
+| ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | this PR |
 | ⑥-4 | Attach to task (a file's menu) and Attach from Library (a stage's files) | |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
 
@@ -133,6 +133,13 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 84. **Brand pictures** (⑥-2). The handoff's *Upload logo / cover* only toggles a pattern; built as real uploads to R2 under `brand/`, an image of 10 MB at most. One replaced or taken off is deleted (unless another profile shows it); one sent and not saved is taken back.
 85. **The Schedule** (⑥-2). The handoff's are typed into its sample (*Year-End Video shoot*, *11.11 ads go live*, *Countdown reel approval*); built from the Calendar's dates — the subsidiary's stages due and runs to open, not done, from today, the first three — each a link to its project. Shoots and ads days wait for questions 15–16.
 86. **Brand fonts** (⑥-2). Playfair Display, DM Serif Display and Space Grotesk are loaded for a brand's name alone (on Marketing's shell, downloaded only when a brand wears one); the portal's own faces stay as DESIGN.md sets them.
+87. **Who may share** (⑥-3). The handoff's *Share link* is in everybody's menu; built as Marketing · Edit's (who adds files) — a link hands company files to people outside the portal. View sees each live link.
+88. **Nothing shared on opening** (⑥-3). The handoff's dialog shows a link at once; built: *Create link* makes it, so opening the dialog shares nothing. Once live, a change is saved as it is made.
+89. **Stop link** (⑥-3). The handoff has no way to take a link back — one that *Never* expires would live for good; built: *Stop link* closes it at once.
+90. **The page** (⑥-3). The handoff's link points at `houzs.link/lib/…`, a page it never draws; built at the portal's own address, `/l/<code>`: the brand (its cover, logo and font), the item, its files shown in place where a browser can, *Download* when allowed, when the link ends; *This link is closed* for anything else.
+91. **Allow download, off** (⑥-3). A browser can still keep what it shows (a picture, a video, a PDF); off means no *Download* and nothing sent that would save (a ZIP, a document) — *View only*.
+92. **A file link lives an hour** (⑥-3). Stopped or expired, a link closes the page and every new click at once; a file already opened from it (a video playing) keeps its signed link for up to an hour.
+93. **The wording** (⑥-3). The handoff's *Guest link · for people without an account* and *Anyone with the link can view and download — no account needed* explain; the dialog carries none — its state instead (*Expires Fri 30 Oct, 10:39*, *Never expires*).
 
 ## 5. Open questions (for the user)
 

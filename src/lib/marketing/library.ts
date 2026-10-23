@@ -24,7 +24,10 @@ export interface LibSub { id: string; code: string; name: string; emoji: string;
 export interface LibFolder { id: string; sub: string; type: string; url: string | null; at: string }
 export interface LibFile { id: string; folder: string; name: string; path: string; size: number; mime: string; by: string; at: string }
 export interface LibTrash { kind: 'file' | 'folder'; id: string; name: string; sub: string; type: string; n: number | null; size: number | null; by: string; at: string }
-export interface Library { today: string; types: LibType[]; subs: LibSub[]; folders: LibFolder[]; files: LibFile[]; trash: LibTrash[] }
+export type ShareExpiry = '24h' | '7d' | '30d' | 'never'
+/** A live guest link (⑥-3): the file or folder it opens, its code, download, what expiry was picked and when it ends. */
+export interface LibShare { kind: 'file' | 'folder'; id: string; code: string; download: boolean; expiry: ShareExpiry; expires: string | null }
+export interface Library { today: string; types: LibType[]; subs: LibSub[]; folders: LibFolder[]; files: LibFile[]; trash: LibTrash[]; shares: LibShare[] }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -32,7 +35,7 @@ const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0)
 const rows = (v: unknown) => (Array.isArray(v) ? v : []).filter(isObj)
 const cat = (v: unknown): LibCat => (LIB_CATS as readonly string[]).includes(str(v)) ? (v as LibCat) : 'Content'
 
-export const EMPTY_LIBRARY: Library = { today: '', types: [], subs: [], folders: [], files: [], trash: [] }
+export const EMPTY_LIBRARY: Library = { today: '', types: [], subs: [], folders: [], files: [], trash: [], shares: [] }
 
 /** mkt_library(). */
 export function libraryFromRow(v: unknown): Library {
@@ -52,7 +55,28 @@ export function libraryFromRow(v: unknown): Library {
       kind: t.kind === 'folder' ? 'folder' : 'file', id: str(t.id), name: str(t.name), sub: str(t.sub), type: str(t.type),
       n: t.n == null ? null : num(t.n), size: t.size == null ? null : num(t.size), by: str(t.by), at: str(t.at),
     })),
+    shares: rows(v.shares).filter(s => str(s.id) && isShareCode(str(s.code))).map(s => ({
+      kind: s.kind === 'folder' ? 'folder' : 'file', id: str(s.id), code: str(s.code), download: s.download !== false,
+      expiry: oneOf(SHARE_EXPIRIES.map(e => e.key), s.expiry) ?? '7d', expires: str(s.expires) || null,
+    })),
   }
+}
+
+// ── A guest share link (⑥-3) ───────────────────────────────────────────────────────
+/** The handoff's four, 7 days its default. */
+export const SHARE_EXPIRIES: readonly { key: ShareExpiry; label: string }[] = [
+  { key: '24h', label: '24 hours' }, { key: '7d', label: '7 days' }, { key: '30d', label: '30 days' }, { key: 'never', label: 'Never' },
+]
+export const isShareCode = (code: string) => /^[0-9a-f]{32}$/.test(code)
+/** The live link of a file or a folder, if it has one. */
+export const shareOf = (lib: Library, kind: 'file' | 'folder', id: string) => lib.shares.find(s => s.kind === kind && s.id === id) ?? null
+/** Its address: the portal's own, /l/<code>. */
+export const shareAddress = (origin: string, code: string) => `${origin.replace(/\/+$/, '')}/l/${code}`
+/** When it ends, the office's: "Expires Fri 31 Oct, 10:22" — or "Never expires". */
+export function shareEnds(expires: string | null): string {
+  if (!expires) return 'Never expires'
+  const t = officeTime(expires)
+  return t?.isValid() ? `Expires ${longDay(t.format('YYYY-MM-DD'))}, ${t.format('HH:mm')}` : ''
 }
 
 // ── A subsidiary's brand profile (⑥-2) ────────────────────────────────────────────
