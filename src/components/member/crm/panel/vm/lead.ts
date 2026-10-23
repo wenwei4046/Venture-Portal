@@ -85,7 +85,9 @@ export function leadVM(ctx: PanelCtx) {
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
       reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
-      press: { "data-msg": m.id, ...pressToOpen(() => openMsgMenu({
+      // data-mine: the quote in our own orange bubble is drawn light, as in Mine's chat (crm.module.css) — it was the dark
+      // default on the orange, unreadable (the owner, 2026-10-23).
+      press: { "data-msg": m.id, ...(mine ? { "data-mine": "1" } : {}), ...pressToOpen(() => openMsgMenu({
         mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
