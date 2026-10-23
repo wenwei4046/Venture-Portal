@@ -29,7 +29,7 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     hireCancel: hrAppCancelHire,
     hireFill: hrAppFill,
     hireNew: hrAppNewHire,
-    candStage: (_hire, candidate, stage) => hrAppCandidateStage(candidate, stage),
+    candStage: (_hire, candidate, stage, reason) => hrAppCandidateStage(candidate, stage, reason),
     candAdd: hrAppAddCandidate,
     talentNotes: hrAppTalentNotes,
     talentRemove: hrAppRemoveTalent,

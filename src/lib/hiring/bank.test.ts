@@ -17,7 +17,7 @@ const F_OHANA_SALES = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
 const F_SENIOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'
 
 const talent = (id: string, name: string, more: Partial<HiringTalent> = {}): HiringTalent => ({
-  id, no: 'T-001', name, phone: '', email: '', position: 'Sales Executive', department: 'Revenue', fromRequest: null, notes: '',
+  id, no: 'T-001', name, phone: '', email: '', position: 'Sales Executive', department: 'Revenue', fromRequest: null, notes: '', reason: null,
   files: [], savedBy: 'Grace Lim', savedAt: '2026-10-12T08:00:00Z', events: [], ...more,
 })
 

@@ -7,7 +7,7 @@
  */
 import { urgencyOf } from "../../sales/vm/common";
 import { jobTitle } from "../../shared/people";
-import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, ini, numbersOf, pct, periodRange, seatOf, tagOf, type PanelCtx } from "./common";
+import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, inRange, ini, numbersOf, pct, periodRange, seatOf, tagOf, type PanelCtx } from "./common";
 
 export function overviewVM(ctx: PanelCtx) {
   const { ui, set, patch, data, me, now, teams, directors } = ctx;
@@ -57,7 +57,7 @@ export function overviewVM(ctx: PanelCtx) {
   const grow = all.leads - P.leads, growP = P.leads ? Math.round((grow / P.leads) * 100) : null;
   const hero4 = [
     { label: "Appt rate", value: pct(all.booked, all.leads), ...pts(r100(all.booked, all.leads), r100(P.booked, P.leads)) },
-    { label: "Leads", value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
+    { label: "Leads", open: () => patch({ cLs: "leads" }), value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
     { label: "Show-up", value: pct(all.came, all.due), ...pts(r100(all.came, all.due), r100(P.came, P.due)) },
     { label: "Reply 24 h", value: pct(all.replied24, all.waits), ...pts(r100(all.replied24, all.waits), r100(P.replied24, P.waits)) },
   ];
@@ -65,6 +65,8 @@ export function overviewVM(ctx: PanelCtx) {
   const h = now.getHours(), greet = `Hello, ${me.role === "boss" ? "Principal" : first(me.name)}`; void h; // the owner, 2026-10-18: "改成 hello"
   return {
     hero4, vsLabel, greet,
+    // The period's leads, for the list Leads opens (the owner, 2026-10-24: "點20，可以看到list").
+    leadIds: data.customers.filter(c => inRange(c.createdAt, cur)).map(c => c.id),
     ...dateSheetVM(ctx),
     onOverview: ui.tab === "overview",
     exitApp: ctx.exitApp,

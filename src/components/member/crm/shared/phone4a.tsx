@@ -79,14 +79,14 @@ export function Phone4aSeg({ items }: { items: { label: string; on: boolean; pic
 
 /** Change list 19 · the rust hero: three rates in white, an amber mark over the first, each one's change readable on rust. */
 /** `compact` = v3 T01's smaller hero: 14px padding, 24px figures. */
-export function Phone4aHero({ items, cols, compact }: { items: { label: string; value: string; delta: string; good: boolean }[]; cols?: number; compact?: boolean }) {
+export function Phone4aHero({ items, cols, compact }: { items: { label: string; value: string; delta: string; good: boolean; open?: () => void }[]; cols?: number; compact?: boolean }) {
   const n = cols ?? items.length;
   if (compact) return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, rowGap: "12px", padding: "14px 0", borderRadius: "16px", background: "var(--crm-rust)", color: "#fff" }}>
       {items.map((m, i) => (
-        <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "0 16px", borderLeft: i % n ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", minWidth: 0 }}>
+        <div key={m.label} onClick={m.open} role={m.open ? "button" : undefined} style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "0 16px", borderLeft: i % n ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", minWidth: 0, cursor: m.open ? "pointer" : "default" }}>
           <span style={{ width: "18px", height: "2px", background: i ? "transparent" : "var(--crm-amber)" }} />
-          <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}{m.open && <Ic name="chevron-right" size={11} />}</span>
           <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(24), letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
           <span style={{ minHeight: "14px", fontSize: fs(11), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)" }}>{m.delta}</span>
         </div>
@@ -138,20 +138,24 @@ export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitR
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div style={{ display: "flex", flexDirection: "column", margin: "0 -20px", borderTop: "1px solid var(--crm-rule-soft)" }}>
+      {/* The split at a glance (2026-10-24: it left the Assignment cards for this page). */}
+      <div style={{ display: "flex", gap: "2px", height: "8px", margin: "12px 20px 4px", borderRadius: "4px", overflow: "hidden", background: "var(--crm-track)" }}>
+        {s.splits.filter(r => r.range > 0).map((r, i) => <span key={i} style={{ flex: `${r.range} 1 0px`, background: r.c, transition: "flex-grow 200ms" }} />)}
+      </div>
       {s.splits.map((r, i) => {
         const g = inner.find(x => x.name === r.team), dir = /director/i.test(r.team), on = !!g && open === g.id;
         const line = g?.held ? `Over the limit · holding ${g.held} lead${g.held === 1 ? "" : "s"}` : g ? (dir ? `${g.people.map(p => p.name).join(", ")} · always first` : `${g.count} ${g.count === 1 ? "person" : "people"} · ${g.modeLbl}`) : "No share";
         return (
-          <div key={i} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "9px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <button type="button" onClick={() => g && setOpen(on ? null : g.id)} style={{ ...BTN, flex: 1, minWidth: 0, display: "flex", gap: "10px", alignItems: "flex-start", textAlign: "left" }}>
                 <span style={{ flex: "none", width: "9px", height: "9px", marginTop: "6px", borderRadius: "2px", background: r.c }} />
                 <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.team}</span>
-                  <span style={{ fontSize: fs(12), color: g?.held ? "var(--crm-oxblood)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{line}</span>
+                  <span style={{ fontSize: fs(14), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.team}</span>
+                  <span style={{ fontSize: fs(11.5), color: g?.held ? "var(--crm-oxblood)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{line}</span>
                 </span>
               </button>
-              <label style={{ flex: "none", width: "84px", height: "38px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+              <label style={{ flex: "none", width: "76px", height: "34px", padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
                 <input type="text" inputMode="decimal" aria-label={`${r.team} share`} value={r.v} onChange={r.setN} onFocus={r.selAll} enterKeyHint="next" onKeyDown={enterNext}
                   style={{ width: "100%", minWidth: 0, border: 0, background: "transparent", textAlign: "right", font: "inherit", fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none", padding: 0 }} />
                 <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>%</span>
@@ -445,7 +449,7 @@ export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: bool
   // Compact (the owner, 2026-10-23: "下方的廣告也是有沒有可能小一點，如果同時打很多廣告就很亂"): one line — channel, name,
   // leads, chevron — and a thin split bar under it; the headline is the title tooltip.
   return (
-    <div onClick={a.edit} title={a.head || undefined} style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "9px 12px", borderRadius: "12px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
+    <div onClick={a.edit} title={a.head || undefined} style={{ display: "flex", flexDirection: "column", padding: "11px 12px", borderRadius: "12px", border: `1px solid ${a.setUp ? "var(--crm-tint-attention)" : "var(--crm-line)"}`, background: "#fff", cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ flex: "none", display: "flex", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={a.wa ? "phone" : "message-circle"} size={14} /></span>
         <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
@@ -455,9 +459,6 @@ export function Phone4aAdCard({ a }: { a: { name: string; head: string; wa: bool
         <span style={{ flex: "none", fontSize: fs(12), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{a.leads} leads</span>
         <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)" }}><Ic name="chevron-right" size={13} /></span>
       </div>
-      <span style={{ display: "flex", gap: "2px", height: "4px", borderRadius: "2px", overflow: "hidden", background: "var(--crm-track)" }}>
-        {!a.setUp && a.bar.map((b, i) => <span key={i} style={{ width: b.w, background: b.c, opacity: b.op ?? 1 }} />)}
-      </span>
     </div>
   );
 }
@@ -630,7 +631,7 @@ export function Phone4aActive({ v }: { v: ActiveVM }) {
           <button type="button" aria-expanded={!off} onClick={() => setOpened(x => ({ ...x, [g.name]: off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
             <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-ink)" }}>{g.name}</strong>
-            <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
+            <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{g.count}</small>
             <span style={{ display: "flex", color: "var(--crm-faint)", transform: off ? "none" : "rotate(180deg)", transition: "transform 160ms" }}><Ic name="chevron-down" size={15} /></span>
           </button>
           {!off && g.people.map((p, k) => (

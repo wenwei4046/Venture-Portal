@@ -15,6 +15,7 @@ import type {
   HiringStatus,
   HiringTalent,
 } from './types'
+import { isReason } from './reasons'
 
 // `hiring_board()`'s jsonb, checked field by field: anything missing or of the
 // wrong kind comes back as an empty value, never a crash on the page.
@@ -123,6 +124,7 @@ function talentFromJson(v: unknown): HiringTalent {
     department: str(o.department),
     fromRequest: strOrNull(o.fromRequest),
     notes: str(o.notes),
+    reason: isReason(o.reason) ? o.reason : null,
     files: filesFromJson(o.files),
     savedBy: str(o.savedBy),
     savedAt: str(o.savedAt),

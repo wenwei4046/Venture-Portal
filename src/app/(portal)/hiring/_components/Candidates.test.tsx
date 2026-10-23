@@ -135,6 +135,69 @@ describe('Hiring › a request › candidates’ files', () => {
   })
 })
 
+// IT-0008 (2026-10-24): "after the candidate is failed with interview or not shortlisted, the candidate will be
+// dissapear within the table ish view, where instead of entirely dissapear the candidate will be placed within the
+// Talent Bank". HR-202 had Siti Aisyah hired and Nur Iman not selected (kept in the bank: Not right now).
+describe('Hiring › a request › Not selected goes to the Talent Bank', () => {
+  const filled = HIRING_BOARD.requests.find(r => r.id === 'HR-202')!
+
+  it('the list counts and shows the ones still in the running; the not selected fold at its foot, each with why', () => {
+    render(<Candidates board={HIRING_BOARD} request={filled} can={{ create: true, edit: true, approve: true }} talentPage />)
+    expect(screen.getByText('Candidates · 1')).toBeInTheDocument()
+    expect(screen.getByText('Siti Aisyah')).toBeInTheDocument()
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    const fold = screen.getByRole('button', { name: /Not selected · 1/ })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(fold)
+    expect(fold).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Nur Iman')).toBeInTheDocument()
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    // Their ⋯ opens them in the bank — or brings them back.
+    fireEvent.click(screen.getByRole('button', { name: 'More for Nur Iman' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Open in Talent Bank/ }))
+    expect(push).toHaveBeenCalledWith('/hiring/talent/T-104')
+  })
+
+  it('Change status ▸ Not selected asks why — the one their stage says first — and keeps them in the bank', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Not selected/ }))
+    expect(actions.setCandidateStage).not.toHaveBeenCalled()
+    const why = within(screen.getByRole('group', { name: 'Why not selected' }))
+    expect(why.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Failed interview', 'Not shortlisted', 'Not right now', 'Declined offer', 'Other'])
+    fireEvent.click(why.getByRole('menuitem', { name: 'Not right now' }))
+    await waitFor(() => expect(actions.setCandidateStage).toHaveBeenCalledWith(daniel.id, 'rejected', 'not_right_now'))
+    expect(flash).toHaveBeenCalledWith('Daniel Lee → Not selected · kept in Talent Bank')
+  })
+
+  it('any other status is set at once, as before', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Offered/ }))
+    await waitFor(() => expect(actions.setCandidateStage).toHaveBeenCalledWith(daniel.id, 'offered', undefined))
+    expect(flash).toHaveBeenCalledWith('Daniel Lee → Offered')
+  })
+
+  it('Edit details › Status Not selected asks why too, and sends it', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Edit details/ }))
+    const win = within(screen.getByRole('dialog', { name: 'Edit candidate' }))
+    expect(win.queryByLabelText('Why not selected')).toBeNull()
+    fireEvent.change(win.getByLabelText('Status'), { target: { value: 'rejected' } })
+    const why = win.getByLabelText('Why not selected') as HTMLSelectElement
+    expect(why.value).toBe('failed_interview')
+    fireEvent.change(why, { target: { value: 'declined_offer' } })
+    fireEvent.click(win.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(actions.saveHiringCandidate).toHaveBeenCalled())
+    const form = actions.saveHiringCandidate.mock.calls[0][0] as FormData
+    expect([form.get('stage'), form.get('reason')]).toEqual(['rejected', 'declined_offer'])
+    expect(flash).toHaveBeenCalledWith('Daniel Lee saved · kept in Talent Bank')
+  })
+})
+
 // The user (2026-10-12): at the foot of a request the + menu ran off the page, and the page would not
 // scroll to it. happy-dom lays nothing out, so every box sits at 700–730 of a 760px window and a menu
 // 80px tall sits 6px under it — or, turned over, 6px above (`menu-place.ts`, unit-tested there).

@@ -8,7 +8,7 @@ import {
   acknowledgeHiringRequest, cancelHiringRequest, declineHiringRequest, fillHiringRequest, removeHiringTalent, requestHiringInfo,
   saveHiringCandidate, saveTalentNotes, setCandidateStage, submitHiringRequest,
 } from '@/lib/hiring/actions'
-import type { CandidateStage } from '@/lib/hiring/types'
+import type { CandidateStage, TalentReason } from '@/lib/hiring/types'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
 import { decideRequest } from '@/lib/attendance/actions'
 import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
@@ -56,8 +56,9 @@ export async function hrAppFill(id: string, hired: string, source: string, cost:
   return (await may('hireApprove')) ? done(await fillHiringRequest(id, { hired: [hired], source, cost, note: '' })) : { ok: false, reason: SHUT }
 }
 
-export async function hrAppCandidateStage(candidate: string, stage: CandidateStage): Promise<Act> {
-  return (await may('hireEdit')) ? done(await setCandidateStage(candidate, stage)) : { ok: false, reason: SHUT }
+/** A candidate's status; Not selected keeps them in the Talent Bank with the reason tapped (2026-10-24). */
+export async function hrAppCandidateStage(candidate: string, stage: CandidateStage, reason?: TalentReason): Promise<Act> {
+  return (await may('hireEdit')) ? done(await setCandidateStage(candidate, stage, reason)) : { ok: false, reason: SHUT }
 }
 
 /** The handoff's New candidate: name, phone, a note — shortlisted, as Applied. */
