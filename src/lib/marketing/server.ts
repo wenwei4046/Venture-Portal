@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
 import { chatListFromRow, type ChatList } from './chat'
+import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
@@ -140,6 +141,16 @@ export async function readChatList(): Promise<ChatList> {
   const { data, error } = await db.rpc('mkt_chat_list')
   if (error) throw new Error(error.message)
   return chatListFromRow(data)
+}
+
+/** Chat review (⑦-3b, mig 20261025040000): the people whose chat may be opened and every record — a full-access title's
+ * own login only. Null for anybody else (the page is not theirs). */
+export async function readChatReviewLog(): Promise<ChatReviewLog | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_chat_review_log')
+  if (error?.code === '42501') return null
+  if (error) throw new Error(error.message)
+  return reviewLogFromRow(data)
 }
 
 /** The lobby (⑦-4, mig 20261025038000): the pets of Marketing's roster — those with a login and their pet set up. */

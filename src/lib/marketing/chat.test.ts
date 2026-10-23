@@ -28,7 +28,13 @@ describe('read from the database', () => {
     expect(list.dms.map(d => [d.first, d.title, d.avatarPath, d.last?.project?.track ?? null, d.unread])).toEqual([
       ['Mei', 'VIDEOGRAPHER', 'space/a/me.png', 'TSK-CAR-2610-004', true], ['Siti', null, null, null, false],
     ])
-    expect(chatListFromRow(null)).toEqual({ me: null, lobby: { last: null, unread: false }, dms: [] })
+    expect(chatListFromRow(null)).toEqual({ me: null, reviewer: false, lobby: { last: null, unread: false }, dms: [] })
+  })
+
+  it('a full-access title’s own login may open a chat on a complaint (⑦-3b) — only when the database says so, in so many words', () => {
+    expect(chatListFromRow({ me: null, reviewer: true }).reviewer).toBe(true)
+    expect(chatListFromRow({ me: ALI, reviewer: 'yes' }).reviewer).toBe(false)
+    expect(chatListFromRow({ me: ALI }).reviewer).toBe(false)
   })
 
   it('a message has words or a task — or it is no message; a thread, oldest first, whether more remain', () => {
