@@ -30,7 +30,7 @@ export function overviewVM(ctx: PanelCtx) {
   const row = (id: string, name: string, who: string, c: string, ids: string[], people: typeof teams[number]["people"], tints: [string, string]) => {
     const s = ofStaff(ids), canOpen = people.length > 0, open = !!ui.openT[id];
     return {
-      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due),
+      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due), won: pct(s.won, s.leads),
       canOpen, open: canOpen && open, rot: open ? "90deg" : "0deg", cur: canOpen ? "pointer" : "default",
       toggle: canOpen ? () => set(u => ({ ...u, openT: { ...u.openT, [id]: !open } })) : undefined,
       people: people.map(p => {

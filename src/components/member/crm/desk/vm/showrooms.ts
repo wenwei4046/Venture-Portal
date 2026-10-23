@@ -96,7 +96,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     const results = await Promise.all(targets.map(r => {
       const mine = r.id === en, base = draftOf(r);
       const d: SrDraft = mine ? dr : { ...base, limit: dr.limit, times: [...dr.times], off: { ...dr.off }, blocks: [...dr.blocks], weekDays: [...dr.weekDays] };
-      return ctx.act.saveRoom(roomOf(d)).then(ok => ok && mine ? ctx.deskAct.saveShowroomExtras(r.id, { photo: dr.photoFile, removePhoto: !dr.photo && !!r.photo, gmap: dr.manual ? dr.gmap : "", waze: dr.manual ? dr.waze : "" }) : ok)
+      return ctx.act.saveRoom(roomOf(d)).then(id => !!id).then(ok => ok && mine ? ctx.deskAct.saveShowroomExtras(r.id, { photo: dr.photoFile, removePhoto: !dr.photo && !!r.photo, gmap: dr.manual ? dr.gmap : "", waze: dr.manual ? dr.waze : "" }) : ok)
         .then(ok => ok && mine && (dr.remarks ?? "") !== (r.remarks ?? "") ? ctx.deskAct.saveRoomRemarks(r.id, dr.remarks) : ok);
     }));
     if (results.every(Boolean)) patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });

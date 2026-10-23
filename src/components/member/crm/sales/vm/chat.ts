@@ -353,7 +353,7 @@ export function chatVM(ctx: SalesCtx) {
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
     book = {
       ...book, bookOpen: true,
-      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-cream)" : "#fff", dot: b.room === i ? RUST : "transparent",
+      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-sel)" : "#fff", dot: b.room === i ? RUST : "transparent",
         pick: () => put({ room: i, slot: null, ...(roomClosed(r, b.day) ? { day: firstOpenDay(i, T) } : {}) }) })),
       monthLabel: gb(dd, { month: "short", year: "numeric" }), monthOpen: !!b.monthOpen,
       toggleMonth: () => put({ monthOpen: !b.monthOpen, pickYear: dd.getFullYear() }),

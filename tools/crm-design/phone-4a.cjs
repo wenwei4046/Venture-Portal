@@ -38,7 +38,7 @@ function inbox(body) {
     `<h1 style={{ flex: "1 0 auto", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Inbox</h1>`, "inbox title");
   // All ads leaves the title row for the search row (M01: "All ads ▾ + search").
   body = swap(body, '<span onClick={v.openAd} style={{', "span", "", "inbox ad pill");
-  const adPill = `<span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "${F(13)}", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-cream)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span>`;
+  const adPill = `<span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "${F(13)}", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-sel)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span>`;
   body = swap(body, '<label style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px"', "label", s => {
     s = once(s, 'style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "22px", background: "var(--crm-field)", color: "var(--crm-muted)" }}',
       'style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", boxSizing: "border-box", borderRadius: "20px", background: "var(--crm-field)", color: "var(--crm-faint)" }}', "search box");
@@ -130,7 +130,7 @@ function chat(body, v) {
 
 
 /** Change list 20 · Profile keeps the Revenue app Profile's structure (§6.8) in 4a's look: a stronger radial orange glow,
- * a rust avatar, the workspace rows' icons rust on the pale orange. `rows` is how many workspace icons follow the glow. */
+ * a rust avatar, the workspace rows' icons white on solid rust (v3 M12 / T06). `rows` is how many workspace icons follow the glow. */
 function profile(body, rows) {
   const G = 'background: "linear-gradient(180deg, var(--crm-peach) 0%, var(--crm-peach-soft) 70%, var(--crm-page) 100%) top / 100% 150px no-repeat"';
   const at = body.indexOf('<div data-prof-glow="1"');
@@ -140,7 +140,7 @@ function profile(body, rows) {
   rest = once(rest.slice(0, 4000), 'width: "56px", height: "56px", borderRadius: "50%", background: "var(--crm-ink)"', 'width: "56px", height: "56px", borderRadius: "50%", background: "var(--crm-rust)"', "profile avatar") + rest.slice(4000);
   const re = /width: "52px", height: "52px", borderRadius: "50%", background: "var\(--crm-[a-z-]+\)", color: "var\(--crm-[a-z-]+\)", display: "grid", placeItems: "center" \}\}>/g;
   let n = 0;
-  rest = rest.replace(re, m => (n++ < rows ? 'width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>' : m));
+  rest = rest.replace(re, m => (n++ < rows ? 'width: "52px", height: "52px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center" }}>' : m));
   if (n < rows) throw new Error(`phone-4a: profile rows ${n} < ${rows}`);
   return head + rest;
 }
@@ -235,10 +235,10 @@ function panelChat(body) {
   body = body.slice(0, row + rowEnd) + "<Phone4aStrip s={v.ld.ld.strip} />" + body.slice(row + rowEnd);
   body = once(body, '<span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "5px 12px", borderRadius: "9px", background: "var(--crm-page)", boxShadow: "0 1px 1px rgba(42,22,12,.10)", color: "var(--crm-ink)", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600" }}>{m.sep}</span>',
     `<span style={{ alignSelf: "center", margin: "4px 0 2px", padding: "4px 10px", borderRadius: "12px", background: "rgba(255,255,255,.7)", color: "var(--crm-muted)", fontSize: "${F(12)}", fontWeight: "500", letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.sep}</span>`, "team chat day");
-  // 4a (M04): a plain cream wall, as Mine's (sales/wall.ts).
+  // v3: the wall is #F7F3EF (--crm-field), as Mine's (sales/wall.ts).
   const wall = /backgroundColor: "var\(--crm-cream\)", backgroundImage: "url\('data:image\/svg\+xml[^"]*", backgroundSize: "240px 240px"/;
   if (!wall.test(body)) throw new Error("phone-4a: team chat wall");
-  body = body.replace(wall, 'backgroundColor: "var(--crm-cream)"');
+  body = body.replace(wall, 'backgroundColor: "var(--crm-field)"');
   // M04: the message words 15 px (the frame), as Mine's chat (vm/chat.ts).
   body = once(body, 'fontSize: "calc(14px * var(--rv-type, 1))", lineHeight: "1.45" }}>{m.text}</p>', `fontSize: "${F(15)}", lineHeight: "1.45" }}>{m.text}</p>`, "panel bubble words");
   // M04: the Team chat's header as Mine's — the name 16 px / 600, its line 12 px (the owner, 2026-10-18).
@@ -256,17 +256,15 @@ function panelChat(body) {
  * performance as a list (a team opens to its people as before). The Comparison card shows once a period is picked. */
 function teamInsight(body) {
   const H = '<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "0 4px" }}>';
-  body = swap(body, H, "div", s => {
-    const bell = s.includes("{!!(v.bellIn)") ? s.slice(s.indexOf("{!!(v.bellIn) && (<>"), s.indexOf("{!!(v.houseOv)")) : "";
-    return `<div style={{ flex: "none", display: "flex", alignItems: "center", gap: "12px" }}><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}><h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(22)}", fontWeight: "500", letterSpacing: "-0.02em", lineHeight: "1.2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ov.greet}</h1><span style={{ fontSize: "${F(13)}", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ov.meTitle} · {v.accessLbl}</span></span>${bell}{!!(v.houseOv) && (<span onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ${ROUND} }}><Ic name="house" size={18} /></span>)}<span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", display: "grid", placeItems: "center", fontFamily: "${TIGHT}", fontSize: "${F(15)}", fontWeight: "500" }}>{v.ov.meIni}</span></div>`;
-  }, "team insight head");
+  // v3 T01: the avatar left, the greeting, the house right, then Team performance | Ads performance (shared/phone4a.tsx).
+  body = swap(body, H, "div", "<Phone4aTeamHead h={v.th} />", "team insight head");
   // "vs Sep" on the period card: it picks the period the hero compares with (production's Comparison).
   const pc = body.indexOf('<div onClick={v.ov.ovOpenPeriod}');
   const chev = body.indexOf('<svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16"', pc);
   if (pc < 0 || chev < 0) throw new Error("phone-4a: team period card");
   const [, ce] = el(body.slice(chev, chev + 600), '<svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16"', "svg", "team period chevron");
   body = body.slice(0, chev + ce) + `<span onClick={e => { e.stopPropagation(); v.ov.cmpPick(); }} style={{ flex: "none", height: "32px", padding: "0 12px", borderRadius: "16px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: "${F(13)}", fontWeight: "500", cursor: "pointer" }}>{v.ov.vsLabel}</span>` + body.slice(chev + ce);
-  body = swap(body, '<div style={{ flex: "none", padding: "24px 22px", borderRadius: "26px", background: "linear-gradient(150deg, var(--crm-orange) 0%, var(--crm-orange) 45%, var(--crm-rust) 100%)"', "div", "<Phone4aHero items={v.ov.hero4} cols={2} />", "team hero");
+  body = swap(body, '<div style={{ flex: "none", padding: "24px 22px", borderRadius: "26px", background: "linear-gradient(150deg, var(--crm-orange) 0%, var(--crm-orange) 45%, var(--crm-rust) 100%)"', "div", "<Phone4aHero items={v.ov.hero4} cols={2} compact />", "team hero");
   body = once(body, "{!!(v.ov.cmpOn) && (<>", "{!!(v.ov.cmpOn && v.ov.cmpHas) && (<>", "team comparison");
   body = once(body, '<h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Team performance</h2>',
     `<div style={{ flex: "none", display: "flex", alignItems: "baseline", gap: "10px", margin: "4px 0 -14px" }}><h2 style={{ flex: "1", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(19)}", fontWeight: "500", letterSpacing: "-0.01em" }}>Team performance</h2><span style={{ fontSize: "${F(13)}", color: "var(--crm-muted)" }}>Tap a team for its people</span></div>`, "team perf title");
@@ -275,9 +273,11 @@ function teamInsight(body) {
   body = swap(body, '<div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px", gap: "6px", alignItems: "baseline", paddingBottom: "6px" }}>', "div", "", "team perf header");
   body = once(body, '<div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', '<div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', "team row rule");
   body = swap(body, '<div onClick={t.toggle} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px"', "div",
-    `<div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "11px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: "0" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "${F(15)}", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0", fontSize: "${F(14)}", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: \`rotate(\${t.rot})\`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", paddingLeft: "17px", fontSize: "${F(12.5)}", color: "var(--crm-muted)" }}><span>Leads <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "500", color: "var(--crm-ink)" }}>{t.show}</b></span></span></div>`, "team row");
+    `<div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "11px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: "0" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "${F(15)}", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0", fontSize: "${F(14)}", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: \`rotate(\${t.rot})\`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", columnGap: "8px", paddingLeft: "17px", fontSize: "${F(12)}", color: "var(--crm-muted)", whiteSpace: "nowrap" }}><span>Leads <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.show}</b></span><span>Won <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.won}</b></span></span></div>`, "team row");
   // The owner, 2026-10-18 (circled "Own customers · PETER", "TL ANTHONY"): no line after a team's name.
   body = once(body, '<span style={{ flex: "1", minWidth: "0", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>', '<span style={{ flex: "1", minWidth: "0" }} />', "team who");
+  body = once(body, '<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>',
+    '{v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>)}', "ads under insight head");
   return body;
 }
 
@@ -399,6 +399,20 @@ function teamSplit(body) {
     const head = b.lastIndexOf("<strong", from);
     b = b.slice(0, head) + b.slice(head, from).replace('fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "700"', 'fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "600"') + mid + b.slice(to);
   }
+  // v3 T04: By team is a row a team (dot, name, line, 84px decimal box, the slider under it); a team opens to its member
+  // breakdown, results only, with Adjust split → T04b's sheet (shared/phone4a.tsx). Everything above still runs first, so
+  // the markup it replaces is checked before it goes.
+  {
+    const i = b.indexOf("{!!(v.as.ae.isSplit) && (<>"), j = b.indexOf("{(v.bp.inner).map((g, g_i) => (<Fragment key={g_i}>", i);
+    if (i < 0 || j < 0) throw new Error("phone-4a: by team body");
+    const [, je] = el(b.slice(j), "{(v.bp.inner).map((g, g_i) => (<Fragment key={g_i}>", "Fragment", "by team inner");
+    const close = b.indexOf("))}", j + je);
+    if (close < 0 || close - (j + je) > 40) throw new Error("phone-4a: by team inner end");
+    b = b.slice(0, i) + "{!!(v.as.ae.isSplit) && (<><Phone4aSplitTeams s={v.as.ae} inner={v.bp.inner} enterNext={v.enterNext} />" + b.slice(close + 3);
+    const f = b.indexOf('<div style={{ flex: "none", padding: "12px 20px 26px"');
+    if (f < 0) throw new Error("phone-4a: split foot for sheet");
+    b = b.slice(0, f) + "{!!(v.bp.sheet) && (<Phone4aAdjustSheet s={v.bp.sheet} />)}" + b.slice(f);
+  }
   return body.slice(0, at) + b;
 }
 
@@ -424,7 +438,29 @@ function teamCalendar(body) {
   b = once(b, '<strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650" }}>{a.name}</strong>\n                    <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)",',
     `<strong style={{ fontSize: "${F(17)}", fontWeight: "500" }}>{a.name}</strong>\n                    <small style={{ fontSize: "${F(14)}", color: "var(--crm-muted)",`, "team cal name");
   b = once(b, '<span style={{ flex: "none", padding: "3px 8px", borderRadius: "6px", background: a.sBg, color: a.sFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700" }}>{a.status}</span>',
-    `<span style={{ flex: "none", color: a.sFg, fontSize: "${F(14)}", fontWeight: "500" }}>{a.status}</span>`, "team cal state");
+    `<span style={{ flex: "none", color: a.sFg, fontSize: "${F(13)}", fontWeight: "500" }}>{a.status}</span>`, "team cal state");
+  // v3 T05: the summary card a step quieter — 16px radius, a ring per team, the name column 118px, the bars peach.
+  b = once(b, 'padding: "18px", borderRadius: "22px", background: "linear-gradient(155deg, var(--crm-ink) 0%, var(--crm-ink) 60%)", boxShadow: "0 10px 24px rgba(42,22,12,.22)", color: "#fff", display: "flex", flexDirection: "column", gap: "14px" }}>',
+    'padding: "16px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", display: "flex", flexDirection: "column", gap: "12px" }}>', "team cal summary");
+  b = once(b, '<strong style={{ fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>',
+    `<strong style={{ fontFamily: "${TIGHT}", fontSize: "${F(22)}", fontWeight: "500", fontVariantNumeric: "tabular-nums", color: s.fg }}>{s.v}</strong>`, "team cal stat");
+  b = once(b, '<div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>\n                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-rule-soft)" }}>{b.name}</span>',
+    `<div style={{ display: "grid", gridTemplateColumns: "118px minmax(0, 1fr) 54px", alignItems: "center", gap: "10px" }}>\n                  <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: "0", fontSize: "${F(12)}", fontWeight: "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ flex: "none", width: "9px", height: "9px", boxSizing: "border-box", borderRadius: "50%", border: \`2px solid \${b.c}\` }} />{b.name}</span>`, "team cal bar name");
+  b = once(b, '<span style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,.12)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "4px", background: b.c }}>',
+    '<span style={{ height: "6px", borderRadius: "3px", background: "rgba(255,255,255,.14)", overflow: "hidden" }}>\n                    <i style={{ display: "block", height: "100%", width: b.w, borderRadius: "3px", background: "var(--crm-peach)" }}>', "team cal bar");
+  // v3 T05: the list — "Today  Sun 18 Oct · 5 visits", compact cards, no chevron.
+  b = swap(b, `<span style={{ padding: "6px 2px 2px", fontFamily: "${TIGHT}", fontSize: "${F(18)}", fontWeight: "500", color: d.color }}>{d.day}</span>`, "span",
+    `<span style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "8px 2px 0" }}><span style={{ fontFamily: "${TIGHT}", fontSize: "${F(17)}", fontWeight: "500", color: "var(--crm-ink)" }}>{d.head}</span><span style={{ fontSize: "${F(12)}", color: "var(--crm-faint)" }}>{d.sub}</span></span>`, "team cal day head v3");
+  b = once(b, '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", cursor: "pointer" }}>',
+    '<div onClick={a.open} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "14px", border: "1px solid var(--crm-rule)", background: "#fff", cursor: "pointer" }}>', "team cal item v3");
+  b = once(b, '<span style={{ flex: "none", width: "4px", alignSelf: "stretch", borderRadius: "2px", background: a.tc }}>', '<span style={{ flex: "none", width: "3px", height: "34px", borderRadius: "2px", background: a.tc }}>', "team cal bar v3");
+  b = once(b, `<strong style={{ fontSize: "${F(17)}", fontWeight: "500" }}>{a.name}</strong>`, `<strong style={{ fontSize: "${F(15)}", fontWeight: "500" }}>{a.name}</strong>`, "team cal name v3");
+  b = once(b, `<small style={{ fontSize: "${F(14)}", color: "var(--crm-muted)",`, `<small style={{ fontSize: "${F(12)}", color: "var(--crm-muted)",`, "team cal sub v3");
+  {
+    const i = b.indexOf("{a.status}</span>"), sv = b.indexOf("<svg", i), se = b.indexOf("</svg>", sv);
+    if (i < 0 || sv < 0 || sv - i > 200) throw new Error("phone-4a: team cal chevron");
+    b = b.slice(0, sv) + b.slice(se + 6);
+  }
   return body.slice(0, at) + b;
 }
 
@@ -440,7 +476,7 @@ function teamRooms(body) {
   const a = body.indexOf('{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "inline-flex", alignItems: "center", height: "40px"');
   const b = body.indexOf('<span onClick={v.rm.rmAdd}', a), c = body.indexOf('</span></div>', b);
   if (a < 0 || b < 0 || c < 0) throw new Error("phone-4a: rooms pager");
-  body = body.slice(0, a) + `{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ ${ROUND36}, opacity: v.rm.rmPrevOp }}><Ic name="chevron-left" size={16} /></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "${F(15)}", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ ${ROUND36}, opacity: v.rm.rmNextOp }}><Ic name="chevron-right" size={16} /></span></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><Ic name="plus" size={20} /></span>` + body.slice(c + "</span>".length);
+  body = body.slice(0, a) + `{!!(v.rm.rmPager) && (<span style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}><span onClick={v.rm.rmPrev} role="button" aria-label="Previous showroom" style={{ ${ROUND36}, opacity: v.rm.rmPrevOp }}><Ic name="chevron-left" size={16} /></span><span style={{ minWidth: "34px", textAlign: "center", fontSize: "${F(15)}", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.rm.rmPos}</span><span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ ${ROUND36}, opacity: v.rm.rmNextOp }}><Ic name="chevron-right" size={16} /></span></span>)}{!!(v.rm.rmCanDel) && (<span onClick={v.rm.rmDelCur} role="button" aria-label="Delete showroom" title="Delete showroom" style={{ ${ROUND36.replace('color: "var(--crm-ink)"', 'color: "var(--crm-oxblood)"')} }}><Ic name="trash-2" size={16} /></span>)}<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}><Ic name="plus" size={20} /></span>` + body.slice(c + "</span>".length);
   return body;
 }
 
@@ -464,16 +500,12 @@ function panel(body) {
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
   body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
-  body = once(body, '<input type="range" min="0" max="100" step="5" value={r.v} onChange={r.set} style={{ width: "100%", margin: "0", accentColor: r.c }} />',
-    '<input type="range" data-crm-range="" min="0" max="100" step="5" value={r.range} onChange={r.set} style={{ width: "100%", height: "8px", margin: "0", appearance: "none", WebkitAppearance: "none", borderRadius: "4px", border: "1px solid var(--crm-line)", boxSizing: "border-box", background: `linear-gradient(to right, ${r.c} ${r.range}%, #fff ${r.range}%)`, ["--thumb" as string]: r.c }} />', "split slider");
-  // A team's share is typed to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00"): the decimal keypad and room for "33.33".
-  body = once(body, 'inputMode="numeric" pattern="[0-9]*" value={r.v} onChange={r.setN}', 'inputMode="decimal" value={r.v} onChange={r.setN}', "split share decimal");
-  { const i = body.indexOf('inputMode="decimal" value={r.v} onChange={r.setN}'), w = body.indexOf('width: "30px"', i);
-    if (w < 0 || w - i > 400) throw new Error("phone-4a: split share width");
-    body = body.slice(0, w) + 'width: "54px"' + body.slice(w + 'width: "30px"'.length); }
+  // The team split's slider and 84px decimal box are Phone4aSplitTeams' own since v3 T04 (teamSplit).
   body = teamRooms(body);
   // T07 · Showrooms: the title in 4a's face (the page keeps production's card and Edit — see CHECKLIST).
-  body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.15" }}>Showrooms</h1>`, "showrooms title");
+  // v3 T07: "‹ Showrooms" is the title (the "‹ Profile" line above it goes); the trash for the showroom on screen sits before +.
+  body = swap(body, '<span onClick={v.rm.closeRooms} style={{ flex: "none", alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "6px", height: "44px"', "span", "", "showrooms profile back");
+  body = once(body, '<h1 style={{ flex: "1", minWidth: "0", margin: "0", fontSize: "calc(30px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.15" }}>Showrooms</h1>', `<h1 style={{ flex: "1", minWidth: "0", margin: "0", display: "flex", alignItems: "center", gap: "8px", fontFamily: "${TIGHT}", fontSize: "${F(26)}", fontWeight: "500", letterSpacing: "-0.02em", lineHeight: "1.15" }}><span onClick={v.rm.closeRooms} role="button" aria-label="Back to Profile" style={{ display: "flex", marginLeft: "-4px", cursor: "pointer" }}><Ic name="chevron-left" size={24} /></span>Showrooms</h1>`, "showrooms title");
   // The owner, 2026-10-18: Member work type is Assignment's Work type tab; its row on Profile goes.
   { const a = body.indexOf('<div onClick={v.fts.openPage}'); if (a < 0) throw new Error("phone-4a: work type row");
     const [x, y] = el(body.slice(a, a + 4000), '<div onClick={v.fts.openPage}', "div", "work type row"); body = body.slice(0, a + x) + body.slice(a + y); }
