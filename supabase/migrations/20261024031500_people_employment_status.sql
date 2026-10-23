@@ -60,8 +60,7 @@ ALTER TABLE public.hr_staff_costs ADD CONSTRAINT hr_staff_costs_probation_ack_na
   CHECK (probation_ack_name IS NULL OR length(probation_ack_name) <= 200);
 
 -- Every column of a staff row but the private three is authenticated's to read (mig 20261009050100).
-GRANT SELECT (employment_status, probation_months, probation_end, probation_ack_end, probation_ack_by, probation_ack_name, probation_ack_at)
-  ON public.hr_staff_costs TO authenticated;
+GRANT SELECT (employment_status, probation_months, probation_end, probation_ack_end, probation_ack_by, probation_ack_name, probation_ack_at) ON public.hr_staff_costs TO authenticated;
 
 -- ── The acknowledgement is probation_acknowledge()'s alone ──────────────────
 -- Off probation (and on a new row) it is cleared; on probation it changes only inside probation_acknowledge, which

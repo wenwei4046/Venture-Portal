@@ -6,6 +6,7 @@
  */
 
 import { staffCodeNumber } from './staff-codes'
+import type { EmploymentStatus } from './employment-status'
 
 export type RosterStatus = 'active' | 'inactive' | 'all'
 
@@ -99,8 +100,8 @@ export type RosterSort = { key: RosterSortKey; dir: 'asc' | 'desc' }
 
 /**
  * Which way a column reads when first pressed: names A→Z; the most senior
- * title and rank first; codes from HV001; the most incomplete record first;
- * the latest sign-in first. Pressed again, the other way.
+ * title and rank first; codes from HV001; probation first, the latest hire
+ * first; the latest sign-in first. Pressed again, the other way.
  */
 export const FIRST_WAY: Readonly<Record<RosterSortKey, RosterSort['dir']>> = {
   name: 'asc',
@@ -125,7 +126,14 @@ export interface SortablePerson extends RosterPerson {
   rankLabel?: string | null
   rankRate?: number | null
   lastSeenAt: string | null
+  /** Probation, Permanent or Part time (2026-10-23); null not set; absent for a reader not shown it. */
+  employmentStatus?: EmploymentStatus | null
+  hireDate?: string | null
 }
+
+/** Where the Employment column puts somebody: on probation first — a review is coming — then part time, permanent, not set, inactive. */
+const EMPLOYMENT_RANK: Readonly<Record<EmploymentStatus, number>> = { probation: 4, part_time: 3, permanent: 2 }
+const employmentRank = (p: SortablePerson) => (!p.active ? 0 : p.employmentStatus ? EMPLOYMENT_RANK[p.employmentStatus] : 1)
 
 /**
  * How senior a commission rank reads: SS above S above A, then B, C … — the
@@ -147,8 +155,8 @@ const SORT_VALUE: Readonly<Record<RosterSortKey, (p: SortablePerson) => number |
   title: p => p.levelRank,
   rank: p => rankSeniority(p.rankLabel, p.rankRate),
   code: p => staffCodeNumber(p.code),
-  // Active above inactive, then the most missing: the records that need HR first.
-  employment: p => (p.active ? 1000 : 0) + p.missing.length,
+  // What the column shows (2026-10-23): the status, then the hire date — the latest hire first inside each.
+  employment: p => `${employmentRank(p)}|${p.hireDate ?? '0000-00-00'}`,
   seen: p => (p.lastSeenAt ? Date.parse(p.lastSeenAt) : null),
 }
 

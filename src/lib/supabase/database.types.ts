@@ -4423,6 +4423,13 @@ export type Database = {
           infotech_code: string | null
           employee_name: string
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status: string | null
+          probation_ack_at: string | null
+          probation_ack_by: string | null
+          probation_ack_end: string | null
+          probation_ack_name: string | null
+          probation_end: string | null
+          probation_months: number | null
           epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
           first_name: string | null
@@ -4475,6 +4482,12 @@ export type Database = {
           infotech_code?: string | null
           employee_name: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status?: string | null
+          probation_ack_at?: string | null
+          probation_ack_by?: string | null
+          probation_ack_end?: string | null
+          probation_ack_name?: string | null
+          probation_months?: number | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null
@@ -4527,6 +4540,12 @@ export type Database = {
           infotech_code?: string | null
           employee_name?: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status?: string | null
+          probation_ack_at?: string | null
+          probation_ack_by?: string | null
+          probation_ack_end?: string | null
+          probation_ack_name?: string | null
+          probation_months?: number | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null

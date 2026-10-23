@@ -8,6 +8,15 @@ import { flash } from '@/components/hrv/toast'
 import { BANK_NAMES } from '@/lib/banks'
 import { revenuePath } from '@/lib/revenue'
 import { defaultHireDate, missingFields, transferBanner, transferRefusal, type TransferInput, type WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
+import {
+  DEFAULT_PROBATION_MONTHS,
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABEL,
+  PROBATION_MONTH_CHOICES,
+  dayLabel,
+  monthsLabel,
+  probationEnd,
+} from '@/lib/employment-status'
 import { transferFromWaitingList } from '../../waiting-transfer-actions'
 import type { TransferChoice } from '../_lib/waiting-transfer'
 import s from './waiting-transfer.module.css'
@@ -41,6 +50,9 @@ export default function WaitingTransferForm({
   const [titleId, setTitleId] = useState(titles[0]?.id ?? '')
   const [reportsTo, setReportsTo] = useState<string | null>(managers.find(m => m.submittedIt)?.id ?? null)
   const [hireDate, setHireDate] = useState(defaultHireDate(facts.start, today))
+  // Probation, Permanent or Part time (2026-10-23) — asked as on Add Staff; a probation with its period.
+  const [employmentStatus, setEmploymentStatus] = useState('')
+  const [probationMonths, setProbationMonths] = useState<number>(DEFAULT_PROBATION_MONTHS)
   const [nric, setNric] = useState('')
   const [phone, setPhone] = useState(facts.contact ?? '')
   const [email, setEmail] = useState('')
@@ -54,7 +66,9 @@ export default function WaitingTransferForm({
   const backHref = `${revenuePath(subSlug, 'hierarchy')}?tab=waiting`
   const input: TransferInput = {
     requestId: facts.requestId, name, titleId, reportsTo, hireDate, nric, bankName, bankAccountNo: account, contact: phone, email,
+    employmentStatus, probationMonths: employmentStatus === 'probation' ? probationMonths : null,
   }
+  const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, probationMonths) : null
   const missing = tried ? new Set(missingFields(input)) : new Set<string>()
 
   async function add() {
@@ -122,6 +136,29 @@ export default function WaitingTransferForm({
 
             <label className={s.label} htmlFor="transfer-hire">Hire date</label>
             <input id="transfer-hire" type="date" className={s.date} value={hireDate} onChange={e => setHireDate(e.target.value)} />
+
+            <span className={s.label} id="transfer-status">Employment status</span>
+            <div className={s.choices} role="group" aria-labelledby="transfer-status">
+              {EMPLOYMENT_STATUSES.map(st => (
+                <button key={st} type="button" className={hv.choice} aria-pressed={employmentStatus === st} onClick={() => setEmploymentStatus(st)}>
+                  {EMPLOYMENT_STATUS_LABEL[st]}
+                </button>
+              ))}
+            </div>
+
+            {employmentStatus === 'probation' ? (
+              <>
+                <span className={s.label} id="transfer-probation">Probation period</span>
+                <div className={s.choices} role="group" aria-labelledby="transfer-probation">
+                  {PROBATION_MONTH_CHOICES.map(n => (
+                    <button key={n} type="button" className={hv.choice} aria-pressed={probationMonths === n} onClick={() => setProbationMonths(n)}>
+                      {monthsLabel(n)}
+                    </button>
+                  ))}
+                  {probationEnds ? <span className={s.basisNote}>ends {dayLabel(probationEnds)}</span> : null}
+                </div>
+              </>
+            ) : null}
 
             <span className={s.label}>Pay basis</span>
             <span>

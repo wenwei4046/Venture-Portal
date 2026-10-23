@@ -6,6 +6,7 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { sees } from '@/lib/sensitive'
 import { accountDigits, nricDigits, transferErrorWords, transferRefusal, type TransferInput } from '@/lib/commission/waiting-transfer'
+import { statusColumns } from '@/lib/employment-status'
 
 export type TransferOutcome = { ok: true; staffId: string; code: string | null } | { ok: false; reason: string }
 
@@ -34,6 +35,8 @@ export async function transferFromWaitingList(input: TransferInput): Promise<Tra
   }
   const refused = transferRefusal(input)
   if (refused) return { ok: false, reason: refused }
+  // Probation, Permanent or Part time, a probation with its period (2026-10-23) — filed on the same insert.
+  const status = statusColumns(input.employmentStatus, input.probationMonths)
 
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.rpc('member_transfer_waiting', {
@@ -47,6 +50,8 @@ export async function transferFromWaitingList(input: TransferInput): Promise<Tra
     p_bank_account_no: accountDigits(input.bankAccountNo),
     p_contact: input.contact.trim() || null,
     p_email: input.email.trim() || null,
+    p_employment_status: status.employment_status,
+    p_probation_months: status.probation_months,
   })
   if (error) return { ok: false, reason: transferErrorWords(error) }
   const answer = (data ?? {}) as { staffId?: unknown; code?: unknown }

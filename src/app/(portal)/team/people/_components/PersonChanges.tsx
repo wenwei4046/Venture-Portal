@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import type { CardLadder } from '../card-actions'
 import Promotion from './Promotion'
-import Employment from './Employment'
+import Employment, { type ProbationFacts } from './Employment'
 import w from '../../_components/person-well.module.css'
 
 /**
@@ -19,6 +19,8 @@ export default function PersonChanges({
   department,
   ladder,
   active,
+  probation = null,
+  today,
 }: {
   personId: string
   personName: string
@@ -26,6 +28,10 @@ export default function PersonChanges({
   department: string | null
   ladder: CardLadder
   active: boolean
+  /** On probation (2026-10-23): its end and its reminder — Employment offers the next step. */
+  probation?: ProbationFacts | null
+  /** The office's today (YYYY-MM-DD). */
+  today: string
 }) {
   const router = useRouter()
   const done = () => router.refresh()
@@ -35,7 +41,7 @@ export default function PersonChanges({
       {active ? (
         <Promotion personId={personId} personName={personName} title={title} department={department} ladder={ladder} onDone={done} />
       ) : null}
-      <Employment personId={personId} personName={personName} active={active} onDone={done} />
+      <Employment personId={personId} personName={personName} active={active} probation={probation} today={today} onDone={done} />
     </div>
   )
 }

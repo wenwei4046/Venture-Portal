@@ -237,3 +237,50 @@ describe('a column head sorts each band', () => {
     expect(order()).toEqual(['LOO WEN WEI', 'bella', 'Ann', 'Wendy', 'Cara'])
   })
 })
+
+// 2026-10-23 — the user, circling the Employment chip: "for the employment status, i want go with permenant, part time
+// and probation status follow by the hire date start".
+describe('the Employment column', () => {
+  const roster: PersonRow[] = [
+    row({ id: 'p', name: 'Zack', code: 'HV052', hireDate: '2026-10-05', employmentStatus: 'probation',
+      employmentChip: { label: 'Probation · 9d left', tone: 'alert', title: 'Probation ends 1 Nov 2026 · in 9 days' } }),
+    row({ id: 'm', name: 'Mei', code: 'HV030', hireDate: '2024-03-01', employmentStatus: 'permanent', employmentChip: { label: 'Permanent', tone: 'ledger' } }),
+    row({ id: 't', name: 'Tina', code: 'HV031', hireDate: '2026-09-01', employmentStatus: 'part_time', employmentChip: { label: 'Part time', tone: 'info' } }),
+    row({ id: 'n', name: 'Nobody Set', code: 'HV032', hireDate: null, employmentStatus: null, employmentChip: { label: 'Not set', tone: 'plain' }, missing: ['hire date'] }),
+    row({ id: 'g', name: 'Gone', code: 'HV004', active: false, resignedOn: '2026-09-30', hireDate: '2025-01-01', employmentStatus: 'permanent', employmentChip: null }),
+  ]
+  const draw = () => render(<PeopleDirectory people={roster} unattachedAccounts={[]} canSeeActivity={false} />)
+  const names = () => ['Zack', 'Mei', 'Tina', 'Nobody Set'].map(n => screen.getByText(n))
+    .sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)).map(e => e.textContent)
+
+  it('reads the status where Active was, then the hire date', () => {
+    draw()
+    expect(rowOf('Zack')).toHaveTextContent('Probation · 9d left5 Oct 2026')
+    expect(within(rowOf('Zack')).getByText('Probation · 9d left').closest('[data-tone]')).toHaveAttribute('data-tone', 'alert')
+    expect(within(rowOf('Zack')).getByText('Probation · 9d left').closest('[title]')).toHaveAttribute('title', 'Probation ends 1 Nov 2026 · in 9 days')
+    expect(rowOf('Mei')).toHaveTextContent('Permanent1 Mar 2024')
+    expect(rowOf('Tina')).toHaveTextContent('Part time1 Sep 2026')
+    expect(rowOf('Nobody Set')).toHaveTextContent('Not set1 missing')
+    expect(within(rowOf('Mei')).getByTitle('Hire date')).toHaveTextContent('1 Mar 2024')
+    for (const name of ['Zack', 'Mei', 'Tina', 'Nobody Set']) expect(within(rowOf(name)).queryByText('Active')).toBeNull()
+  })
+
+  it('an inactive person keeps their own chip', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: /^Inactive/ }))
+    expect(rowOf('Gone')).toHaveTextContent('Resigned 30 Sep 2026')
+  })
+
+  it('reads Active where the page could not say which (the directory)', () => {
+    render(<PeopleDirectory people={[row({ id: 'd', name: 'Dee', hireDate: '2026-01-05' })]} unattachedAccounts={[]} canSeeActivity={false} />)
+    expect(rowOf('Dee')).toHaveTextContent('Active5 Jan 2026')
+  })
+
+  it('its head sorts by the status, then the hire date — probation first', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }))
+    expect(names()).toEqual(['Zack', 'Tina', 'Mei', 'Nobody Set'])
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }))
+    expect(names()).toEqual(['Nobody Set', 'Mei', 'Tina', 'Zack'])
+  })
+})

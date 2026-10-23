@@ -114,12 +114,12 @@ describe('a column head sorts each band', () => {
     code: null, title: null, department: 'Revenue', accountEmail: null, active: true, missing: [], levelRank: null, lastSeenAt: null, ...over,
   })
   const band = [
-    sp({ name: 'ANTHONY', code: 'HV008', title: 'Team Leader', levelRank: 7, rankLabel: 'Rank B', rankRate: 0.09, lastSeenAt: '2026-10-20T03:00:00Z' }),
-    sp({ name: 'zack', code: 'HV030', title: 'Revenue Specialist', levelRank: 3, rankLabel: 'Rank F', rankRate: 0.05, missing: ['NRIC'] }),
-    sp({ name: 'CHEA HUAN', code: 'HV009', title: 'Team Leader', levelRank: 7, rankLabel: 'Rank SS', rankRate: 0, lastSeenAt: '2026-10-21T03:00:00Z' }),
-    sp({ name: 'Bella', code: 'HV012', title: 'Revenue Specialist', levelRank: 3, rankLabel: 'Rank A', rankRate: 0.04, missing: ['NRIC', 'bank account'] }),
-    sp({ name: 'INTERN', title: 'Intern', levelRank: null }),
-    sp({ name: 'GONE', code: 'HV004', title: 'Revenue Specialist', levelRank: 3, active: false, lastSeenAt: '2026-01-02T03:00:00Z' }),
+    sp({ name: 'ANTHONY', code: 'HV008', title: 'Team Leader', levelRank: 7, rankLabel: 'Rank B', rankRate: 0.09, lastSeenAt: '2026-10-20T03:00:00Z', employmentStatus: 'permanent', hireDate: '2024-03-01' }),
+    sp({ name: 'zack', code: 'HV030', title: 'Revenue Specialist', levelRank: 3, rankLabel: 'Rank F', rankRate: 0.05, missing: ['NRIC'], employmentStatus: 'probation', hireDate: '2026-10-05' }),
+    sp({ name: 'CHEA HUAN', code: 'HV009', title: 'Team Leader', levelRank: 7, rankLabel: 'Rank SS', rankRate: 0, lastSeenAt: '2026-10-21T03:00:00Z', employmentStatus: 'permanent', hireDate: '2026-10-01' }),
+    sp({ name: 'Bella', code: 'HV012', title: 'Revenue Specialist', levelRank: 3, rankLabel: 'Rank A', rankRate: 0.04, missing: ['NRIC', 'bank account'], employmentStatus: 'part_time', hireDate: '2026-09-01' }),
+    sp({ name: 'INTERN', title: 'Intern', levelRank: null, employmentStatus: null }),
+    sp({ name: 'GONE', code: 'HV004', title: 'Revenue Specialist', levelRank: 3, active: false, lastSeenAt: '2026-01-02T03:00:00Z', employmentStatus: 'permanent', hireDate: '2025-01-01' }),
   ]
   const order = (sort: RosterSort | null) => [...band].sort(rosterCompare(sort, compareByLadder)).map(p => p.name)
 
@@ -167,9 +167,10 @@ describe('a column head sorts each band', () => {
     expect(order({ key: 'code', dir: 'desc' })).toEqual(['zack', 'Bella', 'CHEA HUAN', 'ANTHONY', 'GONE', 'INTERN'])
   })
 
-  it('Employment: the active with the most missing first — then the other way, the inactive first', () => {
-    expect(order({ key: 'employment', dir: 'desc' })).toEqual(['Bella', 'zack', 'ANTHONY', 'CHEA HUAN', 'INTERN', 'GONE'])
-    expect(order({ key: 'employment', dir: 'asc' })).toEqual(['GONE', 'ANTHONY', 'CHEA HUAN', 'INTERN', 'zack', 'Bella'])
+  // 2026-10-23: the column reads the employment status, then the hire date — so it sorts by them.
+  it('Employment: probation, part time, permanent, not set, inactive — the latest hire first inside each; then the other way', () => {
+    expect(order({ key: 'employment', dir: 'desc' })).toEqual(['zack', 'Bella', 'CHEA HUAN', 'ANTHONY', 'INTERN', 'GONE'])
+    expect(order({ key: 'employment', dir: 'asc' })).toEqual(['GONE', 'INTERN', 'ANTHONY', 'CHEA HUAN', 'Bella', 'zack'])
   })
 
   it('Last seen: the latest sign-in first — then the oldest; never signed in last either way', () => {

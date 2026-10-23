@@ -15,6 +15,7 @@ import { isMasked, sees } from '@/lib/sensitive'
 import { addressRefusal } from '@/lib/address/address'
 import { addressFromForm, addressPatch } from '@/lib/address/address-form'
 import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
+import { statusColumns } from '@/lib/employment-status'
 import type { TablesUpdate } from '@/lib/supabase/database.types'
 
 /**
@@ -68,6 +69,9 @@ export async function addStaff(formData: FormData) {
     titleId: str(formData, 'title_id'),
     homeSubDepartmentId: str(formData, 'home_sub_department_id'),
     reportsTo: str(formData, 'reports_to'),
+    hireDate: str(formData, 'hire_date'),
+    employmentStatus: str(formData, 'employment_status'),
+    probationMonths: str(formData, 'probation_months'),
     fullCommission: formData.get('full_commission') === 'on',
     variablePay: formData.get('variable_pay') === 'on',
     basicSalary: str(formData, 'basic_salary'),
@@ -111,6 +115,11 @@ export async function addStaff(formData: FormData) {
     home_sub_department_id: form.homeSubDepartmentId,
     reports_to: form.reportsTo,
     designation,
+    // When they start, and Probation / Permanent / Part time with a probation's period (2026-10-23): the database
+    // works out the probation's last day from the two, and HR is reminded before it.
+    hire_date: form.hireDate,
+    employment_status: form.employmentStatus,
+    probation_months: form.probationMonths,
     employment_type: form.employmentType,
     basic_salary: form.basicSalary,
     allowances: form.allowances,
@@ -227,7 +236,7 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
 
   const { data: current } = await supabase
     .from('hr_staff_costs')
-    .select('department_id, title_id, employment_type, bank_name, user_id, departments(payroll_source)')
+    .select('department_id, title_id, employment_type, bank_name, user_id, hire_date, employment_status, probation_months, departments(payroll_source)')
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
@@ -297,6 +306,22 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
   // it is not ours to keep, and a wrong one would match the wrong file row.
   if (sent('infotech_code')) patch.infotech_code = text('infotech_code').trim() || null
   if (sent('hire_date')) patch.hire_date = text('hire_date') || null
+  // Probation, Permanent or Part time (2026-10-23) — with a probation's period, the two sent together whenever either
+  // changed (lib/person-record.ts). A probation is counted from the hire date, so a save touching either needs one.
+  if (sent('employment_status') || sent('probation_months')) {
+    Object.assign(
+      patch,
+      statusColumns(
+        sent('employment_status') ? text('employment_status') : current.employment_status,
+        sent('probation_months') ? text('probation_months') : current.probation_months,
+      ),
+    )
+  }
+  const onProbation = (patch.employment_status ?? current.employment_status) === 'probation'
+  const hireDate = sent('hire_date') ? patch.hire_date : current.hire_date
+  if (onProbation && !hireDate && (sent('employment_status') || sent('probation_months') || sent('hire_date'))) {
+    throw new Error('A probation is counted from the hire date — fill in the hire date too.')
+  }
   if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
   if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
   for (const key of ['contact_number', 'email', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {

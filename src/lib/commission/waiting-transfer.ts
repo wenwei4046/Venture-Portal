@@ -8,6 +8,7 @@
  *
  * Pure, so the form stays thin and this is tested.
  */
+import { statusColumns } from '@/lib/employment-status'
 
 /** `member_waiting_transfer(request)`'s answer: what the form starts from. */
 export interface WaitingTransferFacts {
@@ -85,6 +86,9 @@ export interface TransferInput {
   titleId: string
   reportsTo: string | null
   hireDate: string
+  /** Probation, Permanent or Part time (2026-10-23) — '' until picked — and a probation's period in months. */
+  employmentStatus: string
+  probationMonths: number | null
   nric: string
   bankName: string
   bankAccountNo: string
@@ -114,6 +118,11 @@ export function transferRefusal(input: TransferInput): string | null {
   if (missingFields(input).length) return `Fill in NRIC and the bank account to add ${name}.`
   if (!input.titleId) return 'Pick the joining title.'
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.hireDate)) return 'Pick the hire date.'
+  try {
+    statusColumns(input.employmentStatus, input.probationMonths)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Pick the employment status.'
+  }
   if (!/^\d+$/.test(accountDigits(input.bankAccountNo))) return 'An account number is its digits.'
   const email = input.email.trim()
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'That email does not look right.'

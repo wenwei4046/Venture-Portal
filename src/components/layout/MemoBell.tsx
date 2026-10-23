@@ -1,8 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { Drawer } from '@/components/hrv/overlay'
+import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
+import { PROBATION_NOTICE_DAYS, probationEndLine } from '@/lib/employment-status'
+import { officeTime, officeToday } from '@/lib/office-time'
+import { acknowledged, dueReviews, reviewsFromRow, waitingCount, type ProbationReview } from '@/lib/probation-reviews'
 import MemoCard, { openMemoFileIn } from '@/components/memos/MemoCard'
 import SignaturePad, { SignatureImage } from '@/components/memos/SignaturePad'
 import { markMyMemo, myMemoSignature, openMemoFile } from '@/lib/memos/actions'
@@ -33,9 +38,26 @@ import s from './memo-bell.module.css'
  * button"): a memo waiting for them carries the signature pad, and Acknowledge
  * waits for a signature; one they acknowledged shows the signature they gave,
  * read back when it is opened.
+ *
+ * In HR's view it is the Notifications bell too (2026-10-23 — the user, circling
+ * it: "at least show up in this notification side, in desktop view"): a
+ * probation ending within PROBATION_NOTICE_DAYS, or past and still open, for
+ * whoever may act on it (`seesProbationReminders`) — the shared hr@ as well,
+ * which has no memos. Read the same way (`probation_reviews()`); Acknowledge
+ * records who and when, the name opens their page for the next step. A
+ * reminder counts until it is acknowledged, and is listed until they are
+ * confirmed, extended past the window or their employment ends.
  */
-export default function MemoBell() {
+export default function MemoBell({ memos: memosOn = true, probation: probationOn = false }: {
+  /** One's own memos — a login a People record names. */
+  memos?: boolean
+  /** HR view's probation reminders. */
+  probation?: boolean
+}) {
   const [memos, setMemos] = useState<MyMemo[] | null>(null)
+  const [reviews, setReviews] = useState<ProbationReview[] | null>(null)
+  const [ackBusy, setAckBusy] = useState<string | null>(null)
+  const [ackError, setAckError] = useState('')
   const [open, setOpen] = useState(false)
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,14 +66,27 @@ export default function MemoBell() {
   const [signed, setSigned] = useState<ReadonlyMap<string, string>>(() => new Map())
 
   const read = useCallback(async () => {
-    try {
-      const db = createClient() as unknown as SupabaseClient
-      const { data, error: failed } = await db.rpc('my_memos')
-      if (!failed) setMemos(myMemosFromRow(data).memos)
-    } catch {
-      // The bell stays as it was.
-    }
-  }, [])
+    // Each read on its own: a refusal of one leaves the other — and the bell stays as it was.
+    const db = createClient() as unknown as SupabaseClient
+    await Promise.all([
+      memosOn
+        ? Promise.resolve(db.rpc('my_memos')).then(
+            ({ data, error: failed }) => {
+              if (!failed) setMemos(myMemosFromRow(data).memos)
+            },
+            () => undefined,
+          )
+        : null,
+      probationOn
+        ? Promise.resolve(db.rpc('probation_reviews')).then(
+            ({ data, error: failed }) => {
+              if (!failed) setReviews(reviewsFromRow(data))
+            },
+            () => undefined,
+          )
+        : null,
+    ])
+  }, [memosOn, probationOn])
 
   useEffect(() => {
     void read()
@@ -62,10 +97,37 @@ export default function MemoBell() {
     return () => document.removeEventListener('visibilitychange', back)
   }, [read])
 
-  const count = memos ? memoBellCount(memos) : 0
+  const today = officeToday()
+  const due = reviews ? dueReviews(reviews, today) : []
+  const toAcknowledge = reviews ? waitingCount(reviews, today) : 0
+  const count = (memos ? memoBellCount(memos) : 0) + toAcknowledge
   const shown = memos ? memosInOrder(memos) : []
   const picked = pick ? shown.find(m => m.id === pick) ?? null : null
   const waiting = shown.filter(memoWaiting).length
+  const word = probationOn ? 'Notifications' : 'Memos'
+  const reading = (memosOn && memos === null) || (probationOn && reviews === null)
+  const sub = probationOn
+    ? [
+        toAcknowledge ? `${toAcknowledge} probation${toAcknowledge === 1 ? '' : 's'} to acknowledge` : null,
+        waiting ? `${waiting} memo${waiting === 1 ? '' : 's'} waiting` : null,
+      ].filter(Boolean).join(' · ') || (reading ? 'Reading…' : 'Nothing waiting for you')
+    : memos === null ? 'Reading…' : waiting ? `${waiting} waiting for your acknowledgement` : 'Nothing waiting for you'
+
+  // HR acknowledges a probation's reminder: who and when, for the end it stands at now.
+  async function acknowledgeReview(r: ProbationReview) {
+    if (ackBusy) return
+    setAckBusy(r.id)
+    setAckError('')
+    try {
+      const res = await acknowledgeProbation(r.id)
+      if (!res.ok) return setAckError(res.reason)
+      setReviews(list => list?.map(x => (x.id === r.id ? { ...x, ackEnd: res.endsOn || x.endsOn, ackName: res.ackName || x.ackName, ackAt: res.ackAt || new Date().toISOString() } : x)) ?? list)
+    } catch {
+      setAckError('Could not acknowledge. Check the connection and try again.')
+    } finally {
+      setAckBusy(null)
+    }
+  }
 
   const patch = (id: string, at: { readAt: string | null; acknowledgedAt: string | null }) =>
     setMemos(list => list?.map(m => (m.id === id ? { ...m, readAt: at.readAt ?? m.readAt, acknowledgedAt: at.acknowledgedAt ?? m.acknowledgedAt } : m)) ?? list)
@@ -116,8 +178,8 @@ export default function MemoBell() {
           setError('')
           void read()
         }}
-        aria-label={count ? `Memos, ${count} new` : 'Memos'}
-        title="Memos"
+        aria-label={count ? `${word}, ${count} new` : word}
+        title={word}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
@@ -130,8 +192,8 @@ export default function MemoBell() {
         onClose={() => setOpen(false)}
         width={480}
         eyebrow="For you"
-        title={picked ? memoHeading(picked) : 'Memos'}
-        sub={picked ? `From ${picked.sender}` : memos === null ? 'Reading…' : waiting ? `${waiting} waiting for your acknowledgement` : 'Nothing waiting for you'}
+        title={picked ? memoHeading(picked) : word}
+        sub={picked ? `From ${picked.sender}` : sub}
       >
         {picked ? (
           <div className={s.detail}>
@@ -159,6 +221,49 @@ export default function MemoBell() {
           </div>
         ) : (
           <div className={s.list}>
+            {/* Probations ending (HR's view, 2026-10-23): those waiting for Acknowledge first, soonest first. */}
+            {due.length > 0 ? (
+              <>
+                <div className={s.section}>Probation ending</div>
+                {due.map(r => {
+                  const done = acknowledged(r)
+                  return (
+                    <div key={r.id} className={s.row} data-unread={done ? undefined : 'true'}>
+                      <span className={s.rowTag} data-tone="probation">PROB</span>
+                      <Link href={`/team/people/${r.id}`} className={s.rowText} onClick={() => setOpen(false)}>
+                        <span className={s.rowTitle}>{r.name}</span>
+                        <span className={s.rowMeta}>
+                          {r.endsOn ? probationEndLine(r.endsOn, today) : ''}
+                          {r.department ? ` · ${r.department}` : ''}
+                        </span>
+                        {done ? (
+                          <span className={s.rowMeta}>
+                            Acknowledged by {r.ackName ?? 'HR'}
+                            {r.ackAt ? ` · ${officeTime(r.ackAt).format('D MMM')}` : ''}
+                          </span>
+                        ) : null}
+                      </Link>
+                      {done ? (
+                        <span className={s.chip} data-tone="ledger">Acknowledged</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`${s.chip} ${s.chipButton}`}
+                          data-tone="alert"
+                          onClick={() => void acknowledgeReview(r)}
+                          disabled={ackBusy !== null}
+                          aria-busy={ackBusy === r.id || undefined}
+                        >
+                          {ackBusy === r.id ? 'Recording…' : 'Acknowledge'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+                {ackError ? <div className={s.err} role="alert">{ackError}</div> : null}
+                {memosOn ? <div className={s.section}>Memos</div> : null}
+              </>
+            ) : null}
             {shown.map(m => (
               <button key={m.id} type="button" className={s.row} data-unread={memoUnread(m) ? 'true' : undefined} onClick={() => openMemo(m)}>
                 <span className={s.rowTag}>{m.kind === 'Memo' ? 'MEMO' : m.kind.toUpperCase().slice(0, 6)}</span>
@@ -175,7 +280,10 @@ export default function MemoBell() {
                 ) : null}
               </button>
             ))}
-            {memos !== null && shown.length === 0 ? <div className={s.empty}>No memos for you yet.</div> : null}
+            {memosOn && memos !== null && shown.length === 0 ? <div className={s.empty}>No memos for you yet.</div> : null}
+            {!memosOn && reviews !== null && due.length === 0 ? (
+              <div className={s.empty}>No probation ends in the next {PROBATION_NOTICE_DAYS} days.</div>
+            ) : null}
           </div>
         )}
       </Drawer>

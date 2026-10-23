@@ -23,6 +23,7 @@ const ROW = {
 
 const INPUT: TransferInput = {
   requestId: ROW.requestId, name: 'Amelia Tan', titleId: 't1', reportsTo: null, hireDate: '2026-10-20',
+  employmentStatus: 'probation', probationMonths: 3,
   nric: '900101-14-5678', bankName: 'Maybank', bankAccountNo: '1234 5678 90', contact: '012-345 6789', email: '',
 }
 
@@ -67,6 +68,13 @@ describe('Add to company', () => {
     expect(transferRefusal({ ...INPUT, titleId: '' })).toBe('Pick the joining title.')
     expect(transferRefusal({ ...INPUT, bankAccountNo: '12AB' })).toBe('An account number is its digits.')
     expect(transferRefusal({ ...INPUT, email: 'amelia@' })).toBe('That email does not look right.')
+  })
+
+  // 2026-10-23: asked as on Add Staff — Probation, Permanent or Part time, a probation with its period.
+  it('asks the employment status, and a probation’s period', () => {
+    expect(transferRefusal({ ...INPUT, employmentStatus: '' })).toBe('Pick the employment status — Probation, Permanent or Part time.')
+    expect(transferRefusal({ ...INPUT, probationMonths: null })).toBe('Pick the probation period.')
+    expect(transferRefusal({ ...INPUT, employmentStatus: 'permanent', probationMonths: null })).toBeNull()
   })
 
   it('files NRIC and the account as digits', () => {
