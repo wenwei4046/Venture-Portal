@@ -7,6 +7,7 @@ import {
   editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems, stepsOf, whatsappUrl,
   type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
+import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
@@ -37,6 +38,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
+  // How long the PIC has been silent, only once in the browser (the server's clock and the browser's differ).
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => setNow(new Date()), [page])
   const [logOpen, setLogOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [copied, setCopied] = useState(false)
@@ -339,7 +343,13 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
                   <button type="button" className={p.ghost} onClick={() => void copy(url)}>{copied ? 'Copied ✓' : 'Copy link'}</button>
                   {wa ? <a className={`${p.ghost} ${p.ghostWide}`} href={wa} target="_blank" rel="noreferrer">Share via WhatsApp</a> : null}
                 </div>
-                {pr.status === 'waiting_pic' && pr.linkSentAt ? <div className={p.wait}>Sent {trailTime(pr.linkSentAt)}</div> : null}
+                {pr.status === 'waiting_pic' && pr.linkSentAt ? (() => {
+                  // No reply after 4 working hours: red (2026-10-24 — the user's answer 2, the PIC's wait as a stage's).
+                  const hours = now ? workingHours(pr.linkSentAt, now, new Set()) : 0
+                  return hours >= ACCEPT_HOURS
+                    ? <div className={`${p.wait} ${p.waitLate}`}>Sent {trailTime(pr.linkSentAt)} · no reply · {Math.floor(hours)} working hours</div>
+                    : <div className={p.wait}>Sent {trailTime(pr.linkSentAt)}</div>
+                })() : null}
                 {pr.status === 'changes' && can.manage ? (
                   <button type="button" className={p.primary} disabled={pending} onClick={resend}>Resend to {picName}</button>
                 ) : null}

@@ -1,21 +1,25 @@
 'use client'
 
 import { useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
-import type { MktDept } from '@/lib/marketing/board'
-import { DEPT_LABEL } from '@/lib/marketing/tasks'
+import type { MktGroup } from '@/lib/marketing/board'
+import { groupLabel, groupTone } from '@/lib/marketing/groups'
 import b from './builder.module.css'
 
-// The builders' stages in order (`Workflow Builder.dc.html`): a card each — ⋮⋮ to drag, its number, its name, its team,
-// how many fields it fills in, and the facts the builder shows under it — joined by short lines, + Add stage at the end.
+// The builders' stages in order (`Workflow Builder.dc.html`): a card each — ⋮⋮ to drag, its number, its name, its group
+// (a People title), how many fields it fills in, and the facts the builder shows under it — joined by short lines,
+// + Add stage at the end.
 
 export interface StageCardBase {
   key: string
   name: string
-  dept: MktDept
+  dept: MktGroup
   form: readonly unknown[]
 }
 
-const deptStyle = (d: MktDept): CSSProperties => ({ background: `var(--mk-team-${d}-bg)`, color: `var(--mk-team-${d})` })
+const deptStyle = (d: MktGroup): CSSProperties => {
+  const t = groupTone(d)
+  return { background: `var(--mk-team-${t}-bg)`, color: `var(--mk-team-${t})` }
+}
 
 /** One fact under a card's name: "Who Rachel", "SLA 2d" (mono), "Approval 👤 Rachel → 🔗 PIC". */
 export function Fact({ k, children, mono, missing }: { k: string; children: ReactNode; mono?: boolean; missing?: boolean }) {
@@ -98,7 +102,7 @@ export default function StageList<T extends StageCardBase>({
             <div className={b.wbBody}>
               <div className={b.wbNameRow}>
                 <span className={b.wbName}>{x.name || 'Untitled stage'}</span>
-                <span className={b.wbTag} style={deptStyle(x.dept)}>{DEPT_LABEL[x.dept]}</span>
+                {x.dept ? <span className={b.wbTag} style={deptStyle(x.dept)} title={x.dept}>{groupLabel(x.dept)}</span> : null}
                 {x.form.length ? <span className={`${b.wbTag} ${b.wbForm}`}>📝 {x.form.length} form field{x.form.length === 1 ? '' : 's'}</span> : null}
               </div>
               <div className={b.wbFacts}>{facts(x, i)}</div>

@@ -64,8 +64,8 @@ export default function NewProject({
   const [type, setType] = useState<TaskType>('social')
   const [brief, setBrief] = useState('')
   const [rule, setRule] = useState<RecurRule>(() => defaultRule(today))
-  const onRoster = !!me && people.some(p => p.id === me)
-  const [stages, setStages] = useState<DraftStage[]>(() => starterStages(onRoster ? me : null, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null))
+  const mine = me ? people.find(p => p.id === me) ?? null : null
+  const [stages, setStages] = useState<DraftStage[]>(() => starterStages(mine, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null))
   const [error, setError] = useState<string | null>(null)
   // Marketing's own clients: added here, picked at once.
   const [subList, setSubList] = useState(subs)

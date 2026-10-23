@@ -464,4 +464,34 @@ check(await peek1(`SELECT status FROM public.mkt_projects WHERE id = $1`, [forev
 await refuses(`SELECT public.mkt_series_set($1, 'end')`, [forever.id], /has ended already/, 'an ended series stays ended')
 await refuses(`SELECT public.mkt_series_set($1, 'stop')`, [SERIES], /has ended already|Pause, resume or end/, 'pause, resume or end — nothing else')
 
+// ── 2026-10-24: the user's answers 1 and 7 (20261025031000) — a stage's group is its person's People title; Marketing
+//    keeps Selangor's holidays ──────────────────────────────────────────────────────────────────────────────────────
+await asSystem()
+const answers = (await readFile(new URL('20261025031000_marketing_groups_selangor.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(answers)
+await db.exec(answers) // twice: nothing changes, nothing breaks
+check(await one(`SELECT has_function_privilege('authenticated', 'public.mkt_holiday_ok(text)', 'EXECUTE')`), false, 'the holiday check is the functions’ own')
+
+// 7 "Selangor": HR's holidays for every state, every state but Sarawak, or Selangor are skipped — never another state's.
+check(await dates('2027-03-05', [1]), [[0, '2027-03-05', '2027-03-08']], 'Friday + 1 working day = Monday')
+await q(`INSERT INTO public.att_holidays (day, name, states) VALUES ('2027-03-08', 'Sarawak only', 'Sarawak'), ('2027-03-08', 'KL only', 'Kuala Lumpur')`)
+check(await dates('2027-03-05', [1]), [[0, '2027-03-05', '2027-03-08']], 'another state’s holiday is a working day for Marketing')
+await q(`INSERT INTO public.att_holidays (day, name, states) VALUES ('2027-03-08', 'Selangor day', 'Selangor'),
+  ('2027-03-09', 'Not Sarawak', 'All except Sarawak'), ('2027-03-10', 'Everywhere', 'All')`)
+check(await dates('2027-03-05', [1]), [[0, '2027-03-05', '2027-03-11']], 'Selangor’s, every-state-but-Sarawak’s and everybody’s are skipped')
+await as(U.ali, STAFF)
+const hols = (await one(`SELECT public.mkt_board()`)).holidays.filter(h => h.day >= '2027-03-08' && h.day <= '2027-03-10').map(h => h.name)
+check(hols.sort(), ['Everywhere', 'Not Sarawak', 'Selangor day'], 'the board’s key dates are Selangor’s alone')
+
+// 1 "每个 title 就是一组": a quick stage's group is its person's title, whatever the page sent.
+await as(U.josiah, MANAGER)
+const grouped = await create('quick', [{ name: 'Design', dept: 'pink', who: S.ali, sla: 1 }, { name: 'Boost', who: S.loaned, sla: 1 }], { title: 'Groups' })
+check((await peek(`SELECT dept FROM public.mkt_stages WHERE project_id = $1 ORDER BY idx`, [grouped.id])).map(r => r.dept),
+  ['GRAPHIC DESIGNER', 'SENIOR MARKETING EXECUTIVE'], 'each stage in its person’s group — a People title')
+await asSystem()
+await assert.rejects(q(`UPDATE public.mkt_stages SET dept = $2 WHERE project_id = $1 AND idx = 0`, [grouped.id, 'X'.repeat(81)]), /check constraint/,
+  'a group of 80 characters at most'); checks++
+check(await peek1(`SELECT column_default FROM information_schema.columns WHERE table_name = 'mkt_stages' AND column_name = 'dept'`), "''::text",
+  'a stage of no group by default')
+
 console.log(`marketing tasks: ${checks} checks passed`)

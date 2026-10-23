@@ -249,4 +249,30 @@ check((await row(copy.id)).canvas, (await row(reels.id)).canvas, 'a clone has th
 // The draft count still guards the canvas.
 await refuses(`SELECT public.mkt_workflow_save($1, 1, '{"canvas":{}}'::jsonb)`, [reels.id], /changed this template since you opened it/, 'never over somebody else’s save')
 
+// ── 2026-10-24: the user's answers 1 and 16 (20261025031000) — a template stage's group is a People title; a canvas
+//    date is one of six kinds ──────────────────────────────────────────────────────────────────────────────────────
+await asSystem()
+const answers = await sql('20261025031000_marketing_groups_selangor.sql')
+await db.exec(answers)
+await db.exec(answers) // twice: nothing changes, nothing breaks
+await as(U.josiah, MANAGER)
+const KIND_STAGES = [
+  { name: 'Design', dept: '  GRAPHIC   DESIGNER ', who: { mode: 'assign' }, sla: 2, appr: [{ kind: 'pic' }],
+    form: [{ label: 'Post on', type: 'Date', cal: { kind: 'post', pic: true } }, { label: 'Shoot on', type: 'Date', cal: { kind: 'shoot', label: 'ignored', tone: 'ads' } }] },
+  { name: 'Anyone', dept: '', who: { mode: 'assign' }, sla: 1 },
+]
+const kinds = await save(null, null, { action: 'Poster design', tname: 'Standard', stages: KIND_STAGES })
+r = await row(kinds.id)
+check(r.draft.map(s => s.dept), ['GRAPHIC DESIGNER', ''], 'a stage’s group: a People title, tidied — or none')
+check(r.draft[0].form.map(f => f.cal), [{ kind: 'post', label: 'Post day', pic: true }, { kind: 'shoot', label: 'Shoot day', pic: false }],
+  'a date on the calendar: its kind, named as the kind is — a name or a colour sent is not kept')
+const kindBad = async (stages, pattern, what) => refuses(`SELECT public.mkt_workflow_save($1, $2, $3::jsonb)`,
+  [kinds.id, (await row(kinds.id)).draft_rev, JSON.stringify({ stages })], pattern, what)
+await kindBad([{ ...KIND_STAGES[0], form: [{ label: 'D', type: 'Date', cal: { kind: 'birthday' } }] }], /Stage 1: pick which date it is on the calendar/, 'only the six kinds')
+await kindBad([{ ...KIND_STAGES[0], form: [{ label: 'D', type: 'Date', cal: { label: 'Shoot', tone: 'content' } }] }], /pick which date it is/, 'a name and a colour are no kind')
+await kindBad([{ ...KIND_STAGES[0], dept: 'X'.repeat(81) }], /Stage 1: a group of at most 80 characters/, 'a group of 80 characters at most')
+const kv = await publish(kinds.id, (await row(kinds.id)).draft_rev)
+check(kv.version, 1, 'a template of groups and date kinds publishes')
+check((await versions(kinds.id))[0].stages[0].dept, 'GRAPHIC DESIGNER', 'its version keeps the group')
+
 console.log(`marketing canvas: ${checks} checks passed`)

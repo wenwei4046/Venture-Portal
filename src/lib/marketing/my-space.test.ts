@@ -118,4 +118,17 @@ describe('My Space columns', () => {
     expect(plateLine(1)).toBe('you have 1 thing on your plate')
     expect(plateLine(0)).toBe('your plate is clear')
   })
+
+  it('turns a stage not accepted after 4 working hours red (2026-10-24 — the user’s answer 2)', () => {
+    const holiday = (b: ReturnType<typeof board>) => ({ ...b, holidays: [{ day: '2026-10-23', name: 'Holiday' }] })
+    const at = (b: ReturnType<typeof board>, iso: string) => plateColumns(b, MEI, new Date(iso))[0].cards[0]
+    // Opened Thu 22 Oct at 10:00 in the office: three hours by lunch, the fourth at 15:00.
+    const b = holiday(board('2026-10-22', MEI, project([{ owner: MEI, status: 'todo', dueOn: '2026-10-30', enteredAt: '2026-10-22T02:00:00Z' }])))
+    expect(at(b, '2026-10-22T05:59:00Z')).toMatchObject({ tone: 'waiting', label: 'New · just assigned', isNew: true })
+    expect(at(b, '2026-10-22T07:00:00Z')).toMatchObject({ tone: 'red', label: 'Not accepted · 4+ working hours', isNew: false })
+    // Opened Thu at 17:00: Thursday's last hour, then Friday's holiday and the weekend count nothing — red at Monday noon.
+    const late = holiday(board('2026-10-22', MEI, project([{ owner: MEI, status: 'todo', dueOn: '2026-10-30', enteredAt: '2026-10-22T09:00:00Z' }])))
+    expect(at(late, '2026-10-26T03:59:00Z').tone).toBe('waiting')
+    expect(at(late, '2026-10-26T04:00:00Z').tone).toBe('red')
+  })
 })

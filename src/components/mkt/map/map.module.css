@@ -29,6 +29,8 @@
 .lane_design { background: color-mix(in oklch, var(--mk-team-design-bg) 40%, rgb(var(--mk-white))); }
 .lane_ads { background: color-mix(in oklch, var(--mk-team-ads-bg) 40%, rgb(var(--mk-white))); }
 .lane_brand { background: color-mix(in oklch, var(--mk-team-brand-bg) 40%, rgb(var(--mk-white))); }
+.lane_manager { background: color-mix(in oklch, var(--mk-team-manager-bg) 40%, rgb(var(--mk-white))); }
+.lane_none { background: color-mix(in oklch, var(--mk-team-none-bg) 40%, rgb(var(--mk-white))); }
 
 .svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .edge { fill: none; stroke: rgb(var(--mk-text-3)); stroke-width: 1.6; transition: stroke .3s; }
@@ -98,7 +100,11 @@
   border-right: 1px solid rgb(var(--mk-line-2)); border-bottom: 1px solid rgb(var(--mk-line-2)); pointer-events: none; overflow: hidden;
 }
 .laneEmoji { font-size: 15px; }
-.laneName { font-size: 12px; font-weight: 600; color: rgb(var(--mk-text-2)); line-height: 1.2; }
+/* A lane is a People title (2026-10-24) — a long one wraps to three lines at most. */
+.laneName {
+  font-size: 11px; font-weight: 600; color: rgb(var(--mk-text-2)); line-height: 1.2; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding-right: 6px;
+}
 
 .legend {
   position: absolute; left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 12px; border-radius: 10px;

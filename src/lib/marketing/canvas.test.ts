@@ -14,7 +14,7 @@ const stage = (over: Partial<WfStage> = {}): WfStage => ({ ...newWfStage(undefin
 const STAGES = [
   stage({ key: 'a', name: 'Script', form: [{ label: 'Topic', type: 'Text' }, { label: 'Read the brief', type: 'Note' }] }),
   stage({ key: 'b', name: 'Shoot', sec: { emoji: '🎬', locked: true, req: false, pic: false },
-    form: [{ label: 'Shoot date', type: 'Date', cal: { label: 'Shoot day', tone: 'content', pic: false } }, { label: 'Shots', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }] }] }),
+    form: [{ label: 'Shoot date', type: 'Date', cal: { kind: 'shoot', pic: false } }, { label: 'Shots', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }] }] }),
   stage({ key: 'c', name: 'Edit', form: [{ label: 'Final video', type: 'File', pic: false }] }),
 ]
 const ROW = {
@@ -22,7 +22,7 @@ const ROW = {
   sections: [
     { emoji: '💬', title: 'Caption', stage: 0, locked: true, req: true, pic: true, fields: [
       { label: 'Caption', type: 'Text', stage: 0, req: true, pic: true },
-      { label: 'Posting date', type: 'Date', stage: 0, req: true, pic: true, cal: { label: 'Posting date', tone: 'social', pic: true } },
+      { label: 'Posting date', type: 'Date', stage: 0, req: true, pic: true, cal: { kind: 'post', pic: true } },
       { label: 'Platform', type: 'Select', stage: 2, req: false, pic: false, opts: ['Instagram', 'TikTok'] },
       { label: 'Budget', type: 'Number', stage: 0 },
     ] },
@@ -36,7 +36,7 @@ describe('what the builder reads', () => {
     expect(c.req).toEqual({ pic: false })
     expect(c.sections.map(s => [s.emoji, s.title, s.stage, s.locked, s.req, s.pic])).toEqual([['💬', 'Caption', 0, true, true, true], ['📝', 'Internal notes', null, false, false, false]])
     expect(c.sections[0].fields.map(f => f.label)).toEqual(['Caption', 'Posting date', 'Platform'])
-    expect(c.sections[0].fields[1].cal).toEqual({ label: 'Posting date', tone: 'social', pic: true })
+    expect(c.sections[0].fields[1].cal).toEqual({ kind: 'post', pic: true })
     expect(c.sections[0].fields[2].opts).toEqual(['Instagram', 'TikTok'])
   })
 
@@ -47,9 +47,9 @@ describe('what the builder reads', () => {
 
   it('a stage’s section and its fields’ settings', () => {
     const s = wfStageFromRow({ name: 'Shoot', dept: 'content', sla: 1, sec: { emoji: '🎬', locked: true, req: false, pic: false },
-      form: [{ label: 'Day', type: 'Date', req: false, pic: true, cal: { label: 'Shoot day', tone: 'ads', pic: true } }, { label: 'Where', type: 'Select', opts: ['LRT'] }] })
+      form: [{ label: 'Day', type: 'Date', req: false, pic: true, cal: { kind: 'ads_live', label: 'Ads go-live', pic: true } }, { label: 'Where', type: 'Select', opts: ['LRT'] }] })
     expect(s.sec).toEqual({ emoji: '🎬', locked: true, req: false, pic: false })
-    expect(s.form[0]).toEqual({ label: 'Day', type: 'Date', req: false, pic: true, cal: { label: 'Shoot day', tone: 'ads', pic: true } })
+    expect(s.form[0]).toEqual({ label: 'Day', type: 'Date', req: false, pic: true, cal: { kind: 'ads_live', pic: true } })
     expect(s.form[1].opts).toEqual(['LRT'])
     expect(wfStageFromRow({ name: 'Old', dept: 'design', sla: 1 }).sec).toEqual({ emoji: '🎯', locked: false, req: true, pic: true })
   })
@@ -59,9 +59,9 @@ describe('what the builder sends', () => {
   it('a field’s settings, explicit: required and shown unless set, a note never required, a mark only on a date, options only on a choice', () => {
     expect(fieldExtras({ label: 'T', type: 'Text' })).toEqual({ req: true, pic: true })
     expect(fieldExtras({ label: 'N', type: 'Note', req: true })).toEqual({ req: false, pic: true })
-    expect(fieldExtras({ label: 'D', type: 'Date', cal: { label: 'Day', tone: 'brand', pic: true } })).toEqual({ req: true, pic: true, cal: { label: 'Day', tone: 'brand', pic: true } })
+    expect(fieldExtras({ label: 'D', type: 'Date', cal: { kind: 'report', pic: true } })).toEqual({ req: true, pic: true, cal: { kind: 'report', pic: true } })
     expect(fieldExtras({ label: 'S', type: 'Select' })).toEqual({ req: true, pic: true, opts: [] })
-    expect(fieldExtras({ label: 'X', type: 'Text', cal: { label: 'x', tone: 'ads', pic: false }, opts: ['a'] })).toEqual({ req: true, pic: true })
+    expect(fieldExtras({ label: 'X', type: 'Text', cal: { kind: 'ads_end', pic: false }, opts: ['a'] })).toEqual({ req: true, pic: true })
   })
 
   it('the canvas without the page’s keys', () => {
@@ -72,7 +72,7 @@ describe('what the builder sends', () => {
   })
 
   it('a new kind of answer: options for a choice, a calendar mark only on a date', () => {
-    const d: FormField = { label: 'Day', type: 'Date', cal: { label: 'Day', tone: 'ads', pic: false } }
+    const d: FormField = { label: 'Day', type: 'Date', cal: { kind: 'ads_live', pic: false } }
     expect(withType(d, 'Select')).toEqual({ label: 'Day', type: 'Select', opts: [] })
     expect(withType({ label: 'P', type: 'Select', opts: ['a'] }, 'Text')).toEqual({ label: 'P', type: 'Text' })
   })
@@ -85,7 +85,7 @@ describe('what the builder sends', () => {
   })
 
   it('a field’s marks on the canvas', () => {
-    expect(fieldFlags({ label: 'D', type: 'Date', cal: { label: 'D', tone: 'ads', pic: false } })).toBe('⭐ 👁 📅')
+    expect(fieldFlags({ label: 'D', type: 'Date', cal: { kind: 'meeting', pic: false } })).toBe('⭐ 👁 📅')
     expect(fieldFlags({ label: 'T', type: 'Text', req: false, pic: false })).toBe('🔒')
     expect(fieldFlags({ label: 'N', type: 'Note' }, false)).toBe('')
   })
@@ -156,7 +156,7 @@ describe('the preview', () => {
       ['Edit', []],
       ['Caption', ['Caption', 'Posting date']],
     ])
-    expect(v.calendar).toEqual([{ label: 'Posting date', tone: 'social', from: 'Posting date' }])
+    expect(v.calendar).toEqual([{ label: 'Post day', kind: 'post', from: 'Posting date' }])
     expect(v.hidden).toBe('Hidden: Requirements, Shoot, Internal notes, 2 internal fields.')
   })
 })

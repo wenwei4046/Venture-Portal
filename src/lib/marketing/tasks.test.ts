@@ -82,11 +82,15 @@ describe('what a stage still needs', () => {
 })
 
 describe('the stage form', () => {
-  const three = (): DraftStage[] => starterStages('me', 'boss').map((s, i) => ({ ...s, who: s.who ?? `p${i}` }))
+  const ME = { id: 'me', group: 'SOCIAL MEDIA SPECIALIST' }
+  const three = (): DraftStage[] => starterStages(ME, 'boss').map((s, i) => ({ ...s, who: s.who ?? `p${i}` }))
 
   it('starts from the handoff’s quick template: my first draft, a redesign I approve that comes back to it, the publishing', () => {
-    const s = starterStages('me', 'boss')
+    const s = starterStages(ME, 'boss')
     expect(s.map(x => [x.name, x.who, x.appr, x.back])).toEqual([['First draft', 'me', [], null], ['Redesign', null, ['boss'], 0], ['Publish', null, [], null]])
+    // Each stage's group is its person's People title (2026-10-24): mine for the first, none until somebody is picked.
+    expect(s.map(x => x.dept)).toEqual(['SOCIAL MEDIA SPECIALIST', '', ''])
+    expect(starterStages(null, null)[0]).toMatchObject({ who: null, dept: '' })
     expect(stageProblems(s)).toEqual(['A stage has no person'])
   })
   it('where changes go back to follows a move, and forgets a stage taken out', () => {
@@ -106,7 +110,7 @@ describe('the stage form', () => {
     const s = three()
     s[0].name = '  First draft  '
     s[0].sla = 99
-    expect(stagesPayload(s)[0]).toEqual({ name: 'First draft', dept: 'social', who: 'me', sla: 30, appr: [],
+    expect(stagesPayload(s)[0]).toEqual({ name: 'First draft', dept: 'SOCIAL MEDIA SPECIALIST', who: 'me', sla: 30, appr: [],
       form: [{ label: 'Canva template link', type: 'Text' }, { label: 'Draft notes', type: 'Text' }], back: null })
   })
 })

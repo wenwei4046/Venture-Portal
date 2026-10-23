@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cloneMktWorkflow, deleteMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
 import { canvasProblems, canvasRemap, stageMap } from '@/lib/marketing/canvas'
+import { sameGroup } from '@/lib/marketing/groups'
 import { moveStage, removeStage } from '@/lib/marketing/tasks'
 import {
   asRun, firstWfStage, newWfStage, nextTemplateName, picTimes, totalDays, wfActions, wfApprText, wfPatch, wfProblems, wfStagesPayload,
@@ -214,8 +215,8 @@ export default function WorkflowBuilder({
   // A stage moved or taken out: the canvas's sections and fields follow it.
   const restage = (nextStages: WfStage[]) => edit && change({ ...edit, stages: nextStages, canvas: canvasRemap(edit.canvas, stageMap(stages, nextStages)) })
   const updStage = (patch: Partial<WfStage>) => setStages(stages.map((s, i) => (i === at ? { ...s, ...patch } : s)))
-  /** Whom the canvas's staff view is drawn for at a stage: the first of its team. */
-  const nameAt = (i: number) => people.find(p => p.team === stages[i]?.dept)?.first ?? 'the team'
+  /** Whom the canvas's staff view is drawn for at a stage: the first of its group. */
+  const nameAt = (i: number) => people.find(p => sameGroup(p.group, stages[i]?.dept))?.first ?? 'the team'
 
   const publish = async () => {
     if (!sel || !edit || busy) return

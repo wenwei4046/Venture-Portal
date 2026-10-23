@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { MktBoard } from '@/lib/marketing/board'
 import { nudgeMkt } from '@/lib/marketing/actions'
+import { groupTone } from '@/lib/marketing/groups'
 import {
   NO_FILTER, countPool, dueLabel, filterTasks, flowLanes, flowOptions, peopleCards, trackCounts,
   type TrackFilter, type TrackPeriod, type TrackStatus, type TrackTask, type TrackTone,
@@ -19,10 +20,6 @@ const TONE: Record<TrackTone, { box: string; fg: string; slot: string }> = {
   waiting: { box: s.tWaiting, fg: s.fgWaiting, slot: s.sWaiting },
   risk: { box: s.tRisk, fg: s.fgRisk, slot: s.sRisk },
   ok: { box: s.tOk, fg: s.fgOk, slot: s.sOk },
-}
-const TEAM_BG: Record<string, string> = {
-  manager: 'var(--mk-team-manager-bg)', content: 'var(--mk-team-content-bg)', social: 'var(--mk-team-social-bg)',
-  design: 'var(--mk-team-design-bg)', ads: 'var(--mk-team-ads-bg)', brand: 'var(--mk-team-brand-bg)',
 }
 const STATS: { key: TrackStatus; label: string; dot: string; fg: string }[] = [
   { key: 'All', label: 'Ongoing', dot: 'rgb(var(--mk-brown))', fg: 'rgb(var(--mk-ink))' },
@@ -63,7 +60,8 @@ export default function TrackingDashboard({ board, tasks }: { board: MktBoard; t
   const lanes = useMemo(() => flowLanes(shown), [shown])
   const flows = useMemo(() => flowOptions(tasks), [tasks])
   const teamOf = new Map(board.team.map(p => [p.id, p]))
-  const avBg = (id: string | null) => (id && teamOf.get(id)?.team ? TEAM_BG[teamOf.get(id)?.team as string] : 'var(--mk-team-manager-bg)')
+  // The tint behind an initial: the colour of the person's group, their People title.
+  const avBg = (id: string | null) => `var(--mk-team-${groupTone(id ? teamOf.get(id)?.title : null)}-bg)`
   const filtered = f.sub !== 'All' || f.flow !== 'All' || f.person !== 'All' || f.status !== 'All'
   const period = (p: TrackPeriod['kind']) => set({ period: p === 'custom' ? { kind: 'custom', ...range } : { kind: p } })
 

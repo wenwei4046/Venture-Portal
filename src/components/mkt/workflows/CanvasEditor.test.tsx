@@ -9,7 +9,7 @@ import CanvasEditor from './CanvasEditor'
 // space; a section's and a field's settings; the Preview as the staff and as the PIC see it. The editor hands back the
 // stages and the canvas changed; the Workflow Builder saves them (WorkflowBuilder.test.tsx).
 
-const stage = (over: Partial<WfStage>): WfStage => ({ ...newWfStage(undefined), dept: 'content', ...over })
+const stage = (over: Partial<WfStage>): WfStage => ({ ...newWfStage(undefined), dept: 'VIDEOGRAPHER', ...over })
 const STAGES = [
   stage({ key: 'a', name: 'Script', form: [{ label: 'Topic', type: 'Text' }] }),
   stage({ key: 'b', name: 'Shoot', form: [{ label: 'Shoot date', type: 'Date' }, { label: 'Shots', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }, { name: 'Done', type: 'Checkbox' }], rows: [['Opening', '']] }] }),
@@ -58,16 +58,29 @@ describe('the Canvas Template Editor', () => {
     expect(onEditStage).toHaveBeenCalledWith(0)
   })
 
-  it('a stage’s field: required, the PIC, a date on the calendar with its colour', () => {
+  it('a stage’s field: required, the PIC, a date on the calendar of the kind it is', () => {
     const { onStages } = editor()
     fireEvent.click(screen.getByRole('button', { name: /Shoot date/ }))
     const pop = screen.getByRole('dialog', { name: 'Field Shoot date' })
     fireEvent.click(within(pop).getByRole('switch', { name: '📅 Show on calendar' }))
     let next = onStages.mock.calls.at(-1)?.[0] as WfStage[]
-    expect(next[1].form[0].cal).toEqual({ label: 'Shoot date', tone: 'social', pic: false })
+    // A date on the calendar is one of the fixed kinds (the user, 2026-10-24) — a Post day until another is picked.
+    expect(next[1].form[0].cal).toEqual({ kind: 'post', pic: false })
     fireEvent.click(within(pop).getByRole('switch', { name: '👁 Visible to PIC' }))
     next = onStages.mock.calls.at(-1)?.[0] as WfStage[]
     expect(next[1].form[0].pic).toBe(false)
+  })
+
+  it('a date already on the calendar says which kind it is, and takes another', () => {
+    const dated = STAGES.map((s, i) => i === 1 ? { ...s, form: [{ ...s.form[0], cal: { kind: 'post' as const, pic: false } }, s.form[1]] } : s)
+    const { onStages } = editor(dated)
+    fireEvent.click(screen.getByRole('button', { name: /Shoot date/ }))
+    const kinds = within(screen.getByRole('dialog', { name: 'Field Shoot date' })).getByRole('radiogroup', { name: 'Which date is it?' })
+    expect(within(kinds).getAllByRole('radio').map(r => `${r.textContent}${r.getAttribute('aria-checked') === 'true' ? '*' : ''}`)).toEqual([
+      '📣 Post day*', '🎬 Shoot day', '🗓️ Meeting', '📈 Ads go-live', '🛑 Ads end', '📊 Report day',
+    ])
+    fireEvent.click(within(kinds).getByRole('radio', { name: '🎬 Shoot day' }))
+    expect((onStages.mock.calls.at(-1)?.[0] as WfStage[])[1].form[0].cal).toEqual({ kind: 'shoot', pic: false })
   })
 
   it('the manager’s own sections: + Add section, a field added, its options, its stage, removed', () => {

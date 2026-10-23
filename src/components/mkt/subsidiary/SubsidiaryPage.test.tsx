@@ -28,11 +28,11 @@ const board = boardFromRow({
       owner: MEI, createdAt: '2026-10-19T01:00:00Z', updatedAt: '2026-10-19T01:00:00Z' },
   ],
   stages: [
-    { project: P1, idx: 0, name: 'Script', dept: 'content', owner: MEI, status: 'done', dueOn: '2026-10-14' },
-    { project: P1, idx: 1, name: 'Edit', dept: 'design', owner: MEI, status: 'accepted', dueOn: '2026-10-21' },
-    { project: P1, idx: 2, name: 'Final', dept: 'design', owner: MEI, status: 'planned', dueOn: '2026-10-28' },
-    { project: S1, idx: 0, name: 'Plan', dept: 'social', owner: MEI, status: 'planned', dueOn: '2026-10-20' },
-    { project: R1, idx: 0, name: 'Plan', dept: 'social', owner: MEI, status: 'accepted', dueOn: '2026-10-23' },
+    { project: P1, idx: 0, name: 'Script', dept: 'VIDEOGRAPHER', owner: MEI, status: 'done', dueOn: '2026-10-14' },
+    { project: P1, idx: 1, name: 'Edit', dept: 'GRAPHIC DESIGNER', owner: MEI, status: 'accepted', dueOn: '2026-10-21' },
+    { project: P1, idx: 2, name: 'Final', dept: 'GRAPHIC DESIGNER', owner: MEI, status: 'planned', dueOn: '2026-10-28' },
+    { project: S1, idx: 0, name: 'Plan', dept: 'SOCIAL MEDIA SPECIALIST', owner: MEI, status: 'planned', dueOn: '2026-10-20' },
+    { project: R1, idx: 0, name: 'Plan', dept: 'SOCIAL MEDIA SPECIALIST', owner: MEI, status: 'accepted', dueOn: '2026-10-23' },
   ],
   holidays: [{ day: '2026-10-20', name: 'Deepavali' }],
 })
@@ -94,8 +94,9 @@ describe('a subsidiary’s page', () => {
     expect(within(activity).getByRole('link').textContent).toBe('👍Mei accepted Stage 1 · Plan12 min ago · Weekly reel')
     const table = screen.getByRole('table', { name: 'Projects' })
     expect(within(table).getAllByRole('row').slice(1).map(r => [r.getAttribute('href'), r.textContent])).toEqual([
-      ['/marketing/projects/MKT-CAR-2610-007', '📦Year-End VideoDesignOverdue · In progress1/3MMei21 Oct'],
-      ['/marketing/projects/RCR-CAR-2610-001-R01', '🔁Weekly reelSocial MediaIn progress0/1MMei23 Oct'],
+      // The group is the current stage's People title (2026-10-24).
+      ['/marketing/projects/MKT-CAR-2610-007', '📦Year-End VideoGRAPHIC DESIGNEROverdue · In progress1/3MMei21 Oct'],
+      ['/marketing/projects/RCR-CAR-2610-001-R01', '🔁Weekly reelSOCIAL MEDIA SPECIALISTIn progress0/1MMei23 Oct'],
     ])
   })
 

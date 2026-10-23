@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { picView, staffView, TONE_GLYPH, type WfCanvas } from '@/lib/marketing/canvas'
-import { DEPT_LABEL } from '@/lib/marketing/tasks'
+import { picView, staffView, type WfCanvas } from '@/lib/marketing/canvas'
+import { calKind } from '@/lib/marketing/tasks'
 import type { WfStage } from '@/lib/marketing/workflows'
 import c from './canvas.module.css'
 
@@ -28,7 +28,6 @@ export default function CanvasPreview({
   const stageAt = Math.min(at, Math.max(0, stages.length - 1))
   const staff = staffView(stages, canvas, stageAt)
   const pic = picView(stages, canvas)
-  const team = stages[0] ? DEPT_LABEL[stages[0].dept] : 'Marketing'
 
   return (
     <aside className={c.preview} aria-label="Preview">
@@ -81,7 +80,7 @@ export default function CanvasPreview({
               <div>
                 <div className={c.pvMuted}>Subsidiary · Track ID</div>
                 <div className={c.pvLinkTitle}>{title}</div>
-                <div className={c.pvState}><span className={c.pvDot} />{team} team is working on it</div>
+                <div className={c.pvState}><span className={c.pvDot} />The team is working on it</div>
               </div>
               {pic.sections.map(s => (
                 <div key={s.key} className={c.pvPicSec}>
@@ -106,8 +105,8 @@ export default function CanvasPreview({
                   <div className={c.pvPicTitle}>On your calendar</div>
                   {pic.calendar.map((d, i) => (
                     <div key={`${d.label}-${i}`} className={c.pvCal}>
-                      <span className={`${c.pvCalDot} ${c[`cal_${d.tone}`]}`} />
-                      <span className={c.pvCalName}>{TONE_GLYPH[d.tone]} {d.label}</span>
+                      <span className={`${c.pvCalDot} ${c[`cal_${calKind(d.kind).tone}`]}`} />
+                      <span className={c.pvCalName}>{calKind(d.kind).glyph} {d.label}</span>
                       <span className={c.pvMuted}>· from {d.from}</span>
                     </div>
                   ))}

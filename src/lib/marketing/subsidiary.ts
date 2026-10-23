@@ -1,11 +1,12 @@
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): where its work stands (the stat cards), its dates by Month,
-// Week or Timeline — stage due dates and the runs to come, coloured by team, red once passed undone, HR's holidays as
+// Week or Timeline — stage due dates and the runs to come, coloured by group (a People title), red once passed undone, HR's holidays as
 // key dates — its projects with how far each has come, and the newest lines of their trails. All from the board
 // (mkt_board) and its feed (mkt_sub_feed). The handoff's campaigns, posts, shoots and ads have no source yet (open
 // questions 13–16): the page draws what exists. Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, shortDay, type MktBoard, type MktDept, type MktProjectKind } from './board'
+import { addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, shortDay, type MktBoard, type MktGroup, type MktProjectKind } from './board'
+import { sameGroup } from './groups'
 import type { CalEvent, CalTone } from './calendar'
 import { productEventText } from './project'
 import { projectRows, type ProjectRow } from './projects'
@@ -57,7 +58,8 @@ export const SUB_STATUSES: readonly { key: Exclude<CalTone, 'meet'>; label: stri
 ]
 export interface SubFilter {
   types: SubType[]
-  teams: MktDept[]
+  /** Groups — People titles (2026-10-24). */
+  teams: MktGroup[]
   statuses: CalTone[]
 }
 export const NO_FILTER: SubFilter = { types: [], teams: [], statuses: [] }
@@ -66,7 +68,7 @@ export const filterCount = (f: SubFilter) => f.types.length + f.teams.length + f
 export function passesSub(e: CalEvent, f: SubFilter): boolean {
   const type: SubType = e.recur ? 'run' : 'due'
   return (!f.types.length || f.types.includes(type))
-    && (!f.teams.length || (!!e.team && f.teams.includes(e.team)))
+    && (!f.teams.length || f.teams.some(g => sameGroup(g, e.team)))
     && (!f.statuses.length || f.statuses.includes(e.tone))
 }
 
@@ -81,8 +83,8 @@ export function keyDates(board: MktBoard): KeyDate[] {
 
 // ── The projects table ───────────────────────────────────────────────────────────
 export interface SubProjectRow extends ProjectRow {
-  /** The team of the stage it is at (else its first). */
-  team: MktDept | null
+  /** The group of the stage it is at (else its first) — a People title. */
+  team: MktGroup | null
   /** Its stages done, of all of them. */
   done: number
   total: number
@@ -100,7 +102,7 @@ export function subProjects(board: MktBoard, sub: string): SubProjectRow[] {
     const done = p?.status === 'done' ? stages.length : stages.filter(s => s.status === 'done' || (p ? s.idx < p.cur : false)).length
     // Its owner on Marketing's roster — else (the Principal made it) whoever's stage it is at.
     const owner = ix.person(p?.owner ?? null) ?? ix.person(cur?.owner ?? null)
-    return { ...r, team: cur?.dept ?? null, done, total: stages.length, owner: owner?.first || owner?.full || '—' }
+    return { ...r, team: cur?.dept || null, done, total: stages.length, owner: owner?.first || owner?.full || '—' }
   })
 }
 
@@ -116,7 +118,7 @@ export interface TimelineBar {
   id: string
   trackId: string
   title: string
-  team: MktDept | null
+  team: MktGroup | null
   tone: ProjectRow['tone']
   left: number
   width: number

@@ -23,11 +23,11 @@ const RACHEL = 's-rachel'
 const SITI = 's-siti'
 const AINA = 's-aina'
 const people = [
-  { id: RACHEL, first: 'Rachel', hint: 'Manager · 2 active', team: 'manager' },
-  { id: SITI, first: 'Siti', hint: 'Design · 4 active', team: 'design' },
-  { id: AINA, first: 'Aina', hint: 'Design · 2 active', team: 'design' },
+  { id: RACHEL, first: 'Rachel', hint: 'MARKETING MANAGER · 2 active', group: 'MARKETING MANAGER' },
+  { id: SITI, first: 'Siti', hint: 'GRAPHIC DESIGNER · 4 active', group: 'GRAPHIC DESIGNER' },
+  { id: AINA, first: 'Aina', hint: 'GRAPHIC DESIGNER · 2 active', group: 'GRAPHIC DESIGNER' },
 ]
-const approvers = people.filter(p => p.team === 'manager')
+const approvers = people.filter(p => p.group === 'MARKETING MANAGER')
 const team = people.map(p => p.id)
 
 const REELS = {
@@ -168,7 +168,7 @@ describe('the Workflow Builder', () => {
     const name = screen.getByRole('textbox', { name: 'New action' })
     fireEvent.change(name, { target: { value: 'Design photo' } })
     const made = { id: 'w9', action: 'Design photo', tname: 'Standard', emoji: '✨', note: null, promise: null, locked: false,
-      draft: [{ name: 'Design photo', dept: 'design', who: { mode: 'assign', cands: [] }, sla: 2, appr: [{ kind: 'pic' }], split: false, back: null, picText: '', form: [] }],
+      draft: [{ name: 'Design photo', dept: '', who: { mode: 'assign', cands: [] }, sla: 2, appr: [{ kind: 'pic' }], split: false, back: null, picText: '', form: [] }],
       rev: 1, version: 0, changed: true, live: 0 }
     actions.saveMktWorkflow.mockResolvedValue({ ok: true, id: 'w9', rev: 1, workflows: list(BROKEN, made, REELS) })
     await act(async () => {

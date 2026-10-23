@@ -3,13 +3,16 @@
 // a field the database leaves out draws as nothing, and the pages work on plain types. Dates stay 'YYYY-MM-DD'
 // strings, the office's (the database answers today in Asia/Kuala_Lumpur).
 
+import { groupOf } from './groups'
 import type { MktTeam } from './shell'
 
 export type MktProjectKind = 'product' | 'quick' | 'recurring'
 export type MktProjectStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
 export type MktStageStatus = 'planned' | 'todo' | 'accepted' | 'review' | 'changes' | 'done'
 export type MktSubtaskStatus = 'working' | 'ready' | 'revising' | 'approved'
-export type MktDept = 'content' | 'social' | 'design' | 'ads' | 'brand'
+/** A stage's group: a People title of the Marketing department as People writes it, '' for none (lib/marketing/groups.ts
+ * — the user, 2026-10-24: "每个 title 就是一组"). */
+export type MktGroup = string
 
 /** One level of a stage's approval: a person in the portal, or the subsidiary's PIC through the link. */
 export type MktApprover = { kind: 'person'; staff: string } | { kind: 'pic' }
@@ -69,7 +72,8 @@ export interface MktStage {
   project: string
   idx: number
   name: string
-  dept: MktDept
+  /** Its group — a People title. */
+  dept: MktGroup
   owner: string | null
   appr: MktApprover[]
   split: boolean
@@ -117,7 +121,6 @@ export interface MktBoard {
 }
 
 const TEAMS: readonly MktTeam[] = ['manager', 'content', 'social', 'design', 'ads', 'brand']
-const DEPTS: readonly MktDept[] = ['content', 'social', 'design', 'ads', 'brand']
 const KINDS: readonly MktProjectKind[] = ['product', 'quick', 'recurring']
 const PSTATUS: readonly MktProjectStatus[] = ['minutes', 'waiting_pic', 'changes', 'approved', 'active', 'paused', 'done', 'cancelled']
 const SSTATUS: readonly MktStageStatus[] = ['planned', 'todo', 'accepted', 'review', 'changes', 'done']
@@ -205,7 +208,7 @@ export function stageFromRow(s: Record<string, unknown>): MktStage {
     project: str(s.project),
     idx: Math.max(0, int(s.idx)),
     name: str(s.name),
-    dept: oneOf(s.dept, DEPTS, 'social'),
+    dept: groupOf(str(s.dept)),
     owner: strOrNull(s.owner),
     appr: (Array.isArray(s.appr) ? s.appr : []).map(approver).filter((a): a is MktApprover => !!a),
     split: s.split === true,
@@ -273,6 +276,30 @@ export const daysBetween = (a: string, b: string) => Math.round((dayValue(b) - d
 /** 0 = Monday … 6 = Sunday. */
 export const weekdayOf = (d: string) => (new Date(dayValue(d)).getUTCDay() + 6) % 7
 export const mondayOf = (d: string) => addDays(d, -weekdayOf(d))
+
+const OFFICE_SHIFT = 8 * 36e5
+/** The office's working hours of a day (UTC+8): 09:00–13:00 and 14:00–18:00 — 8 hours, a working day. */
+const WORK_SPANS: readonly [number, number][] = [[9, 13], [14, 18]]
+/** A stage not accepted is red after this many working hours (2026-10-24 — the user's answer 2: "4 个工作小时"). */
+export const ACCEPT_HOURS = 4
+
+/** The working hours between an instant and `to`, by the office's clock: Monday to Friday less the holidays given,
+ * 09:00–13:00 and 14:00–18:00 (HR's schedules are empty on production; until a schedule is the office's, these). */
+export function workingHours(fromIso: string, to: Date, holidays: ReadonlySet<string>): number {
+  const a = Date.parse(fromIso)
+  const b = to.getTime()
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return 0
+  // Shifted, so that a Date's UTC fields read the office's wall clock.
+  const la = a + OFFICE_SHIFT
+  const lb = b + OFFICE_SHIFT
+  let ms = 0
+  for (let d = Math.floor(la / 864e5) * 864e5; d < lb; d += 864e5) {
+    const day = new Date(d).toISOString().slice(0, 10)
+    if (weekdayOf(day) >= 5 || holidays.has(day)) continue
+    for (const [h1, h2] of WORK_SPANS) ms += Math.max(0, Math.min(d + h2 * 36e5, lb) - Math.max(d + h1 * 36e5, la))
+  }
+  return ms / 36e5
+}
 
 /** "21 Oct" */
 export const shortDay = (d: string) => `${+d.slice(8, 10)} ${MON[+d.slice(5, 7) - 1]}`

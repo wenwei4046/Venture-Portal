@@ -116,6 +116,11 @@
 .tone_ads, .cal_ads { background: var(--mk-team-ads-bar); color: var(--mk-team-ads); }
 .tone_brand, .cal_brand { background: var(--mk-team-brand-bar); color: var(--mk-team-brand); }
 .calChip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 5px; font-size: 12px; font-weight: 500; }
+/* A date's kind, one of six (2026-10-24): picked like a chip, ringed when on. */
+.calKinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.calKinds .calChip { border: 0; cursor: pointer; font-family: inherit; padding: 4px 9px; }
+.calChipOn { box-shadow: 0 0 0 2px rgb(var(--mk-white)), 0 0 0 3.5px rgb(var(--mk-ink)); }
+.cal_manager { background: var(--mk-team-manager-bar); color: var(--mk-team-manager); }
 
 /* The Preview. */
 .preview { border-left: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-surface)); padding: 18px 18px 40px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; box-sizing: border-box; }
