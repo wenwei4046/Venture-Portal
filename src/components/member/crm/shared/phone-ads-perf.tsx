@@ -11,7 +11,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily, fetchAdInsights } from "@/app/(member)/member/crm-actions";
 import { ALL, METRICS, metaFigures } from "../desk/vm/adsperf";
-import { chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, isoOf, scaled, SERIES } from "../desk/vm/adschart";
+import { chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, isoOf, scaled } from "../desk/vm/adschart";
 import { PHONE_TYPE, typePx } from "./type";
 import { Ic } from "./icons4a";
 
@@ -21,6 +21,8 @@ const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const BTN = { border: 0, background: "transparent", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" } as const;
 const DAY = 86_400_000;
 const MAX = 4;
+/** Four colours that tell apart at a glance (the owner, 2026-10-24: "顏色有點像" — the desktop's series sat too close here). */
+const COLORS = ["var(--crm-rust)", "var(--crm-messenger)", "var(--crm-today)", "var(--crm-amber)"];
 /** What the phone offers: the CRM's own figures and Meta's that the server reads (the rest of the desktop's list stays there). */
 const OFFER = ["leads", "appt", "apptrate", "showup", "showrate", "won", "winrate", "spend", "cpl", "cpappt", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"];
 const DEF = ["leads", "apptrate", "spend", "cpl"];
@@ -30,10 +32,11 @@ const LOWER_IS_BETTER = /^(cpl|cpappt|cpwon|cpmsg|cpc|cpm|cpr|cpp|cpcall|spend)$
 
 type Range = { a: number; b: number };
 const day0 = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-function rangeOf(k: string, now: Date): Range {
+function rangeOf(k: string, now: Date, custom?: Range | null): Range {
+  if (k === "custom" && custom) return custom;
   const T = day0(now.getTime());
   if (k === "today") return { a: T, b: T };
-  if (k === "7d") return { a: T - 6 * DAY, b: T };
+  if (k === "week") return { a: T - ((now.getDay() + 6) % 7) * DAY, b: T };
   if (k === "lastm") return { a: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), b: new Date(now.getFullYear(), now.getMonth(), 0).getTime() };
   return { a: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), b: T };
 }
@@ -56,7 +59,9 @@ const label = (k: string) => SHORT[k] ?? defOf(k)?.[1] ?? k;
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean }; head?: ReactNode }) {
   const [per, setPer] = useState("month"), [cmp, setCmp] = useState(true), [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
-  const r = rangeOf(per, p.now), rb = before(r);
+  const [custom, setCustom] = useState<Range | null>(null), [cal, setCal] = useState(false);
+  const r = rangeOf(per, p.now, custom), rb = before(r);
+  const tOf = (v: string) => { const [y, m, d] = v.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
   const ads = useMemo(() => {
     const ids = new Set<string>(); p.customers.forEach(c => { if (c.adId) ids.add(c.adId); });
@@ -95,22 +100,28 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
       {head}
       {/* The period, and "vs the period before" */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
-          {([["today", "Today"], ["7d", "7 days"], ["month", "This month"], ["lastm", "Last month"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => setPer(k)} style={chip(per === k)}>{l}</button>)}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {([["today", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => { setPer(k); setCal(false); }} style={chip(per === k)}>{l}</button>)}
+          {/* Dates of one's own, and the comparison, as icons (the owner, 2026-10-24: "做comparison功能，用图标代替即可"). */}
+          <span style={{ marginLeft: "auto" }} />
+          <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={per === "custom"} onClick={() => { setCal(!cal); if (!custom) setCustom(rangeOf("month", p.now)); }} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: per === "custom" ? "var(--crm-ink)" : "#fff", color: per === "custom" ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
+          <button type="button" aria-label="Compare with the period before" title="Compare with the period before" aria-pressed={cmp} onClick={() => setCmp(!cmp)} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: cmp ? "var(--crm-ink)" : "#fff", color: cmp ? "#fff" : "var(--crm-ink)" }}><Ic name="trending-up" size={14} /></button>
         </div>
+        {cal && custom && <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <input type="date" aria-label="From" value={isoOf(custom.a)} max={isoOf(custom.b)} onChange={e => { if (e.target.value) { setCustom({ ...custom, a: tOf(e.target.value) }); setPer("custom"); } }} style={{ flex: 1, minWidth: 0, height: "34px", padding: "0 8px", border: "1px solid var(--crm-line)", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)" }} />
+          <span style={{ color: "var(--crm-faint)" }}>–</span>
+          <input type="date" aria-label="To" value={isoOf(custom.b)} min={isoOf(custom.a)} onChange={e => { if (e.target.value) { setCustom({ ...custom, b: tOf(e.target.value) }); setPer("custom"); } }} style={{ flex: 1, minWidth: 0, height: "34px", padding: "0 8px", border: "1px solid var(--crm-line)", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)" }} />
+        </div>}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>
-          <button type="button" onClick={() => setCmp(!cmp)} aria-pressed={cmp} style={{ ...BTN, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: fs(12), color: cmp ? "var(--crm-ink)" : "var(--crm-muted)" }}>
-            <span style={{ position: "relative", width: "28px", height: "16px", borderRadius: "8px", background: cmp ? "var(--crm-brown)" : "var(--crm-line)" }}><span style={{ position: "absolute", top: "2px", left: cmp ? "14px" : "2px", width: "12px", height: "12px", borderRadius: "50%", background: "#fff", transition: "left 160ms" }} /></span>
-            vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
-          </button>
+          {cmp && <span style={{ marginLeft: "auto" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}</span>}
         </div>
       </div>
 
       {/* The metrics: a tile each, × to take one off, + to add (up to four) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
         {keys.map((k, i) => { const d = delta(k), def = defOf(k); return (
-          <div key={k} style={{ ...card, position: "relative", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "2px", boxShadow: `inset 3px 0 0 ${SERIES[i]}` }}>
+          <div key={k} style={{ ...card, position: "relative", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "2px", boxShadow: `inset 3px 0 0 ${COLORS[i]}` }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: fs(11.5), color: "var(--crm-muted)", paddingRight: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{def?.[1] ?? k}</span>
             <span style={{ fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{show(k, tot[k])}</span>
             <span style={{ minHeight: "14px", fontSize: fs(11), fontWeight: 500, color: d ? (d.good ? "var(--crm-today)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{d ? `${d.t} vs before` : cmp ? "—" : ""}</span>
@@ -121,7 +132,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
 
       {/* Day by day: one line a metric, each against its own highest day */}
       <div style={{ ...card, padding: "12px 12px 8px" }}>
-        <Chart days={days} lines={keys.map((k, i) => ({ k, c: SERIES[i], v: series[k] ?? [] }))} />
+        <Chart days={days} lines={keys.map((k, i) => ({ k, c: COLORS[i], v: series[k] ?? [] }))} />
       </div>
 
       {/* Every ad with those figures */}
@@ -136,7 +147,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
             </span>
             <span style={{ display: "grid", gridTemplateColumns: `repeat(${keys.length}, minmax(0,1fr))`, gap: "6px" }}>
               {keys.map((k, i) => <span key={k} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
-                <span style={{ fontSize: fs(10.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: SERIES[i], marginRight: "4px" }} />{label(k)}</span>
+                <span style={{ fontSize: fs(10.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: COLORS[i], marginRight: "4px" }} />{label(k)}</span>
                 <span style={{ fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{show(k, a.f[k])}</span>
               </span>)}
             </span>

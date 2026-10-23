@@ -201,11 +201,11 @@ export function alertsVM(ctx: DeskCtx) {
   const today = new Date(now).toDateString();
   const when = (iso: string) => { const d = new Date(iso), t = d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
     return d.toDateString() === today ? t : `${d.toLocaleDateString("en-MY", { day: "numeric", month: "short" })}, ${t}`; };
-  const KIND: Record<PanelNotif["kind"], [string, string]> = { assign: ["Assign", "var(--crm-muted)"], move: ["Move", "var(--crm-ink-soft)"], share: ["Share", "var(--crm-ink-soft)"], won: ["Won", "var(--crm-brown)"], lost: ["Lost", "var(--crm-muted)"], overdue: ["Overdue 9 h+", "var(--crm-oxblood)"] };
+  const KIND: Record<PanelNotif["kind"], [string, string]> = { adsetup: ["Ad not set", "var(--crm-rust)"], assign: ["Assign", "var(--crm-muted)"], move: ["Move", "var(--crm-ink-soft)"], share: ["Share", "var(--crm-ink-soft)"], won: ["Won", "var(--crm-brown)"], lost: ["Lost", "var(--crm-muted)"], overdue: ["Overdue 9 h+", "var(--crm-oxblood)"] };
   const rows = list.map(n => {
     const c = n.customerId ? data.customers.find(x => x.id === n.customerId) : undefined, unr = !isRead(n), [kind, color] = KIND[n.kind];
     const last = c ? lastReal(c) : undefined;
-    const open = () => { if (unr) act.readNotifs([n.key]); if (c) patch({ tab: "inbox", pane: "docked", kind: "chat", chat: c.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }); };
+    const open = () => { if (unr) act.readNotifs([n.key]); if (n.adId) { patch({ tab: "assignment" }); return; } if (c) patch({ tab: "inbox", pane: "docked", kind: "chat", chat: c.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }); };
     return { key: n.key, kind, color, time: when(n.at), unread: unr, bg: unr ? "var(--crm-page)" : "#fff", dot: unr ? color : "var(--crm-rule)",
       title: c?.name ?? n.lead,
       line: n.kind === "overdue" ? `Waiting ${Math.floor(urgencyOf(c ?? ({} as never), now).waitingMinutes / 60) || 9} h for ${n.lead === "a reply" ? "a reply" : `${n.lead}'s reply`}`
@@ -213,7 +213,7 @@ export function alertsVM(ctx: DeskCtx) {
       extra: n.extra,
       sub: c ? [CHANNEL[c.channel].name, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
       quote: last ? `${last.from === "me" ? "You: " : ""}${last.text || mediaWord(last)}` : "", hasQuote: !!last,
-      canOpen: !!c, open,
+      canOpen: !!c || !!n.adId, open,
       markRead: unr ? (e?: { stopPropagation(): void }) => { e?.stopPropagation(); act.readNotifs([n.key]); } : null };
   });
   // Invitations to me (2026-10-23 — a Move is a request on the computer too, so whoever it asks answers it here): Mine ›

@@ -202,7 +202,8 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
         const heldN = ad ? data.customers.filter(c => c.adId === ad.id && c.held && !c.assignedTo && c.heldTeam === t.id).length : 0;
         const modeWord = m === "pct" ? "By %" : m === "max" ? "By max" : "Evenly";
         const lead = director ? t.people.map(p => p.name).join(", ") : t.who;
-        const sub = heldN ? `Over the limit · holding ${heldN} lead${heldN === 1 ? "" : "s"} (By max)` : director ? `${lead} · always first` : [lead, `${mem.length} ${mem.length === 1 ? "person" : "people"}`, modeWord].filter(Boolean).join(" · ");
+        // As the phone's (2026-10-24, the owner: "打開怎麼和手機版不一樣？"): "3 people · By %", no leader's name.
+        const sub = heldN ? `Over the limit · holding ${heldN} lead${heldN === 1 ? "" : "s"} (By max)` : director ? `${lead} · always first` : [`${mem.length} ${mem.length === 1 ? "person" : "people"}`, modeWord].join(" · ");
         const totalPct = mem.reduce((a2, p, k) => a2 + valOf(t, "pct", p.id, k), 0);
         return { id: t.id, name: t.name, color: t.color, sub, subColor: heldN ? "var(--crm-oxblood)" : "var(--crm-muted)", pct,
           pctStr: ui.splitTyping?.id === t.id ? ui.splitTyping.text : pctShow(pct), onType: (e: { target: { value: string } }) => setSplit(t.id, e.target.value),
