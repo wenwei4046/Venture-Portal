@@ -36,7 +36,7 @@
 .plan + .frame { margin-top: 16px; }
 .space {
   flex: 1; min-width: 0; border-radius: 18px; overflow: hidden; background: var(--sp-bg);
-  border: 1px solid rgb(var(--mk-line-2)); transition: background .3s;
+  border: 1px solid rgb(var(--mk-line-2)); transition: background .3s; container-type: inline-size;
 }
 
 /* ── The cover, the avatar ─────────────────────────────────────────────────────── */
@@ -289,13 +289,17 @@ button.photo:disabled { cursor: wait; }
   background: var(--sp-accent); color: var(--sp-accent-ink); display: flex; align-items: center; justify-content: center;
 }
 
-/* A phone: the tiles one under another, as they are read on the board; laying out is the desktop's. */
-@media (max-width: 760px) {
-  .page { padding: 16px 16px 48px; }
-  .frame { flex-direction: column; align-items: stretch; }
-  .editBtn, .drawer { display: none; }
+/* A narrow space (a phone, or a small window beside the shell's sidebar): the tiles one under another, as they are
+   read on the board — laying out is for a wide one. */
+@container (max-width: 520px) {
   .boardPad { padding: 16px; }
   .board { height: auto !important; display: flex; flex-direction: column; gap: 12px; }
   .tile { position: relative; left: auto !important; top: auto !important; width: auto !important; }
   .cards2 { grid-template-columns: minmax(0, 1fr); }
+  .editBtn { display: none; }
+}
+@media (max-width: 760px) {
+  .page { padding: 16px 16px 48px; }
+  .frame { flex-direction: column; align-items: stretch; }
+  .editBtn, .drawer { display: none; }
 }
