@@ -7256,6 +7256,16 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-new-bg: 255 251 244; --mk-new-line: 214 180 140;
   --mk-plan-bg: oklch(0.975 0.015 235); --mk-plan-line: oklch(0.92 0.035 235); --mk-plan: oklch(0.45 0.10 235);
   --mk-cover: linear-gradient(135deg, oklch(0.86 0.07 60), oklch(0.84 0.07 20) 50%, oklch(0.82 0.06 330));
+  /* My Space's own look (⑦-1, `My Space Bento.dc.html`): the board's five backgrounds, the five accents (lettering on
+     an accent: dark on orange, white on the rest), the four covers and the Notes tile. */
+  --mk-sp-linen: 246 244 240; --mk-sp-mint: 238 246 241; --mk-sp-lilac: 243 240 248; --mk-sp-sand: 244 233 218; --mk-sp-white: 255 255 255;
+  --mk-sp-orange: #EC9B55; --mk-sp-walnut: rgb(90 62 43); --mk-sp-blue: oklch(0.52 0.12 235); --mk-sp-green: oklch(0.52 0.13 150);
+  --mk-sp-pink: oklch(0.55 0.15 350);
+  --mk-sp-cover-0: linear-gradient(135deg, oklch(0.86 0.07 60), oklch(0.84 0.07 20) 50%, oklch(0.82 0.06 330));
+  --mk-sp-cover-1: linear-gradient(135deg, oklch(0.87 0.06 200), oklch(0.84 0.07 160));
+  --mk-sp-cover-2: linear-gradient(135deg, oklch(0.38 0.06 280), oklch(0.52 0.09 320));
+  --mk-sp-cover-3: linear-gradient(135deg, oklch(0.92 0.06 95), oklch(0.85 0.08 55));
+  --mk-sp-notes: 255 249 222;
   --mk-today-ink: 246 238 230;
   --mk-shadow-sm: 0 1px 2px rgb(51 36 27 / .04);
   --mk-shadow-seg: 0 1px 2px rgb(51 36 27 / .14);

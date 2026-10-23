@@ -12,6 +12,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
+import { spaceFromRow, spacePatchOf, type Space, type SpacePatch } from './space'
 import {
   libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, taskFilesFromRow, type Library, type LibProfile, type ShareExpiry,
   type TaskFile,
@@ -496,4 +497,16 @@ export async function saveMktLibProfile(sub: string, profile: LibProfile): Promi
   const clean = profileFromRow({ avatar: p.avatar, avatar_path: p.avatarPath, banner: p.banner, banner_path: p.bannerPath, font: p.font, name: p.name, caption: p.caption })
   const { error } = await db.rpc('mkt_lib_profile_save', { p_sub: sub, p_profile: profileToRow(clean) })
   return libraryAfter(db, error, 'The brand profile could not be saved. Please try again.')
+}
+
+/** My Space's own side (⑦-1, migs 20261024007500 and 20261024007600): only the parts sent — the layout, the look, the
+ * cover, the avatar, the status, the notes, the photo. The page keeps what it drew; the space as saved comes back. */
+export async function saveMktSpace(patch: SpacePatch): Promise<Done<{ space: Space }>> {
+  await requireActionOn('/marketing', 'marketing', 'edit')
+  const clean = spacePatchOf(patch ?? {})
+  if (!Object.keys(clean).length) return { ok: false, reason: 'Nothing to save.' }
+  const { data, error } = await (await client()).rpc('mkt_space_save', { p_patch: clean })
+  if (error) return { ok: false, reason: words(error, 'Your space could not be saved. Please try again.') }
+  revalidatePath('/marketing')
+  return { ok: true, space: spaceFromRow(data) }
 }
