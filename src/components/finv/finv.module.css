@@ -56,6 +56,40 @@
 .dialogRoot[data-shown='true'] .dialogScrim,
 .dialogRoot[data-shown='true'] .dialog { opacity: 1; }
 .dialogRoot[data-shown='true'] .dialog { transform: scale(1); }
+/* A panel beside the window (2026-10-24 — IT support's file preview): the two centred together, the window moving
+   left by half of what the panel and the 16px between them take; the panel as tall as the window may grow (86vh),
+   up to 760px wide. In these percentages the window's own width (its 520 or 680) is the 100%. */
+.dialogAside {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 17px);
+  box-sizing: border-box;
+  width: min(760px, calc(100vw - 100% - 66px));
+  height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: rgb(var(--hvs-nav));
+  border: 1px solid rgb(var(--hvs-nav-border));
+  border-radius: 16px;
+  box-shadow: 0 30px 70px rgb(var(--hvs-ink) / 0.22);
+  overflow: hidden;
+  transform: translateY(-50%);
+  animation: finAsideIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dialogRoot[data-shown='true'] .dialog[data-aside] { transform: translateX(calc((min(760px, calc(100vw - 100% - 64px)) + 16px) / -2)); }
+@keyframes finAsideIn {
+  from { opacity: 0; transform: translate(-12px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+@keyframes finAsideOver {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* No room beside it (under 960px): the panel lies over the window instead. */
+@media (max-width: 959px) {
+  .dialogAside { inset: 0; width: auto; height: auto; border: 0; border-radius: inherit; box-shadow: none; transform: none; animation-name: finAsideOver; }
+  .dialogRoot[data-shown='true'] .dialog[data-aside] { transform: scale(1); }
+}
 
 .dialogHead {
   flex: none;
@@ -248,6 +282,21 @@
 }
 .dialogRoot[data-sheet][data-shown='true'] .dialog { opacity: 1; transform: none; }
 .dialogRoot[data-sheet] .dialog[data-tall] { height: 92%; }
+/* The panel beside a window (IT support's file preview) has no room on a phone: it covers the sheet, its foot as
+   clear of the phone's own bar as the sheet's. */
+.dialogRoot[data-sheet] .dialogAside {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+  transform: none;
+  padding-bottom: calc(14px + var(--safe-bottom, 0px));
+  animation-name: finAsideOver;
+}
+.dialogRoot[data-sheet][data-platform='ios'] .dialogAside { padding-bottom: max(30px, var(--safe-bottom, 0px)); }
+.dialogRoot[data-sheet][data-shown='true'] .dialog[data-aside] { transform: none; }
 .sheetHead { flex: none; padding: 10px 20px 0; }
 .grab {
   display: block;
@@ -315,4 +364,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dialogScrim, .dialog, .toast { transition: none; }
+  .dialogAside { animation: none; }
 }
