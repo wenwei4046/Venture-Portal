@@ -149,7 +149,7 @@ export function BaFormSheet({
   const [borrowerName, setBorrowerName] = useState('')
   const [notes, setNotes] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  // Read, then kept on save: one staged copy of the bank's advice for both (lib/storage/stage.ts, 2026-10-24).
+  // Read, then kept on save: one staged copy of the bank's advice for both (lib/storage/stage.ts, 2026-10-23).
   const [stage] = useState(() => stagedOnce())
   const fileRef = useRef<HTMLInputElement>(null)
   const [readNote, setReadNote] = useState<string | null>(null)

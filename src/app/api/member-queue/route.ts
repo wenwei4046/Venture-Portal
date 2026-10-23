@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     // …and (2026-10-14) objects nobody recorded a day after they went up — an upload or a copy whose record never came.
     if (dataCenterBin?.orphans) console.info('Data center unrecorded objects removed', dataCenterBin.orphans)
     // The buckets in R2 (2026-10-23): a row whose file never arrived, a file no row names, a file sent ahead that no
-    // Server Action took (2026-10-24) — a day old. Counts only.
+    // Server Action took (2026-10-23) — a day old. Counts only.
     const files = await sweepFileObjects(db).catch(() => null)
     if (files && (files.rowsWithoutFile || files.filesWithoutRow || files.stagedLeft)) console.info('R2 leftovers cleared', files)
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {

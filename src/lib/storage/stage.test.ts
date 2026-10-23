@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// The browser's half of a file sent ahead of its Server Action (2026-10-24): into the sender's own folder of
+// The browser's half of a file sent ahead of its Server Action (2026-10-23): into the sender's own folder of
 // `uploads`, then a line in the form in the file's place.
 const ME = '0e2f8a7c-1b3d-4e5f-8a9b-0c1d2e3f4a5b'
 

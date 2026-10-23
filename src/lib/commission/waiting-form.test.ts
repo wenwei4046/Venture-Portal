@@ -122,7 +122,7 @@ describe('the form as saved', () => {
 })
 
 describe('Upload form', () => {
-  it('takes what the bucket takes, up to its 100 MB (sent ahead of the action since 2026-10-24)', () => {
+  it('takes what the bucket takes, up to its 100 MB (sent ahead of the action since 2026-10-23)', () => {
     expect(templateContentType('Form.DOCX')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     expect(templateContentType('scan.webp')).toBeNull()
     expect(templateRefusal({ name: 'form.pdf', size: 120_000 })).toBeNull()

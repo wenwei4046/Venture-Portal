@@ -35,7 +35,7 @@ export function neededSentence(need: string[], short = false): string | null {
 }
 
 /**
- * What one file may be (2026-10-24): each is sent ahead of the save to its sender's own folder (lib/storage/stage.ts),
+ * What one file may be (2026-10-23): each is sent ahead of the save to its sender's own folder (lib/storage/stage.ts),
  * so the cap is the bucket's 100 MB a file — no longer the Server Action body's 4 MB for them all.
  */
 export const FILE_CAP = 100 * 1024 * 1024

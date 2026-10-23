@@ -323,7 +323,7 @@ function RecordForm({
   )
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [file, setFile] = useState<File | null>(null)
-  // Auto-read, then kept on save: one staged copy of the advice for both (lib/storage/stage.ts, 2026-10-24).
+  // Auto-read, then kept on save: one staged copy of the advice for both (lib/storage/stage.ts, 2026-10-23).
   const [stage] = useState(() => stagedOnce())
   const fileRef = useRef<HTMLInputElement>(null)
   const [readNote, setReadNote] = useState<string | null>(null)
@@ -797,7 +797,7 @@ export function AttachmentChips({ row, full = false }: { row: BaRow; full?: bool
     if (!f) return
     const fd = new FormData()
     startTransition(async () => {
-      // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+      // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
       const r = await stageInto(fd, 'file', f).then(
         () => uploadBaAttachment(row.id, fd),
         (err: unknown) => ({ error: err instanceof Error ? err.message : 'The document could not be sent.' }),

@@ -65,7 +65,7 @@ async function createPaymentVoucherInner(formData: FormData) {
   try {
     return await makePaymentVoucher(formData)
   } catch (err) {
-    // A save that failed takes the files it was sent ahead with away again — the page sends them anew (2026-10-24).
+    // A save that failed takes the files it was sent ahead with away again — the page sends them anew (2026-10-23).
     if (!isRedirect(err)) await dropStagedIn(await createClient(), formData).catch(() => undefined)
     throw err
   }
@@ -75,7 +75,7 @@ async function makePaymentVoucher(formData: FormData) {
   const user = await requireActionOn('/payments', 'treasury', 'create')
   const supabase = await createClient()
 
-  // The files that go with it (attachment_0 …): since 2026-10-24 each one is sent ahead to its sender's own folder of
+  // The files that go with it (attachment_0 …): since 2026-10-23 each one is sent ahead to its sender's own folder of
   // `uploads` (lib/storage/staging.ts — a Server Action's body stops at 4 MB); from a page loaded before that, the
   // File itself. Looked up before anything is written, so one that did not arrive stops the save, not the file.
   const attachmentCount = parseInt((formData.get('attachment_count') as string) ?? '0', 10)
@@ -2210,7 +2210,7 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
   }
   const afterDecision = !UNDECIDED_STATUSES.includes(voucher.status)
 
-  // Each sent ahead to the sender's own folder of `uploads` (2026-10-24), or the File itself from an older page.
+  // Each sent ahead to the sender's own folder of `uploads` (2026-10-23), or the File itself from an older page.
   const read = await formFiles(supabase, formData, 'files')
   if (!read.ok) throw new Error(read.reason)
   const files = read.files.filter((f) => f.size > 0)

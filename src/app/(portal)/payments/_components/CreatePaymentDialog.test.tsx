@@ -295,7 +295,7 @@ describe('the lines', () => {
     expect((sent().get('attachment_0') as File).name).toBe('slip.pdf')
   })
 
-  // 2026-10-24: each file goes ahead of the save (lib/storage/stage.ts), so a file may be up to 100 MB — no longer
+  // 2026-10-23: each file goes ahead of the save (lib/storage/stage.ts), so a file may be up to 100 MB — no longer
   // 4 MB for them all. One past it is named before anything is sent.
   it('Attachments: a file past 100 MB is named, and nothing is sent', async () => {
     draw()

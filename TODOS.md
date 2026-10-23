@@ -19,7 +19,7 @@ and its 34 policies, kept as the fallback until the owner says to delete them
   `INSERT … SELECT` once more: a browser still on a pre-#633 bundle uploads
   straight to Storage, and that file needs its bytes and its row in R2.
 
-## Owed — the CRM's one upload that still passes through a Server Action (2026-10-24)
+## Owed — the CRM's one upload that still passes through a Server Action (2026-10-23)
 
 Every portal page that handed a file to a Server Action (4 MB body) now sends it
 ahead to the sender's own folder of `uploads` first (mig `20261024006800`,

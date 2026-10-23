@@ -282,7 +282,7 @@ export default function CreatePaymentDialog({
     fd.set('attachment_count', String(files.length))
     if (submit) fd.set('submit', '1')
     try {
-      // Each file sent ahead, the save carrying only its line (2026-10-24 — no longer 4 MB for them all).
+      // Each file sent ahead, the save carrying only its line (2026-10-23 — no longer 4 MB for them all).
       for (const [i, f] of files.entries()) await stageInto(fd, `attachment_${i}`, f)
       const res = await createPaymentFromDialog(fd)
       if (!res.ok) {

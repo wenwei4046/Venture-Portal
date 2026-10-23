@@ -128,7 +128,7 @@ export async function uploadStatementInWords(formData: FormData): Promise<{ ok: 
 /** Parse the statement, save the month's session and its lines, auto-match them — the session's id, or why not. */
 async function createReconSession(formData: FormData, userId: string): Promise<{ error: string } | { id: string }> {
   const supabase = await reconClient()
-  // The statement is sent ahead to its sender's own folder since 2026-10-24 (lib/storage/staging.ts — a Server
+  // The statement is sent ahead to its sender's own folder since 2026-10-23 (lib/storage/staging.ts — a Server
   // Action's body stops at 4 MB), or comes as the File itself from an older page. Read, never kept: its staged copy
   // goes once it is parsed, whatever the answer.
   const read = await formFile(supabase, formData, 'file')

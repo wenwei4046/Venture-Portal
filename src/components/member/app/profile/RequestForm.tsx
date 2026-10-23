@@ -378,7 +378,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
     }
     setBusy(true);
     try {
-      // The invoice and the signed form go ahead of the request (2026-10-24, lib/storage/stage.ts): up to 100 MB,
+      // The invoice and the signed form go ahead of the request (2026-10-23, lib/storage/stage.ts): up to 100 MB,
       // not the 4 MB a Server Action's body carries.
       await stageFiles(form);
       const outcome = await onSubmit(form);

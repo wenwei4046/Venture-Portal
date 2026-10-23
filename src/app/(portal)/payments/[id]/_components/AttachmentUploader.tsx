@@ -15,7 +15,7 @@ interface Props {
 }
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.docx,.doc,.csv'
-// Sent ahead of the action since 2026-10-24 (lib/storage/staging.ts), so the bucket's 100 MB, not a body's 4 MB.
+// Sent ahead of the action since 2026-10-23 (lib/storage/staging.ts), so the bucket's 100 MB, not a body's 4 MB.
 const CLIENT_MAX_BYTES = 100 * 1024 * 1024
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
 

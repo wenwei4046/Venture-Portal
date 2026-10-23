@@ -18,7 +18,7 @@ import w from './waiting.module.css'
  * the uploaded form's View uses; *Replace* uploads another in its place. With none on file, the dashed *Upload
  * the signed form* (a file can be dropped on it too). Uploading is Member services · Edit's, as "+" is; the
  * file is what "+" takes: a PDF, PNG or JPG, or a Word file (2026-10-20, the user: "want word file as well"),
- * of 100 MB or less (3 MB until 2026-10-24). A Word .docx is read in the viewer; an old .doc is Download only.
+ * of 100 MB or less (3 MB until 2026-10-23). A Word .docx is read in the viewer; an old .doc is Download only.
  */
 export default function SignedFormPanel({
   requestId,
@@ -58,7 +58,7 @@ export default function SignedFormPanel({
     setError(null)
     const data = new FormData()
     data.set('requestId', requestId)
-    // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB.
+    // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB.
     const done = await stageInto(data, 'file', file).then(
       () => uploadSignedForm(data),
       (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The signed form could not be sent.' }),

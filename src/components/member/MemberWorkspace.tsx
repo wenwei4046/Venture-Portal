@@ -2887,7 +2887,7 @@ function RequestForm({
         });
         return;
       }
-      // The invoice goes ahead of the request (2026-10-24, lib/storage/stage.ts) — from a copy, so a retry after a
+      // The invoice goes ahead of the request (2026-10-23, lib/storage/stage.ts) — from a copy, so a retry after a
       // refusal sends the kept file again.
       const sending = new FormData();
       saved.forEach((v, k) => sending.append(k, v));

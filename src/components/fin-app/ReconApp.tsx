@@ -526,7 +526,7 @@ function ReconUploadSheet({
     fd.set('bank_account_id', bankId)
     fd.set('period_month', month)
     try {
-      // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
+      // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
       await stageInto(fd, 'file', file)
       const res = await uploadStatementInWords(fd)
       if (!res.ok) return setError(res.reason)

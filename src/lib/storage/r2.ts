@@ -129,7 +129,7 @@ const PUT_TRIES = 4
 
 /**
  * Puts one object from the server; never over one already there. Signed first (the body is UNSIGNED-PAYLOAD, so it is
- * no part of the signature), then sent with the bytes themselves (2026-10-24): handed to `fetch` inside a Request, as
+ * no part of the signature), then sent with the bytes themselves (2026-10-23): handed to `fetch` inside a Request, as
  * aws4fetch's own `fetch` does, the body became a stream that Next's server sends chunked, without a length — and R2
  * refuses every such PUT, `411 MissingContentLength` (Finance's voucher attachments, the morning after the move).
  */

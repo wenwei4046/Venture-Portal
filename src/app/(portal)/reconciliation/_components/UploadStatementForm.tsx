@@ -38,7 +38,7 @@ export default function UploadStatementForm({
     fd.set('period_month', month)
     startTransition(async () => {
       try {
-        // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
+        // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
         await stageInto(fd, 'file', file)
         const r = await uploadStatement(fd)
         if (r?.error) setError(r.error)
