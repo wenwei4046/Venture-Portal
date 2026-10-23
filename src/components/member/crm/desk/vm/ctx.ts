@@ -199,7 +199,9 @@ export interface DeskUi {
   // Channels
   chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string;
   /** v2 frame 09b: the number whose Business profile drawer is open. */
-  chProf: string | null; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
+  chProf: string | null;
+  /** v2: the New chat (Inbox) / Add customer (Contacts) sheet. */
+  addCust: "chat" | "contact" | null; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
   chDlg: { kind: string; id: string } | null; chNewOpen: boolean; chNew: { name: string; cat: string; lang: string; body: string } | null; chWaNum: string | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
@@ -244,7 +246,7 @@ export const initialDeskUi = (): DeskUi => ({
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
   cfDraft: null, cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
-  chTab: "conn", chProf: null, chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
+  chTab: "conn", chProf: null, addCust: null, chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 
 /** The Revenue app around the CRM: its sidebar pages, top bar and who is signed in. */
@@ -283,6 +285,8 @@ export interface DeskActions {
   deleteForm(id: string): Promise<boolean>;
   /** v2 frame 08: the form every Customer info asks (crm_set_active_form puts it first). */
   setActiveForm(id: string): Promise<boolean>;
+  /** v2 frames 02 / 03: a customer added by hand on WhatsApp (crm_add_contact) — their id, or false. */
+  addCustomer(name: string, phone: string, assign: string | null): Promise<string | false>;
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
   /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
   saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;

@@ -46,6 +46,8 @@ const CRM_WRITES = [
   "crm_save_showroom_remarks", "crm_delete_showroom",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
+  // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
+  "crm_add_contact",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -124,7 +126,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
-  "crm_add_note",
+  "crm_add_note", "crm_add_contact",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;

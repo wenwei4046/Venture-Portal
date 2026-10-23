@@ -152,6 +152,17 @@ export default function DeskScreens(p: DeskScreensProps) {
         });
         return id;
       },
+      async addCustomer(name, phone, assign) {
+        const r = await call("crm_add_contact", { p_name: name, p_phone: phone, p_assign: assign });
+        if (!r) return false;
+        const id = live ? String(r.data ?? "") : `demo-${Date.now()}`;
+        if (!id) return false;
+        // Shown at once; the next read (≤ 5 s) brings the row as the database keeps it.
+        const d = phone.replace(/D/g, "").replace(/^0/, "60"), at = new Date().toISOString();
+        setData(x => (x.customers.some(c => c.id === id) ? x : { ...x, customers: [{ id, name: name.trim(), phone: `+${d}`, channel: "whatsapp", adId: null, ad: "", status: "new", wonAmount: null,
+          assignedTo: assign ?? me, teamId: null, lastCustomerAt: null, createdAt: at, unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, detailsSaved: false, messages: [] }, ...x.customers] }));
+        return id;
+      },
       async setActiveForm(id) {
         if (!(await call("crm_set_active_form", { p_id: id }))) return false;
         setData(d => { const list = d.forms ?? []; const f = list.find(x => x.id === id); return f ? { ...d, forms: [f, ...list.filter(x => x.id !== id)] } : d; });

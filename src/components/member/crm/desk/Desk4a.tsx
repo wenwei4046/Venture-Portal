@@ -11,7 +11,7 @@ import { usePanelOpen } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
 import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
-import { DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
+import { DeskAddCustomer, DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
 import { WA_VERTICALS } from "@/lib/meta/channels";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -161,6 +161,7 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
   return (<>
+    {f4.addCust && <DeskAddCustomer v={f4.addCust} />}
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
       {h.tabs.length > 0 && (

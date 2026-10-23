@@ -26,7 +26,7 @@ const APP = {
   p01: [["Insight"]], p01b: [["Insight"], ["Ads performance"]], p02: [["Inbox"], ["Lim Wei Jie"]], p02b: [["Inbox"], ["Lim Wei Jie"], ["Audit log"]], p03: [["Contacts"]], p04: [["Calendar"]],
   p05: [["Ads Performance"]], p06: [["Assignment"]], p06b: [["Assignment"], ["Leads by ad"]], p06c: [["Assignment"], ["Active members"]],
   p07: [["Showrooms"]], p08: [["Customer form"]], p09: [["Channels"]], p10: [["Settings"]], p11: [["Audit log"]],
-  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]], p12c2: [["Reports"], ["Salespeople"], ["Farah Aziz"]], p06b2: [["Assignment"], ["Leads by ad"], ["Farah Aziz"]],
+  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]], p12c2: [["Reports"], ["Salespeople"], ["Farah Aziz"]], "app-newchat": [["Inbox"], ["New chat"]], "app-addcust": [["Contacts"], ["Add customer"]], p06b2: [["Assignment"], ["Leads by ad"], ["Farah Aziz"]],
 };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".svg": "image/svg+xml" };
@@ -64,12 +64,15 @@ try {
   ws.addEventListener("message", e => { const m = JSON.parse(e.data); if (m.id && wait.has(m.id)) { wait.get(m.id)(m); wait.delete(m.id); } });
   await send("Page.enable"); await send("Runtime.enable");
   for (const f of list.split(",")) {
+    // An app-only scene (no frame in the prototype, e.g. a sheet the design does not draw): the app at 1440 × 900 alone.
+    let box = { x: 0, y: 0, width: 1440, height: 900 };
+    if (!f.startsWith("app-")) {
     // The prototype: the canvas with every other frame hidden; the frame's own box captured.
     await send("Emulation.setDeviceMetricsOverride", { width: 2000, height: 1300, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url: "http://127.0.0.1:3411/CRM%20Desktop.dc.html" });
     for (let i = 0; i < 60; i++) { await sleep(250); if (await js(`!!document.getElementById(${JSON.stringify(f)})`)) break; }
     await js("document.fonts.ready.then(() => true)"); await sleep(600);
-    const box = await js(`(() => { const all = [...document.querySelectorAll('[data-screen-label]')]; all.forEach(e => e.style.display = e.id === ${JSON.stringify(f)} ? 'flex' : 'none');
+    box = await js(`(() => { const all = [...document.querySelectorAll('[data-screen-label]')]; all.forEach(e => e.style.display = e.id === ${JSON.stringify(f)} ? 'flex' : 'none');
       const sec = document.querySelector('section'); sec.style.padding = '0'; sec.firstElementChild.style.display = 'none'; sec.children[1].style.display = 'block';
       const fr = document.getElementById(${JSON.stringify(f)}); fr.firstElementChild.style.display = 'none'; const b = fr.children[1]; b.style.borderRadius = '0'; b.style.boxShadow = 'none';
       window.scrollTo(0, 0); const r = b.getBoundingClientRect(); return { x: r.left, y: r.top, width: r.width, height: r.height }; })()`);
@@ -77,6 +80,7 @@ try {
     writeFileSync(join(out, `${f}-proto.png`), await capture(box));
     // The frame as rendered (its inline styles are the spec): <out>/<frame>.html.
     writeFileSync(join(out, `${f}.html`), await js(`document.getElementById(${JSON.stringify(f)}).children[1].outerHTML`));
+    }
     const steps = APP[f];
     if (steps) {
       await send("Emulation.setDeviceMetricsOverride", { width: box.width, height: box.height, deviceScaleFactor: 1, mobile: false });

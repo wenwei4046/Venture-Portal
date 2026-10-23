@@ -69,6 +69,18 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
     // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
+    addCust: ui.addCust ? {
+      title: ui.addCust === "chat" ? "New chat" : "Add customer", go: ui.addCust === "chat" ? "Start chat" : "Add customer",
+      people: ctx.data.can.manage ? [...ctx.directors, ...ctx.teams.flatMap(t => t.people)].filter((p, i, a) => a.findIndex(x => x.id === p.id) === i).map(p => ({ id: p.id, name: p.name })) : null,
+      me: ctx.me.id, close: () => ctx.patch({ addCust: null }),
+      save: async (name: string, phone: string, assign: string | null) => {
+        const id = await ctx.deskAct.addCustomer(name, phone, assign && assign !== ctx.me.id ? assign : null);
+        if (!id) return false;
+        if (ui.addCust === "chat") ctx.patch({ addCust: null, tab: "inbox", pane: "docked", kind: "chat", chat: id, inbF: "All", whoSel: [] });
+        else ctx.patch({ addCust: null, toast: `${name.trim()} added · their chat opens with a template` });
+        return true;
+      },
+    } : null,
     bookPick: (() => {
       const q = ui.bookQ.trim().toLowerCase();
       const rows = data.customers.filter(c => c.status !== "won" && c.status !== "lost" && (!q || c.name.toLowerCase().includes(q) || c.phone.includes(q))).slice(0, 30);
@@ -118,8 +130,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
   return {
     // v2 frames 01 / 01b: Team performance | Ads performance under the title; Export PDF.
     insight: { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
-    inbox: { tabs: [], sub: "", cta: null },
-    people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: null },
+    // v2 frames 02 / 03 (the owner: "做手动新增客户"): New chat and Add customer — one sheet, a customer added by hand.
+    inbox: { tabs: [], sub: "", cta: ctx.data.can.editOwn ? { label: "New chat", icon: "plus", act: () => ctx.patch({ addCust: "chat" }) } : null },
+    people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: ctx.data.can.editOwn ? { label: "Add customer", icon: "user-plus", act: () => ctx.patch({ addCust: "contact" }) } : null },
     calendar: { tabs: v.calViews, sub: v.calTitle, cta: { label: "Book a visit", icon: "calendar", act: () => ctx.patch({ bookPick: !ctx.ui.bookPick }) } },
     // v2 (frame 05, note 02): no period tabs (the range button under the title does it); Export is the head's primary, its
     // menu Excel / CSV / PDF report as before.

@@ -1007,3 +1007,41 @@ export function DeskProfileDrawer({ v, verticals }: { v: ProfileDrawerV; vertica
     </div>
   );
 }
+
+/**
+ * v2 frames 02 / 03 — New chat (Inbox) and Add customer (Contacts), the owner's "做手动新增客户": a name and a WhatsApp
+ * phone (a Malaysian 01… number is read as 601…), given to oneself — or, for CRM · Manage, to anybody. A phone already in
+ * the CRM opens that customer instead of a second one. Outside WhatsApp's 24 h window the chat opens with a template.
+ */
+export interface AddCustomerV { title: string; go: string; people: { id: string; name: string }[] | null; me: string; close: () => void; save: (name: string, phone: string, assign: string | null) => Promise<boolean> }
+export function DeskAddCustomer({ v }: { v: AddCustomerV }) {
+  const [name, setName] = useState(""), [phone, setPhone] = useState(""), [who, setWho] = useState(v.me), [busy, setBusy] = useState(false);
+  const digits = phone.replace(/\D/g, ""), ok = !!name.trim() && digits.length >= 9 && !busy;
+  const box: CSSProperties = { height: "36px", padding: "0 10px", borderRadius: "7px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none", width: "100%" };
+  const label: CSSProperties = { display: "flex", flexDirection: "column", gap: "5px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" };
+  const go = async () => { if (!ok) return; setBusy(true); const done = await v.save(name, phone, who); setBusy(false); if (!done) return; };
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label={v.title} style={{ width: "400px", borderRadius: "12px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{v.title}</span>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px" }}>
+          <label style={label}>Name<input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Tan Mei Ling" style={box} /></label>
+          <label style={label}>WhatsApp phone<input value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void go(); }} inputMode="tel" placeholder="012-345 6789" style={box} /></label>
+          {v.people && (
+            <label style={label}>Give to
+              <select value={who} onChange={e => setWho(e.target.value)} style={box}>{[{ id: v.me, name: "Me" }, ...v.people.filter(p => p.id !== v.me)].map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            </label>
+          )}
+          <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Added on the CRM&apos;s WhatsApp number. Until they write, a message to them goes as an approved template.</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={v.close} style={{ ...XBTN, height: "36px", padding: "0 14px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 13px Inter, sans-serif" }} className={ok ? "crm4a-primary" : undefined}>{busy ? "Adding…" : v.go}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
