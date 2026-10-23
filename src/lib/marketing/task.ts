@@ -398,6 +398,8 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'paused': return `${e.actor} paused the series`
     case 'resumed': return `${e.actor} resumed the series`
     case 'ended': return e.data?.after === 'last run' ? 'The last run is done · the series ended' : `${e.actor} ended the series`
+    case 'attached': return `${e.actor} attached "${e.reason ?? ''}" from the Library`
+    case 'detached': return `${e.actor} took "${e.reason ?? ''}" off the task`
     default: return `${e.actor} · ${e.action}`
   }
 }

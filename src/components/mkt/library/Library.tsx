@@ -13,8 +13,9 @@ import {
 import {
   binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
   libraryPath, libView, listedName, moveTargets, railCounts, shareOf, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
-  type LibFile, type LibSub, type LibView, type SchedItem,
+  type LibFile, type LibSub, type LibView, type SchedItem, type AttachTask,
 } from '@/lib/marketing/library'
+import AttachToTask from './AttachToTask'
 import BrandProfile from './BrandProfile'
 import ShareLink from './ShareLink'
 import s from './library.module.css'
@@ -29,7 +30,7 @@ import s from './library.module.css'
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
 type Menu = { kind: 'file' | 'folder'; id: string } | 'new' | 'add' | null
-type Modal = { kind: 'move' | 'share'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | { kind: 'profile' } | null
+type Modal = { kind: 'move' | 'share' | 'attach'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | { kind: 'profile' } | null
 
 const CAT_CLASS: Record<LibCat, string> = { Brand: s.cat_Brand, Product: s.cat_Product, Photo: s.cat_Photo, Video: s.cat_Video, Content: s.cat_Content, Minutes: s.cat_Minutes }
 const asCat = (v: string | null): LibCat | null => ((LIB_CATS as readonly string[]).includes(v ?? '') ? (v as LibCat) : null)
@@ -61,7 +62,14 @@ function Avatar({ x, className, pct }: { x: LibSub; className: string; pct?: num
   )
 }
 
-export default function Library({ initial, schedules = {}, can, at }: { initial: Lib; schedules?: Record<string, SchedItem[]>; can: Can; at: At }) {
+export default function Library({ initial, schedules = {}, tasks = {}, can, at }: {
+  initial: Lib
+  schedules?: Record<string, SchedItem[]>
+  /** Each subsidiary's open tasks, for Attach to task (⑥-4). */
+  tasks?: Record<string, AttachTask[]>
+  can: Can
+  at: At
+}) {
   const router = useRouter()
   const [lib, setLib] = useState(initial)
   useEffect(() => setLib(initial), [initial])
@@ -174,6 +182,9 @@ export default function Library({ initial, schedules = {}, can, at }: { initial:
         <>
           <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'share', what: 'file', id: f.id, name: f.name }) }}>
             Share link<span className={s.menuHint}>{shareOf(lib, 'file', f.id) ? 'live' : 'guest'}</span>
+          </button>
+          <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'attach', what: 'file', id: f.id, name: f.name }) }}>
+            Attach to task<span className={s.menuHint}>send</span>
           </button>
           <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'file', id: f.id, name: f.name }) }}>Move to…</button>
           <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), 'Moved to Dustbin · deletes automatically in 30 days')}>
@@ -499,6 +510,12 @@ export default function Library({ initial, schedules = {}, can, at }: { initial:
       {modal?.kind === 'share' && can.edit ? (
         <ShareLink lib={lib} what={modal.what} id={modal.id} name={modal.name} onClose={() => setModal(null)} onLibrary={setLib} />
       ) : null}
+
+      {modal?.kind === 'attach' && can.edit ? (() => {
+        const theFile = lib.files.find(f => f.id === modal.id)
+        const owner = theFile ? ix.sub(ix.subOf(theFile)) : undefined
+        return <AttachToTask file={modal.id} name={modal.name} sub={owner?.name ?? ''} tasks={owner ? tasks[owner.id] ?? [] : []} onClose={() => setModal(null)} />
+      })() : null}
 
       {modal?.kind === 'profile' && sub && can.manage ? (
         <BrandProfile sub={sub} onClose={() => setModal(null)} onSaved={l => { setLib(l); setModal(null) }} />

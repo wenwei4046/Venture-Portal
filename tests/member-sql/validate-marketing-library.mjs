@@ -432,4 +432,66 @@ await one(`SELECT public.mkt_lib_delete('folder', $1)`, [brandCar])
 check(await peek1(`SELECT count(*)::int FROM public.mkt_lib_shares WHERE file_id IN ($1, $2) OR folder_id = $3`, [fa, fb, brandCar]), 0,
   'a folder deleted for good takes its links, and its files’')
 
+// ── ⑥-4: a Library file attached to a task (20261024007400) ─────────────────────────
+await db.exec('RESET ROLE')
+const attachMig = await sql('20261024007400_marketing_task_library.sql')
+await db.exec(attachMig)
+await db.exec(attachMig) // twice: nothing changes, nothing breaks
+for (const fn of ['mkt_task_library(uuid)', 'mkt_task_attach(uuid,uuid[])', 'mkt_task_detach(uuid,uuid)']) {
+  check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
+    [false, true], `${fn}: a sign-in’s, never the publishable key’s`)
+}
+const project = async (track, kind, sub, status = 'active', series = null) =>
+  peek1(`INSERT INTO public.mkt_projects (track_id, kind, subsidiary_id, title, status, series_id, run_no) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [track, kind, sub, `E2E ${track}`, status, series, series ? 1 : null])
+const TQ = await project('TSK-CAR-2610-901', 'quick', CAR)
+const PJ = await project('MKT-CAR-2610-902', 'product', CAR, 'minutes')
+const RS = await project('RCR-CAR-2610-903', 'recurring', CAR)
+const RR = await project('RCR-CAR-2610-903-R01', 'recurring', CAR, 'active', RS)
+const TD = await project('TSK-CAR-2610-904', 'quick', CAR, 'done')
+const handCar = await peek1(`SELECT id FROM public.mkt_lib_folders WHERE subsidiary_id = $1 AND type_id = $2 AND trashed_at IS NULL`, [CAR, await type('Handbook')])
+const TA = `library/${id(971)}/alpha.pdf`
+const TB = `library/${id(972)}/beta.jpg`
+const TC = `library/${id(973)}/other.pdf`
+await as(U.mei, STAFF)
+await put(TA)
+await put(TB, 4096, 'image/jpeg')
+await put(TC)
+const ta = (await one(`SELECT public.mkt_lib_file_add($1, 'Alpha brief', $2)`, [handCar, TA])).id
+const tb = (await one(`SELECT public.mkt_lib_file_add($1, 'Beta photo', $2)`, [handCar, TB])).id
+const tc = (await one(`SELECT public.mkt_lib_file_add($1, 'Other', $2)`, [photosCar, TC])).id
+const attach = (p, files) => one(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [p, files])
+const trail = async p => (await peek(`SELECT action, reason FROM public.mkt_events WHERE project_id = $1 ORDER BY id`, [p])).map(e => `${e.action}:${e.reason}`)
+
+await as(U.ali, VIEW)
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [ta]], /Attaching to a task is not open/, 'attaching is Marketing · Edit’s')
+await as(U.mei, STAFF)
+const at1 = await attach(TQ, [ta, tb, ta])
+check([at1.attached, at1.files.map(f => f.name)], [2, ['Alpha brief', 'Beta photo']], 'two files on the task — the Library’s, no copy')
+check(Object.keys(at1.files[0]).sort(), ['at', 'by', 'folder', 'id', 'mime', 'name', 'path', 'size'], 'each with its place, its folder, who attached it')
+check((await attach(TQ, [ta])).attached, 0, 'attached once')
+check(await trail(TQ), ['attached:Alpha brief', 'attached:Beta photo'], 'the trail says each, once')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [tc]], /another subsidiary's/, 'only the task’s own subsidiary’s files')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [PJ, [ta]], /attached to a task/, 'never a product project (②b-2)')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [RS, [ta]], /attached to a task/, 'never a series — its runs are the tasks')
+check((await attach(RR, [ta])).attached, 1, 'a run of a recurring task takes them')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TD, [ta]], /That task is closed/, 'never a closed task')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, [id(999)]], /not in the Library/, 'never a file not there')
+await refuses(`SELECT public.mkt_task_attach($1, $2::uuid[])`, [TQ, []], /Pick a file/, 'something to attach')
+
+// Binned in the Library: off the task until restored. Taken off: the file stays. Deleted for good: gone from the task.
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [ta])
+await as(U.ali, VIEW)
+check((await one(`SELECT public.mkt_task_library($1)`, [TQ])).map(f => f.name), ['Beta photo'], 'a binned file waits off the task')
+await as(U.mei, STAFF)
+await one(`SELECT public.mkt_lib_restore('file', $1)`, [ta])
+check((await one(`SELECT public.mkt_task_detach($1, $2)`, [TQ, tb])).map(f => f.name), ['Alpha brief'], 'taken off the task')
+check([await peek1(`SELECT count(*)::int FROM public.mkt_lib_files WHERE id = $1 AND trashed_at IS NULL`, [tb]), (await trail(TQ)).at(-1)],
+  [1, 'detached:Beta photo'], '…the file still in the Library, the trail saying so')
+await refuses(`SELECT public.mkt_task_detach($1, $2)`, [TQ, tb], /not on the task/, 'taken off once')
+await one(`SELECT public.mkt_lib_bin('file', $1)`, [ta])
+await as(U.josiah, MANAGER)
+await one(`SELECT public.mkt_lib_delete('file', $1)`, [ta])
+check(await peek1(`SELECT count(*)::int FROM public.mkt_task_files WHERE file_id = $1`, [ta]), 0, 'deleted for good: off every task')
+
 console.log(`marketing library: ${checks} checks passed`)

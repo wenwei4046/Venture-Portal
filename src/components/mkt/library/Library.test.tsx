@@ -8,7 +8,7 @@ import { libraryFromRow } from '@/lib/marketing/library'
 
 const actions = vi.hoisted(() => ({
   addMktLibFolder: vi.fn(), addMktLibType: vi.fn(), binMktLib: vi.fn(), deleteMktLib: vi.fn(), fileMktLib: vi.fn(), moveMktLib: vi.fn(),
-  saveMktLibProfile: vi.fn(), shareMktLib: vi.fn(), stopMktLibShare: vi.fn(),
+  saveMktLibProfile: vi.fn(), shareMktLib: vi.fn(), stopMktLibShare: vi.fn(), attachMktTaskFiles: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const replace = vi.fn()
@@ -276,6 +276,19 @@ describe('a guest link', () => {
     await waitFor(() => expect(actions.stopMktLibShare).toHaveBeenCalledWith('file', 'x2'))
     expect(flash).toHaveBeenCalledWith('Link stopped')
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('Attach to task: one of the file’s subsidiary’s open tasks', async () => {
+    actions.attachMktTaskFiles.mockResolvedValueOnce({ ok: true, attached: 1, files: [] })
+    const tasks = { [CAR]: [{ id: '50000000-0000-4000-8000-000000000001', trackId: 'TSK-CAR-2610-001', title: 'Banner', stage: 'Publish' }] }
+    render(<Library initial={lib} tasks={tasks} can={{ edit: true, manage: false }} at={{ ...AT, folder: F.brandCar }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Logo pack — more' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Attach to task/ }))
+    const dlg = screen.getByRole('dialog', { name: 'Attach "Logo pack" to a task' })
+    expect(within(dlg).getAllByRole('button').slice(1).map(b => b.textContent)).toEqual(['TSK-CAR-2610-001BannerNow at Publish'])
+    fireEvent.click(within(dlg).getByRole('button', { name: /TSK-CAR-2610-001/ }))
+    await waitFor(() => expect(actions.attachMktTaskFiles).toHaveBeenCalledWith('50000000-0000-4000-8000-000000000001', ['x2']))
+    expect(flash).toHaveBeenCalledWith('Attached "Logo pack" to TSK-CAR-2610-001')
   })
 
   it('is never offered for a link folder', () => {

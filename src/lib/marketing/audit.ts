@@ -49,6 +49,7 @@ const ACTION: Record<string, string> = {
   'link sent': 'Link sent to PIC', resent: 'Resent to PIC', 'pic approved': 'PIC approved via link',
   'pic changes': 'Changes requested via link', signed: 'Minutes signed', 'minutes completed': 'Minutes completed',
   'edited after approval': 'Edited after approval', 'started before approval': 'Started before approval',
+  attached: 'Attached from the Library', detached: 'Taken off the task',
 }
 const TONE: Record<string, AuditTone> = {
   approved: 'green', completed: 'green', 'pic approved': 'green',

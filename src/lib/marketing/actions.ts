@@ -13,7 +13,8 @@ import { productBookFromRow, type ProductBook, type ProductStatus } from './prod
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 import {
-  libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, type Library, type LibProfile, type ShareExpiry,
+  libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, taskFilesFromRow, type Library, type LibProfile, type ShareExpiry,
+  type TaskFile,
 } from './library'
 
 /**
@@ -449,6 +450,31 @@ export async function shareMktLib(kind: 'file' | 'folder', id: string, expiry: S
   const db = await client()
   const { error } = await db.rpc('mkt_lib_share', { p_kind: kind, p_id: id, p_expiry: expiry, p_download: download !== false })
   return libraryAfter(db, error, 'The link could not be made. Please try again.')
+}
+
+/** Library files onto a task (⑥-4, mig 20261024007400) — from the Library's *Attach to task* or the task's *Attach from
+ * Library*: the task's files as they now stand. */
+export async function attachMktTaskFiles(project: string, files: string[]): Promise<Done<{ files: TaskFile[]; attached: number }>> {
+  await requireActionOn(['/marketing/library', '/marketing/projects/[id]'], 'marketing', 'edit')
+  const ids = (Array.isArray(files) ? files : []).filter(isId).slice(0, 50)
+  if (!isId(project) || !ids.length) return { ok: false, reason: 'Pick a file and a task.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_task_attach', { p_project: project, p_files: ids })
+  if (error) return { ok: false, reason: words(error, 'The files could not be attached. Please try again.') }
+  freshen()
+  const row = (data ?? {}) as { attached?: unknown; files?: unknown }
+  return { ok: true, files: taskFilesFromRow(row.files), attached: Number(row.attached) || 0 }
+}
+
+/** A Library file taken off a task — it stays in the Library. */
+export async function detachMktTaskFile(project: string, file: string): Promise<Done<{ files: TaskFile[] }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !isId(file)) return { ok: false, reason: 'That file is not on the task.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_task_detach', { p_project: project, p_file: file })
+  if (error) return { ok: false, reason: words(error, 'The file could not be taken off. Please try again.') }
+  freshen()
+  return { ok: true, files: taskFilesFromRow(data) }
 }
 
 /** A guest link stopped at once. */

@@ -37,7 +37,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-24 |
 | ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-24 |
 | ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | this PR |
-| ⑥-4 | Attach to task (a file's menu) and Attach from Library (a stage's files) | |
+| ⑥-4 | A Library file on a task: *Attach to task* (a file's menu — the file's subsidiary's open tasks), the task page's *Library files* with *+ Attach from Library*, taken off; each a line on the trail (mig `20261024007400`) | this PR |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
 
 ## 3. Data (mig `20261023214100`)
@@ -140,6 +140,11 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 91. **Allow download, off** (⑥-3). A browser can still keep what it shows (a picture, a video, a PDF); off means no *Download* and nothing sent that would save (a ZIP, a document) — *View only*.
 92. **A file link lives an hour** (⑥-3). Stopped or expired, a link closes the page and every new click at once; a file already opened from it (a video playing) keeps its signed link for up to an hour.
 93. **The wording** (⑥-3). The handoff's *Guest link · for people without an account* and *Anyone with the link can view and download — no account needed* explain; the dialog carries none — its state instead (*Expires Fri 30 Oct, 10:39*, *Never expires*).
+94. **Where a file shows on a task** (⑥-4). The handoff: "It appears in the task Canvas as a linked file"; the Canvas belongs to the product task page (②b-2), so built as *Library files* on the task page under Requirements — each the Library's own file, opened from there (no copy).
+95. **Which tasks** (⑥-4). The handoff lists every task; built as the file's own subsidiary's open tasks — quick tasks and recurring runs (a series is a pattern; a product project's task page comes with ②b-2). The database refuses another subsidiary's file.
+96. **Taken off** (⑥-4). The handoff has no way to take a file off a task; built — × on its chip, the file staying in the Library. Binned in the Library, a file waits off its tasks until restored; deleted for good, it leaves them.
+97. **The trail** (⑥-4). Attaching and taking off are lines on the task's trail and in its formal log (*Attached from the Library*, *Taken off the task*, the file's name).
+98. **The picker** (⑥-4). The handoff's *Attach from Library* opens the whole Library as a picker; built as a dialog of the task's subsidiary's file folders and their files, those on the task ticked already — at most 50 files on a task.
 
 ## 5. Open questions (for the user)
 

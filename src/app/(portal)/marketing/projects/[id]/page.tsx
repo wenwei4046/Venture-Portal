@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { requireAuth, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { readProductProject, readTask } from '@/lib/marketing/server'
+import { readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
 import TaskPage from '@/components/mkt/task/TaskPage'
 import ProductProject from '@/components/mkt/project/ProductProject'
 
@@ -17,7 +17,11 @@ export default async function MarketingProjectPage({ params }: { params: Promise
   const can = { edit: canDo(user, 'marketing', 'edit'), approve: canDo(user, 'marketing', 'approve'), manage: canDo(user, 'marketing', 'manage') }
   // A Track ID says which; an id is read as a task first, and a product project's read on its own page.
   const page = /^MKT-/i.test(key) ? null : await readTask(key)
-  if (page && page.project.kind !== 'product') return <TaskPage key={page.project.id} initial={page} can={can} />
+  // A task's files from the Library (⑥-4) — a series is a pattern, never a task with files.
+  if (page && page.project.kind !== 'product') {
+    const files = page.project.kind === 'recurring' && !page.project.series ? [] : await readTaskFiles(page.project.id)
+    return <TaskPage key={page.project.id} initial={page} can={can} files={files} />
+  }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()
   return <ProductProject key={product.project.id} initial={product} can={{ edit: can.edit, manage: can.manage }} />

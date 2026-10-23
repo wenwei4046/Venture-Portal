@@ -189,6 +189,7 @@ const FEED_EMOJI: Record<string, string> = {
   created: '✨', opened: '📬', accepted: '👍', picked: '🔓', submitted: '📤', approved: '✅', changes: '↩️', completed: '🏁',
   closed: '🏁', nudged: '👋', paused: '⏸', resumed: '▶', ended: '⏹', 'link sent': '🔗', resent: '🔗', 'pic approved': '🔗',
   'pic changes': '🔗', signed: '✍️', 'minutes completed': '📝', 'edited after approval': '✏️', 'started before approval': '⚡',
+  attached: '📚', detached: '📚',
 }
 
 /** "just now", "12 min ago", "3h ago", "yesterday", else the day — `now` an instant (ms). */

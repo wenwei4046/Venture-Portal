@@ -150,6 +150,10 @@
 .fontName { font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 3px; }
 .dialogFoot { border-top: 1px solid rgb(var(--mk-line-3)); padding-top: 12px; }
 
+/* Attach to task (⑥-4): a row per open task. */
+.taskId { font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-muted)); flex: none; min-width: 130px; }
+.taskTitle { font-weight: 500; }
+
 /* A guest link's dialog (⑥-3). */
 .shareRow { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 8px; background: rgb(var(--mk-surface-2)); }
 .shareUrl {
