@@ -118,7 +118,7 @@ export default function TaskLibrary({ project, sub, open, initial, canEdit }: {
             <div className={s.dialogBtns}>
               <button type="button" className={s.btn} onClick={() => setLib(null)}>Cancel</button>
               <button type="button" className={`${s.btn} ${s.btnPrimary}`} disabled={busy || !picked.length} onClick={() => void attach()}>
-                {picked.length === 1 ? 'Attach 1 file' : `Attach ${picked.length} files`}
+                {!picked.length ? 'Attach' : picked.length === 1 ? 'Attach 1 file' : `Attach ${picked.length} files`}
               </button>
             </div>
           </div>
