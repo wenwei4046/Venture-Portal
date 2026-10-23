@@ -136,7 +136,7 @@ export function formPageVM(ctx: DeskCtx) {
           toggleReq: () => { if (!core) upd(si, fi, { req: !f.req }); }, reqCur: core ? "default" : "pointer",
           remove: () => { if (!core) edit(S => { S[si].fields.splice(fi, 1); }); },
           typeOpen, typeToggle: () => patch({ cfType: typeOpen ? null : `${si}:${f.id}` }), typeClose: () => patch({ cfType: null }), typeBd: typeOpen ? "var(--crm-rust)" : "var(--crm-line)",
-          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "var(--crm-cream)" : "transparent", fg: t === f.type ? "var(--crm-rust)" : "var(--crm-ink)", w: t === f.type ? 650 : 500, chk: t === f.type ? "var(--crm-rust)" : "transparent",
+          types: ANSWER_TYPES.filter(t => !fixedType || t === f.type).map(t => ({ t, on: t === f.type, bg: t === f.type ? "var(--crm-sel)" : "transparent", fg: t === f.type ? "var(--crm-rust)" : "var(--crm-ink)", w: t === f.type ? 650 : 500, chk: t === f.type ? "var(--crm-rust)" : "transparent",
             pick: () => upd(si, fi, { type: t }) })),
           pv: pv(f) }; }) })),
 

@@ -1879,7 +1879,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </button>
                 </div>
                 <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.aw.owner}</p>
-                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
                   <span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.aw.time}</span>
                   {!!(v.aw.inn) && (<>
                     <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
@@ -2869,7 +2869,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </svg>{v.backPersonLabel}</button>
                   </>)}
                   <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>
-                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
                     {!!(v.firstDay) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.firstDay}</span></>)}{!!(v.pinShown) && (<>
                       <div style={{ position: "sticky", top: "-10px", zIndex: "3", margin: "-10px -20px 0", display: "flex", alignItems: "center", gap: "10px", padding: "8px 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

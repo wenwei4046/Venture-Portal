@@ -6,9 +6,10 @@
  * vm/frame4a.ts — the same links, counts, menus and permissions the frame had before.
  */
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Ic } from "../shared/icons4a";
+import { Ic, type Icon4a } from "../shared/icons4a";
+import { usePanelOpen } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
-import { avatarTint } from "../shared/palette";
+import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -60,7 +61,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
               {MODULE_ROWS.map(([id, label]) => { const on = id === f.modules!.current;
                 return <button key={id} type="button" role="menuitemradio" aria-checked={on} onClick={() => { setMods(false); if (!on) f.modules!.onPick(id); }}
                   style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 8px", borderRadius: "7px", font: "500 13px Inter, sans-serif",
-                    color: "var(--crm-ink)", background: on ? "var(--crm-cream)" : "transparent" }}>
+                    color: "var(--crm-ink)", background: on ? "var(--crm-sel)" : "transparent" }}>
                   <span style={{ flex: 1 }}>{label}</span>{on && <Ic name="check" size={15} style={{ color: "var(--crm-rust)" }} />}</button>; })}
             </div>
           </>)}
@@ -104,7 +105,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
         {g.head && <div style={{ padding: "20px 10px 6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>{g.head}</div>}
         {g.items.map(n => (
           <button key={n.label} type="button" onClick={n.pick} aria-current={n.on ? "page" : undefined} style={{ ...BTN, flex: "none", display: "flex", alignItems: "center", gap: "11px", height: "36px",
-            padding: "0 10px", borderRadius: "7px", position: "relative", font: `${n.on ? 500 : 400} 14px Inter, sans-serif`, background: n.on ? "var(--crm-cream-nav-active)" : "transparent",
+            padding: "0 10px", borderRadius: "7px", position: "relative", font: `${n.on ? 500 : 400} 14px Inter, sans-serif`, background: n.on ? "var(--crm-nav-active)" : "transparent",
             color: n.on ? "var(--crm-ink)" : "var(--crm-ink-soft)" }} className="crm4a-nav">
             <span style={{ position: "absolute", left: "-12px", top: "9px", bottom: "9px", width: "2px", background: n.on ? "var(--crm-orange)" : "transparent" }} />
             <Ic name={n.icon} size={16} /><span>{n.label}</span>
@@ -169,11 +170,12 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
       {h.sub && <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{h.sub}</div>}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px", flex: "none" }}>
         {extra}
-        {/* The owner, 2026-10-18: CRM alerts is the bell alone (a dot when there are unread ones). */}
-        <button type="button" onClick={f4.openAlerts} title={f4.alertsN ? `CRM alerts · ${f4.alertsN} unread` : "CRM alerts"} aria-label="CRM alerts" style={{ ...BTN, position: "relative", width: "36px", height: "36px", borderRadius: "50%",
-          display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">
-          <Ic name="bell" size={16} />
-          {f4.alertsN && <span style={{ position: "absolute", top: "6px", right: "7px", width: "7px", height: "7px", boxSizing: "content-box", borderRadius: "50%", background: "var(--crm-orange)", border: "2px solid #fff" }} />}
+        {/* v2 (2026-10-23, the owner: "全部根据新设计"; supersedes 2026-10-18's bell alone): CRM alerts is the outline button
+            with the bell, its words, and an orange dot + oxblood count when some are unread. */}
+        <button type="button" onClick={f4.openAlerts} aria-label="CRM alerts" style={{ ...BTN, height: "36px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
+          font: "500 13px Inter, sans-serif", boxSizing: "border-box", border: "1px solid var(--crm-line)", whiteSpace: "nowrap", color: "var(--crm-ink)" }} className="crm4a-outline">
+          <Ic name="bell" size={15} />CRM alerts
+          {f4.alertsN && <><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--crm-orange)" }} /><span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-oxblood)" }}>{f4.alertsN}</span></>}
         </button>
         {h.cta && (
           <span style={{ position: "relative" }}>
@@ -323,7 +325,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
                   ? <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>
                       <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: w.color }} />{w.label}</div>
                   : <button key={i} type="button" onClick={w.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "36px", padding: "4px 8px", borderRadius: "7px",
-                      font: `${w.sel ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: w.sel ? "var(--crm-cream)" : "transparent" }} className="crm4a-row">
+                      font: `${w.sel ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: w.sel ? "var(--crm-sel)" : "transparent" }} className="crm4a-row">
                       {w.isGroup ? <span style={{ width: "24px", display: "grid", placeItems: "center" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.color }} /></span>
                         : <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 10px ${TIGHT}`, background: w.avBg, color: w.avFg }}>{w.ini}</span>}
                       <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.label}</span>
@@ -355,8 +357,8 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }} data-inbox-list="">
         {L.rows.map(r => (
           <button key={r.id} type="button" onClick={r.open} aria-current={r.sel ? "true" : undefined} style={{ ...BTN, width: "100%", display: "flex", gap: "12px", padding: "14px 18px", position: "relative",
-            borderTop: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className={r.sel ? undefined : "crm4a-row"}>
-            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-orange)" : "transparent" }} />
+            borderTop: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className={r.sel ? undefined : "crm4a-row"}>
+            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-rust)" : "transparent" }} />
             <span style={{ width: "40px", height: "40px", flex: "none", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: r.avBg, color: r.avFg }}>{r.ini}</span>
             <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
               <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
@@ -481,35 +483,58 @@ interface ContactsBits {
   ppQ: string; setPpQ: (e: { target: { value: string } }) => void;
   ppSelGroups: { label: string; sels: PpSel[] }[];
   ppChips: { label: string; clear: () => void }[]; ppHasChips: boolean; ppClear: () => void;
-  ppGrid: string; ppDragC: (e: never) => void; ppReset: () => void;
+  ppGrid: string; ppKeys: string[]; ppMinW: number; ppDragC: (e: never) => void; ppReset: () => void;
   ppSortCols0: { arrow: string; fg: string; pick: () => void }[];
   ppHead: { label: string; arrow: string; fg: string; pick: () => void; remove: () => void; drag: (e: never) => void }[];
   ppAddOpen: boolean; ppAddToggle: () => void; ppAddClose: () => void; ppAddOpts: { label: string; grp: string; chk: string; toggle: () => void }[];
   ppRows: { ini: string; name: string; phone: string; avBg: string; avFg: string; cells: PpCell[]; on: boolean; open: () => void }[];
   ppHas: boolean; ppEmpty: boolean; ppPagerOn: boolean;
 }
-const MAIN_FILTERS = ["Status", "Ad", "Salesperson", "Showroom"];
+const MAIN_FILTERS = ["Status", "Ad", "Team", "Showroom"];
+
+/**
+ * A filter's menu (v2 frame 03b, note 01): 280 px (240 at least), a 1 px line and the popover shadow, 8 px inside; the Ad
+ * menu alone opens on a search field; each option is tick · label · count on one grid, the label clamped to two lines
+ * (its full name in the tooltip) so long ad names never run into each other; the list scrolls past 300 px.
+ */
+function FilterMenu({ f }: { f: PpSel }) {
+  const [q, setQ] = useState("");
+  const searchable = f.label === "Ad";
+  const opts = q ? f.opts.filter(o => o.v.toLowerCase().includes(q.trim().toLowerCase())) : f.opts;
+  return (<>
+    <div onClick={f.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
+    <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "280px", minWidth: "240px", maxWidth: "calc(100vw - 32px)", boxSizing: "border-box", padding: "8px", background: "#fff",
+      border: "1px solid var(--crm-line)", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "6px" }}>
+      {searchable && (
+        <label style={{ height: "34px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", background: "var(--crm-field)", color: "var(--crm-faint)", font: "400 13px Inter, sans-serif" }}>
+          <Ic name="search" size={13} />
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search ads" aria-label="Search ads" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", font: "inherit", color: "var(--crm-ink)", padding: 0 }} />
+        </label>
+      )}
+      <div style={{ maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+        {opts.map(o => (
+          <button key={o.v} type="button" onClick={o.pick} title={o.v} style={{ ...BTN, display: "grid", gridTemplateColumns: "16px minmax(0,1fr) auto", alignItems: "start", columnGap: "10px", padding: "8px 10px", borderRadius: "7px",
+            background: o.on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className={o.on ? undefined : "crm4a-row"}>
+            <span style={{ width: "14px", height: "14px", marginTop: "2px", display: "flex", color: "var(--crm-rust)" }}>{o.on && <Ic name="check" size={14} />}</span>
+            <span style={{ font: `${o.on ? 600 : 400} 13px/1.4 Inter, sans-serif`, color: "var(--crm-ink)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{o.v}</span>
+            <span style={{ font: `500 12px/1.4 ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{o.n}</span>
+          </button>
+        ))}
+        {!opts.length && <div style={{ padding: "8px 10px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>No ad matches</div>}
+      </div>
+    </div>
+  </>);
+}
 
 function FilterButton({ f, label }: { f: PpSel; label?: string }) {
   const on = f.value !== "Any";
   return (
     <span style={{ position: "relative", flex: "none" }}>
       <button type="button" onClick={f.toggle} aria-expanded={f.open} style={{ ...BTN, height: "36px", padding: "0 12px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
-        font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", border: `1px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, background: on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className={on ? undefined : "crm4a-outline"}>
+        font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", border: `1px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, background: on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className={on ? undefined : "crm4a-outline"}>
         {label ?? f.label}{on && <span style={{ color: "var(--crm-rust)" }}>{f.value}</span>}<Ic name="chevron-down" size={13} />
       </button>
-      {f.open && (<>
-        <div onClick={f.close} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, minWidth: "200px", maxHeight: "300px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
-          {f.opts.map(o => (
-            <button key={o.v} type="button" onClick={o.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", borderRadius: "7px", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`,
-              background: o.on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">
-              <span style={{ width: "14px", display: "flex", color: "var(--crm-rust)" }}>{o.on && <Ic name="check" size={14} />}</span>
-              <span style={{ flex: 1 }}>{o.v}</span><span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{o.n}</span>
-            </button>
-          ))}
-        </div>
-      </>)}
+      {f.open && <FilterMenu f={f} />}
     </span>
   );
 }
@@ -562,18 +587,22 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
         </div>
       )}
       {v.ppHas && (
-        <div style={{ flex: "1 1 auto", minHeight: "240px", marginTop: "4px", display: "flex", flexDirection: "column", overflow: "auto", border: "1px solid var(--crm-line)", borderRadius: "10px" }}>
-          <div style={{ position: "sticky", top: 0, zIndex: 4, display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", minHeight: "34px", padding: "0 12px", background: "var(--crm-cream-nav)", borderBottom: "1px solid var(--crm-rule)",
+        // v2 (frame 03): no box round the table — the header sits on an ink rule; the rows scroll under it, sideways too when
+        // the columns no longer fit (Name sticky, notes 05 / 06).
+        <div style={{ flex: "1 1 auto", minHeight: "240px", display: "flex", flexDirection: "column", overflow: "auto" }}>
+          <div style={{ minWidth: `${v.ppMinW}px`, display: "flex", flexDirection: "column" }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 4, display: "grid", gridTemplateColumns: v.ppGrid, gap: "8px", alignItems: "center", padding: "9px 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)", borderBottom: "1px solid var(--crm-nav-line)",
             font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
-            <span style={{ position: "relative", whiteSpace: "nowrap" }}>
+            <span style={{ position: "sticky", left: 0, zIndex: 1, background: "var(--crm-cream-nav)", whiteSpace: "nowrap" }}>
               {v.ppSortCols0.map((c, i) => <button key={i} type="button" onClick={c.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", display: "inline-flex", gap: "4px" }}>Name <span>{c.arrow === "↕" ? "" : c.arrow}</span></button>)}
-              <span onPointerDown={v.ppDragC as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-12px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
+              <span onPointerDown={v.ppDragC as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-9px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
             </span>
             {v.ppHead.map(h => (
-              <span key={h.label} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", minWidth: 0 }} className="crm4a-th">
-                <button type="button" onClick={h.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", overflow: "hidden", textOverflow: "ellipsis" }}>{h.label}{h.arrow !== "↕" ? ` ${h.arrow}` : ""}</button>
-                <button type="button" onClick={h.remove} title="Hide column" style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }} className="crm4a-th-x"><Ic name="x" size={10} /></button>
-                <span onPointerDown={h.drag as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-12px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
+              // A header wraps onto a second line as the frame's does ("ASSIGNED / TO") rather than lose its words.
+              <span key={h.label} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "4px", minWidth: 0 }} className="crm4a-th">
+                <button type="button" onClick={h.pick} title="Sort" style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", lineHeight: 1.25, minWidth: 0, overflowWrap: "anywhere" }}>{h.label}{h.arrow !== "↕" ? ` ${h.arrow}` : ""}</button>
+                <button type="button" onClick={h.remove} title="Hide column" style={{ ...BTN, position: "absolute", right: "0", top: "50%", transform: "translateY(-50%)", padding: "2px", borderRadius: "4px", background: "var(--crm-cream-nav)", display: "flex", color: "var(--crm-faint)" }} className="crm4a-th-x"><Ic name="x" size={10} /></button>
+                <span onPointerDown={h.drag as never} onDoubleClick={v.ppReset} title="Drag to resize · double-click to reset" className="crm4a-colgrip crm4a-colgrip-seen" style={{ position: "absolute", top: "-6px", bottom: "-6px", right: "-9px", width: "10px", cursor: "col-resize", touchAction: "none", zIndex: 2 }} />
               </span>
             ))}
             <span style={{ position: "relative", display: "flex", justifyContent: "flex-end" }}>
@@ -599,26 +628,29 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
             </span>
           </div>
           {v.ppRows.map((d, i) => (
-            <button key={i} type="button" onClick={d.open} title="Show in the rail" style={{ ...BTN, display: "grid", gridTemplateColumns: v.ppGrid, gap: "14px", alignItems: "center", minHeight: "48px", padding: "8px 12px", position: "relative",
-              borderBottom: "1px solid var(--crm-rule-soft)", background: d.on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className={d.on ? undefined : "crm4a-row"}>
-              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: d.on ? "var(--crm-orange)" : "transparent" }} />
-              <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+            <button key={i} type="button" onClick={d.open} title="Show in the rail" style={{ ...BTN, display: "grid", gridTemplateColumns: v.ppGrid, gap: "8px", alignItems: "center", height: "47px", padding: "0 12px", position: "relative",
+              font: "400 13px Inter, sans-serif", borderBottom: "1px solid var(--crm-rule-soft)", background: d.on ? "var(--crm-sel)" : "var(--crm-page)", color: "var(--crm-ink)" }} className={d.on ? undefined : "crm4a-row"}>
+              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", zIndex: 2, background: d.on ? "var(--crm-rust)" : "transparent" }} />
+              <span style={{ position: "sticky", left: 0, zIndex: 1, background: "inherit", display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
                 <span style={{ width: "30px", height: "30px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT}`, background: d.avBg, color: d.avFg }}>{d.ini}</span>
                 <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
                   <span style={{ font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</span>
-                  <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.phone}</span>
+                  <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{d.phone}</span>
                 </span>
               </span>
               {d.cells.map((x, j) => (
-                <span key={j} style={{ minWidth: 0, display: "flex" }}>
-                  {x.pill ? <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "22px", padding: "0 9px", borderRadius: "11px", background: x.bg, color: x.fg, font: "500 12px Inter, sans-serif", whiteSpace: "nowrap" }}>
+                // v2 (frame 03): pills 24 px; Ad and Visit in ink-soft, Assigned to in ink, Added right-aligned muted.
+                <span key={j} style={{ minWidth: 0, display: "flex", overflow: "hidden", justifyContent: v.ppKeys[j] === "first" ? "flex-end" : undefined }}>
+                  {x.pill ? <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "24px", padding: "0 9px", borderRadius: "12px", background: x.bg, color: x.fg, font: "500 12px Inter, sans-serif", whiteSpace: "nowrap" }}>
                     {x.dot && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: x.dot }} />}{x.v}</span>
-                    : <span style={{ font: "400 13px Inter, sans-serif", color: x.fg === "var(--crm-faint)" ? "var(--crm-faint-2)" : "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{x.v}</span>}
+                    : <span style={{ font: "400 13px Inter, sans-serif", color: x.v === "—" ? "var(--crm-faint-2)" : v.ppKeys[j] === "sp" ? "var(--crm-ink)" : v.ppKeys[j] === "first" ? "var(--crm-muted)" : "var(--crm-ink-soft)",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>{x.v}</span>}
                 </span>
               ))}
               <span />
             </button>
           ))}
+          </div>
         </div>
       )}
       {v.ppPagerOn && <div style={{ flex: "none", marginTop: "12px" }}>{pager}</div>}
@@ -646,9 +678,89 @@ interface RailBits {
 const KICK: CSSProperties = { font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" };
 const HOT = new Set(["Attention", "Overdue", "Urgent", "Reply soon"]);
 
+/**
+ * The shared folded rail (v2 note 04 / 08): 44 px on #FBF4EC with the rule on its left; top to bottom a 16 px icon in
+ * brown, the panel's name running down (12 px, 500, ink-soft) and one chevron-left (13 px, faint). A click anywhere opens it.
+ */
+export function FoldedRail4a({ icon, label, open, side = "left" }: { icon: Icon4a; label: string; open: () => void; side?: "left" | "right" }) {
+  return (
+    <button type="button" onClick={open} title={`Open ${label}`} aria-label={`Open ${label}`} style={{ ...BTN, width: "44px", flex: "none", alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px",
+      paddingTop: "20px", background: "var(--crm-cream-nav)", [side === "left" ? "borderLeft" : "borderRight"]: "1px solid var(--crm-rule)" }}>
+      <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={icon} size={16} /></span>
+      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>{label}</span>
+      <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
+    </button>
+  );
+}
+
+/** A panel's collapse button (v2 note 08): 24 px square, 1 px line, chevron-right 11 px muted — beside its ✕ when it has one. */
+export function CollapseBtn4a({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} title="Collapse" aria-label="Collapse" style={{ ...BTN, flex: "none", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center",
+      border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="chevron-right" size={11} /></button>
+  );
+}
+
+/**
+ * Frame 03 · Contacts' rail (v2, notes 01 / 08): SELECTED and its collapse button; the customer picked in the table — 44 px
+ * avatar, name, phone · channel, Status · Ad · Assigned to · Visit · Last message — with Open chat and Customer info at
+ * its foot. Nobody picked: who still lacks property info, each opening its customer. Open at first, kept per browser.
+ */
+function ContactSelected4a({ s }: { s: RailSide }) {
+  const [open, toggle] = usePanelOpen("contacts-selected", true);
+  if (!open) return <FoldedRail4a icon="user-round" label="Selected" open={toggle} />;
+  const KICK2: CSSProperties = { font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" };
+  const row = (k: string, val: ReactNode, c?: string) => (
+    <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "10px", font: "400 13px Inter, sans-serif" }}>
+      <span style={{ color: "var(--crm-muted)", flex: "none" }}>{k}</span>
+      <span style={{ fontWeight: 500, textAlign: "right", color: c ?? "var(--crm-ink)", minWidth: 0, overflowWrap: "anywhere" }}>{val}</span>
+    </div>
+  );
+  const st = STATUS[s.status as keyof typeof STATUS];
+  return (
+    <aside style={{ width: "264px", flex: "none", display: "flex", flexDirection: "column", gap: "18px", padding: "18px 20px", borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-page)", overflow: "auto", minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center" }}><div style={KICK2}>{s.has ? "Selected" : s.todoTitle || "Selected"}</div><span style={{ marginLeft: "auto" }}><CollapseBtn4a onClick={toggle} /></span></div>
+        {s.has ? (<>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: "44px", height: "44px", flex: "none", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 14px ${TIGHT}`, background: "var(--crm-cream)", color: "var(--crm-ink)" }}>{s.ini}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+              <div style={{ font: `500 16px ${TIGHT}`, color: "var(--crm-ink)", overflowWrap: "anywhere" }}>{s.name}</div>
+              <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{[s.phone, s.ch].filter(Boolean).join(" · ")}</div>
+            </div>
+          </div>
+          {row("Status", s.status || "—", st?.text)}
+          {row("Ad", s.ad ? <AdLinkInline ad={s.ad} url={s.adUrl} /> : "—")}
+          {row("Assigned to", s.owner || "—")}
+          {row("Visit", s.visit || "—")}
+          {row("Last message", s.lastAt || "—")}
+        </>) : s.todo.length ? s.todo.map(t => (
+          <button key={t.id} type="button" onClick={t.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", padding: "6px 0", color: "var(--crm-ink)" }} className="crm4a-row">
+            <span style={{ width: "30px", height: "30px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT}`, background: avatarTint(t.name)[0], color: avatarTint(t.name)[1] }}>{t.ini}</span>
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              <span style={{ font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+              <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.sub}</span>
+            </span>
+          </button>
+        )) : <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Pick a customer in the table.</div>}
+      </div>
+      {s.has && (
+        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <button type="button" onClick={s.openChat} style={{ ...BTN, height: "38px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">
+            <Ic name="message-circle" size={15} />Open chat</button>
+          <button type="button" onClick={s.edit} style={{ ...BTN, height: "38px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", font: "500 13px Inter, sans-serif", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Customer info</button>
+        </div>
+      )}
+    </aside>
+  );
+}
+const AdLinkInline = ({ ad, url }: { ad: string; url: string | null }) => (url ? <a href={url} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>{ad}</a> : <>{ad}</>);
+
 /** Frames 03 / 04 · the page's right rail: Contacts' Breakdown and Selected customer (264 px), the Calendar's figures (248 px). Folds to a strip. */
 export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
-  const people = !!v.side, W = people ? 304 : 288; // 264 / 248 inside, 20 px a side (the frames' content-box)
+  // v2 (frame 03, note 01): Contacts' rail is the Selected panel alone — Breakdown and its figures are gone.
+  if (v.side) return <ContactSelected4a s={v.side} />;
+  const people = !!(v.side as RailSide | null), W = people ? 304 : 288; // 264 / 248 inside, 20 px a side (the frames' content-box)
   const [byOpen, setByOpen] = useState(false);
   if (!v.open) return (
     <button type="button" onClick={v.toggle} title={`Open ${v.title.toLowerCase()}`} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
@@ -658,7 +770,7 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
       <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
     </button>
   );
-  const c = v.chart, s = v.side;
+  const c = v.chart, s = v.side as RailSide | null; // the Calendar's now; Contacts returned above
   const total = c ? c.rows.reduce((a, r) => a + r.n, 0) : 0;
   let acc = 0;
   const donut = c && total ? `conic-gradient(${c.rows.filter(r => r.n).map(r => { const a = acc; acc += (r.n / total) * 360; return `${r.color} ${a}deg ${acc}deg`; }).join(",")})` : "var(--crm-rule-soft)";
@@ -683,7 +795,7 @@ export function DeskRail4a({ v, extra }: { v: RailBits; extra?: ReactNode }) {
               <div onClick={() => setByOpen(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
               <div style={{ position: "absolute", top: "24px", right: 0, zIndex: 8, minWidth: "180px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
                 {c.bys.map(b => <button key={b.label} type="button" onClick={() => { b.pick(); setByOpen(false); }} style={{ ...BTN, height: "32px", padding: "0 10px", borderRadius: "7px", font: `${b.on ? 500 : 400} 13px Inter, sans-serif`,
-                  background: b.on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">{b.label}</button>)}
+                  background: b.on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">{b.label}</button>)}
               </div>
             </>)}
           </span>
@@ -886,17 +998,17 @@ export function DeskCalendar4a({ v }: { v: CalPageBits }) {
         </Pop>
         <Pop label={team && team.label !== "All teams" ? team.label : "Teams"} open={teamsOpen} onToggle={() => setTeamsOpen(o => !o)}>
           {v.calTeams.map(t => { const on = t.bg === "var(--crm-ink)"; return <button key={t.label} type="button" onClick={() => { t.pick(); setTeamsOpen(false); }} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px",
-            borderRadius: "7px", font: `${on ? 500 : 400} 13px Inter, sans-serif`, background: on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">
+            borderRadius: "7px", font: `${on ? 500 : 400} 13px Inter, sans-serif`, background: on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.dot ?? "transparent", border: t.dot ? 0 : "1px solid var(--crm-faint-2)", boxSizing: "border-box" }} />{t.label}</button>; })}
         </Pop>
         <Pop label={room && room.v !== "all" ? room.label.replace(/ showroom$/i, "") : "Showrooms"} open={roomsOpen} onToggle={() => setRoomsOpen(o => !o)}>
           {v.showroomOpts.map(o => { const on = o.v === v.calShowroom; return <button key={o.v} type="button" onClick={() => { v.pickShowroom({ target: { value: o.v } }); setRoomsOpen(false); }} style={{ ...BTN, height: "34px", padding: "0 10px",
-            borderRadius: "7px", font: `${on ? 500 : 400} 13px Inter, sans-serif`, background: on ? "var(--crm-cream)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">{o.label}</button>; })}
+            borderRadius: "7px", font: `${on ? 500 : 400} 13px Inter, sans-serif`, background: on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">{o.label}</button>; })}
         </Pop>
         <Pop label={v.calWhoLabel === "Everyone" ? "People" : v.calWhoLabel} open={v.calWhoOpen} onToggle={v.toggleCalWho}>
           {v.calWhoOpts.map((w, i) => w.head
             ? <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: w.color }} />{w.label}</div>
-            : <button key={i} type="button" onClick={w.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "34px", padding: "4px 8px", borderRadius: "7px", font: `${w.sel ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: w.sel ? "var(--crm-cream)" : "transparent" }} className="crm4a-row">
+            : <button key={i} type="button" onClick={w.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "34px", padding: "4px 8px", borderRadius: "7px", font: `${w.sel ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: w.sel ? "var(--crm-sel)" : "transparent" }} className="crm4a-row">
                 <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 9px ${TIGHT}`, background: w.avBg, color: w.avFg }}>{w.ini}</span>
                 <span style={{ flex: 1 }}>{w.label}</span><span style={{ width: "16px", display: "flex", color: "var(--crm-rust)" }}>{w.sel && <Ic name="check" size={14} />}</span></button>)}
           <button type="button" onClick={v.calWhoClear} style={{ ...BTN, margin: "6px 4px 2px", height: "30px", borderRadius: "6px", textAlign: "center", font: "500 12px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }}>Clear</button>
@@ -1112,8 +1224,8 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
       {L.rows.map((r, i) => (<Fragment key={i}>
         {r.brandHead && <div style={{ display: "flex", alignItems: "center", gap: "8px", minHeight: "34px", padding: "0 12px", background: "var(--crm-page)", borderBottom: "1px solid var(--crm-rule-soft)", font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-ink-soft)" }}>{r.brand}<span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{r.brandN}</span></div>}
         <div onClick={r.open} style={{ display: "grid", gridTemplateColumns: AD_GRID, gap: "12px", alignItems: "center", minHeight: "62px", padding: "0 12px", position: "relative", cursor: "pointer",
-          borderBottom: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-cream)" : "transparent" }} className={r.sel ? undefined : "crm4a-row"}>
-          <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-orange)" : "transparent" }} />
+          borderBottom: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-sel)" : "transparent" }} className={r.sel ? undefined : "crm4a-row"}>
+          <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-rust)" : "transparent" }} />
           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>

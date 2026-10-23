@@ -279,6 +279,8 @@ module.exports = function desk4a(body) {
   }
   // Reports (2026-10-23, the owner: "在左手边功能加一个报告的功能，里面分成不一样的 category"; DeskReports.tsx,
   // vm/reports-page.ts): its own page, before Ads Performance's block (after the Audit log's, which replaces everything up to it).
+  // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
+  body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
   body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {

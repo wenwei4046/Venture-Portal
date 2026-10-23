@@ -171,7 +171,7 @@ export function channelsVM(ctx: DeskCtx) {
     chMenu: menu.map((m, i) => ({ l: m.title, t: m.type, set: (e: { target: { value: string } }) => { const a = menu.map(x => ({ ...x })); a[i].title = e.target.value; put("menu", a); }, remove: () => { if (can) put("menu", menu.filter((_, j) => j !== i)); } })),
     chMenuAdd: () => { if (can && menu.length < 5) put("menu", [...menu, { title: "", type: "Reply" }]); },
     // WhatsApp.
-    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-cream)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
+    waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-sel)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
     waCount: live.length, waAdd: () => { if (can) { open(WA_MANAGER); toast("Opened WhatsApp Manager — add the number there, then Refresh here"); } },
     wn: { name: wn?.number ?? "—", disp: wn?.verifiedName || "—", id: wn?.id ?? "", cat: WA_VERTICALS.find(v => v[0] === vertical)?.[1] ?? "Other" }, waIni: (wn?.verifiedName || "W").charAt(0).toUpperCase(),
     waSubs: ([["insights", "Insights"], ["prof", "Profile"], ["auto", "Automations"], ["links", "Message links"], ["calls", "Call settings"], ["log", "Call log"]] as const)
@@ -180,7 +180,7 @@ export function channelsVM(ctx: DeskCtx) {
     // A display name is changed through Meta's review in WhatsApp Manager.
     waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: false, notEditing: true, edit: () => { if (can) open(WA_MANAGER); }, draft: wn?.verifiedName ?? "", setDraft: () => {}, cancel: () => {}, submit: () => {} },
     waCatOpen: ui.chDlg?.kind === "cat", waCatToggle: () => { if (can) patch({ chDlg: ui.chDlg?.kind === "cat" ? null : { kind: "cat", id: "" } }); },
-    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-cream)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
+    waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-sel)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
     waF: [wf("desc", "Description", prof?.description ?? "", 512, { long: true }), wf("addr", "Address", prof?.address ?? "", 256, { ph: "Business address" }), wf("mail", "Email", prof?.email ?? "", 128, { ph: "Business email" })],
     waWeb: [wf("web1", "Website", prof?.websites[0] ?? "", 256, { ph: "https://www.example.com" }), wf("web2", "", prof?.websites[1] ?? "", 256, { ph: "https://www.example.com" })],
     waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) open(META_SUITE); },

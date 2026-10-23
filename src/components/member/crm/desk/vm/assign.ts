@@ -109,7 +109,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
       mode: r ? (r.mode === "even" ? `Evenly · each team 1/${TA.length || 1}` : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
       bd: sel ? "var(--crm-rust)" : "var(--crm-rule)", ring: sel ? "0 0 0 3px var(--crm-tint-attention)" : "none",
       // v2's list row: the split as a bar (faint while on the default), its note, the leads, a flag when something is off.
-      rowBg: sel ? "var(--crm-cream)" : "#fff",
+      rowBg: sel ? "var(--crm-sel)" : "#fff",
       segs2: (r && r.mode === "split" ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => ({ color: t.color, pct: r.split[t.id], op: 1, label: t.name.replace(/^Team /, ""), pctS: `${r.split[t.id]}%` }))
         : TA.map(t => ({ color: t.color, pct: Math.round(100 / (TA.length || 1)), op: r ? 1 : 0.4, label: t.name.replace(/^Team /, ""), pctS: `${Math.round(100 / (TA.length || 1))}%` }))),
       splitNote: r ? (r.mode === "even" ? "Evenly · each team an equal share" : "Custom split") : "Evenly by default", noteC: "var(--crm-muted)",

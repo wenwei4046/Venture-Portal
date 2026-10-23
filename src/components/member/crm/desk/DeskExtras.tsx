@@ -450,7 +450,7 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
             <div style={{ display: "flex", flexDirection: "column" }}>
               {c.rows.map(b => (
                 <div key={b.label} onClick={b.pick} title={b.pick ? "Click to filter" : undefined} className={b.pick ? DX.alert : undefined}
-                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 70px 28px 40px", gap: "8px", alignItems: "center", padding: "6px 6px", margin: "0 -6px", borderRadius: "8px", background: b.on ? "var(--crm-cream)" : "transparent", cursor: b.pick ? "pointer" : "default" }}>
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 70px 28px 40px", gap: "8px", alignItems: "center", padding: "6px 6px", margin: "0 -6px", borderRadius: "8px", background: b.on ? "var(--crm-sel)" : "transparent", cursor: b.pick ? "pointer" : "default" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "12.5px", fontWeight: b.on ? "700" : "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: b.color }}></span>{b.label}</span>
                   <span style={{ display: "block", height: "6px", borderRadius: "3px", background: "var(--crm-field)" }}><span style={{ display: "block", height: "6px", width: `${b.w}%`, borderRadius: "3px", background: b.color }}></span></span>
@@ -483,28 +483,34 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
   }
   const ICO = (d: string) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
   const cell = (on: boolean) => ({ ...BTN, minWidth: "30px", height: "30px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums",
-    background: on ? "var(--crm-ink)" : "transparent", color: on ? "#fff" : "var(--crm-ink-soft)" } as const);
+    background: on ? "var(--crm-ink)" : "transparent", color: on ? "var(--crm-on-light)" : "var(--crm-ink-soft)" } as const);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{v.range}</span>
-      <span style={{ marginLeft: "20px", display: "flex", alignItems: "center", gap: "6px", position: "relative", whiteSpace: "nowrap" }}>Show
-        <button type="button" onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "4px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-ink)" }}>
-          {cur}{ICO(open ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6")}</button>
+      {/* v2 (frame 03): "Show 20 · 10 · 50" written out, underlined in ink — the page size in use first, each one a click
+          (supersedes 2026-10-16's dropdown: the owner, 2026-10-23, "全部根据新设计"). */}
+      <span style={{ marginLeft: "20px", display: "flex", alignItems: "center", gap: "4px", position: "relative", whiteSpace: "nowrap" }}>Show
+        <span style={{ display: "inline-flex", alignItems: "center", fontWeight: 500, color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-ink)" }}>
+          {[cur, ...v.sizes.map(o => o.n).filter(n => n !== cur)].map((n, i) => (
+            <span key={n} style={{ display: "inline-flex" }}>{i > 0 && <span>&nbsp;·&nbsp;</span>}
+              <button type="button" onClick={() => v.sizes.find(o => o.n === n)?.pick()} aria-pressed={n === cur} style={{ ...BTN, font: "inherit", color: "inherit" }}>{n}</button></span>
+          ))}
+        </span>
         {open && <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "0", zIndex: 7 }}></div>
           <div role="listbox" style={{ position: "absolute", bottom: "28px", left: "36px", zIndex: 8, minWidth: "140px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
             {v.sizes.map(o => <button key={o.n} type="button" role="option" aria-selected={o.on} onClick={() => { o.pick(); setOpen(false); }}
-              style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "32px", padding: "0 10px", borderRadius: "7px", background: o.on ? "var(--crm-cream)" : "transparent", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
+              style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "32px", padding: "0 10px", borderRadius: "7px", background: o.on ? "var(--crm-sel)" : "transparent", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
               <span style={{ flex: 1, textAlign: "left" }}>{o.n} per page</span>{o.on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg>}
             </button>)}
           </div>
         </>}
       </span>
       <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-        <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={{ ...cell(false), color: v.prevOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m15 18-6-6 6-6")}</button>
+        <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={{ ...cell(false), color: v.prevOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>‹</button>
         {nums.map((n, i) => n === "…" ? <span key={`d${i}`} style={{ ...cell(false), cursor: "default" }}>…</span>
           : <button key={n} type="button" onClick={() => v.go(n)} aria-current={n === v.cur ? "page" : undefined} style={cell(n === v.cur)}>{n + 1}</button>)}
-        <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={{ ...cell(false), color: v.nextOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m9 18 6-6-6-6")}</button>
+        <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={{ ...cell(false), color: v.nextOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>›</button>
       </div>
     </div>
   );
@@ -677,7 +683,7 @@ export function DeskLeadsByAd({ v }: { v: { periods: { label: string; on: boolea
               <div key={r.who || "none"} style={{ borderBottom: "1px solid var(--crm-field)" }}>
                 {/* A person opens to the leads they got from this ad (2026-10-23: "点成员名单要可以看到他们得到的 list"). */}
                 <button type="button" onClick={r.toggle} aria-expanded={r.open} title={r.open ? "Hide their leads" : "Show their leads"} style={{ display: "grid", gridTemplateColumns: "14px minmax(0, 1fr) 140px 36px", alignItems: "center", gap: "12px",
-                  width: "100%", padding: "8px 16px", border: 0, background: r.open ? "var(--crm-cream)" : "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }} className={r.open ? undefined : "crm4a-row"}>
+                  width: "100%", padding: "8px 16px", border: 0, background: r.open ? "var(--crm-sel)" : "transparent", boxShadow: r.open ? "inset 3px 0 0 var(--crm-rust)" : "none", font: "inherit", textAlign: "left", cursor: "pointer" }} className={r.open ? undefined : "crm4a-row"}>
                   <span style={{ display: "flex", color: "var(--crm-faint)", transform: r.open ? "none" : "rotate(-90deg)", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
                   <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
                     <span style={{ fontSize: "13.5px", fontWeight: 600, color: r.team ? "var(--crm-ink)" : "var(--crm-oxblood)", lineHeight: 1.25, overflowWrap: "anywhere" }}>{r.name}</span>

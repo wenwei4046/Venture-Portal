@@ -394,6 +394,14 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-nav-line: #F0E2D4;
   --crm-hover: #FBF7F3;
   --crm-audit: #F6E7D8;
+  /* redesign v2 (2026-10-23, docs/design_handoff_crm_redesign_v2 › Global rules): ONE selected colour on white, the nav's
+     active item a step darker on its cream, a selected parent row, and the large summary blocks — cream #FCEEE2 stays for
+     small things only (an avatar, a chip) */
+  --crm-sel: #F5F0EA;
+  --crm-nav-active: #EFE6DD;
+  --crm-sum: #F5F0EA;
+  --crm-sum-line: #ECE3DA;
+  --crm-sum-div: #E6DCD2;
   --crm-audit-line: #E3CDB8;
   /* accents */
   --crm-rust: #BD4A19;

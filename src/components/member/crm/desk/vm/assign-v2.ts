@@ -192,7 +192,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     adSum: { rows: adSumRows }, adFunnel, adCosts,
     adPerLabel: per[0] === "Custom" ? per[1] : per[0], adPerOpen: ui.adPerOpen, adPerBg: ui.adPerOpen ? "var(--crm-tint-attention)" : "#fff",
     adPerToggle: () => patch({ adPerOpen: !ui.adPerOpen, adCal: false }),
-    adPerOpts: PER.map(([label, range]) => { const on = label === per[0]; return { label, range, bg: on ? "var(--crm-cream)" : "transparent", w: on ? 650 : 500,
+    adPerOpts: PER.map(([label, range]) => { const on = label === per[0]; return { label, range, bg: on ? "var(--crm-sel)" : "transparent", w: on ? 650 : 500,
       pick: () => (label === "Custom" ? patch({ adCal: true, adCustT: { ...cu, step: 0 } }) : patch({ adPer: label, adPerOpen: false, adCal: false })) }; }),
     adCalOpen: ui.adCal, adCalList: !ui.adCal, adCalHint: t0.step === 1 ? "Now pick the end date" : "Pick the start date", adCalLabel: calLbl(t0),
     adCalBack: () => patch({ adCal: false }), adCalApply: () => patch({ adCust: { a: t0.a, b: t0.b }, adPer: "Custom", adCal: false, adPerOpen: false }), adCalDays,
@@ -208,7 +208,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     ftSame, ftApplyDis: !ftSame, ftApplyOn, ftApplyFg: ftSame ? "var(--crm-ink)" : "var(--crm-faint)", ftApplyCur: ftSame ? "pointer" : "not-allowed", ftApplyTip: ftSame ? "" : "Everyone in this team needs the same days",
     toggleFtApplyChk: () => { if (ftSame) patch({ ftApplyChk: !ui.ftApplyChk }); }, ftSaveOrApply: () => (ftApplyOn ? as.ftApplyAll : as.ftSave)(),
     ftNone: frame.isFtOp && inSheet && !as.ftOpen,
-    ftCards: as.ftCards.map(c => ({ ...c, rowBg: ui.ftEdit && as.ftE.name === c.name ? "var(--crm-cream)" : "#fff", stFg: c.state === "On" ? "var(--crm-brown)" : "var(--crm-faint)" })),
+    ftCards: as.ftCards.map(c => ({ ...c, rowBg: ui.ftEdit && as.ftE.name === c.name ? "var(--crm-sel)" : "#fff", stFg: c.state === "On" ? "var(--crm-brown)" : "var(--crm-faint)" })),
     // Which ad / team to open on entering (DeskScreens opens it once, as v2's "entering opens the first running ad").
     adSeed: frame.isAdsOp && inSheet && !ui.ad && ads[0] ? ads[0].id : null,
     ftSeed: frame.isFtOp && inSheet && !ui.ftEdit && as.ftCards[0] ? as.ftCards[0].open : null,

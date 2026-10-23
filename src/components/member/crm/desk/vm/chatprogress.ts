@@ -130,7 +130,7 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
         mineTxt: my ? `${my.kind === "assign" ? "You assigned" : my.kind === "move" ? "You moved" : my.kind === "share" ? "You shared" : "You reminded"}${my.text.replace(/^[A-Z][a-z]+ (the chat )?/, " ")} · ${dShort(my.at)}` : "",
         tfg: tc[0], ttint: tc[1], hasSh: !!r.sh.length, shTxt: `Shared with ${r.sh.map(nameOf).join(", ")}`, init: initials(r.c.assignedTo ? nameOf(r.c.assignedTo) : "?"),
         status: r.cur, sbg: SC[r.cur][0], sfg: SC[r.cur][1], last: `${dShort(L.at)} · ${new Date(L.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}`,
-        lastWho: L.who ? (L.who === me.id ? "by you" : `by ${nameOf(L.who)}`) : "", steps: strip(r, cmp), bg: on ? "var(--crm-cream)" : "#fff",
+        lastWho: L.who ? (L.who === me.id ? "by you" : `by ${nameOf(L.who)}`) : "", steps: strip(r, cmp), bg: on ? "var(--crm-sel)" : "#fff",
         open: () => patch({ stage: "op", cpSel: r.c.id, awChat: null, sendFor: null, frmOpen: false, cltEdit: null }) }; }),
     cpClose: () => patch({ cpSel: null }), cpOpenChat: () => { if (sel) patch({ awChat: sel.c.id, sendFor: null, stage: "op" }); },
     cpName: sel?.c.name ?? "", cpSub: sel ? `${sel.c.ad} · ${sel.c.assignedTo ? nameOf(sel.c.assignedTo) : "No one yet"}` : "", cpStatus: sel?.cur ?? "",

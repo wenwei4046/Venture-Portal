@@ -16,6 +16,7 @@ import type { Team } from "../panel/vm/common";
 import DeskApp from "./DeskApp";
 import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
+import { titleData, titleName, titleTeams } from "./vm/names";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace } from "./nav";
@@ -205,8 +206,11 @@ export default function DeskScreens(p: DeskScreensProps) {
   useEffect(() => { setOrigin(window.location.origin); }, []);
   const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1), origin }), [metaData, onChannels, metaErr, origin]);
 
+  // People and teams in Title Case on the desktop (v2 › note 03) — display only; the writes take ids.
+  const shown = useMemo(() => ({ data: titleData(data), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors]);
+  const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
   const ctx = {
-    data, me: p.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: p.teams, directors: p.directors, nameOf: p.nameOf,
+    data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,
     slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
