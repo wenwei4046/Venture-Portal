@@ -44,7 +44,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ⑥-4 | A Library file on a task: *Attach to task* (a file's menu — the file's subsidiary's open tasks), the task page's *Library files* with *+ Attach from Library*, taken off; each a line on the trail (mig `20261024007400`) | #665, live 2026-10-23 |
 | ⑦-1 | My Space's own side, first part: the cover (four presets or a picture), the avatar, the status; *Edit layout* — tiles dragged anywhere and resized from eight handles, added and taken off, the page's background, the accent, the corners, Reset; the Notes and Photo tiles — kept as the login's own row (migs `20261024007500`, `20261024007600`) | #673, live 2026-10-23 |
 | ⑦-2 | The room — its wall, floor and furniture (the sixteen, dragged left or right, flipped, taken out) — on the board from the start; the pet as it looks (four kinds or one's own animal, its name, its colour) in the room and beside the avatar, its mood its owner's plate; the drawer's 🎨 Room & pet; the 5-step setup on the first visit (mig `20261024007700`) | this PR |
-| ⑦-3 | **Built 2026-10-24** (mig `20261025039000`): the chat — the lobby's thread (everybody with View reads it, the roster writes) and direct messages (two people's alone, answer 35); kept for good (36); unread a dot (39); a visit's Message and Wave. A full-access personal account opening a DM on a complaint (35, amended) comes next | answered |
+| ⑦-3 | **Built 2026-10-24** (mig `20261025039000`): the chat — the lobby's thread (everybody with View reads it, the roster writes) and direct messages (two people's alone, answer 35); kept for good (36); unread a dot (39); a visit's Message and Wave. **⑦-3b** (mig `20261025040000`): a DM opened on a complaint by a full-access title's own login — a reason first, a record kept for good; never the shared Principal login (35, amended) | answered |
 | ⑦-4 | **Built 2026-10-24** (mig `20261025038000`): the lobby — the roster's pets wandering, seen by everybody with View, a pet opening its owner's space (answer 37) — and a visit: their look, cover, name, status, room, pet, trophies, Notes and Photo (38), the avatar uploaded on My Space (40); Message and Wave with the chat (⑦-3) | answered |
 | ⑦-5 | **Built 2026-10-24** (mig `20261025037000`): the pet's levels, XP and energy — +10 a stage finished, +20 a product project's, nothing taken back (answer 32); energy never falls (33); fed with the snacks stages earn, three workouts a day for XP — and the trophies, this quarter's projects where you did a stage (34) | answered |
 
@@ -207,6 +207,11 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 150. **A message** (⑦-3). One line, tidied, 1,000 characters at most, and/or a task attached — one of the board's tasks, the newest forty. The prototype's empty-state hints (*Say hi or attach a task*, *Say hi to Mei 👋*) are instructions — no descriptions: *No messages yet*; its *Everyone on the team sees this* is *Everyone sees this*.
 151. **Live enough** (⑦-3). No realtime: a thread in view is read again every 15 s, the list every 30 s; the lobby's speech bubble is the page's read, new on the next visit.
 152. **The first board** (⑦-3). With the chat every tile of the prototype is here, so a first board is its DEFAULT_POS exactly — the chat at the right three rows high, the trophies under the room, the lobby and This week at the foot; a saved board gets the chat once, under the rest.
+153. **Who opens a chat** (⑦-3b). Answer 35, amended: a login on its owner's active People record whose title's template is full-access — the Principal's kind, or one ticking Manage permissions, as Invite user and a login's email call it — and who manages permissions now (somebody lowered on it does not). On 2026-10-24: the CEO, the Director, the Executive and the Personal Assistant. The shared Principal login is on nobody's record: never — View as included (the database asks the login); the page is closed while viewing as a person.
+154. **The reason first** (⑦-3b). Ten characters at least (*Complaint* alone is not a reason), 500 at most, one line. The two are picked from the roster's with a login and anybody in a direct chat (somebody who has left since) — never oneself: one's own chats are on My Space.
+155. **The record** (⑦-3b). Who opened it (their People name then, their record and login), which two (their names then), why, when. It is itself the log: never changed or deleted, not copied into the audit log, read by the full-access logins alone — whether the two are told is question 41.
+156. **An hour to read on** (⑦-3b). The newest fifty come with the record; older ones fifty at a time under that record, by the same login, for an hour — then it is opened again, with its reason. No read mark moves, nobody is told, and the chat itself stays closed to them: a record is the only way in.
+157. **Where it is reached** (⑦-3b). The chat tile's *🔍 Review*, shown only to those who may; not in the sidebar, as nobody else may. The page sits on My Space's tab.
 
 ## 5. Open questions (for the user) — all answered 2026-10-24, §6
 
@@ -299,3 +304,7 @@ Every question of §5 has its answer here; what is built from each says so in `.
 | 38 | A visitor sees **both** Notes and Photo. |
 | 39 | No sound or push for a direct message yet — an unread dot. |
 | 40 | The avatar is My Space's own. |
+
+## 7. Questions after the answers (2026-10-24)
+
+41. A chat opened on a complaint (⑦-3b): are the two people told — that it was opened, by whom, why — and does anybody besides the full-access logins read the records (HR, say)? Built: nobody is told; the records are the full-access logins' alone. No suggestion: it decides the company's own oversight.
