@@ -134,7 +134,8 @@ const SLIDER = (pct: number, c: string): CSSProperties => ({ width: "100%", heig
 /** T04 (v3) · By team: a row a team — its dot, name (ink) and line, the share in an 84px decimal box, the slider under the row.
  * A team opens to its member breakdown — results only (name, bar, share) — and Adjust split, which opens T04b's sheet. */
 export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitRow[] }; inner: InnerVM[]; enterNext: (e: KeyboardEvent<HTMLInputElement>) => void }) {
-  const [open, setOpen] = useState<string | null>(() => inner.find(g => !/director/i.test(g.name))?.id ?? null);
+  // Every team folded at first (the owner, 2026-10-24: "點進split leads , anthony 的會是開著，全部默認收起").
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div style={{ display: "flex", flexDirection: "column", margin: "0 -20px", borderTop: "1px solid var(--crm-rule-soft)" }}>
       {s.splits.map((r, i) => {
@@ -159,8 +160,11 @@ export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitR
             <input type="range" data-crm-range="" aria-label={`${r.team} slider`} min="0" max="100" step="5" value={r.range} onChange={r.set} style={SLIDER(r.range, r.c)} />
             {on && g && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px 12px", borderRadius: "12px", background: "var(--crm-sel)" }}>
-                <div style={{ display: "flex", gap: "16px" }}>{g.modes.map(m => (
-                  <button key={m.label} type="button" onClick={m.pick} style={{ ...BTN, padding: "2px 0 4px", fontSize: fs(13), color: m.w > 500 ? "var(--crm-ink)" : "var(--crm-muted)", fontWeight: m.w > 500 ? 600 : 500, borderBottom: `2px solid ${m.w > 500 ? "var(--crm-rust)" : "transparent"}` }}>{m.label}</button>))}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>{g.modes.map(m => (
+                  <button key={m.label} type="button" onClick={m.pick} style={{ ...BTN, padding: "2px 0 4px", fontSize: fs(13), color: m.w > 500 ? "var(--crm-ink)" : "var(--crm-muted)", fontWeight: m.w > 500 ? 600 : 500, borderBottom: `2px solid ${m.w > 500 ? "var(--crm-rust)" : "transparent"}` }}>{m.label}</button>))}
+                  {/* Adjust split is an icon at the top-right (the owner, 2026-10-24: "adjust split放到右上角，或者變成一個調整的符號"). */}
+                  {g.custom && <button type="button" onClick={g.adjust} aria-label="Adjust split" title="Adjust split" style={{ ...BTN, marginLeft: "auto", width: "32px", height: "32px", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)" }}><Ic name="sliders-horizontal" size={14} /></button>}
+                </div>
                 {g.isEven && <span style={{ fontSize: fs(12), lineHeight: 1.45, color: "var(--crm-muted)" }}>{g.evenLine}</span>}
                 {g.custom && g.people.map(p => (
                   <div key={p.name} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 72px 56px", alignItems: "center", gap: "10px", fontSize: fs(13), color: p.locked ? "var(--crm-faint)" : "var(--crm-ink)" }}>
@@ -169,7 +173,6 @@ export function Phone4aSplitTeams({ s, inner, enterNext }: { s: { splits: SplitR
                     <span style={{ display: "flex", justifyContent: "flex-end", fontVariantNumeric: "tabular-nums" }}>{p.locked ? <Ic name="lock" size={12} /> : p.txt}</span>
                   </div>))}
                 {g.custom && !g.ok && <span style={{ fontSize: fs(12), color: g.sumFg }}>{g.sum}</span>}
-                {g.custom && <button type="button" onClick={g.adjust} style={{ ...BTN, alignSelf: "flex-end", height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: fs(12.5), fontWeight: 500, color: "var(--crm-ink)" }}><Ic name="sliders-horizontal" size={13} />Adjust split</button>}
               </div>
             )}
           </div>
@@ -225,7 +228,6 @@ export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: s
           <span style={{ fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: s.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{pct ? s.total : `up to ${s.total}`}</span>
           {s.ok && <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="check" size={14} /></span>}
         </div>}
-        {pct && <span style={{ flex: "none", padding: "8px 20px 0", fontSize: fs(11), lineHeight: 1.45, color: "var(--crm-faint)" }}>Drag, or tap a box to type (e.g. 40.5). The lock = set by you; the others re-balance to keep 100%.</span>}
         <div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))" }}>
           <button type="button" onClick={s.cancel} style={{ ...BTN, flex: 1, height: "48px", borderRadius: "24px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
           <button type="button" onClick={s.apply} disabled={!s.apply} style={{ ...BTN, flex: 1.6, height: "48px", borderRadius: "24px", background: s.apply ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>Apply</button>
@@ -618,13 +620,14 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
  */
 export function Phone4aActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
-  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); all open at first.
-  const [shut, setShut] = useState<Record<string, boolean>>({});
+  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); folded at first (2026-10-24:
+  // "member work type & active 默認收起") — `opened` keeps the ones opened.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      {groups.map(g => { const off = !!shut[g.name]; return (
+      {groups.map(g => { const off = !opened[g.name]; return (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
-          <button type="button" aria-expanded={!off} onClick={() => setShut(x => ({ ...x, [g.name]: !off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
+          <button type="button" aria-expanded={!off} onClick={() => setOpened(x => ({ ...x, [g.name]: off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
             <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-ink)" }}>{g.name}</strong>
             <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
