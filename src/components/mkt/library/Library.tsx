@@ -12,10 +12,11 @@ import {
 } from '@/lib/marketing/actions'
 import {
   binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
-  libraryPath, libView, listedName, moveTargets, railCounts, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
+  libraryPath, libView, listedName, moveTargets, railCounts, shareOf, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
   type LibFile, type LibSub, type LibView, type SchedItem,
 } from '@/lib/marketing/library'
 import BrandProfile from './BrandProfile'
+import ShareLink from './ShareLink'
 import s from './library.module.css'
 
 // The Library (`Library.dc.html`, ⑥-1): the rail — every subsidiary with its files, the categories, the Dustbin; the
@@ -28,7 +29,7 @@ import s from './library.module.css'
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
 type Menu = { kind: 'file' | 'folder'; id: string } | 'new' | 'add' | null
-type Modal = { kind: 'move'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | { kind: 'profile' } | null
+type Modal = { kind: 'move' | 'share'; what: 'file' | 'folder'; id: string; name: string } | { kind: 'link' } | { kind: 'profile' } | null
 
 const CAT_CLASS: Record<LibCat, string> = { Brand: s.cat_Brand, Product: s.cat_Product, Photo: s.cat_Photo, Video: s.cat_Video, Content: s.cat_Content, Minutes: s.cat_Minutes }
 const asCat = (v: string | null): LibCat | null => ((LIB_CATS as readonly string[]).includes(v ?? '') ? (v as LibCat) : null)
@@ -171,6 +172,9 @@ export default function Library({ initial, schedules = {}, can, at }: { initial:
       </a>
       {can.edit ? (
         <>
+          <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'share', what: 'file', id: f.id, name: f.name }) }}>
+            Share link<span className={s.menuHint}>{shareOf(lib, 'file', f.id) ? 'live' : 'guest'}</span>
+          </button>
           <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'file', id: f.id, name: f.name }) }}>Move to…</button>
           <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`} onClick={() => void run(() => binMktLib('file', f.id), 'Moved to Dustbin · deletes automatically in 30 days')}>
             Move to Dustbin<span className={s.menuHint}>30 days</span>
@@ -391,6 +395,11 @@ export default function Library({ initial, schedules = {}, can, at }: { initial:
                           : <button type="button" role="menuitem" className={s.menuItem} onClick={() => go({ t: 'folder', sub: sub.id, folder: t.folder.id })}>Open</button>}
                         {can.edit ? (
                           <>
+                            {!t.type.link ? (
+                              <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'share', what: 'folder', id: t.folder.id, name: t.type.name }) }}>
+                                Share link<span className={s.menuHint}>{shareOf(lib, 'folder', t.folder.id) ? 'live' : 'guest'}</span>
+                              </button>
+                            ) : null}
                             <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'folder', id: t.folder.id, name: t.type.name }) }}>Move to…</button>
                             <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`}
                               onClick={() => void run(() => binMktLib('folder', t.folder.id), 'Folder moved to Dustbin · 30 days')}>
@@ -485,6 +494,10 @@ export default function Library({ initial, schedules = {}, can, at }: { initial:
             </div>
           </div>
         </div>
+      ) : null}
+
+      {modal?.kind === 'share' && can.edit ? (
+        <ShareLink lib={lib} what={modal.what} id={modal.id} name={modal.name} onClose={() => setModal(null)} onLibrary={setLib} />
       ) : null}
 
       {modal?.kind === 'profile' && sub && can.manage ? (

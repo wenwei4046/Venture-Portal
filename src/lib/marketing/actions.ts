@@ -12,7 +12,9 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { workflowsFromRow, type WfTemplate } from './workflows'
-import { libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, type Library, type LibProfile } from './library'
+import {
+  libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, type Library, type LibProfile, type ShareExpiry,
+} from './library'
 
 /**
  * Marketing's writes (2026-10-23, migs 20261023234000, 20261023235500, 20261023235800, 20261023235900, 20261024002000 and
@@ -437,6 +439,25 @@ export async function deleteMktLib(kind: 'file' | 'folder', id: string): Promise
   const db = await client()
   const { error } = await db.rpc('mkt_lib_delete', { p_kind: kind, p_id: id })
   return libraryAfter(db, error, 'It could not be deleted. Please try again.')
+}
+
+/** A file's or a folder's guest link (⑥-3, mig 20261024007300): made, or the live one's expiry and download changed. */
+export async function shareMktLib(kind: 'file' | 'folder', id: string, expiry: ShareExpiry, download: boolean): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if ((kind !== 'file' && kind !== 'folder') || !isId(id)) return { ok: false, reason: 'That is not there.' }
+  if (!SHARE_EXPIRIES.some(e => e.key === expiry)) return { ok: false, reason: 'Pick when the link expires.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_share', { p_kind: kind, p_id: id, p_expiry: expiry, p_download: download !== false })
+  return libraryAfter(db, error, 'The link could not be made. Please try again.')
+}
+
+/** A guest link stopped at once. */
+export async function stopMktLibShare(kind: 'file' | 'folder', id: string): Promise<Done<{ library: Library }>> {
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
+  if ((kind !== 'file' && kind !== 'folder') || !isId(id)) return { ok: false, reason: 'That is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_lib_share_stop', { p_kind: kind, p_id: id })
+  return libraryAfter(db, error, 'The link could not be stopped. Please try again.')
 }
 
 /** A subsidiary's brand profile, saved whole (⑥-2, mig 20261024007200) — the manager's. */
