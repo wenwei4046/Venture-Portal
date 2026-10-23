@@ -481,6 +481,13 @@ export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAu
   };
 }
 
+/** A person's name as the CRM shows it — each word's first letter capital, the rest small ("Harm Hao Hong HECTOR" →
+ * "Harm Hao Hong Hector"; the owner, 2026-10-23: "人名…第一個字大寫 其餘小寫，全部人名都統一"). After a hyphen or an
+ * apostrophe a new word starts; scripts without case (Chinese, …) are left as they are. */
+export function personName(name: string): string {
+  return name.trim().toLowerCase().replace(/(^|[\s\-'’(])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+}
+
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
   for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true, startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}) };
@@ -490,7 +497,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     viewerId: rows.people.role ? rows.people.me : null,
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
-    people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
+    people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read
     // a customer's `ad` (the owner, 2026-10-16: "顯示廣告的名稱，不然業務也看不懂"); Meta's headline stays in adHeadline.
     customers: rows.contacts.map(c => {

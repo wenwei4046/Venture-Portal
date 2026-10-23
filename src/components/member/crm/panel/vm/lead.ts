@@ -85,7 +85,9 @@ export function leadVM(ctx: PanelCtx) {
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
       reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
-      press: { "data-msg": m.id, ...pressToOpen(() => openMsgMenu({
+      // data-mine: the quote in our own orange bubble is drawn light, as in Mine's chat (crm.module.css) — it was the dark
+      // default on the orange, unreadable (the owner, 2026-10-23).
+      press: { "data-msg": m.id, ...(mine ? { "data-mine": "1" } : {}), ...pressToOpen(() => openMsgMenu({
         mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
@@ -270,6 +272,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
           bg: sel ? "var(--crm-rust)" : ok ? "#fff" : "var(--crm-field)", fg: sel ? "#fff" : ok ? "var(--crm-ink)" : "var(--crm-faint-2)", bd: sel ? "var(--crm-rust)" : ok ? "var(--crm-rule)" : "var(--crm-field)" };
       }),
       bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "var(--crm-rust)" : "var(--crm-line)",
+      remarks: room?.remarks?.trim() ?? "",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
         const at = slotAt(B.day, B.slot!).toISOString(), moving = B.visitId;
@@ -336,6 +339,6 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
-    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm,
+    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm, bookRemarks: book?.remarks ?? "",
   };
 }

@@ -377,4 +377,19 @@ describe("the dealer, rev 1011 (twin of crm_assign_contact)", () => {
     expect(dealEnquiry("AD-F", tuesday, { mode: "split", split: { tla: 100 }, people: { tla: 1 }, teamModes: { tla: "cnt" } },
       { tla: { days: [(day + 1) % 7], ticked: { a1: { [(day + 1) % 7]: 1 } } } }, zero(), members).memberId).toBe("tla");
   });
+
+  it("a Full time day: only teams with somebody full time that day get the ad's leads (2026-10-23)", () => {
+    const day = officeWeekday(tuesday);
+    const ft = { tla: { days: [day], ticked: { a1: { [day]: 1 } } } }; // Team B has no Full time
+    // By team 50 / 50: that day all to Team A's full-time person; Team B's share falls to Team A.
+    const { out } = deal(4, "AD-FT", { mode: "split", split: { tla: 50, tlb: 50 }, people: {} }, ft);
+    expect(out.map(d => [d.teamId, d.memberId, d.by])).toEqual(Array(4).fill(["tla", "a1", "full_time"]));
+    // Evenly too.
+    expect(deal(2, "AD-FTE", { mode: "even", split: {}, people: {} }, ft).out.map(d => d.memberId)).toEqual(["a1", "a1"]);
+    // Another day: the split as set.
+    const other = { tla: { days: [(day + 1) % 7], ticked: { a1: { [(day + 1) % 7]: 1 } } } };
+    expect(deal(4, "AD-FT2", { mode: "split", split: { tla: 50, tlb: 50 }, people: {} }, other).out.map(d => d.teamId).sort()).toEqual(["tla", "tla", "tlb", "tlb"]);
+    // None of the ad's teams full time that day: as any other day (a lead never stalls).
+    expect(deal(1, "AD-FT3", { mode: "split", split: { tlb: 100 }, people: {} }, ft).out[0].teamId).toBe("tlb");
+  });
 });

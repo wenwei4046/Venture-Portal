@@ -408,6 +408,13 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
     const director = fewest(members.filter(m => m.role === "hod").map(m => m.id), id => counts.given[id] ?? 0);
     return director ? { teamId: null, memberId: director, by: "default_director" } : organic;
   }
+  // A Full time day (2026-10-23, mig 20261024230000 — the SQL's crm_fulltime_teams): a weekday some team's Full time ticks for
+  // somebody who can be dealt. That day only those teams get the ad's leads, inside them their ticked people in turn.
+  const ftTeams = tls.filter(t => !!fullTimePick(t, at, fullTime[t], counts, members));
+  if (rule.mode === "even" && ftTeams.length) {
+    const teamId = fewest(ftTeams, id => counts.team[id] ?? 0)!;
+    return { teamId, memberId: fullTimePick(teamId, at, fullTime[teamId], counts, members), by: "full_time" };
+  }
   if (rule.mode === "even") {
     const all = [...new Set(tls.flatMap(t => teamHandlers(t, members).map(m => m.id)))];
     let memberId = fewest(all, id => counts.given[id] ?? 0);
@@ -417,7 +424,9 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
     if (ft) memberId = ft;
     return { teamId, memberId, by: ft ? "full_time" : "even" };
   }
-  const shares = Object.entries(rule.split).filter(([id, n]) => n > 0 && tls.includes(id));
+  const shares0 = Object.entries(rule.split).filter(([id, n]) => n > 0 && tls.includes(id));
+  // …only the ad's teams with somebody full time that day, their shares taking the others' (none: as any other day).
+  const ftShares = shares0.filter(([id]) => ftTeams.includes(id)), shares = ftShares.length ? ftShares : shares0;
   const teamId = fewest(shares.map(([id]) => id), id => ((counts.team[id] ?? 0) + 1) / rule.split[id]); // team = given + held, as the SQL adds them
   if (!teamId) return organic;
   const p = pickInside(teamId, rule.teamModes?.[teamId] ?? "pct", rule.people, at, fullTime[teamId], counts, members);

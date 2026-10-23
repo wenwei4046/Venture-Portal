@@ -54,32 +54,7 @@ describe("the CRM's type scale", () => {
     expect(readFileSync(resolve(process.cwd(), "src/components/member/app/shell.module.css"), "utf8")).toMatch(/\.screen \{\s*--rv-type: \.92;/);
   });
 
-  // The CRM's Profile is the Revenue app's Profile (tools/crm-design/profile-type.cjs): the same sizes, read from the app's own
-  // stylesheet, on both sides — the salesperson's Profile and the Control panel's.
-  it("draws Profile's card and Your workspace in the Revenue app Profile's sizes", () => {
-    const app = readFileSync(resolve(process.cwd(), "src/components/member/app/profile/profile.module.css"), "utf8");
-    const rv = (cls: string) => Number(new RegExp(`\\.${cls} \\{[^}]*font-size: calc\\((\\d*\\.?\\d+)px \\* var\\(--rv-type\\)\\)`).exec(app)?.[1]);
-    const sizeOf = (rel: string, text: string) => {
-      const src = read(rel), at = src.indexOf(`>${text}</`);
-      const open = src.lastIndexOf("<", src.lastIndexOf("style=", at));
-      return /fontSize: "([^"]+)"/.exec(src.slice(open, at))?.[1];
-    };
-    const want = { avatar: typePx(rv("avatar")), name: typePx(rv("name")), sub: typePx(rv("whoSub")), label: typePx(rv("factLabel")),
-      value: typePx(rv("factValue")), h2: typePx(rv("h2")), row: typePx(rv("workLabel")) };
-    expect(Object.values(want).every(Boolean)).toBe(true);
-    expect({
-      avatar: sizeOf("sales/SalesProfile.tsx", "{v.meIniX}"), name: sizeOf("sales/SalesProfile.tsx", "{v.meNameX}"),
-      sub: sizeOf("sales/SalesProfile.tsx", "HOUZS Venture · CRM"), label: sizeOf("sales/SalesProfile.tsx", "Title"),
-      value: sizeOf("sales/SalesProfile.tsx", "{v.meRankX}"), h2: sizeOf("sales/SalesProfile.tsx", "Your workspace"),
-      row: sizeOf("sales/SalesProfile.tsx", "Notifications"),
-    }).toEqual(want);
-    expect({
-      avatar: sizeOf("panel/PanelApp.tsx", "{v.pf.meIni}"), name: sizeOf("panel/PanelApp.tsx", "{v.pf.meName}"),
-      sub: sizeOf("panel/PanelApp.tsx", "HOUZS Venture · CRM"), label: sizeOf("panel/PanelApp.tsx", "Access"),
-      value: sizeOf("panel/PanelApp.tsx", "{v.pf.meAccess}"), h2: sizeOf("panel/PanelApp.tsx", "Your workspace"),
-      row: sizeOf("panel/PanelApp.tsx", "Showrooms"),
-    }).toEqual(want);
-  });
+  // Both Profiles are the v3 prototype's since 2026-10-23 (Phone4aProfile), not the Revenue app's sizes.
 
   it("scales the CRM's own stylesheet too", () => {
     const sizes = [...read("crm.module.css").matchAll(/font-size:\s*([^;}]+)/g)].map(m => m[1].trim()).filter(v => v !== "inherit");

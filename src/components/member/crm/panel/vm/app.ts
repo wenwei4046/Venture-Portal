@@ -17,6 +17,7 @@ import { roomsVM } from "./rooms";
 import { overlaysVM } from "./overlays";
 import { navVM } from "./nav";
 import { calendarInfoVM, calendarListVM } from "./calendar-list";
+import { notifsVM } from "./notifs";
 import { assignExtraVM } from "./assign-1011";
 import { memberWorkTypeVM, templatesVM } from "./profile-1011";
 import { jobTitle, teamName, teamOf } from "../../shared/people";
@@ -38,6 +39,27 @@ export function enterNext(e: KeyboardEvent<HTMLInputElement>) {
 
 /** A group whose screen is off: never read by the markup (it sits behind show.*), typed as the group. */
 const off = <T,>() => undefined as unknown as T;
+
+/** v3 T06 · the Team side's Profile: the avatar centred, View as, MANAGE (CRM · Manage) and ME. */
+function profile6(ctx: PanelCtx, house: boolean) {
+  const { me, patch, data } = ctx, boss = me.role === "boss";
+  const n = (k: number) => (k ? String(k) : "");
+  const notifs = notifsVM(ctx).notifUnread;
+  return {
+    ini: ini(me.name), name: boss ? "Principal" : me.name,
+    sub: `${boss ? "Principal" : jobTitle(me)} · ${data.can.viewAll ? "everyone" : teamName(teamOf(me.id, data.people)) || "my team"}`,
+    house, exit: () => ctx.exitApp(), viewAs: () => patch({ viewAs: true }),
+    // ME first, then MANAGE; no Auto-reply on the Team side (the owner, 2026-10-23: "principal 在team的時候不會有auto reply
+    // 就不用；然後me 和manage 調換，me在上面"). Member work type lives on Assignment alone ("Member work type 只需要在assignment").
+    groups: [{ title: "Me", rows: [
+      { label: "Notifications", icon: "bell" as const, open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
+    ] }, { title: "Manage", rows: data.can.manage ? [
+      { label: "Showrooms", icon: "map-pin" as const, open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
+      { label: "Cold lead templates", icon: "message-square-text" as const, open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
+      { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
+    ] : [] }],
+  };
+}
 
 /** v3 T01 · Insight's head, on both of its sides. */
 function insightHead(ctx: PanelCtx, house: boolean, ads: boolean) {
@@ -86,6 +108,8 @@ export function panelAppVM(ctx: PanelCtx) {
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
     th: insightHead(ctx, !!bl.showBell, ovAds),
+    // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
+    pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

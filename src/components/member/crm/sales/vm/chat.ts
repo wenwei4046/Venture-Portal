@@ -316,7 +316,7 @@ export function chatVM(ctx: SalesCtx) {
     days: [] as { wk: string; n: number; pick?: () => void; bg: string; fg: string; border: string }[], wkHead: [] as string[],
     monthCells: [] as { n: number | string; pick?: () => void; cursor: string; weight: number; deco: string; bg: string; fg: string; border: string }[],
     slots: [] as { t: string; left: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
-    confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
+    bookRemarks: "", confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
     dateLeft: (_: MouseEvent) => {}, dateRight: (_: MouseEvent) => {}, dateWheel: (_: WheelEvent<HTMLElement>) => {}, dateDown: (_: RPointerEvent<HTMLElement>) => {}, dateMove: (_: RPointerEvent<HTMLElement>) => {}, dateUp: (_: RPointerEvent<HTMLElement>) => {}, dateClickGuard: (_: MouseEvent) => {},
     mDown: (_: RPointerEvent<HTMLElement>) => {}, mUp: (_: RPointerEvent<HTMLElement>) => {}, mCancel: () => {}, mClickGuard: (_: MouseEvent) => {},
   };
@@ -389,6 +389,8 @@ export function chatVM(ctx: SalesCtx) {
         return { t, left: leftOf(b.day, t), pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
           bg: on ? RUST : off ? "var(--crm-cream-nav)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint)" : INK, border: on ? RUST : off ? "var(--crm-cream-nav)" : BD, weight: on ? 650 : 500 };
       }),
+      // The showroom's staff-only remarks under the times (the owner, 2026-10-23: "book visit 下方如果有remarks的話要顯示出來").
+      bookRemarks: room?.remarks?.trim() ?? "",
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",
       confirmBg: ready ? RUST : "var(--crm-line)",
       confirmBook: ready && room ? () => void oneAtATime(`book:${c.id}`, async () => {

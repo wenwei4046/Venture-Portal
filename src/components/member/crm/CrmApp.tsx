@@ -312,8 +312,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       openCrmOf,
       // Mine: one's own CRM — or, viewing somebody, back to theirs — on `tab` (the phone's button: Mine's Inbox), else the
       // same page (the desktop).
-      toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab) => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: null })); }
-        : sells ? (tab?: SalesTab) => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab] })); } : undefined,
+      toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: sub ?? null })); }
+        : sells ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], profSub: sub ?? null })); } : undefined,
       exitApp: onExit, slotCounts, recents,
       // A chat's ⋮ Assign to, by what the SIGNED-IN account may do (2026-10-23, Mine's rule): CRM · Manage gives anyone,
       // whoever's Team is on screen; a TL / STL / TA on their own Team side, their own people; else none.

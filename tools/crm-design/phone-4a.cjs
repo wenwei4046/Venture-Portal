@@ -206,12 +206,16 @@ function sales(name, body) {
   if (name === "SalesNav") body = swap(body, '<nav style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nav3b} />", "sales bottom bar");
   if (name === "SalesInbox") body = inbox(body);
   if (name === "SalesChat") body = chat(body, "v.cl");
+  if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
+  // v3 M12 (the owner, 2026-10-23: "要" — Mine's Profile as the prototype too): the main page is Phone4aProfile.
+  if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profMain) && (<>"), b = body.indexOf("{!!(v.teamOpen) && (<>", a); if (a < 0 || b < 0) throw new Error("phone-4a: mine profile main");
+    body = body.slice(0, a) + "{!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}\n      " + body.slice(b); }
   if (name === "SalesCalendar") body = calendar(body);
   if (name === "SalesContacts") body = contacts(body);
   // M11 · Insight (change list 19): the page itself is 4a's; its sheets (Range, the lists, Customer info, the form) stay.
   if (name === "SalesInsight") body = swap(body, '<main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>', "main", "<Phone4aInsightMine v={v} />", "insight page");
-  return body;
+  return nameCase(body);
 }
 
 
@@ -273,7 +277,7 @@ function teamInsight(body) {
   body = swap(body, '<div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px", gap: "6px", alignItems: "baseline", paddingBottom: "6px" }}>', "div", "", "team perf header");
   body = once(body, '<div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', '<div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule)" }}>\n                <div onClick={t.toggle}', "team row rule");
   body = swap(body, '<div onClick={t.toggle} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px"', "div",
-    `<div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "11px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: "0" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "${F(15)}", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0", fontSize: "${F(14)}", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: \`rotate(\${t.rot})\`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", columnGap: "8px", paddingLeft: "17px", fontSize: "${F(12)}", color: "var(--crm-muted)", whiteSpace: "nowrap" }}><span>Leads <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.show}</b></span><span>Won <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.won}</b></span></span></div>`, "team row");
+    `<div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "11px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: "0" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "${F(15)}", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0", fontSize: "${F(14)}", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: \`rotate(\${t.rot})\`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", columnGap: "8px", paddingLeft: "17px", fontSize: "${F(12)}", color: "var(--crm-muted)", whiteSpace: "nowrap" }}><span>Leads <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.show}</b></span></span></div>`, "team row");
   // The owner, 2026-10-18 (circled "Own customers · PETER", "TL ANTHONY"): no line after a team's name.
   body = once(body, '<span style={{ flex: "1", minWidth: "0", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>', '<span style={{ flex: "1", minWidth: "0" }} />', "team who");
   body = once(body, '<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>',
@@ -339,10 +343,10 @@ function teamAssign(body) {
   if (ads < 0) throw new Error("phone-4a: assign ads");
   let rest = body.slice(ads);
   rest = every(rest, '<section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-cold)", border: "1px solid var(--crm-tint-cold)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>',
-    '<section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>', "assign ads box");
+    '<section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>', "assign ads box");
   rest = every(rest, '<span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-ink-soft)" }}>\n                </span>', "", "assign ads bar");
   for (let k = rest.indexOf('<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"'); k >= 0; k = rest.indexOf('<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"', k + 1)) { const sub = rest.slice(k, k + 3000); const [ta, tb] = el(sub, '<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>\n                  <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "12px", background: "var(--crm-ink-soft)"', "div", "assign ads title");
-  rest = rest.slice(0, k) + `<div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "${F(13)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "${F(12)}" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "${F(13)}", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", margin: "-2px 0 2px" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "${F(14)}", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>` + rest.slice(k + tb); }
+  rest = rest.slice(0, k) + `<div style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>{(v.as.adTabs).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "1", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", borderRadius: "999px", background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(0,0,0,.08)" : "none", fontSize: "${F(13)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", cursor: "pointer" }}>{t.label}<span style={{ color: "var(--crm-faint)", fontSize: "${F(12)}" }}>{t.n}</span></span>))}</div>{!!(v.as.adsEmpty) && (<div style={{ padding: "18px 0", textAlign: "center", fontSize: "${F(13)}", color: "var(--crm-faint)" }}>{v.as.adsEmpty}</div>)}<div data-drag-scroll="1" style={{ display: "flex", gap: "12px", margin: "-2px -20px 0", padding: "0 20px", overflowX: "auto", scrollbarWidth: "none", whiteSpace: "nowrap" }}>{(v.as.adLegend).map((l, l_i) => (<span key={l_i} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "${F(12)}", color: "var(--crm-ink-soft)" }}><span style={{ width: "9px", height: "9px", borderRadius: "2px", background: l.c }} />{l.name}</span>))}</div>` + rest.slice(k + tb); }
   for (let k = rest.indexOf('<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"'); k >= 0; k = rest.indexOf('<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"', k + 1)) { const nx = rest.indexOf('<div onClick={a.edit}', k + 1); const [ca, cb] = el(rest.slice(k, nx > 0 ? nx : undefined), '<div onClick={a.edit} style={{ padding: "12px 14px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-cold)"', "div", "assign ad card"); rest = rest.slice(0, k + ca) + "<Phone4aAdCard a={a} />" + rest.slice(k + cb); }
   return body.slice(0, ads) + rest;
 }
@@ -485,6 +489,7 @@ function panel(body) {
   // Change list 16 · the bottom bar (T01).
   body = swap(body, '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nv.nav} hidden={!v.navOn} />", "panel bottom bar");
   body = panelChat(body);
+  body = once(body, "<span onClick={v.ld.lx.confirm}", "<Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm}", "panel book remarks");
   body = teamInsight(body);
   body = teamInbox(body);
   body = teamAssign(body);
@@ -521,7 +526,37 @@ function panel(body) {
     const [, e] = el(body.slice(s0, end > 0 ? end : undefined), S, "div", "work type list");
     body = body.slice(0, s0 + e) + `{!!(v.fts.dirty) && (<div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.fts.cancel} role="button" style={{ flex: "0 0 auto", height: "48px", padding: "0 20px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "500", color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</span><span onClick={v.fts.save} role="button" style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "600", cursor: "pointer" }}>{v.fts.saveLabel}</span></div>)}` + body.slice(s0 + e);
   }
-  return body;
+    // Work type: each team folds to its head (the owner, 2026-10-23: "這個也可收起"); the team's name in ink, its colour the dot's.
+  { const a = body.indexOf("{(v.fts.groups).map((g, g_i) => (<Fragment key={g_i}>"); if (a < 0) throw new Error("phone-4a: work type groups");
+    let g = body.slice(a);
+    g = once(g, '<div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>', '<div onClick={g.fold} role="button" aria-expanded={g.open} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", borderBottom: g.headRule, cursor: "pointer" }}>', "work type head");
+    g = once(g, 'fontWeight: "700", color: g.c }}>{g.name}</strong>', 'fontWeight: "700", color: "var(--crm-ink)" }}>{g.name}</strong>', "work type name");
+    g = once(g, '{g.count}</small>', '{g.count}</small><span style={{ display: "flex", color: "var(--crm-faint)", transform: `rotate(${g.chev})`, transition: "transform 160ms" }}><Ic name="chevron-down" size={15} /></span>', "work type chevron");
+    g = once(g, "{(g.people).map((p, p_i) => (<Fragment key={p_i}>\n                <div onClick={p.toggle}", "{(g.open ? g.people : []).map((p, p_i) => (<Fragment key={p_i}>\n                <div onClick={p.toggle}", "work type fold");
+    body = body.slice(0, a) + g; }
+  // v3 T06 (the owner, 2026-10-23: "我的profile 應該長這樣才對"): Profile is the prototype's — Phone4aProfileTeam.
+  { const a = body.indexOf("{!!(v.pf.onProfile) && (<>"); if (a < 0) throw new Error("phone-4a: team profile");
+    const m = body.indexOf("<main ", a); const [x, y] = el(body.slice(m), body.slice(m, m + 60), "main", "team profile main");
+    body = body.slice(0, m + x) + "{!!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}" + body.slice(m + y); }
+  return nameCase(body);
+}
+
+/** Names as written (Title Case — crm-data.ts › personName): a style that shows a person's or team's name drops
+ * textTransform: "uppercase" and its letter-spacing (the owner, 2026-10-23: "全部人名都統一"). Section labels keep theirs. */
+function nameCase(body) {
+  const U = 'textTransform: "uppercase"';
+  let out = "", i = 0;
+  for (;;) {
+    const at = body.indexOf(U, i);
+    if (at < 0) return out + body.slice(i);
+    const st = body.lastIndexOf("style={{", at), se = body.indexOf("}}>", at);
+    // an empty span first (a colour dot) is not the text
+    const text = body.slice(se + 3, se + 520).replace(/^\s*<span style=\{\{[^}]*\}\}>\s*<\/span>/, ""), close = text.search(/<\/(span|strong|div|b)>/);
+    const shown = close < 0 ? "" : text.slice(0, close);
+    if (st < 0 || se < 0 || !/\{\w+\.(name|team|who)\}/.test(shown)) { out += body.slice(i, at + U.length); i = at + U.length; continue; }
+    const style = body.slice(st, se).replace(/, textTransform: "uppercase"|textTransform: "uppercase", /, "").replace(/, letterSpacing: "[^"]*"|letterSpacing: "[^"]*", /, "");
+    out += body.slice(i, st) + style; i = se;
+  }
 }
 
 /** The import lines a screen needs for the 4a parts it mounts. */
@@ -529,4 +564,4 @@ function IMPORT(body, from) {
   const names = [...new Set([...body.matchAll(/<(Phone4a\w*)/g)].map(m => m[1]))].sort();
   return (names.length ? `import { ${names.join(", ")} } from "${from}";\n` : "") + (/<Ic[\s/]/.test(body) ? `import { Ic } from "${from.replace(/phone4a$/, "icons4a")}";\n` : "");
 }
-module.exports = { sales, panel, IMPORT, once, every, swap, F };
+module.exports = { sales, panel, IMPORT, once, every, swap, F, nameCase };
