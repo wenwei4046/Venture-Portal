@@ -2,7 +2,7 @@ import type { StagedRef } from '@/lib/storage/staging'
 
 /**
  * `@/lib/storage/stage` for a page's test: a file "sent ahead" stays the File itself in the form, as every page sent
- * it before 2026-10-24 — the server reads both (lib/storage/staged.ts) — so the test checks what the page sends, not
+ * it before 2026-10-23 — the server reads both (lib/storage/staged.ts) — so the test checks what the page sends, not
  * the trip to R2 (which needs a signed-in browser). Use: `vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))`.
  */
 export async function stageFile(file: File): Promise<StagedRef> {

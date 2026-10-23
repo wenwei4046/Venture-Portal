@@ -1,4 +1,4 @@
--- Files sent ahead of their Server Action (2026-10-24 — the owner: "make the size more bigger for all, let me know
+-- Files sent ahead of their Server Action (2026-10-23 — the owner: "make the size more bigger for all, let me know
 -- the limit"). A Server Action's body stops at 4 MB (next.config.ts; a Vercel function takes 4.5 MB at most), so
 -- Payments, Receipts, Invoice Financing, Reconciliation, the waiting list's forms and the Revenue app's invoices
 -- stopped there whatever their bucket said (mig 20261024006700). Now the browser puts such a file first in its

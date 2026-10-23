@@ -10,7 +10,7 @@ import { STAGING_BUCKET } from './staging'
  *   - a row whose file never arrived — the browser closed between its row and its PUT, or a PUT refused;
  *   - a file nobody's row names — its row deleted while R2 would not delete the file just then, or a copy that
  *     failed half way;
- *   - and in `uploads` (2026-10-24, lib/storage/staging.ts) every file a day old: one sent ahead of a Server Action
+ *   - and in `uploads` (2026-10-23, lib/storage/staging.ts) every file a day old: one sent ahead of a Server Action
  *     the page never called, or one that refused it — its action takes it away the moment it is done with it.
  *
  * Only the buckets whose backend is R2. The member-queue cron hands in its service-role client (this module imports

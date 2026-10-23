@@ -1,5 +1,5 @@
 /**
- * A file sent ahead of its Server Action (2026-10-24 — the owner: "make the size more bigger for all, let me know the
+ * A file sent ahead of its Server Action (2026-10-23 — the owner: "make the size more bigger for all, let me know the
  * limit"). A Server Action's body stops at 4 MB (next.config.ts; a Vercel function takes 4.5 MB at most), so a page
  * that hands a file to one — Payments, Receipts, Invoice Financing, Reconciliation, the waiting list's forms, the
  * Revenue app's invoices — puts the file first in its sender's own folder of the private `uploads` bucket, straight

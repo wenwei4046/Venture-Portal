@@ -251,7 +251,7 @@ const ATTACHMENT_TYPES = new Set([
   'image/gif',
 ])
 // The bucket's own 100 MB (mig 20261024006700): the file is sent ahead of the action (lib/storage/staging.ts) —
-// 15 MB said here until 2026-10-24, though the Server Action's body stopped it at 4.
+// 15 MB said here until 2026-10-23, though the Server Action's body stopped it at 4.
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
 // What Auto-read hands the reader: a request is at most 32 MB and the file goes in it as base64, a third bigger —
 // so a PDF up to 20 MB; a picture up to 5 MB.
@@ -266,7 +266,7 @@ export async function uploadBaAttachment(
     const user = await requireActionOn('/ba', 'treasury', 'edit')
     const supabase = await baClient()
 
-    // Sent ahead to the sender's own folder (2026-10-24), or the File itself from an older page.
+    // Sent ahead to the sender's own folder (2026-10-23), or the File itself from an older page.
     const read = await formFile(supabase, formData, 'file')
     if (!read.ok) return { error: read.reason }
     const file = read.file
@@ -415,7 +415,7 @@ export async function extractBaFromDocument(
       }
     }
 
-    // Sent ahead (2026-10-24) — and left there: the save that follows keeps the same copy on the financing.
+    // Sent ahead (2026-10-23) — and left there: the save that follows keeps the same copy on the financing.
     const read = await formFile(await baClient(), formData, 'file')
     if (!read.ok) return { error: read.reason }
     const file = read.file

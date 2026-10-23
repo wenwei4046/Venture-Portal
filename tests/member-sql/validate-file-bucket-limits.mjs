@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261024006700 (2026-10-24 — the owner, once every bucket was in R2: "make the size
+// Local PostgreSQL regression for 20261024006700 (2026-10-23 — the owner, once every bucket was in R2: "make the size
 // more bigger for all, let me know the limit"). The buckets' limits and types are what `file_objects_stamp` asks of
 // every file a session sends; this runs 20261023150000 (the twin tables, their policies, the stamp) and then the new
 // limits VERBATIM over the same stand-ins as validate-file-objects.mjs, every bucket moved. No live I/O.

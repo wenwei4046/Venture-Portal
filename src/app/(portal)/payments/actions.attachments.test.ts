@@ -83,7 +83,7 @@ describe('uploadVoucherAttachment', () => {
   })
 })
 
-// 2026-10-24 (the owner: "make the size more bigger for all"): the page sends each file ahead to its own folder of
+// 2026-10-23 (the owner: "make the size more bigger for all"): the page sends each file ahead to its own folder of
 // `uploads` (a Server Action's body stops at 4 MB); the action reads it back, files it, and takes the copy away.
 describe('uploadVoucherAttachment, a file sent ahead', () => {
   const ME = '0e2f8a7c-1b3d-4e5f-8a9b-0c1d2e3f4a5b'

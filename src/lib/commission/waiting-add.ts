@@ -112,7 +112,7 @@ export function waitingAddDetail(
 /**
  * What HR attaches as an applicant's signed form — with "+" and in the waiting drawer: the member app's PDF, PNG
  * or JPG (`verifiedUpload`), and since 2026-10-20 a Word file too (the user: "want word file as well"), each of
- * 100 MB or less (3 MB until 2026-10-24, when the file began to go ahead of its Server Action — lib/storage/stage.ts;
+ * 100 MB or less (3 MB until 2026-10-23, when the file began to go ahead of its Server Action — lib/storage/stage.ts;
  * mig 20261024006800 lets the database keep that much). The member app itself still takes a PDF, PNG or JPG only.
  */
 export const SIGNED_FORM_ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx'

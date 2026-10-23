@@ -317,7 +317,7 @@ export default function BaApp({
   const upload = (file: File | null) => {
     if (!file || !r) return
     const fd = new FormData()
-    // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+    // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
     run(
       () =>
         stageInto(fd, 'file', file).then(

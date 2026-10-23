@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseStagedRef, stagedOwner, stagedPath, stagedRefText, STAGED_MAX_BYTES, STAGING_BUCKET } from './staging'
 
-// A file sent ahead of its Server Action (2026-10-24, the owner: "make the size more bigger for all").
+// A file sent ahead of its Server Action (2026-10-23, the owner: "make the size more bigger for all").
 const ME = '0e2f8a7c-1b3d-4e5f-8a9b-0c1d2e3f4a5b'
 const KEY = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
 

@@ -389,7 +389,7 @@ export function withdrawnLine(m: Pick<Published, 'withdrawnAt' | 'withdrawnBy' |
 
 // ── Uploads ─────────────────────────────────────────────────────────────────
 
-/** The file box's accept list: "PDF, Office, image, video or zip" — videos, PowerPoint and zip since 2026-10-24. */
+/** The file box's accept list: "PDF, Office, image, video or zip" — videos, PowerPoint and zip since 2026-10-23. */
 export const DOC_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp,.gif,.heic,.mp4,.mov,.webm,.zip'
 /** The bucket's own limit (mig 20261024006700, the owner: "make the size more bigger for all"): 2 GB. */
 export const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
@@ -450,7 +450,7 @@ export function previewKind(fileName: string, contentType: string | null): 'pdf'
   const type = contentTypeOf(fileName, contentType)
   if (type === 'application/pdf') return 'pdf'
   if (type && type.startsWith('image/') && type !== 'image/heic') return 'image'
-  // Played where it is (2026-10-24, videos taken): the player asks the file a piece at a time, so a big one starts at once.
+  // Played where it is (2026-10-23, videos taken): the player asks the file a piece at a time, so a big one starts at once.
   if (type && type.startsWith('video/')) return 'video'
   // Excel and CSV are drawn as the handoff's sheet (2026-10-11, lib/documentation/sheet.ts); a Word file stays a download, as there.
   if (type === TYPES.xlsx || type === TYPES.xls || type === TYPES.csv) return 'sheet'

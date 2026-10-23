@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { dropStaged, dropStagedIn, formFile, formFiles } from './staged'
 import { stagedRefText } from './staging'
 
-// The server's half of a file sent ahead of its Server Action (2026-10-24): what a form sent, the File itself or a
+// The server's half of a file sent ahead of its Server Action (2026-10-23): what a form sent, the File itself or a
 // staged one read back under the action's own client.
 const ME = '0e2f8a7c-1b3d-4e5f-8a9b-0c1d2e3f4a5b'
 const KEY = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'

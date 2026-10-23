@@ -98,7 +98,7 @@ describe('R2 (lib/storage/r2.ts)', () => {
     expect(headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\//)
   })
 
-  // 2026-10-24: handed to fetch inside a Request (aws4fetch's own fetch), the body became a stream that Next's server
+  // 2026-10-23: handed to fetch inside a Request (aws4fetch's own fetch), the body became a stream that Next's server
   // sends chunked, without a length — R2 refused every such PUT, 411 MissingContentLength (Finance's attachments).
   it('sends the bytes themselves, never a Request around them, so fetch says their length', async () => {
     const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) => new Response(null, { status: 200 }))

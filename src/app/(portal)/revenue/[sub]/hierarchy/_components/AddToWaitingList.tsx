@@ -120,7 +120,7 @@ function AddWindow({
     const data = new FormData()
     data.set('input', JSON.stringify(input))
     start(async () => {
-      // The signed form is sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB.
+      // The signed form is sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB.
       const done = await stageInto(data, 'signedForm', file).then(
         () => addToWaitingList(data),
         (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The signed form could not be sent.' }),

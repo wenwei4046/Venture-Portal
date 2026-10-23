@@ -86,7 +86,7 @@ export default function MemberFormTools({
     }
     setUploading(true)
     const data = new FormData()
-    // Sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+    // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
     const done = await stageInto(data, 'file', file).then(
       () => (kind === 'replacement' ? uploadReplacementFormTemplate(data) : uploadWaitingFormTemplate(data)),
       (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The form could not be sent.' }),

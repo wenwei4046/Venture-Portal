@@ -276,7 +276,7 @@ const TEMPLATE_TYPES: Readonly<Record<string, string>> = {
   jpeg: 'image/jpeg',
 }
 /**
- * The bucket's own 100 MB (mig 20261024006700): since 2026-10-24 the file is sent ahead of its Server Action
+ * The bucket's own 100 MB (mig 20261024006700): since 2026-10-23 the file is sent ahead of its Server Action
  * (lib/storage/stage.ts) — until then it rode in the action's body, which stops at 4 MB (so 3.8 MB here).
  */
 export const TEMPLATE_MAX_BYTES = 100 * 1024 * 1024

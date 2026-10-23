@@ -357,7 +357,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       formData.set('source_pool', sourceRows[0]?.pool ?? '')
     }
 
-    // Guard: each attachment is sent ahead of the save (2026-10-24, lib/storage/stage.ts), up to 100 MB a file —
+    // Guard: each attachment is sent ahead of the save (2026-10-23, lib/storage/stage.ts), up to 100 MB a file —
     // no longer the Server Action body's 4 MB for them all.
     const tooBig = filesProblem(files)
     if (tooBig) {

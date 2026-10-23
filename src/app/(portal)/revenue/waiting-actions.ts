@@ -154,7 +154,7 @@ export async function saveReplacementForm(draft: FormDraft): Promise<WaitingForm
 async function uploadTemplate(kind: MemberFormKind, formData: FormData): Promise<WaitingFormOutcome> {
   if (!(await manages())) return { ok: false, reason: kind === 'replacement' ? NO_ACCESS_REPLACEMENT : NO_ACCESS }
   const supabase = await client()
-  // Sent ahead to the uploader's own folder (2026-10-24, lib/storage/staging.ts), or the File itself from an older page.
+  // Sent ahead to the uploader's own folder (2026-10-23, lib/storage/staging.ts), or the File itself from an older page.
   const read = await formFile(supabase, formData, 'file')
   if (!read.ok) return { ok: false, reason: read.reason }
   const file = read.file
@@ -291,7 +291,7 @@ export async function addToWaitingList(formData: FormData): Promise<WaitingAddOu
   const input = waitingAddInputFrom(raw)
   if (!input) return { ok: false, reason: 'Reload the page and try again.' }
 
-  // The signed form is sent ahead to the adder's own folder (2026-10-24, lib/storage/staging.ts), or comes as the
+  // The signed form is sent ahead to the adder's own folder (2026-10-23, lib/storage/staging.ts), or comes as the
   // File itself from an older page. Its bytes are read here once — the staged copy goes straight after.
   const supabase = await client()
   const sent = await formFile(supabase, formData, 'signedForm')
@@ -404,7 +404,7 @@ export type SignedFormOutcome = { ok: true; form: SignedForm } | { ok: false; re
  * then can be upload as well, the file"): the signed form for somebody already on the list — added with "+" and
  * no form, or a better copy of a member's (it replaces the one on file; that one stays, attested). "+"'s rule: a
  * PDF, PNG or JPG — or, since 2026-10-20 ("want word file as well"), a Word .docx / .doc without macros — of 100 MB
- * or less (3 MB until 2026-10-24), looked at byte by byte (`letterFile`). The file goes into the
+ * or less (3 MB until 2026-10-23), looked at byte by byte (`letterFile`). The file goes into the
  * uploader's own folder of the request under this session (`member_invoice_waiting_form_insert`), then
  * `member_waiting_attach_form` (mig 20261020130000) finds it, attests it and makes it the request's signed form;
  * refused, the file is removed again (`member_invoice_unattested_manager_delete`).
@@ -416,7 +416,7 @@ export async function uploadSignedForm(formData: FormData): Promise<SignedFormOu
   if (!user.permissions.includes('member_requests_manage')) return { ok: false, reason: NO_ACCESS }
   const requestId = String(formData.get('requestId') ?? '')
   if (!UUID.test(requestId)) return { ok: false, reason: 'Reload the page and try again.' }
-  // Sent ahead to the uploader's own folder (2026-10-24, lib/storage/staging.ts), or the File itself from an older
+  // Sent ahead to the uploader's own folder (2026-10-23, lib/storage/staging.ts), or the File itself from an older
   // page. Its bytes are read here once — the staged copy goes straight after.
   const supabase = await client()
   const sent = await formFile(supabase, formData, 'file')
