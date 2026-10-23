@@ -38,6 +38,10 @@
   color: rgb(var(--hv-ink));
   font-size: 10px;
   font-weight: 600;
+  /* Its own line, not the label's 20px (2026-10-23, the user: "make the number centre"): a taller line grew the
+     grid's row past the 16px circle and set the figure ~2px low; at 1 it sits in the middle (measured: ±0.25px). */
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   margin-right: 6px;
   /* In a host's own block label (Add person's), level with its words. */
