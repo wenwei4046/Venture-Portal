@@ -15,10 +15,12 @@ export type ChartFmt = "rm" | "n" | "pct" | "x";
 /** The chart picks from the table's own metrics (2026-10-23, the owner: "这个 + 要可以选择要看什么资料，他的资料跟下方的
  * + 是一样的") — Customise metrics' list, less Delivery (a word, not a figure); vm/adsperf.ts builds it from METRICS. */
 export const chartFmtOf = (f: string): ChartFmt => (f === "rm" || f === "rm2" ? "rm" : f === "pct" ? "pct" : f === "x" ? "x" : "n");
-export const CHART_DEF: (string | null)[] = ["spend", "leads", "cpl", "appt"];
+export const CHART_DEF: (string | null)[] = ["spend", "leads", "cpl", "appt", "impr"];
 export const CHART_MAX = 6;
 /** One colour a tile's PLACE, so a line keeps its colour when another is hidden or taken off (globals.css --crm-series-*). */
 export const SERIES = [1, 2, 3, 4, 5, 6].map(n => `var(--crm-series-${n})`);
+/** Each place's card tint (v2 note 02: "tint background with a 3px top border in the series colour"). */
+export const SERIES_TINT = [1, 2, 3, 4, 5, 6].map(n => `var(--crm-series-tint-${n})`);
 /** Every metric that is Meta's, or built on Meta's spend: empty until an ad has been read. */
 const META_KEYS = new Set(["spend", "impr", "reach", "results", "cpr", "freq", "cpm", "cpp", "msgconv", "cpmsg", "newmsg", "msgreply", "blocks", "clicks", "cpc", "ctr", "allclk", "ctrall", "cpcall", "outclk",
   "eng", "reacts", "comments", "shares", "saves", "follows", "cpe", "v3", "thru", "cpthru", "v25", "v50", "v75", "v100", "hook", "cpl", "cpappt", "cpwon"]);

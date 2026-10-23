@@ -394,6 +394,14 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-nav-line: #F0E2D4;
   --crm-hover: #FBF7F3;
   --crm-audit: #F6E7D8;
+  /* redesign v2 (2026-10-23, docs/design_handoff_crm_redesign_v2 › Global rules): ONE selected colour on white, the nav's
+     active item a step darker on its cream, a selected parent row, and the large summary blocks — cream #FCEEE2 stays for
+     small things only (an avatar, a chip) */
+  --crm-sel: #F5F0EA;
+  --crm-nav-active: #EFE6DD;
+  --crm-sum: #F5F0EA;
+  --crm-sum-line: #ECE3DA;
+  --crm-sum-div: #E6DCD2;
   --crm-audit-line: #E3CDB8;
   /* accents */
   --crm-rust: #BD4A19;
@@ -413,6 +421,8 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-peach-soft: #F9D3BA;
   --crm-hero-line: #EBD6C3;
   --crm-track: #EFE7E1;
+  --crm-track-2: #EEE2D8;
+  --crm-hover-2: #FFFCF9;
   /* channels — these two appear nowhere else */
   --crm-whatsapp: #25D366;
   --crm-messenger: #0A7CFF;
@@ -441,14 +451,22 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-brand-waze: #33CCFF;
   --crm-brand-maps: #34A853;
   --crm-brand-instagram: #C13584;
-  /* Ads Performance's chart (2026-10-23): one hue a metric, in this fixed order — the dataviz reference's categorical
-     slots 1–6, validated together on white (adjacent CVD ΔE ≥ 9.1; under 3:1 contrast, so each line has its labelled tile) */
-  --crm-series-1: #2a78d6;
-  --crm-series-2: #eb6834;
-  --crm-series-3: #1baf7a;
-  --crm-series-4: #eda100;
-  --crm-series-5: #e87ba4;
-  --crm-series-6: #008300;
+  /* Ads Performance's chart and its cards (redesign v2 note 02, 2026-10-23 — replaces the first cut's blue/orange/green):
+     the CRM palette in a fixed order, each with its card tint; text on every card stays ink */
+  --crm-series-1: #422315;
+  --crm-series-2: #BD4A19;
+  --crm-series-3: #6F402C;
+  --crm-series-4: #FFA91F;
+  --crm-series-5: #C29C88;
+  --crm-series-6: #9A6B55;
+  --crm-series-7: #DCC6B8;
+  --crm-series-tint-1: #F3EBE5;
+  --crm-series-tint-2: #FDE3D2;
+  --crm-series-tint-3: #F1E3DA;
+  --crm-series-tint-4: #FFF0D1;
+  --crm-series-tint-5: #F7F0EB;
+  --crm-series-tint-6: #F7F0EB;
+  --crm-series-tint-7: #F7F0EB;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Inter+Tight:wght@300;400;500;600&amp;display=swap">
+<style>body{margin:0;background:#E9E2DA}a{color:#422315}a:hover{color:#8A1F0A}</style>
+</helmet>
+<section id="turn-6" style="padding:80px;display:flex;flex-direction:column;gap:64px;font-family:Inter,sans-serif;background:#E9E2DA;color:#422315">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+    <div style="font:500 44px 'Inter Tight',sans-serif;letter-spacing:-0.025em">CRM phone · 4a Espresso &amp; White</div>
+    <div style="font:400 18px/1.55 Inter,sans-serif;color:#6F402C;text-wrap:pretty">The desktop rules carried to 430 × 932. White pages, cream for the chat wall and highlights, deep orange #BD4A19 for your own bubbles and the one main action, bright orange for unread and urgency, oxblood for urgent text, team colours from the palette. Mine first, then Team.</div>
+  </div>
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+    <div id="{{ g.id }}" style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:baseline;gap:16px;padding-bottom:12px;border-bottom:1px solid #CDBFB5">
+        <div style="font:500 32px 'Inter Tight',sans-serif;letter-spacing:-0.02em">{{ g.title }}</div>
+        <div style="font:400 16px Inter,sans-serif;color:#6F402C">{{ g.note }}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,430px);gap:56px 44px">
+        <sc-for list="{{ g.screens }}" as="s" hint-placeholder-count="6">
+          <div id="{{ s.id }}" data-screen-label="{{ s.label }}" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="font:600 13px 'Inter Tight',sans-serif;color:#FFF8F1;background:#422315;border-radius:6px;padding:3px 9px">{{ s.num }}</div>
+              <div style="font:500 17px 'Inter Tight',sans-serif">{{ s.title }}</div>
+              <div style="font:400 13px Inter,sans-serif;color:#7A6255;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.note }}</div>
+            </div>
+            <div style="width:430px;height:932px;position:relative;overflow:hidden;border-radius:52px;box-shadow:0 0 0 10px #2A160C,0 30px 60px #2A160C40;display:flex;flex-direction:column;font-family:Inter,sans-serif;color:#422315;background:{{ s.bg }}">
+              <div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;box-sizing:border-box;position:relative;z-index:3;font:600 16px 'Inter Tight',sans-serif;color:{{ s.sbColor }}">
+                <span>9:41</span>
+                <div style="display:flex;gap:6px;align-items:center"><span style="width:17px;height:17px;background:currentColor;mask:url(icons/signal.svg) center/contain no-repeat"></span><span style="width:17px;height:17px;background:currentColor;mask:url(icons/wifi.svg) center/contain no-repeat"></span><span style="width:22px;height:22px;background:currentColor;mask:url(icons/battery-full.svg) center/contain no-repeat"></span></div>
+              </div>
+
+              <sc-if value="{{ s.isInbox }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:14px;padding:6px 20px 12px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em;margin-right:auto">Inbox</div>
+                    <div style="height:40px;padding:0 14px;border-radius:20px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;box-sizing:border-box;background:#FDE3D2;color:#8A1F0A"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/users.svg) center/contain no-repeat"></span>Mine</div>
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/house.svg) center/contain no-repeat"></span></div>
+                    <div style="width:40px;height:40px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/bell.svg) center/contain no-repeat"></span><span style="position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:#EE5E08;border:2px solid #FFFFFF"></span></div>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <div style="height:40px;padding:0 12px;border-radius:20px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;white-space:nowrap;background:#F5F0EA">All ads<span style="width:13px;height:13px;background:currentColor;mask:url(icons/chevron-down.svg) center/contain no-repeat"></span></div>
+                    <div style="flex:1;height:40px;padding:0 14px;border-radius:20px;display:flex;align-items:center;gap:8px;font:400 14px Inter,sans-serif;background:#F7F3EF;color:#A8968B"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/search.svg) center/contain no-repeat"></span>Search</div>
+                  </div>
+                  <div style="display:flex;gap:6px;overflow:hidden;margin-right:-20px">
+                    <sc-for list="{{ chips }}" as="c" hint-placeholder-count="8"><div style="flex:none;height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}<span style="font-variant-numeric:tabular-nums;color:{{ c.countColor }}">{{ c.count }}</span></div></sc-for>
+                  </div>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden">
+                  <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="7">
+                    <div style="position:relative;overflow:hidden;border-top:1px solid #F4F0EC">
+                      <sc-if value="{{ r.swiped }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;top:0;bottom:0;right:0;width:156px;display:flex">
+                          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 12px Inter,sans-serif;background:#FFA91F;color:#2A160C"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/user-plus.svg) center/contain no-repeat"></span>Assign</div>
+                          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 12px Inter,sans-serif;background:#422315;color:#FFF8F1"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/ellipsis.svg) center/contain no-repeat"></span>More</div>
+                        </div>
+                      </sc-if>
+                      <div style="display:flex;gap:12px;padding:13px 20px;position:relative;background:{{ r.bg }};transform:{{ r.shift }}">
+                        <div style="position:relative;flex:none;width:48px;height:48px">
+                          <div style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 15px 'Inter Tight',sans-serif;background:{{ r.avBg }};color:{{ r.avText }}">{{ r.initials }}</div>
+                          <div style="position:absolute;right:-2px;bottom:-2px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ r.chBg }};color:#FFFFFF;border:2px solid #FFFFFF"><span style="width:10px;height:10px;background:currentColor;mask:{{ r.chMask }}"></span></div>
+                        </div>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                          <div style="display:flex;align-items:baseline;gap:8px"><div style="font:{{ r.nameWeight }} 16px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div><div style="margin-left:auto;font:500 12px Inter,sans-serif;white-space:nowrap;color:{{ r.timeColor }}">{{ r.time }}</div></div>
+                          <div style="font:400 12px Inter,sans-serif;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.ad }}</div>
+                          <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0;font:400 14px Inter,sans-serif;color:#5A4034;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.last }}</div>
+                            <sc-if value="{{ r.hasUnread }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font:600 12px 'Inter Tight',sans-serif;background:#BD4A19;color:#FFFFFF">{{ r.unread }}</span></sc-if></div>
+                          <sc-if value="{{ r.hasNote }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:5px;font:{{ r.noteWeight }} 12px Inter,sans-serif;color:{{ r.noteColor }}"><span style="width:12px;height:12px;background:currentColor;mask:{{ r.noteMask }}"></span>{{ r.note }}</div></sc-if>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isEmptyInbox }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:14px;padding:6px 20px 12px">
+                  <div style="display:flex;align-items:center;gap:8px"><div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em;margin-right:auto">Inbox</div>
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/house.svg) center/contain no-repeat"></span></div>
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/bell.svg) center/contain no-repeat"></span></div></div>
+                  <div style="display:flex;gap:6px;overflow:hidden;margin-right:-20px"><sc-for list="{{ chipsAppt }}" as="c" hint-placeholder-count="8"><div style="flex:none;height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:{{ c.bg }};color:{{ c.color }}">{{ c.label }}<span style="font-variant-numeric:tabular-nums;color:{{ c.countColor }}">{{ c.count }}</span></div></sc-for></div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 48px 120px;text-align:center">
+                  <div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#FDE3D2"><span style="width:30px;height:30px;background:#BD4A19;mask:url(icons/calendar-check.svg) center/contain no-repeat"></span></div>
+                  <div style="font:500 22px 'Inter Tight',sans-serif">No appointments yet</div>
+                  <div style="font:400 15px/1.5 Inter,sans-serif;color:#7A6255;text-wrap:pretty">A chat moves here when you book a showroom visit from it.</div>
+                  <div style="margin-top:6px;height:44px;padding:0 20px;border-radius:22px;display:flex;align-items:center;font:500 14px Inter,sans-serif;box-sizing:border-box;border:1px solid #E2D8D0">See all chats</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isChat }}" hint-placeholder-val="{{ false }}">
+                <div style="height:62px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 8px;border-bottom:1px solid #EEE8E3;background:#FFFFFF">
+                  <span style="width:26px;height:26px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span>
+                  <div style="width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 14px 'Inter Tight',sans-serif;background:#FCEEE2">{{ s.chat.initials }}</div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><div style="font:600 16px Inter,sans-serif">{{ s.chat.name }}</div><div style="font:400 12px Inter,sans-serif;color:#7A6255;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.chat.ad }}</div></div>
+                  <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="width:20px;height:20px;background:currentColor;mask:url(icons/ellipsis-vertical.svg) center/contain no-repeat"></span></div>
+                </div>
+                <div style="height:34px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;font:500 12px Inter,sans-serif;background:{{ s.chat.stripBg }};border-bottom:1px solid #F3C9B4">
+                  <span style="width:7px;height:7px;border-radius:50%;background:{{ s.chat.dot }}"></span><span style="color:{{ s.chat.stripColor }}">{{ s.chat.stripL }}</span><span style="margin-left:auto;font-weight:400;color:#7A6255">{{ s.chat.stripR }}</span>
+                </div>
+                <div style="flex:1;min-height:0;position:relative;background:#F7F3EF">
+                  <div style="position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:12px 12px {{ s.chat.padBottom }}">
+                    <div style="align-self:center;font:500 11px Inter,sans-serif;letter-spacing:0.06em;text-transform:uppercase;padding:4px 10px;border-radius:10px;background:#FFFFFFB3;color:#7A6255">{{ s.chat.day }}</div>
+                    <sc-for list="{{ s.chat.bubbles }}" as="b" hint-placeholder-count="6">
+                      <div style="display:flex;justify-content:{{ b.justify }};opacity:{{ b.opacity }}">
+                        <div style="max-width:80%;padding:{{ b.pad }};border-radius:{{ b.radius }};display:flex;flex-direction:column;gap:4px;box-sizing:border-box;background:{{ b.bg }};color:{{ b.color }};box-shadow:0 1px 1px #2A160C14">
+                          <sc-if value="{{ b.isAlbum }}" hint-placeholder-val="{{ false }}">
+                            <div style="display:grid;grid-template-columns:repeat(2,112px);gap:3px;border-radius:12px;overflow:hidden">
+                              <sc-for list="{{ albumTiles }}" as="at" hint-placeholder-count="4"><div style="height:112px;position:relative;display:flex;align-items:center;justify-content:center;background:{{ at.bg }}"><span style="width:22px;height:22px;background:#FFFFFF99;mask:url(icons/image.svg) center/contain no-repeat"></span><sc-if value="{{ at.more }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 26px 'Inter Tight',sans-serif;color:#FFFFFF;background:#2A160C80">+3</div></sc-if></div></sc-for>
+                            </div>
+                          </sc-if>
+                          <sc-if value="{{ b.isVoice }}" hint-placeholder-val="{{ false }}">
+                            <div style="display:flex;align-items:center;gap:10px;width:230px;padding:2px 0">
+                              <div style="width:36px;height:36px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#422315;color:#FFF8F1"><span style="width:14px;height:14px;margin-left:2px;background:currentColor;mask:url(icons/play.svg) center/contain no-repeat"></span></div>
+                              <div style="flex:1;display:flex;align-items:center;gap:2px;height:28px"><sc-for list="{{ wave }}" as="wv" hint-placeholder-count="28"><span style="flex:1;border-radius:1px;height:{{ wv.h }};background:{{ wv.c }}"></span></sc-for></div>
+                              <div style="font:400 11px Inter,sans-serif;color:#7A6255;font-variant-numeric:tabular-nums">0:24</div>
+                            </div>
+                          </sc-if>
+                          <sc-if value="{{ b.isVisit }}" hint-placeholder-val="{{ false }}">
+                            <div style="display:flex;flex-direction:column;gap:3px;padding:2px 2px 4px;min-width:210px">
+                              <div style="display:flex;align-items:center;gap:6px;font:500 10px Inter,sans-serif;letter-spacing:0.12em;text-transform:uppercase;color:#F3CDBB"><span style="width:12px;height:12px;background:currentColor;mask:url(icons/calendar-check.svg) center/contain no-repeat"></span>Showroom visit · Booked</div>
+                              <div style="font:500 18px 'Inter Tight',sans-serif">Sat 24 Oct · 2:00 pm</div>
+                              <div style="font:400 13px Inter,sans-serif;color:#FBE6DC">HOUZS Puchong showroom</div>
+                            </div>
+                          </sc-if>
+                          <sc-if value="{{ b.isText }}" hint-placeholder-val="{{ true }}"><div style="font:400 15px/1.42 Inter,sans-serif">{{ b.text }}</div></sc-if>
+                          <div style="align-self:flex-end;display:flex;align-items:center;gap:3px;font:400 11px Inter,sans-serif;color:{{ b.meta }}">{{ b.time }}<sc-if value="{{ b.out }}" hint-placeholder-val="{{ false }}"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/check-check.svg) center/contain no-repeat"></span></sc-if></div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+
+                  <sc-if value="{{ s.chat.attach }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:14px;right:14px;bottom:84px;border-radius:22px;padding:20px 12px;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#FFFFFF;box-shadow:0 16px 40px #2A160C2E">
+                      <sc-for list="{{ attachItems }}" as="ai" hint-placeholder-count="5"><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ ai.bg }};color:{{ ai.fg }}"><span style="width:22px;height:22px;background:currentColor;mask:{{ ai.mask }}"></span></div><div style="font:500 12px Inter,sans-serif;text-align:center;line-height:1.25">{{ ai.label }}</div></div></sc-for>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ s.chat.idle }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:absolute;left:10px;right:10px;bottom:14px;display:flex;align-items:center;gap:8px">
+                      <div style="flex:1;min-height:52px;border-radius:26px;display:flex;align-items:center;gap:14px;padding:0 16px;box-sizing:border-box;background:#FFFFFF;box-shadow:0 4px 16px #2A160C1F;color:#7A6255">
+                        <span style="width:22px;height:22px;flex:none;background:currentColor;mask:{{ s.chat.leftMask }}"></span>
+                        <span style="flex:1;font:400 16px Inter,sans-serif;color:{{ s.chat.inputColor }}">{{ s.chat.input }}</span>
+                        <span style="width:22px;height:22px;flex:none;background:{{ s.chat.clipColor }};mask:url(icons/paperclip.svg) center/contain no-repeat"></span>
+                        <span style="width:22px;height:22px;flex:none;background:currentColor;mask:url(icons/camera.svg) center/contain no-repeat"></span>
+                      </div>
+                      <div style="width:52px;height:52px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#BD4A19;color:#FFFFFF;box-shadow:0 4px 16px #2A160C33"><span style="width:22px;height:22px;background:currentColor;mask:{{ s.chat.mainMask }}"></span></div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ s.chat.cold }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:12px;right:12px;bottom:14px;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;box-shadow:0 8px 24px #2A160C26">
+                      <div style="display:flex;gap:10px"><span style="width:18px;height:18px;flex:none;margin-top:1px;background:#6F402C;mask:url(icons/lock.svg) center/contain no-repeat"></span><div style="display:flex;flex-direction:column;gap:3px"><div style="font:600 14px Inter,sans-serif">This chat is cold</div><div style="font:400 13px/1.45 Inter,sans-serif;color:#5A4034">Ahmad last wrote 2 days ago. WhatsApp only lets an approved template open the chat again.</div></div></div>
+                      <div style="height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;gap:8px;font:500 15px Inter,sans-serif;background:#BD4A19;color:#FFFFFF"><span style="width:17px;height:17px;background:currentColor;mask:url(icons/message-square-text.svg) center/contain no-repeat"></span>Send template message</div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ s.chat.menu }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;inset:0;background:#2A160C73;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:10px;padding:0 14px 30px">
+                      <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:28px;background:#FFFFFF;box-shadow:0 8px 24px #2A160C40;font-size:26px">
+                        <sc-for list="{{ reactions }}" as="re" hint-placeholder-count="6"><span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center">{{ re }}</span></sc-for>
+                        <span style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#F7F3EF"><span style="width:18px;height:18px;background:#7A6255;mask:url(icons/plus.svg) center/contain no-repeat"></span></span>
+                      </div>
+                      <div style="max-width:80%;padding:9px 12px 7px;border-radius:16px 16px 16px 4px;display:flex;flex-direction:column;gap:4px;background:#FFFFFF;box-shadow:0 8px 24px #2A160C40"><div style="font:400 15px/1.42 Inter,sans-serif">Ok can I come Saturday afternoon?</div><div style="align-self:flex-end;font:400 11px Inter,sans-serif;color:#A8968B">9:12</div></div>
+                      <div style="width:250px;border-radius:16px;overflow:hidden;background:#FFFFFF;box-shadow:0 8px 24px #2A160C40">
+                        <sc-for list="{{ menuItems }}" as="mi" hint-placeholder-count="8"><div style="display:flex;align-items:center;gap:12px;height:46px;padding:0 16px;font:400 15px Inter,sans-serif;border-top:1px solid {{ mi.line }};color:{{ mi.color }}">{{ mi.label }}<span style="margin-left:auto;width:18px;height:18px;background:currentColor;mask:{{ mi.mask }}"></span></div></sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ s.chat.emoji }}" hint-placeholder-val="{{ false }}">
+                  <div style="height:316px;flex:none;display:flex;flex-direction:column;background:#FFFFFF;border-top:1px solid #EEE8E3">
+                    <div style="display:flex;gap:4px;padding:10px 12px 6px">
+                      <sc-for list="{{ emojiTabs }}" as="et" hint-placeholder-count="6"><div style="flex:1;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:{{ et.bg }}">{{ et.e }}</div></sc-for>
+                    </div>
+                    <div style="padding:2px 16px 4px;font:500 11px Inter,sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#A8968B">Smileys</div>
+                    <div style="display:grid;grid-template-columns:repeat(8,1fr);row-gap:4px;padding:0 10px;font-size:27px;text-align:center">
+                      <sc-for list="{{ emojis }}" as="em" hint-placeholder-count="32"><span style="height:42px;line-height:42px">{{ em }}</span></sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ s.isContacts }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:14px;padding:6px 20px 8px">
+                  <div style="display:flex;align-items:baseline;gap:10px"><div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em">Contacts</div><div style="font:400 14px Inter,sans-serif;color:#A8968B;font-variant-numeric:tabular-nums">248</div></div>
+                  <div style="height:40px;padding:0 14px;border-radius:20px;display:flex;align-items:center;gap:8px;font:400 14px Inter,sans-serif;background:#F7F3EF;color:#A8968B"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/search.svg) center/contain no-repeat"></span>Search name or phone</div>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden;position:relative;padding-right:24px">
+                  <sc-for list="{{ contactSections }}" as="cs" hint-placeholder-count="4">
+                    <div style="padding:10px 20px 4px;font:600 13px 'Inter Tight',sans-serif;color:#BD4A19">{{ cs.letter }}</div>
+                    <sc-for list="{{ cs.rows }}" as="c" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px;padding:10px 0 10px 20px">
+                        <div style="width:42px;height:42px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 14px 'Inter Tight',sans-serif;background:{{ c.avBg }};color:{{ c.avText }}">{{ c.initials }}</div>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-bottom:10px;margin-bottom:-10px;border-bottom:1px solid #F4F0EC"><div style="font:500 15px Inter,sans-serif">{{ c.name }}</div><div style="font:400 12px Inter,sans-serif;color:#A8968B;font-variant-numeric:tabular-nums">{{ c.phone }}</div></div>
+                        <span style="display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;font:500 11px Inter,sans-serif;white-space:nowrap;background:{{ c.stBg }};color:{{ c.stText }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.stColor }}"></span>{{ c.status }}</span>
+                      </div>
+                    </sc-for>
+                  </sc-for>
+                  <div style="position:absolute;right:6px;top:8px;display:flex;flex-direction:column;align-items:center;gap:3px;font:600 10px Inter,sans-serif;color:#A8968B"><sc-for list="{{ az }}" as="l" hint-placeholder-count="26"><span style="color:{{ l.c }}">{{ l.l }}</span></sc-for></div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isCalendar }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;align-items:center;gap:10px;padding:6px 20px 12px">
+                  <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em;margin-right:auto">Calendar</div>
+                  <div style="display:flex;padding:3px;border-radius:20px;background:#F7F3EF"><div style="height:32px;padding:0 14px;border-radius:16px;display:flex;align-items:center;font:500 13px Inter,sans-serif;background:#BD4A19;color:#FFFFFF">Month</div><div style="height:32px;padding:0 14px;border-radius:16px;display:flex;align-items:center;font:500 13px Inter,sans-serif;color:#7A6255">List</div></div>
+                </div>
+                <div style="flex:none;padding:0 16px 10px">
+                  <div style="display:flex;align-items:center;padding:0 4px 10px"><div style="font:500 17px 'Inter Tight',sans-serif">October 2026</div><span style="margin-left:auto;width:20px;height:20px;background:#7A6255;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span><span style="margin-left:16px;width:20px;height:20px;background:#7A6255;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div>
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);font:500 11px Inter,sans-serif;color:#A8968B;text-align:center;padding-bottom:4px"><sc-for list="{{ dow }}" as="d" hint-placeholder-count="7"><div>{{ d }}</div></sc-for></div>
+                  <div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px">
+                    <sc-for list="{{ month }}" as="m" hint-placeholder-count="35">
+                      <div style="height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
+                        <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 15px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;background:{{ m.bg }};color:{{ m.color }}">{{ m.d }}</div>
+                        <span style="width:5px;height:5px;border-radius:50%;margin-top:-3px;background:{{ m.dot }}"></span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:10px;padding:14px 16px 0;border-top:1px solid #EEE8E3;background:#FBF7F3">
+                  <sc-for list="{{ calCards }}" as="cc" hint-placeholder-count="4">
+                    <sc-if value="{{ cc.isHead }}" hint-placeholder-val="{{ false }}"><div style="padding:4px 4px 0;font:500 11px Inter,sans-serif;letter-spacing:0.1em;text-transform:uppercase;color:#A8968B">{{ cc.label }}</div></sc-if>
+                    <sc-if value="{{ cc.isCard }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;gap:12px;padding:12px 14px 10px;border-radius:16px 16px 0 0;background:{{ cc.bg }};border:1px solid {{ cc.bd }};border-bottom:0;box-shadow:inset 4px 0 0 {{ cc.bar }}">
+                        <div style="width:52px;flex:none;display:flex;flex-direction:column;gap:1px"><div style="font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">{{ cc.time }}</div><div style="font:400 11px Inter,sans-serif;color:#A8968B">{{ cc.ampm }}</div></div>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font:500 15px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cc.name }}</span><sc-if value="{{ cc.tag }}" hint-placeholder-val="{{ false }}"><span style="flex:none;height:20px;padding:0 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;background:#387557;color:#FFFFFF;font:600 10px Inter,sans-serif;letter-spacing:.04em"><span style="width:5px;height:5px;border-radius:50%;background:#FFFFFF"></span>{{ cc.tag }}</span></sc-if></div><div style="font:400 12px Inter,sans-serif;color:#7A6255;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cc.room }}</div></div>
+                          </div>
+                      </div>
+                      <div style="display:flex;gap:6px;margin-top:-6px;padding:0 14px 12px;background:{{ cc.bg }};border:1px solid {{ cc.bd }};border-top:0;border-radius:0 0 16px 16px;box-shadow:inset 4px 0 0 {{ cc.bar }}"><sc-for list="{{ cc.btns }}" as="bt" hint-placeholder-count="1"><div style="flex:1 1 0;min-width:0;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;font:500 13px Inter,sans-serif;white-space:nowrap;box-sizing:border-box;background:{{ bt.bg }};color:{{ bt.color }};border:1px solid {{ bt.border }}">{{ bt.label }}</div></sc-for></div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isInsight }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:16px;padding:6px 20px 0">
+                  <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em">Insight</div>
+                  <div style="display:flex;padding:3px;border-radius:20px;background:#F7F3EF"><sc-for list="{{ periodsPhone }}" as="pp" hint-placeholder-count="4"><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font:500 13px Inter,sans-serif;background:{{ pp.bg }};color:{{ pp.color }};box-shadow:{{ pp.sh }}">{{ pp.label }}</div></sc-for></div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);padding:20px 0;border-radius:20px;background:#BD4A19;color:#FFFFFF">
+                    <sc-for list="{{ rates }}" as="ra" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:6px;padding:0 16px;border-left:1px solid {{ ra.div }}"><span style="width:18px;height:2px;background:{{ ra.mark }}"></span><div style="font:500 12px Inter,sans-serif;color:#F7D3C0">{{ ra.label }}</div><div style="font:500 32px 'Inter Tight',sans-serif;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;color:{{ ra.color }}">{{ ra.value }}</div><div style="font:500 11px Inter,sans-serif;color:{{ ra.dc }}">{{ ra.delta }}</div></div></sc-for>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                    <sc-for list="{{ counts }}" as="co" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:16px;border:1px solid #F0E2D4"><div style="font:500 12px Inter,sans-serif;color:#7A6255">{{ co.label }}</div><div style="font:500 26px 'Inter Tight',sans-serif;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">{{ co.value }}</div></div></sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid #F0E2D4"><span style="width:20px;height:20px;background:#6F402C;mask:url(icons/clock.svg) center/contain no-repeat"></span><div style="font:500 14px Inter,sans-serif;white-space:nowrap">Avg. reply time</div><div style="margin-left:auto;font:500 22px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">9<span style="font-size:13px;font-weight:400;margin-left:2px">min</span></div></div>
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:baseline"><div style="font:500 17px 'Inter Tight',sans-serif">Leads by status</div><div style="margin-left:auto;font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">58</div></div>
+                    <div style="display:flex;height:8px;gap:2px;border-radius:4px;overflow:hidden"><sc-for list="{{ myStatuses }}" as="st" hint-placeholder-count="7"><div style="flex:{{ st.count }};background:{{ st.color }}"></div></sc-for></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px"><sc-for list="{{ myStatuses }}" as="st" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:8px;height:34px;font:400 13px Inter,sans-serif;border-bottom:1px solid #F4F0EC"><span style="width:8px;height:8px;border-radius:2px;background:{{ st.color }}"></span><span style="color:{{ st.text }}">{{ st.label }}</span><span style="margin-left:auto;font-weight:500;font-variant-numeric:tabular-nums">{{ st.count }}</span><span style="flex:none;width:11px;height:11px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div></sc-for></div><div style="font:400 12px Inter,sans-serif;color:#A8968B">Tap a status to open those leads in Inbox</div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isProfile }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:0;right:0;top:0;height:380px;background:linear-gradient(180deg,#EADFD4 0%,#F5F0EA 45%,#FFFFFF 100%)"></div>
+                <div style="flex:1;min-height:0;overflow:hidden;position:relative;display:flex;flex-direction:column;gap:18px;padding:6px 20px 0">
+                  <div style="display:flex;justify-content:flex-end;gap:8px">
+                    
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#FFFFFFB3"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/house.svg) center/contain no-repeat"></span></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 6px">
+                    <div style="width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 30px 'Inter Tight',sans-serif;background:#BD4A19;color:#FFFFFF;box-shadow:0 0 0 5px #FFFFFF">{{ s.me.ini }}</div>
+                    <div style="font:500 24px 'Inter Tight',sans-serif;letter-spacing:-0.02em;padding-top:6px">{{ s.me.name }}</div>
+                    <div style="font:400 14px Inter,sans-serif;color:#6F402C">{{ s.me.title }}</div>
+                  </div>
+                  <sc-if value="{{ s.isTeam }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;background:#422315;color:#FFFFFF"><span style="flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#5A4034"><span style="width:17px;height:17px;background:#F6B48A;mask:url(icons/users.svg) center/contain no-repeat"></span></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font:500 15px Inter,sans-serif">View as a team member</span><span style="font:400 12px Inter,sans-serif;color:#E0CFC4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Open anyone’s CRM · reply and book for them</span></span><span style="width:14px;height:14px;background:#E0CFC4;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div></sc-if>
+                  <sc-for list="{{ s.me.cards }}" as="pc" hint-placeholder-count="2">
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                      <div style="padding:0 6px;font:500 11px Inter,sans-serif;letter-spacing:0.1em;text-transform:uppercase;color:#A8968B">{{ pc.title }}</div>
+                      <div style="border-radius:20px;overflow:hidden;background:#FFFFFF;box-shadow:0 8px 28px #2A160C14;border:1px solid #F4F0EC">
+                        <sc-for list="{{ pc.rows }}" as="pr" hint-placeholder-count="3">
+                          <div style="display:flex;align-items:center;gap:14px;height:56px;padding:0 16px;border-top:1px solid {{ pr.line }}">
+                            <div style="width:34px;height:34px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#BD4A19;color:#FFFFFF"><span style="width:17px;height:17px;background:currentColor;mask:{{ pr.mask }}"></span></div>
+                            <div style="flex:1;font:500 15px Inter,sans-serif">{{ pr.label }}</div>
+                            <sc-if value="{{ pr.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font:600 12px 'Inter Tight',sans-serif;background:#BD4A19;color:#FFFFFF">{{ pr.badge }}</span></sc-if>
+                            <div style="font:400 14px Inter,sans-serif;color:#7A6255">{{ pr.value }}</div>
+                            <span style="width:16px;height:16px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isNotif }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:14px;padding:4px 16px 12px">
+                  <div style="display:flex;align-items:center;gap:6px"><span style="width:26px;height:26px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span><div style="font:500 26px 'Inter Tight',sans-serif;letter-spacing:-0.02em">Notifications</div></div>
+                  <div style="display:flex;padding:3px;border-radius:20px;background:#F7F3EF"><sc-for list="{{ notifTabs }}" as="nt" hint-placeholder-count="3"><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:6px;font:500 13px Inter,sans-serif;background:{{ nt.bg }};color:{{ nt.color }};box-shadow:{{ nt.sh }}">{{ nt.label }}<span style="color:#A8968B;font-variant-numeric:tabular-nums">{{ nt.n }}</span></div></sc-for></div>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden">
+                  <sc-for list="{{ notifs }}" as="no" hint-placeholder-count="8">
+                    <sc-if value="{{ no.isHead }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 20px 6px;font:500 11px Inter,sans-serif;letter-spacing:0.1em;text-transform:uppercase;color:#A8968B">{{ no.label }}</div></sc-if>
+                    <sc-if value="{{ no.isRow }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;gap:12px;padding:12px 20px;background:{{ no.bg }}">
+                        <div style="width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ no.iconBg }};color:{{ no.iconFg }}"><span style="width:18px;height:18px;background:currentColor;mask:{{ no.mask }}"></span></div>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font:{{ no.w }} 14px/1.4 Inter,sans-serif">{{ no.text }}</div><div style="font:400 12px Inter,sans-serif;color:#A8968B">{{ no.sub }}</div></div>
+                        <span style="width:8px;height:8px;margin-top:6px;flex:none;border-radius:50%;background:{{ no.dot }}"></span>
+                      </div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ s.sheet }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:0;z-index:4;background:#2A160C66;display:flex;flex-direction:column;justify-content:flex-end">
+                    <div style="border-radius:28px 28px 0 0;padding:10px 20px 34px;display:flex;flex-direction:column;gap:16px;background:#FFFFFF">
+                      <div style="align-self:center;width:40px;height:5px;border-radius:3px;background:#DCC6B8"></div>
+                      <div style="display:flex;align-items:center;gap:12px"><div style="width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 17px 'Inter Tight',sans-serif;background:#FCEEE2">SA</div><div style="display:flex;flex-direction:column;gap:2px"><div style="font:500 20px 'Inter Tight',sans-serif">Siti Aminah</div><div style="font:400 13px Inter,sans-serif;color:#7A6255">Sofa Raya Sale · Puchong · WhatsApp</div></div></div>
+                      <div style="padding:14px 16px;border-radius:16px;font:400 15px/1.45 Inter,sans-serif;background:#F5F0EA">“Is the 3-seater available in grey? And can it be delivered before Raya?”<div style="font:400 12px Inter,sans-serif;color:#7A6255;padding-top:6px">2 messages · 9:41</div></div>
+                      <div style="display:flex;flex-direction:column">
+                        <sc-for list="{{ sheetFields }}" as="sf" hint-placeholder-count="3"><div style="display:flex;align-items:center;height:42px;font:400 14px Inter,sans-serif;border-bottom:1px solid #F4F0EC"><span style="color:#7A6255">{{ sf.k }}</span><span style="margin-left:auto;font-weight:500;color:{{ sf.c }}">{{ sf.v }}</span></div></sc-for>
+                      </div>
+                      <div style="display:flex;gap:8px"><div style="flex:1;height:50px;border-radius:25px;display:flex;align-items:center;justify-content:center;font:500 15px Inter,sans-serif;box-sizing:border-box;border:1px solid #E2D8D0">Mark as read</div><div style="flex:1.4;height:50px;border-radius:25px;display:flex;align-items:center;justify-content:center;gap:8px;font:500 15px Inter,sans-serif;background:#BD4A19;color:#FFFFFF"><span style="width:17px;height:17px;background:currentColor;mask:url(icons/message-circle.svg) center/contain no-repeat"></span>Open chat</div></div>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ s.isTeamInsight }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:16px;padding:6px 20px 0">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    
+                    <div style="width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 14px 'Inter Tight',sans-serif;background:#422315;color:#FFF8F1">PT</div>
+                    <div style="display:flex;flex-direction:column"><div style="font:500 20px 'Inter Tight',sans-serif;letter-spacing:-0.01em">Good morning, Peter</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">Revenue Director · everyone</div></div><div style="width:40px;height:40px;flex:none;margin-left:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/house.svg) center/contain no-repeat"></span></div>
+                  </div>
+                  <div style="display:flex;padding:3px;border-radius:20px;background:#F7F3EF;font:500 13px Inter,sans-serif"><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;background:#FFFFFF;box-shadow:0 1px 2px #2A160C1F;color:#422315">Team performance</div><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;color:#7A6255">Ads performance</div></div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:16px;border:1px solid #F0E2D4">
+                    <span style="width:18px;height:18px;background:#6F402C;mask:url(icons/calendar.svg) center/contain no-repeat"></span>
+                    <div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;gap:4px;font:500 15px Inter,sans-serif">This month<span style="width:13px;height:13px;background:currentColor;mask:url(icons/chevron-down.svg) center/contain no-repeat"></span></div><div style="font:400 12px Inter,sans-serif;color:#7A6255">1–18 Oct</div></div>
+                    <div style="margin-left:auto;flex:none;white-space:nowrap;height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;font:500 12px Inter,sans-serif;background:#FDE3D2;color:#8A1F0A">vs Sep</div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;row-gap:12px;padding:14px 0;border-radius:16px;background:#BD4A19;color:#FFFFFF">
+                    <sc-for list="{{ teamHero }}" as="th" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:3px;padding:0 16px;border-left:1px solid {{ th.div }}"><span style="width:18px;height:2px;background:{{ th.mark }}"></span><div style="font:500 12px Inter,sans-serif;color:#F7D3C0">{{ th.label }}</div><div style="font:500 24px 'Inter Tight',sans-serif;letter-spacing:-0.02em;line-height:1.1;font-variant-numeric:tabular-nums;color:{{ th.color }}">{{ th.value }}</div><div style="font:500 11px Inter,sans-serif;color:{{ th.dc }}">{{ th.delta }} vs last</div></div></sc-for>
+                  </div>
+                  <div style="display:flex;align-items:baseline"><div style="font:500 17px 'Inter Tight',sans-serif">Team performance</div><div style="margin-left:auto;font:400 12px Inter,sans-serif;color:#7A6255">Tap a team for its people</div></div>
+                  <div style="display:flex;flex-direction:column;margin-top:-6px">
+                    <sc-for list="{{ teamRows }}" as="tr" hint-placeholder-count="5">
+                      <div style="display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid #F4F0EC">
+                        <div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:{{ tr.dot }}"></span><span style="font:500 15px Inter,sans-serif;white-space:nowrap">{{ tr.name }}</span><span style="min-width:0;font:400 12px Inter,sans-serif;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tr.sub }}</span><span style="margin-left:auto;width:15px;height:15px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div>
+                        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:8px;padding-left:17px;font:400 12px Inter,sans-serif;color:#7A6255;white-space:nowrap"><div>Leads <span style="font-weight:600;color:#422315">{{ tr.leads }}</span></div><div>Appt <span style="font-weight:600;color:#422315">{{ tr.appt }}</span></div><div>Show <span style="font-weight:600;color:#422315">{{ tr.show }}</span></div><div>Won <span style="font-weight:600;color:#422315">{{ tr.won }}</span></div></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isBoard }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:6px 20px 12px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em;margin-right:auto">Inbox</div>
+                    <div style="height:40px;padding:0 14px;border-radius:20px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:#FDE3D2;color:#8A1F0A"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/users.svg) center/contain no-repeat"></span>Team</div>
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/bell.svg) center/contain no-repeat"></span></div>
+                    <div style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/contact.svg) center/contain no-repeat"></span></div>
+                  </div>
+                  <div style="display:flex;gap:6px;overflow:hidden;margin-right:-20px"><sc-for list="{{ whoChips }}" as="c" hint-placeholder-count="6"><div style="flex:none;height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:{{ c.bg }};color:{{ c.color }}"><sc-if value="{{ c.hasDot }}" hint-placeholder-val="{{ true }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }}"></span></sc-if>{{ c.label }}<span style="font-variant-numeric:tabular-nums;color:{{ c.countColor }}">{{ c.count }}</span></div></sc-for></div>
+                  <div style="display:flex;gap:16px;overflow:hidden;margin-right:-20px;font:500 13px Inter,sans-serif"><sc-for list="{{ boardStatus }}" as="bs" hint-placeholder-count="7"><div style="flex:none;padding:4px 0;border-bottom:2px solid {{ bs.line }};color:{{ bs.color }}">{{ bs.label }}</div></sc-for></div>
+                </div>
+                <div style="flex:1;min-height:0;display:flex;gap:12px;padding:12px 0 0 16px;overflow:hidden;background:#FBF7F3;border-top:1px solid #EEE8E3">
+                  <sc-for list="{{ board }}" as="col" hint-placeholder-count="2">
+                    <div style="width:300px;flex:none;display:flex;flex-direction:column;gap:8px">
+                      <div style="display:flex;align-items:center;gap:8px;padding:2px 4px 4px"><span style="width:8px;height:8px;border-radius:2px;background:{{ col.c }}"></span><div style="font:600 14px Inter,sans-serif;color:{{ col.tc }}">{{ col.title }}</div><div style="font:500 13px Inter,sans-serif;color:#A8968B">{{ col.n }}</div></div>
+                      <sc-for list="{{ col.cards }}" as="bc" hint-placeholder-count="4">
+                        <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:16px;background:#FFFFFF;border:1px solid #F0E2D4">
+                          <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 12px 'Inter Tight',sans-serif;background:{{ bc.avBg }};color:{{ bc.avText }}">{{ bc.ini }}</div><div style="flex:1;min-width:0;font:600 14px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bc.name }}</div><div style="font:500 11px Inter,sans-serif;color:#A8968B">{{ bc.time }}</div>
+                            <sc-if value="{{ bc.hasUnread }}" hint-placeholder-val="{{ false }}"><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;display:flex;align-items:center;justify-content:center;font:600 11px 'Inter Tight',sans-serif;background:#BD4A19;color:#FFFFFF">{{ bc.unread }}</span></sc-if></div>
+                          <div style="font:400 13px Inter,sans-serif;color:#5A4034;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bc.last }}</div>
+                          <div style="display:flex;align-items:center;gap:8px;font:500 12px Inter,sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:{{ bc.teamDot }}"></span><span style="color:{{ bc.whoColor }}">{{ bc.who }}</span><span style="margin-left:auto;color:{{ bc.urgColor }}">{{ bc.urg }}</span></div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isAssign }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:6px 20px 0">
+                  <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em">Assignment</div>
+                  <div style="display:flex;gap:18px;font:500 13px Inter,sans-serif;border-bottom:1px solid #EEE8E3"><div style="padding:6px 0 10px;border-bottom:2px solid #BD4A19">Ads to teams</div><div style="padding:6px 0 10px;color:#A8968B">Full time</div><div style="padding:6px 0 10px;color:#A8968B">Work type</div></div>
+                  <div style="display:flex;flex-wrap:wrap;gap:12px;padding-top:2px"><sc-for list="{{ teamLegend }}" as="tl" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:5px;font:400 12px Inter,sans-serif;color:#5A4034"><span style="width:8px;height:8px;border-radius:2px;background:{{ tl.c }}"></span>{{ tl.n }}</div></sc-for></div>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:10px;padding:14px 16px 0">
+                  <sc-for list="{{ assignAds }}" as="a" hint-placeholder-count="6">
+                    <div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:16px;background:#FFFFFF;border:1px solid {{ a.border }}">
+                      <div style="display:flex;align-items:center;gap:10px"><span style="width:15px;height:15px;flex:none;background:{{ a.chColor }};mask:{{ a.chMask }}"></span><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div style="font:600 15px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ a.nameColor }}">{{ a.name }}</div><div style="font:400 12px Inter,sans-serif;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.headline }}</div></div><div style="font:500 13px Inter,sans-serif;font-variant-numeric:tabular-nums;color:#5A4034">{{ a.leads }} leads</div></div>
+                      <div style="display:flex;align-items:center;gap:12px"><div style="flex:1;display:flex;height:8px;gap:2px;border-radius:2px;overflow:hidden;background:{{ a.empty }}"><sc-for list="{{ a.split }}" as="sp" hint-placeholder-count="4"><div style="flex:{{ sp.w }};background:{{ sp.c }}"></div></sc-for></div>
+                        <sc-if value="{{ a.unsetFlag }}" hint-placeholder-val="{{ false }}"><div style="height:26px;padding:0 10px;border-radius:13px;display:flex;align-items:center;font:500 12px Inter,sans-serif;background:#FDE3D2;color:#8A1F0A;white-space:nowrap">Not set up</div></sc-if><span style="flex:none;width:14px;height:14px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isSplit }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;align-items:center;gap:6px;padding:4px 16px 10px"><span style="width:26px;height:26px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span><div style="font:500 24px 'Inter Tight',sans-serif;letter-spacing:-0.02em">Split leads</div></div>
+                <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:12px;padding:0 20px">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="height:50px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:8px;box-sizing:border-box;border:1.5px solid #422315;font:500 18px 'Inter Tight',sans-serif">Mattress Fair · Mid Valley<span style="margin-left:auto;width:16px;height:16px;background:#7A6255;mask:url(icons/pencil.svg) center/contain no-repeat"></span></div>
+                    <div style="font:400 12px/1.4 Inter,sans-serif;color:#7A6255">Meta sends only the headline: “Try the Cloud mattress, 40% off this weekend”. 128 leads · Messenger</div>
+                  </div>
+                  <div style="display:flex;padding:3px;border-radius:22px;background:#F7F3EF"><div style="flex:1;height:38px;border-radius:19px;display:flex;align-items:center;justify-content:center;font:500 14px Inter,sans-serif;color:#7A6255">Evenly</div><div style="flex:1;height:38px;border-radius:19px;display:flex;align-items:center;justify-content:center;font:500 14px Inter,sans-serif;background:#BD4A19;color:#FFFFFF">By team</div></div>
+                  <div style="display:flex;height:10px;gap:2px;border-radius:3px;overflow:hidden"><sc-for list="{{ splitRows }}" as="sr" hint-placeholder-count="5"><div style="flex:{{ sr.pct }};background:{{ sr.c }}"></div></sc-for></div>
+                  <div style="display:flex;flex-direction:column">
+                    <sc-for list="{{ splitRows }}" as="sr" hint-placeholder-count="5">
+                      <div style="display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid #F4F0EC">
+                        <div style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:3px;flex:none;background:{{ sr.c }}"></span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font:500 15px Inter,sans-serif;color:#422315;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sr.name }}</span><span style="font:400 12px Inter,sans-serif;color:{{ sr.subColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sr.sub }}</span></div>
+                          <div style="flex:none;width:84px;height:36px;padding:0 12px;border-radius:12px;display:flex;align-items:center;justify-content:flex-end;gap:3px;box-sizing:border-box;border:1px solid #E2D8D0;font:500 16px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#422315">{{ sr.pct }}<span style="color:#A8968B;font-size:13px">%</span></div></div>
+                        <div style="position:relative;height:14px;display:flex;align-items:center;margin-left:20px"><span style="flex:1;height:4px;border-radius:2px;background:#EEE2D8;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:{{ sr.w }};border-radius:2px;background:{{ sr.c }}"></span></span><span style="position:absolute;left:calc({{ sr.w }} - 7px);width:14px;height:14px;border-radius:50%;background:#FFFFFF;border:2px solid {{ sr.c }};box-sizing:border-box;box-shadow:0 1px 3px #2A160C33"></span></div>
+                        <sc-if value="{{ sr.open }}" hint-placeholder-val="{{ false }}">
+                          <div style="display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin-left:20px;border-radius:12px;background:#FBF4EC">
+                            <div style="display:flex;gap:16px;font:500 13px Inter,sans-serif"><sc-for list="{{ sr.modes }}" as="md" hint-placeholder-count="3"><div style="padding-bottom:3px;border-bottom:2px solid {{ md.line }};color:{{ md.color }}">{{ md.label }}</div></sc-for></div>
+                            <sc-for list="{{ sr.members }}" as="mb" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:minmax(0,1fr) 72px 52px;gap:10px;align-items:center;font:400 14px Inter,sans-serif;color:#5A4034"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mb.n }}</span><span style="height:4px;border-radius:2px;background:#EEE2D8;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:{{ mb.w }};background:#BD4A19"></span></span><span style="text-align:right;font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#422315">{{ mb.v }}%</span></div></sc-for>
+                            <div style="display:flex;justify-content:flex-end"><span style="height:30px;padding:0 12px;border-radius:15px;display:flex;align-items:center;gap:6px;box-sizing:border-box;border:1px solid #E2D8D0;background:#FFFFFF;font:500 12px Inter,sans-serif;color:#422315"><span style="width:12px;height:12px;background:currentColor;mask:url(icons/sliders-horizontal.svg) center/contain no-repeat"></span>Adjust split</span></div>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="flex:none;display:flex;flex-direction:column;gap:8px;padding:12px 20px 34px;border-top:1px solid #EEE8E3;background:#FFFFFF">
+                  <div style="height:50px;border-radius:25px;display:flex;align-items:center;justify-content:center;font:500 15px Inter,sans-serif;background:#BD4A19;color:#FFFFFF">Save</div>
+                  <div style="height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;font:500 14px Inter,sans-serif;box-sizing:border-box;border:1px solid #E2D8D0">Save and apply to all 14 ads</div>
+                </div>
+                <sc-if value="{{ s.adjOpen }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;z-index:5;background:#2A160C59;display:flex;flex-direction:column;justify-content:flex-end"><div style="display:flex;flex-direction:column;gap:12px;padding:10px 20px 28px;border-radius:24px 24px 0 0;background:#FFFFFF;box-shadow:0 -10px 30px #2A160C33"><span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#E2D8D0"></span><div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:3px;background:#EE5E08"></span><div style="display:flex;flex-direction:column"><span style="font:500 19px 'Inter Tight',sans-serif">Team Priya</span><span style="font:400 12px Inter,sans-serif;color:#7A6255">30% of Mattress Fair · 3 people</span></div><span style="margin-left:auto;width:16px;height:16px;background:#A8968B;mask:url(icons/x.svg) center/contain no-repeat"></span></div><div style="display:flex;padding:3px;border-radius:20px;background:#F7F3EF;font:500 13px Inter,sans-serif"><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;color:#7A6255">Evenly</div><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;background:#FFFFFF;box-shadow:0 1px 2px #2A160C1F">By %</div><div style="flex:1;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;color:#7A6255">By max</div></div><div style="display:flex;flex-direction:column"><div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid #F4F0EC"><div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#FCEEE2;font:500 11px 'Inter Tight',sans-serif">AR</span><span style="flex:1;min-width:0;font:500 15px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Aina Rahman</span><span style="flex:none;width:14px;height:14px;display:grid;place-items:center"><span style="width:12px;height:12px;background:#A8968B;mask:url(icons/lock.svg) center/contain no-repeat"></span></span><span style="flex:none;width:88px;height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;justify-content:flex-end;gap:3px;box-sizing:border-box;border:1.5px solid #BD4A19;font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">40.5<span style="color:#A8968B;font-size:13px">%</span></span></div><div style="position:relative;height:20px;display:flex;align-items:center;margin-left:40px"><span style="flex:1;height:5px;border-radius:3px;background:#EEE2D8;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:40.5%;border-radius:3px;background:#BD4A19"></span></span><span style="position:absolute;left:calc(40.5% - 10px);width:20px;height:20px;border-radius:50%;background:#FFFFFF;border:2px solid #BD4A19;box-sizing:border-box;box-shadow:0 1px 3px #2A160C33"></span></div></div><div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid #F4F0EC"><div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#FCEEE2;font:500 11px 'Inter Tight',sans-serif">JT</span><span style="flex:1;min-width:0;font:500 15px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Jason Tan</span><span style="flex:none;width:14px;height:14px;display:grid;place-items:center"><span style="width:12px;height:12px;background:#A8968B;mask:url(icons/lock.svg) center/contain no-repeat"></span></span><span style="flex:none;width:88px;height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;justify-content:flex-end;gap:3px;box-sizing:border-box;border:1.5px solid #E2D8D0;font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">34.5<span style="color:#A8968B;font-size:13px">%</span></span></div><div style="position:relative;height:20px;display:flex;align-items:center;margin-left:40px"><span style="flex:1;height:5px;border-radius:3px;background:#EEE2D8;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:34.5%;border-radius:3px;background:#BD4A19"></span></span><span style="position:absolute;left:calc(34.5% - 10px);width:20px;height:20px;border-radius:50%;background:#FFFFFF;border:2px solid #BD4A19;box-sizing:border-box;box-shadow:0 1px 3px #2A160C33"></span></div></div><div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid #F4F0EC"><div style="display:flex;align-items:center;gap:10px"><span style="flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#FCEEE2;font:500 11px 'Inter Tight',sans-serif">FI</span><span style="flex:1;min-width:0;font:500 15px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Farah Idris</span><span style="flex:none;width:14px;height:14px"></span><span style="flex:none;width:88px;height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;justify-content:flex-end;gap:3px;box-sizing:border-box;border:1.5px solid #E2D8D0;font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">25<span style="color:#A8968B;font-size:13px">%</span></span></div><div style="position:relative;height:20px;display:flex;align-items:center;margin-left:40px"><span style="flex:1;height:5px;border-radius:3px;background:#EEE2D8;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:25%;border-radius:3px;background:#BD4A19"></span></span><span style="position:absolute;left:calc(25% - 10px);width:20px;height:20px;border-radius:50%;background:#FFFFFF;border:2px solid #BD4A19;box-sizing:border-box;box-shadow:0 1px 3px #2A160C33"></span></div></div></div><div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#F5F0EA;font:500 13px Inter,sans-serif">Total<span style="margin-left:auto;font:500 17px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">100%</span><span style="width:15px;height:15px;background:#6F402C;mask:url(icons/check.svg) center/contain no-repeat"></span></div><div style="font:400 11px Inter,sans-serif;color:#A8968B">Drag, or tap a box to type (e.g. 40.5). 🔒 = set by you; the others re-balance to keep 100%.</div><div style="display:flex;gap:8px"><div style="flex:1;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0;font:500 15px Inter,sans-serif">Cancel</div><div style="flex:2;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;background:#BD4A19;color:#FFFFFF;font:500 15px Inter,sans-serif">Apply</div></div></div></div></sc-if>
+              </sc-if>
+
+              <sc-if value="{{ s.isTeamCal }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;flex-direction:column;gap:10px;padding:6px 20px 12px"><div style="display:flex;align-items:center;gap:10px"><div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.025em;margin-right:auto">Calendar</div><div style="height:38px;padding:0 12px;border-radius:19px;display:flex;align-items:center;gap:7px;box-sizing:border-box;border:1px solid #E2D8D0;font:500 13px Inter,sans-serif;white-space:nowrap"><span style="width:14px;height:14px;background:#BD4A19;mask:url(icons/calendar.svg) center/contain no-repeat"></span>1 Oct – 31 Oct<span style="width:11px;height:11px;background:#7A6255;mask:url(icons/chevron-down.svg) center/contain no-repeat"></span></div></div><div style="display:flex;gap:6px;overflow:hidden;margin-right:-20px"><sc-for list="{{ whoChips }}" as="c" hint-placeholder-count="6"><div style="flex:none;height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;white-space:nowrap;background:{{ c.bg }};color:{{ c.color }}"><sc-if value="{{ c.hasDot }}" hint-placeholder-val="{{ true }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }}"></span></sc-if>{{ c.label }}</div></sc-for></div><div style="display:flex;gap:8px"><div style="flex:1;min-width:0;height:38px;padding:0 12px;border-radius:12px;display:flex;align-items:center;box-sizing:border-box;border:1px solid #E2D8D0;font:500 13px Inter,sans-serif">Everyone<span style="margin-left:auto;width:11px;height:11px;background:#7A6255;mask:url(icons/chevron-down.svg) center/contain no-repeat"></span></div><div style="flex:none;display:flex;padding:3px;border-radius:19px;background:#F7F3EF"><div style="height:32px;padding:0 14px;border-radius:16px;display:flex;align-items:center;font:500 13px Inter,sans-serif;color:#7A6255">Month</div><div style="height:32px;padding:0 14px;border-radius:16px;display:flex;align-items:center;font:500 13px Inter,sans-serif;background:#BD4A19;color:#FFFFFF">List</div></div></div><div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:16px;background:#422315;color:#FFFFFF"><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px"><div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 20px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#FFFFFF">51</span><span style="font:400 11px Inter,sans-serif;color:#E0CFC4;white-space:nowrap">Visits</span></div><div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 20px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#F6B48A">12</span><span style="font:400 11px Inter,sans-serif;color:#E0CFC4;white-space:nowrap">Upcoming</span></div><div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 20px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#FFFFFF">35</span><span style="font:400 11px Inter,sans-serif;color:#E0CFC4;white-space:nowrap">Showed up</span></div><div style="display:flex;flex-direction:column;gap:1px"><span style="font:500 20px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#FFFFFF">74%</span><span style="font:400 11px Inter,sans-serif;color:#E0CFC4;white-space:nowrap">Show-up</span></div></div><div style="height:1px;background:#5A4034"></div><div style="display:grid;grid-template-columns:118px minmax(0,1fr) 54px;gap:10px;align-items:center;font:400 12px Inter,sans-serif"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#422315;box-shadow:0 0 0 1.5px #FFFFFF55"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Revenue Director</span></span><span style="height:5px;border-radius:3px;background:#5A4034;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:67%;background:#F6B48A"></span></span><span style="text-align:right;font:500 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">12 · 75%</span></div><div style="display:grid;grid-template-columns:118px minmax(0,1fr) 54px;gap:10px;align-items:center;font:400 12px Inter,sans-serif"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#EE5E08;box-shadow:0 0 0 1.5px #FFFFFF55"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team Priya</span></span><span style="height:5px;border-radius:3px;background:#5A4034;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:100%;background:#F6B48A"></span></span><span style="text-align:right;font:500 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">18 · 72%</span></div><div style="display:grid;grid-template-columns:118px minmax(0,1fr) 54px;gap:10px;align-items:center;font:400 12px Inter,sans-serif"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#FFA91F;box-shadow:0 0 0 1.5px #FFFFFF55"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team Hafiz</span></span><span style="height:5px;border-radius:3px;background:#5A4034;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#F6B48A"></span></span><span style="text-align:right;font:500 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">9 · 67%</span></div><div style="display:grid;grid-template-columns:118px minmax(0,1fr) 54px;gap:10px;align-items:center;font:400 12px Inter,sans-serif"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#8A1F0A;box-shadow:0 0 0 1.5px #FFFFFF55"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team Grace</span></span><span style="height:5px;border-radius:3px;background:#5A4034;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:39%;background:#F6B48A"></span></span><span style="text-align:right;font:500 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">7 · 57%</span></div><div style="display:grid;grid-template-columns:118px minmax(0,1fr) 54px;gap:10px;align-items:center;font:400 12px Inter,sans-serif"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#6F402C;box-shadow:0 0 0 1.5px #FFFFFF55"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team Kavitha</span></span><span style="height:5px;border-radius:3px;background:#5A4034;position:relative;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:28%;background:#F6B48A"></span></span><span style="text-align:right;font:500 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">5 · 60%</span></div></div></div>
+                <div style="flex:1;min-height:0;overflow:hidden;background:#FBF7F3;border-top:1px solid #EEE8E3">
+                  <sc-for list="{{ teamVisits }}" as="tv" hint-placeholder-count="10">
+                    <sc-if value="{{ tv.isHead }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:baseline;gap:8px;padding:16px 20px 8px"><div style="font:500 16px 'Inter Tight',sans-serif">{{ tv.label }}</div><div style="font:400 12px Inter,sans-serif;color:#A8968B">{{ tv.sub }}</div></div></sc-if>
+                    <sc-if value="{{ tv.isRow }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;align-items:center;gap:12px;margin:0 16px 6px;padding:12px 14px;border-radius:14px;background:#FFFFFF;border:1px solid #F0E2D4">
+                        <div style="width:50px;flex:none;font:500 15px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">{{ tv.time }}</div>
+                        <span style="width:3px;height:34px;border-radius:2px;flex:none;background:{{ tv.c }}"></span>
+                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font:500 14px Inter,sans-serif">{{ tv.name }}</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">{{ tv.who }} · {{ tv.room }}</div></div>
+                        <div style="font:500 12px Inter,sans-serif;white-space:nowrap;color:{{ tv.stColor }}">{{ tv.st }}</div>
+                      </div>
+                    </sc-if>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.isShowroom }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:none;display:flex;align-items:center;gap:6px;padding:4px 16px 10px"><span style="width:26px;height:26px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span><div style="font:500 24px 'Inter Tight',sans-serif;letter-spacing:-0.02em;margin-right:auto">Showrooms</div>
+                  <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span></div>
+                  <div style="font:500 14px 'Inter Tight',sans-serif;padding:0 4px;font-variant-numeric:tabular-nums">1 / 2</div>
+                  <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0"><span style="width:15px;height:15px;background:currentColor;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div>
+                  <div title="Delete showroom" style="width:40px;height:40px;margin-left:4px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid #E2D8D0;color:#8A1F0A"><span style="width:16px;height:16px;background:currentColor;mask:url(icons/trash-2.svg) center/contain no-repeat"></span></div><div style="width:40px;height:40px;margin-left:4px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#BD4A19;color:#FFFFFF"><span style="width:18px;height:18px;background:currentColor;mask:url(icons/plus.svg) center/contain no-repeat"></span></div>
+                </div>
+                <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:14px;padding:4px 20px 24px">
+                  <div style="display:flex;flex-direction:column;gap:4px"><div style="font:500 24px 'Inter Tight',sans-serif;letter-spacing:-0.02em">HOUZS Puchong</div><div style="font:400 13px/1.45 Inter,sans-serif;color:#5A4034">Lot 12, Jalan Industri PBP 3, 47100 Puchong, Selangor</div>
+                    <div style="display:flex;gap:8px;padding-top:6px"><div style="height:34px;padding:0 12px;border-radius:17px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:#F5F0EA"><span style="width:14px;height:14px;background:currentColor;mask:url(icons/map-pin.svg) center/contain no-repeat"></span>Google Maps</div><div style="height:34px;padding:0 12px;border-radius:17px;display:flex;align-items:center;gap:6px;font:500 13px Inter,sans-serif;background:#F5F0EA"><span style="width:14px;height:14px;background:currentColor;mask:url(icons/map-pin.svg) center/contain no-repeat"></span>Waze</div></div></div>
+                  <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:baseline"><div style="font:500 15px 'Inter Tight',sans-serif">Opening hours</div><div style="margin-left:auto;font:400 12px Inter,sans-serif;color:#7A6255">Type, or tap the grid</div></div><div style="display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:#F5F0EA"><div style="display:flex;align-items:center;gap:8px"><span style="flex:none;font:500 13px Inter,sans-serif;width:58px">All days</span><span style="flex:1;min-width:0;height:36px;padding:0 10px;border-radius:10px;display:flex;align-items:center;box-sizing:border-box;border:1px solid #E2D8D0;background:#FFFFFF;font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">10:00</span><span style="color:#A8968B">–</span><span style="flex:1;min-width:0;height:36px;padding:0 10px;border-radius:10px;display:flex;align-items:center;box-sizing:border-box;border:1px solid #E2D8D0;background:#FFFFFF;font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums">21:00</span></div><div style="height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;background:#BD4A19;color:#FFFFFF;font:500 14px Inter,sans-serif">Apply to all days</div></div><div style="display:flex;flex-direction:column;border:1px solid #F0E2D4;border-radius:14px;overflow:hidden;margin-top:-1px"><div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;font:500 14px Inter,sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:#6F402C"></span><span style="flex:1;color:#422315">Mon – Thu</span><span style="font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#422315">10:00 – 21:00</span><span style="width:12px;height:12px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div><div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-top:1px solid #F4F0EC;font:500 14px Inter,sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:#6F402C"></span><span style="flex:1;color:#422315">Fri – Sat</span><span style="font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#422315">10:00 – 22:00</span><span style="width:12px;height:12px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div><div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-top:1px solid #F4F0EC;font:500 14px Inter,sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:#CDBFB5"></span><span style="flex:1;color:#A8968B">Sun</span><span style="font:500 14px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;color:#A8968B">Closed</span><span style="width:12px;height:12px;background:#CDBFB5;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div></div><div style="font:400 12px Inter,sans-serif;color:#A8968B">Tap a row to change single days. Days with the same hours are grouped.</div></div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid #F0E2D4"><div style="flex:1;display:flex;flex-direction:column;gap:1px"><div style="font:500 14px Inter,sans-serif">Visits per slot</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">Each slot is one hour</div></div><div style="display:flex;align-items:center;height:38px;border-radius:19px;box-sizing:border-box;border:1px solid #E2D8D0"><div style="width:36px;text-align:center;font-size:18px;color:#7A6255">−</div><div style="width:26px;text-align:center;font:500 16px 'Inter Tight',sans-serif">3</div><div style="width:36px;text-align:center;font-size:18px;color:#7A6255">+</div></div></div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid #F0E2D4"><span style="width:16px;height:16px;background:#6F402C;mask:url(icons/calendar.svg) center/contain no-repeat"></span><div style="flex:1;display:flex;flex-direction:column;gap:1px"><div style="font:500 14px Inter,sans-serif">Weekly slots</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">Tap to paint open hours on the grid</div></div><span style="width:14px;height:14px;background:#A8968B;mask:url(icons/chevron-right.svg) center/contain no-repeat"></span></div>
+                  <div style="display:flex;flex-direction:column">
+                    <div style="display:flex;align-items:center;padding-bottom:4px"><div style="font:500 15px 'Inter Tight',sans-serif">Closures</div><div style="margin-left:auto;font:500 13px Inter,sans-serif;color:#BD4A19">Add</div></div>
+                    <sc-for list="{{ closures }}" as="cl" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #F4F0EC"><span style="width:15px;height:15px;background:#8A1F0A;mask:url(icons/calendar-x.svg) center/contain no-repeat"></span><div style="font:500 13px Inter,sans-serif">{{ cl.date }}</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">{{ cl.when }} · {{ cl.why }}</div></div></sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;gap:8px"><div style="font:500 15px 'Inter Tight',sans-serif">Remarks</div><span style="height:22px;padding:0 8px;border-radius:11px;display:inline-flex;align-items:center;gap:4px;background:#F2EEEB;color:#7A6255;font:500 11px Inter,sans-serif"><span style="width:10px;height:10px;background:currentColor;mask:url(icons/lock.svg) center/contain no-repeat"></span>Staff only</span></div><div style="min-height:72px;padding:10px 12px;border-radius:12px;box-sizing:border-box;border:1px solid #E2D8D0;font:400 14px/1.5 Inter,sans-serif;color:#5A4034">Park at B1, lift lobby B. Bring the customer to the Cloud mattress corner first.</div><div style="font:400 12px Inter,sans-serif;color:#A8968B">Customers never see this.</div></div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ s.hasBar }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:none;height:86px;display:flex;padding:8px 6px 0;box-sizing:border-box;position:relative;z-index:2;background:#FFFFFF;border-top:1px solid #EEE8E3">
+                  <sc-for list="{{ s.tabs }}" as="tb" hint-placeholder-count="5">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ tb.color }}">
+                      <div style="position:relative;width:52px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:{{ tb.bg }}"><span style="width:22px;height:22px;background:{{ tb.iconColor }};mask:{{ tb.mask }}"></span>
+                        <sc-if value="{{ tb.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;right:2px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;justify-content:center;font:600 10px 'Inter Tight',sans-serif;background:#BD4A19;color:#FFFFFF;border:2px solid #FFFFFF">{{ tb.badge }}</span></sc-if></div>
+                      <div style="font:{{ tb.w }} 11px Inter,sans-serif">{{ tb.label }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="position:absolute;bottom:8px;left:50%;margin-left:-68px;width:136px;height:5px;border-radius:3px;z-index:5;background:{{ s.homeBar }}"></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  data = this.build();
+  build() {
+    const I = n => `url(icons/${n}.svg) center/contain no-repeat`;
+    const INK = '#422315', RUST = '#BD4A19', ORANGE = '#EE5E08', OX = '#8A1F0A', AMBER = '#FFA91F', BROWN = '#6F402C', CREAM = '#FCEEE2';
+    const ramp = { New: INK, Attention: ORANGE, 'Follow up': BROWN, Appointment: AMBER, Won: '#C29C88', Lost: '#DCC6B8', 'Cold leads': '#EEE2D8' };
+    const tint = { New: ['#EFE5DE', INK], Attention: ['#FDE3D2', OX], 'Follow up': ['#F1E3DA', BROWN], Appointment: ['#FFF0D1', '#7A4E00'], Won: ['#F3EBE5', BROWN], Lost: ['#F2EEEB', '#7A6255'], 'Cold leads': ['#F1EEEC', '#7A6255'] };
+    const avs = [['#FCEEE2', INK], ['#FFF0D1', '#7A4E00'], ['#F1E3DA', BROWN], ['#FDE3D2', OX]];
+    const av = n => avs[n.length % 4];
+    const teamC = { Director: INK, Priya: ORANGE, Hafiz: AMBER, Grace: OX, Kavitha: BROWN };
+    const bar = (list, active, badges) => list.map(([label, icon]) => { const a = label === active;
+      return { label, mask: I(icon), color: a ? RUST : '#7A6255', iconColor: a ? '#FFFFFF' : '#7A6255', bg: a ? RUST : 'transparent', w: a ? 600 : 500, badge: badges[label], hasBadge: !!badges[label] }; });
+    const mineTabs = [['Inbox', 'inbox'], ['Contacts', 'contact'], ['Calendar', 'calendar'], ['Insight', 'trending-up'], ['Profile', 'user-round']];
+    const teamTabs = [['Insight', 'trending-up'], ['Inbox', 'inbox'], ['Assignment', 'users'], ['Calendar', 'calendar'], ['Profile', 'user-round']];
+    const mineBadges = { Inbox: 12, Profile: 4 };
+    const rowsBase = [
+      ['Siti Aminah', 'SA', 'wa', 'Sofa Raya Sale · Puchong', 'Is the 3-seater available in grey?', '9:41', 2, ['Reply soon · 3 h', 'warm']],
+      ['Daniel Lim', 'DL', 'ms', 'Mattress Fair · Mid Valley', 'Ok can I come Saturday afternoon?', '9:12', 1, ['Urgent · 6 h', 'hot']],
+      ['Rajesh Kumar', 'RK', 'wa', 'Sofa Raya Sale · Puchong', 'Photo', '8:05', 3, ['Overdue · 9 h+', 'over']],
+      ['Nurul Huda', 'NH', 'wa', 'Bedframe Promo Oct', 'Thank you! See you then', 'Yesterday', 0, ['Visit · Sat 24 Oct, 11:00 am', 'visit']],
+      ['Mei Ling Tan', 'MT', 'ms', 'Mattress Fair · Mid Valley', 'You: Here is the brochure for the Cloud series', 'Thu', 0],
+      ['Kumar Selvam', 'KS', 'wa', 'Sofa Raya Sale · Puchong', 'You: Our showroom is open until 9 pm', 'Wed', 0],
+      ['Ahmad Faiz', 'AF', 'wa', 'Bedframe Promo Oct', 'How much for delivery to Shah Alam?', 'Mon', 0, ['Cold · 2 d', 'cold']],
+      ['Jasmine Ong', 'JO', 'ms', 'Cloud Series · Setia Alam', 'Can I bring my parents too?', 'Mon', 0, ['Visit · Sun 25 Oct, 11:00 am', 'visit']],
+      ['Farhan Aziz', 'FA', 'wa', 'Bedframe Promo Oct', 'You: Sure, I will send the price list', 'Sun', 0],
+    ];
+    const noteStyle = { warm: [INK, 500, 'clock'], hot: [OX, 600, 'clock'], over: [OX, 600, 'triangle-alert'], visit: [BROWN, 500, 'calendar-check'], cold: ['#A8968B', 500, 'lock'] };
+    const mkRows = (n, swipeAt) => rowsBase.slice(0, n).map(([name, initials, ch, ad, last, time, unread, note], i) => { const ns = note ? noteStyle[note[1]] : null; const a = av(name);
+      return { name, initials, ad, last, time, unread, hasUnread: unread > 0, nameWeight: unread ? 600 : 500, timeColor: unread ? RUST : '#A8968B',
+        hasNote: !!note, note: note ? note[0] : '', noteColor: ns ? ns[0] : '', noteWeight: ns ? ns[1] : 500, noteMask: I(ns ? ns[2] : 'clock'),
+        chMask: I(ch === 'wa' ? 'phone' : 'message-circle'), chBg: ch === 'wa' ? '#25D366' : '#0A7CFF', avBg: a[0], avText: a[1], swiped: i === swipeAt, shift: i === swipeAt ? 'translateX(-156px)' : 'none', bg: '#FFFFFF' }; });
+    const chipList = (active) => [['All', 58], ['New', 4], ['Attention', 2], ['Follow up', 11], ['Appointment', 0], ['Won', 9], ['Lost', 5], ['Cold leads', 27]].map(([label, count]) => {
+      const a = label === active; return { label, count, bg: a ? RUST : '#F7F3EF', color: a ? '#FFFFFF' : INK, countColor: a ? '#F3CDBB' : (label === 'Attention' ? OX : '#A8968B') }; });
+    const B = (out, text, time, kind) => ({ out, text, time, isText: !kind, isAlbum: kind === 'album', isVoice: kind === 'voice', isVisit: kind === 'visit', opacity: 1,
+      justify: out ? 'flex-end' : 'flex-start', radius: out ? '16px 16px 4px 16px' : '16px 16px 16px 4px', pad: kind === 'album' ? '3px 3px 6px' : '8px 12px 6px',
+      bg: out ? RUST : '#FFFFFF', color: out ? '#FFFFFF' : INK, meta: out ? '#F3CDBB' : '#A8968B' });
+    const normalBubbles = [B(0, 'Hi, I saw the Cloud mattress at the fair. Is the queen still on promotion?', '8:47'), B(1, 'Yes! Queen is RM 2,390 until 31 Oct, free delivery in the Klang Valley.', '8:52'),
+      B(0, '', '8:58', 'album'), B(0, '', '9:01', 'voice'), B(1, '', '9:05', 'visit'), B(0, 'Ok can I come Saturday afternoon?', '9:12')];
+    const typingBubbles = normalBubbles.slice(3);
+    const coldBubbles = [B(0, 'Hi, how much for delivery to Shah Alam?', 'Mon 4:12 pm'), B(1, 'Hi Ahmad! Delivery to Shah Alam is free for orders above RM 1,500.', 'Mon 4:20 pm'), B(1, 'Would you like to see the bedframes at our Puchong showroom this week?', 'Mon 4:21 pm')];
+    const chatBase = { stripBg: '#FDE3D2', initials: 'DL', name: 'Daniel Lim', ad: 'Mattress Fair · Mid Valley · Messenger', dot: ORANGE, stripColor: OX, stripL: 'Attention · waiting 6 h', stripR: 'Reply window · 18 h left', day: 'Today',
+      bubbles: normalBubbles, padBottom: '84px', idle: true, attach: false, emoji: false, menu: false, cold: false, leftMask: I('smile'), input: 'Message', inputColor: '#A8968B', clipColor: 'currentColor', mainMask: I('mic') };
+    const C = o => Object.assign({}, chatBase, o);
+    const meMine = { ini: 'AR', name: 'Aina Rahman', title: 'Retail Sales · Team Priya', cards: [{ title: 'Messages', rows: [
+      { label: 'Notifications', mask: I('bell'), badge: 4, hasBadge: true, value: '' }, { label: 'Auto-reply', mask: I('bot'), value: 'On' }, { label: 'Quick replies', mask: I('message-square-text'), value: '12' }] }] };
+    const meTeam = { ini: 'PT', name: 'Peter Tan', title: 'Revenue Director · everyone', cards: [{ title: 'Manage', rows: [
+      { label: 'Member work type', mask: I('user-check'), value: '' }, { label: 'Showrooms', mask: I('map-pin'), value: '2' }, { label: 'Cold lead templates', mask: I('message-square-text'), value: '8' }, { label: 'Ads Performance', mask: I('arrow-up-right'), value: '' }] },
+      { title: 'Me', rows: [{ label: 'Notifications', mask: I('bell'), badge: 2, hasBadge: true, value: '' }, { label: 'Auto-reply', mask: I('bot'), value: 'Off' }] }] };
+    [meMine, meTeam].forEach(m => m.cards.forEach(c => c.rows.forEach((r, i) => { r.line = i ? '#F4F0EC' : 'transparent'; r.hasBadge = !!r.hasBadge; })));
+    let n = 0;
+    const S = (num, title, note, o) => Object.assign({ num, title, note, id: 's' + num, label: num + ' ' + title, bg: '#FFFFFF', sbColor: INK, homeBar: INK, hasBar: true, tabs: [], isTeam: false }, o);
+    const flags = ['isInbox', 'isEmptyInbox', 'isChat', 'isContacts', 'isCalendar', 'isInsight', 'isProfile', 'isNotif', 'isTeamInsight', 'isBoard', 'isAssign', 'isSplit', 'isTeamCal', 'isShowroom'];
+    const mine = [
+      S('M01', 'Inbox', 'Normal', { isInbox: true, rows: mkRows(7), tabs: bar(mineTabs, 'Inbox', mineBadges) }),
+      S('M02', 'Inbox', 'Many rows · a row swiped left', { isInbox: true, rows: mkRows(9, 2), tabs: bar(mineTabs, 'Inbox', mineBadges) }),
+      S('M03', 'Inbox', 'Empty · Appointment filter', { isEmptyInbox: true, tabs: bar(mineTabs, 'Inbox', mineBadges) }),
+      S('M04', 'Chat', 'Photos, voice note, visit card', { isChat: true, hasBar: false, chat: C({}) }),
+      S('M05', 'Chat', 'Attach open', { isChat: true, hasBar: false, chat: C({ attach: true }) }),
+      S('M06', 'Chat', 'Typing · emoji panel', { isChat: true, hasBar: false, chat: C({ emoji: true, bubbles: typingBubbles, leftMask: I('keyboard'), input: 'Sure, see you Saturday at 2', inputColor: INK, mainMask: I('send-horizontal') }) }),
+      S('M07', 'Chat', 'Long press · message menu', { isChat: true, hasBar: false, chat: C({ menu: true }) }),
+      S('M08', 'Chat', 'Cold chat · template only', { isChat: true, hasBar: false, chat: C({ initials: 'AF', name: 'Ahmad Faiz', ad: 'Bedframe Promo Oct · WhatsApp', dot: '#A8968B', stripBg: '#F4F0EC', stripColor: '#5A4034', stripL: 'Cold · no reply for 2 days', stripR: 'Window closed', day: 'Monday', bubbles: coldBubbles, idle: false, cold: true, padBottom: '170px' }) }),
+      S('M09', 'Contacts', 'A–Z, searchable', { isContacts: true, tabs: bar(mineTabs, 'Contacts', mineBadges) }),
+      S('M10', 'Calendar', 'Month · reminders · did they come', { isCalendar: true, tabs: bar(mineTabs, 'Calendar', mineBadges) }),
+      S('M11', 'Insight', 'This month', { isInsight: true, tabs: bar(mineTabs, 'Insight', mineBadges) }),
+      S('M12', 'Profile', 'Revenue app look', { isProfile: true, me: meMine, tabs: bar(mineTabs, 'Profile', mineBadges) }),
+      S('M13', 'Notifications', 'All · Unread · Read', { isNotif: true, hasBar: false, sheet: false }),
+      S('M14', 'Notifications', 'Summary card open', { isNotif: true, hasBar: false, sheet: true }),
+    ];
+    const team = [
+      S('T01', 'Insight', 'Team opens here', { isTeamInsight: true, tabs: bar(teamTabs, 'Insight', {}) }),
+      S('T02', 'Inbox board', 'One column per status', { isBoard: true, tabs: bar(teamTabs, 'Inbox', { Inbox: 37 }) }),
+      S('T03', 'Assignment', 'Ads to teams', { isAssign: true, tabs: bar(teamTabs, 'Assignment', {}) }),
+      S('T04', 'Split leads', 'By team · Director first', { isSplit: true, hasBar: false }),
+      S('T04b', 'Split leads', 'Adjust split · Team Priya', { isSplit: true, hasBar: false, adjOpen: true }),
+      S('T05', 'Calendar', 'Every team’s visits', { isTeamCal: true, tabs: bar(teamTabs, 'Calendar', {}) }),
+      S('T06', 'Profile', 'Management rows', { isProfile: true, isTeam: true, me: meTeam, tabs: bar(teamTabs, 'Profile', {}) }),
+      S('T07', 'Showrooms', 'One at a time', { isShowroom: true, hasBar: false }),
+    ];
+    [...mine, ...team].forEach(s => { flags.forEach(f => { s[f] = !!s[f]; }); if (!s.chat) s.chat = chatBase; if (!s.me) s.me = meMine; if (!s.rows) s.rows = []; s.sheet = !!s.sheet; });
+    const albumTiles = [{ bg: '#C29C88' }, { bg: '#9A6B55' }, { bg: '#6F402C' }, { bg: '#B5856C', more: true }].map(t => Object.assign({ more: false }, t));
+    const wave = [6, 12, 18, 10, 22, 26, 14, 8, 16, 24, 20, 12, 6, 10, 18, 26, 22, 14, 10, 6, 12, 18, 14, 8, 6, 10, 8, 6].map((h, i) => ({ h: h + 'px', c: i < 9 ? INK : '#CDBFB5' }));
+    const attachItems = [['Camera', 'camera'], ['Photos', 'images'], ['Document', 'file-text'], ['Quick replies', 'message-square-text'], ['Auto replies', 'bot']].map(([l, i]) => [l, i, '#F5F0EA', INK])
+      .map(([label, icon, bg, fg]) => ({ label, mask: I(icon), bg, fg }));
+    const menuItems = [['Reply', 'reply'], ['Forward', 'forward'], ['Copy', 'copy'], ['Info', 'info'], ['Star', 'star'], ['Pin', 'pin'], ['Delete for me', 'trash-2', 1]]
+      .map(([label, icon, danger], i) => ({ label, mask: I(icon), color: danger ? OX : INK, line: i ? '#F4F0EC' : 'transparent' }));
+    const emojis = '😀😃😄😁😆😅😂🙂😊😇🥰😍😘😋😛😜🤗🤔🤩😎🥳😌😴😮👍🙏👏💪❤️🔥✨🎉'.match(/(\p{Extended_Pictographic}\uFE0F?)/gu);
+    const emojiTabs = ['🕘', '😀', '👍', '🛋️', '🎉', '❤️'].map((e, i) => ({ e, bg: i === 1 ? CREAM : 'transparent' }));
+    const contactRaw = { A: [['Ahmad Faiz', '+60 13-220 9182', 'Cold leads'], ['Aisyah Zulkifli', '+60 17-301 4456', 'Appointment']], C: [['Chong Wei Han', '+60 12-778 0921', 'Won']], D: [['Daniel Lim', '+60 12-384 2291', 'Attention'], ['Devi Nair', '+60 16-210 7735', 'New']],
+      F: [['Farhan Aziz', '+60 19-554 8810', 'Follow up']], G: [['Grace Lee', '+60 16-882 3307', 'New']], H: [['Hafizah Noor', '+60 11-2034 7781', 'Lost']], J: [['Jasmine Ong', '+60 12-660 1928', 'Appointment']], K: [['Kumar Selvam', '+60 17-889 2210', 'Follow up']] };
+    const contactSections = Object.entries(contactRaw).map(([letter, rows]) => ({ letter, rows: rows.map(([name, phone, status]) => { const a = av(name);
+      return { name, phone, status, initials: name.split(' ').map(w => w[0]).slice(0, 2).join(''), avBg: a[0], avText: a[1], stBg: tint[status][0], stText: tint[status][1], stColor: ramp[status] }; }) }));
+    const az = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('').map(l => ({ l, c: contactRaw[l] ? RUST : '#CDBFB5' }));
+    const dow = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const visitDays = { 10: 1, 11: 1, 14: 1, 17: 1, 18: 1, 24: 1, 25: 1, 29: 1 };
+    const month = Array.from({ length: 35 }, (_, i) => { const d = i - 2; const valid = d >= 1 && d <= 31; const today = d === 18;
+      return { d: valid ? d : '', bg: today ? RUST : 'transparent', color: today ? '#FFFFFF' : (d > 18 ? INK : '#7A6255'), dot: valid && visitDays[d] && !today ? (d > 18 ? ORANGE : '#DCC6B8') : 'transparent' }; });
+    const btn = (label, kind) => ({ label, bg: kind === 'main' ? RUST : kind === 'green' ? '#387557' : '#FFFFFF', color: kind === 'main' || kind === 'green' ? '#FFFFFF' : INK, border: kind === 'main' ? RUST : kind === 'green' ? '#387557' : '#E2D8D0' });
+    const calCards = [{ isHead: true, isCard: false, label: 'Today · Sun 18 Oct' },
+      { isHead: false, isCard: true, time: '5:00', ampm: 'pm', name: 'Daniel Lim', room: 'HOUZS Puchong · in 2 h', tag: 'TODAY', bg: '#EEF5F0', bd: '#BFD9C8', bar: '#387557', btns: [btn('Change'), btn('No show'), btn('Show up', 'green')] },
+      { isHead: true, isCard: false, label: 'Did they come? · Sat 17 Oct' },
+      { isHead: false, isCard: true, time: '11:00', ampm: 'am', name: 'Chong Wei Han', room: 'HOUZS Puchong', btns: [btn('Change'), btn('No show'), btn('Show up', 'main')] },
+      { isHead: true, isCard: false, label: 'Upcoming · Sat 24 Oct' },
+      { isHead: false, isCard: true, time: '11:00', ampm: 'am', name: 'Nurul Huda', room: 'HOUZS Puchong', btns: [btn('Change'), btn('Send reminder', 'main')] }];
+    calCards.forEach(c => { if (c.isCard) Object.assign(c, Object.assign({ tag: '', bg: '#FFFFFF', bd: '#F0E2D4', bar: 'transparent' }, c)); });
+    const periodsPhone = ['Month', 'Week', 'Day', 'Range'].map(l => ({ label: l, bg: l === 'Month' ? RUST : 'transparent', color: l === 'Month' ? '#FFFFFF' : '#7A6255', sh: 'none' }));
+    const rates = [['Appt rate', '36%', '+5 pts', 1], ['Show-up', '74%', '−2 pts', 0], ['Won rate', '21%', '+3 pts', 1]].map(([label, value, delta, good], i) => ({ label, value, delta, dc: good ? '#FBE6DC' : '#FFD9A0', color: '#FFFFFF', mark: i === 0 ? AMBER : 'transparent', div: i === 0 ? 'transparent' : '#CF6A3C' }));
+    const counts = [['Leads', 58], ['Appointments', 21], ['Upcoming', 4]].map(([label, value]) => ({ label, value }));
+    const myStatuses = [['New', 4], ['Attention', 2], ['Follow up', 11], ['Appointment', 4], ['Won', 9], ['Lost', 5], ['Cold leads', 23]].map(([label, count]) => ({ label, count, color: ramp[label], text: label === 'Attention' ? OX : INK }));
+    const notifTabs = [['All', 9], ['Unread', 4], ['Read', 5]].map(([label, nn]) => ({ label, n: nn, bg: label === 'All' ? RUST : 'transparent', color: label === 'All' ? '#FFFFFF' : '#7A6255', sh: 'none' }));
+    const NR = (text, sub, icon, unread, kind) => ({ isHead: false, isRow: true, text, sub, mask: I(icon), w: unread ? 600 : 400, dot: unread ? ORANGE : 'transparent', bg: unread ? '#FFFCF9' : 'transparent',
+      iconBg: kind === 'hot' ? '#FDE3D2' : kind === 'visit' ? '#FFF0D1' : CREAM, iconFg: kind === 'hot' ? OX : kind === 'visit' ? '#7A4E00' : RUST });
+    const H = label => ({ isHead: true, isRow: false, label });
+    const notifs = [H('Today'), NR('Siti Aminah sent 2 messages', 'Sofa Raya Sale · 9:41', 'message-circle', 1), NR('Daniel Lim has waited 6 hours', 'Urgent · 9:12', 'clock', 1, 'hot'), NR('New lead: Grace Lee', 'Sofa Raya Sale · given to you · 8:40', 'user-plus', 1),
+      NR('Visit today at 5:00 pm · Daniel Lim', 'Reminder sent · 8:00', 'calendar-check', 1, 'visit'), H('Earlier'), NR('Nurul Huda booked Sat 24 Oct, 11 am', 'Yesterday', 'calendar-check', 0, 'visit'),
+      NR('Rajesh Kumar sent a photo', 'Yesterday', 'image', 0), NR('Ahmad Faiz moved to Cold leads', 'Mon', 'lock', 0), NR('New lead: Jasmine Ong', 'Mon', 'user-plus', 0)];
+    const sheetFields = [{ k: 'Status', v: 'Follow up', c: BROWN }, { k: 'Waiting', v: 'Reply soon · 3 h', c: INK }, { k: 'Visit', v: 'Not booked', c: '#A8968B' }];
+    const teamHero = [['Appt rate', '32.4%', '+4.1 pts', 1], ['Leads', '486', '+12%', 1], ['Show-up', '71%', '−3 pts', 0], ['Reply 24 h', '94%', '+2 pts', 1]]
+      .map(([label, value, delta, good], i) => ({ label, value, delta, dc: good ? '#FBE6DC' : '#FFD9A0', color: '#FFFFFF', mark: i === 0 ? AMBER : 'transparent', div: i % 2 === 0 ? 'transparent' : '#CF6A3C' }));
+    const teamRows = [['Revenue Director', 'Peter Tan', 'Director', 64, '38%', '76%', '22/9%'], ['Team Priya', 'TL Priya Menon', 'Priya', 142, '35%', '73%', '20/8%'], ['Team Hafiz', 'TL Hafiz Osman', 'Hafiz', 118, '31%', '71%', '18/10%'],
+      ['Team Grace', 'TL Grace Wong', 'Grace', 96, '29%', '66%', '15/12%'], ['Team Kavitha', 'TL Kavitha Rao', 'Kavitha', 66, '27%', '68%', '14/13%']].map(([name, sub, k, leads, appt, show, wl]) => ({ name, sub, dot: teamC[k], leads, appt, show, wl, won: wl.split('/')[0] + '%' }));
+    const whoChips = [['All', 486], ['Director', 64, 'Director'], ['Priya', 142, 'Priya'], ['Hafiz', 118, 'Hafiz'], ['Grace', 96, 'Grace'], ['Kavitha', 66, 'Kavitha']].map(([label, count, k], i) => ({ label, count, hasDot: !!k, dot: k ? teamC[k] : 'transparent',
+      bg: i === 0 ? RUST : '#F7F3EF', color: i === 0 ? '#FFFFFF' : INK, countColor: i === 0 ? '#F3CDBB' : '#A8968B' }));
+    const boardStatus = ['New 24', 'Attention 9', 'Follow up 61', 'Appointment 38', 'Won 90', 'Lost 41', 'Cold 223'].map((label, i) => ({ label, line: i === 0 ? RUST : 'transparent', color: i === 0 ? INK : '#7A6255' }));
+    const BC = (name, time, unread, last, team, who, urg, urgKind) => { const a = av(name); return { name, ini: name.split(' ').map(w => w[0]).join('').slice(0, 2), time, unread, hasUnread: unread > 0, last, teamDot: teamC[team], who, whoColor: who.includes('to assign') ? OX : '#5A4034', urg, urgColor: urgKind === 'hot' ? OX : '#7A6255', avBg: a[0], avText: a[1] }; };
+    const board = [
+      { title: 'New', n: 24, c: INK, tc: INK, cards: [BC('Grace Lee', '8:40', 1, 'Hi, do you have sofa beds?', 'Priya', 'Team Priya · to assign', 'Reply soon · 2 h'), BC('Devi Nair', '8:31', 2, 'Price for the king size?', 'Hafiz', 'Daniel Ho', '1 h'), BC('Tan Kok Wai', '8:02', 1, 'Is the showroom open today?', 'Director', 'Peter Tan', '40 min'), BC('Lee Mun Yee', '7:48', 1, 'Photo', 'Grace', 'Team Grace · to assign', 'Urgent · 6 h', 'hot')] },
+      { title: 'Attention', n: 9, c: ORANGE, tc: OX, cards: [BC('Daniel Lim', '9:12', 1, 'Ok can I come Saturday afternoon?', 'Priya', 'Aina Rahman', 'Urgent · 6 h', 'hot'), BC('Rajesh Kumar', '8:05', 3, 'Photo', 'Priya', 'Jason Tan', 'Overdue · 9 h+', 'hot'), BC('Wong Siew Lan', 'Yest.', 1, 'Can I change the colour?', 'Kavitha', 'Kavitha Rao', 'Overdue · 9 h+', 'hot')] },
+    ];
+    const sp = (d, p, h, g, k) => [{ w: d, c: teamC.Director }, { w: p, c: teamC.Priya }, { w: h, c: teamC.Hafiz }, { w: g, c: teamC.Grace }, { w: k, c: teamC.Kavitha }].filter(x => x.w);
+    const assignAds = [['Mattress Fair · Mid Valley', 'Try the Cloud mattress, 40% off this weekend', 'ms', 128, sp(20, 30, 25, 15, 10)], ['Sofa Raya Sale · Puchong', 'Free delivery for Raya on every sofa', 'wa', 104, sp(20, 20, 20, 20, 20)],
+      ['Bedframe Promo Oct', 'Solid wood bedframes from RM 899', 'wa', 72, sp(10, 40, 30, 10, 10)], ['Cloud Series · Setia Alam', 'Sleep test at our new showroom', 'wa', 58, sp(0, 0, 0, 100, 0)],
+      ['Not named yet', 'Your perfect mattress is waiting', 'wa', 5, [], 1], ['Pillow Bundle', 'Buy a mattress, get 2 pillows free', 'ms', 41, sp(20, 20, 20, 20, 20)]]
+      .map(([name, headline, ch, leads, split, unset]) => ({ name, headline, leads, split, chMask: I(ch === 'wa' ? 'phone' : 'message-circle'), chColor: ch === 'wa' ? '#25D366' : '#0A7CFF', nameColor: unset ? OX : INK, empty: unset ? '#F4F0EC' : 'transparent', border: unset ? '#F3C9B4' : '#F0E2D4',
+        unsetFlag: !!unset, action: unset ? 'Set up' : 'Edit split', btnBg: unset ? RUST : 'transparent', btnColor: unset ? '#FFFFFF' : INK, btnBorder: unset ? RUST : '#E2D8D0' }));
+    const teamLegend = ['Director', 'Priya', 'Hafiz', 'Grace', 'Kavitha'].map(n2 => ({ n: n2, c: teamC[n2] }));
+    const modes = act => ['Evenly', 'By %', 'By max'].map(label => ({ label, line: label === act ? RUST : 'transparent', color: label === act ? INK : '#A8968B' }));
+    const splitRows = [
+      { name: 'Revenue Director', sub: 'Peter Tan · always first', c: teamC.Director, pct: 20, subColor: '#7A6255' },
+      { name: 'Team Priya', sub: 'TL Priya Menon · By %', c: teamC.Priya, pct: 30, subColor: '#7A6255', open: true, modes: modes('By %'), members: [{ n: 'Aina Rahman', v: '40.5', w: '100%' }, { n: 'Jason Tan', v: '34.5', w: '85%' }, { n: 'Farah Idris', v: '25', w: '62%' }] },
+      { name: 'Team Hafiz', sub: '4 people · Evenly', c: teamC.Hafiz, pct: 24.5, subColor: '#7A6255' },
+      { name: 'Team Grace', sub: 'Over the limit · holding 4 leads', c: teamC.Grace, pct: 15.5, subColor: OX },
+      { name: 'Team Kavitha', sub: '3 people · Evenly', c: teamC.Kavitha, pct: 10, subColor: '#7A6255' },
+    ].map(r => Object.assign({ open: false, modes: [], members: [] }, r));
+    const TV = (time, name, team, who, room, st) => ({ isHead: false, isRow: true, time, name, c: teamC[team], who, room, st, stColor: st === 'Came' ? BROWN : st === 'No-show' ? OX : '#7A4E00' });
+    const teamVisits = [{ isHead: true, isRow: false, label: 'Today', sub: 'Sun 18 Oct · 5 visits' }, TV('11:00', 'Farah Hanim', 'Priya', 'Jason Tan', 'Puchong', 'Came'), TV('1:00', 'Ng Chee Keong', 'Hafiz', 'Daniel Ho', 'Mid Valley', 'Came'),
+      TV('3:00', 'Grace Lee', 'Priya', 'Team Priya', 'Puchong', 'Booked'), TV('5:00', 'Daniel Lim', 'Priya', 'Aina Rahman', 'Puchong', 'Booked'), TV('7:00', 'Jasmine Ong', 'Grace', 'Grace Wong', 'Setia Alam', 'Booked'),
+      { isHead: true, isRow: false, label: 'Yesterday', sub: 'Sat 17 Oct · 5 visits' }, TV('10:00', 'Lim Mei Chen', 'Director', 'Peter Tan', 'Puchong', 'Came'), TV('4:00', 'Priya Devi', 'Kavitha', 'Kavitha Rao', 'Setia Alam', 'No-show')];
+    splitRows.forEach(r => { r.w = Math.min(100, r.pct) + '%'; r.open = r.open || false; r.modes = r.modes || []; r.members = r.members || []; });
+    const weekDays1 = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const slotRows = Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? (h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm') : '',
+      cells: weekDays1.map((d, i) => (i < 5 ? h >= 10 && h < 21 : h >= 10 && h < 22) ? BROWN : '#F4F0EC') }));
+    const closures = [{ date: 'Fri 30 Oct', when: '2–6 pm', why: 'Stock take' }, { date: 'Sun 8 Nov', when: 'All day', why: 'Deepavali' }];
+    return { groups: [{ id: 'mine', title: 'Mine', note: 'A salesperson · bottom bar Inbox, Contacts, Calendar, Insight, Profile', screens: mine }, { id: 'team', title: 'Team', note: 'Principal, Director or a leader · Insight, Inbox, Assignment, Calendar, Profile', screens: team }],
+      chips: chipList('All'), chipsAppt: chipList('Appointment'), albumTiles, wave, attachItems, menuItems, reactions: ['👍', '❤️', '😂', '😮', '😢', '🙏'], emojis, emojiTabs, contactSections, az, dow, month, calCards, periodsPhone, rates, counts, myStatuses,
+      notifTabs, notifs, sheetFields, teamHero, teamRows, whoChips, boardStatus, board, assignAds, teamLegend, splitRows, teamVisits, weekDays1, slotRows, closures };
+  }
+
+  renderVals() { return this.data; }
+}
+</script>
+</body>
+</html>

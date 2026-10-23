@@ -9,6 +9,7 @@ import type { CrmAdRule } from "@/lib/member/crm-data";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import { urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
+import { teamLead } from "./names";
 import { first, initials, shortName, teamNameOf } from "./data";
 import { sendTo } from "./inbox";
 import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META, teamColours } from "./tokens";
@@ -28,10 +29,10 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   const sheetOpen = ui.stage !== "menu";
   // A member locked for now is on none of Assignment's lists — the split, Full time (2026-10-22, shared/locked.ts).
   const lk = lockedOf(data), live = <P extends { id: string }>(ps: P[]) => ps.filter(p => !lk.has(p.id));
-  const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: live(t.people), all: t.people }));
+  const T = teams.map((t, k) => ({ id: t.id, name: t.name, color: teamColours(k)[0], tint: teamColours(k)[1], people: live(t.people), all: t.people, who: teamLead(t) }));
   // An ad's split has one more row, the Revenue Director, its people the directors (the owner, 2026-10-16; mig 20261016010000).
   // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
-  const TA = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: live(ctx.directors), all: ctx.directors }] : []), ...T];
+  const TA = [...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0], tint: DIRECTOR_C[1], people: live(ctx.directors), all: ctx.directors, who: "" }] : []), ...T];
 
   // ── Organic Leads and Awaiting reply: the rows, Send to / Assign, Remind (D1 / D4).
   const organic = data.customers.filter(c => !c.assignedTo && !c.teamId && !c.held).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -109,7 +110,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
       mode: r ? (r.mode === "even" ? `Evenly · each team 1/${TA.length || 1}` : "By team") : "Not set · evenly by default", cta: r ? "Edit split" : "Set up",
       bd: sel ? "var(--crm-rust)" : "var(--crm-rule)", ring: sel ? "0 0 0 3px var(--crm-tint-attention)" : "none",
       // v2's list row: the split as a bar (faint while on the default), its note, the leads, a flag when something is off.
-      rowBg: sel ? "var(--crm-cream)" : "#fff",
+      rowBg: sel ? "var(--crm-sel)" : "#fff",
       segs2: (r && r.mode === "split" ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => ({ color: t.color, pct: r.split[t.id], op: 1, label: t.name.replace(/^Team /, ""), pctS: `${r.split[t.id]}%` }))
         : TA.map(t => ({ color: t.color, pct: Math.round(100 / (TA.length || 1)), op: r ? 1 : 0.4, label: t.name.replace(/^Team /, ""), pctS: `${Math.round(100 / (TA.length || 1))}%` }))),
       splitNote: r ? (r.mode === "even" ? "Evenly · each team an equal share" : "Custom split") : "Evenly by default", noteC: "var(--crm-muted)",
@@ -130,10 +131,14 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   // A team's share to the hundredth (2026-10-22, the owner: "帮我调整成可输入，并且能小数点 .00"); the box keeps what is typed.
   const setSplit = (id: string, raw: string) => {
     const tx = pctText(String(raw)), v = pctOf(tx);
-    const others = TA.map(x => x.id).filter(n => n !== id), rest = others.reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
-    const out: Record<string, number> = { [id]: v }; let left = r2(100 - v);
-    others.forEach((n, i) => { const share = i === others.length - 1 ? left : rest ? r2(((100 - v) * (pctDefault[n] ?? 0)) / rest) : r2((100 - v) / others.length); out[n] = share; left = r2(left - share); });
-    patch({ split: out, splitTyping: { id, text: tx } });
+    // v2 note 06: only the rows not set by hand take up the difference; a row set by hand stays. With none left, all others do.
+    const touched = (ui.splitTouched ?? []).filter(n => n !== id), all = TA.map(x => x.id).filter(n => n !== id);
+    const free = all.filter(n => !touched.includes(n)), others = free.length ? free : all;
+    const fixed = all.filter(n => !others.includes(n)).reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
+    const room = Math.max(0, r2(100 - v - fixed)), rest = others.reduce((a2, n) => a2 + (pctDefault[n] ?? 0), 0);
+    const out: Record<string, number> = { ...pctDefault, [id]: v }; let left = room;
+    others.forEach((n, i) => { const share = i === others.length - 1 ? left : rest ? r2((room * (pctDefault[n] ?? 0)) / rest) : r2(room / others.length); out[n] = share; left = r2(left - share); });
+    patch({ split: out, splitTyping: { id, text: tx }, splitTouched: [...touched, id] });
   };
   const takenOf = (pid: string) => (ad ? data.customers.filter(c => c.adId === ad.id && c.assignedTo === pid).length : 0);
   const inModeOf = (id: string): InMode => tm[id] ?? "pct";
@@ -166,7 +171,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     return { mode: "split" as const, split: { ...pctDefault }, pm: "pct" as const, pp, tm: tmo };
   };
   const draftOk = mode === "evenly" || (is100(Object.values(pctDefault).reduce((a2, n) => a2 + n, 0))
-    && TA.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0) === 100; if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
+    && TA.every(t => { const m = inModeOf(t.id); if (!(pctDefault[t.id] > 0)) return true; if (m === "pct") return is100(t.people.reduce((s, p, k) => s + valOf(t, "pct", p.id, k), 0)); if (m === "max") return t.people.some((p, k) => valOf(t, "max", p.id, k) > 0); return true; }));
   const saveOne = async (id: string, label: string) => ctx.act.saveAdRule(id, label, ruleFromDraft());
   // The ad's name, typed in the editor's title (crm_name_ad; the phone's ad editor does the same — panel/vm/assign.ts).
   const savedName = ad ? data.adNames?.[ad.id]?.name ?? "" : "";
@@ -188,7 +193,31 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     adByTeam: mode === "team", adEvenly: mode !== "team",
     adSplit: TA.map(t => ({ name: t.name, color: t.color, pct: mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1)), pctStr: ui.splitTyping?.id === t.id && mode === "team" ? ui.splitTyping.text : pctShow(mode === "team" ? pctDefault[t.id] ?? 0 : Math.round(100 / (TA.length || 1))),
       onRange: (e: { target: { value: string } }) => setSplit(t.id, e.target.value) })),
-    resetSplit: () => patch({ split: null, mv: {}, splitTyping: null }),
+    resetSplit: () => patch({ split: null, mv: {}, splitTyping: null, splitTouched: [], mvTyping: null }),
+    // v2 frame 06 (Desk4a.tsx › DeskSplit4a): every team (the director's row first), its line, an 84 px box and a slider under
+    // it; a team opens to its own Evenly · By % · By max and its people (a slider and a box each).
+    split4: mode !== "team" ? null : {
+      total: pctShow(Object.values(pctDefault).reduce((a2, n) => a2 + n, 0)), ok: is100(Object.values(pctDefault).reduce((a2, n) => a2 + n, 0)),
+      rows: TA.map(t => { const m = inModeOf(t.id), mem = t.people, pct = pctDefault[t.id] ?? 0, director = t.id === DIRECTOR_SPLIT_KEY;
+        const heldN = ad ? data.customers.filter(c => c.adId === ad.id && c.held && !c.assignedTo && c.heldTeam === t.id).length : 0;
+        const modeWord = m === "pct" ? "By %" : m === "max" ? "By max" : "Evenly";
+        const lead = director ? t.people.map(p => p.name).join(", ") : t.who;
+        const sub = heldN ? `Over the limit · holding ${heldN} lead${heldN === 1 ? "" : "s"} (By max)` : director ? `${lead} · always first` : [lead, `${mem.length} ${mem.length === 1 ? "person" : "people"}`, modeWord].filter(Boolean).join(" · ");
+        const totalPct = mem.reduce((a2, p, k) => a2 + valOf(t, "pct", p.id, k), 0);
+        return { id: t.id, name: t.name, color: t.color, sub, subColor: heldN ? "var(--crm-oxblood)" : "var(--crm-muted)", pct,
+          pctStr: ui.splitTyping?.id === t.id ? ui.splitTyping.text : pctShow(pct), onType: (e: { target: { value: string } }) => setSplit(t.id, e.target.value),
+          open: !!ui.splitOpen?.[t.id], toggle: () => set(u => ({ ...u, splitOpen: { ...u.splitOpen, [t.id]: !u.splitOpen?.[t.id] } })),
+          modes: ([["evenly", "Evenly"], ["pct", "By %"], ["max", "By max"]] as const).map(([v, label]) => ({ label, on: v === m, pick: () => set(u => ({ ...u, tm: { ...u.tm, [t.id]: v } })) })),
+          isPct: m === "pct", isMax: m === "max", unit: m === "max" ? "max" : "%",
+          note: m === "pct" ? (is100(totalPct) ? "" : `Adds up to ${pctShow(totalPct)}% · needs 100%`) : m === "max" ? `Up to ${mem.reduce((a2, p, k) => a2 + valOf(t, "max", p.id, k), 0)} leads in this team` : `Shared evenly among ${mem.length} people`,
+          members: mem.map((p, k) => { const key = `${t.id}|${m}|${p.id}`, val = valOf(t, m, p.id, k);
+            return { id: p.id, name: p.name, locked: false, val, pctW: m === "pct" ? Math.min(100, val) : 0,
+              valStr: ui.mvTyping?.key === key ? ui.mvTyping.text : pctShow(val),
+              onType: (e: { target: { value: string } }) => { const raw = String(e.target.value);
+                if (m === "pct") { const tx = pctText(raw); set(u => ({ ...u, mv: { ...u.mv, [key]: pctOf(tx) }, mvTyping: { key, text: tx } })); }
+                else { const nv = Math.min(999, parseInt(raw.replace(/D/g, ""), 10) || 0); set(u => ({ ...u, mv: { ...u.mv, [key]: nv }, mvTyping: null })); } } }; })
+            .concat(t.all.filter(p => lk.has(p.id)).map(p => ({ id: p.id, name: p.name, locked: true, val: 0, pctW: 0, valStr: "", onType: () => {} }))) }; }),
+    },
     evenTotal: TA.reduce((a2, t) => a2 + t.people.length, 0),
     evenTeams: TA.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
     adTeams, closeAd: () => patch({ ad: null }),

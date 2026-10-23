@@ -11,7 +11,7 @@ import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
 import { INS_CARDS, MON } from "./insight";
 import { columnSizer } from "./columns";
-import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES } from "./adschart";
+import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
@@ -34,7 +34,7 @@ export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "
 const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend (RM)", cpl: "Per lead (RM)" };
 const COSTY = /^(cpr|cpm|cpc|cpl|spend|cpp|cpmsg|cpcall|cpe|cpthru|cpappt|cpwon|blocks)$/;
 const DAY = 86_400_000;
-const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+export const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const tOf = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
 const dfmt = (iso: string) => { if (!iso) return ""; const [, m, d] = iso.split("-"); return `${parseInt(d, 10)} ${MON[parseInt(m, 10) - 1].slice(0, 3)}`; };
 const shown = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -184,7 +184,7 @@ export function adsPerfVM(ctx: DeskCtx) {
     tiles: slots.map((k, i) => {
       if (!k) return null;
       const m = CHART_METRICS.find(x => x[0] === k)!, on = !ui.apChartOff[k];
-      return { key: k, label: m[1], total: chartFmt(total(k), m[2]), color: SERIES[i], on,
+      return { key: k, label: m[1], total: chartFmt(total(k), m[2]), color: SERIES[i], tint: SERIES_TINT[i], on,
         toggle: () => set(u => ({ ...u, apChartOff: { ...u.apChartOff, [k]: !u.apChartOff[k] } })),
         options: CHART_METRICS.filter(x => x[0] === k || !chosen.includes(x[0])).map(x => ({ v: x[0], label: x[1] })),
         change: (e: { target: { value: string } }) => setSlot(i, e.target.value),
@@ -196,16 +196,21 @@ export function adsPerfVM(ctx: DeskCtx) {
     lines: slots.map((k, i) => (k && !ui.apChartOff[k] ? { key: k, color: SERIES[i], fmt: CHART_METRICS.find(x => x[0] === k)![2], label: CHART_METRICS.find(x => x[0] === k)![1], values: series[k] } : null))
       .filter((l): l is NonNullable<typeof l> => !!l),
   };
+  // The table a page at a time: 5 / 10 / 20 (v2 frame 05); the total row stays every ad's.
+  const per = ui.apPer || 5, pages = Math.max(1, Math.ceil(ADs.length / per)), pg = Math.min(ui.apPg, pages - 1);
+  const apPager = { range: ADs.length ? `${pg * per + 1}–${Math.min(ADs.length, pg * per + per)} of ${ADs.length} ads` : "0 ads", per, sizes: [5, 10, 20],
+    setPer: (n: number) => patch({ apPer: n, apPg: 0 }), pages, cur: pg, go: (i: number) => patch({ apPg: i }) };
   return {
-    apNeed, apDayNeed, apChartV,
-    kAdsPerf: ui.tab === "adsperf",
+    apNeed, apDayNeed, apChartV, apPager,
+    // Insight › Ads performance (v2 frame 01b) is this page's body under Insight's head.
+    kAdsPerf: ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads"),
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
     ap4: {
       tabs: ([["Today", 4], ["This week", 5], ["This month", 0], ["Custom", "custom"]] as const).map(([label, k]) => ({ label, on: ui.apRange === k,
         custom: k === "custom", pick: () => { if (k !== "custom") patch({ apRange: k }); } })),
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
-      rows: ADs.map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
       total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,

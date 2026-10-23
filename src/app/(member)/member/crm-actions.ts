@@ -42,6 +42,12 @@ const CRM_WRITES = [
   "crm_set_channel",
   // Settings › General (mig 20261018100000), CRM · Manage.
   "crm_save_settings",
+  // v2 frame 07 · Showrooms: staff-only remarks, delete (mig 20261024150000), CRM · Manage.
+  "crm_save_showroom_remarks", "crm_delete_showroom",
+  // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
+  "crm_set_active_form",
+  // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
+  "crm_add_contact",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -115,12 +121,12 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad",
-  "crm_set_channel", "crm_save_settings",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
-  "crm_add_note",
+  "crm_add_note", "crm_add_contact",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;
@@ -179,7 +185,9 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       contacts: extra.size ? contacts.map(c => (extra.has(c.id) ? { ...c, extra: extra.get(c.id) } : c)) : contacts,
       rooms: rooms.map(r => {
         const x = roomX.get(r.id);
-        return x ? { ...r, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r;
+        const y = more.roomMore.find(m => m.id === r.id);
+        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at } : r;
+        return x ? { ...r2, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r2;
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
@@ -201,7 +209,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -218,8 +226,10 @@ async function desktopRows(db: Db, journey: boolean) {
     (async () => { try { const { data, error } = await db.rpc("crm_settings_read"); return error ? null : (data as unknown); } catch { return null; } })(),
     // Members locked out of the dealing for now (mig 20261022130000).
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("locked", true)),
+    // Showrooms' staff-only remarks and the deleted ones (mig 20261024150000).
+    soft<{ id: string; remarks: string | null; deleted_at: string | null }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at")),
   ]);
-  return { forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id) };
+  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id) };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

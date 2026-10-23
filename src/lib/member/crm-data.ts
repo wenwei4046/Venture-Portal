@@ -115,6 +115,10 @@ export interface CrmRoom {
   photo?: string | null;
   mapGoogle?: string | null;
   mapWaze?: string | null;
+  /** v2 frame 07: staff only — never sent to a customer; shown to sales in Book visit. */
+  remarks?: string;
+  /** Deleted (soft): left out of every list, kept so past visits keep the showroom's name. */
+  deleted?: boolean;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
@@ -253,10 +257,14 @@ export interface CrmSettings {
   pushMessages: boolean;
   /** Off: no reminders — the hourly sweep's pushes, and the screens' own. */
   reminders: boolean;
+  /** v2 frame 10 (mig 20261024170000): a manager's CRM alerts also tell of their own people's chats (off = one's own only). */
+  teamAlerts: boolean;
+  /** v2 frame 10: off — no auto-reply for anyone, even one set in a Profile. */
+  sendAutoReply: boolean;
 }
 
 /** What the CRM did before Settings were stored — and what it reads when the database gives nothing. */
-export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true };
+export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true, teamAlerts: false, sendAutoReply: true };
 
 /** The database's answer, checked: the three lines rising within 1–24 h, else today's values. */
 export function settingsFrom(raw: unknown): CrmSettings {
@@ -265,7 +273,7 @@ export function settingsFrom(raw: unknown): CrmSettings {
   const D = DEFAULT_CRM_SETTINGS;
   const s = n(r.replySoonH, D.replySoonH), u = n(r.replyUrgentH, D.replyUrgentH), o = n(r.replyOverdueH, D.replyOverdueH);
   const lines = s >= 1 && u > s && o > u && o <= 24 ? { replySoonH: s, replyUrgentH: u, replyOverdueH: o } : { replySoonH: D.replySoonH, replyUrgentH: D.replyUrgentH, replyOverdueH: D.replyOverdueH };
-  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false };
+  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false, teamAlerts: r.teamAlerts === true, sendAutoReply: r.sendAutoReply !== false };
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
@@ -340,6 +348,8 @@ export interface CrmRoomRow {
   address?: string | null; slots?: string[] | null; cap?: number | null; weekly?: number[] | null; blocks?: CrmBlock[] | null;
   /** CRM Desktop rev 1 (B4): the photo's signed link (made by the read), the map links typed over the address's own. */
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
+  /** v2 frame 07 (mig 20261024150000): staff-only remarks; a deleted showroom stays for its past visits' names. */
+  remarks?: string; deleted?: boolean;
 }
 export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null; marked_unread?: boolean }
 export interface CrmInviteRow {
@@ -452,6 +462,7 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   id: r.id, name: r.name, active: r.active, address: r.address ?? "",
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
   ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
+  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => ({

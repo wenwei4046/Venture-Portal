@@ -169,24 +169,20 @@ module.exports = function desk4a(body) {
     for (let m; (m = re.exec(toolbar));) { depth += m[0] === "(<>" ? 1 : -1; if (!depth) { d1 = toolbar.indexOf("}", m.index) + 1; break; } }
     if (d0 < 0 || d1 < 0) throw new Error("desk-4a: ads date picker");
     const dp = toolbar.slice(d0, d1);
-    const OUT = 'display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap"';
+    // v2 (frame 05, note 02): the two controls 34 px on one row (6 px over, 10 under); Export is the head's primary now and
+    // the info line is gone; the range button has no calendar icon.
+    const OUT = 'display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap"';
     const POP = 'position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column"';
-    const tb4 = `<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+    const tb4 = `<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ ${OUT} }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.dpOpen} style={{ ${OUT} }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg>{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <button type="button" onClick={v.dpOpen} style={{ ${OUT} }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     ${dp}
                   </span>
-                  <span style={{ flex: "1" }}></span>
-                  <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apToggleDl} style={{ ${OUT} }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
-                    {!!(v.apDlOpen) && (<><div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, right: "0" }}>{(v.apDl).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className="crm4a-row"><span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>))}</div></>)}
-                  </span>
-                </div>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Ad names, spend and every Meta figure come from Ads Manager for the dates picked; an ad it does not share shows —.</div>`;
+                </div>`;
     body = body.slice(0, t0 + ta) + tb4 + body.slice(t0 + tb);
     // the table
     const tStart = '<div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflowX: "auto" }}>\n                  <div style={{ minWidth: `${v.apMinW}px` }}>';
@@ -255,16 +251,17 @@ module.exports = function desk4a(body) {
   body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid var(--crm-rust)", background: "transparent", font: "inherit", fontSize: "13');
   body = body.split('height: "42px", padding: "0 14px", marginBottom: "-1px", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "14').join('height: "36px", padding: "0 2px", margin: "0 10px -1px 0", border: "0", borderBottom: "2px solid transparent", background: "transparent", font: "inherit", fontSize: "13');
 
-  // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a). The Ads
-  // Performance part production keeps below them stays, under a 4a section head.
+  // Frame 01 · Insight: the hero, Team performance and Leads by status are 4a's (Desk4a.tsx › DeskInsight4a).
   {
     const start = '<div style={{ flex: "0 0 auto", position: "relative", padding: "26px 30px 0", borderRadius: "26px"';
     const end = '<div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>\n                  <strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>';
     const a = body.indexOf(start), b = body.indexOf(end);
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: insight body");
-    body = body.slice(0, a) + "<DeskInsight4a v={v} />\n                " + body.slice(b);
-    body = once(body, '<strong style={{ flex: "1", fontSize: "22px", fontWeight: "700", letterSpacing: "-.01em" }}>Ads Performance</strong>',
-      '<strong style={{ flex: "1", font: "500 18px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>', "insight ads head");
+    // v2 (frames 01 / 01b, 2026-10-23): production's Ads Performance part under Insight is gone — Insight's own Ads
+    // performance tab draws Ads Performance's body (kAdsPerf, vm/adsperf.ts), so the block is the 4a body alone.
+    const head = body.lastIndexOf("{!!(v.kInsight) && (<>", a), close = body.indexOf("{!!(v.kCh) && (<>", b);
+    if (head < 0 || close < b) throw new Error("desk-4a: insight block");
+    body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              " + body.slice(close);
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
@@ -279,6 +276,10 @@ module.exports = function desk4a(body) {
   }
   // Reports (2026-10-23, the owner: "在左手边功能加一个报告的功能，里面分成不一样的 category"; DeskReports.tsx,
   // vm/reports-page.ts): its own page, before Ads Performance's block (after the Audit log's, which replaces everything up to it).
+  // v2 (frame 02): no "X's customer" line under the chat's head — who has the customer is Customer info's Assigned to.
+  body = once(body, '<p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>', "", "v2 chat owner line");
+  // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
+  body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
   body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {
@@ -286,6 +287,20 @@ module.exports = function desk4a(body) {
     const end = '{!!(v.isFrmOp) && (<>', b = body.indexOf(end, a);
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: customer form");
     body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
+  }
+  // v2 frame 06 (2026-10-23, note 04 / 06 / 08): Split, Ad performance and Audit log are ONE panel with three tabs
+  // (DeskAdTabs4a), one shown at a time (v.paneOn) — the two strips they folded to are gone; › folds the whole panel to
+  // the 44 px rail. Split's body is Desk4a.tsx › DeskSplit4a: team rows with a slider under each and an 84 px box.
+  body = once(body, "{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}", "", "v2 perf strip");
+  body = once(body, '{!!(v.adLogClosed) && (<DeskFoldRail v={{ title: "Audit log", open: v.adLogToggle }} />)}', "", "v2 audit strip");
+  body = once(body, "{!(v.perfShut) && (<><aside style={{ position: \"relative\", flex: `0 1 ${v.perfW}px`", "{!!(v.paneOn.perf) && (<><aside style={{ position: \"relative\", flex: `0 1 ${v.perfW}px`", "v2 perf pane");
+  body = once(body, "{!!(v.adLogOpen) && (<>\n                <aside className={DX.slideIn} style={v.adLogStyle}>", "{!!(v.paneOn.audit) && (<>\n                <aside className={DX.slideIn} style={v.adLogStyle}>", "v2 audit pane");
+  body = once(body, 'display: v.splitShut ? "none" : "flex"', 'display: v.splitShut || !v.paneOn.split ? "none" : "flex"', "v2 split pane");
+  {
+    const start = '<DeskAdTabs4a v={v} which="split" />', a = body.indexOf(start);
+    const end = '<div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>', b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: split body");
+    body = body.slice(0, a) + start + "\n                <DeskSplit4a v={v} />\n                " + '<div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>' + body.slice(b + end.length);
   }
   return body;
 };
