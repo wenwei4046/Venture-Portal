@@ -9,7 +9,7 @@ import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
 export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
 
@@ -122,6 +122,8 @@ export interface DeskUi {
   lbaShut: Record<string, boolean>; lbaOpen: Record<string, boolean>;
   /** Active members / Member work type: a team's card folded (by team name). */
   teamShut: Record<string, boolean>;
+  /** Reports (2026-10-23): the category on screen, the period of Salespeople / Appointments / Lead sources, Salespeople's sort. */
+  rpCat: import("./reports-page").RpCat; rpPer: import("./reports").RpPeriod; rpSort: { k: string; dir: "asc" | "desc" } | null;
   /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
   apMeta: Record<string, Record<string, MetaFig | null>>;
   /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
@@ -210,7 +212,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, apMeta: {}, apDaily: {}, apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, lbaPer: "month", lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

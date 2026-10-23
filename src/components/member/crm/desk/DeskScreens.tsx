@@ -243,9 +243,11 @@ export default function DeskScreens(p: DeskScreensProps) {
   // Ads Performance reads Ads Manager's figures for the range on screen (and the compare range) — spend, cost per lead …
   // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
   const apNeedKey = JSON.stringify(v.apNeed ?? []);
+  // …on Ads Performance, and on Reports › Ads performance, which draws the same table (2026-10-23).
+  const adsOn = ui.tab === "adsperf" || (ui.tab === "reports" && ui.rpCat === "ads");
   const asked = useRef(new Set<string>());
   useEffect(() => {
-    if (ui.tab !== "adsperf" || !live || !data.can.manage) return;
+    if (!adsOn || !live || !data.can.manage) return;
     for (const n of (v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]) {
       const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
       if (!ids.length) continue;
@@ -256,14 +258,14 @@ export default function DeskScreens(p: DeskScreensProps) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ui.tab, live, data.can.manage, apNeedKey]);
+  }, [adsOn, live, data.can.manage, apNeedKey]);
 
   // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
   const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;
   const dayNeedKey = JSON.stringify(dayNeed ?? null);
   const askedDays = useRef(new Set<string>());
   useEffect(() => {
-    if (ui.tab !== "adsperf" || !live || !data.can.manage || !dayNeed) return;
+    if (!adsOn || !live || !data.can.manage || !dayNeed) return;
     const ids = dayNeed.ids.filter(id => !askedDays.current.has(`${dayNeed.key}|${id}`));
     if (!ids.length) return;
     ids.forEach(id => askedDays.current.add(`${dayNeed.key}|${id}`));
@@ -272,7 +274,7 @@ export default function DeskScreens(p: DeskScreensProps) {
       setUi(u => ({ ...u, apDaily: { ...u.apDaily, [dayNeed.key]: { ...(u.apDaily[dayNeed.key] ?? {}), ...days } } }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ui.tab, live, data.can.manage, dayNeedKey]);
+  }, [adsOn, live, data.can.manage, dayNeedKey]);
 
   // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
   const seeded = useRef("");

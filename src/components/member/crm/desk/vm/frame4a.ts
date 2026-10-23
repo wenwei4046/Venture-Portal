@@ -14,7 +14,7 @@ export interface F4Head { title: string; tabs: F4Tab[]; sub: string; cta: { labe
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
-  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3",
+  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text",
 };
 
 /** "Sun, 18 Oct 2026" — the top bar's date, as the frames write it. */
@@ -38,7 +38,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
   const hidden = new Set(app.hidden ?? []);
   const inboxUnread = data.customers.reduce((n, c) => n + (c.unread || 0), 0);
   const ids: Record<string, DeskTab> = { Insight: "insight", Inbox: "inbox", Contacts: "people", Calendar: "calendar", "Ads Performance": "adsperf", Assignment: "assignment",
-    Showrooms: "showrooms", "Customer form": "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog" };
+    Showrooms: "showrooms", "Customer form": "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports" };
   const crmNav = fr.crmGroups.map(g => ({ head: g.label ?? "", items: g.items.map((n): F4Item => {
     const id = ids[n.label] ?? "insight";
     return { label: n.label, icon: CRM_ICON[id], on: n.on, pick: n.pick, badge: id === "inbox" && inboxUnread ? (inboxUnread > 99 ? "99+" : String(inboxUnread)) : "" };
@@ -105,6 +105,7 @@ interface HeadBits {
   insightSub: string;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
   addAd?: { canAdd: boolean; show: () => void };
+  reports?: { cats: { label: string; on: boolean; pick: () => void }[]; canCsv: boolean; csv: () => void };
   dpOpen: () => void;
 }
 
@@ -123,5 +124,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },
+    // Reports (2026-10-23): its categories as the head's tabs, Export CSV of the one on screen.
+    reports: { tabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.canCsv ? { label: "Export CSV", icon: "download", act: v.reports.csv } : null },
   };
 }

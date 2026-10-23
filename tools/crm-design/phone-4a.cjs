@@ -354,7 +354,9 @@ function teamSplit(body) {
   if (at < 0) throw new Error("phone-4a: split");
   let b = body.slice(at);
   b = once(b, '<div style={{ flex: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "10px", borderBottom: "1px solid var(--crm-tint-cold)" }}>',
-    '<div style={{ flex: "none", padding: "10px 20px 6px", display: "flex", flexDirection: "column", gap: "12px" }}>', "split head");
+    // Room and a rule under the name, so the split scrolls away beneath them (2026-10-23, the owner: "overlap" — the
+    // scrolled split showed right under the name box, as if under it).
+    '<div style={{ flex: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "12px", borderBottom: "1px solid var(--crm-rule)", background: "#fff", position: "relative", zIndex: "1" }}>', "split head");
   b = swap(b, '<span onClick={v.as.ae.close} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "4px", height: "32px"', "span",
     `<span onClick={v.as.ae.close} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "8px", marginLeft: "-4px", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="chevron-left" size={26} /><span style={{ fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em" }}>Split leads</span></span>`, "split back");
   b = once(b, 'padding: "2px 0 4px", border: "0", borderBottom: "1px dashed var(--crm-line)", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "var(--crm-ink)", outline: "none" }} />)',

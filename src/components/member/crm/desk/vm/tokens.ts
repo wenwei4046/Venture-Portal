@@ -27,17 +27,18 @@ export const ICON: Record<string, string> = {
   channels: "M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
   forms: "M9 3h6v3H9zM6 5H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1M8 11h8M8 15h5",
   auditlog: "M12 8v4l3 3M3.05 11a9 9 0 1 1 .5 4M3 4v5h5",
+  reports: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 17v-3M12 17v-6M16 17v-4",
   profile: "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
 };
-export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["people", "Contacts"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["forms", "Customer form"], ["channels", "Channels"], ["settings", "Settings"], ["auditlog", "Audit log"]];
+export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["people", "Contacts"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["forms", "Customer form"], ["channels", "Channels"], ["settings", "Settings"], ["auditlog", "Audit log"], ["reports", "Reports"]];
 /** The sidebar's groups (v2): [label, pages]. */
-export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar"]], ["MARKETING", ["adsperf", "assignment"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
+export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar"]], ["MARKETING", ["adsperf", "assignment"]], ["REPORTS", ["reports"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
 /**
  * CRM · Manage's pages (rev 1 dev changes), with v2's Customer form and Audit log (a setting and its history). Contacts
  * reads (View at All, as Inbox); Channels shows read-only to whoever cannot manage (README §7).
  */
-export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings", "forms", "auditlog"]);
-export const PANE_MODE = { adsperf: "closed", insight: "closed", calendar: "closed", inbox: "empty", assignment: "wideEmpty", settings: "wideEmpty", showrooms: "wideEmpty", people: "closed", forms: "wideEmpty", channels: "closed", auditlog: "closed" } as const;
+export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings", "forms", "auditlog", "reports"]);
+export const PANE_MODE = { adsperf: "closed", insight: "closed", calendar: "closed", inbox: "empty", assignment: "wideEmpty", settings: "wideEmpty", showrooms: "wideEmpty", people: "closed", forms: "wideEmpty", channels: "closed", auditlog: "closed", reports: "closed" } as const;
 export const LI: Record<string, string> = {
   sprout: "M7 20h10M10 20c5.5-2.5.8-6.4 3-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z",
   megaphone: "M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6",

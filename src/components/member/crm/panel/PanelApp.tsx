@@ -1033,7 +1033,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         {!!(v.as.adEdOpen) && (<>
           <div style={{ position: "absolute", inset: "0", zIndex: "9", background: "#fff", display: "flex", flexDirection: "column", animation: "slideIn 280ms cubic-bezier(.2,.8,.2,1)" }}>
             <div style={{ flex: "1 1 auto", minHeight: "0", display: "flex", flexDirection: "column" }}>
-              <div style={{ flex: "none", padding: "10px 20px 6px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ flex: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "12px", borderBottom: "1px solid var(--crm-rule)", background: "#fff", position: "relative", zIndex: "1" }}>
                 <span onClick={v.as.ae.close} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "8px", marginLeft: "-4px", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="chevron-left" size={26} /><span style={{ fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em" }}>Split leads</span></span>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>

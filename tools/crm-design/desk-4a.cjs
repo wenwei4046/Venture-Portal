@@ -277,6 +277,9 @@ module.exports = function desk4a(body) {
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: audit");
     body = body.slice(0, a) + "{!!(v.kAudit) && (<DeskAudit4a v={v} />)} " + body.slice(b);
   }
+  // Reports (2026-10-23, the owner: "在左手边功能加一个报告的功能，里面分成不一样的 category"; DeskReports.tsx,
+  // vm/reports-page.ts): its own page, before Ads Performance's block (after the Audit log's, which replaces everything up to it).
+  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {
     const start = '{!!(v.cfOn) && (<>', a = body.indexOf(start);
