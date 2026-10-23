@@ -70,6 +70,7 @@ type Save =
   | { kind: "msgr"; id: string; name: string; profile: MessengerProfile }
   | { kind: "wa"; id: string; name: string; profile: WaProfile }
   | { kind: "wa-auto"; id: string; name: string; automation: WaAutomation }
+  | { kind: "wa-name"; id: string; name: string; newName: string }
   | { kind: "template"; template: { name: string; category: string; language: string; body: string } };
 
 /** Send one tab's changes to Meta; on Meta's yes, record what was saved. */
@@ -94,6 +95,17 @@ export async function saveCrmChannel(s: Save): Promise<{ ok: true } | { ok: fals
         if (!r.ok) return r;
         await note("page", s.id, s.name, { greeting: s.profile.greeting, ice_breakers: s.profile.ice, menu: s.profile.menu.map(m => m.title) });
       }
+      return { ok: true };
+    }
+    // A new display name (the owner, 2026-10-23: edited here, not in Meta): a request Meta reviews, usually 1–2 days.
+    if (s.kind === "wa-name") {
+      if (!waba) throw new Error("The WhatsApp account is not set on this server yet.");
+      if (!/^d{5,32}$/.test(s.id)) throw new Error("Choose the number again.");
+      const nn = s.newName.trim().slice(0, 120);
+      if (!nn) throw new Error("Type the new display name.");
+      const r = await postJson(graph(s.id), token, { new_display_name: nn });
+      if (!r.ok) return r;
+      await note("wa", s.id, s.name, { name_request: nn });
       return { ok: true };
     }
     if (s.kind === "wa" || s.kind === "wa-auto") {

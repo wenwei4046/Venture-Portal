@@ -177,15 +177,19 @@ export function channelsVM(ctx: DeskCtx) {
     waSubs: ([["insights", "Insights"], ["prof", "Profile"], ["auto", "Automations"], ["links", "Message links"], ["calls", "Call settings"], ["log", "Call log"]] as const)
       .map(([k, label]) => ({ label, on: k === wsub, off: k !== wsub, pick: () => patch({ chWaTab: k }) })),
     waIns: wsub === "insights", waProf: wsub === "prof", waAuto: wsub === "auto", waLinks: wsub === "links", waCalls: wsub === "calls", waLog: wsub === "log",
-    // A display name is changed through Meta's review in WhatsApp Manager.
-    waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: false, notEditing: true, edit: () => { if (can) open(WA_MANAGER); }, draft: wn?.verifiedName ?? "", setDraft: () => {}, cancel: () => {}, submit: () => {} },
+    // A display name is edited here and sent to Meta for review (the owner, 2026-10-23: "为什么点 edit 会跳转到 fb").
+    waDn: { st: dnSt, bg: DNC[dnSt][0], fg: DNC[dnSt][1], editing: ui.chDn != null, notEditing: ui.chDn == null,
+      edit: () => { if (can) patch({ chDn: wn?.verifiedName ?? "" }); }, draft: ui.chDn ?? wn?.verifiedName ?? "",
+      setDraft: (e: { target: { value: string } }) => patch({ chDn: e.target.value }), cancel: () => patch({ chDn: null }),
+      submit: () => { const nn = (ui.chDn ?? "").trim(); if (!wn || !nn || nn === wn.verifiedName) { patch({ chDn: null }); return; }
+        void ctx.deskAct.saveMeta({ kind: "wa-name", id: wn.id, name: wn.number, newName: nn }).then(ok => { if (ok) { patch({ chDn: null }); toast("Sent to Meta · the new name shows once WhatsApp approves it (1–2 days)"); meta.reload(); } }); } },
     waCatOpen: ui.chDlg?.kind === "cat", waCatToggle: () => { if (can) patch({ chDlg: ui.chDlg?.kind === "cat" ? null : { kind: "cat", id: "" } }); },
     waCats: WA_VERTICALS.map(([k, c]) => ({ c, bg: k === vertical ? "var(--crm-sel)" : "transparent", pick: () => { put(wk("vertical"), k); patch({ chDlg: null }); } })),
     waF: [wf("desc", "Description", prof?.description ?? "", 512, { long: true }), wf("addr", "Address", prof?.address ?? "", 256, { ph: "Business address" }), wf("mail", "Email", prof?.email ?? "", 128, { ph: "Business email" })],
     waWeb: [wf("web1", "Website", prof?.websites[0] ?? "", 256, { ph: "https://www.example.com" }), wf("web2", "", prof?.websites[1] ?? "", 256, { ph: "https://www.example.com" })],
-    waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) open(META_SUITE); },
-    waUser: "", waUserNone: true, waUserHas: false, waUserCreate: () => { if (can) open(WA_MANAGER); },
-    waOba: "", waObaNone: true, waObaHas: false, waObaReq: () => { if (can) open(WA_MANAGER); },
+    waFb: `${pages.filter(p => p.on).length} Page linked`, waIg: "", waIgNone: true, waIgHas: false, waIgLink: () => { if (can) { open(META_SUITE); toast("Instagram is linked in Meta Business Suite — opened it"); } },
+    waUser: "", waUserNone: true, waUserHas: false, waUserCreate: () => { if (can) { open(WA_MANAGER); toast("Meta lets a username be set only in WhatsApp Manager — opened it"); } },
+    waOba: "", waObaNone: true, waObaHas: false, waObaReq: () => { if (can) { open(WA_MANAGER); toast("The blue tick is requested in WhatsApp Manager (Meta has no API for it) — opened it"); } },
     waStats: [["Conversations · 30 days", String(recent.length)], ["Delivered", pc(delivered, outs.length)], ["Read", pc(read, outs.length)], ["Quality rating", qualityWords(wn?.quality ?? "")],
       ["Messaging limit", limitWords(wn?.limit ?? "")], ["Blocked by customers", "View in Meta"]].map(([k, v]) => ({ k, v })),
     waAutoRows: ([["Welcome message", "Sent when someone messages for the first time", autoOn(wk("aw"), !!auto?.welcome), "aw"], ["Conversation starters", "Up to 4 questions people can tap", autoOn(wk("as"), !!auto?.prompts.length), "as"],
