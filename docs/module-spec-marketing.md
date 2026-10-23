@@ -34,8 +34,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | #657, live 2026-10-23 |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
-| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-24 |
-| ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-24 |
+| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-23 |
+| ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-23 |
 | ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | this PR |
 | ⑥-4 | A Library file on a task: *Attach to task* (a file's menu — the file's subsidiary's open tasks), the task page's *Library files* with *+ Attach from Library*, taken off; each a line on the trail (mig `20261024007400`) | this PR |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
@@ -150,7 +150,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 
 1. A title's default team: SENIOR MARKETING EXECUTIVE and TELEMARKETER → **Ads**; EVENT SPECIALIST CUM VISUAL MERCHANDISER → **Brand** — right? (The manager can change anyone's team.)
 2. When is an unaccepted stage red — after how many working hours? What are the PIC's "working hours"?
-3. *(Answered 2026-10-24 — your words to the storage session, "make sure in future i can upload all big file, video and etc" and "make the size more bigger for all": the Library takes 2 GB a file, as HR's documents.)*
+3. *(Answered 2026-10-23 — your words to the storage session, "make sure in future i can upload all big file, video and etc" and "make the size more bigger for all": the Library takes 2 GB a file, as HR's documents.)*
 4. HR invites Marketing's 12 people (no logins yet) — when?
 5. Does anybody besides MM / AMM approve stages (the handoff's content Director)?
 6. Nudge on WhatsApp too (from People's phone numbers)?
