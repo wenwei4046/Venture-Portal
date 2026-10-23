@@ -24,6 +24,7 @@ interface HistoryClient {
                   months: number | null
                   compound_interest: boolean
                   reason: string | null
+                  next_interest_on_original?: boolean | null
                 }[]
               | null
             error: { message: string } | null
@@ -49,7 +50,7 @@ export async function fetchTermsHistory(
   const client = supabase as unknown as HistoryClient
   const { data, error } = await client
     .from('treasury_terms_history')
-    .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason')
+    .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason, next_interest_on_original')
     .eq('record_kind', kind)
     .in('record_id', ids)
     .order('valid_from', { ascending: true })
@@ -63,6 +64,7 @@ export async function fetchTermsHistory(
       months: h.months == null ? null : Number(h.months),
       compounding: h.compound_interest === true,
       reason: h.reason,
+      nextInterestOnOriginal: h.next_interest_on_original === true,
     })
     out.set(h.record_id, rows)
   }

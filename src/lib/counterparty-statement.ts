@@ -21,6 +21,7 @@ import {
   allTermsChanges,
   compoundRoll,
   currentSegment,
+  planTotals,
   principalPaidSince,
   segmentRemainingPeriods,
   termsChanged,
@@ -105,6 +106,10 @@ export interface PositionRow {
    *  effect, the base they run on, and every change with its 差价. */
   termsFrom?: string | null
   termsBase?: number
+  /** The current terms take their interest on the original principal (the change said so). */
+  termsInterestOnOriginal?: boolean
+  /** A changed fixed-term deal's whole-plan interest, segment by segment (Total Interest). */
+  planInterest?: number | null
   termsChanges?: TermsChangeComparison[]
 }
 
@@ -118,13 +123,16 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
   const seg = changed ? currentSegment(p.segments!, currentYM) : null
   const monthlyRate = seg ? seg.rate : p.monthlyRate
   const monthlyInterest = seg ? seg.interestPerMonth : r2(p.principal * p.monthlyRate)
+  // The term and Total Interest read the whole plan (2026-10-23 — HC's Conts 60k: 6mo, 2,100 + 5 × 1,800);
+  // what is left (periods, interest, finish) reads the current segment, as before.
+  const whole = seg ? planTotals(p.segments!) : null
   const base = {
     id: p.id,
     side: p.side,
     counterparty: p.counterparty,
     principal: p.principal,
     monthlyRate,
-    tenureMonths: seg ? seg.months : p.tenureMonths,
+    tenureMonths: seg ? (whole?.months ?? seg.months) : p.tenureMonths,
     principalPaid: r2(p.principalPaid),
     principalOutstanding: r2(p.outstanding),
     monthlyInterest,
@@ -135,6 +143,8 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
       ? {
           termsFrom: seg.fromYM,
           termsBase: seg.base,
+          termsInterestOnOriginal: seg.interestOnOriginal === true,
+          planInterest: whole?.interest ?? null,
           termsChanges: allTermsChanges(p.segments!, { currentYM, paidByMonth: p.paidByMonth }),
         }
       : {}),

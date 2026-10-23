@@ -774,6 +774,7 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
+  const interestOnOriginal = formData.get('interest_on_original') === 'on'
 
   const { error } = await supabase.rpc('amend_loan_from', {
     p_loan_id: loanId,
@@ -784,6 +785,7 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
     p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
+    p_interest_on_original: interestOnOriginal,
   })
   if (error) return { error: `修改失败: ${error.message}` }
 

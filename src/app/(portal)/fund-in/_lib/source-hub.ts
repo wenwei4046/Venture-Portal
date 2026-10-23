@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
 import { SOURCE_TYPE_LABELS, withCode, type FundRecord, type FundStatus } from '@/lib/fund-hub'
+import { installmentsInAll, resolveFirstDueYM } from '@/lib/treasury-terms'
 
 // Fund IN's hub reads (2026-10-15, the Finance revamp v2 — D12): every fund
 // source with who it came from (a company, a department, a director by name),
@@ -19,6 +20,8 @@ type SourceRow = {
   cost_rate: number | string
   lock_in_months: number | null
   effective_date: string | null
+  repayment_start_month: string | null
+  terms_effective_from: string | null
   maturity_date: string | null
   status: FundStatus
   notes: string | null
@@ -36,7 +39,7 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
   const [{ data: sources, error }, { data: companies }, { data: directors }, { data: departments }, { data: outstandingRows }, { data: banks }, { data: accounts }, { data: requests }] = await Promise.all([
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at, repaid_at, repaid_by')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, repayment_start_month, terms_effective_from, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at, repaid_at, repaid_by')
       .order('effective_date', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('directors').select('id, name, code'),
@@ -107,7 +110,9 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
       approvedAt: ok?.approved_at ?? null,
       approvedBy: ok?.approved_by ? (names.get(ok.approved_by) ?? null) : null,
       maturity: s.maturity_date,
-      months: s.lock_in_months ? Number(s.lock_in_months) : null,
+      months: s.lock_in_months
+        ? installmentsInAll(resolveFirstDueYM(s.repayment_start_month, s.effective_date), s.terms_effective_from ? s.terms_effective_from.slice(0, 7) : null, Number(s.lock_in_months))
+        : null,
       compound: s.compound_interest === true,
       minPayInterest: s.min_pay_interest === true,
       fundingSource: null,

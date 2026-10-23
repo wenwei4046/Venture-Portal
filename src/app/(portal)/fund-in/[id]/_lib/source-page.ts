@@ -12,7 +12,7 @@ import { fetchDeptRegistry } from '@/lib/dept-registry'
 import { paymentPoolOptions, registryPoolOptions } from '@/lib/payment-pools'
 import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayment-source-rows'
 import { fullDay, type FullStep } from '@/components/finv/FullParts'
-import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
+import { allTermsChanges, buildTermsSegments, currentSegment, installmentsInAll, termsChanged, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
 import type { AmendTerms } from '@/lib/fund-amend'
 import type { SourceEditFields } from '@/lib/fund-source-edit'
@@ -217,9 +217,12 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
   const amount = Number(source.amount)
   const outstanding = Number(outstandingRow?.outstanding ?? source.amount)
   const totalPrincipalPaid = Number(outstandingRow?.total_principal_paid ?? 0)
-  const monthlyPayment = Number(outstandingRow?.monthly_payment ?? 0)
   // Monthly interest = the rate on the principal — or, once the terms changed mid-life, the current segment's figure.
-  const monthlyInterest = termsChanged(termsSegments) ? currentSegment(termsSegments, officeMonth()).interestPerMonth : amount * Number(source.cost_rate)
+  // So is the monthly payment: the view's reads the record's rate and months on the whole amount, which a change
+  // re-bases (HC's Conts 60k from 2026-06: 10,000 + 1,800, not the view's 13,800 on 5 months).
+  const nowSeg = termsChanged(termsSegments) ? currentSegment(termsSegments, officeMonth()) : null
+  const monthlyInterest = nowSeg ? nowSeg.interestPerMonth : amount * Number(source.cost_rate)
+  const monthlyPayment = nowSeg && nowSeg.months ? Math.round((nowSeg.principalPerMonth + nowSeg.interestPerMonth) * 100) / 100 : Number(outstandingRow?.monthly_payment ?? 0)
   const repaymentsList = repayments ?? []
 
   // The repayment start (2026-10-12): the date the first instalment falls due — the Expected repayment — and every instalment's day.
@@ -254,7 +257,9 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
 
   const typeLabel = SOURCE_TYPE_LABELS[source.source_type as string] ?? (source.source_type as string)
   const st = fundStatus({ status, overdue: null, side: 'in', maturity: (source.maturity_date as string | null) ?? null }, today)
-  const fullyRepaid = start.date && source.lock_in_months ? expectedFullRepaymentDate(start.date, source.lock_in_months) : null
+  // The whole plan's installments: a 从某月起 change left the months from its month on the record.
+  const termMonths = source.lock_in_months ? installmentsInAll(terms.firstDueYM, terms.current.effectiveFrom, Number(source.lock_in_months)) : null
+  const fullyRepaid = start.date && termMonths ? expectedFullRepaymentDate(start.date, termMonths) : null
 
   const approvedRow = approved as { approved_at: string | null; users: { name?: string } | null } | null
   const steps: FullStep[] = [{ label: 'Created', by: source.created_by ? (userName.get(source.created_by) ?? null) : null, when: stamp(source.created_at), state: 'done' }]
@@ -283,7 +288,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     createdBy: (source.created_by && userName.get(source.created_by)) || null,
     createdAt: stamp(source.created_at),
     compound: !!source.compound_interest,
-    lockInMonths: source.lock_in_months ? Number(source.lock_in_months) : null,
+    lockInMonths: termMonths,
     fullyRepaid,
     rate: `${(Number(source.cost_rate) * 100).toFixed(3)}% /mo`,
     plan,

@@ -175,6 +175,10 @@ export function AmendTermsSheet({
                 <span className={fm.checkName}>No fixed term from then</span>
               </label>
               <label className={fm.check}>
+                <input type="checkbox" checked={d.interestOnOriginal} onChange={(e) => set({ interestOnOriginal: e.target.checked })} />
+                <span className={fm.checkName}>Interest on the original principal</span>
+              </label>
+              <label className={fm.check}>
                 <input type="checkbox" checked={d.compound} onChange={(e) => set({ compound: e.target.checked })} />
                 <span className={fm.checkName}>Compound interest</span>
               </label>
