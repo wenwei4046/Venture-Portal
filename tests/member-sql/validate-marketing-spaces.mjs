@@ -135,7 +135,7 @@ for (const m of ['20261024007000_marketing_library.sql', '20261024007100_marketi
   '20261024007200_marketing_brand_profiles.sql', '20261024007300_marketing_library_shares.sql', '20261024007400_marketing_task_library.sql']) {
   await db.exec(await sql(m))
 }
-for (const m of ['20261024007500_marketing_spaces.sql', '20261024007600_marketing_space_private_photo.sql']) {
+for (const m of ['20261024007500_marketing_spaces.sql', '20261024007600_marketing_space_private_photo.sql', '20261024007700_marketing_space_room_pet.sql']) {
   const mig = await sql(m)
   await db.exec(mig)
   await db.exec(mig) // twice: nothing changes, nothing breaks
@@ -239,5 +239,49 @@ check([sp.coverPath, sp.avatarPath, await peek1(`SELECT count(*)::int FROM publi
   'the cover taken off loses its bytes’ row; the avatar kept, kept')
 check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [DOC])).length, 1,
   'one never shown is its sender’s to take back')
+
+// ── ⑦-2: the room, the pet's look, one's own animal ──────────────────────────────
+await as(U.mei, STAFF)
+sp = await save({ room: { wall: 'sage', floor: 'tile', items: [
+  { id: 'tv-16', k: 'tv', x: 16.4, flip: 1 }, { id: 'sofa-34', k: 'sofa', x: 120, flip: -1 }, { id: 'frame-1', k: 'frame', x: 2 },
+] } })
+check(sp.room, { wall: 'sage', floor: 'tile', items: [
+  { id: 'tv-16', k: 'tv', x: 16, flip: 1 }, { id: 'sofa-34', k: 'sofa', x: 96, flip: -1 }, { id: 'frame-1', k: 'frame', x: 4, flip: 1 },
+] }, 'the room by its keys; a piece kept in the room, whole percents, facing one way or the other')
+check([sp.status, sp.layout.length], ['Shooting all day', 5], 'the rest untouched')
+await saveRefused({ room: { wall: '#2f2b3d' } }, /from the drawer/, 'a wall from the drawer, never a colour')
+await saveRefused({ room: { floor: 'marble' } }, /from the drawer/, 'a floor from the drawer')
+await saveRefused({ room: { items: Array.from({ length: 31 }, (_, i) => ({ id: `bed-${i}`, k: 'bed', x: 50 })) } }, /at most 30/, 'thirty pieces at most')
+await saveRefused({ room: { items: [{ id: 'jet-1', k: 'jet', x: 50 }] } }, /catalogue/, 'only the catalogue’s')
+await saveRefused({ room: { items: [{ id: 'bed-1', k: 'bed', x: 50 }, { id: 'bed-1', k: 'bed', x: 60 }] } }, /once/, 'each piece once')
+await saveRefused({ room: { items: [{ id: 'bed-1', k: 'bed', x: 'left' }] } }, /catalogue/, 'somewhere in numbers')
+await saveRefused({ room: { items: [{ id: '<b>', k: 'bed', x: 50 }] } }, /catalogue/, 'an id of letters and digits')
+
+sp = await save({ pet: { species: 'dog', name: '  Teh   Tarik ', color: 'mint', onboarded: true } })
+check(sp.pet, { species: 'dog', name: 'Teh Tarik', color: 'mint', onboarded: true }, 'the pet: its kind, its name tidied, its colour, set up')
+check(sp.room.wall, 'sage', 'the room untouched')
+await saveRefused({ pet: { species: 'tiger' } }, /kind and colour/, 'one of the four kinds')
+await saveRefused({ pet: { color: '#ff0000' } }, /kind and colour/, 'a colour from the list')
+await saveRefused({ pet: { onboarded: 'yes' } }, /kind and colour/, 'set up or not')
+await saveRefused({ pet: { name: 'x'.repeat(17) } }, /16 characters/, 'a name of 16 at most')
+check((await save({ pet: { species: 'cat' } })).pet, { species: 'cat', color: 'original', onboarded: false }, 'saved whole: what is left out is the default')
+
+const PET = `space/${id(991)}/rex.png`
+const PET2 = `space/${id(992)}/rex2.png`
+await put(PET)
+await put(PET2)
+await put(`mine/${id(993)}/rex.png`)
+await saveRefused({ petPath: `mine/${id(993)}/rex.png` }, /has not arrived/, 'one’s own animal under space/ — teammates see the pet')
+sp = await save({ petPath: PET })
+check(sp.petPath, PET, 'one’s own animal')
+check((await q(`DELETE FROM public.file_objects WHERE bucket_id = 'marketing' AND name = $1 RETURNING name`, [PET])).length, 0,
+  'the animal shown is filed — not taken back from under it')
+await as(U.ali, VIEW)
+check(await sees(PET), 1, 'a teammate sees the animal')
+await as(U.mei, STAFF)
+sp = await save({ petPath: PET2 })
+check([sp.petPath, await peek1(`SELECT count(*)::int FROM public.file_objects WHERE name = $1`, [PET])], [PET2, 0], 'another chosen: the first one’s row goes')
+check(Object.keys(await one(`SELECT public.mkt_space()`)).filter(k => ['room', 'pet', 'petPath'].includes(k)).sort(), ['pet', 'petPath', 'room'],
+  'the space hands them over')
 
 console.log(`marketing spaces: ${checks} checks passed`)

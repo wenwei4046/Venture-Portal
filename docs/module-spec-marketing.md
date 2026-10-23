@@ -194,8 +194,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 32. The pet's XP: the handoff says "stages × difficulty (S 1, M 2, L 3) × 10 for each finished task", but neither the portal nor the handoff has a difficulty. Suggested: +10 for each stage you finish, +20 for a product project's stage; nothing taken back for changes asked; approvals and subtasks do not count — right?
 33. Should the pet's energy fall over time? (The handoff's falls only with exercise.) Suggested: no.
 34. Trophies: a project whose last stage was yours, finished this quarter (office time), at most 6 shown?
-35. Direct messages: seen by the two people only — not a manager, the Principal or the audit trail? Suggested: yes.
-36. How long are messages kept; may they be edited or deleted? Suggested: kept, never changed or deleted.
+35. Direct messages: who may read them — the two people only (then a harassment complaint or a customer record pasted in one is beyond the company's reach), the two plus the Principal on a complaint (the opening logged), or the manager too? No suggestion: it decides the company's own oversight.
+36. How long are messages kept, and who may edit or delete one — nobody (then customer data pasted by mistake cannot be removed), each their own, the Principal any, or all after some months? No suggestion: as 35.
 37. The lobby: everyone with Marketing · View sees it; only the people on the roster write in it and have a pet (the Principal has none)?
 38. Visiting a teammate: their Notes shown, their Photo private (as the handoff draws it)? Built private for now (gap 100).
 39. A new direct message: a sound, or a push to the phone? Suggested: not yet — an unread dot until the phone app.
