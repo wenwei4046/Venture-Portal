@@ -6,8 +6,9 @@ import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { inviteHiringTalent, saveHiringTalent } from '@/lib/hiring/actions'
 import { savedIn } from '@/lib/hiring/bank'
+import { REASONS } from '@/lib/hiring/reasons'
 import { answerOf, departmentNames, pickRows } from '@/lib/hiring/view'
-import type { HiringBoard, HiringCandidate, HiringRequest } from '@/lib/hiring/types'
+import type { HiringBoard, HiringCandidate, HiringRequest, TalentReason } from '@/lib/hiring/types'
 import s from './hiring.module.css'
 
 /** Pick from Talent Bank (README §11): the bank's people not already on this request, matching ones first; Add invites them. */
@@ -59,7 +60,10 @@ export function PickTalentWindow({ board, request: r, open, onClose }: { board: 
   )
 }
 
-/** Move to Talent Bank… (README §11): a candidate kept on file — name, phone, email, department, what they fit, why keep them; their files go with them. */
+/**
+ * Move to Talent Bank… (README §11): a candidate kept on file — name, phone, email, department, what they fit, why keep
+ * them; their files go with them. The reason they are kept (2026-10-24): Not right now for somebody still in the running.
+ */
 export function MoveToTalentWindow({
   board,
   request: r,
@@ -83,6 +87,7 @@ export function MoveToTalentWindow({
   const [dept, setDept] = useState('')
   const [position, setPosition] = useState('')
   const [notes, setNotes] = useState('')
+  const [reason, setReason] = useState<TalentReason>('not_right_now')
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
 
@@ -92,6 +97,7 @@ export function MoveToTalentWindow({
     setPhone(c.phone)
     setEmail('')
     setPosition(answerOf(r, 'position'))
+    setReason(c.stage === 'rejected' ? 'not_shortlisted' : 'not_right_now')
     const first = (answerOf(r, 'dept') || 'Revenue').split(' · ')[0]
     setDept(guest ? answerOf(r, 'dept') || first : departments.includes(first) ? first : departments[0] ?? first)
     setNotes(c.note)
@@ -111,6 +117,7 @@ export function MoveToTalentWindow({
     form.set('department', dept)
     form.set('position', position)
     form.set('notes', notes)
+    form.set('reason', reason)
     start(async () => {
       const out = await saveHiringTalent(form)
       if (!out.ok) return setErr(out.reason)
@@ -143,6 +150,16 @@ export function MoveToTalentWindow({
           <label className={s.label}>
             <span className={s.labelText}>Email</span>
             <input className={s.input} value={email} onChange={e => setEmail(e.target.value)} />
+          </label>
+          <label className={s.label}>
+            <span className={s.labelText}>Reason *</span>
+            <Select bare className={s.select} value={reason} onChange={e => setReason(e.target.value as TalentReason)}>
+              {REASONS.map(x => (
+                <option key={x.id} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </Select>
           </label>
           {guest ? null : (
             <label className={s.label}>

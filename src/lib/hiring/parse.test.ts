@@ -47,6 +47,11 @@ describe('boardFromJson', () => {
     expect(fieldFromJson({ id: 'x', label: 'X', type: 'colour', required: 'yes' })).toEqual({ id: 'x', label: 'X', type: 'text', options: '', required: false, core: false })
   })
 
+  it('why somebody is kept: one of the five, else none (2026-10-24)', () => {
+    const b = boardFromJson({ talents: [{ id: 'a', reason: 'failed_interview' }, { id: 'b', reason: 'bored' }, { id: 'c' }] })
+    expect(b.talents.map(t => t.reason)).toEqual(['failed_interview', null, null])
+  })
+
   it('sources default on, with how often they were used', () => {
     const b = boardFromJson({ sources: [{ id: 's', name: 'Jobstreet', used: '2' }, { id: 't', name: 'Other', active: false }], me: { staffId: 'x', name: 'Grace Lim' } })
     expect(b.sources).toEqual([{ id: 's', name: 'Jobstreet', active: true, used: 2 }, { id: 't', name: 'Other', active: false, used: 0 }])

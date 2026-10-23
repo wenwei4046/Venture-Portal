@@ -22,6 +22,8 @@ import { todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
 import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
 import { missingAnswers } from '@/lib/hiring/view'
+import { REASONS, outReason } from '@/lib/hiring/reasons'
+import type { TalentReason } from '@/lib/hiring/types'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
   approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, probationFacts, probationRows,
@@ -59,7 +61,7 @@ export interface HrAppActions {
   hireFill(id: string, hired: string, source: string, cost: string): Promise<ActResult>
   /** "+ New hiring request" (2026-10-17): the desktop drawer's own Submit to HR. */
   hireNew(requestedBy: string, answers: Record<string, string>): Promise<{ ok: true; id: string } | { ok: false; reason: string }>
-  candStage(hireId: string, candId: string, stage: CandStage): Promise<ActResult>
+  candStage(hireId: string, candId: string, stage: CandStage, reason?: TalentReason): Promise<ActResult>
   candAdd(hireId: string, cand: { name: string; phone: string; note: string }): Promise<ActResult>
   requestDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string, route?: 'payroll' | 'payment'): Promise<ActResult>
   /** HR › Attendance › Requests (2026-10-17): the waiting step — HR's, or the upline's on their behalf. */
@@ -119,7 +121,8 @@ type Page =
 
 type SheetK =
   | { k: 'facts'; eyebrow: string; title: string; sub?: string; facts: Array<[string, string]>; actions?: SheetAction[] }
-  | { k: 'stage'; cid: string; name: string; cur: CandStage }
+  // `why`: Not selected was tapped — why, before they go to the Talent Bank (2026-10-24).
+  | { k: 'stage'; cid: string; name: string; cur: CandStage; why?: boolean }
   | { k: 'ack' } | { k: 'info' } | { k: 'fill' } | { k: 'cand' } | { k: 'newHire' }
   | { k: 'book' }
   | { k: 'booking'; id: string }
@@ -678,7 +681,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       ) : null}
 
       <SheetLayer d={d} sheet={sheet} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr} busy={busy} arm={arm} setArm={setArm}
-        close={closeSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
+        close={closeSheet} swap={setSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
         openGuide={() => setPopUpGuide(true)} openIt={() => openIt()} flash={flash} />
       {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
       <Toast msg={toast} />
@@ -760,6 +763,8 @@ function SheetLayer(p: {
   arm: boolean
   setArm: (a: boolean) => void
   close: () => void
+  /** Another sheet in this one's place (the status sheet's Not selected › why). */
+  swap: (next: SheetK) => void
   pop: () => void
   run: (fn: () => Promise<ActResult>, after?: () => void, done?: string) => void
   actions: HrAppActions
@@ -771,7 +776,7 @@ function SheetLayer(p: {
   openIt: () => void
   flash: (m: string) => void
 }) {
-  const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, day, pushNow, togglePush, flash } = p
+  const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, swap, pop, run, actions, day, pushNow, togglePush, flash } = p
   const hr = p.hr
   const [locked, setLocked] = useState(false)
   if (!sh) return null
@@ -791,6 +796,24 @@ function SheetLayer(p: {
     return <Sheet open eyebrow={sh.eyebrow} title={sh.title} sub={sh.sub} onClose={close} actions={sh.actions ?? [{ label: 'Close', onClick: close }]}><SheetFacts items={sh.facts} /></Sheet>
   }
 
+  if (sh.k === 'stage' && hr && sh.why) {
+    // Not selected keeps them in the Talent Bank: why — the one their stage says first.
+    const first = outReason(sh.cur)
+    const dot = CHIP[candChip('rejected').tone][1]
+    return (
+      <Sheet open eyebrow={hr.id} title={`Not selected · ${sh.name}`} sub="Why?" onClose={close}>
+        {[...REASONS].sort((a, b) => Number(b.id === first) - Number(a.id === first)).map(x => (
+          <button key={x.id} type="button" className={s.option} style={{ background: 'var(--ds-surface-2)' }}
+            onClick={() => run(() => actions.candStage(hr.id, sh.cid, 'rejected', x.id), close, `${sh.name} · Not selected · kept in Talent Bank`)}>
+            <span className={s.optionDot} style={{ background: dot }} />
+            <span style={{ flex: 1, fontWeight: 500 }}>{x.label}</span>
+          </button>
+        ))}
+        {err}
+      </Sheet>
+    )
+  }
+
   if (sh.k === 'stage' && hr) {
     return (
       <Sheet open eyebrow={hr.id} title={`Status · ${sh.name}`} onClose={close}>
@@ -799,10 +822,10 @@ function SheetLayer(p: {
           const on = v === sh.cur
           return (
             <button key={v} type="button" className={s.option} style={{ background: on ? 'var(--hr2-pill-on)' : 'var(--ds-surface-2)' }}
-              onClick={() => (on ? close() : run(() => actions.candStage(hr.id, sh.cid, v), close, `${sh.name} · ${CAND_STAGE[v][0]}`))}>
+              onClick={() => (on ? close() : v === 'rejected' ? swap({ ...sh, why: true }) : run(() => actions.candStage(hr.id, sh.cid, v), close, `${sh.name} · ${CAND_STAGE[v][0]}`))}>
               <span className={s.optionDot} style={{ background: CHIP[cc.tone][1] }} />
               <span style={{ flex: 1, fontWeight: on ? 700 : 500 }}>{cc.label}</span>
-              <span>{on ? '✓' : ''}</span>
+              <span>{on ? '✓' : v === 'rejected' ? '›' : ''}</span>
             </button>
           )
         })}

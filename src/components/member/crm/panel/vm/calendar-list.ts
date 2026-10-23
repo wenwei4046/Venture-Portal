@@ -13,7 +13,7 @@ import type { calendarVM } from "./calendar";
 const p2 = (n: number) => String(n).padStart(2, "0");
 const dOnly = (d: Date) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
 
-export function calendarListVM(ctx: PanelCtx, cal: ReturnType<typeof calendarVM> | undefined) {
+export function calendarListVM(ctx: PanelCtx, cal: Pick<ReturnType<typeof calendarVM>, "cLeadIds" | "cUpV" | "cCameV" | "cRangeBtn"> | undefined) {
   const { ui, patch, data, nameOf } = ctx;
   const k = ui.cLs || "", isV = k === "up" || k === "came";
   const byId = (id: string) => data.customers.find(c => c.id === id);

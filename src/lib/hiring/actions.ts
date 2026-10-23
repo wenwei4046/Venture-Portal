@@ -6,7 +6,8 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { HIRING_BUCKET, previewKind } from './files'
-import type { CandidateField, CandidateStage, HiringField } from './types'
+import { isReason } from './reasons'
+import type { CandidateField, CandidateStage, HiringField, TalentReason } from './types'
 
 /**
  * Hiring's writes (2026-10-11, HR revamp round 2 — README §11–13), shared by
@@ -94,6 +95,10 @@ const text = (form: FormData, key: string) => {
   const v = form.get(key)
   return typeof v === 'string' ? v : ''
 }
+
+/** Why somebody is kept in the Talent Bank (mig 20261024233700): one of the five, else none. */
+const reasonIn = (v: unknown): TalentReason | null => (isReason(v) ? v : null)
+const PICK_REASON = 'Pick why they are kept.'
 
 /** Uploads handed in by the browser, as the database files them, or null when not in shape. */
 function uploadsFrom(raw: string): Array<{ path: string; name: string; type: string }> | null {
@@ -207,7 +212,9 @@ export async function fillHiringRequest(id: string, input: { hired: string[]; so
  * the candidate fields, a note and their files. FormData: `request`,
  * `candidate` (absent to add), `name`, `phone`, `stage`, `note`, `answers`
  * (JSON), `files` (JSON — the uploads to file, `UploadedFile[]`), `remove`
- * (JSON — ids of files to take off; Edit only).
+ * (JSON — ids of files to take off; Edit only), `reason` (why, when the
+ * status becomes Not selected — they are kept in the Talent Bank,
+ * mig 20261024233700; none: the one their stage says).
  */
 export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome> {
   const candidate = text(form, 'candidate')
@@ -226,6 +233,7 @@ export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome
     p_note: text(form, 'note'),
     p_answers: answers,
     p_files: files.length ? files : null,
+    p_reason: reasonIn(text(form, 'reason')),
   }
   const { data, error } = candidate
     ? await supabase.rpc('hiring_candidate_edit', { p_candidate: candidate, ...args, p_remove: remove.length ? remove : null })
@@ -240,10 +248,13 @@ export async function saveHiringCandidate(form: FormData): Promise<HiringOutcome
   return deleted ? { ok: true } : { ok: true, warning: LEFT_IN_STORAGE }
 }
 
-/** Change status ▸ — one candidate's stage. */
-export async function setCandidateStage(candidate: string, stage: CandidateStage): Promise<HiringOutcome> {
+/**
+ * Change status ▸ — one candidate's stage. Not selected keeps them in the Talent Bank with the reason picked (none:
+ * the one their stage says — mig 20261024233700).
+ */
+export async function setCandidateStage(candidate: string, stage: CandidateStage, reason?: TalentReason | null): Promise<HiringOutcome> {
   await requireActionOn('/hiring/requests', 'hiring', 'edit')
-  return call('hiring_candidate_stage', { p_candidate: candidate, p_stage: stage }, 'The status could not be changed. Please try again.')
+  return call('hiring_candidate_stage', { p_candidate: candidate, p_stage: stage, p_reason: reasonIn(reason) }, 'The status could not be changed. Please try again.')
 }
 
 /**
@@ -387,8 +398,9 @@ export async function removeHiringSource(id: string): Promise<HiringOutcome> {
  * Move to Talent Bank… from a candidate (who brings all their files) — the
  * database keeps them in their company › department (mig 20261013030000; the
  * Talent Bank's own + Add talent is `addBankTalent`). FormData: `name`,
- * `phone`, `email`, `position`, `department`, `notes`, `candidate` (from a
- * request), `files` (JSON — the uploads to file, `UploadedFile[]`).
+ * `phone`, `email`, `position`, `department`, `notes`, `reason` (why they are
+ * kept, mig 20261024233700), `candidate` (from a request), `files` (JSON — the
+ * uploads to file, `UploadedFile[]`).
  */
 export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome> {
   await requireActionOn('/hiring/requests/[id]', 'hiring', 'create')
@@ -396,6 +408,8 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) {
     return { ok: false, reason: candidate ? 'Name and position are needed.' : 'Add a name and the position they fit.' }
   }
+  const reason = reasonIn(text(form, 'reason'))
+  if (!reason) return { ok: false, reason: PICK_REASON }
   const files = uploadsFrom(text(form, 'files'))
   if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
   const supabase = await client()
@@ -408,6 +422,7 @@ export async function saveHiringTalent(form: FormData): Promise<HiringIdOutcome>
     p_notes: text(form, 'notes'),
     p_from_candidate: candidate || null,
     p_files: files.length ? files : null,
+    p_reason: reason,
   })
   if (error) {
     await deleteObjects(supabase, files.map(f => f.path))
@@ -469,11 +484,13 @@ export async function moveBankTalent(talent: string, place: string): Promise<Hir
 
 /**
  * + New › Add talent, in the place it is pressed (Create). FormData: `name`, `phone`, `email`, `position`, `notes`,
- * `files` (JSON — the uploads to file, `UploadedFile[]`).
+ * `reason` (why they are kept, mig 20261024233700), `files` (JSON — the uploads to file, `UploadedFile[]`).
  */
 export async function addBankTalent(place: string, form: FormData): Promise<HiringIdOutcome> {
   await requireActionOn('/hiring/talent', 'hiring', 'create')
   if (!text(form, 'name').trim() || !text(form, 'position').trim()) return { ok: false, reason: 'Add a name and the position they fit.' }
+  const reason = reasonIn(text(form, 'reason'))
+  if (!reason) return { ok: false, reason: PICK_REASON }
   const files = uploadsFrom(text(form, 'files'))
   if (!files) return { ok: false, reason: 'The files are not in the right shape.' }
   const supabase = await client()
@@ -485,6 +502,7 @@ export async function addBankTalent(place: string, form: FormData): Promise<Hiri
     p_position: text(form, 'position'),
     p_notes: text(form, 'notes'),
     p_files: files.length ? files : null,
+    p_reason: reason,
   })
   if (error) {
     await deleteObjects(supabase, files.map(f => f.path))
@@ -493,6 +511,14 @@ export async function addBankTalent(place: string, form: FormData): Promise<Hiri
   if (files.length) await sweep(supabase)
   refresh()
   return { ok: true, id: String(data) }
+}
+
+/** Why they are kept, changed on their page or panel (Edit). Their History says from what to what. */
+export async function setTalentReason(talent: string, reason: TalentReason): Promise<HiringOutcome> {
+  await requireActionOn('/hiring/talent', 'hiring', 'edit')
+  const picked = reasonIn(reason)
+  if (!picked) return { ok: false, reason: PICK_REASON }
+  return call('hiring_talent_set_reason', { p_talent: talent, p_reason: picked }, 'The reason could not be saved. Please try again.')
 }
 
 /** + New › Upload files: one file the browser has put in the bucket, kept in a place of the bank (Create). */

@@ -10,6 +10,7 @@ import { loadDocumentation } from '@/lib/documentation/server'
 import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/model'
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
+import { reasonLabel } from '@/lib/hiring/reasons'
 import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import { noticesFromRow } from '@/lib/push/notices'
 import { bookerName, type Booking } from '@/lib/rooms/model'
@@ -131,7 +132,7 @@ export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): Hr
 export function talentOf(t: HiringTalent): HrTalent {
   return {
     id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined, position: t.position, dept: t.department,
-    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes,
+    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes, reason: reasonLabel(t.reason) || undefined,
   }
 }
 
