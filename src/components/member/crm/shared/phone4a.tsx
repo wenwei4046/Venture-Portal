@@ -286,8 +286,6 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
   );
 }
 
-const OUT: CSSProperties = { ...BTN, height: "32px", padding: "0 11px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", fontSize: fs(13), fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" };
-const MAIN: CSSProperties = { ...OUT, border: "1px solid var(--crm-rust)", background: "var(--crm-rust)", color: "#fff" };
 
 /** M10 · the Calendar's title row: "Calendar" and its views (Month · Week · Day — production's three; 4a's segmented look). */
 export function Phone4aCalHead({ v }: { v: { calViews: { label: string; weight: number; pick: () => void }[] } }) {
