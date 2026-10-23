@@ -70,7 +70,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   useEffect(() => { setStatus(r.status); }, [r.status]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [annotating, setAnnotating] = useState<ItFile | null>(null);
+  const [annotating, setAnnotating] = useState<{ file: ItFile; src: string } | null>(null);
   const files = useItUploads(upload);
   const { discard } = files;
   const closed = useRef(false);
@@ -85,6 +85,13 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   }, [discard]);
   const writes = !readOnly && (r.mine || canEdit);
   const setsStatus = canEdit && !readOnly;
+  // A link made at the press: the preview's may have run out (ten minutes) while the sheet stayed open.
+  const mark = async (f: ItFile) => {
+    const fresh = sign ? await sign([f.id]).catch(() => null) : null;
+    const src = (fresh?.ok ? fresh.data[f.id] : undefined) ?? urls[f.id];
+    if (src && !closed.current) setAnnotating({ file: f, src });
+  };
+  const annotate = writes && !busy && !files.full ? (f: ItFile) => void mark(f) : undefined;
 
   const send = async () => {
     if (sending.current) return;
@@ -131,7 +138,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
       {own.length > 0 && (
         <div>
           <p className={t.label}>SCREENSHOTS AND FILES</p>
-          <Files files={own} urls={urls} openFile={openFile} annotate={writes && !busy && !files.full ? setAnnotating : undefined} />
+          <Files files={own} urls={urls} openFile={openFile} annotate={annotate} />
         </div>
       )}
       {r.notes.length > 0 && (
@@ -150,7 +157,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
                     <div className={t.noteStatus}>Marked <span className={`${s.status} ${TONE[STATUS_TONE[n.statusTo]]}`}>{STATUS_LABEL[n.statusTo]}</span></div>
                   )}
                   {n.body && <p className={t.noteBody}>{n.body}</p>}
-                  {theirs.length > 0 && <Files files={theirs} urls={urls} openFile={openFile} annotate={writes && !busy && !files.full ? setAnnotating : undefined} />}
+                  {theirs.length > 0 && <Files files={theirs} urls={urls} openFile={openFile} annotate={annotate} />}
                 </div>
               );
             })}
@@ -181,7 +188,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
         </div>
       )}
       <button className={`${s.done} ${t.requestDone}`} onClick={onClose}>Done</button>
-      {annotating && urls[annotating.id] && <ImageAnnotator src={urls[annotating.id]} fileName={annotating.name} theme="revenue"
+      {annotating && <ImageAnnotator src={annotating.src} fileName={annotating.file.name} theme="revenue"
         onClose={() => setAnnotating(null)} onSave={file => { files.add([file]); setAnnotating(null); }} />}
     </>
   );
