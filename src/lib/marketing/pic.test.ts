@@ -83,6 +83,16 @@ describe('where it stands, for the PIC', () => {
       .toEqual(['You approved the minutes:done:25 Oct', 'Work starts:cur'])
   })
 
+  it('minutes that asked no sign-off never went to the PIC: the team completed them — never “sent to you”, never “you approved” (2026-10-24, the preview walk)', () => {
+    const states = (p: PicPage) => picTimeline(p).map(t => `${t.label}:${t.state}${t.date ? `:${t.date}` : ''}`)
+    const work = [{ id: 'd1', title: 'Banner', status: 'active', stages: 1, done: 0, stage: { idx: 0, name: 'Design', status: 'review', ver: 1, waiting: true, fields: [], links: [] } }]
+    expect(states(page({ status: 'active', sentAt: null, work })))
+      .toEqual(['Kick-off meeting:done:23 Oct', 'Minutes completed by the team:done', 'The work:cur'])
+    // Sent once and answered: as before.
+    expect(states(page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:00:00Z' }, work }))[2])
+      .toBe('You approved the minutes:done:25 Oct')
+  })
+
   it('after an answer, the card with its receipt — never for a reply that no longer stands', () => {
     expect(picAnswered(page({ status: 'approved', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z' } })))
       .toEqual({ approved: true, title: 'Approved', text: 'You approved the meeting minutes. The team has been told.', quote: '',

@@ -210,9 +210,17 @@ export function picBanner(p: Pick<PicPage, 'status' | 'updated' | 'asked'>, over
 
 export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: string; sub: string }
 
-/** The progress: the meeting, the minutes sent, their approval, the work. */
+/** The progress: the meeting, the minutes sent, their approval, the work. Minutes that asked no sign-off never went to
+ * the PIC (no sending, no answer) — the team completed them; the link is theirs for the work (②b-2d). */
 export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & { work?: readonly PicWork[] }): PicStep[] {
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
+  if (approved && !p.sentAt && !p.reply) {
+    return [
+      { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
+      { label: 'Minutes completed by the team', state: 'done', date: '', sub: '' },
+      workStep(p.work ?? [], approved),
+    ]
+  }
   const yours: PicStep = p.status === 'waiting_pic' ? { label: 'Your approval', state: 'cur', date: '', sub: 'Waiting for you' }
     : p.status === 'changes' ? { label: 'The team is making your changes', state: 'cur', date: '', sub: 'You will get the new minutes on this link' }
     : { label: 'You approved the minutes', state: 'done', date: p.reply?.decision === 'approved' ? day(p.reply.at) : '', sub: '' }
