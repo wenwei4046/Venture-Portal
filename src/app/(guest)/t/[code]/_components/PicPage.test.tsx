@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { picPageFromRow, type PicPage as Page } from '@/lib/marketing/pic'
 
-// 2026-10-24 — the PIC's link (⑤-1, `PIC Link.dc.html`) for the subsidiary's PIC, who has no login: they read the
+// 2026-10-23 — the PIC's link (⑤-1, `PIC Link.dc.html`) for the subsidiary's PIC, who has no login: they read the
 // minutes, approve with their full name or ask for changes in their words, and see the receipt. Walked against the one
 // call it makes (lib/marketing/pic-actions.ts; the database's side is tests/member-sql/validate-marketing-pic-link.mjs).
 

@@ -1,4 +1,4 @@
--- Marketing ⑥-4 (2026-10-24): a Library file attached to a task — the handoff's *Attach to task* (a file's menu in
+-- Marketing ⑥-4 (2026-10-23): a Library file attached to a task — the handoff's *Attach to task* (a file's menu in
 -- the Library: "It appears in the task Canvas as a linked file — no duplicate copy") and *Attach from Library* (the
 -- Library as a picker, opened from the task).
 --

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { productProjectFromRow, type ProductProjectPage } from '@/lib/marketing/project'
 
-// 2026-10-24 — a 📦 product project's page (②b-1, `New Project.dc.html` steps 2–4) for the people who work it: the
+// 2026-10-23 — a 📦 product project's page (②b-1, `New Project.dc.html` steps 2–4) for the people who work it: the
 // manager writes the intake minutes with the PIC (saved as typed — only what changed), makes the tracking link once
 // nothing is missing, resends after the PIC's changes, or starts before approval with a reason; an attendee signs for
 // themselves. Marketing has no logins yet, so the page is walked here against the actions it calls

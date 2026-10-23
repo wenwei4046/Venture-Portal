@@ -9,7 +9,7 @@ export const nunito = Nunito({ subsets: ['latin'], weight: ['400', '500', '600',
 export const plex = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-mk-plex', display: 'swap' })
 
 /**
- * A subsidiary's brand font in the Library (2026-10-24, ⑥-2 — the handoff's six: Newsreader, Nunito, Playfair, DM Serif,
+ * A subsidiary's brand font in the Library (2026-10-23, ⑥-2 — the handoff's six: Newsreader, Nunito, Playfair, DM Serif,
  * Space Grotesk, Inter): the three the portal has not, hung on Marketing's shell beside the two above and drawn only on
  * a brand's own name (lib/marketing/library.ts › brandFace), so a browser downloads one only when a brand wears it.
  */

@@ -1,4 +1,4 @@
--- Marketing ⑥-3 (2026-10-24): a guest share link for a Library file or folder — the handoff's *Share link* (a file's
+-- Marketing ⑥-3 (2026-10-23): a guest share link for a Library file or folder — the handoff's *Share link* (a file's
 -- and a folder's menu, `Library.dc.html`): "Guest link · for people without an account", *Link expires* 24 hours /
 -- 7 days / 30 days / Never (7 days the default), *Allow download* (on by default), Copy.
 --

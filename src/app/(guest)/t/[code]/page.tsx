@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * The PIC's link (2026-10-24, Marketing ⑤-1 — `PIC Link.dc.html`): public, no sign-in, outside the portal's layout,
+ * The PIC's link (2026-10-23, Marketing ⑤-1 — `PIC Link.dc.html`): public, no sign-in, outside the portal's layout,
  * as the guest link. The code in the address is the only key; the database answers "closed" for a wrong one, a project
  * never sent or cancelled. Never requirePage — there is no account here.
  */

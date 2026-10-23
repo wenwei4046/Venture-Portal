@@ -84,8 +84,9 @@ describe('the Library', () => {
       .toEqual(['Brandbookalready here (off)', 'Product photosalready here (off)', 'Raw footagealready here (off)', 'Meeting minutes'])
     expect(within(pop).queryByLabelText('New folder type name')).toBeNull()
     fireEvent.click(within(pop).getByRole('button', { name: /Meeting minutes/ }))
-    await waitFor(() => expect(actions.addMktLibFolder).toHaveBeenCalledWith(CAR, T.minutes, null))
-    expect(flash).toHaveBeenCalledWith('Folder "Meeting minutes" added to Carres')
+    // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — it raced on CI).
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Folder "Meeting minutes" added to Carres'))
+    expect(actions.addMktLibFolder).toHaveBeenCalledWith(CAR, T.minutes, null)
   })
 
   it('lets the manager make a folder type for every subsidiary', async () => {
@@ -177,7 +178,7 @@ describe('the Library', () => {
   })
 })
 
-// 2026-10-24 — ⑥-2: a subsidiary's brand profile (the manager's ✎) and its Schedule.
+// 2026-10-23 — ⑥-2: a subsidiary's brand profile (the manager's ✎) and its Schedule.
 describe('a brand in the Library', () => {
   const LOGO = 'brand/00000000-0000-4000-8000-000000000009/carres-logo.png'
   const dressed = {
@@ -239,7 +240,7 @@ describe('a brand in the Library', () => {
   })
 })
 
-// 2026-10-24 — ⑥-3: a file's or a folder's guest link.
+// 2026-10-23 — ⑥-3: a file's or a folder's guest link.
 describe('a guest link', () => {
   const CODE = '0123456789abcdef0123456789abcdef'
   const shared = { ...lib, shares: [{ kind: 'file' as const, id: 'x2', code: CODE, download: true, expiry: '7d' as const, expires: '2026-10-31T02:22:00Z' }] }
@@ -268,14 +269,22 @@ describe('a guest link', () => {
     expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }).textContent).toContain('live')
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ }))
     const dlg = screen.getByRole('dialog', { name: 'Share "Logo pack"' })
+    // The dialog's buttons wait while a change is on its way: each next click waits for them (a click on a disabled
+    // button does nothing).
+    const ready = (role: 'switch' | 'button', name: string) =>
+      waitFor(() => expect((within(dlg).getByRole(role, { name }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(within(dlg).getByRole('radio', { name: '30 days' }))
     await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', true))
+    await ready('switch', 'Allow download')
     fireEvent.click(within(dlg).getByRole('switch', { name: 'Allow download' }))
     await waitFor(() => expect(actions.shareMktLib).toHaveBeenCalledWith('file', 'x2', '30d', false))
+    await ready('button', 'Stop link')
     fireEvent.click(within(dlg).getByRole('button', { name: 'Stop link' }))
-    await waitFor(() => expect(actions.stopMktLibShare).toHaveBeenCalledWith('file', 'x2'))
-    expect(flash).toHaveBeenCalledWith('Link stopped')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => {
+      expect(flash).toHaveBeenCalledWith('Link stopped')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+    expect(actions.stopMktLibShare).toHaveBeenCalledWith('file', 'x2')
   })
 
   it('Attach to task: one of the file’s subsidiary’s open tasks', async () => {
@@ -287,8 +296,8 @@ describe('a guest link', () => {
     const dlg = screen.getByRole('dialog', { name: 'Attach "Logo pack" to a task' })
     expect(within(dlg).getAllByRole('button').slice(1).map(b => b.textContent)).toEqual(['TSK-CAR-2610-001BannerNow at Publish'])
     fireEvent.click(within(dlg).getByRole('button', { name: /TSK-CAR-2610-001/ }))
-    await waitFor(() => expect(actions.attachMktTaskFiles).toHaveBeenCalledWith('50000000-0000-4000-8000-000000000001', ['x2']))
-    expect(flash).toHaveBeenCalledWith('Attached "Logo pack" to TSK-CAR-2610-001')
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Attached "Logo pack" to TSK-CAR-2610-001'))
+    expect(actions.attachMktTaskFiles).toHaveBeenCalledWith('50000000-0000-4000-8000-000000000001', ['x2'])
   })
 
   it('is never offered for a link folder', () => {

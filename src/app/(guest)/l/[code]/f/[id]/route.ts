@@ -3,7 +3,7 @@ import { shareClient } from '@/lib/marketing/share-server'
 import { inlineSafe } from '@/lib/storage/names'
 
 /**
- * GET /l/<code>/f/<id> — one file of a Library share link (2026-10-24, Marketing ⑥-3), signed at the click as the
+ * GET /l/<code>/f/<id> — one file of a Library share link (2026-10-23, Marketing ⑥-3), signed at the click as the
  * stranger. A read-only file download (CLAUDE.md › Coding Conventions) whose gate is the link's code: the database
  * answers where the file is only for a live link that holds it (mkt_lib_shared_file), and the bucket's anon policy asks
  * the same code again before R2 is asked for a link (mkt_lib_share_may_read) — so a stopped, expired or binned link

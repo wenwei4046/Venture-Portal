@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-// 2026-10-24 — ⑥-4: a task's files from the Library — each opened from the Library; + Attach from Library (the task's
+// 2026-10-23 — ⑥-4: a task's files from the Library — each opened from the Library; + Attach from Library (the task's
 // subsidiary's folders, ticked, those on the task already ticked); × takes one off.
 
 const actions = vi.hoisted(() => ({ attachMktTaskFiles: vi.fn(), detachMktTaskFile: vi.fn() }))
@@ -50,9 +50,12 @@ describe('a task’s Library files', () => {
     expect(screen.getByRole('link', { name: /Brief/ }).getAttribute('href')).toBe(`/files/marketing/library/${X1}/brief.pdf`)
     expect(screen.getByText('Brandbook · 2 KB')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Take Brief off the task' }))
-    await waitFor(() => expect(actions.detachMktTaskFile).toHaveBeenCalledWith(PROJECT, X1))
-    expect(flash).toHaveBeenCalledWith('Took "Brief" off the task')
-    expect(screen.getByText('No files from the Library')).toBeTruthy()
+    // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — it raced on CI).
+    await waitFor(() => {
+      expect(flash).toHaveBeenCalledWith('Took "Brief" off the task')
+      expect(screen.getByText('No files from the Library')).toBeTruthy()
+    })
+    expect(actions.detachMktTaskFile).toHaveBeenCalledWith(PROJECT, X1)
   })
 
   it('attaches from the Library: its own subsidiary’s files folders, those on the task ticked already', async () => {
@@ -65,9 +68,11 @@ describe('a task’s Library files', () => {
     expect(within(dlg).queryByText(/Raw footage/)).toBeNull()
     fireEvent.click(within(dlg).getAllByRole('checkbox')[1])
     fireEvent.click(within(dlg).getByRole('button', { name: 'Attach 1 file' }))
-    await waitFor(() => expect(actions.attachMktTaskFiles).toHaveBeenCalledWith(PROJECT, [X2]))
-    expect(flash).toHaveBeenCalledWith('Attached 1 file from the Library')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => {
+      expect(flash).toHaveBeenCalledWith('Attached 1 file from the Library')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+    expect(actions.attachMktTaskFiles).toHaveBeenCalledWith(PROJECT, [X2])
     expect(screen.getByRole('link', { name: /Logo/ })).toBeTruthy()
   })
 

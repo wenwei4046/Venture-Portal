@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * A Library share link (2026-10-24, Marketing ⑥-3 — `Library.dc.html` › *Share link*): public, no sign-in, outside the
+ * A Library share link (2026-10-23, Marketing ⑥-3 — `Library.dc.html` › *Share link*): public, no sign-in, outside the
  * portal's layout, as the guest link and the PIC's. The code in the address is the only key; the database answers
  * "closed" for a wrong one, a link stopped or past its expiry, a file or folder binned. Never requirePage — there is no
  * account here.

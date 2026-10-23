@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261024002000 (2026-10-24 — Marketing's 📦 product projects, the first part: ②b of the
+// Local PostgreSQL regression for 20261024002000 (2026-10-23 — Marketing's 📦 product projects, the first part: ②b of the
 // Claude Design handoff "HOUZS Marketing Module Setup"). Marketing's migrations up to the canvas run, then this one, twice.
 // What is under test: who may call what; the products on sale at their version in effect; a project started on it with its
 // intake minutes; the page; minutes written (each kind of answer, the team, never over another's save), signed by those
