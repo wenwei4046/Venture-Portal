@@ -51,17 +51,17 @@ const ACTION: Record<string, string> = {
   'edited after approval': 'Edited after approval', 'started before approval': 'Started before approval',
   attached: 'Attached from the Library', detached: 'Taken off the task',
   'work started': 'Work started', planned: 'Plan saved', replanned: 'Plan changed before it opened', 'plan changed': 'Plan changed',
-  reassigned: 'Reassigned',
+  reassigned: 'Reassigned', replaced: 'Replaced',
 }
 const TONE: Record<string, AuditTone> = {
   approved: 'green', completed: 'green', 'pic approved': 'green',
   changes: 'red', 'pic changes': 'red',
-  submitted: 'amber', 'link sent': 'amber', resent: 'amber', reassigned: 'amber',
+  submitted: 'amber', 'link sent': 'amber', resent: 'amber', reassigned: 'amber', replaced: 'amber',
 }
 /** A product project's actions whose reason is a name or a minutes' title — their own columns, not Reason. */
 const TO_PIC = new Set(['link sent', 'resent'])
 const OF_MINUTES = new Set(['signed', 'minutes completed', 'pic approved'])
-const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned'])
+const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced'])
 const NONE = '—'
 
 function actionWords(e: TaskEvent, kind: MktProjectKind): string {
@@ -82,7 +82,7 @@ export function auditRows(log: ProjectLog): AuditRow[] {
       tone: TONE[e.action] ?? 'grey',
       stage: e.stageName || (e.stage != null ? `Stage ${e.stage + 1}` : NONE),
       fromTo: TO_PIC.has(e.action) ? (reason ? `→ ${reason} (PIC)` : NONE)
-        : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
+        : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
       reason: TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: e.version ? (e.stageName ? `${e.stageName} ${e.version}` : e.version) : OF_MINUTES.has(e.action) ? reason || NONE : product || NONE,
     }

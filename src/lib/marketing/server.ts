@@ -8,6 +8,7 @@ import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
+import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
 import { spaceFromRow, type Space } from './space'
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { taskFromRow, type MktTaskPage } from './task'
@@ -48,6 +49,22 @@ export async function readMinutesTemplates(): Promise<MinutesTemplate[]> {
   const { data, error } = await db.rpc('mkt_minutes_templates')
   if (error) throw new Error(error.message)
   return minutesTemplatesFromRow(data)
+}
+
+/** Replace Person (④-5, mig 20261025036000) — Marketing · Manage: everybody who stands somewhere, and in how many places. */
+export async function readReplaceCounts(): Promise<ReplaceCount[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_replace_people')
+  if (error) throw new Error(error.message)
+  return replaceCountsFromRow(data)
+}
+
+/** …one person's places, or null — nobody by that id. */
+export async function readReplacePlaces(staff: string): Promise<ReplacePlaces | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_replace_places', { p_staff: staff })
+  if (error) throw new Error(error.message)
+  return replacePlacesFromRow(data)
 }
 
 /** The Product Builder's products, prices and versions, and the templates its pickers offer (mig 20261023235900) —
