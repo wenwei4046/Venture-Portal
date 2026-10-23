@@ -34,8 +34,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | #657, live 2026-10-23 |
 | ④-5 | Replace Person — after ②b-2 (questions 24–28) | |
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
-| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | this PR |
-| ⑥-2 | A subsidiary's brand profile (avatar, banner, font, caption) and its schedule | next |
+| ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-24 |
+| ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | this PR |
 | ⑥-3 | The guest share link — a file or a folder, its expiry, Allow download; a stranger's page | |
 | ⑥-4 | Attach to task (a file's menu) and Attach from Library (a stage's files) | |
 | ⑦ | My Space's personal side: cover and avatar uploads, status, Edit layout, the room, the pet (levels, XP, energy, states), the lobby, chat (DM + lobby), trophies, notes, photo; the 5-step first-login onboarding | last |
@@ -127,6 +127,12 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 78. **Link folders** (⑥-1). The handoff's *Add a link* only says *Paste a Google Drive or Dropbox link…*; built as a dialog — a link type (*Raw footage*, seeded) and the https address. A manager's new type is never a link type (question 31).
 79. **Download as ZIP, Rename** (⑥-1). A folder's *Download as ZIP*: not built — files download one at a time (a ZIP made by a function stops at 4.5 MB). Nobody renames a file or a folder in the handoff, nor in the portal.
 80. **The toasts** (⑥-1). The handoff's words, but *Uploaded to …* names the folder the file was put in, never a guessed one.
+81. **Who edits a brand profile** (⑥-2). The handoff's ✎ is anybody's; built as the manager's (Marketing · Manage) — a brand's look is the manager's call, as folder types are.
+82. **The display name** (⑥-2). The handoff's renames the company everywhere in the Library (the rail, the crumbs); built as the brand's name on its card and banner only — the subsidiary's own name stays on the rail, in Track IDs and on projects (whether one may be renamed is question 29).
+83. **Before a profile** (⑥-2). The handoff's companies start on a colour and an initial; the portal's keep their own emoji and tint until a colour or a logo is picked.
+84. **Brand pictures** (⑥-2). The handoff's *Upload logo / cover* only toggles a pattern; built as real uploads to R2 under `brand/`, an image of 10 MB at most. One replaced or taken off is deleted (unless another profile shows it); one sent and not saved is taken back.
+85. **The Schedule** (⑥-2). The handoff's are typed into its sample (*Year-End Video shoot*, *11.11 ads go live*, *Countdown reel approval*); built from the Calendar's dates — the subsidiary's stages due and runs to open, not done, from today, the first three — each a link to its project. Shoots and ads days wait for questions 15–16.
+86. **Brand fonts** (⑥-2). Playfair Display, DM Serif Display and Space Grotesk are loaded for a brand's name alone (on Marketing's shell, downloaded only when a brand wears one); the portal's own faces stay as DESIGN.md sets them.
 
 ## 5. Open questions (for the user)
 
