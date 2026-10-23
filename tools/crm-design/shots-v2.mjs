@@ -26,7 +26,7 @@ const APP = {
   p01: [["Insight"]], p01b: [["Insight"], ["Ads performance"]], p02: [["Inbox"], ["Lim Wei Jie"]], p02b: [["Inbox"], ["Lim Wei Jie"], ["Audit log"]], p03: [["Contacts"]], p04: [["Calendar"]],
   p05: [["Ads Performance"]], p06: [["Assignment"]], p06b: [["Assignment"], ["Leads by ad"]], p06c: [["Assignment"], ["Active members"]],
   p07: [["Showrooms"]], p08: [["Customer form"]], p09: [["Channels"]], p10: [["Settings"]], p11: [["Audit log"]],
-  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]],
+  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]], p12c2: [["Reports"], ["Salespeople"], ["Farah Aziz"]], p06b2: [["Assignment"], ["Leads by ad"], ["Farah Aziz"]],
 };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".svg": "image/svg+xml" };

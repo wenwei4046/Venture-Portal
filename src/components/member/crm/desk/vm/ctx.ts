@@ -132,6 +132,8 @@ export interface DeskUi {
   teamShut: Record<string, boolean>;
   /** Reports (2026-10-23): the category on screen, the period of Salespeople / Appointments / Lead sources, Salespeople's sort. */
   rpCat: import("./reports-page").RpCat; rpPer: import("./reports").RpPeriod; rpSort: { k: string; dir: "asc" | "desc" } | null;
+  /** Reports › Salespeople (v2 12c / 12c·2): the team filter, the search, the person picked (their panel folded), the lead opened. */
+  rpTeam: string; rpQ: string; rpPick: string | null; rpPickShut: boolean; rpLead: string | null;
   /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
   apMeta: Record<string, Record<string, MetaFig | null>>;
   /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
@@ -230,7 +232,7 @@ export const initialDeskUi = (): DeskUi => ({
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
   srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaFrom: null, lbaTo: null, lbaSt: "all", lbaQ: "", lbaSort: null, lbaPick: null, lbaPickShut: false, lbaLead: null, lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaFrom: null, lbaTo: null, lbaSt: "all", lbaQ: "", lbaSort: null, lbaPick: null, lbaPickShut: false, lbaLead: null, lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, rpTeam: "all", rpQ: "", rpPick: null, rpPickShut: false, rpLead: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},

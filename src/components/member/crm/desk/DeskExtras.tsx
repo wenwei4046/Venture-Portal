@@ -734,6 +734,66 @@ function useLbaCols() {
   return { grid, minW, drag, reset };
 }
 
+/** The member's leads panel (v2 06b·2 / 06b·3 / 12c·2): 300 px, folding to the 44 px rail; shared by Leads by ad and Salespeople. */
+export type LeadsPanelV = NonNullable<LbaV["panel"]>;
+export function LeadsPanel({ P }: { P: LeadsPanelV }) {
+  return (<>
+    {P && P.shut && (
+      <button type="button" onClick={P.unfold} title="Open" style={{ ...XBTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "16px", boxSizing: "border-box",
+        border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "var(--crm-cream-nav)" }}>
+        <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 9px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
+        <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", letterSpacing: "0.04em", color: "var(--crm-ink-soft)" }}>{P.rail}</span>
+        <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
+      </button>
+    )}
+    {P && !P.shut && (
+      <div className={DX.slideIn} style={{ width: "300px", flex: "none", display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
+        <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "14px 16px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+              <span style={{ font: `500 15px ${TIGHT_X}`, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{P.name}</span>
+              {P.team && <span style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: P.teamDot }} />{P.team}</span>}
+            </span>
+            <button type="button" onClick={P.fold} title="Collapse" aria-label="Collapse" style={{ ...XBTN, flex: "none", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="chevron-right" size={11} /></button>
+            <button type="button" onClick={P.close} title="Close" aria-label="Close" style={{ ...XBTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+          </div>
+          <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><b style={{ font: `600 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.n} lead{P.n === 1 ? "" : "s"}</b> {P.line}</div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
+          {P.leads.map((l, i) => l.open ? (
+            <div key={l.id} style={{ display: "flex", flexDirection: "column", background: "var(--crm-sel)", boxShadow: "inset 3px 0 0 var(--crm-rust)", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }}>
+              <button type="button" onClick={l.toggle} aria-expanded style={{ ...XBTN, display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px" }}>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                  <span style={{ font: "600 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
+                  <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)" }}>{l.sub}</span>
+                </span>
+                {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
+                <span style={{ display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={12} /></span>
+              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "2px 16px 12px" }}>
+                {l.facts.map(([k, val]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "10px", font: "400 12px Inter, sans-serif" }}><span style={{ color: "var(--crm-muted)" }}>{k}</span><span style={{ color: "var(--crm-ink)", textAlign: "right" }}>{val}</span></div>)}
+                <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
+                  <button type="button" onClick={l.openChat} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "var(--crm-rust)", color: "#fff", font: "500 12px Inter, sans-serif" }} className="crm4a-primary"><Ic name="message-circle" size={13} />Open chat</button>
+                  <button type="button" onClick={l.openInfo} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline"><Ic name="user-round" size={13} />Customer info</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button key={l.id} type="button" onClick={l.toggle} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }} className="crm4a-row">
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
+                <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{l.sub}</span>
+              </span>
+              {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+  </>);
+}
+
 export function DeskLeadsByAd({ v }: { v: LbaV }) {
   const C = useLbaCols(), P = v.panel;
   const head = (label: string, k: LbaSortK | null, col: (typeof LBA_COLS)[number] | null, right?: boolean) => (
@@ -816,59 +876,7 @@ export function DeskLeadsByAd({ v }: { v: LbaV }) {
           </div>
         </div>
       </div>
-      {P && P.shut && (
-        <button type="button" onClick={P.unfold} title="Open" style={{ ...XBTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "16px", boxSizing: "border-box",
-          border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "var(--crm-cream-nav)" }}>
-          <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 9px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
-          <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", letterSpacing: "0.04em", color: "var(--crm-ink-soft)" }}>{P.rail}</span>
-          <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
-        </button>
-      )}
-      {P && !P.shut && (
-        <div className={DX.slideIn} style={{ width: "300px", flex: "none", display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
-          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "14px 16px", borderBottom: "1px solid var(--crm-rule)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
-              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                <span style={{ font: `500 15px ${TIGHT_X}`, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{P.name}</span>
-                {P.team && <span style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: P.teamDot }} />{P.team}</span>}
-              </span>
-              <button type="button" onClick={P.fold} title="Collapse" aria-label="Collapse" style={{ ...XBTN, flex: "none", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="chevron-right" size={11} /></button>
-              <button type="button" onClick={P.close} title="Close" aria-label="Close" style={{ ...XBTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
-            </div>
-            <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><b style={{ font: `600 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.n} lead{P.n === 1 ? "" : "s"}</b> {P.line}</div>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
-            {P.leads.map((l, i) => l.open ? (
-              <div key={l.id} style={{ display: "flex", flexDirection: "column", background: "var(--crm-sel)", boxShadow: "inset 3px 0 0 var(--crm-rust)", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }}>
-                <button type="button" onClick={l.toggle} aria-expanded style={{ ...XBTN, display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px" }}>
-                  <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                    <span style={{ font: "600 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
-                    <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)" }}>{l.sub}</span>
-                  </span>
-                  {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
-                  <span style={{ display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={12} /></span>
-                </button>
-                <div style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "2px 16px 12px" }}>
-                  {l.facts.map(([k, val]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "10px", font: "400 12px Inter, sans-serif" }}><span style={{ color: "var(--crm-muted)" }}>{k}</span><span style={{ color: "var(--crm-ink)", textAlign: "right" }}>{val}</span></div>)}
-                  <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
-                    <button type="button" onClick={l.openChat} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "var(--crm-rust)", color: "#fff", font: "500 12px Inter, sans-serif" }} className="crm4a-primary"><Ic name="message-circle" size={13} />Open chat</button>
-                    <button type="button" onClick={l.openInfo} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline"><Ic name="user-round" size={13} />Customer info</button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <button key={l.id} type="button" onClick={l.toggle} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }} className="crm4a-row">
-                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
-                  <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{l.sub}</span>
-                </span>
-                {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {P && <LeadsPanel P={P} />}
     </div>
   );
 }
