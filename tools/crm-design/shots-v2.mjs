@@ -26,7 +26,7 @@ const APP = {
   p01: [["Insight"]], p01b: [["Insight"], ["Ads performance"]], p02: [["Inbox"], ["Lim Wei Jie"]], p02b: [["Inbox"], ["Lim Wei Jie"], ["Audit log"]], p03: [["Contacts"]], p04: [["Calendar"]],
   p05: [["Ads Performance"]], p06: [["Assignment"]], p06b: [["Assignment"], ["Leads by ad"]], p06c: [["Assignment"], ["Active members"]],
   p07: [["Showrooms"]], p08: [["Customer form"]], p09: [["Channels"]], p10: [["Settings"]], p11: [["Audit log"]],
-  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]], p12c2: [["Reports"], ["Salespeople"], ["Farah Aziz"]], "app-newchat": [["Inbox"], ["New chat"]], "app-addcust": [["Contacts"], ["Add customer"]], p06b2: [["Assignment"], ["Leads by ad"], ["Farah Aziz"]],
+  p12: [["Reports"]], p12b: [["Reports"], ["Lead sources & status"]], p12c: [["Reports"], ["Salespeople"]], p12c2: [["Reports"], ["Salespeople"], ["Farah Aziz"]], "app-newchat": [["Inbox"], ["New chat"]], "app-addcust": [["Contacts"], ["Add customer"]], "app-splitfold": [["Assignment"], ["Collapse"]], p06b2: [["Assignment"], ["Leads by ad"], ["Farah Aziz"]],
 };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".svg": "image/svg+xml" };
@@ -45,7 +45,7 @@ const send = (method, params = {}) => new Promise(r => { const i = ++id; wait.se
 const js = async e => (await send("Runtime.evaluate", { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
 
 async function click(text) {
-  const c = await js(`(() => { const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && e.children.length < 12 && (e.innerText || "").trim() === ${JSON.stringify(text)});
+  const c = await js(`(() => { const all = [...document.body.querySelectorAll("*")].filter(e => e.offsetParent !== null && e.children.length < 12 && ((e.innerText || "").trim() === ${JSON.stringify(text)} || e.getAttribute("aria-label") === ${JSON.stringify(text)}));
     const vis = all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 8 && r.height > 8; }); const el = vis.find(e => e.getBoundingClientRect().left >= 72) || vis.at(0) || all.at(0); if (!el) return null; el.scrollIntoView({ block: "nearest" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   if (!c) { console.log("  not found:", text); return; }
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });

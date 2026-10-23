@@ -526,13 +526,17 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
  * A panel folded to its 44 px strip, as the Audit log's and the rails' (Assignment's Ad performance — the owner,
  * 2026-10-15): « at the top under a rule, the panel's name running down, the sand of the panel open; a tap opens it.
  */
+/** The shared folded rail (v2 note 04 / 08; the owner, 2026-10-23: "跟 inbox 是一样"): 44 px on the cream nav, the rule on its
+ *  left, a 16 px icon, the panel's name running down, one chevron — the whole rail opens it again. */
+const RAIL_ICON: Record<string, Icon4a> = { Split: "sliders-horizontal", "Ad performance": "trending-up", "Audit log": "history" };
 export function DeskFoldRail({ v }: { v: { title: string; open: () => void } }) {
   return (
-    <aside className={DX.slideIn} style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <button type="button" onClick={v.open} title={`Open ${v.title}`} className={DX.emo} style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"></path></svg></button>
-      <button type="button" onClick={v.open} title={`Open ${v.title}`} style={{ marginTop: "16px", padding: "8px 0", border: "0", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-muted)", writingMode: "vertical-rl", cursor: "pointer", whiteSpace: "nowrap" }}>{v.title}</button>
-    </aside>
+    <button type="button" onClick={v.open} title={`Open ${v.title}`} aria-label={`Open ${v.title}`} className={DX.slideIn} style={{ ...XBTN, flex: "0 0 44px", width: "44px", alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px",
+      paddingTop: "20px", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)" }}>
+      <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={RAIL_ICON[v.title] ?? "layout-grid"} size={16} /></span>
+      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>{v.title}</span>
+      <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
+    </button>
   );
 }
 
