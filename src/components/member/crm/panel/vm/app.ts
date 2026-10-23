@@ -52,11 +52,11 @@ function profile6(ctx: PanelCtx, house: boolean) {
     // ME first, then MANAGE; no Auto-reply on the Team side (the owner, 2026-10-23: "principal 在team的時候不會有auto reply
     // 就不用；然後me 和manage 調換，me在上面"). Member work type lives on Assignment alone ("Member work type 只需要在assignment").
     groups: [{ title: "Me", rows: [
-      { label: "Notifications", icon: "bell", open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
+      { label: "Notifications", icon: "bell" as const, open: () => patch({ nfOpen: true }), n: notifs ? String(notifs) : "", badge: true },
     ] }, { title: "Manage", rows: data.can.manage ? [
-      { label: "Showrooms", icon: "map-pin", open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
-      { label: "Cold lead templates", icon: "message-square-text", open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
-      { label: "Ads Performance", icon: "arrow-up-right", open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
+      { label: "Showrooms", icon: "map-pin" as const, open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
+      { label: "Cold lead templates", icon: "message-square-text" as const, open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
+      { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
     ] : [] }],
   };
 }

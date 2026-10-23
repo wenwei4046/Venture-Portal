@@ -66,9 +66,9 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
       ini: ini(owner.name), name: owner.name, sub: [jobTitle(owner), teamName(teamOf(owner.id, data.people))].filter(Boolean).join(" · "),
       house: !!onExit, exit: () => onExit?.(), flush: true,
       groups: [{ title: "Messages", rows: [
-        { label: "Notifications", icon: "bell", open: () => patch({ profSub: "notif", nTab: "all" }), n: unread ? String(unread) : "", badge: true },
-        { label: "Auto-reply", icon: "bot", open: () => patch({ profSub: "auto" }), n: AR.welcome.on || AR.after.on || AR.kws.some(k => k.on) ? "On" : "Off", badge: false },
-        { label: "Quick replies", icon: "message-square-text", open: () => patch({ profSub: "quick" }), n: String(qrs.length), badge: false },
+        { label: "Notifications", icon: "bell" as const, open: () => patch({ profSub: "notif", nTab: "all" }), n: unread ? String(unread) : "", badge: true },
+        { label: "Auto-reply", icon: "bot" as const, open: () => patch({ profSub: "auto" }), n: AR.welcome.on || AR.after.on || AR.kws.some(k => k.on) ? "On" : "Off", badge: false },
+        { label: "Quick replies", icon: "message-square-text" as const, open: () => patch({ profSub: "quick" }), n: String(qrs.length), badge: false },
       ] }],
     },
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",

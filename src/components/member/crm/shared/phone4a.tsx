@@ -246,7 +246,7 @@ export function Phone4aRoomRemarks({ text }: { text: string }) {
   );
 }
 
-type ProfRow = { label: string; icon: string; open: () => void; n: string; badge: boolean };
+type ProfRow = { label: string; icon: Icon4a; open: () => void; n: string; badge: boolean };
 /** v3 T06 / M12 · a Profile as the prototype draws it: the house top-right, the avatar centred with its name and line, on
  * the Team side View as a team member (the dark card), then groups of rows (MANAGE · ME, or MESSAGES) as white cards —
  * each row a solid rust tile, a count or state, a chevron. */
@@ -284,7 +284,7 @@ export function Phone4aProfile({ p }: { p: { ini: string; name: string; sub: str
         <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(255,255,255,.12)", color: "var(--crm-peach)" }}><Ic name="users" size={17} /></span>
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
           <span style={{ fontSize: fs(15), fontWeight: 600 }}>View as a team member</span>
-          <span style={{ fontSize: fs(12), color: "var(--crm-peach-soft)" }}>Open anyone's CRM · reply and book for them</span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-peach-soft)" }}>Open anyone&apos;s CRM · reply and book for them</span>
         </span>
         <span style={{ display: "flex", color: "var(--crm-peach-soft)" }}><Ic name="chevron-right" size={15} /></span>
       </button>}
