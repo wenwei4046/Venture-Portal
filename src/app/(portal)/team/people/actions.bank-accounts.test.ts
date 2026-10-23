@@ -360,7 +360,7 @@ describe('employment status — Probation, Permanent or Part time', () => {
     const form = new FormData()
     form.set('employment_status', 'permanent')
     await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
-    expect(update).toHaveBeenCalledWith({ employment_status: 'permanent', probation_months: null })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'permanent', probation_months: null, contract_months: null })
   })
 
   it('put on probation with its period — refused without a hire date to count it from', async () => {
@@ -369,7 +369,7 @@ describe('employment status — Probation, Permanent or Part time', () => {
     form.set('employment_status', 'probation')
     form.set('probation_months', '3')
     await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
-    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 3 })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 3, contract_months: null })
 
     query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: null, employment_status: null, probation_months: null }, error: null })
     await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A probation is counted from the hire date — fill in the hire date too.' })
@@ -381,7 +381,7 @@ describe('employment status — Probation, Permanent or Part time', () => {
     const months = new FormData()
     months.set('probation_months', '6')
     await expect(updateStaff('staff', months)).resolves.toEqual({ ok: true })
-    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 6 })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 6, contract_months: null })
 
     query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-10-05', employment_status: 'probation', probation_months: 3 }, error: null })
     const cleared = new FormData()
@@ -389,9 +389,46 @@ describe('employment status — Probation, Permanent or Part time', () => {
     await expect(updateStaff('staff', cleared)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/counted from the hire date/) })
   })
 
-  it('a status that is not one of the three is refused in words', async () => {
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('a new person on a contract is filed with its period, never a probation’s', async () => {
+    const form = newStaffForm()
+    form.set('employment_status', 'contract')
+    form.set('contract_months', '12')
+    await addStaff(form)
+    expect(insert.mock.calls[0][0]).toMatchObject({ employment_status: 'contract', probation_months: null, contract_months: 12 })
+  })
+
+  it('from a probation to a contract on their page: the probation’s period cleared, the contract’s written — a hire date needed', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-08-01', employment_status: 'probation', probation_months: 3, contract_months: null }, error: null })
     const form = new FormData()
     form.set('employment_status', 'contract')
+    form.set('contract_months', '24')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'contract', probation_months: null, contract_months: 24 })
+
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-08-01', employment_status: 'contract', probation_months: null, contract_months: 24 }, error: null })
+    const period = new FormData()
+    period.set('contract_months', '36')
+    await expect(updateStaff('staff', period)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenLastCalledWith({ employment_status: 'contract', probation_months: null, contract_months: 36 })
+
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: null, employment_status: null, probation_months: null, contract_months: null }, error: null })
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A contract is counted from the hire date — fill in the hire date too.' })
+    expect(update).toHaveBeenCalledTimes(2)
+  })
+
+  it('a contract without its period is refused in words', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-08-01', employment_status: 'permanent', probation_months: null, contract_months: null }, error: null })
+    const form = new FormData()
+    form.set('employment_status', 'contract')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'Pick the contract period.' })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('a status that is not one of the four is refused in words', async () => {
+    const form = new FormData()
+    form.set('employment_status', 'freelance')
     await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Pick the employment status/) })
     expect(update).not.toHaveBeenCalled()
   })

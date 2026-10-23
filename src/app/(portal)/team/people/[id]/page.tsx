@@ -156,10 +156,12 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // record words its salary and statutory by how they are paid.
   const parts = keptParts(row)
   const today = officeToday()
-  // Probation, Permanent or Part time (2026-10-23) — the staff table's; a directory reader's row carries none.
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — the staff table's; a directory
+  // reader's row carries none.
   const employmentStatus = row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status)
   const probationEnds: string | null = employmentStatus === 'probation' ? (row.probation_end ?? null) : null
   const probationAcked = !!probationEnds && row.probation_ack_end === probationEnds
+  const contractEnds: string | null = employmentStatus === 'contract' ? (row.contract_end ?? null) : null
   const view: PersonRecordView = {
     name: staff.employee_name,
     firstName: parts.first,
@@ -173,9 +175,14 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     reportsTo: upline,
     employment: {
       status: employmentStatus,
-      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, probationAcked, ackName: row.probation_ack_name ?? null }, today),
+      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, probationAcked, ackName: row.probation_ack_name ?? null, contractEnd: contractEnds }, today),
       value: employmentStatus
-        ? [statusLine(employmentStatus, row.probation_months ?? null, probationEnds), probationEnds && probationDue(probationEnds, today) ? whenLabel(probationEnds, today) : null]
+        ? [
+            employmentStatus === 'contract'
+              ? statusLine(employmentStatus, row.contract_months ?? null, contractEnds)
+              : statusLine(employmentStatus, row.probation_months ?? null, probationEnds),
+            probationEnds && probationDue(probationEnds, today) ? whenLabel(probationEnds, today) : null,
+          ]
             .filter(Boolean)
             .join(' · ')
         : null,

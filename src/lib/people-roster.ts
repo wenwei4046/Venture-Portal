@@ -131,8 +131,11 @@ export interface SortablePerson extends RosterPerson {
   hireDate?: string | null
 }
 
-/** Where the Employment column puts somebody: on probation first — a review is coming — then part time, permanent, not set, inactive. */
-const EMPLOYMENT_RANK: Readonly<Record<EmploymentStatus, number>> = { probation: 4, part_time: 3, permanent: 2 }
+/**
+ * Where the Employment column puts somebody: on probation first — a review is coming — then on a contract (the other
+ * with an end, 2026-10-24), part time, permanent, not set, inactive.
+ */
+const EMPLOYMENT_RANK: Readonly<Record<EmploymentStatus, number>> = { probation: 5, contract: 4, part_time: 3, permanent: 2 }
 const employmentRank = (p: SortablePerson) => (!p.active ? 0 : p.employmentStatus ? EMPLOYMENT_RANK[p.employmentStatus] : 1)
 
 /**

@@ -170,7 +170,7 @@ describe('Add Staff — the hire date and the employment status', () => {
     setup()
     expect(hire()).toBeRequired()
     expect(status()).toBeRequired()
-    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Permanent', 'Part time'])
+    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Contract', 'Permanent', 'Part time'])
     expect(screen.queryByLabelText('Probation period')).toBeNull()
   })
 
@@ -185,7 +185,7 @@ describe('Add Staff — the hire date and the employment status', () => {
     expect(screen.getByLabelText('Probation ends')).toHaveValue('1 Feb 2027')
     fireEvent.change(months, { target: { value: '6' } })
     expect(screen.getByLabelText('Probation ends')).toHaveValue('1 May 2027')
-    expect(screen.getByText('HR is reminded 14 days before.')).toBeInTheDocument()
+    expect(screen.getByText('HR is reminded 15 days before.')).toBeInTheDocument()
 
     fireEvent.change(status(), { target: { value: 'permanent' } })
     expect(screen.queryByLabelText('Probation period')).toBeNull()
@@ -207,5 +207,33 @@ describe('Add Staff — the hire date and the employment status', () => {
     expect(sent.get('probation_months')).toBe('6')
     // The end is the database's to keep — a disabled field is not sent.
     expect(sent.has('probation_end')).toBe(false)
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('a contract asks its period — 12 months to start, 6 to 36 — shows the day it ends, and files it alone', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    fireEvent.change(status(), { target: { value: 'contract' } })
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months.value).toBe('12')
+    expect(optionsOf(months).map(o => o.label)).toEqual(['6 months', '12 months', '18 months', '24 months', '30 months', '36 months'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('Pick the hire date first')
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2027')
+    fireEvent.change(months, { target: { value: '36' } })
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2029')
+
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(sent.get('employment_status')).toBe('contract')
+    expect(sent.get('contract_months')).toBe('36')
+    expect(sent.has('probation_months')).toBe(false)
+
+    fireEvent.change(status(), { target: { value: 'part_time' } })
+    expect(screen.queryByLabelText('Contract period')).toBeNull()
   })
 })

@@ -45,6 +45,7 @@ describe('validateStaffForm', () => {
       hireDate: '2026-11-02',
       employmentStatus: 'probation',
       probationMonths: 3,
+      contractMonths: null,
       basicSalary: 3500,
       allowances: 200.5,
       nonStatutoryAllowance: 0,
@@ -172,8 +173,14 @@ describe('validateStaffForm', () => {
   })
 
   it('a permanent or part-time hire carries no period, whatever the hidden field held', () => {
-    expect(validateStaffForm({ ...ok, employmentStatus: 'permanent', probationMonths: '3' })).toMatchObject({ employmentStatus: 'permanent', probationMonths: null })
-    expect(validateStaffForm({ ...ok, employmentStatus: 'part_time', probationMonths: null })).toMatchObject({ employmentStatus: 'part_time', probationMonths: null })
+    expect(validateStaffForm({ ...ok, employmentStatus: 'permanent', probationMonths: '3', contractMonths: '12' })).toMatchObject({ employmentStatus: 'permanent', probationMonths: null, contractMonths: null })
+    expect(validateStaffForm({ ...ok, employmentStatus: 'part_time', probationMonths: null })).toMatchObject({ employmentStatus: 'part_time', probationMonths: null, contractMonths: null })
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well").
+  it('a contract hire carries its period, never a probation’s — and is refused without one', () => {
+    expect(validateStaffForm({ ...ok, employmentStatus: 'contract', probationMonths: '3', contractMonths: '18' })).toMatchObject({ employmentStatus: 'contract', probationMonths: null, contractMonths: 18 })
+    expect(() => validateStaffForm({ ...ok, employmentStatus: 'contract', contractMonths: '' })).toThrow(/Pick the contract period/)
   })
 })
 

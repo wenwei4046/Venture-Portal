@@ -21,11 +21,14 @@ import { EMPTY_ADDRESS, addressRefusal, type Address } from '@/lib/address/addre
 import { addressFormEntries } from '@/lib/address/address-form'
 import { loadMalaysia } from '@/lib/address/malaysia'
 import {
+  CONTRACT_MONTH_CHOICES,
+  DEFAULT_CONTRACT_MONTHS,
   DEFAULT_PROBATION_MONTHS,
   EMPLOYMENT_STATUSES,
   EMPLOYMENT_STATUS_LABEL,
   PROBATION_MONTH_CHOICES,
   PROBATION_NOTICE_DAYS,
+  contractEnd,
   dayLabel,
   monthsLabel,
   probationEnd,
@@ -119,12 +122,14 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
   const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
-  // When they start, and Probation / Permanent / Part time (2026-10-23): a probation asks its period, and its last
-  // day — the hire date plus the months — is shown as the database will keep it.
+  // When they start, and Probation / Contract / Permanent / Part time (2026-10-23; Contract 2026-10-24): a probation or
+  // a contract asks its period, and its last day — the hire date plus the months — is shown as the database will keep it.
   const [hireDate, setHireDate] = useState('')
   const [employmentStatus, setEmploymentStatus] = useState('')
   const [probationMonths, setProbationMonths] = useState(String(DEFAULT_PROBATION_MONTHS))
+  const [contractMonths, setContractMonths] = useState(String(DEFAULT_CONTRACT_MONTHS))
   const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, Number(probationMonths)) : null
+  const contractEnds = employmentStatus === 'contract' ? contractEnd(hireDate, Number(contractMonths)) : null
 
   const department = departments.find(d => d.id === departmentId) ?? null
   const isCommissionDept = department?.payroll_source === 'commission'
@@ -449,6 +454,41 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
               <p id="staff-probation-end-hint" className={helpText}>
                 HR is reminded {PROBATION_NOTICE_DAYS} days before.
               </p>
+            </div>
+          </>
+        ) : null}
+        {employmentStatus === 'contract' ? (
+          <>
+            <div>
+              <label htmlFor="staff-contract-months" className={labelBase}>
+                Contract period
+              </label>
+              <Select bare
+                id="staff-contract-months"
+                name="contract_months"
+                required
+                value={contractMonths}
+                onChange={e => setContractMonths(e.target.value)}
+                className={textInput}
+              >
+                {CONTRACT_MONTH_CHOICES.map(n => (
+                  <option key={n} value={String(n)}>
+                    {monthsLabel(n)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="staff-contract-end" className={labelBase}>
+                Contract ends
+              </label>
+              <input
+                id="staff-contract-end"
+                value={contractEnds ? dayLabel(contractEnds) : 'Pick the hire date first'}
+                readOnly
+                disabled
+                className={readOnlyMono}
+              />
             </div>
           </>
         ) : null}

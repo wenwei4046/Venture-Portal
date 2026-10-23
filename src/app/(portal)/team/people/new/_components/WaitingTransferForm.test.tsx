@@ -86,6 +86,27 @@ describe('WaitingTransferForm', () => {
     expect(push).toHaveBeenCalledWith('/team/people')
   })
 
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('files a contract with its period — 12 months to start — and no probation’s', async () => {
+    transferFromWaitingList.mockResolvedValue({ ok: true, staffId: 'new', code: 'HV071' })
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Contract' }))
+    expect(screen.queryByRole('group', { name: 'Probation period' })).toBeNull()
+    const period = screen.getByRole('group', { name: 'Contract period' })
+    expect(within(period).getAllByRole('button').map(b => b.textContent)).toEqual(['6 months', '12 months', '18 months', '24 months', '30 months', '36 months'])
+    expect(within(period).getByRole('button', { name: '12 months' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(period).getByRole('button', { name: '24 months' }))
+    expect(screen.getByText('ends 19 Oct 2028')).toBeInTheDocument()
+    fireEvent.change(field(/^NRIC/), { target: { value: '900101-14-5678' } })
+    fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
+    fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
+    })
+    expect(transferFromWaitingList).toHaveBeenCalledWith(expect.objectContaining({ employmentStatus: 'contract', probationMonths: null, contractMonths: 24 }))
+  })
+
   it('shows the database’s refusal and stays', async () => {
     transferFromWaitingList.mockResolvedValue({ ok: false, reason: 'Fair is full — 28 of 28 places are taken. Raise the limit on Rules › Capacity first.' })
     show()
@@ -109,7 +130,7 @@ describe('WaitingTransferForm', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
     })
     expect(transferFromWaitingList).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Permanent or Part time.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Contract, Permanent or Part time.')
   })
 
   it('cannot be sent at all while it is blocked', () => {

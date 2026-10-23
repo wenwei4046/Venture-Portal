@@ -72,6 +72,7 @@ export async function addStaff(formData: FormData) {
     hireDate: str(formData, 'hire_date'),
     employmentStatus: str(formData, 'employment_status'),
     probationMonths: str(formData, 'probation_months'),
+    contractMonths: str(formData, 'contract_months'),
     fullCommission: formData.get('full_commission') === 'on',
     variablePay: formData.get('variable_pay') === 'on',
     basicSalary: str(formData, 'basic_salary'),
@@ -115,11 +116,13 @@ export async function addStaff(formData: FormData) {
     home_sub_department_id: form.homeSubDepartmentId,
     reports_to: form.reportsTo,
     designation,
-    // When they start, and Probation / Permanent / Part time with a probation's period (2026-10-23): the database
-    // works out the probation's last day from the two, and HR is reminded before it.
+    // When they start, and Probation / Contract / Permanent / Part time with a probation's or a contract's period
+    // (2026-10-23; Contract 2026-10-24): the database works out its last day from the two, and HR is reminded before a
+    // probation's.
     hire_date: form.hireDate,
     employment_status: form.employmentStatus,
     probation_months: form.probationMonths,
+    contract_months: form.contractMonths,
     employment_type: form.employmentType,
     basic_salary: form.basicSalary,
     allowances: form.allowances,
@@ -236,7 +239,7 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
 
   const { data: current } = await supabase
     .from('hr_staff_costs')
-    .select('department_id, title_id, employment_type, bank_name, user_id, hire_date, employment_status, probation_months, departments(payroll_source)')
+    .select('department_id, title_id, employment_type, bank_name, user_id, hire_date, employment_status, probation_months, contract_months, departments(payroll_source)')
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
@@ -306,21 +309,24 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
   // it is not ours to keep, and a wrong one would match the wrong file row.
   if (sent('infotech_code')) patch.infotech_code = text('infotech_code').trim() || null
   if (sent('hire_date')) patch.hire_date = text('hire_date') || null
-  // Probation, Permanent or Part time (2026-10-23) — with a probation's period, the two sent together whenever either
-  // changed (lib/person-record.ts). A probation is counted from the hire date, so a save touching either needs one.
-  if (sent('employment_status') || sent('probation_months')) {
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — with a probation's or a contract's
+  // period, sent together whenever any changed (lib/person-record.ts); the other status's period is cleared on the same
+  // write. A probation or a contract is counted from the hire date, so a save touching any of them needs one.
+  const statusSent = sent('employment_status') || sent('probation_months') || sent('contract_months')
+  if (statusSent) {
     Object.assign(
       patch,
       statusColumns(
         sent('employment_status') ? text('employment_status') : current.employment_status,
         sent('probation_months') ? text('probation_months') : current.probation_months,
+        sent('contract_months') ? text('contract_months') : current.contract_months,
       ),
     )
   }
-  const onProbation = (patch.employment_status ?? current.employment_status) === 'probation'
+  const statusNow = patch.employment_status ?? current.employment_status
   const hireDate = sent('hire_date') ? patch.hire_date : current.hire_date
-  if (onProbation && !hireDate && (sent('employment_status') || sent('probation_months') || sent('hire_date'))) {
-    throw new Error('A probation is counted from the hire date — fill in the hire date too.')
+  if ((statusNow === 'probation' || statusNow === 'contract') && !hireDate && (statusSent || sent('hire_date'))) {
+    throw new Error(`A ${statusNow} is counted from the hire date — fill in the hire date too.`)
   }
   if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
   if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
