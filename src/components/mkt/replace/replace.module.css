@@ -3,7 +3,7 @@
 .head { display: flex; align-items: center; gap: 10px; }
 .headIcon { font-size: 18px; }
 /* The shell's own face, as the handoff's — never the portal's display serif a bare h1 takes. */
-.title { margin: 0; font-family: inherit; font-size: 1.5em; font-weight: 600; line-height: 1.2; }
+.page .title { margin: 0; font-family: inherit; font-size: 1.5em; font-weight: 600; letter-spacing: normal; line-height: 1.2; color: inherit; }
 .grow { flex: 1; }
 
 /* The steps */
