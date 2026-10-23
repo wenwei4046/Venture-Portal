@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { fileRoute } from '@/lib/storage/browser'
-import { COVERS } from '@/lib/marketing/space'
+import { COVERS, type SpacePicture } from '@/lib/marketing/space'
 import s from './myspace.module.css'
 
 // My Space's cover (`My Space Bento.dc.html`): one of four gradients or a picture, with *🖼️ Change cover* — the four
@@ -16,12 +16,14 @@ export interface SpaceCoverProps {
   letter: string
   avatarBg: string
   canEdit: boolean
-  /** A picture on its way up. */
-  sending: 'cover' | 'avatar' | 'photo' | null
+  /** A picture on its way up: the cover's and the avatar's buttons wait for it. */
+  sending: SpacePicture | null
   popOpen: boolean
   onPop: (open: boolean) => void
   onPreset: (cover: number) => void
   onPick: (kind: 'cover' | 'avatar') => void
+  /** The pet, sitting beside the avatar (⑦-2). */
+  pet?: ReactNode
 }
 
 export default function SpaceCover(p: SpaceCoverProps) {
@@ -51,7 +53,7 @@ export default function SpaceCover(p: SpaceCoverProps) {
     <div className={s.cover} data-cover={p.coverPath ? undefined : String(p.cover)} data-picture={p.coverPath ? '' : undefined} style={picture}>
       {p.canEdit ? (
         <div className={s.coverBtns}>
-          <button ref={toggle} type="button" className={s.coverBtn} aria-expanded={popOpen} aria-haspopup="dialog" disabled={p.sending === 'cover'}
+          <button ref={toggle} type="button" className={s.coverBtn} aria-expanded={popOpen} aria-haspopup="dialog" disabled={p.sending != null}
             onClick={() => onPop(!popOpen)}>
             {p.sending === 'cover' ? 'Uploading…' : '🖼️ Change cover'}
           </button>
@@ -70,12 +72,13 @@ export default function SpaceCover(p: SpaceCoverProps) {
       ) : null}
       {p.canEdit ? (
         <button type="button" className={s.avatar} style={{ background: p.avatarBg }} title="Change profile picture" aria-label="Change profile picture"
-          disabled={p.sending === 'avatar'} onClick={() => p.onPick('avatar')}>
+          disabled={p.sending != null} onClick={() => p.onPick('avatar')}>
           {face}
         </button>
       ) : (
         <div className={s.avatar} style={{ background: p.avatarBg }} aria-hidden="true">{face}</div>
       )}
+      {p.pet ? <div className={s.coverPet}>{p.pet}</div> : null}
     </div>
   )
 }

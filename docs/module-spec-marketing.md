@@ -36,10 +36,10 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`) | #660, live 2026-10-23 |
 | ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-23 |
-| ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | this PR |
+| ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | #664, live 2026-10-23 |
 | ⑥-4 | A Library file on a task: *Attach to task* (a file's menu — the file's subsidiary's open tasks), the task page's *Library files* with *+ Attach from Library*, taken off; each a line on the trail (mig `20261024007400`) | #665, live 2026-10-23 |
-| ⑦-1 | My Space's own side, first part: the cover (four presets or a picture), the avatar, the status; *Edit layout* — tiles dragged anywhere and resized from eight handles, added and taken off, the page's background, the accent, the corners, Reset; the Notes and Photo tiles — kept as the login's own row (migs `20261024007500`, `20261024007600`) | this PR |
-| ⑦-2 | The room (wall, floor, furniture to drag), the pet's look (four kinds or one's own animal, its colour) and the 5-step first-login onboarding | |
+| ⑦-1 | My Space's own side, first part: the cover (four presets or a picture), the avatar, the status; *Edit layout* — tiles dragged anywhere and resized from eight handles, added and taken off, the page's background, the accent, the corners, Reset; the Notes and Photo tiles — kept as the login's own row (migs `20261024007500`, `20261024007600`) | #673, live 2026-10-23 |
+| ⑦-2 | The room — its wall, floor and furniture (the sixteen, dragged left or right, flipped, taken out) — on the board from the start; the pet as it looks (four kinds or one's own animal, its name, its colour) in the room and beside the avatar, its mood its owner's plate; the drawer's 🎨 Room & pet; the 5-step setup on the first visit (mig `20261024007700`) | this PR |
 | ⑦-3 | Chat — direct messages and the lobby's thread (questions 35, 36, 39) | |
 | ⑦-4 | The lobby tile and visiting a teammate's space (questions 37, 38, 40) | |
 | ⑦-5 | The pet's levels, XP, energy and states, and the trophies (questions 32–34) | |
@@ -157,6 +157,13 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 104. **The keyboard** (⑦-1). The handoff lays tiles out by pointer only; built also by the arrow keys on a tile's face (1% across or 12 px down; with Shift, its size).
 105. **A narrow space** (⑦-1). The handoff draws a desktop board; built: under 520 px wide the tiles go one under another in reading order, and Edit layout is the desktop's.
 106. **The drawer's words** (⑦-1). The handoff's Layout tab opens with *Drag a tile anywhere to move it. Drag any edge or corner to resize it freely…*; built without it (DESIGN.md › No descriptions on the page), and without the Layout / Room & pet tabs until the room exists.
+107. **The first board** (⑦-2). The handoff's DEFAULT_POS — the room 2×2, My turn 1×2, the pet, chat, Waiting, Delegated, Trophies, the lobby, This week — as far as it is built: the room, My turn, Waiting and Delegated in the pet's and chat's column, This week 2×1 under the room. A board saved before gets the room once, under the rest (gap 101).
+108. **Who has a pet** (⑦-2). The handoff gives everybody one; built for somebody on Marketing's roster. The Principal's shared login has a room, no pet, and is never asked the setup (question 37).
+109. **The pet's level and mood** (⑦-2). Every pet is Lv 1 — its first form, the later two dimmed in the drawer — until XP comes with ⑦-5 (question 32). Its mood is the prototype's myState without energy: *Overloaded* (two late, or four on My turn), *New task!* (a stage just put on the plate), *Working*, *Sleeping*; *Level up!* for a moment when the setup finishes. *Eating*, *Working out* and *Hungry* wait for energy (question 33).
+110. **The setup's words** (⑦-2). The handoff puts a line under each step's title (*It lives in your room and grows as you finish tasks.*, *You can change it later.* …); built without them (DESIGN.md › No descriptions on the page). The colour stays required, the cover and the photo may be skipped, as drawn.
+111. **One's own animal** (⑦-2). The prototype keeps it in the browser; built under `space/` like the avatar, so teammates will see the pet in the lobby and on a visit (⑦-4) — an image, 10 MB at most.
+112. **The window** (⑦-2). The handoff's window is always day (its hour is fixed at 10) unless the wall is Night; built on the office's clock (UTC+8) — the evening sky from 18:00, read once the page is drawn, so the server and the browser agree.
+113. **The room's limits** (⑦-2). The handoff has none; the database keeps at most 30 pieces of the sixteen, each between 4% and 96% across.
 
 ## 5. Open questions (for the user)
 
@@ -194,8 +201,8 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 32. The pet's XP: the handoff says "stages × difficulty (S 1, M 2, L 3) × 10 for each finished task", but neither the portal nor the handoff has a difficulty. Suggested: +10 for each stage you finish, +20 for a product project's stage; nothing taken back for changes asked; approvals and subtasks do not count — right?
 33. Should the pet's energy fall over time? (The handoff's falls only with exercise.) Suggested: no.
 34. Trophies: a project whose last stage was yours, finished this quarter (office time), at most 6 shown?
-35. Direct messages: seen by the two people only — not a manager, the Principal or the audit trail? Suggested: yes.
-36. How long are messages kept; may they be edited or deleted? Suggested: kept, never changed or deleted.
+35. Direct messages: who may read them — the two people only (then a harassment complaint or a customer record pasted in one is beyond the company's reach), the two plus the Principal on a complaint (the opening logged), or the manager too? No suggestion: it decides the company's own oversight.
+36. How long are messages kept, and who may edit or delete one — nobody (then customer data pasted by mistake cannot be removed), each their own, the Principal any, or all after some months? No suggestion: as 35.
 37. The lobby: everyone with Marketing · View sees it; only the people on the roster write in it and have a pet (the Principal has none)?
 38. Visiting a teammate: their Notes shown, their Photo private (as the handoff draws it)? Built private for now (gap 100).
 39. A new direct message: a sound, or a push to the phone? Suggested: not yet — an unread dot until the phone app.

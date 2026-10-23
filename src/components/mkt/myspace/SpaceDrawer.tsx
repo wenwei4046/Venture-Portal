@@ -1,15 +1,23 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import {
   ACCENT_NAMES, ACCENTS, addable, BG_NAMES, BGS, CORNER_NAMES, CORNERS, TILES, type SpaceTheme, type TileKind, type TilePlace,
 } from '@/lib/marketing/space'
 import s from './myspace.module.css'
 
-// Edit layout's drawer (`My Space Bento.dc.html` › ✥ Layout): *Add a tile* (the kinds not on the board), *Page
-// background*, *Accent*, *Tile corners*, *Reset layout and theme* and *Done*. Its other tab, 🎨 Room & pet, comes with
-// the room (⑦-2) — until then there is no tab bar.
+// Edit layout's drawer (`My Space Bento.dc.html`): its two tabs — **✥ Layout**: *Add a tile* (the kinds not on the
+// board), *Page background*, *Accent*, *Tile corners*, *Reset layout and theme*; **🎨 Room & pet** (RoomDrawerTab) —
+// and *Done*.
+
+export type DrawerTab = 'layout' | 'room'
 
 export interface SpaceDrawerProps {
+  tab: DrawerTab
+  onTab: (tab: DrawerTab) => void
+  /** The Room & pet tab's content, and its name (🎨 Room & pet, or 🎨 Room for a space with no pet). */
+  room: ReactNode
+  roomLabel: string
   layout: TilePlace[]
   theme: SpaceTheme
   onAdd: (kind: TileKind) => void
@@ -21,8 +29,24 @@ export interface SpaceDrawerProps {
 export default function SpaceDrawer(p: SpaceDrawerProps) {
   const add = addable(p.layout)
   const { theme } = p
+  const tabs: [DrawerTab, string][] = [['layout', '✥ Layout'], ['room', p.roomLabel]]
   return (
     <aside className={s.drawer} aria-label="Edit layout">
+      <div className={s.tabs} role="tablist" aria-label="Edit layout">
+        {tabs.map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={p.tab === k} className={s.tab} onClick={() => p.onTab(k)}>{label}</button>
+        ))}
+      </div>
+      {p.tab === 'room' ? p.room : <LayoutTab {...p} add={add} theme={theme} />}
+      <button type="button" className={s.doneBtn} onClick={p.onDone}>Done</button>
+    </aside>
+  )
+}
+
+function LayoutTab(p: SpaceDrawerProps & { add: TileKind[] }) {
+  const { add, theme } = p
+  return (
+    <>
       <div>
         <div className={s.drawerHead}>Add a tile</div>
         {add.length ? (
@@ -68,7 +92,6 @@ export default function SpaceDrawer(p: SpaceDrawerProps) {
         </div>
       </div>
       <button type="button" className={s.reset} onClick={p.onReset}>Reset layout and theme</button>
-      <button type="button" className={s.doneBtn} onClick={p.onDone}>Done</button>
-    </aside>
+    </>
   )
 }
