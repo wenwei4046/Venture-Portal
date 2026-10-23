@@ -87,6 +87,17 @@
 .fileChip { height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: inline-flex; align-items: center; gap: 6px; font-size: .86em; max-width: 100%; color: inherit; text-decoration: none; }
 .fileChip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fileX { cursor: pointer; color: rgb(var(--mk-x)); background: none; border: 0; font: inherit; padding: 0 0 0 4px; }
+/* A task's files from the Library (⑥-4): a chip each — the Library's own file, its folder and size; the picker. */
+.libLink { color: inherit; text-decoration: none; display: inline-flex; gap: 6px; min-width: 0; }
+.libMeta { font-size: .86em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.pickDialog { width: 520px; }
+.pickList { display: flex; flex-direction: column; gap: 12px; max-height: 55vh; overflow-y: auto; }
+.pickFolder { display: flex; flex-direction: column; gap: 4px; }
+.pickHead { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); display: flex; gap: 6px; align-items: center; }
+.pickRow { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line-2)); cursor: pointer; min-width: 0; }
+.pickRow:hover { background: rgb(var(--mk-surface)); }
+.pickOn { background: rgb(var(--mk-surface-2)); cursor: default; }
+.pickName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .files { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .noFiles { font-size: .86em; color: rgb(var(--mk-quiet)); }
 .linkAdd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

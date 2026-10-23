@@ -4,7 +4,7 @@
 // Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { longDay, shortDay } from './board'
+import { indexBoard, isSeries, longDay, shortDay, type MktBoard } from './board'
 import type { CalEvent } from './calendar'
 
 export type LibCat = 'Brand' | 'Product' | 'Photo' | 'Video' | 'Content' | 'Minutes'
@@ -183,6 +183,34 @@ export function libSchedule(events: readonly CalEvent[], sub: string, today: str
       // "Stage 2 · Shoot" → the stage's name; "Run 3 opens · Plan" → "run 3".
       title: `${e.title} · ${e.recur ? e.line2.replace(/^Run (\d+) opens.*$/, 'run $1') : e.line2.replace(/^Stage \d+ · /, '')}`,
     }))
+}
+
+// ── A Library file on a task (⑥-4) ─────────────────────────────────────────────────
+/** A file attached to a task — the Library's own (no copy): where it is, its folder, who put it on the task. */
+export interface TaskFile { id: string; name: string; path: string; size: number; mime: string; folder: string; by: string; at: string }
+
+/** mkt_task_library(project) — and mkt_task_attach's / mkt_task_detach's answers. */
+export function taskFilesFromRow(v: unknown): TaskFile[] {
+  return rows(v).filter(f => str(f.id) && /^library\/[0-9a-f-]{36}\/[^/]+$/.test(str(f.path))).map(f => ({
+    id: str(f.id), name: str(f.name), path: str(f.path), size: num(f.size), mime: str(f.mime), folder: str(f.folder), by: str(f.by), at: str(f.at),
+  }))
+}
+
+/** A task a file may go on: its Track ID, its title, where it stands now. */
+export interface AttachTask { id: string; trackId: string; title: string; stage: string }
+
+/** Each subsidiary's open tasks — quick tasks and recurring runs, never a series (a pattern) or a product project (its
+ * task page comes with ②b-2) — newest first. */
+export function attachTasks(board: MktBoard): Record<string, AttachTask[]> {
+  const ix = indexBoard(board)
+  const out: Record<string, AttachTask[]> = {}
+  for (const p of board.projects) {
+    if (p.kind === 'product' || isSeries(p) || p.status === 'done' || p.status === 'cancelled') continue
+    const stage = ix.stagesOf(p.id)[p.cur]?.name ?? ''
+    ;(out[p.sub] ??= []).push({ id: p.id, trackId: p.trackId, title: p.title, stage })
+  }
+  for (const list of Object.values(out)) list.sort((a, b) => b.trackId.localeCompare(a.trackId))
+  return out
 }
 
 // ── A file's look ─────────────────────────────────────────────────────────────────
