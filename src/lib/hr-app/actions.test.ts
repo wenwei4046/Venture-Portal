@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   decide: vi.fn(),
   letter: vi.fn(),
   attDecide: vi.fn(),
+  probationAck: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ getUser: mocks.user }))
 vi.mock('./server', () => ({ appAccess: mocks.access }))
@@ -22,12 +23,13 @@ vi.mock('@/lib/hiring/actions', () => ({
 }))
 vi.mock('@/lib/rooms/actions', () => ({ bookRoom: mocks.bookRoom, cancelBooking: vi.fn() }))
 vi.mock('@/lib/attendance/actions', () => ({ decideRequest: mocks.attDecide }))
+vi.mock('@/app/(portal)/team/people/probation-actions', () => ({ acknowledgeProbation: mocks.probationAck }))
 
-import { hrAppAcknowledge, hrAppAttDecide, hrAppBook, hrAppDecide, hrAppLetterLink, hrAppTalentNotes } from './actions'
+import { hrAppAcknowledge, hrAppAttDecide, hrAppBook, hrAppDecide, hrAppLetterLink, hrAppProbationAck, hrAppTalentNotes } from './actions'
 
 const OPEN = {
-  parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true },
-  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+  parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, people: true },
+  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, probationAck: true },
 }
 const SHUT = { ok: false, reason: 'This is not open to your account.' }
 
@@ -88,5 +90,24 @@ describe('HR Mobile’s decision on an attendance request (2026-10-17)', () => {
     mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, attDecide: false } })
     await expect(hrAppAttDecide('r1', true, '')).resolves.toEqual(SHUT)
     expect(mocks.attDecide).not.toHaveBeenCalled()
+  })
+})
+
+describe('a probation’s reminder, acknowledged from the HR app (2026-10-23)', () => {
+  it('goes to People’s own acknowledgeProbation while the person page’s Edit is open to them', async () => {
+    mocks.probationAck.mockResolvedValue({ ok: true, endsOn: '2026-10-31', ackName: 'LI SEAN', ackAt: '2026-10-23T02:00:00Z' })
+    await expect(hrAppProbationAck('st1')).resolves.toEqual({ ok: true })
+    expect(mocks.probationAck).toHaveBeenCalledWith('st1')
+  })
+  it('says the database’s refusal, and is refused before asking once the box is unticked', async () => {
+    mocks.probationAck.mockResolvedValue({ ok: false, reason: 'They are not on probation any more — reload the page.' })
+    await expect(hrAppProbationAck('st1')).resolves.toEqual({ ok: false, reason: 'They are not on probation any more — reload the page.' })
+    mocks.probationAck.mockClear()
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, probationAck: false } })
+    await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
+    // An account whose may carries no probationAck at all (an older shape): refused too.
+    mocks.access.mockReturnValue({ ...OPEN, may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true } })
+    await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
+    expect(mocks.probationAck).not.toHaveBeenCalled()
   })
 })

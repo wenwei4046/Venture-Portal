@@ -11,6 +11,7 @@ import {
 import type { CandidateStage } from '@/lib/hiring/types'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
 import { decideRequest } from '@/lib/attendance/actions'
+import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
 import { appAccess } from './server'
 import type { HrAppData } from './model'
 
@@ -28,7 +29,7 @@ const SHUT = 'This is not open to your account.'
 
 async function may(write: keyof HrAppData['may']): Promise<boolean> {
   const user = await getUser()
-  return !!user && appAccess(user).may[write]
+  return !!user && !!appAccess(user).may[write]
 }
 
 const done = (res: { ok: true } | { ok: false; reason: string }): Act => (res.ok ? { ok: true } : { ok: false, reason: res.reason })
@@ -129,6 +130,12 @@ export async function hrAppCancelBooking(id: string): Promise<Act> {
   if (!(await may('book'))) return { ok: false, reason: SHUT }
   const res = await cancelBooking(id)
   return res.ok ? { ok: true } : { ok: false, reason: res.reason }
+}
+
+// ── People: a probation's reminder acknowledged (2026-10-23) — People · Edit on the person's page ──
+
+export async function hrAppProbationAck(id: string): Promise<Act> {
+  return (await may('probationAck')) ? done(await acknowledgeProbation(id)) : { ok: false, reason: SHUT }
 }
 
 // ── People › Documentation: a letter's short link, made at the press (never kept) ──

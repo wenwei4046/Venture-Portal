@@ -4,10 +4,10 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { HrIconName } from '@/components/hrv/icons'
 import { CHIP_C, type GenPage, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type RequestView, type TodayKey, type TodayRow,
+  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type ProbationRow, type RequestView, type TodayKey, type TodayRow,
 } from '@/lib/hr-app/hr-view'
 import {
-  CAND_STAGE, MAJOR_EVENTS, MEMBER_KIND, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
+  CAND_STAGE, MAJOR_EVENTS, MEMBER_KIND, PROBATION_TAG, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
   type CandStage, type HrHire, type HrMemberRequest, type HrTalent,
 } from '@/lib/hr-app/model'
 import type { Notice } from '@/lib/push/notices'
@@ -46,7 +46,7 @@ export interface HomeItem {
   go: () => void
 }
 
-export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
+export function HomeScreen({ first, summary, quick, cats, memos, openMemo, probation = [], openPerson }: {
   first: string
   summary: string
   quick: HomeItem[]
@@ -54,6 +54,9 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
   /** Their memos still to acknowledge (the old Home's "Waiting for you", 2026-10-12): drawn only while there are some. */
   memos: MyMemo[]
   openMemo: (id: string) => void
+  /** The probations still waiting for Acknowledge (2026-10-23): drawn only while there are some — each opens the person. */
+  probation?: ProbationRow[]
+  openPerson?: (id: string) => void
 }) {
   return (
     <div className={s.home}>
@@ -69,6 +72,17 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
             {memos.map((m, i) => (
               <Row key={m.id} first={i === 0} onClick={() => openMemo(m.id)} title={m.title} sub={`From ${m.sender} · please acknowledge`} right={<Chev />}
                 lead={<Avatar bg="rgb(var(--tone-olive))" fg="rgb(var(--tone-olive-deep))" font={9.5}>MEMO</Avatar>} />
+            ))}
+          </Card>
+        </div>
+      ) : null}
+      {probation.length && openPerson ? (
+        <div className={s.group}>
+          <SectHead label="Probation ending" count={probation.length} />
+          <Card>
+            {probation.map((p, i) => (
+              <Row key={p.id} first={i === 0} onClick={() => openPerson(p.id)} title={p.name} sub={p.sub} right={<Chev />}
+                lead={<Avatar bg={PROBATION_TAG.bg} fg={PROBATION_TAG.fg} font={9.5}>{PROBATION_TAG.tag}</Avatar>} />
             ))}
           </Card>
         </div>

@@ -3,6 +3,9 @@ import { closeNodes, dueBy, waitingIn } from '@/lib/attendance/close'
 import { ROUTE_WORDS, amountLabel, bucketOf, flowNodes, kindLabel, sinceLabel, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
 import type { AttConfig, AttLedger, AttLeaveType, AttMonth, AttPerson, AttRequest } from '@/lib/attendance/types'
 import { correctionNth, quotaFor } from '@/lib/me/requests'
+import { monthsLabel, probationEndLine } from '@/lib/employment-status'
+import { officeTime } from '@/lib/office-time'
+import { acknowledged, dueReviews, probationsEnding, type ProbationReview } from '@/lib/probation-reviews'
 
 /**
  * The HR app's attendance screens (2026-10-17, the Claude Design handoff `design_handoff_hr_mobile` — HR Mobile):
@@ -296,11 +299,47 @@ export function closeView(a: HrAtt): CloseView {
 }
 
 /** Home's line: "4 requests waiting for HR · 2 not in yet · 3 late · October closes 3 Nov." */
-export function homeSummary(waiting: number, today: Record<TodayKey, number> | null, month: string | null): string {
+export function homeSummary(waiting: number, today: Record<TodayKey, number> | null, month: string | null, probations = 0): string {
   const parts = [`${waiting} request${waiting === 1 ? '' : 's'} waiting for HR`]
+  // The probations still waiting for Acknowledge (2026-10-23) — only while there are some.
+  if (probations > 0) parts.push(probationsEnding(probations))
   if (today) parts.push(`${today.notin} not in yet`, `${today.late} late`)
   if (month) parts.push(`${monthName(month)} closes ${dayMon(dueBy(month))}`)
   return `${parts.join(' · ')}.`
+}
+
+// ── A probation ending (2026-10-23 — the user: "HR 手机 app 里的提醒和推送") ──────────
+
+export interface ProbationRow {
+  id: string
+  name: string
+  /** "Ends 31 Oct 2026 · in 8 days · HR" — the desktop bell's own line. */
+  sub: string
+}
+
+/** Home's *Probation ending*: those still waiting for Acknowledge, soonest first — each opens the person. */
+export function probationRows(list: readonly ProbationReview[], today: string): ProbationRow[] {
+  return dueReviews(list, today).filter(r => !acknowledged(r)).map(r => ({
+    id: r.id,
+    name: r.name,
+    sub: [r.endsOn ? probationEndLine(r.endsOn, today) : null, r.department].filter(Boolean).join(' · '),
+  }))
+}
+
+/**
+ * A person's page, while they are on probation: the period and its end, and — once given for the end it stands at —
+ * who acknowledged the reminder and when (the desktop's Employment well, in the app's facts).
+ */
+export function probationFacts(r: ProbationReview, today: string): Array<{ k: string; v: string; mono: boolean }> {
+  const facts = [{
+    k: 'Probation',
+    v: [r.months ? monthsLabel(r.months) : null, r.endsOn ? probationEndLine(r.endsOn, today, true) : 'no end — the hire date is missing'].filter(Boolean).join(' · '),
+    mono: false,
+  }]
+  if (acknowledged(r)) {
+    facts.push({ k: 'Reminder', v: `Acknowledged by ${r.ackName ?? 'HR'}${r.ackAt ? ` · ${officeTime(r.ackAt).format('D MMM YYYY')}` : ''}`, mono: false })
+  }
+  return facts
 }
 
 // ── Records, the org chart, the levels ──────────────────────────────────────

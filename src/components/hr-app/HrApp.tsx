@@ -24,9 +24,11 @@ import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
 import { missingAnswers } from '@/lib/hiring/view'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, requestView,
-  todayCounts, todayRows, type TodayKey,
+  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, probationFacts, probationRows,
+  requestView, todayCounts, todayRows, type TodayKey,
 } from '@/lib/hr-app/hr-view'
+import { probationDue } from '@/lib/employment-status'
+import { acknowledged } from '@/lib/probation-reviews'
 import {
   CAND_STAGE, CHIP, HR_APP_VIEWS, MEMBER_KIND, bookingTimes, candChip, clashOf, dayLabel, hm, hourFrom, isPendingHire, isPendingRequest, positionLabel,
   type CandStage, type HrAppData, type HrAppView, type HrHire,
@@ -90,6 +92,8 @@ export interface HrAppActions {
   memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** One of their own documents (2026-10-14): a short link made at the press. */
   myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
+  /** A probation's reminder acknowledged (2026-10-23) — People · Edit on the person's page. Absent: no button. */
+  probationAck?(id: string): Promise<ActResult>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -135,6 +139,11 @@ const defaultDept = (d: HrAppData) => (d.bookDepts.find(x => x.name === 'HR') ??
 function waNumber(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, '').replace(/^\+/, '')
   return digits.startsWith('0') ? `6${digits}` : digits
+}
+
+/** A person's page with more facts after its own — their probation's (2026-10-23). */
+function withFacts<V extends { facts: Array<{ k: string; v: string; mono: boolean }> }>(v: V, more: V['facts']): V {
+  return more.length ? { ...v, facts: [...v.facts, ...more] } : v
 }
 
 /** A link made at the press, opened in a tab readied in the tap (never kept; no handle back on the app). */
@@ -216,6 +225,9 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const lowLeave = bRows.filter(r => r.low).length
   const pendingHires = d.parts.hiring ? d.hires.filter(isPendingHire).length : 0
   const attShut = (open: boolean) => (!open ? 'This is not open to your account.' : !att ? d.attError ?? 'Attendance could not be read.' : null)
+  // The probations HR is reminded of (2026-10-23): Home lists those waiting for Acknowledge; a person's page acknowledges.
+  const probation = useMemo(() => (d.viewingAs ? [] : d.probation ?? []), [d.viewingAs, d.probation])
+  const probRows = useMemo(() => probationRows(probation, d.today), [probation, d.today])
 
   // ── Moving about ──
   const push = (p: Page) => {
@@ -284,6 +296,10 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       setTab('approve')
       setReqF('members')
       setStack(d.requests.some(r => r.id === id) ? [{ k: 'mreq', id }] : [])
+    } else if (kind === 'hr_staff') {
+      // A probation ending (2026-10-23): the person, over People — or People itself once they have left the lists.
+      setTab(d.parts.people ? 'people' : 'home')
+      setStack(att?.config.people.some(p => p.id === id) || d.staff.some(p => p.id === id) ? [{ k: 'person', id }] : [])
     } else {
       setTab('home')
       setStack([{ k: 'gen', id: 'roomSched' }])
@@ -308,7 +324,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       }
       return
     }
-    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request' : 'booking', target.id)
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request'
+      : target.k === 'person' ? 'hr_staff' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -336,6 +353,10 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
   const attPerson = top?.k === 'person' && att ? att.config.people.find(p => p.id === top.id) ?? null : null
   const staffPerson = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
+  // Their probation (2026-10-23): its facts on the page, and Acknowledge while HR is being told and nobody has yet.
+  const pr = top?.k === 'person' ? probation.find(r => r.id === top.id) ?? null : null
+  const prFacts = pr ? probationFacts(pr, d.today) : []
+  const prAck = !!pr && probationDue(pr.endsOn, d.today) && !acknowledged(pr) && !!d.may.probationAck && !d.viewingAs && !!actions.probationAck
 
   // Opening a memo is reading it: the login's receipt, the same in every view.
   const memoOpen = mm && memoUnread(mm) && !d.viewingAs ? mm.id : null
@@ -533,7 +554,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       <div ref={scrollerRef} className={s.scroller}>
         {main && tab === 'home' ? (
           <HomeScreen first={d.greetName} quick={quick} cats={cats} memos={d.viewingAs ? [] : memos.filter(memoWaiting)} openMemo={id => push({ k: 'memo', id })}
-            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null)} />
+            probation={probRows} openPerson={id => push({ k: 'person', id })}
+            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null, probRows.length)} />
         ) : null}
         {main && tab === 'today' ? (
           <TodayScreen rows={tRows} counts={tCounts} filter={todayF} setFilter={setTodayF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.today)} />
@@ -553,11 +575,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         ) : null}
         {top?.k === 'mreq' && mr ? <MemberScreen r={mr} note={note} setNote={setNote} canDecide={isPendingRequest(mr) && mr.kind !== 'replacement' && d.may.decide && !d.viewingAs} /> : null}
         {top?.k === 'person' && attPerson && att ? (
-          <PersonScreen v={personView(att, attPerson)} onCall={() => callOf(attPerson.id, attPerson.name, 'call')} onMessage={() => callOf(attPerson.id, attPerson.name, 'message')}
+          <PersonScreen v={withFacts(personView(att, attPerson), prFacts)} onCall={() => callOf(attPerson.id, attPerson.name, 'call')} onMessage={() => callOf(attPerson.id, attPerson.name, 'message')}
             onRecords={() => flash(`${dayLabel(att.month.month, { month: 'long' })} records · desktop`)} />
         ) : null}
         {top?.k === 'person' && !attPerson && staffPerson ? (
-          <PersonScreen v={{ name: staffPerson.name, title: staffPerson.title || 'No title', dept: staffPerson.dept || 'No department', chip: { label: 'Today · —', bg: 'var(--ds-surface-3)', fg: 'var(--ds-ink-2)' }, facts: [], leave: [] }}
+          <PersonScreen v={{ name: staffPerson.name, title: staffPerson.title || 'No title', dept: staffPerson.dept || 'No department', chip: { label: 'Today · —', bg: 'var(--ds-surface-3)', fg: 'var(--ds-ink-2)' }, facts: prFacts, leave: [] }}
             onCall={() => callOf(staffPerson.id, staffPerson.name, 'call')} onMessage={() => callOf(staffPerson.id, staffPerson.name, 'message')} onRecords={() => flash('Records · desktop')} />
         ) : null}
         {top?.k === 'leave' ? <BalancesScreen rows={bRows} filter={lvF} setFilter={setLvF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.balances)} /> : null}
@@ -613,6 +635,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
             onClick={() => { if (!arm) { setArm(true); return } run(() => actions.talentRemove(tt.id), () => { pop(); setArm(false) }, `${tt.name} removed`) }}>
             {arm ? 'Tap again to remove' : 'Remove from Talent Bank'}
           </button>
+        </div>
+      ) : null}
+      {top?.k === 'person' && pr && prAck && actions.probationAck ? (
+        <div className={s.actBar}>
+          <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy}
+            onClick={() => { const ack = actions.probationAck; if (ack) run(() => ack(pr.id), undefined, 'Acknowledged') }}>{busy ? 'Recording…' : 'Acknowledge'}</button>
         </div>
       ) : null}
       {top?.k === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
