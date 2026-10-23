@@ -12,6 +12,7 @@ import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { dropStaged, formFile, type FormFile } from '@/lib/storage/staged'
 import { requireActionOn } from '@/lib/auth'
 import {
   autoMatch, csvToRows, parseStatementRows,
@@ -127,10 +128,21 @@ export async function uploadStatementInWords(formData: FormData): Promise<{ ok: 
 /** Parse the statement, save the month's session and its lines, auto-match them — the session's id, or why not. */
 async function createReconSession(formData: FormData, userId: string): Promise<{ error: string } | { id: string }> {
   const supabase = await reconClient()
+  // The statement is sent ahead to its sender's own folder since 2026-10-24 (lib/storage/staging.ts — a Server
+  // Action's body stops at 4 MB), or comes as the File itself from an older page. Read, never kept: its staged copy
+  // goes once it is parsed, whatever the answer.
+  const read = await formFile(supabase, formData, 'file')
+  if (!read.ok) return { error: read.reason }
+  try {
+    return await reconSessionFrom(supabase, formData, userId, read.file)
+  } finally {
+    await dropStaged(supabase, [read.file])
+  }
+}
 
+async function reconSessionFrom(supabase: SupabaseClient, formData: FormData, userId: string, file: FormFile | null): Promise<{ error: string } | { id: string }> {
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
   const month = (formData.get('period_month') as string) || '' // YYYY-MM
-  const file = formData.get('file') as File | null
   if (!bankAccountId) return { error: 'Pick a bank' }
   if (!/^\d{4}-\d{2}$/.test(month)) return { error: 'Pick the statement month' }
   if (!file || file.size === 0) return { error: 'Pick a statement file' }
@@ -144,7 +156,7 @@ async function createReconSession(formData: FormData, userId: string): Promise<{
   if (name.endsWith('.pdf')) {
     // Coordinate-based per-bank templates (HLB tuned on the user's real
     // Apr'26 statement, 47/47 lines, balance tie-out enforced inside).
-    const buf = Buffer.from(await file.arrayBuffer())
+    const buf = Buffer.from(await file.bytes())
     const { default: PDFParser } = await import('pdf2json')
     const data = await new Promise<{ Pages: Array<{ Texts: Array<{ x: number; y: number; R: Array<{ T: string }> }> }> }>(
       (resolve, reject) => {
@@ -176,7 +188,7 @@ async function createReconSession(formData: FormData, userId: string): Promise<{
     if ('error' in p) return { error: p.error }
     parsed = p
   } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    const buf = Buffer.from(await file.arrayBuffer())
+    const buf = Buffer.from(await file.bytes())
     const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
     const sheet = wb.Sheets[wb.SheetNames[0]]
     const p = parseStatementRows(

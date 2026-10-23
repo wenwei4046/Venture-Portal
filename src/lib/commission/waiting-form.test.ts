@@ -122,12 +122,13 @@ describe('the form as saved', () => {
 })
 
 describe('Upload form', () => {
-  it('takes what the bucket takes, under the Server Action’s limit', () => {
+  it('takes what the bucket takes, up to its 100 MB (sent ahead of the action since 2026-10-24)', () => {
     expect(templateContentType('Form.DOCX')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     expect(templateContentType('scan.webp')).toBeNull()
     expect(templateRefusal({ name: 'form.pdf', size: 120_000 })).toBeNull()
     expect(templateRefusal({ name: 'form.gif', size: 10 })).toBe('Upload a PDF, Word, HTML, PNG or JPEG file.')
-    expect(templateRefusal({ name: 'form.pdf', size: 4_000_000 })).toBe('The form must be smaller than 3.8 MB.')
+    expect(templateRefusal({ name: 'form.pdf', size: 4_000_000 })).toBeNull()
+    expect(templateRefusal({ name: 'form.pdf', size: 100 * 1024 * 1024 + 1 })).toBe('The form must be 100 MB or smaller.')
     expect(templateRefusal({ name: 'form.pdf', size: 0 })).toBe('Choose a file to upload.')
   })
 

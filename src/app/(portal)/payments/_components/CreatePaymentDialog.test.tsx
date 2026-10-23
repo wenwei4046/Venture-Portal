@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 
@@ -292,6 +293,25 @@ describe('the lines', () => {
     await save()
     expect(sent().get('attachment_count')).toBe('1')
     expect((sent().get('attachment_0') as File).name).toBe('slip.pdf')
+  })
+
+  // 2026-10-24: each file goes ahead of the save (lib/storage/stage.ts), so a file may be up to 100 MB — no longer
+  // 4 MB for them all. One past it is named before anything is sent.
+  it('Attachments: a file past 100 MB is named, and nothing is sent', async () => {
+    draw()
+    await act(async () => undefined)
+    fill()
+    const input = dialog().querySelector('input[type="file"]') as HTMLInputElement
+    const scan = new File(['x'], 'scan.pdf', { type: 'application/pdf' })
+    Object.defineProperty(scan, 'size', { value: 150 * 1024 * 1024 })
+    const statement = new File(['x'], 'statement.pdf', { type: 'application/pdf' })
+    Object.defineProperty(statement, 'size', { value: 60 * 1024 * 1024 })
+    fireEvent.change(input, { target: { files: [statement] } })
+    expect(screen.queryByText(/a file can be up to 100 MB/)).not.toBeInTheDocument()
+    fireEvent.change(input, { target: { files: [scan] } })
+    expect(screen.getByText('scan.pdf is 150.0 MB — a file can be up to 100 MB.')).toBeInTheDocument()
+    await save()
+    expect(mocks.create).not.toHaveBeenCalled()
   })
 
   it('Pay to offers the companies it matches; picking one links the voucher to it', async () => {

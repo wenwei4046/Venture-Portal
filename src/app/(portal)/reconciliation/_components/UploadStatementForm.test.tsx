@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // 2026-10-10 — Upload statement as the handoff's modal: Bank account,

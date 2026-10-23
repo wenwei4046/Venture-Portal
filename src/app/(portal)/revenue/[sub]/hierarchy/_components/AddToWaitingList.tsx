@@ -16,6 +16,7 @@ import {
   type WaitingAddDraft,
 } from '@/lib/commission/waiting-add'
 import type { WaitingField, WaitingForm } from '@/lib/commission/waiting-form'
+import { stageInto } from '@/lib/storage/stage'
 import { addToWaitingList } from '../../../waiting-actions'
 import s from './sales-groups.module.css'
 import w from './waiting.module.css'
@@ -118,9 +119,12 @@ function AddWindow({
     }
     const data = new FormData()
     data.set('input', JSON.stringify(input))
-    if (file) data.set('signedForm', file)
     start(async () => {
-      const done = await addToWaitingList(data)
+      // The signed form is sent ahead of the action (2026-10-24, lib/storage/stage.ts) — up to 100 MB.
+      const done = await stageInto(data, 'signedForm', file).then(
+        () => addToWaitingList(data),
+        (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The signed form could not be sent.' }),
+      )
       if (!done.ok) {
         setError(done.reason)
         return
@@ -218,7 +222,7 @@ function AddWindow({
               </button>
             ) : null}
           </div>
-          <span className={w.addHint}>PDF, Word, PNG or JPG, 3 MB or smaller.</span>
+          <span className={w.addHint}>PDF, Word, PNG or JPG, 100 MB or smaller.</span>
         </div>
 
         {error ? (

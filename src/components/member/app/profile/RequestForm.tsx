@@ -14,6 +14,7 @@ import {
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
 import { ANY_TIME, ANY_TIME_LABEL, isAnyTime } from "@/lib/member/waiting-start";
+import { stageFiles } from "@/lib/storage/stage";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -287,7 +288,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
         if (regionRow.planeTicket) {
           if (!(amount > 0)) return setError("Enter the plane ticket's price, as its invoice shows.");
           if (!file) return setError("Add the plane ticket's invoice.");
-          if (file.size > 3 * 1024 * 1024) return setError("The invoice must be 3 MB or smaller.");
+          if (file.size > 100 * 1024 * 1024) return setError("The invoice must be 100 MB or smaller.");
           form.set("amount", ticket.trim());
           form.set("invoice", file);
         } else if (!(amount > 0)) {
@@ -302,7 +303,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
         if (!(stayValue && stayValue > 0)) return setError("Enter the stay's total from its invoice.");
         if (!(amount > 0)) return setError("HR has not set the Airbnb rate yet.");
         if (!file) return setError("Add the invoice.");
-        if (file.size > 3 * 1024 * 1024) return setError("The invoice must be 3 MB or smaller.");
+        if (file.size > 100 * 1024 * 1024) return setError("The invoice must be 100 MB or smaller.");
         form.set("start", checkIn);
         form.set("end", checkOut);
         form.set("male", String(male));
@@ -319,7 +320,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       const missing = fillIn(blankRequired(rown, vals));
       if (missing) { setTried(true); return setError(missing); }
       if (needsForm && !signedName) { setTried(true); return setError("Upload the signed replacement form."); }
-      if (signed && signed.size > 3 * 1024 * 1024) return setError("The signed form must be 3 MB or smaller.");
+      if (signed && signed.size > 100 * 1024 * 1024) return setError("The signed form must be 100 MB or smaller.");
       form.set("originalStaffId", member);
       form.set("destination", dest);
       if (dest === "transfer") form.set("targetDepartmentId", target);
@@ -349,7 +350,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       const missing = fillIn(blankRequired(questions, answered));
       if (missing) { setTried(true); return setError(missing); }
       if (needsForm && !signedName) { setTried(true); return setError("Upload the signed application form."); }
-      if (signed && signed.size > 3 * 1024 * 1024) return setError("The signed form must be 3 MB or smaller.");
+      if (signed && signed.size > 100 * 1024 * 1024) return setError("The signed form must be 100 MB or smaller.");
       if (sigMode === "draw" ? !drawn : !signature.trim()) {
         setTried(true);
         return setError(sigMode === "draw" ? "Sign in the box, or type your signature." : "Type your full name to sign.");
@@ -377,6 +378,9 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
     }
     setBusy(true);
     try {
+      // The invoice and the signed form go ahead of the request (2026-10-24, lib/storage/stage.ts): up to 100 MB,
+      // not the 4 MB a Server Action's body carries.
+      await stageFiles(form);
       const outcome = await onSubmit(form);
       if (outcome.ok) {
         setDone(outcome.code);
@@ -811,7 +815,7 @@ function Invoice({ file, fileRef, onFile }: { file: File | null; fileRef: RefObj
       <button className={s.upload} onClick={() => fileRef.current?.click()}>
         <Svg d={CAMERA} size={24} sw={1.8} stroke="var(--rv-accent)" />
         <span className={s.uploadTitle}>{file ? file.name : "Take a photo or choose a file"}</span>
-        <span className={s.uploadSub}>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · tap to change` : "JPG, PNG or PDF, up to 3 MB"}</span>
+        <span className={s.uploadSub}>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · tap to change` : "JPG, PNG or PDF, up to 100 MB"}</span>
       </button>
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,application/pdf" hidden onChange={e => onFile(e.target.files?.[0] ?? null)} />
     </div>
