@@ -211,7 +211,7 @@ function sales(name, body) {
   if (name === "SalesContacts") body = contacts(body);
   // M11 · Insight (change list 19): the page itself is 4a's; its sheets (Range, the lists, Customer info, the form) stay.
   if (name === "SalesInsight") body = swap(body, '<main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>', "main", "<Phone4aInsightMine v={v} />", "insight page");
-  return body;
+  return nameCase(body);
 }
 
 
@@ -521,7 +521,25 @@ function panel(body) {
     const [, e] = el(body.slice(s0, end > 0 ? end : undefined), S, "div", "work type list");
     body = body.slice(0, s0 + e) + `{!!(v.fts.dirty) && (<div style={{ flex: "none", display: "flex", gap: "10px", padding: "12px 20px calc(14px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}><span onClick={v.fts.cancel} role="button" style={{ flex: "0 0 auto", height: "48px", padding: "0 20px", boxSizing: "border-box", borderRadius: "24px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "500", color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</span><span onClick={v.fts.save} role="button" style={{ flex: "1", height: "48px", borderRadius: "24px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", fontSize: "${F(15)}", fontWeight: "600", cursor: "pointer" }}>{v.fts.saveLabel}</span></div>)}` + body.slice(s0 + e);
   }
-  return body;
+  return nameCase(body);
+}
+
+/** Names as written (Title Case — crm-data.ts › personName): a style that shows a person's or team's name drops
+ * textTransform: "uppercase" and its letter-spacing (the owner, 2026-10-23: "全部人名都統一"). Section labels keep theirs. */
+function nameCase(body) {
+  const U = 'textTransform: "uppercase"';
+  let out = "", i = 0;
+  for (;;) {
+    const at = body.indexOf(U, i);
+    if (at < 0) return out + body.slice(i);
+    const st = body.lastIndexOf("style={{", at), se = body.indexOf("}}>", at);
+    // an empty span first (a colour dot) is not the text
+    const text = body.slice(se + 3, se + 520).replace(/^\s*<span style=\{\{[^}]*\}\}>\s*<\/span>/, ""), close = text.search(/<\/(span|strong|div|b)>/);
+    const shown = close < 0 ? "" : text.slice(0, close);
+    if (st < 0 || se < 0 || !/\{\w+\.(name|team|who)\}/.test(shown)) { out += body.slice(i, at + U.length); i = at + U.length; continue; }
+    const style = body.slice(st, se).replace(/, textTransform: "uppercase"|textTransform: "uppercase", /, "").replace(/, letterSpacing: "[^"]*"|letterSpacing: "[^"]*", /, "");
+    out += body.slice(i, st) + style; i = se;
+  }
 }
 
 /** The import lines a screen needs for the 4a parts it mounts. */
@@ -529,4 +547,4 @@ function IMPORT(body, from) {
   const names = [...new Set([...body.matchAll(/<(Phone4a\w*)/g)].map(m => m[1]))].sort();
   return (names.length ? `import { ${names.join(", ")} } from "${from}";\n` : "") + (/<Ic[\s/]/.test(body) ? `import { Ic } from "${from.replace(/phone4a$/, "icons4a")}";\n` : "");
 }
-module.exports = { sales, panel, IMPORT, once, every, swap, F };
+module.exports = { sales, panel, IMPORT, once, every, swap, F, nameCase };

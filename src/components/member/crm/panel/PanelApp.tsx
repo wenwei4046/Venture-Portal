@@ -518,7 +518,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <p style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ld.ld.ad} · now with {v.ld.ld.ownerName}</p>
                 {(v.ld.ld.groups).map((g, g_i) => (<Fragment key={g_i}>
                   <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                       </span>{g.name} · {g.n}</span>
                     {(g.people).map((o, o_i) => (<Fragment key={o_i}>
                       <div onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-rule)", cursor: "pointer" }} className={H.hov3}>
@@ -993,7 +993,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 {(v.ftx.sum).map((t, t_i) => (<Fragment key={t_i}>
                   <div onClick={t.open} style={{ display: "flex", flexDirection: "column", padding: "4px 12px 8px", borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-tint-follow)", cursor: "pointer" }} className={H.hov4}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0 4px" }}>
-                      <span style={{ flex: "1", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".04em", textTransform: "uppercase", color: "var(--crm-brown)" }}>{t.name}</span>
+                      <span style={{ flex: "1", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-brown)" }}>{t.name}</span>
                       <small style={{ fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-muted)" }}>{t.mode}</small>
                       <svg style={{ color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="m9 6 6 6-6 6">
@@ -1290,7 +1290,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
               {(v.cal.cpGroups).map((g, g_i) => (<Fragment key={g_i}>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                     </span>{g.name} · {g.n}</span>
                   {(g.people).map((o, o_i) => (<Fragment key={o_i}>
                     <div onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 10px", margin: "0 -10px", borderTop: "1px solid var(--crm-rule)", borderRadius: o.r, background: o.bg, cursor: "pointer" }} className={H.hov3}>
@@ -1917,7 +1917,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           <p style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ol.sdAd}</p>
           {(v.ol.sdGroups).map((g, g_i) => (<Fragment key={g_i}>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                 </span>{g.name} · {g.n}</span>
               {(g.people).map((o, o_i) => (<Fragment key={o_i}>
                 <div onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-rule)", cursor: "pointer" }} data-x="1" className={H.hov3}>
@@ -1948,7 +1948,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
           <p style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{v.ol.mvAd}</p>
           {(v.ol.mvGroups).map((g, g_i) => (<Fragment key={g_i}>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 0 6px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
                 </span>{g.name} · {g.n}</span>
               {(g.people).map((o, o_i) => (<Fragment key={o_i}>
                 <div onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-rule)", cursor: "pointer" }} data-x="1" className={H.hov3}>
@@ -1984,7 +1984,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </div>
         {(v.ol.attGroups).map((g, g_i) => (<Fragment key={g_i}>
           <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 0", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".06em", textTransform: "uppercase", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 0", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: g.c }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.c }}>
               </span>{g.name} · {g.n}</span>
             {(g.items).map((l, l_i) => (<Fragment key={l_i}>
               <div onClick={l.open} style={{ display: "grid", gridTemplateColumns: "36px minmax(0, 1fr) auto 34px", gap: "10px", alignItems: "center", padding: "10px 0", borderTop: "1px solid var(--crm-rule)", cursor: "pointer" }}>
@@ -2035,12 +2035,12 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </label>
         {(v.ol.vaGroups).map((g, g_i) => (<Fragment key={g_i}>
           <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
-            <span style={{ padding: "8px 0 4px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".08em", textTransform: "uppercase", color: "var(--crm-muted)" }}>{g.name} · {g.n}</span>
+            <span style={{ padding: "8px 0 4px", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-muted)" }}>{g.name} · {g.n}</span>
             {(g.people).map((p, p_i) => (<Fragment key={p_i}>
               <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "12px 0", borderTop: p.rule, cursor: "pointer" }}>
                 <span style={{ flex: "none", width: "48px", height: "48px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650" }}>{p.ini}</span>
                 <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700", textTransform: "uppercase", letterSpacing: ".01em" }}>{p.name}</strong>
+                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700" }}>{p.name}</strong>
                   <small style={{ fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{p.title}</small>
                 </span>
                 <span style={{ flex: "none", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)" }}>View</span>
