@@ -398,8 +398,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Edit; folder types made and the Dustbin emptied for good by Manage.
   'mkt_library', 'mkt_lib_type_add', 'mkt_lib_folder_add', 'mkt_lib_file_add', 'mkt_lib_move', 'mkt_lib_bin', 'mkt_lib_restore',
   'mkt_lib_delete',
-  // A subsidiary's brand profile in the Library (mig 20261024007200): saved whole by Manage.
+  // A subsidiary's brand profile in the Library (mig 20261024007200): saved whole by Edit (Manage until mig
+  // 20261025004000 — the user: "人人都能改 · but with audit log").
   'mkt_lib_profile_save',
+  // A template or a product never published, deleted by Marketing · Manage (mig 20261025004100 — the user's answer 8).
+  'mkt_workflow_delete', 'mkt_minutes_delete', 'mkt_product_delete',
   // A Library file's or folder's guest link (mig 20261024007300): made, changed and stopped by Edit; the page /l/<code>
   // and its files read as the stranger — anon's by name, as the PIC's, each checking the link's code.
   'mkt_lib_share', 'mkt_lib_share_stop', 'mkt_lib_shared', 'mkt_lib_shared_file',

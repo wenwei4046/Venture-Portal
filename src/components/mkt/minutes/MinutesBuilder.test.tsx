@@ -10,6 +10,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from '@/lib/marketing/m
 const actions = vi.hoisted(() => ({
   saveMktMinutes: vi.fn(),
   publishMktMinutes: vi.fn(),
+  deleteMktMinutes: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
@@ -126,6 +127,20 @@ describe('the Minutes Builder', () => {
     expect([id, rev, patch.name, patch.fields.map((f: { type: string }) => f.type)]).toEqual([null, null, 'New minutes', ['Project link', 'Date', 'People', 'Signature']])
     expect(await screen.findByDisplayValue('New minutes')).toBeTruthy()
     expect(router.replace).toHaveBeenCalledWith('/marketing/minutes?t=t9', { scroll: false })
+  })
+
+  it('deletes a template never published, asked first; a published one offers no delete (the user’s answer 8)', async () => {
+    const draft = { ...KICKOFF, id: 't2', name: 'Brief call', rev: 1, version: 0, changed: true }
+    actions.deleteMktMinutes.mockResolvedValue({ ok: true, templates: list(KICKOFF) })
+    render(<MinutesBuilder initial={list(KICKOFF, draft)} first="t2" attendees={['Rachel']} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('group', { name: 'Delete this template?' })).getByRole('button', { name: 'Delete' }))
+    })
+    expect(actions.deleteMktMinutes).toHaveBeenCalledWith('t2', 1)
+    expect(await screen.findByText('Deleted “Brief call”')).toBeTruthy()
+    expect(screen.getByText('v2 · live')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Delete draft' })).toBeNull()
   })
 
   it('the Preview tries the template and keeps nothing: Complete waits for what is required and the signatures', () => {

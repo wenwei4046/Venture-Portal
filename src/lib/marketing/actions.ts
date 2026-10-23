@@ -195,6 +195,19 @@ export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; t
   return { ok: true, id: String(r.id ?? ''), tname: String(r.tname ?? ''), workflows: await freshWorkflows(db) }
 }
 
+/** A template never published, deleted (the user's answer 8, mig 20261025004100) — refused while a product's draft links
+ * it; the list as it now stands. */
+export async function deleteMktWorkflow(id: string, rev: number): Promise<Done<{ workflows: WfTemplate[] | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_workflow_delete', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The template could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, workflows: await freshWorkflows(db) }
+}
+
 /** The Minutes Builder's templates as they now stand (mig 20261023235800); null when they cannot be read. */
 async function freshMinutes(db: SupabaseClient): Promise<MinutesTemplate[] | null> {
   const { data, error } = await db.rpc('mkt_minutes_templates')
@@ -226,6 +239,18 @@ export async function publishMktMinutes(id: string, rev: number): Promise<Done<{
   if (error) return { ok: false, reason: words(error, 'The template could not be published. Please try again.') }
   revalidatePath('/marketing', 'layout')
   return { ok: true, version: Number((data as { version?: number } | null)?.version ?? 0) }
+}
+
+/** A minutes template never published, deleted (mig 20261025004100) — refused while a product takes it as its intake. */
+export async function deleteMktMinutes(id: string, rev: number): Promise<Done<{ templates: MinutesTemplate[] | null }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_minutes_delete', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The template could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, templates: await freshMinutes(db) }
 }
 
 /** The Product Builder's book as it now stands (mig 20261023235900); null when it cannot be read. */
@@ -261,6 +286,18 @@ export async function publishMktProduct(id: string, rev: number): Promise<Done<{
   revalidatePath('/marketing', 'layout')
   const r = (data ?? {}) as { version?: number; effectiveFrom?: string; live?: number }
   return { ok: true, version: Number(r.version ?? 0), effectiveFrom: r.effectiveFrom ? String(r.effectiveFrom) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
+}
+
+/** A product still a draft, deleted (mig 20261025004100) — one once on sale is retired instead. */
+export async function deleteMktProduct(id: string, rev: number): Promise<Done<{ book: ProductBook | null }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That product is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_product_delete', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The product could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, book: await freshProducts(db) }
 }
 
 /** A product retired (picked for no new project; those running keep their version) or reactivated. */
@@ -390,11 +427,13 @@ async function libraryAfter(db: SupabaseClient, error: { message?: string } | nu
   return lib ? { ok: true, library: lib } : { ok: false, reason: 'Saved — the Library could not be read again. Refresh the page.' }
 }
 
-/** A new folder type, for every subsidiary — the manager's. */
-export async function addMktLibType(name: string, color: string, cat: string): Promise<Done<{ library: Library }>> {
+/** A new folder type, for every subsidiary — the manager's; a link type (as Raw footage) keeps each folder elsewhere. */
+export async function addMktLibType(name: string, color: string, cat: string, link = false): Promise<Done<{ library: Library }>> {
   await requireActionOn('/marketing/library', 'marketing', 'manage')
   const db = await client()
-  const { error } = await db.rpc('mkt_lib_type_add', { p_name: String(name ?? '').slice(0, 80), p_color: String(color ?? ''), p_cat: String(cat ?? '') })
+  const { error } = await db.rpc('mkt_lib_type_add', {
+    p_name: String(name ?? '').slice(0, 80), p_color: String(color ?? ''), p_cat: String(cat ?? ''), p_link: link === true,
+  })
   return libraryAfter(db, error, 'The folder type could not be added. Please try again.')
 }
 
@@ -487,9 +526,10 @@ export async function stopMktLibShare(kind: 'file' | 'folder', id: string): Prom
   return libraryAfter(db, error, 'The link could not be stopped. Please try again.')
 }
 
-/** A subsidiary's brand profile, saved whole (⑥-2, mig 20261024007200) — the manager's. */
+/** A subsidiary's brand profile, saved whole (⑥-2, mig 20261024007200) — Marketing · Edit's since 2026-10-24 (the user:
+ * "人人都能改 · but with audit log"; mig 20261025004000), every change kept in its history. */
 export async function saveMktLibProfile(sub: string, profile: LibProfile): Promise<Done<{ library: Library }>> {
-  await requireActionOn('/marketing/library', 'marketing', 'manage')
+  await requireActionOn('/marketing/library', 'marketing', 'edit')
   if (!isId(sub)) return { ok: false, reason: 'That subsidiary is not on the list.' }
   const db = await client()
   // Whatever came in, read as a stored profile would be (only the handoff's colours and fonts, words as text).

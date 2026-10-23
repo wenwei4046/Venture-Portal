@@ -14,7 +14,10 @@ vi.mock('@/lib/marketing/actions', () => actions)
 const replace = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }) }))
 const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => bucket } }) }))
+// A brand profile's history is read on opening its dialog (audit_changes, 2026-10-24).
+const audit = vi.hoisted(() => ({ rows: [] as unknown[] }))
+const rpc = vi.hoisted(() => vi.fn(async () => ({ data: audit.rows, error: null })))
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => bucket }, rpc }) }))
 vi.mock('@/lib/storage/browser', () => ({
   fileRoute: (b: string, p: string, d?: string) => `/files/${b}/${p}${d ? `?download=${encodeURIComponent(d)}` : ''}`,
 }))
@@ -58,6 +61,8 @@ beforeEach(() => {
   flash.mockReset()
   bucket.upload.mockReset().mockResolvedValue({ data: {}, error: null })
   bucket.remove.mockReset().mockResolvedValue({ data: [], error: null })
+  audit.rows = []
+  rpc.mockClear()
 })
 
 const rail = () => screen.getByRole('navigation', { name: 'Library' })
@@ -95,7 +100,22 @@ describe('the Library', () => {
     fireEvent.change(screen.getByLabelText('New folder type name'), { target: { value: 'Moodboards' } })
     fireEvent.change(screen.getByLabelText('Its files\' category'), { target: { value: 'Photo' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    await waitFor(() => expect(actions.addMktLibType).toHaveBeenCalledWith('Moodboards', 'oklch(0.55 0.12 300)', 'Photo'))
+    await waitFor(() => expect(actions.addMktLibType).toHaveBeenCalledWith('Moodboards', 'oklch(0.55 0.12 300)', 'Photo', false))
+  })
+
+  it('lets the manager make a LINK folder type too — as Raw footage (2026-10-24, the user’s answer 31)', async () => {
+    actions.addMktLibType.mockResolvedValueOnce({ ok: true, library: lib })
+    render(<Library initial={lib} can={{ edit: true, manage: true }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add folder' }))
+    fireEvent.change(screen.getByLabelText('New folder type name'), { target: { value: 'Edited reels' } })
+    fireEvent.change(screen.getByLabelText('Its files\' category'), { target: { value: 'Video' } })
+    const link = screen.getByRole('switch', { name: /Link folder/ })
+    expect(link.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(link)
+    expect(link.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(actions.addMktLibType).toHaveBeenCalledWith('Edited reels', 'oklch(0.55 0.12 300)', 'Video', true))
+    expect(flash).toHaveBeenCalledWith('New link folder type "Edited reels" saved for every subsidiary')
   })
 
   it('opens a folder — its files; a file’s menu: Download, Move to…, Move to Dustbin', async () => {
@@ -199,13 +219,14 @@ describe('a brand in the Library', () => {
     const banner = document.querySelector('[class*="banner"][data-dark]') as HTMLElement
     expect(banner.textContent).toContain('Carres Living')
     expect(banner.querySelector('[class*="bannerAvatar"]')?.textContent).toBe('C')
-    expect(screen.queryByRole('button', { name: 'Edit brand profile' })).toBeNull()
+    // ✎ is Marketing · Edit's since 2026-10-24 (the user: "人人都能改 · but with audit log") — not only the manager's.
+    expect(screen.getByRole('button', { name: 'Edit brand profile' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Thu 5 Nov.*Year-End Video · Shoot/ }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001')
   })
 
-  it('lets the manager edit it: colours, a logo uploaded, a font, the words — saved whole', async () => {
+  it('lets anybody who edits change it: colours, a logo uploaded, a font, the words — saved whole', async () => {
     actions.saveMktLibProfile.mockResolvedValueOnce({ ok: true, library: dressed })
-    render(<Library initial={lib} can={{ edit: true, manage: true }} at={{ ...AT, co: 'CAR' }} />)
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit brand profile' }))
     const dlg = screen.getByRole('dialog', { name: 'Edit Carres profile' })
     fireEvent.click(within(within(dlg).getByRole('radiogroup', { name: 'Background colour' })).getByRole('radio', { name: 'Blush' }))
@@ -237,6 +258,25 @@ describe('a brand in the Library', () => {
     fireEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(bucket.remove).toHaveBeenCalledWith([cover]))
     expect(actions.saveMktLibProfile).not.toHaveBeenCalled()
+  })
+
+  it('shows its history — who, when (the office’s), what moved from what to what; a change to anything else is not its', async () => {
+    audit.rows = [
+      { id: 12100, occurred_at: '2026-10-22T09:00:00+00:00', actor_name: 'Mei', op: 'UPDATE', changed: ['name'], old_row: {}, new_row: {} },
+      {
+        id: 12287, occurred_at: '2026-10-23T02:40:12.011913+00:00', actor_name: 'Sia Josiah', op: 'UPDATE', changed: ['profile'],
+        old_row: { profile: { avatar: 'rgb(44 82 130)', font: 'Playfair', name: 'Carres Living' } },
+        new_row: { profile: { avatar_path: LOGO, font: 'DM Serif', name: 'Carres Living', caption: 'Sofa & living' } },
+      },
+    ]
+    render(<Library initial={lib} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit brand profile' }))
+    const dlg = screen.getByRole('dialog', { name: 'Edit Carres profile' })
+    const list = await within(dlg).findByRole('list', { name: 'Carres profile history' })
+    expect(rpc).toHaveBeenCalledWith('audit_changes', { p_tables: ['mkt_subsidiaries'], p_row: 'CAR', p_limit: 40 })
+    expect(within(list).getAllByRole('listitem').map(li => [...li.children].map(c => c.textContent))).toEqual([
+      ['Sia Josiah · 23 Oct, 10:40', 'Profile colour: Navy → —', 'Logo added: carres-logo.png', 'Font: Playfair → DM Serif', 'Caption: — → "Sofa & living"'],
+    ])
   })
 })
 

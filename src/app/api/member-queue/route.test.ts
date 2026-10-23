@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // ending within 14 days among them (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送").
 
 const calls = vi.hoisted(() => [] as string[])
-const answers = vi.hoisted(() => ({ probation: { data: 3 as number | null, error: null as { code: string } | null } }))
+const answers = vi.hoisted(() => ({
+  probation: { data: 3 as number | null, error: null as { code: string } | null },
+  purge: { data: null as null, error: null as { code: string } | null },
+}))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({
     rpc: async (name: string) => {
@@ -12,6 +15,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (name === 'member_process_all_queues') return { data: { status: 'complete', runId: 'r1', departmentsProcessed: 0, newReservations: 0, failures: 0 }, error: null }
       if (name === 'member_run_due_replacements') return { data: { ran: 0, failed: 0 }, error: null }
       if (name === 'notify_probation_due') return answers.probation
+      if (name === 'mkt_lib_purge') return answers.purge
       return { data: 0, error: null }
     },
   }),
@@ -30,6 +34,7 @@ const sweep = (auth = `Bearer ${SECRET}`) => GET(new Request('https://erp.exampl
 beforeEach(() => {
   calls.length = 0
   answers.probation = { data: 3, error: null }
+  answers.purge = { data: null, error: null }
   process.env.CRON_SECRET = SECRET
 })
 afterEach(() => {
@@ -55,6 +60,17 @@ describe('the hourly sweep', () => {
     expect(res.status).toBe(200)
     expect(error).toHaveBeenCalledWith('Probation notices failed', '42501')
     expect(calls).toContain('flushPush')
+  })
+
+  it("purges Marketing's Dustbin every hour; a failure is logged by its code and stops nothing", async () => {
+    // The user (2026-10-24): "60 days , auto clean" — not only when somebody next touches the Library.
+    const res = await sweep()
+    expect(res.status).toBe(200)
+    expect(calls).toContain('mkt_lib_purge')
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    answers.purge = { data: null, error: { code: '42883' } }
+    expect((await sweep()).status).toBe(200)
+    expect(error).toHaveBeenCalledWith('Marketing Dustbin purge failed', '42883')
   })
 
   it('answers nobody without the cron secret — nothing is written', async () => {

@@ -1,6 +1,6 @@
 // The Library (`Library.dc.html`, ⑥-1): each subsidiary's folders — one of each folder type, the types shared by every
 // subsidiary — their files (in R2, ≤ 2 GB) and link folders (Google Drive …); every file under its folder type's
-// category; search across every folder; the Dustbin's 30 days. Read from mkt_library(); its writes are the actions'.
+// category; search across every folder; the Dustbin's 60 days. Read from mkt_library(); its writes are the actions'.
 // Pure.
 
 import { officeTime } from '@/lib/office-time'
@@ -16,8 +16,9 @@ export const LIB_MAX_BYTES = 2 * 1024 * 1024 * 1024
 export const LIB_TYPE_COLORS = [
   'oklch(0.55 0.12 300)', 'oklch(0.58 0.12 50)', 'oklch(0.50 0.08 175)', 'oklch(0.52 0.09 260)', 'oklch(0.62 0.10 80)', 'oklch(0.55 0.12 340)',
 ] as const
-/** How long the Dustbin keeps what is put in it. */
-export const BIN_DAYS = 30
+/** How long the Dustbin keeps what is put in it — the user (2026-10-24): "60 days , auto clean" (mig 20261025004000;
+ * the hourly cron purges it too). */
+export const BIN_DAYS = 60
 
 export interface LibType { id: string; name: string; color: string; cat: LibCat; link: boolean }
 export interface LibSub { id: string; code: string; name: string; emoji: string; dot: string; client: boolean; profile: LibProfile }
@@ -126,6 +127,61 @@ export function profileToRow(p: LibProfile): Record<string, string> {
 
 /** A brand picture's place in the bucket: brand/<uuid>/<the name, tidied>. */
 export const brandPath = (fileName: string, uuid: string) => `brand/${uuid}/${tidyFileName(fileName)}`
+
+/** What a screen reader — and the history — calls each colour (the handoff names none), in LIB_AVATAR_COLORS' and
+ * LIB_BANNER_COLORS' order. */
+export const AVATAR_NAMES = ['Walnut', 'Navy', 'Charcoal', 'Olive', 'Teal', 'Rust', 'Plum'] as const
+export const BANNER_NAMES = ['Sand', 'Mist', 'Stone', 'Sage', 'Peach', 'Blush', 'Charcoal'] as const
+
+/** One change of a brand profile as its history shows it: who, when (the office's), what moved from what to what. */
+export interface ProfileChange {
+  id: number
+  at: string
+  who: string
+  lines: string[]
+}
+
+/** A brand profile's history (the user, 2026-10-24: "人人都能改 · but with audit log, who changes before, and change
+ * what") from audit_changes() over mkt_subsidiaries — each row that touched its profile, newest first: the colours by
+ * name, a picture added / replaced / taken off by its file's name, the font and the words before → after. */
+export function profileHistory(rows: unknown): ProfileChange[] {
+  const list = Array.isArray(rows) ? rows.filter(isObj) : []
+  const named = (colors: readonly string[], names: readonly string[], v: string | null) => (v ? names[colors.indexOf(v)] ?? v : '—')
+  const file = (p: string | null) => (p ? p.slice(p.lastIndexOf('/') + 1) : '')
+  const word = (v: string) => (v.trim() ? `"${v.trim()}"` : '—')
+  const out: ProfileChange[] = []
+  for (const r of list) {
+    const changed = Array.isArray(r.changed) ? r.changed : []
+    const op = str(r.op)
+    if (op === 'UPDATE' && !changed.includes('profile')) continue
+    if (op !== 'UPDATE' && op !== 'INSERT') continue
+    const before = profileFromRow(isObj(r.old_row) ? r.old_row.profile : null)
+    const after = profileFromRow(isObj(r.new_row) ? r.new_row.profile : null)
+    const lines: string[] = []
+    if (before.avatar !== after.avatar) lines.push(`Profile colour: ${named(LIB_AVATAR_COLORS, AVATAR_NAMES, before.avatar)} → ${named(LIB_AVATAR_COLORS, AVATAR_NAMES, after.avatar)}`)
+    if (before.avatarPath !== after.avatarPath) {
+      lines.push(!before.avatarPath ? `Logo added: ${file(after.avatarPath)}` : !after.avatarPath ? `Logo taken off: ${file(before.avatarPath)}`
+        : `Logo replaced: ${file(before.avatarPath)} → ${file(after.avatarPath)}`)
+    }
+    if (before.banner !== after.banner) lines.push(`Background colour: ${named(LIB_BANNER_COLORS, BANNER_NAMES, before.banner)} → ${named(LIB_BANNER_COLORS, BANNER_NAMES, after.banner)}`)
+    if (before.bannerPath !== after.bannerPath) {
+      lines.push(!before.bannerPath ? `Cover added: ${file(after.bannerPath)}` : !after.bannerPath ? `Cover taken off: ${file(before.bannerPath)}`
+        : `Cover replaced: ${file(before.bannerPath)} → ${file(after.bannerPath)}`)
+    }
+    if (before.font !== after.font) lines.push(`Font: ${before.font ?? '—'} → ${after.font ?? '—'}`)
+    if (before.name.trim() !== after.name.trim()) lines.push(`Display name: ${word(before.name)} → ${word(after.name)}`)
+    if (before.caption.trim() !== after.caption.trim()) lines.push(`Caption: ${word(before.caption)} → ${word(after.caption)}`)
+    if (!lines.length) continue
+    const at = officeTime(str(r.occurred_at))
+    out.push({
+      id: Number(r.id) || 0,
+      at: at?.isValid() ? `${shortDay(at.format('YYYY-MM-DD'))}, ${at.format('HH:mm')}` : '',
+      who: str(r.actor_name) || (str(r.actor_id) ? 'Removed account' : 'System'),
+      lines,
+    })
+  }
+  return out.sort((a, b) => b.id - a.id)
+}
 
 export interface BrandLook {
   /** The brand's display name — else the subsidiary's own. */

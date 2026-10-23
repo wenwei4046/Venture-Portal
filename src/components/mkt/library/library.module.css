@@ -133,6 +133,12 @@
   .profileGrid { grid-template-columns: minmax(0, 1fr); }
 }
 .profileHead { font-size: 12.5px; font-weight: 600; }
+/* A brand profile's history (2026-10-24): who and when over what moved, newest first, in a box of its own height. */
+.history { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; border: 1px solid rgb(var(--mk-line-2)); border-radius: 8px; }
+.historyRow { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; font-size: 12px; }
+.historyRow + .historyRow { border-top: 1px solid rgb(var(--mk-surface-2)); }
+.historyWho { font-size: 11px; color: rgb(var(--mk-muted)); }
+.historyLine { color: rgb(var(--mk-ink)); overflow-wrap: anywhere; }
 .swatch24 { width: 24px; height: 24px; border-radius: 7px; border: 0; cursor: pointer; padding: 0; }
 .swatchEdge { border: 1px solid rgb(var(--mk-line)); }
 .dashBtn {

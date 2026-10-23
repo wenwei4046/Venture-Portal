@@ -1,32 +1,40 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { fileRoute } from '@/lib/storage/browser'
 import { flash } from '@/components/hrv/toast'
 import { saveMktLibProfile } from '@/lib/marketing/actions'
 import {
-  brandFace, brandLook, brandPath, LIB_AVATAR_COLORS, LIB_BANNER_COLORS, LIB_FONTS, type Library, type LibProfile, type LibSub,
+  AVATAR_NAMES, BANNER_NAMES, brandFace, brandLook, brandPath, LIB_AVATAR_COLORS, LIB_BANNER_COLORS, LIB_FONTS, profileHistory, type Library,
+  type LibProfile, type LibSub, type ProfileChange,
 } from '@/lib/marketing/library'
 import s from './library.module.css'
 
-// A subsidiary's brand profile (`Library.dc.html` › *Edit … profile*, ⑥-2) — the manager's: the preview, the profile
-// picture (a colour, or a logo uploaded) and the background (a colour, or a cover uploaded), the brand font, the display
-// name and the caption; Save profile sends it whole. A picture goes to the bucket at once (brand/<uuid>/<name>); one sent
-// here and not saved is taken back out when the dialog closes.
+// A subsidiary's brand profile (`Library.dc.html` › *Edit … profile*, ⑥-2) — Marketing · Edit's since 2026-10-24 (the
+// user: "人人都能改 · but with audit log, who changes before, and change what"): the preview, the profile picture (a
+// colour, or a logo uploaded) and the background (a colour, or a cover uploaded), the brand font, the display name and the
+// caption; Save profile sends it whole. A picture goes to the bucket at once (brand/<uuid>/<name>); one sent here and not
+// saved is taken back out when the dialog closes. Under it, its History: every change, who, when, before → after — read
+// when the dialog opens (audit_changes, what the reader's permissions open), as the bell reads its list.
 
 /** A brand picture: an image, and a small one. */
 const PICTURE_MAX = 10 * 1024 * 1024
-/** What a screen reader calls each colour (the handoff names none), in LIB_AVATAR_COLORS' and LIB_BANNER_COLORS' order. */
-const AVATAR_NAMES = ['Walnut', 'Navy', 'Charcoal', 'Olive', 'Teal', 'Rust', 'Plum']
-const BANNER_NAMES = ['Sand', 'Mist', 'Stone', 'Sage', 'Peach', 'Blush', 'Charcoal']
 
 export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; onClose: () => void; onSaved: (lib: Library) => void }) {
   const [draft, setDraft] = useState<LibProfile>(sub.profile)
   const [sending, setSending] = useState<'avatarPath' | 'bannerPath' | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [history, setHistory] = useState<ProfileChange[] | null>(null)
+  useEffect(() => {
+    let live = true
+    void (createClient() as unknown as SupabaseClient)
+      .rpc('audit_changes', { p_tables: ['mkt_subsidiaries'], p_row: sub.code, p_limit: 40 })
+      .then(({ data, error: e }) => { if (live) setHistory(e ? [] : profileHistory(data)) })
+    return () => { live = false }
+  }, [sub.code])
   // Pictures sent from this dialog — any not saved are taken back out of the bucket.
   const sent = useRef<string[]>([])
   const pickAvatar = useRef<HTMLInputElement>(null)
@@ -149,6 +157,22 @@ export default function BrandProfile({ sub, onClose, onSaved }: { sub: LibSub; o
             <span className={s.profileHead}>Caption</span>
             <input className={s.input} value={draft.caption} maxLength={80} onChange={e => set({ caption: e.target.value })} />
           </label>
+        </div>
+
+        <div className={s.field}>
+          <span className={s.profileHead}>History{history?.length ? ` · ${history.length}` : ''}</span>
+          {history === null ? <span className={s.muted}>Loading…</span>
+            : !history.length ? <span className={s.muted}>No changes yet</span>
+              : (
+                <ol className={s.history} aria-label={`${sub.name} profile history`}>
+                  {history.map(h => (
+                    <li key={h.id} className={s.historyRow}>
+                      <span className={s.historyWho}>{h.who} · {h.at}</span>
+                      {h.lines.map(l => <span key={l} className={s.historyLine}>{l}</span>)}
+                    </li>
+                  ))}
+                </ol>
+              )}
         </div>
 
         {error ? <div className={s.err} role="status">{error}</div> : null}

@@ -2,7 +2,10 @@
 // "HOUZS Marketing Module Setup"). The five Marketing migrations run VERBATIM, twice, over the stand-ins the first one's
 // check uses. What is under test: only the manager builds — and so sees the prices; a product's code made; its draft
 // saved part by part and never over somebody else's save; publishing asks what the five sections do and keeps each
-// version whole with the workflow and minutes versions it starts on; retired and reactivated; the reader. No live I/O.
+// version whole with the workflow and minutes versions it starts on; retired and reactivated; the reader. Then
+// 20261025004100 (2026-10-24, the user's answer 8): a workflow template, a minutes template or a product never published,
+// deleted by the manager — never one published, never on an old draft count, never while a product's draft links it.
+// No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -243,5 +246,44 @@ check([bp.price, bp.live, bp.changed, bp.history.length, bp.history[0].note, bp.
 check(b.workflows.map(w => [w.action, w.version, w.stages, w.days, w.pic]), [['Design photo', 1, 1, 2, 1], ['Reels video', 0, 1, 3, 0]],
   'the workflow picker: each template, published or not, its stages, days and PIC approvals')
 check(b.minutes.map(t => [t.name, t.version, t.fields]), [['Kickoff', 1, 3]], 'the intake picker')
+
+// ── 2026-10-24: never published, deleted (20261025004100 — the user's answer 8: "可以删（只限从没发布、没被用过的）") ──
+await asSystem()
+const deletes = await sql('20261025004100_marketing_builder_deletes.sql')
+await db.exec(deletes)
+await db.exec(deletes) // twice: nothing changes, nothing breaks
+for (const fn of ['mkt_workflow_delete(uuid,integer)', 'mkt_minutes_delete(uuid,integer)', 'mkt_product_delete(uuid,integer)']) {
+  check([await one(`SELECT has_function_privilege('anon', 'public.${fn}', 'EXECUTE')`), await one(`SELECT has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE')`)],
+    [false, true], `${fn}: a sign-in’s, never the publishable key’s`)
+}
+const wfRev = async wid => peek1(`SELECT draft_rev FROM public.mkt_workflows WHERE id = $1`, [wid])
+const minRev = async mid => peek1(`SELECT draft_rev FROM public.mkt_minutes_templates WHERE id = $1`, [mid])
+await as(U.mei, STAFF)
+await refuses(`SELECT public.mkt_workflow_delete($1, $2)`, [wfDraft.id, await wfRev(wfDraft.id)], /The Workflow Builder is the manager's/, 'deleting a template is the manager’s')
+await refuses(`SELECT public.mkt_product_delete($1, 1)`, [p2.id], /The Product Builder is the manager's/, '…so is deleting a product')
+await as(U.josiah, MANAGER)
+await refuses(`SELECT public.mkt_workflow_delete($1, $2)`, [wf.id, await wfRev(wf.id)], /A template once published stays/, 'a published template keeps its versions')
+await refuses(`SELECT public.mkt_workflow_delete($1, 0)`, [wfDraft.id], /changed this template since you opened it/, 'on the draft count it was opened on')
+// A draft a product's draft links: refused, in words, until the product lets it go.
+let p2rev = (await save(p2.id, 1, { groups: [{ name: 'Video', items: [{ name: 'Reels', qty: 2, workflow: wfDraft.id }] }] })).rev
+await refuses(`SELECT public.mkt_workflow_delete($1, $2)`, [wfDraft.id, await wfRev(wfDraft.id)], new RegExp(`The product "PRD-${yy}002" links this template — unlink it there first`),
+  'a draft a product links stays until the product lets it go')
+p2rev = (await save(p2.id, p2rev, { groups: [] })).rev
+await one(`SELECT public.mkt_workflow_delete($1, $2)`, [wfDraft.id, await wfRev(wfDraft.id)])
+check(await peek1(`SELECT count(*)::int FROM public.mkt_workflows WHERE id = $1`, [wfDraft.id]), 0, 'a template never published, deleted')
+// A minutes template: the same — refused while a product takes it as its intake.
+const m2 = await one(`SELECT public.mkt_minutes_save(NULL, NULL, $1::jsonb)`, [JSON.stringify({ name: 'Brief call', rules: { project: true },
+  fields: [{ name: 'Project (from Projects)', type: 'Project link' }, { name: 'Attendees', type: 'People', lock: true }] })])
+await refuses(`SELECT public.mkt_minutes_delete($1, $2)`, [mins.id, await minRev(mins.id)], /A template once published stays/, 'a published minutes template keeps its versions')
+p2rev = (await save(p2.id, p2rev, { name: 'Brand Book', intake: m2.id })).rev
+await refuses(`SELECT public.mkt_minutes_delete($1, $2)`, [m2.id, await minRev(m2.id)], /The product "Brand Book" takes this template as its intake/, 'a draft a product takes as its intake stays')
+p2rev = (await save(p2.id, p2rev, { intake: null })).rev
+await one(`SELECT public.mkt_minutes_delete($1, $2)`, [m2.id, await minRev(m2.id)])
+check(await peek1(`SELECT count(*)::int FROM public.mkt_minutes_templates WHERE id = $1`, [m2.id]), 0, 'a minutes template never published, deleted')
+// A product: a draft goes; one once on sale is retired instead.
+await refuses(`SELECT public.mkt_product_delete($1, $2)`, [p1.id, rev], /A product once on sale is retired, not deleted/, 'a product once on sale is retired, not deleted')
+await refuses(`SELECT public.mkt_product_delete($1, 1)`, [p2.id], /changed this product since you opened it/, 'on the draft count it was opened on')
+await one(`SELECT public.mkt_product_delete($1, $2)`, [p2.id, p2rev])
+check((await book()).products.map(p => p.code), [`PRD-${yy}001`], 'a draft product, deleted')
 
 console.log(`marketing products: ${checks} checks passed`)
