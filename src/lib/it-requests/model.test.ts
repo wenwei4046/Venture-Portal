@@ -67,7 +67,8 @@ describe('files', () => {
     expect(itFileRefusal({ name: 'a.png', size: 10, type: 'image/png' })).toBeNull()
     expect(itFileRefusal({ name: 'a.exe', size: 10, type: '' })).toMatch(/a picture, a video/)
     expect(itFileRefusal({ name: 'a.png', size: 0, type: 'image/png' })).toMatch(/empty/)
-    expect(itFileRefusal({ name: 'big.mp4', size: 50 * 1024 * 1024 + 1, type: 'video/mp4' })).toMatch(/over 50 MB/)
+    expect(itFileRefusal({ name: 'recording.mp4', size: 2 * 1024 * 1024 * 1024, type: 'video/mp4' })).toBeNull()
+    expect(itFileRefusal({ name: 'big.mp4', size: 2 * 1024 * 1024 * 1024 + 1, type: 'video/mp4' })).toMatch(/over 2 GB/)
   })
 
   it('is kept in the uploader’s own folder under a safe name', () => {

@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { MAX_FILE_BYTES, contentTypeOf, extLabel, fileRefusal, objectPath, previewKind, resumeOf, safeFileName, startingType } from './files'
 import type { HiringFile } from './types'
 
-// The private hiring-files bucket: PDF, Word and images up to 10 MB, each
-// under its own folder.
+// The private hiring-files bucket: PDF, Word and images up to 100 MB (mig
+// 20261024006700), each under its own folder.
 describe('hiring files', () => {
-  it('keeps a PDF, a Word document or an image up to 10 MB', () => {
+  it('keeps a PDF, a Word document or an image up to 100 MB', () => {
+    expect(MAX_FILE_BYTES).toBe(104857600)
     expect(fileRefusal({ name: 'Daniel_Lee_CV.pdf', size: 1000 })).toBeNull()
     expect(fileRefusal({ name: 'cv.DOCX', size: 1000 })).toBeNull()
     expect(fileRefusal({ name: 'scan.jpeg', size: MAX_FILE_BYTES })).toBeNull()
     expect(fileRefusal({ name: 'cv.zip', size: 1000 })).toBe('A file is a PDF, a Word document or an image.')
-    expect(fileRefusal({ name: 'cv.pdf', size: MAX_FILE_BYTES + 1 })).toBe('That file is over 10 MB.')
+    expect(fileRefusal({ name: 'cv.pdf', size: MAX_FILE_BYTES + 1 })).toBe('That file is over 100 MB.')
     expect(fileRefusal({ name: 'cv.pdf', size: 0 })).toBe('Choose a file.')
   })
 

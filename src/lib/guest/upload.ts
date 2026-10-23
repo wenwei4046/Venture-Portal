@@ -7,7 +7,7 @@ import { attachable } from './model'
  * browser puts it in the private `hiring-files` bucket under guest/<code>/ —
  * as a stranger (the publishable key, no session, even for somebody signed in
  * to the portal), which one storage policy lets in only while the link is on
- * with Request manpower open. Too big for a Server Action (10 MB); nobody
+ * with Request manpower open. Too big for a Server Action (100 MB); nobody
  * outside reads it back — Hiring opens it by a signed link.
  */
 let stranger: SupabaseClient | null = null

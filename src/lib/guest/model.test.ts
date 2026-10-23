@@ -209,10 +209,11 @@ describe('request manpower', () => {
     expect(hireAnswers({ ...answers, _file: 'x', notes: '  ' })).toEqual({ position: 'Driver', budget: '2500–3000', headcount: '2' })
   })
 
-  it('attaches a PDF, Word file or photo under 10 MB', () => {
+  it('attaches a PDF, Word file or photo up to 100 MB', () => {
     expect(attachable('JD.PDF', 1000)).toEqual({ ext: 'pdf' })
     expect(attachable('jd.exe', 1000)).toEqual({ reason: 'Attach a PDF, a Word file or a photo.' })
-    expect(attachable('jd.pdf', 11 * 1024 * 1024)).toEqual({ reason: 'Attach a file under 10 MB.' })
+    expect(attachable('jd.pdf', 100 * 1024 * 1024)).toEqual({ ext: 'pdf' })
+    expect(attachable('jd.pdf', 100 * 1024 * 1024 + 1)).toEqual({ reason: 'Attach a file up to 100 MB.' })
   })
 })
 

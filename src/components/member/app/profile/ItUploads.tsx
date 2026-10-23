@@ -25,7 +25,7 @@ export type ItUploader = (file: File) => Promise<Uploaded>;
 /**
  * The files of a request or a note (IT support, 2026-10-20): each goes up the moment it is picked (or pasted — a
  * screenshot on a computer), so Send waits only for the last of them; × takes one off (and out of the bucket). Ten at a
- * time, 50 MB each — the bucket's own limits.
+ * time, 2 GB each — the bucket's own limits.
  */
 export function useItUploads(upload: ItUploader = uploadItFile) {
   const [items, setItemsState] = useState<ItAttachment[]>([]);

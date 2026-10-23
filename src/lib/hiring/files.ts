@@ -1,13 +1,13 @@
 // A candidate's and a talent's files (2026-10-11, Hiring): the private
 // `hiring-files` bucket (mig 20261011080000) takes PDF, Word and images up to
-// 10 MB, each under its own folder so two files of one name never meet. Since
-// mig 20261011160000 a record keeps several, each with a file type (Résumé,
-// IC, Certificate …). Pure.
+// 100 MB (10 MB until mig 20261024006700), each under its own folder so two
+// files of one name never meet. Since mig 20261011160000 a record keeps
+// several, each with a file type (Résumé, IC, Certificate …). Pure.
 
 import type { HiringFile, HiringFileType } from './types'
 
 export const HIRING_BUCKET = 'hiring-files'
-export const MAX_FILE_BYTES = 10 * 1024 * 1024
+export const MAX_FILE_BYTES = 100 * 1024 * 1024
 /** What a file input offers. */
 export const HIRING_ACCEPT = '.pdf,.doc,.docx,image/*'
 
@@ -35,7 +35,7 @@ export function contentTypeOf(name: string): string | null {
 export function fileRefusal(file: { name: string; size: number }): string | null {
   if (!file.name || file.size === 0) return 'Choose a file.'
   if (!contentTypeOf(file.name)) return 'A file is a PDF, a Word document or an image.'
-  if (file.size > MAX_FILE_BYTES) return 'That file is over 10 MB.'
+  if (file.size > MAX_FILE_BYTES) return 'That file is over 100 MB.'
   return null
 }
 

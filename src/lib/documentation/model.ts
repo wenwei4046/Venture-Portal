@@ -389,9 +389,10 @@ export function withdrawnLine(m: Pick<Published, 'withdrawnAt' | 'withdrawnBy' |
 
 // ── Uploads ─────────────────────────────────────────────────────────────────
 
-/** The file box's accept list: "PDF, Excel, Word or image". */
-export const DOC_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.gif,.heic'
-export const MAX_FILE_BYTES = 25 * 1024 * 1024
+/** The file box's accept list: "PDF, Office, image, video or zip" — videos, PowerPoint and zip since 2026-10-24. */
+export const DOC_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp,.gif,.heic,.mp4,.mov,.webm,.zip'
+/** The bucket's own limit (mig 20261024006700, the owner: "make the size more bigger for all"): 2 GB. */
+export const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 
 const TYPES: Record<string, string> = {
   pdf: 'application/pdf',
@@ -399,6 +400,8 @@ const TYPES: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   csv: 'text/csv',
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -406,6 +409,10 @@ const TYPES: Record<string, string> = {
   webp: 'image/webp',
   gif: 'image/gif',
   heic: 'image/heic',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+  zip: 'application/zip',
 }
 
 /** The type the bucket is told — by the name's ending, which a browser does not always fill in. */
@@ -416,8 +423,8 @@ export function contentTypeOf(fileName: string, given?: string | null): string |
 
 /** Why this file cannot go up — or null. */
 export function fileRefusal(file: { name: string; size: number; type?: string }): string | null {
-  if (!contentTypeOf(file.name, file.type)) return 'That kind of file cannot be kept here — a PDF, Excel, Word file or an image.'
-  if (file.size > MAX_FILE_BYTES) return 'That file is larger than 25 MB.'
+  if (!contentTypeOf(file.name, file.type)) return 'That kind of file cannot be kept here — a PDF, an Office file, an image, a video or a zip.'
+  if (file.size > MAX_FILE_BYTES) return 'That file is larger than 2 GB.'
   return null
 }
 
@@ -438,11 +445,13 @@ export function nameFromFile(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
 }
 
-/** How the preview drawer shows a file: inline for a PDF or a picture, else "No preview". */
-export function previewKind(fileName: string, contentType: string | null): 'pdf' | 'image' | 'sheet' | 'none' {
+/** How the preview drawer shows a file: inline for a PDF, a picture or a video, else "No preview". */
+export function previewKind(fileName: string, contentType: string | null): 'pdf' | 'image' | 'video' | 'sheet' | 'none' {
   const type = contentTypeOf(fileName, contentType)
   if (type === 'application/pdf') return 'pdf'
   if (type && type.startsWith('image/') && type !== 'image/heic') return 'image'
+  // Played where it is (2026-10-24, videos taken): the player asks the file a piece at a time, so a big one starts at once.
+  if (type && type.startsWith('video/')) return 'video'
   // Excel and CSV are drawn as the handoff's sheet (2026-10-11, lib/documentation/sheet.ts); a Word file stays a download, as there.
   if (type === TYPES.xlsx || type === TYPES.xls || type === TYPES.csv) return 'sheet'
   return 'none'
