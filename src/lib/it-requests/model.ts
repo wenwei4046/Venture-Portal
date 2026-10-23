@@ -202,6 +202,19 @@ export function itObjectPath(uid: string, name: string, key: string): string {
 export const isImage = (contentType: string | null) => !!contentType && contentType.startsWith('image/') && contentType !== 'image/heic' && contentType !== 'image/heif'
 export const isVideo = (contentType: string | null) => !!contentType && contentType.startsWith('video/')
 
+/**
+ * How a filed file shows beside its request (2026-10-24): what a browser draws in place — a picture, a video, a PDF, a
+ * text file — or null (an Office file, a zip, a CSV, an iPhone's HEIC), which opens in a new tab or downloads instead.
+ */
+export function previewKind(name: string, contentType: string | null): 'image' | 'video' | 'pdf' | 'text' | null {
+  const type = itContentType(name, contentType ?? '') ?? ''
+  if (isImage(type)) return 'image'
+  if (isVideo(type)) return 'video'
+  if (type === 'application/pdf') return 'pdf'
+  if (type === 'text/plain' || type === 'application/json') return 'text'
+  return null
+}
+
 /** A moment on the office's calendar: 20 Oct (a request sent at 01:00 is the office's day, not UTC's). */
 export const itDay = (iso: string): string => (iso ? officeDay(iso).format('D MMM') : '')
 /** …and its time: 20 Oct · 14:32. */
