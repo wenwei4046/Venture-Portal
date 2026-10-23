@@ -407,6 +407,33 @@ button.photo:disabled { cursor: wait; }
 .trophyRow { display: flex; flex-wrap: wrap; gap: 4px; font-size: 26px; line-height: 1.1; }
 .trophyLocked { opacity: .25; filter: grayscale(1); }
 .trophyLine { font-size: .8em; color: rgb(var(--mk-muted)); margin-top: auto; }
+
+/* ── ⑦-4: the lobby, a visit ───────────────────────────────────────────────────── */
+.lobby { position: absolute; inset: 0; background: var(--mk-lobby-wall); overflow: hidden; }
+.lobbyFloor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+  background: repeating-linear-gradient(90deg, var(--mk-lobby-floor) 0 40px, var(--mk-lobby-floor-2) 40px 42px);
+}
+.lobbyPet {
+  position: absolute; transform: translateX(-50%); transition: left 2.6s ease-in-out; display: flex; flex-direction: column;
+  align-items: center; border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer;
+}
+div.lobbyPet { cursor: default; }
+.lobbyPet:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; border-radius: 8px; }
+.lobbyName {
+  font-size: 9.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: rgb(var(--mk-white) / .92); white-space: nowrap;
+  margin-top: 2px; color: rgb(var(--mk-ink));
+}
+.lobbyNone { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: .86em; color: rgb(var(--mk-muted)); }
+.visitBar {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-on-ink));
+  font-size: .9em;
+}
+.visitBack {
+  flex: none; padding: 5px 12px; border-radius: 7px; background: rgb(var(--mk-on-ink)); color: rgb(var(--mk-ink)); font-weight: 500;
+  text-decoration: none; white-space: nowrap;
+}
+.visitBack:hover { background: rgb(var(--mk-white)); }
 @keyframes pIdle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes pNew { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-12px) scale(1.05); } }
 @keyframes pBusy { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }

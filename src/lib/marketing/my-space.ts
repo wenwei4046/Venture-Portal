@@ -190,6 +190,14 @@ export function weekRows(columns: PlateColumn[], today: string): WeekRow[] {
     .map(c => ({ key: c.key, when: shortDay(c.due as string), title: c.title, red: c.tone === 'red', trackId: c.trackId }))
 }
 
+/** What is on a plate, for the pet's mood (`petState`): My turn's cards, those late there and in Waiting, a stage just
+ * put on it to Accept. */
+export function plateOf(columns: PlateColumn[]): { count: number; red: number; fresh: boolean } {
+  const turn = columns.find(c => c.key === 'turn')?.cards ?? []
+  const waiting = columns.find(c => c.key === 'waiting')?.cards ?? []
+  return { count: turn.length, red: [...turn, ...waiting].filter(c => c.tone === 'red').length, fresh: turn.some(c => c.isNew) }
+}
+
 /** "you have 2 things on your plate" / "your plate is clear" — the greeting's second half. */
 export function plateLine(turn: number): string {
   return turn > 0 ? `you have ${plural(turn, 'thing')} on your plate` : 'your plate is clear'

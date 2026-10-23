@@ -7279,6 +7279,8 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-floor-tile: #f2efe9; --mk-floor-tile-2: #e0d9cd; --mk-floor-grass: #cfe3b5; --mk-floor-grass-2: #b9d49c;
   --mk-floor-carpet: #d9cfe6; --mk-floor-carpet-2: #c8bcda;
   --mk-room-frame: #ffffff; --mk-room-frame-night: #4b4560; --mk-room-base: rgb(255 255 255 / .5); --mk-room-base-night: #1f1c2b;
+  --mk-lobby-wall: #efe6d8; --mk-lobby-floor: #e9dfcf; --mk-lobby-floor-2: #e1d4c0;
+  --mk-on-ink: 246 238 230;
   --mk-sky-day: linear-gradient(#fbe3b0, #cfe4f2); --mk-sky-evening: linear-gradient(#f5a97f, #6f6aa8);
   --mk-sky-night: linear-gradient(#2c3a66, #56679c);
   --mk-pet-original: linear-gradient(135deg, #f2c48d, #d99a5b); --mk-pet-cocoa: linear-gradient(135deg, #9a6a48, #5e3b25);
