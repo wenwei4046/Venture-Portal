@@ -1042,7 +1042,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                   </span>
                 </div>
               </div>
-              <div style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">
                 <div style={{ display: "flex", gap: "2px", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>
                   {(v.as.ae.modes).map((m, m_i) => (<Fragment key={m_i}>
                     <span onClick={m.pick} style={{ flex: "1", height: "36px", borderRadius: "18px", display: "grid", placeItems: "center", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: m.w, background: m.bg, color: m.fg, boxShadow: m.sh, cursor: "pointer" }}>{m.label}</span>
@@ -1153,7 +1153,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 </svg>Full time lead allocation</span>
               <strong style={{ fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>{v.ftx.name}</strong>
             </div>
-            <div style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">
               <div style={{ flex: "none", display: "flex", flexDirection: "column", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) repeat(7, 30px)", alignItems: "center", gap: "4px", padding: "10px 12px 6px" }}>
                   <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".04em", color: "var(--crm-faint)" }}>PERSON</span>

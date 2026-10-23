@@ -453,6 +453,13 @@ function panel(body) {
   body = teamInbox(body);
   body = teamAssign(body);
   body = teamSplit(body);
+  // Split leads' and Full time's lists keep every card whole on an iPhone (2026-10-23, the owner: "数据被 overlap"): Safari
+  // let a card shrink inside the scrolling column so its rows ran into the next, and dropped the column's end padding so the
+  // last row stayed under Save — data-scroll-keep (crm.module.css) stops the shrink and ends the list with a spacer.
+  body = once(body, 'overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>',
+    'overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">', "split list keeps its cards");
+  body = once(body, 'overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 20px", display: "flex", flexDirection: "column", gap: "14px" }}>',
+    'overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">', "full time list keeps its cards");
   // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
   body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");

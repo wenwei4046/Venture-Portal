@@ -136,3 +136,9 @@
    rest white, the thumb a dot in the team's colour (phone-4a.cjs draws the track; --thumb is the team's colour). */
 .app input[data-crm-range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb, var(--crm-rust)); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(42,22,12,.3); cursor: pointer; }
 .app input[data-crm-range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--thumb, var(--crm-rust)); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(42,22,12,.3); cursor: pointer; }
+
+/* A scrolling list whose cards must stay whole (Split leads, Full time — 2026-10-23, the owner: "数据被 overlap"): an iPhone's
+   Safari shrank a card inside the scrolling column so its rows ran into the next one, and dropped the column's end padding
+   so the last row stayed under the Save bar. No child shrinks; a spacer ends the list (phone-4a.cjs puts data-scroll-keep). */
+.app [data-scroll-keep] > * { flex-shrink: 0; }
+.app [data-scroll-keep]::after { content: ""; flex: 0 0 6px; }
