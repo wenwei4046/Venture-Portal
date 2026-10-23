@@ -25,6 +25,7 @@ const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   active: true,
   login: null,
   reportsTo: { name: 'BOSS LADY', title: 'Marketing Manager', href: '/team/people/staff-boss', active: true },
+  employment: { status: 'permanent', chip: { label: 'Permanent', tone: 'ledger' }, value: 'Permanent' },
   hireDate: '05 Jan 2026',
   tenure: '9 months',
   resignationDate: null,
@@ -44,7 +45,7 @@ const staff = (over: Partial<StaffRow> = {}): StaffRow => ({
   id: 'staff-1', employee_name: 'TEST STAFF', first_name: 'TEST', last_name: 'STAFF', designation: 'Executive', department_id: 'd-marketing',
   department_name: 'Marketing', commission_dept: false, director_dept: false, title_id: 't-exec',
   basic_salary: 2500, allowances: 0, non_statutory_allowance: 0, employee_code: 'HV042', infotech_code: null,
-  hire_date: '2026-01-05', resignation_date: null, epf_category: 'A', socso_category: 'first',
+  hire_date: '2026-01-05', resignation_date: null, employment_status: 'permanent', probation_months: null, epf_category: 'A', socso_category: 'first',
   is_epf_exempt: false, pcb_category: 'KA1', children_count: 0, employment_type: 'salaried',
   bank_name: 'Maybank', bank_account_no: '0012345678', bank_name_2: 'CIMB', bank_account_no_2: '0098765432',
   nric: '850101141234', contact_number: '012-345 6789', email: 'test@example.com', address: null,
@@ -141,9 +142,9 @@ describe('the card', () => {
   const card = () => screen.getByRole('complementary', { name: 'TEST STAFF' })
   const labels = () => Array.from(card().querySelectorAll('dt'), dt => dt.textContent)
 
-  it('reads Department, Reports to, Level, Employment Type and Hire Date — no Account, no Role', () => {
+  it('reads Department, Reports to, Level, Employment Type, Employment Status and Hire Date — no Account, no Role', () => {
     render(<PersonRecord view={view({ login: 'active', contact: { phone: null, email: 'test@example.com', address: null } })} editor={editor()} inviteHref={null} />)
-    expect(labels()).toEqual(['Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(labels()).toEqual(['Department', 'Reports to', 'Level', 'Employment Type', 'Employment Status', 'Hire Date'])
     expect(within(card()).getByRole('link', { name: 'BOSS LADY' })).toHaveAttribute('href', '/team/people/staff-boss')
     expect(within(card()).getByText('Marketing Manager')).toBeInTheDocument()
     expect(within(card()).getByText('05 Jan 2026 · 9 months')).toBeInTheDocument()
@@ -154,7 +155,7 @@ describe('the card', () => {
 
   it('edited, the title and the upline are its fields', () => {
     openEditor()
-    expect(labels()).toEqual(['Title', 'Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(labels()).toEqual(['Title', 'Department', 'Reports to', 'Level', 'Employment Type', 'Employment Status', 'Hire Date'])
     expect(within(card()).getByLabelText('Title')).toHaveValue('t-exec')
     expect(within(card()).getByLabelText('Hire Date')).toHaveValue('2026-01-05')
   })
@@ -163,6 +164,72 @@ describe('the card', () => {
     render(<PersonRecord view={view({ reportsTo: { name: 'BOSS LADY', title: null, href: null, active: true } })} editor={null} inviteHref={null} />)
     expect(within(card()).getByText('BOSS LADY')).toBeInTheDocument()
     expect(within(card()).queryByRole('link', { name: 'BOSS LADY' })).toBeNull()
+  })
+})
+
+// 2026-10-23 — the user: "for the employment status, i want go with permenant, part time and probation status follow by
+// the hire date start": the chip names it, the card reads it, Edit makes it a field — a probation with its period.
+describe('Employment Status', () => {
+  const card = () => screen.getByRole('complementary', { name: 'TEST STAFF' })
+
+  it('the chip names it where Active was, and the card reads its line', () => {
+    render(
+      <PersonRecord
+        view={view({
+          employment: {
+            status: 'probation',
+            chip: { label: 'Probation · 9d left', tone: 'alert', title: 'Probation ends 1 Nov 2026 · in 9 days' },
+            value: 'Probation · 3 months · ends 1 Nov 2026 · in 9 days',
+          },
+        })}
+        editor={null}
+        inviteHref={null}
+      />,
+    )
+    expect(within(card()).getByText('Probation · 9d left')).toHaveAttribute('title', 'Probation ends 1 Nov 2026 · in 9 days')
+    expect(within(card()).queryByText('Active')).toBeNull()
+    expect(within(card()).getByText('Probation · 3 months · ends 1 Nov 2026 · in 9 days')).toBeInTheDocument()
+  })
+
+  it('edited: Probation brings its period, and the two are sent together', async () => {
+    openEditor()
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    expect(status).toHaveValue('permanent')
+    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Permanent', 'Part time'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    fireEvent.change(status, { target: { value: 'probation' } })
+    expect(screen.getByLabelText('Probation period')).toHaveValue('3')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ employment_status: 'probation', probation_months: '3' })
+  })
+
+  it('a record not set yet offers “— Not set” until it is, and Permanent goes alone', async () => {
+    openEditor(view({ employment: { status: null, chip: { label: 'Not set', tone: 'plain' }, value: null } }), editor({ employment_status: null }))
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    expect(status).toHaveValue('')
+    expect(status.options[0].text).toBe('— Not set')
+    fireEvent.change(status, { target: { value: 'permanent' } })
+    expect(await save()).toEqual({ employment_status: 'permanent' })
+  })
+
+  it('an extended probation keeps its period among the choices, and a new period goes with its status', async () => {
+    openEditor(view(), editor({ employment_status: 'probation', probation_months: 9 }))
+    const months = screen.getByLabelText('Probation period') as HTMLSelectElement
+    expect(months).toHaveValue('9')
+    expect(Array.from(months.options).map(o => o.value)).toEqual(['1', '2', '3', '4', '5', '6', '9'])
+    fireEvent.change(months, { target: { value: '6' } })
+    expect(await save()).toEqual({ employment_status: 'probation', probation_months: '6' })
+  })
+
+  it('nothing changed, nothing of it is sent', async () => {
+    openEditor(view(), editor({ employment_status: 'probation', probation_months: 3 }))
+    fireEvent.change(screen.getByLabelText('Reports to'), { target: { value: 'staff-ceo' } })
+    expect(await save()).toEqual({ reports_to: 'staff-ceo' })
+  })
+
+  it('a reader the directory serves has no field for it', () => {
+    openEditor(view({ employment: { status: undefined, chip: { label: 'Active', tone: 'ledger' }, value: null } }))
+    expect(within(card()).queryByLabelText('Employment Status')).toBeNull()
   })
 })
 

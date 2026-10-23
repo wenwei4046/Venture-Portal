@@ -352,6 +352,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // HR edits a login's email on the person's page (mig 20261022150000): People · Edit on that page, a full-access title
   // only by whoever manages permissions — asked before the login moves, and again when the record takes it.
   'person_login_email_move', 'person_login_email_set',
+  // Employment status (mig 20261024214500): HR view's bell reads who is on probation, and Acknowledge writes the
+  // reminder's acknowledgement — both People · Edit with the HR scope; Acknowledge on the person page's box too.
+  'probation_reviews', 'probation_acknowledge',
   // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
   // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',

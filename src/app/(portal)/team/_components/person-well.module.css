@@ -51,4 +51,8 @@
 .value { font-size: 14.5px; color: rgb(var(--hv-ink)); overflow-wrap: anywhere; }
 .mono { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 13px; margin-left: 8px; color: rgb(var(--hv-body-2)); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* A second line in the same well (Employment's probation, 2026-10-23), a hairline above it. */
+.lineRule { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgb(var(--hv-hairline)); }
+/* Extend's "+ 1 month" — the kit's soft dropdown at a button's height. */
+.extendBy { min-width: 128px; }
 .note { margin: 0; font-size: 13.5px; color: rgb(var(--hv-body-2)); }

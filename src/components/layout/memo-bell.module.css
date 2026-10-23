@@ -80,6 +80,24 @@
 .chip[data-tone='ledger'] { background: rgb(222 240 232); border-color: rgb(180 215 198); color: rgb(21 110 78); }
 .empty { padding: 28px 0; text-align: center; color: rgb(var(--hv-brown)); font-size: 13px; }
 
+/* HR's view (2026-10-23): probations ending above the memos, each group under its word. */
+.section {
+  padding: 14px 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgb(var(--hv-brown));
+}
+.section:first-child { padding-top: 0; }
+.section + .row { border-top: 0; }
+.rowTag[data-tone='probation'] { background: rgb(249 238 214); color: rgb(150 100 12); }
+/* The row's name opens their page; Acknowledge is its own press. */
+a.rowText { color: inherit; text-decoration: none; }
+.chipButton { cursor: pointer; font: inherit; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; }
+.chipButton:hover:not(:disabled) { border-color: rgb(150 100 12); }
+.chipButton:disabled { opacity: 0.6; cursor: wait; }
+
 .detail { display: flex; flex-direction: column; gap: 14px; line-height: normal; }
 .back {
   align-self: flex-start;

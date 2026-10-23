@@ -144,7 +144,9 @@
 }
 .rate { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10px; }
 .code { padding: 9px 14px; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empCell { padding: 9px 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+.empCell { padding: 9px 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; overflow: hidden; }
+/* The hire date after the status chip (2026-10-23): the code column's face, a step quieter. */
+.hired { flex: none; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-body-2)); }
 .missing {
   padding: 2px 8px;
   border-radius: 999px;

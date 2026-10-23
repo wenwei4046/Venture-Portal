@@ -65,6 +65,12 @@ describe('WaitingTransferForm', () => {
     show()
     fireEvent.click(screen.getByRole('button', { name: 'Senior Revenue Specialist' }))
     fireEvent.click(screen.getByRole('button', { name: 'ANTHONY' }))
+    // Probation, Permanent or Part time (2026-10-23) — a probation with its period, its end shown.
+    expect(screen.queryByRole('group', { name: 'Probation period' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Probation' }))
+    expect(within(screen.getByRole('group', { name: 'Probation period' })).getByRole('button', { name: '3 months' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '6 months' }))
+    expect(screen.getByText('ends 19 Apr 2027')).toBeInTheDocument()
     fireEvent.change(field(/^NRIC/), { target: { value: '900101-14-5678' } })
     fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
     fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
@@ -73,6 +79,7 @@ describe('WaitingTransferForm', () => {
     })
     expect(transferFromWaitingList).toHaveBeenCalledWith(expect.objectContaining({
       requestId: FACTS.requestId, name: 'Amelia Tan', titleId: 'srs', reportsTo: 'anthony', hireDate: '2026-10-20',
+      employmentStatus: 'probation', probationMonths: 6,
       nric: '900101-14-5678', bankName: 'Maybank', bankAccountNo: '1234567890', contact: '012-345 6789',
     }))
     expect(flash).toHaveBeenCalledWith('Amelia Tan is now an employee in Fair · HV070')
@@ -82,6 +89,7 @@ describe('WaitingTransferForm', () => {
   it('shows the database’s refusal and stays', async () => {
     transferFromWaitingList.mockResolvedValue({ ok: false, reason: 'Fair is full — 28 of 28 places are taken. Raise the limit on Rules › Capacity first.' })
     show()
+    fireEvent.click(screen.getByRole('button', { name: 'Permanent' }))
     fireEvent.change(field(/^NRIC/), { target: { value: '900101145678' } })
     fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
     fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
@@ -90,6 +98,18 @@ describe('WaitingTransferForm', () => {
     })
     expect(screen.getByRole('alert')).toHaveTextContent('Fair is full')
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('asks the employment status before anything is sent', async () => {
+    show()
+    fireEvent.change(field(/^NRIC/), { target: { value: '900101145678' } })
+    fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
+    fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
+    })
+    expect(transferFromWaitingList).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Permanent or Part time.')
   })
 
   it('cannot be sent at all while it is blocked', () => {

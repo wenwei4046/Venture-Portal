@@ -44,6 +44,15 @@ import AddressFields from '@/components/address/AddressFields'
 import { EMPTY_ADDRESS, addressOf, addressRefusal, isEmptyAddress, sameAddress, type Address } from '@/lib/address/address'
 import { addressFormEntries } from '@/lib/address/address-form'
 import { loadMalaysia } from '@/lib/address/malaysia'
+import {
+  DEFAULT_PROBATION_MONTHS,
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABEL,
+  PROBATION_MONTH_CHOICES,
+  monthsLabel,
+  type EmploymentStatus,
+  type StatusChip,
+} from '@/lib/employment-status'
 import { updateStaff } from '../actions'
 import PersonWell from '../../_components/PersonWell'
 import s from './person-record.module.css'
@@ -80,6 +89,11 @@ export interface PersonRecordView {
   login: 'active' | 'disabled' | null
   /** Who they report to — `href` only for a reader of the whole roster. */
   reportsTo: { name: string; title: string | null; href: string | null; active: boolean } | null
+  /**
+   * Probation, Permanent or Part time (2026-10-23): the chip for the active, and the card's line ("Probation · 3 months
+   * · ends 31 Dec 2026 · in 9 days"); `status` undefined for a reader not shown it (the directory).
+   */
+  employment: { status: EmploymentStatus | null | undefined; chip: StatusChip; value: string | null }
   /** As the page writes a date ("05 Jan 2026"). */
   hireDate: string | null
   /** How long they have been with the company ("9 months"). */
@@ -354,9 +368,14 @@ export default function PersonRecord({
         </p>
       ) : null}
       <div className={s.chips}>
-        <Chip tone={view.active ? 'ledger' : 'danger'}>
-          {view.active ? 'Active' : view.resignationDate ? `Resigned ${view.resignationDate}` : 'Inactive'}
-        </Chip>
+        {/* Probation, Permanent or Part time for the active (2026-10-23), as the roster's row reads. */}
+        {view.active ? (
+          <Chip tone={view.employment.chip.tone} title={view.employment.chip.title}>
+            {view.employment.chip.label}
+          </Chip>
+        ) : (
+          <Chip tone="danger">{view.resignationDate ? `Resigned ${view.resignationDate}` : 'Inactive'}</Chip>
+        )}
         <Chip tone={view.login ? (view.login === 'active' ? 'info' : 'danger') : 'plain'}>
           {view.login ? (view.login === 'active' ? 'Has login' : 'Login disabled') : 'No login'}
         </Chip>
@@ -434,6 +453,26 @@ export default function PersonRecord({
               ))}
             </Select>
           )}
+        />
+        {/* Probation, Permanent or Part time (2026-10-23) — a probation with its period; then when they started, which
+            a probation is counted from. Not offered to a reader the directory serves (it carries no status). */}
+        <SideFact
+          label="Employment Status"
+          field="employment_status"
+          value={view.employment.value}
+          edit={
+            view.employment.status === undefined
+              ? undefined
+              : e => (
+                  <EmploymentStatusField
+                    current={e.staff.employment_status ?? null}
+                    months={e.staff.probation_months ?? null}
+                    onSwitch={() => {
+                      if (form.current) setChanged(changedFields(form.current))
+                    }}
+                  />
+                )
+          }
         />
         <SideFact
           label="Hire Date"
@@ -926,6 +965,63 @@ function UplineField({ current, groups }: { current: string | null; groups: Upli
         </optgroup>
       ))}
     </Select>
+  )
+}
+
+/**
+ * Employment Status (2026-10-23): Probation, Permanent or Part time — a probation with its period beside it. "— Not
+ * set" is offered only while it is (a record filed before the status existed). The two are saved together whenever
+ * either changed (lib/person-record.ts › SAVED_TOGETHER); `onSwitch` counts the changes again once the period comes
+ * or goes.
+ */
+function EmploymentStatusField({ current, months, onSwitch }: { current: EmploymentStatus | null; months: number | null; onSwitch: () => void }) {
+  const [status, setStatus] = useState<string>(current ?? '')
+  const onProbation = status === 'probation'
+  const statusDirty = useChanged('employment_status')
+  const monthsDirty = useChanged('probation_months')
+  const switched = useRef(false)
+  useLayoutEffect(() => {
+    if (switched.current) onSwitch()
+    switched.current = true
+    // Only when the period comes or goes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onProbation])
+  // An extended probation may run past the periods Add Staff offers: theirs stays a choice.
+  const periods = [...new Set<number>([...PROBATION_MONTH_CHOICES, ...(months ? [months] : [])])].sort((a, b) => a - b)
+  return (
+    <span className={s.pair}>
+      <Select
+        id={fieldId('employment_status')}
+        name="employment_status"
+        defaultValue={current ?? ''}
+        onChange={event => setStatus(event.target.value)}
+        data-dirty={statusDirty}
+        className={s.select}
+      >
+        {current ? null : <option value="">— Not set</option>}
+        {EMPLOYMENT_STATUSES.map(st => (
+          <option key={st} value={st}>
+            {EMPLOYMENT_STATUS_LABEL[st]}
+          </option>
+        ))}
+      </Select>
+      {onProbation ? (
+        <Select
+          id={fieldId('probation_months')}
+          name="probation_months"
+          defaultValue={String(months ?? DEFAULT_PROBATION_MONTHS)}
+          data-dirty={monthsDirty}
+          className={s.select}
+          aria-label="Probation period"
+        >
+          {periods.map(n => (
+            <option key={n} value={String(n)}>
+              {monthsLabel(n)}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </span>
   )
 }
 

@@ -20,6 +20,16 @@ import AddressFields from '@/components/address/AddressFields'
 import { EMPTY_ADDRESS, addressRefusal, type Address } from '@/lib/address/address'
 import { addressFormEntries } from '@/lib/address/address-form'
 import { loadMalaysia } from '@/lib/address/malaysia'
+import {
+  DEFAULT_PROBATION_MONTHS,
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABEL,
+  PROBATION_MONTH_CHOICES,
+  PROBATION_NOTICE_DAYS,
+  dayLabel,
+  monthsLabel,
+  probationEnd,
+} from '@/lib/employment-status'
 
 export interface AddStaffDepartment {
   id: string
@@ -109,6 +119,12 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
   const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
+  // When they start, and Probation / Permanent / Part time (2026-10-23): a probation asks its period, and its last
+  // day — the hire date plus the months — is shown as the database will keep it.
+  const [hireDate, setHireDate] = useState('')
+  const [employmentStatus, setEmploymentStatus] = useState('')
+  const [probationMonths, setProbationMonths] = useState(String(DEFAULT_PROBATION_MONTHS))
+  const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, Number(probationMonths)) : null
 
   const department = departments.find(d => d.id === departmentId) ?? null
   const isCommissionDept = department?.payroll_source === 'commission'
@@ -363,6 +379,79 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
               : 'HV + the next number after the highest on the roster.'}
           </p>
         </div>
+        <div>
+          <label htmlFor="staff-hire-date" className={labelBase}>
+            Hire date
+          </label>
+          <input
+            id="staff-hire-date"
+            name="hire_date"
+            type="date"
+            required
+            value={hireDate}
+            onChange={e => setHireDate(e.target.value)}
+            className={textInput}
+          />
+        </div>
+        <div>
+          <label htmlFor="staff-employment-status" className={labelBase}>
+            Employment status
+          </label>
+          <Select bare
+            id="staff-employment-status"
+            name="employment_status"
+            required
+            value={employmentStatus}
+            onChange={e => setEmploymentStatus(e.target.value)}
+            className={textInput}
+          >
+            <option value="">Select...</option>
+            {EMPLOYMENT_STATUSES.map(st => (
+              <option key={st} value={st}>
+                {EMPLOYMENT_STATUS_LABEL[st]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {employmentStatus === 'probation' ? (
+          <>
+            <div>
+              <label htmlFor="staff-probation-months" className={labelBase}>
+                Probation period
+              </label>
+              <Select bare
+                id="staff-probation-months"
+                name="probation_months"
+                required
+                value={probationMonths}
+                onChange={e => setProbationMonths(e.target.value)}
+                className={textInput}
+              >
+                {PROBATION_MONTH_CHOICES.map(n => (
+                  <option key={n} value={String(n)}>
+                    {monthsLabel(n)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="staff-probation-end" className={labelBase}>
+                Probation ends
+              </label>
+              <input
+                id="staff-probation-end"
+                value={probationEnds ? dayLabel(probationEnds) : 'Pick the hire date first'}
+                readOnly
+                disabled
+                aria-describedby="staff-probation-end-hint"
+                className={readOnlyMono}
+              />
+              <p id="staff-probation-end-hint" className={helpText}>
+                HR is reminded {PROBATION_NOTICE_DAYS} days before.
+              </p>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="border-t border-hairline my-6" />

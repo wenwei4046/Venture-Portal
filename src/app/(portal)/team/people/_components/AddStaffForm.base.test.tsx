@@ -159,3 +159,53 @@ describe('Add Staff — the address', () => {
     expect(actions.addStaff).not.toHaveBeenCalled()
   })
 })
+
+// 2026-10-23 — the user: "when people add in, will need to fill up one more, is status, is probation, permanent or part
+// time. then is select probation, needs to select with probation period, so that is can be notice and verify".
+describe('Add Staff — the hire date and the employment status', () => {
+  const status = () => screen.getByLabelText('Employment status') as HTMLSelectElement
+  const hire = () => screen.getByLabelText('Hire date') as HTMLInputElement
+
+  it('asks both, required; Probation, Permanent, Part time', () => {
+    setup()
+    expect(hire()).toBeRequired()
+    expect(status()).toBeRequired()
+    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Permanent', 'Part time'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+  })
+
+  it('a probation asks its period — 3 months to start — and shows the day it ends', () => {
+    setup()
+    fireEvent.change(status(), { target: { value: 'probation' } })
+    const months = screen.getByLabelText('Probation period') as HTMLSelectElement
+    expect(months.value).toBe('3')
+    expect(optionsOf(months).map(o => o.label)).toEqual(['1 month', '2 months', '3 months', '4 months', '5 months', '6 months'])
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('Pick the hire date first')
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('1 Feb 2027')
+    fireEvent.change(months, { target: { value: '6' } })
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('1 May 2027')
+    expect(screen.getByText('HR is reminded 14 days before.')).toBeInTheDocument()
+
+    fireEvent.change(status(), { target: { value: 'permanent' } })
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+  })
+
+  it('files the three with the rest', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    fireEvent.change(status(), { target: { value: 'probation' } })
+    fireEvent.change(screen.getByLabelText('Probation period'), { target: { value: '6' } })
+
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(sent.get('hire_date')).toBe('2026-11-02')
+    expect(sent.get('employment_status')).toBe('probation')
+    expect(sent.get('probation_months')).toBe('6')
+    // The end is the database's to keep — a disabled field is not sent.
+    expect(sent.has('probation_end')).toBe(false)
+  })
+})

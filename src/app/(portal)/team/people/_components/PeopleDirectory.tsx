@@ -10,6 +10,7 @@ import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { ratePct } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
+import { dayLabel, type EmploymentStatus, type StatusChip } from '@/lib/employment-status'
 import {
   FIRST_WAY,
   initialsOf,
@@ -54,6 +55,12 @@ export interface PersonRow {
   /** Employment, from hr_staff_costs.status — not the same fact as the account. */
   active: boolean
   resignedOn: string | null
+  /** Probation, Permanent or Part time (2026-10-23); null not set; absent for a reader not shown it (the directory). */
+  employmentStatus?: EmploymentStatus | null
+  /** When they started — the Employment column shows it after the chip. */
+  hireDate?: string | null
+  /** The active's chip, worked out by the page on the office's today ("Probation · 9d left"); null for the inactive. */
+  employmentChip?: StatusChip | null
   accountEmail: string | null
   accountActive: boolean | null
   lastSeenAt: string | null
@@ -328,9 +335,22 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                         </span>
                         <span className={s.code}>{p.code ?? '—'}</span>
                         <span className={s.empCell}>
-                          <Chip tone={p.active ? 'ledger' : 'danger'} soft>
-                            {p.active ? 'Active' : p.resignedOn ? `Resigned ${dayjs(p.resignedOn).format('D MMM YYYY')}` : 'Inactive'}
-                          </Chip>
+                          {/* Probation, Permanent or Part time, then the hire date (2026-10-23) — Active where the
+                              page could not say which. Inactive keeps its own chip. */}
+                          {p.active ? (
+                            <Chip tone={p.employmentChip?.tone ?? 'ledger'} soft title={p.employmentChip?.title}>
+                              {p.employmentChip?.label ?? 'Active'}
+                            </Chip>
+                          ) : (
+                            <Chip tone="danger" soft>
+                              {p.resignedOn ? `Resigned ${dayjs(p.resignedOn).format('D MMM YYYY')}` : 'Inactive'}
+                            </Chip>
+                          )}
+                          {p.hireDate ? (
+                            <span className={s.hired} title="Hire date">
+                              {dayLabel(p.hireDate)}
+                            </span>
+                          ) : null}
                           {p.missing.length > 0 ? (
                             <span className={s.missing} title={`Missing ${p.missing.join(', ')} — blocks payroll or the InfoTech import`}>
                               {p.missing.length} missing

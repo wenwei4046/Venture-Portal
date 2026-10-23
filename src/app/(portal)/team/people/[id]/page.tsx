@@ -11,6 +11,7 @@ import { fullAccessTemplate } from '@/lib/invite'
 import { keptParts } from '@/lib/person-name'
 import { addressLines, addressOf } from '@/lib/address/address'
 import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, loginEmailHeld, payModeOf, tenureLabel } from '@/lib/person-record'
+import { employmentStatusOf, probationDue, statusChip, statusLine, whenLabel } from '@/lib/employment-status'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
@@ -154,6 +155,11 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // variable pay (the Director department's month, keyed on payroll) — the
   // record words its salary and statutory by how they are paid.
   const parts = keptParts(row)
+  const today = officeToday()
+  // Probation, Permanent or Part time (2026-10-23) — the staff table's; a directory reader's row carries none.
+  const employmentStatus = row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status)
+  const probationEnds: string | null = employmentStatus === 'probation' ? (row.probation_end ?? null) : null
+  const probationAcked = !!probationEnds && row.probation_ack_end === probationEnds
   const view: PersonRecordView = {
     name: staff.employee_name,
     firstName: parts.first,
@@ -165,8 +171,17 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     active,
     login: account ? (account.is_active ? 'active' : 'disabled') : null,
     reportsTo: upline,
+    employment: {
+      status: employmentStatus,
+      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, probationAcked, ackName: row.probation_ack_name ?? null }, today),
+      value: employmentStatus
+        ? [statusLine(employmentStatus, row.probation_months ?? null, probationEnds), probationEnds && probationDue(probationEnds, today) ? whenLabel(probationEnds, today) : null]
+            .filter(Boolean)
+            .join(' · ')
+        : null,
+    },
     hireDate: staff.hire_date ? formatDate(staff.hire_date) : null,
-    tenure: tenureLabel(staff.hire_date, officeToday()),
+    tenure: tenureLabel(staff.hire_date, today),
     resignationDate: staff.resignation_date ? formatDate(staff.resignation_date) : null,
     nric: priv.nric,
     infotechCode: staff.infotech_code,
@@ -237,6 +252,20 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
             department={card.department}
             ladder={card.ladder}
             active={card.active}
+            // A probation's reminder, and its next step (2026-10-23): Acknowledge, Confirm as permanent, Extend.
+            probation={
+              card.active && card.staff.employment_status === 'probation'
+                ? {
+                    hireDate: card.staff.hire_date ?? null,
+                    months: card.staff.probation_months ?? null,
+                    endsOn: card.staff.probation_end ?? null,
+                    ackEnd: card.staff.probation_ack_end ?? null,
+                    ackName: card.staff.probation_ack_name ?? null,
+                    ackAt: card.staff.probation_ack_at ?? null,
+                  }
+                : null
+            }
+            today={today}
           />
         ) : null}
 

@@ -13,6 +13,8 @@ import type { InviteCandidate, PendingInvite } from './_components/InviteDialog'
 import PeopleManagement from './_components/PeopleManagement'
 import { fullAccessHeld, fullAccessTemplate, pendingLogins } from '@/lib/invite'
 import { fullNameOf } from '@/lib/person-name'
+import { officeToday } from '@/lib/office-time'
+import { employmentStatusOf, statusChip } from '@/lib/employment-status'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -55,6 +57,11 @@ interface RosterRow {
   status: string | null
   resignation_date: string | null
   hire_date: string | null
+  /** Probation, Permanent or Part time, a probation's last day and its reminder's acknowledgement (2026-10-23) — the
+   *  staff table's; the directory has none, and its readers' chip reads Active as before. */
+  employment_status?: string | null
+  probation_end?: string | null
+  probation_ack_end?: string | null
   title_id: string | null
   reports_to: string | null
   titles: { name: string; level_id: string | null; template_id: string | null } | null
@@ -97,7 +104,7 @@ export default async function PeopleManagementPage({
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, employment_status, probation_end, probation_ack_end, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -181,12 +188,13 @@ export default async function PeopleManagementPage({
     return template ? fullAccessHeld(title?.name, template) : null
   }
   const inviteHeld: Record<string, string> = {}
+  const today = officeToday()
 
   const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r => {
     const held = canInvite ? heldFrom(r.titles) : null
     if (held) inviteHeld[r.id] = held
     return {
-      ...personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
+      ...personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id), today),
       invitePending: !!r.user_id && pending.has(r.user_id),
       ...(held ? { inviteHeld: held } : {}),
     }
@@ -281,6 +289,7 @@ async function DirectoryPeople({
   const rungs = new Map(
     ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
   )
+  const today = officeToday()
   void supabase.rpc('log_data_access', {
     p_resource_type: 'hr_staff_costs',
     p_action: 'view',
@@ -288,7 +297,7 @@ async function DirectoryPeople({
   })
   return (
     <PeopleManagement
-      people={directory.map(r => personRow(r, rungs, null, r))}
+      people={directory.map(r => personRow(r, rungs, null, r, today))}
       unattachedAccounts={[]}
       canSeeActivity={can(user, 'audit_log')}
       permissions={NO_PERMISSIONS}
@@ -312,9 +321,14 @@ function personRow(
   rungs: Map<string, { id: string; rank: number; name: string }>,
   rank: { label: string; rate: number } | null,
   priv: { nric: string | null; bank_account_no: string | null } | undefined,
+  /** The office's today — how near a probation's end reads on its chip. */
+  today: string,
 ): PersonRow {
   const active = r.status !== 'inactive'
   const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
+  // Probation, Permanent or Part time (2026-10-23): unknown (undefined) to a directory reader, whose rows carry none.
+  const employmentStatus = r.employment_status === undefined ? undefined : employmentStatusOf(r.employment_status)
+  const probationEnd = r.probation_end ?? null
   return {
     id: r.id,
     // Their full name, last name then first (2026-10-20); the full name on their IC is searched too.
@@ -331,6 +345,13 @@ function personRow(
     department: r.departments?.name ?? null,
     active,
     resignedOn: r.resignation_date ?? null,
+    // The Employment column (2026-10-23, the user: "permenant, part time and probation status follow by the hire date
+    // start"): the status's chip — worked out here, on the office's today — then the hire date.
+    employmentStatus,
+    hireDate: r.hire_date ?? null,
+    employmentChip: active
+      ? statusChip({ status: employmentStatus, probationEnd, probationAcked: !!probationEnd && r.probation_ack_end === probationEnd }, today)
+      : null,
     accountEmail: r.users?.email ?? null,
     accountActive: r.users?.is_active ?? null,
     lastSeenAt: r.users?.last_seen_at ?? null,

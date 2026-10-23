@@ -49,6 +49,15 @@ function staffForm(second?: { bank: string; number: string }) {
   return form
 }
 
+/** Add Staff's form: since 2026-10-23 it also asks when they start and Probation / Permanent / Part time. */
+function newStaffForm(second?: { bank: string; number: string }) {
+  const form = staffForm(second)
+  form.set('hire_date', '2026-11-02')
+  form.set('employment_status', 'probation')
+  form.set('probation_months', '3')
+  return form
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   gate.mockResolvedValue(HR)
@@ -56,7 +65,7 @@ beforeEach(() => {
 
 describe('staff bank account server actions', () => {
   it('adds the optional account separately without replacing Account 1', async () => {
-    await addStaff(staffForm({ bank: ' CIMB ', number: ' 0098-7654 ' }))
+    await addStaff(newStaffForm({ bank: ' CIMB ', number: ' 0098-7654 ' }))
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
       bank_name: 'Maybank', bank_account_no: '0012345678', bank_name_2: 'CIMB', bank_account_no_2: '00987654',
     }))
@@ -81,7 +90,7 @@ describe('staff bank account server actions', () => {
     for (const second of [{ bank: 'CIMB', number: '' }, { bank: '', number: '1234' }, { bank: 'CIMB', number: 'invalid' }, { bank: 'maybank', number: '0012-345678' }]) {
       // The save answers in words — production hides a thrown message (2026-10-14).
       await expect(updateStaff('staff', staffForm(second))).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Account 2/) })
-      await expect(addStaff(staffForm(second))).rejects.toThrow(/Account 2/)
+      await expect(addStaff(newStaffForm(second))).rejects.toThrow(/Account 2/)
     }
     // The record is read as it stands (2026-10-14: Account 2 is checked
     // against the Account 1 it will sit beside); nothing is written.
@@ -180,7 +189,7 @@ describe('a person is saved from their own page (2026-10-14, edited where it sta
   })
 
   it('files a new person’s address in its parts — abroad the three typed', async () => {
-    const form = staffForm()
+    const form = newStaffForm()
     for (const [key, value] of addressForm({ address_line1: '1 Raffles Place', address_city: 'Singapore', address_postcode: '048616', address_country: 'Singapore' })) form.set(key, value as string)
     await addStaff(form)
     expect(insert.mock.calls[0][0]).toMatchObject({
@@ -327,6 +336,67 @@ describe('a person is saved from their own page (2026-10-14, edited where it sta
   })
 })
 
+// 2026-10-23 — the user: "for the employment status, i want go with permenant, part time and probation status follow by
+// the hire date start"; Add Staff "will need to fill up one more, is status … then is select probation, needs to select
+// with probation period".
+describe('employment status — Probation, Permanent or Part time', () => {
+  it('a new person is filed with their hire date, status and probation period', async () => {
+    await addStaff(newStaffForm())
+    expect(insert.mock.calls[0][0]).toMatchObject({ hire_date: '2026-11-02', employment_status: 'probation', probation_months: 3 })
+  })
+
+  it('Add Staff refuses a form without the hire date or the status, before any write', async () => {
+    const noDate = newStaffForm()
+    noDate.delete('hire_date')
+    await expect(addStaff(noDate)).rejects.toThrow(/Pick the hire date/)
+    const noStatus = newStaffForm()
+    noStatus.set('employment_status', '')
+    await expect(addStaff(noStatus)).rejects.toThrow(/Pick the employment status/)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('confirmed on their page: permanent, and no period left behind', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-08-01', employment_status: 'probation', probation_months: 3 }, error: null })
+    const form = new FormData()
+    form.set('employment_status', 'permanent')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'permanent', probation_months: null })
+  })
+
+  it('put on probation with its period — refused without a hire date to count it from', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-10-05', employment_status: null, probation_months: null }, error: null })
+    const form = new FormData()
+    form.set('employment_status', 'probation')
+    form.set('probation_months', '3')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 3 })
+
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: null, employment_status: null, probation_months: null }, error: null })
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: 'A probation is counted from the hire date — fill in the hire date too.' })
+    expect(update).toHaveBeenCalledTimes(1)
+  })
+
+  it('a probation’s period changed alone keeps the status, and a hire date cleared under a probation is refused', async () => {
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-10-05', employment_status: 'probation', probation_months: 3 }, error: null })
+    const months = new FormData()
+    months.set('probation_months', '6')
+    await expect(updateStaff('staff', months)).resolves.toEqual({ ok: true })
+    expect(update).toHaveBeenCalledWith({ employment_status: 'probation', probation_months: 6 })
+
+    query.maybeSingle.mockResolvedValueOnce({ data: { department_id: 'department', title_id: null, hire_date: '2026-10-05', employment_status: 'probation', probation_months: 3 }, error: null })
+    const cleared = new FormData()
+    cleared.set('hire_date', '')
+    await expect(updateStaff('staff', cleared)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/counted from the hire date/) })
+  })
+
+  it('a status that is not one of the three is refused in words', async () => {
+    const form = new FormData()
+    form.set('employment_status', 'contract')
+    await expect(updateStaff('staff', form)).resolves.toEqual({ ok: false, reason: expect.stringMatching(/Pick the employment status/) })
+    expect(update).not.toHaveBeenCalled()
+  })
+})
+
 describe('NRIC and bank accounts are written only where ticked (2026-10-09, PR4)', () => {
   it('refuses the edit to somebody whose title does not tick Salary amounts', async () => {
     gate.mockResolvedValue(NO_TICKS)
@@ -369,7 +439,7 @@ describe('NRIC and bank accounts are written only where ticked (2026-10-09, PR4)
 
   it('files a new person without the bank accounts when the adder may not see them', async () => {
     gate.mockResolvedValue(NO_TICKS)
-    await addStaff(staffForm({ bank: 'CIMB', number: '00987654' }))
+    await addStaff(newStaffForm({ bank: 'CIMB', number: '00987654' }))
     const row = insert.mock.calls[0][0]
     for (const key of ['bank_name', 'bank_account_no', 'bank_name_2', 'bank_account_no_2']) {
       expect(row).not.toHaveProperty(key)
