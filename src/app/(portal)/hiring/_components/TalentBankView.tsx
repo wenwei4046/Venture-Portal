@@ -512,7 +512,7 @@ export default function TalentBankView({
                     <BankTalentTile
                       key={t.id}
                       name={t.name}
-                      line={`${t.position} · ${personLine(board, t)}`}
+                      line={`${personLine(board, t)} · ${t.position}`}
                       items={talentItems(t)}
                       onOpen={() => openTalent(t)}
                     />
@@ -697,8 +697,9 @@ function MoveFor({ moving, tree, onClose }: { moving: Moving; tree: BankTree; on
 }
 
 /**
- * What a person's card says after what they fit (2026-10-24): why they are kept — "Failed interview" — or, while a
- * request has them, "Interviewing · HR-…"; somebody kept before the reason was asked, where they stand as before.
+ * What a person's card says first, before what they fit (2026-10-24): why they are kept — "Failed interview" — or, while a
+ * request has them, "Interviewing · HR-…"; somebody kept before the reason was asked, where they stand as before. First,
+ * because a long position ran it off the card's one line (*Sales Executive (Showro…*, prod E2E 2026-10-24).
  */
 function personLine(board: HiringBoard, t: HiringTalent): string {
   const status = talentStatus(board, t)

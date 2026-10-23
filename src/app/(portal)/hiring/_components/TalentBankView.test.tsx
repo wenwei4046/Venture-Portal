@@ -78,7 +78,7 @@ describe('Hiring › Talent Bank as a Drive', () => {
     openCard(/^Revenue/)
     expect(path()).toEqual(['Talent Bank', 'HOUZS Venture', 'Revenue'])
     expect(sections()).toEqual(['Folders 1', 'People 1'])
-    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Revenue Specialist · Interviewing · HR-203')
+    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Interviewing · HR-203 · Revenue Specialist')
     openCard(/^Seniors/)
     expect(screen.getByRole('button', { name: /^Marcus Wong/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'HOUZS Venture' }))
@@ -255,18 +255,18 @@ describe('Hiring › Talent Bank as a Drive', () => {
 // 2026-10-24 (IT-0008; the user: "最好的是它可以显示 candidate 是从哪里来的 … 包括 upload 的时候，最好能放一个 drop 掉的原因
 // … 做成一个 dropdown"): why somebody is kept, and where they came from.
 describe('why somebody is kept in the Talent Bank', () => {
-  it('a card says why they are kept — while a request has them, that they are interviewing; kept before it was asked, as before', () => {
+  it('a card says first why they are kept — while a request has them, that they are interviewing; kept before it was asked, as before', () => {
     view(undefined, 'dept:hv:HR')
-    expect(screen.getByRole('button', { name: /^Joyce Tan/ }).textContent).toContain('HR Executive · Other')
+    expect(screen.getByRole('button', { name: /^Joyce Tan/ }).textContent).toContain('Other · HR Executive')
     cleanup()
     view(undefined, `folder:${SENIORS}`)
-    expect(screen.getByRole('button', { name: /^Marcus Wong/ }).textContent).toContain('Senior Revenue Specialist · Failed interview')
+    expect(screen.getByRole('button', { name: /^Marcus Wong/ }).textContent).toContain('Failed interview · Senior Revenue Specialist')
     cleanup()
     view(undefined, 'dept:hv:Revenue')
-    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Revenue Specialist · Interviewing · HR-203')
+    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Interviewing · HR-203 · Revenue Specialist')
     cleanup()
     view(undefined, 'dept:hv:Finance')
-    expect(screen.getByRole('button', { name: /^Aisyah Rahman/ }).textContent).toContain('Account Executive · Available')
+    expect(screen.getByRole('button', { name: /^Aisyah Rahman/ }).textContent).toContain('Available · Account Executive')
   })
 
   it('the panel says why and where they came from; Edit changes why, as it is picked', async () => {
