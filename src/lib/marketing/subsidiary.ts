@@ -9,7 +9,7 @@ import { addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, s
 import type { CalEvent, CalTone } from './calendar'
 import { productEventText } from './project'
 import { projectRows, type ProjectRow } from './projects'
-import { eventText, type MktTaskPage, type TaskEvent } from './task'
+import { eventFromRow, eventText, type MktTaskPage, type TaskEvent } from './task'
 
 // ── The stat cards ───────────────────────────────────────────────────────────────
 export interface SubStat {
@@ -173,23 +173,13 @@ export interface SubFeedEvent extends TaskEvent {
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
-const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
 
 /** mkt_sub_feed(sub, limit). */
 export function subFeedFromRow(v: unknown): SubFeedEvent[] {
   return (Array.isArray(v) ? v : []).filter(isObj).map(e => {
     const p = isObj(e.project) ? e.project : {}
     return {
-      id: typeof e.id === 'number' ? e.id : Number(e.id) || 0,
-      at: str(e.at),
-      actor: str(e.actor),
-      action: str(e.action),
-      stage: typeof e.stage === 'number' ? e.stage : null,
-      stageName: strOrNull(e.stageName),
-      fromTo: strOrNull(e.fromTo),
-      reason: strOrNull(e.reason),
-      version: strOrNull(e.version),
-      data: isObj(e.data) ? e.data : null,
+      ...eventFromRow(e),
       project: { id: str(p.id), track: str(p.track), title: str(p.title), kind: p.kind === 'product' ? 'product' : p.kind === 'recurring' ? 'recurring' : 'quick' },
     }
   })

@@ -131,7 +131,7 @@
 .freeAdd:hover { border-color: rgb(var(--mk-hover-line)); color: rgb(var(--mk-ink)); }
 
 .trail { position: sticky; top: 12px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); padding: 12px 14px; }
-.trailHead { font-size: .72em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); margin-bottom: 6px; }
+.trailHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .72em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); margin-bottom: 6px; }
 .trailLine { padding: 7px 0; border-top: 1px solid rgb(var(--mk-surface-2)); font-size: .82em; line-height: 1.45; overflow-wrap: anywhere; }
 .trailTime { font-family: var(--mk-mono); font-size: 10px; color: rgb(var(--mk-muted)); }
 

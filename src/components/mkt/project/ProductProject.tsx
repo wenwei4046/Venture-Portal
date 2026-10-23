@@ -8,6 +8,8 @@ import {
   type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { trailTime } from '@/lib/marketing/task'
+import FormalLogSheet from '../audit/FormalLogSheet'
+import a from '../audit/audit.module.css'
 import MinutesForm from './MinutesForm'
 import p from './project.module.css'
 import t from '../task/task.module.css'
@@ -35,6 +37,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [copied, setCopied] = useState(false)
   const [origin, setOrigin] = useState('')
@@ -369,7 +372,10 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </div>
 
           <div className={p.trail} aria-label="Audit trail">
-            <div className={t.trailHead}>Audit trail</div>
+            <div className={t.trailHead}>
+              <span>Audit trail</span>
+              <button type="button" className={a.open} onClick={() => setLogOpen(true)}>Formal log</button>
+            </div>
             {lines.map(l => (
               <div key={l.key} className={t.trailLine}>
                 <div className={t.trailTime}>{l.t}</div>
@@ -379,6 +385,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </div>
         </aside>
       </div>
+      {logOpen ? <FormalLogSheet project={pr.id} track={pr.track} onClose={() => setLogOpen(false)} /> : null}
 
       {modal ? (
         <div className={t.scrim} onClick={() => !pending && setModal(false)}>

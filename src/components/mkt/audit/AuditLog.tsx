@@ -1,0 +1,89 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import {
+  auditChips, auditCount, auditGroups, auditRows, NO_AUDIT_FILTER, passesAudit, toggleAudit, type AuditFilter, type ProjectLog,
+} from '@/lib/marketing/audit'
+import s from './audit.module.css'
+
+// The formal log (`Audit Trail.dc.html`, ④-3): Filter (by person, action, stage — each with its count) and its chips,
+// Clear all, "n of m records"; every record numbered, oldest first, read-only. Export waits for question 18, ▶ Replay
+// for the Task map (④-4).
+
+const HEADS = ['#', 'Time', 'Actor', 'Action', 'From → To', 'Reason', 'Version']
+const DOT: Record<string, string> = { green: s.dotGreen, red: s.dotRed, amber: s.dotAmber, grey: s.dotGrey }
+
+export default function AuditLog({ log }: { log: ProjectLog }) {
+  const all = useMemo(() => auditRows(log), [log])
+  const [f, setF] = useState<AuditFilter>(NO_AUDIT_FILTER)
+  const [open, setOpen] = useState(false)
+  const rows = all.filter(r => passesAudit(r, f))
+  const chips = auditChips(f)
+
+  return (
+    <div className={s.log}>
+      <div className={s.toolbar}>
+        <button type="button" className={`${s.filterBtn}${open || chips.length ? ` ${s.filterOn}` : ''}`} aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+            <line x1="1" y1="3" x2="11" y2="3" /><line x1="3" y1="6" x2="9" y2="6" /><line x1="5" y1="9" x2="7" y2="9" />
+          </svg>
+          <span>Filter</span>
+          {chips.length ? <span className={s.filterCount}>{chips.length}</span> : null}
+        </button>
+        {chips.map(c => (
+          <span key={`${c.key}:${c.value}`} className={s.chip}>
+            <span className={s.chipGroup}>{c.group}:</span>
+            <span className={s.chipValue}>{c.value}</span>
+            <button type="button" className={s.chipX} aria-label={`Remove ${c.group}: ${c.value}`} onClick={() => setF(x => toggleAudit(x, c.key, c.value))}>×</button>
+          </span>
+        ))}
+        {chips.length ? <button type="button" className={s.clear} onClick={() => setF(NO_AUDIT_FILTER)}>Clear all</button> : null}
+        <span className={s.grow} />
+        <span className={s.count}>{auditCount(rows.length, all.length)}</span>
+        {open ? (
+          <div className={s.pop} role="group" aria-label="Filter the log">
+            {auditGroups(all, f).map(g => (
+              <div key={g.key} className={s.group}>
+                <div className={s.groupHead}>{g.title}</div>
+                {g.opts.map(o => (
+                  <button key={o.value} type="button" role="checkbox" aria-checked={o.on} className={s.opt} onClick={() => setF(x => toggleAudit(x, g.key, o.value))}>
+                    <span className={`${s.box}${o.on ? ` ${s.boxOn}` : ''}`} aria-hidden="true">{o.on ? '✓' : ''}</span>
+                    <span className={s.optLabel}>{o.value}</span>
+                    <span className={s.optN}>{o.n}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className={s.table} role="table" aria-label="Formal log">
+        <div className={`${s.tr} ${s.th}`} role="row">
+          {HEADS.map(h => <span key={h} role="columnheader">{h}</span>)}
+        </div>
+        {rows.map(r => (
+          <div key={r.no} className={s.tr} role="row">
+            <span className={s.no} role="cell">{r.no}</span>
+            <span className={s.time} role="cell">{r.time}</span>
+            <span className={s.actor} role="cell">{r.actor}</span>
+            <span className={s.action} role="cell">
+              <span className={`${s.dot} ${DOT[r.tone]}`} aria-hidden="true" />
+              <span className={s.actionText}>{r.action}</span>
+            </span>
+            <span className={`${s.soft}${r.fromTo === '—' ? ` ${s.empty}` : ''}`} role="cell">{r.fromTo}</span>
+            <span className={`${s.soft}${r.reason === '—' ? ` ${s.empty}` : ''}`} role="cell">{r.reason}</span>
+            <span className={`${s.version}${r.version === '—' ? ` ${s.empty}` : ''}`} role="cell">{r.version}</span>
+          </div>
+        ))}
+        {rows.length ? null : <div className={s.none}>{all.length ? 'No records match these filters' : 'No records yet'}</div>}
+      </div>
+      <div className={s.foot}>
+        <svg width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+          <rect x="1" y="5" width="9" height="6" rx="1.5" /><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" />
+        </svg>
+        <span>Read-only</span>
+      </div>
+    </div>
+  )
+}

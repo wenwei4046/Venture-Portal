@@ -94,6 +94,22 @@ export function freeFromRow(v: unknown): FreeBlock[] {
 }
 
 /** mkt_project's answer — null when there is no such project. */
+/** One line of a trail as the readers give it (mkt_project, mkt_sub_feed, mkt_project_log). */
+export function eventFromRow(e: Record<string, unknown>): TaskEvent {
+  return {
+    id: Number(e.id) || 0,
+    at: str(e.at),
+    actor: str(e.actor),
+    action: str(e.action),
+    stage: typeof e.stage === 'number' ? e.stage : null,
+    stageName: strOrNull(e.stageName),
+    fromTo: strOrNull(e.fromTo),
+    reason: strOrNull(e.reason),
+    version: strOrNull(e.version),
+    data: isObj(e.data) ? e.data : null,
+  }
+}
+
 export function taskFromRow(v: unknown): MktTaskPage | null {
   if (!isObj(v) || !isObj(v.project)) return null
   const p = v.project
@@ -137,18 +153,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
     project: { ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free) },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
-    events: rowsOf(v.events).map(e => ({
-      id: Number(e.id) || 0,
-      at: str(e.at),
-      actor: str(e.actor),
-      action: str(e.action),
-      stage: typeof e.stage === 'number' ? e.stage : null,
-      stageName: strOrNull(e.stageName),
-      fromTo: strOrNull(e.fromTo),
-      reason: strOrNull(e.reason),
-      version: strOrNull(e.version),
-      data: isObj(e.data) ? e.data : null,
-    })),
+    events: rowsOf(v.events).map(eventFromRow),
     series,
     holidays: holidaysFromRow(v.holidays),
   }

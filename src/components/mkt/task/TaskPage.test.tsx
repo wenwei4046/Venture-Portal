@@ -17,6 +17,8 @@ const actions = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+const readProjectLog = vi.hoisted(() => vi.fn())
+vi.mock('../audit/read', () => ({ readProjectLog }))
 
 import TaskPage from './TaskPage'
 
@@ -115,5 +117,16 @@ describe('the task page, for the people who work it', () => {
     expect(screen.queryByRole('button', { name: /Accept|Submit|Approve|Complete/ })).toBeNull()
     expect(screen.getByText('Now with Siti')).toBeTruthy()
     expect(screen.queryByText('+ Checklist')).toBeNull()
+  })
+
+  it('opens the formal log from the trail’s head (④-3), read for this task', async () => {
+    readProjectLog.mockResolvedValueOnce({ track: 'TSK-CAR-2610-001', title: 'Price update', kind: 'quick', rows: [] })
+    render(<TaskPage initial={page('s-other', {})} can={{ edit: false, approve: false, manage: false }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Formal log' }))
+    expect(screen.getByRole('dialog', { name: 'Audit trail' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('No records yet')).toBeTruthy())
+    expect(readProjectLog).toHaveBeenCalledWith('p1')
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Audit trail' })).toBeNull()
   })
 })
