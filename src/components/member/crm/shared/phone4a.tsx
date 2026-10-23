@@ -434,7 +434,6 @@ function RoomHours({ h }: { h: Room4["hours"] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "baseline" }}>
         <span style={{ flex: 1, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(15) }}>Opening hours</span>
-        <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>Type, or tap the grid</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", borderRadius: "14px", background: "var(--crm-sel)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -467,7 +466,6 @@ function RoomHours({ h }: { h: Room4["hours"] }) {
           </div>
         ))}
       </div>
-      <span style={{ fontSize: fs(12), lineHeight: 1.4, color: "var(--crm-muted)" }}>Tap a row to change single days. Days with the same hours are grouped.</span>
     </div>
   );
 }
@@ -576,16 +574,19 @@ export function Phone4aEmpty({ e }: { e: { icon: Icon4a; title: string; sub: str
  */
 export function Phone4aActive({ v }: { v: ActiveVM }) {
   const { groups } = v;
+  // Each team folds to its head and opens again (the owner, 2026-10-23: "做可以下拉收起展開"); all open at first.
+  const [shut, setShut] = useState<Record<string, boolean>>({});
   return (
     <section style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}>
-      {groups.map(g => (
+      {groups.map(g => { const off = !!shut[g.name]; return (
         <div key={g.name} style={{ borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+          <button type="button" aria-expanded={!off} onClick={() => setShut(x => ({ ...x, [g.name]: !off }))} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", boxSizing: "border-box", borderBottom: off ? "0" : "1px solid var(--crm-rule-soft)", textAlign: "left" }}>
             <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
-            <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: g.color }}>{g.name}</strong>
+            <strong style={{ flex: "1", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-ink)" }}>{g.name}</strong>
             <small style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{g.count}</small>
-          </div>
-          {g.people.map((p, k) => (
+            <span style={{ display: "flex", color: "var(--crm-faint)", transform: off ? "none" : "rotate(180deg)", transition: "transform 160ms" }}><Ic name="chevron-down" size={15} /></span>
+          </button>
+          {!off && g.people.map((p, k) => (
             <div key={p.id} role="button" aria-pressed={p.active} onClick={p.toggle} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 14px", borderTop: k ? "1px solid var(--crm-rule-soft)" : "0", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
               <span style={{ flex: "none", width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: fs(12), fontWeight: 600 }}>{p.ini}</span>
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
@@ -598,7 +599,7 @@ export function Phone4aActive({ v }: { v: ActiveVM }) {
             </div>
           ))}
         </div>
-      ))}
+      ); })}
     </section>
   );
 }
