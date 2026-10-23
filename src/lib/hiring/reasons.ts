@@ -4,7 +4,7 @@ import type { CandidateStage, HiringBankReason, HiringBoard, HiringTalent, Talen
 // or not shortlisted … the candidate will be placed within the Talent Bank"; the user: "包括 upload 的时候，最好能放一个
 // drop 掉的原因：可能是刚好 not right now，或者他被 fail shortlist 等。做成一个 dropdown，可以选 type 就好了"). The same
 // day, asked whether HR should add, rename and turn off the reasons like File types, the user: "1, yes do with same" —
-// the list is HR's (mig 20261024235300, `hiring_bank_reasons`; the board's `talentReasons`), and the database refuses
+// the list is HR's (mig 20261025021500, `hiring_bank_reasons`; the board's `talentReasons`), and the database refuses
 // a reason not on it, or one turned off.
 
 /** The five the list began with — what a board read before the list was there stands for. */

@@ -95,7 +95,7 @@ const text = (form: FormData, key: string) => {
   return typeof v === 'string' ? v : ''
 }
 
-/** Why somebody is kept in the Talent Bank: a reason's id, else none — HR's list is the database's to check (mig 20261024235300). */
+/** Why somebody is kept in the Talent Bank: a reason's id, else none — HR's list is the database's to check (mig 20261025021500). */
 const reasonIn = (v: unknown): TalentReason | null => (typeof v === 'string' && v.trim() !== '' && v.length <= 64 ? v : null)
 const PICK_REASON = 'Pick why they are kept.'
 
@@ -347,7 +347,7 @@ export async function addHiringFileType(name: string): Promise<HiringIdOutcome> 
   return { ok: true, id: String(data) }
 }
 
-// ── Talent Bank reasons (mig 20261024235300 — the user: "1, yes do with same", as File types) ───────────
+// ── Talent Bank reasons (mig 20261025021500 — the user: "1, yes do with same", as File types) ───────────
 
 /** "+ Add a new reason…" in a picker, or Form settings' + Add reason: the reason of that name — made if new, turned back on if it was off (Edit). */
 export async function addTalentReason(name: string): Promise<HiringIdOutcome> {

@@ -93,7 +93,7 @@ describe('Hiring › Form settings › File types', () => {
 })
 
 // Form settings › Talent Bank reasons (2026-10-24 — asked whether HR should manage them like File types, the user:
-// "1, yes do with same"; mig 20261024235300).
+// "1, yes do with same"; mig 20261025021500).
 describe('Hiring › Form settings › Talent Bank reasons', () => {
   const withOff: HiringBoard = {
     ...HIRING_BOARD,

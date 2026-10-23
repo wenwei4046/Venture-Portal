@@ -157,7 +157,7 @@ export function boardFromJson(v: unknown): HiringBoard {
         return { id: str(x.id), name: str(x.name), builtin: x.builtin === 'resume' ? 'resume' : null, active: x.active !== false, used: num(x.used) ?? 0 }
       })
       .filter(t => t.id && t.name),
-    // HR's list (mig 20261024235300); a board read before it was there: the five it began with.
+    // HR's list (mig 20261025021500); a board read before it was there: the five it began with.
     talentReasons: Array.isArray(o.talentReasons)
       ? o.talentReasons
           .map((r): HiringBankReason => {

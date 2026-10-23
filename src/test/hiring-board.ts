@@ -98,7 +98,7 @@ const talents: HiringTalent[] = [
   T({ id: 'T-101', name: 'Aisyah Rahman', phone: '013-901 2234', email: 'aisyah.r@gmail.com', position: 'Account Executive', dept: 'Finance', from: '', when: '18 Jul 2026', by: 'jason', file: 'Aisyah_Rahman_CV.pdf', notes: 'Walk-in CV. ACCA part-qualified. Jason met her briefly; worth a proper interview for the next Finance role.', events: [['Added to Talent Bank', '18 Jul 2026', 'Jason Ong', 'Walk-in CV']] }),
 ]
 
-/** HR's reasons as the list began (mig 20261024235300), with the people kept with each above. */
+/** HR's reasons as the list began (mig 20261025021500), with the people kept with each above. */
 export const TALENT_REASONS: HiringBankReason[] = [
   { id: 'not_shortlisted', name: 'Not shortlisted', active: true, used: 0 },
   { id: 'failed_interview', name: 'Failed interview', active: true, used: 1 },

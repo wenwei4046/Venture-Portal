@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261024235300 (2026-10-24, Hiring › Talent
+// Local PostgreSQL regression for 20261025021500 (2026-10-24, Hiring › Talent
 // Bank: the reasons are HR's to manage — asked whether HR should add, rename
 // and turn off the reasons like File types, the user: "1, yes do with same").
 // The Hiring migrations, the Drive, the Bin and 20261024233700 run VERBATIM
@@ -174,7 +174,7 @@ try {
   const old = await one(`SELECT public.hiring_bank_add_talent('company:hv', 'Old', '', '', 'Driver', '', NULL, NULL)`)
 
   // ── The migration ─────────────────────────────────────────────────────────
-  await load('20261024235300_talent_bank_reasons_managed.sql')
+  await load('20261025021500_talent_bank_reasons_managed.sql')
 
   // ── 1. The five are rows, their keys kept ─────────────────────────────────
   check(await q(`SELECT id, name, sort, retired_at IS NULL AS live FROM public.hiring_bank_reasons ORDER BY sort`), [

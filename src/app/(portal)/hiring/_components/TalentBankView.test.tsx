@@ -416,7 +416,7 @@ describe('the Talent Bank’s Bin', () => {
 })
 
 // 2026-10-24 — asked whether HR should manage the reasons like File types, the user: "1, yes do with same". HR has renamed
-// Failed interview, turned Not right now off and added Salary too high (mig 20261024235300).
+// Failed interview, turned Not right now off and added Salary too high (mig 20261025021500).
 describe('the reasons are HR’s list', () => {
   const managed: HiringBoard = {
     ...HIRING_BOARD,

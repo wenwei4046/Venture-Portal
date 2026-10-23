@@ -281,7 +281,7 @@ export default function FormSettings({ board, onPreview }: { board: HiringBoard;
 /**
  * A list kept by name — File types (2026-10-11, mig 20261011210000 — the user:
  * rename and turn off) and the Talent Bank's reasons (2026-10-24, mig
- * 20261024235300 — "do with same"): the hiring sources' cards — the name and how
+ * 20261025021500 — "do with same"): the hiring sources' cards — the name and how
  * often it is used, ✎ to rename (Enter or leaving the field keeps it, Esc lets
  * it be), On / Off; Résumé says *Built in*. One turned off leaves the pickers;
  * what is already filed or kept under it keeps it. *+ Add …* names a new one

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261024235300_talent_bank_reasons_managed.sql
+-- 20261025021500_talent_bank_reasons_managed.sql
 -- Hiring › Talent Bank: the reasons are HR's to manage, as the file types are
 -- (2026-10-24 — asked whether HR should add, rename and turn off the reasons
 -- like File types, the user: "1, yes do with same").

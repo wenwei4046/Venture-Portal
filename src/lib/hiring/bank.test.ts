@@ -184,7 +184,7 @@ describe('search', () => {
     expect(searchBank('  ', tree)).toEqual([])
   })
 
-  // Why somebody is kept (2026-10-24), in HR's words — the list Form settings keeps (mig 20261024235300).
+  // Why somebody is kept (2026-10-24), in HR's words — the list Form settings keeps (mig 20261025021500).
   it('finds people by why they are kept, as HR’s list names it', () => {
     const kept: BankTree = { ...tree, talents: tree.talents.map(t => (t.id === T_MEI ? { ...t, reason: 'r-salary' } : t)) }
     const reasons = [{ id: 'r-salary', name: 'Salary too high', active: false, used: 1 }]

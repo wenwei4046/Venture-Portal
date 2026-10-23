@@ -200,7 +200,7 @@ describe('Hiring › a request › Not selected goes to the Talent Bank', () => 
 })
 
 // 2026-10-24 — asked whether HR should manage the reasons like File types, the user: "1, yes do with same". HR has renamed
-// Failed interview and Not right now, turned Not shortlisted off and added Salary too high (mig 20261024235300).
+// Failed interview and Not right now, turned Not shortlisted off and added Salary too high (mig 20261025021500).
 describe('Hiring › a request › the reasons are HR’s list', () => {
   const reasons = [
     ...TALENT_REASONS.map(r =>

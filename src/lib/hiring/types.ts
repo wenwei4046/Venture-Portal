@@ -6,7 +6,7 @@
 export type HiringStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandidateStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
 /**
- * Why somebody is kept in the Talent Bank: a row of HR's list (mig 20261024235300). The five it began with keep
+ * Why somebody is kept in the Talent Bank: a row of HR's list (mig 20261025021500). The five it began with keep
  * their keys — not_shortlisted · failed_interview · not_right_now · declined_offer · other — the stage's default
  * names them; what HR adds has an id of its own.
  */
@@ -69,7 +69,7 @@ export interface HiringFileType {
   used: number
 }
 
-/** A reason in HR's list (Form settings › Talent Bank reasons — mig 20261024235300). */
+/** A reason in HR's list (Form settings › Talent Bank reasons — mig 20261025021500). */
 export interface HiringBankReason {
   id: TalentReason
   name: string

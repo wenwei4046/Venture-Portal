@@ -7,10 +7,10 @@ import { STARTING_REASONS, cameFrom, knownReason, outReason, pickable, reasonLab
 
 // Why somebody is kept in the Talent Bank (2026-10-24, IT-0008) — HR's list since the same day (the user: "1, yes do
 // with same", as File types). The page and the database never disagree on the five it began with, nor on the default
-// a stage gives (migs 20261024233700, 20261024235300).
+// a stage gives (migs 20261024233700, 20261025021500).
 const read = (f: string) => readFileSync(resolve(process.cwd(), 'supabase/migrations', f), 'utf8')
 const REASON_MIGRATION = read('20261024233700_talent_bank_reason.sql')
-const LIST_MIGRATION = read('20261024235300_talent_bank_reasons_managed.sql')
+const LIST_MIGRATION = read('20261025021500_talent_bank_reasons_managed.sql')
 
 // HR has renamed one, turned one off and added two (one of them off too).
 const LIST: HiringBankReason[] = [

@@ -51,7 +51,7 @@ describe('boardFromJson', () => {
     expect(fieldFromJson({ id: 'x', label: 'X', type: 'colour', required: 'yes' })).toEqual({ id: 'x', label: 'X', type: 'text', options: '', required: false, core: false })
   })
 
-  // HR's list since 2026-10-24 (mig 20261024235300): any reason the database answers — it keeps only its list's — else none.
+  // HR's list since 2026-10-24 (mig 20261025021500): any reason the database answers — it keeps only its list's — else none.
   it('why somebody is kept: the reason the database answers, else none', () => {
     const b = boardFromJson({ talents: [{ id: 'a', reason: 'failed_interview' }, { id: 'b', reason: 'r-7f3a' }, { id: 'c', reason: '' }, { id: 'd' }] })
     expect(b.talents.map(t => t.reason)).toEqual(['failed_interview', 'r-7f3a', null, null])
