@@ -1,5 +1,26 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-23 h (SHIPPED, #677) — Fund OUT: a loan's funding source in a Source column of its own
+
+Session 35e03c3c, after g. User, on the Fund OUT list: "fund out 出去的 sc 可以单独一个column 吗？ 确定先" → shown a
+before/after sample (SC column after Description, filter chips) → "栏名用source" → "全绿就合并上线" → (asked to confirm
+it went through a PR) "那就行，做吧". Squash-merged 18d6eb3e; production deploy success 05:18 UTC.
+
+- `FundHub` (desktop hub, Fund OUT only): column `source` · *Source* after `desc` — `r.fundingSource` as recorded
+  (`HC`, `HV (HC)`, `2990s`…), `—` when none; kind `text`, so it sorts, filters by its funnel and ticks off in Columns.
+  The Description is `fundLine(r, false)` (rate · term). Search (`fundHaystack`) still includes the SC; the Finance
+  phone app's line keeps `SC …` (`fundLine` default); the drawer's *Funding source* row stays; Fund IN unchanged.
+- Saved layouts on production for `fin.fund-out`: Principal's (`date, name, desc, rate, amount, outstanding`, hidden
+  status/type) and Finance Manager's — neither hides `source`, so it shows for both, right after Description
+  (`applyOrder`: a column new to a saved order follows its nearest default predecessor). No layout → Name ·
+  Description · Amount as before; Source is ticked on like Date / Rate. No `table_layout_defaults` row exists.
+- Tests: `FundHub.test.tsx` (+2: Source after Description, `HC` / `—`, its funnel filters to HC, search `sc hc`;
+  no Source on Fund IN), `fund-hub.test.ts` (`fundLine(r, false)`). No database change.
+- Also verified for g: the live app's `treasury_terms_history` reads (with `next_interest_on_original`) — 35 × 200
+  after the #671 deploy (edge logs); production has `pgrst_ddl_watch`, so the schema cache reloaded by itself.
+- The repo refuses GitHub auto-merge, and CI must not be polled: with a check still running, finish other work,
+  read `ccd_pr get_status` again, merge when it is all green.
+
 ## CHECKPOINT 2026-10-23 g (SHIPPED, #671 + mig 20261024100000 + data) — 从某月起生效 · 利息按原本金算; HC's Conts 60k / 58k
 
 Session 35e03c3c (Finance user; reply in 华语). User: "帮我检查HC 那两笔为什么是part payment" → "5月那期利率本来就是3.5%"
