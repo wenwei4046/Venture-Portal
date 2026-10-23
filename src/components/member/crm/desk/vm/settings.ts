@@ -48,10 +48,14 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       ini: initials(p.name), track: on[p.id] ? "var(--crm-brown)" : "var(--crm-line)", knob: on[p.id] ? 19 : 3,
       toggle: () => set(u => ({ ...u, mwt: { ...(u.mwt ?? saved), [p.id]: !(u.mwt ?? saved)[p.id] }, mwtSaved: false })) })) }));
   // ── Active members (2026-10-22, the owner: its own section after Ads to teams): Active or Locked, saved by Save.
-  const actVM = activeVM([
+  // v2 (06c): each person's leads this month beside the switch (who holds them now).
+  const m0 = new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), actLeads: Record<string, number> = {};
+  data.customers.forEach(c => { if (c.assignedTo && new Date(c.createdAt).getTime() >= m0) actLeads[c.assignedTo] = (actLeads[c.assignedTo] ?? 0) + 1; });
+  const actBase = activeVM([
     ...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
     ...teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], people: t.people })),
   ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg }));
+  const actVM = { ...actBase, leads: actLeads };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 

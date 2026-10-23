@@ -571,47 +571,75 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
 
 /**
  * Assignment › Active members (2026-10-22, the owner: a member not active for now but still in the company — its own
- * section after Ads to teams). Each person Active (takes new leads) or Locked (off Assignment's lists; their share to the
- * others). Saved by Save, as Member work type (crm_set_locked; shared/locked.ts › activeVM); its cards, in its look.
+ * section after Ads to teams; v2 frame 06c, note 03 / 04): one table card as Approvals — the title, the counts, a search,
+ * All · Active · Locked; Name · Title · Status · Leads this month · New leads, grouped by team (the Revenue Director first),
+ * each group folding at its chevron. A switch changes the draft; Save writes it (crm_set_locked; shared/locked.ts › activeVM)
+ * — the owner's Save (2026-10-22), which the frame does not draw, sits at the card head's right.
  */
-export function DeskActive({ v }: { v: ActiveVM }) {
-  const { groups } = v;
-  // A team's card folds to its head (2026-10-23, the owner: "这些名单做可收缩及展开的功能") — this screen's own, not saved.
+const ACT_GRID = "minmax(0, 1.8fr) minmax(0, 1.3fr) 120px 130px 80px";
+export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, number> } }) {
   const [shut, setShut] = useState<Record<string, boolean>>({});
+  const [q, setQ] = useState(""), [f, setF] = useState<"all" | "active" | "locked">("all");
+  const all = v.groups.flatMap(g => g.people), nOn = all.filter(p => p.active).length;
+  const ql = q.trim().toLowerCase();
+  const groups = v.groups.map(g => ({ ...g, rows: g.people.filter(p => (f === "all" || (f === "active") === p.active) && (!ql || p.name.toLowerCase().includes(ql) || g.name.toLowerCase().includes(ql))) })).filter(g => g.rows.length);
   return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "14px", marginTop: "-10px" }}>
-        {v.dirty && <span style={{ fontSize: "13px", color: "var(--crm-brown)", fontWeight: 650 }}>Unsaved changes</span>}
-        {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
-        <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: "14.5px", fontWeight: 650, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
-      </div>
-      {/* One list, team after team, scrolled down (the owner, 2026-10-22: "active member & member work type 做成往下滑的名单"). */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
-        {groups.map(g => (
-          <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-            <button type="button" onClick={() => setShut(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut[g.name]} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", border: 0,
-              borderBottom: shut[g.name] ? "0" : "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }}>
-              <span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: shut[g.name] ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={14} /></span>
-              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
-              <strong style={{ flex: "1", minWidth: 0, fontSize: "14px", fontWeight: 700, color: g.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</strong>
-              <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
-            </button>
-            {!shut[g.name] && g.people.map(p => (
-              <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
-                <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: "12px", fontWeight: 700, display: "grid", placeItems: "center" }}>{p.ini}</span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: "14px", fontWeight: 650, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
-                  <span style={{ fontSize: "12px", color: p.active ? "var(--crm-muted)" : "var(--crm-oxblood)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.active ? p.role : "Locked · no new leads"}</span>
-                </span>
-                <span style={{ flex: "0 0 auto", width: "40px", height: "24px", borderRadius: "12px", background: p.active ? "var(--crm-brown)" : "var(--crm-line)", position: "relative", display: "block" }}>
-                  <span style={{ position: "absolute", top: "3px", left: p.active ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
-                </span>
+    <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", marginTop: "1px", marginBottom: "-12px", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px" }}>
+          <span style={{ font: `500 16px ${TIGHT_X}`, color: "var(--crm-ink)", whiteSpace: "nowrap" }}>Active members</span>
+          <span style={{ font: "400 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{nOn} active · {all.length - nOn} locked</span>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>Locked members keep their chats</span>
+          <label style={{ marginLeft: "auto", flex: "none", width: "210px", height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-faint)" }}>
+            <Ic name="search" size={13} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or team" aria-label="Search name or team" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)" }} />
+          </label>
+          <div style={{ ...SEG, flex: "none" }}>{([["all", "All"], ["active", "Active"], ["locked", "Locked"]] as const).map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setF(k)} aria-pressed={f === k} style={{ ...segOpt(f === k), padding: "0 10px", gap: "6px" }}>{l}</button>))}</div>
+          {v.dirty && <button type="button" onClick={v.cancel} style={{ ...XBTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>}
+          <button type="button" onClick={v.save} disabled={!v.dirty} style={{ ...XBTN, flex: "none", height: "32px", padding: "0 14px", borderRadius: "7px", font: "500 12px Inter, sans-serif", color: "#fff", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", cursor: v.dirty ? "pointer" : "default" }} className={v.dirty ? "crm4a-primary" : undefined}>{v.dirty ? v.saveLabel : "Save"}</button>
+        </div>
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "36px", padding: "0 16px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-nav-line)",
+          font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
+          <span>Name</span><span>Title</span><span>Status</span><span style={{ textAlign: "right" }}>Leads this month</span><span style={{ textAlign: "right" }}>New leads</span>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
+          {groups.map(g => (
+            <Fragment key={g.name}>
+              <button type="button" onClick={() => setShut(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut[g.name]} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 16px",
+                background: "var(--crm-hover)", borderTop: "1px solid var(--crm-nav-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+                <span style={{ display: "flex", color: "var(--crm-muted)", transform: shut[g.name] ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.color }} />
+                <span style={{ color: "var(--crm-ink)" }}>{g.name}</span>
+                <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{g.count}</span>
               </button>
-            ))}
-          </div>
-        ))}
+              {!shut[g.name] && g.rows.map(p => {
+                const n = v.leads?.[p.id];
+                return (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "46px", padding: "0 16px", borderTop: "1px solid var(--crm-rule-soft)", font: "400 14px Inter, sans-serif" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                      <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT_X}`, background: p.active ? "var(--crm-cream)" : "var(--crm-tint-lost)", color: p.active ? "var(--crm-ink)" : "var(--crm-faint)" }}>{p.ini}</span>
+                      <span style={{ fontWeight: 500, color: p.active ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    </span>
+                    <span style={{ color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.role}</span>
+                    <span>{p.active
+                      ? <span style={{ ...STPILL, background: "var(--crm-tint-new)", color: "var(--crm-ink)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />Active</span>
+                      : <span style={{ ...STPILL, background: "var(--crm-tint-lost)", color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Locked</span>}</span>
+                    <span style={{ textAlign: "right", font: `500 14px ${TIGHT_X}`, fontVariantNumeric: "tabular-nums", color: p.active ? "var(--crm-ink)" : "var(--crm-faint-2)" }}>{p.active ? n ?? 0 : "—"}</span>
+                    <span style={{ textAlign: "right" }}>
+                      <button type="button" role="switch" aria-checked={p.active} aria-label={`${p.name} takes new leads`} onClick={p.toggle} style={{ ...XBTN, width: "36px", height: "20px", borderRadius: "10px", position: "relative", display: "inline-block", verticalAlign: "middle", background: p.active ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .16s" }}>
+                        <span style={{ position: "absolute", top: "2px", left: p.active ? "18px" : "2px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.2)", transition: "left .16s" }} />
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+            </Fragment>
+          ))}
+          {!groups.length && <div style={{ padding: "28px 16px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Nobody matches</div>}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -716,7 +744,7 @@ export function DeskLeadsByAd({ v }: { v: LbaV }) {
   const ROW: CSSProperties = { display: "grid", gridTemplateColumns: C.grid, gap: "12px", alignItems: "center", padding: "0 14px", borderTop: "1px solid var(--crm-rule-soft)" };
   const ell: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
   return (
-    <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", gap: "14px", paddingTop: "16px", marginBottom: "-12px", boxSizing: "border-box" }}>
+    <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", gap: "14px", marginTop: "1px", marginBottom: "-12px", boxSizing: "border-box" }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px 8px" }}>
           <span style={{ font: `500 16px ${TIGHT_X}`, whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{v.title}</span>
