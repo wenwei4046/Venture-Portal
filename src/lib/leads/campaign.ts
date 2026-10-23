@@ -18,6 +18,10 @@ export interface Audience {
   source: 'any' | 'ad' | 'organic'
   /** Include test conversations (all there are until Meta is connected). */
   tests: boolean
+  /** Never closed on Leads (the handoff's "Did not buy yet"; mig 20261023400000). */
+  notBought?: boolean
+  /** Came to the showroom, not closed ("Came to the showroom but did not buy"; mig 20261023400000). */
+  cameNotBought?: boolean
 }
 
 export interface Campaign {
@@ -39,6 +43,8 @@ export interface Campaign {
   paid: number
   replied: number
   phones: number
+  /** Closed on Leads after it went (mig 20261023400000; absent before). */
+  bought?: number
 }
 
 export interface AudienceCount {
@@ -93,4 +99,26 @@ export function campaignProblem(c: { brandId: string; name: string; body: string
 /** Of those it reached, the share who did something. Null before it is sent. */
 export function share(part: number, of: number): number | null {
   return of ? Math.round((part / of) * 100) : null
+}
+
+/** Promotions consent, as lead_consent() counts it: per brand, test or real, and opt-in. */
+export interface ConsentRow { brandId: string; test: boolean; optIn: OptIn; n: number }
+
+/** The header's three numbers: agreed · not asked · unsubscribed — real conversations, or the tests while there are only tests. */
+export function consentTotals(rows: ConsentRow[]): { agreed: number; notAsked: number; unsub: number } {
+  const real = rows.filter(r => !r.test)
+  const use = real.length ? real : rows
+  const sum = (o: OptIn) => use.filter(r => r.optIn === o).reduce((t, r) => t + r.n, 0)
+  return { agreed: sum('in'), notAsked: sum('none'), unsub: sum('out') }
+}
+
+/** A sent campaign's funnel, as drawn: each step with its share of the step before (Read has no source until Meta). */
+export function resultSteps(c: Pick<Campaign, 'sent' | 'replied' | 'phones' | 'bought'>): Array<{ label: string; n: number | null; rate: string }> {
+  const steps: Array<[string, number | null]> = [['Sent', c.sent], ['Read', null], ['Replied', c.replied], ['Gave a phone', c.phones], ['Bought', c.bought ?? null]]
+  let prev: number | null = null
+  return steps.map(([label, n], i) => {
+    const rate = i === 0 ? 'agreed customers' : n === null ? (label === 'Read' ? 'comes with Meta' : 'waits for the database update') : prev ? `${Math.round((n / prev) * 100)}% of previous` : '—'
+    if (n !== null) prev = n
+    return { label, n, rate }
+  })
 }

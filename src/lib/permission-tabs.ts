@@ -254,6 +254,8 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // General info and Business hours (redesign v2 step 3, mig 20261022230000): set up as Settings is (Manage, with its Edit).
   tab('lead', 'info', 'General info', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   tab('lead', 'hours', 'Business hours', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Audit log (redesign v2 step 6, mig 20261023400000): Lead View's own history, read through audit_changes(); nothing to write.
+  tab('lead', 'audit', 'Audit log', LEADS_KEYS, { view: ['leads.view'] }),
   // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
   tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]

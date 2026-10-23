@@ -338,7 +338,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'lead_handoff', 'lead_set_outcome', 'lead_leads', 'lead_set_stage', 'lead_info', 'lead_save_info', 'lead_business_hours', 'lead_save_hours', 'lead_save_template', 'lead_reply_rules', 'lead_save_reply_rules', 'lead_library', 'lead_save_library_item', 'lead_remove_library_item', 'lead_data_files', 'lead_ai_more', 'lead_ai_corrections', 'lead_save_ai', 'lead_ai_draft_kept', 'lead_save_data_file', 'lead_remove_data_file', 'lead_quick_replies', 'lead_save_quick_replies', 'lead_quick_reply_used', 'lead_mark_lost', 'lead_reopen', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
   'lead_flows', 'lead_save_flow', 'lead_remove_flow', 'lead_auto_categories', 'lead_save_auto_category', 'lead_remove_auto_category',
   'lead_knowledge', 'lead_save_knowledge', 'lead_remove_knowledge', 'lead_personas', 'lead_save_persona', 'lead_ai_context',
-  'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience',
+  'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more',
   'lead_save_campaign', 'lead_send_campaign', 'lead_remove_campaign', 'lead_set_opt_in',
   'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
   // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,

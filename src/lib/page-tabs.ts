@@ -116,6 +116,7 @@ export const PAGE_TABS = {
   '/leads/corrections': ['lead.corrections'],
   '/leads/info': ['lead.info'],
   '/leads/hours': ['lead.hours'],
+  '/leads/audit': ['lead.audit'],
   '/leads/settings': ['lead.settings'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { audienceOf, basisOf, campaignProblem, personalize, share } from './campaign'
+import { audienceOf, basisOf, campaignProblem, consentTotals, personalize, resultSteps, share } from './campaign'
 
 const now = new Date('2026-10-16T10:00:00Z')
 
@@ -35,5 +35,25 @@ describe('the audience and results', () => {
   it('rounds a share and has none before sending', () => {
     expect(share(1, 3)).toBe(33)
     expect(share(0, 0)).toBeNull()
+  })
+})
+
+describe('step 6: consent and results', () => {
+  it('counts real conversations, or the tests while there are only tests', () => {
+    const rows = [
+      { brandId: 'a', test: true, optIn: 'in' as const, n: 3 },
+      { brandId: 'a', test: true, optIn: 'none' as const, n: 5 },
+    ]
+    expect(consentTotals(rows)).toEqual({ agreed: 3, notAsked: 5, unsub: 0 })
+    expect(consentTotals([...rows, { brandId: 'a', test: false, optIn: 'out', n: 2 }])).toEqual({ agreed: 0, notAsked: 0, unsub: 2 })
+  })
+
+  it('draws the funnel with each step’s share of the one before, Read waiting for Meta', () => {
+    const r = resultSteps({ sent: 100, replied: 40, phones: 10, bought: 2 })
+    expect(r.map(x => [x.label, x.n, x.rate])).toEqual([
+      ['Sent', 100, 'agreed customers'], ['Read', null, 'comes with Meta'], ['Replied', 40, '40% of previous'],
+      ['Gave a phone', 10, '25% of previous'], ['Bought', 2, '20% of previous'],
+    ])
+    expect(resultSteps({ sent: 5, replied: 0, phones: 0 })[4]).toEqual({ label: 'Bought', n: null, rate: 'waits for the database update' })
   })
 })

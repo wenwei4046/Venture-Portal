@@ -3,12 +3,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import type { KnowledgeCard, Persona } from './ai'
 import type { LeadAd } from './ads'
-import type { Campaign } from './campaign'
+import type { Campaign, ConsentRow } from './campaign'
+import type { InsightMore } from './insight'
 import type { LeadFlow } from './flow'
 import type { BusinessHours, LeadInfo } from './info'
 import type { LibraryItem, ReplyRules } from './template'
 import type { AgentMore, Correction, DataFile } from './agent'
 import type { QuickReply } from './quick'
+import type { AuditChange, AuditTableLine } from '@/lib/audit/changes'
+import { AUDIT_TABLES } from './audit'
 import type { LeadConfig, LeadContact, LeadThread } from './types'
 
 /**
@@ -134,7 +137,32 @@ export function loadCampaigns(): Promise<Read<Campaign[]>> {
   return rpc<Campaign[]>('lead_campaigns', undefined, 'The campaigns')
 }
 
+/** Promotions consent per brand (mig 20261023400000). */
+export function loadConsent(): Promise<Read<ConsentRow[]>> {
+  return rpc<ConsentRow[]>('lead_consent', undefined, 'Promotions consent')
+}
+
+/** Insight beyond the funnel: who answered first and how far templates got (mig 20261023400000). */
+export function loadInsightMore(from: string | null, to: string | null): Promise<Read<InsightMore>> {
+  return rpc<InsightMore>('lead_insight_more', { p_from: from, p_to: to }, 'Insight')
+}
+
 /** Every ad conversations came from, with its name, campaign, ad set and link where known. */
 export function loadAds(): Promise<Read<LeadAd[]>> {
   return rpc<LeadAd[]>('lead_ads', undefined, 'The ads')
+}
+
+/**
+ * The Audit log page (2026-10-23, step 6): Lead View's set-up tables' latest changes through the portal's own
+ * audit_changes() — it shows a reader only what their permissions open (the tables' read key is `leads`) — with the
+ * register's lines so each row names its item. The latest 500, newest first.
+ */
+export async function loadAudit(): Promise<Read<{ changes: AuditChange[]; lines: AuditTableLine[] }>> {
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const [lines, changes] = await Promise.all([
+    supabase.from('audit_tables').select('table_name, label, area, mode, label_columns, reason').in('table_name', AUDIT_TABLES).then(r => r),
+    supabase.rpc('audit_changes', { p_tables: AUDIT_TABLES, p_limit: 500 }).then(r => r),
+  ])
+  if (lines.error || changes.error) return { ok: false, reason: 'The audit log could not be read. Please try again.' }
+  return { ok: true, data: { changes: (changes.data ?? []) as AuditChange[], lines: (lines.data ?? []) as AuditTableLine[] } }
 }

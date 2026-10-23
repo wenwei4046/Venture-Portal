@@ -81,7 +81,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_register', 'att_file',
   // Lead View (mig 20261016300200):
   'lead_config', 'lead_inbox', 'lead_thread', 'lead_list', 'lead_leads', 'lead_info', 'lead_business_hours', 'lead_reply_rules', 'lead_library', 'lead_data_files', 'lead_quick_replies', 'lead_ai_more', 'lead_ai_corrections', 'lead_flows', 'lead_auto_categories', 'lead_knowledge', 'lead_personas',
-  'lead_campaigns', 'lead_campaign_audience', 'lead_ads',
+  'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more', 'lead_ads',
   // Admin › Guest Link (mig 20261011091000):
   'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:

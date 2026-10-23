@@ -729,4 +729,31 @@ await q('select public.lead_quick_reply_used($1)', [quickList[1].id])
 await as(CS_USER, ALL)
 check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_quick_replies' and grantee in ('anon','authenticated')`))[0].n, 0, 'no grants on quick replies')
 
+// ── Step 6: Campaigns' filters and Bought, consent, Insight's replies and steps, the Audit log tab (mig 20261023400000) ──
+const step6 = (await readFile(new URL('../../supabase/migrations/20261023400000_lead_step6.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(step6.slice(0, step6.indexOf('-- ── The Audit log page, by name')))
+check(step6.includes("('/leads/audit', 'lead.audit')") && step6.includes("('lead.audit', 'view', 'leads.view')"), true, 'the Audit log page is registered by name')
+{
+  const consentRows = (await q('select public.lead_consent() c'))[0].c
+  check(Array.isArray(consentRows) && consentRows.every(r => ['in', 'none', 'out'].includes(r.optIn) && r.n > 0), true, 'consent counts per brand and opt-in')
+  const camps = (await q('select public.lead_campaigns() c'))[0].c
+  check(camps.every(k => typeof k.bought === 'number'), true, 'every campaign says how many bought')
+  // The two "did not buy" filters narrow the audience.
+  const all = (await q(`select count(*)::int n from public.lead_audience($1, 'all', '{"days":3650,"tests":true}'::jsonb)`, [b2990]))[0].n
+  const notBought = (await q(`select count(*)::int n from public.lead_audience($1, 'all', '{"days":3650,"tests":true,"notBought":true}'::jsonb)`, [b2990]))[0].n
+  const closedOnes = (await q(`select count(*)::int n from public.lead_contacts where brand_id = $1 and closed_at is not null`, [b2990]))[0].n
+  check(notBought, all - closedOnes, 'Did not buy yet leaves out the closed')
+  const cameNot = (await q(`select count(*)::int n from public.lead_audience($1, 'all', '{"days":3650,"tests":true,"cameNotBought":true}'::jsonb)`, [b2990]))[0].n
+  const cameOpen = (await q(`select count(*)::int n from public.lead_contacts where brand_id = $1 and (came_at is not null or shown = 'came') and closed_at is null`, [b2990]))[0].n
+  check(cameNot, cameOpen, 'Came but did not buy is exactly those')
+  const more = (await q('select public.lead_insight_more(null, null) m'))[0].m
+  check([Array.isArray(more.replies), Array.isArray(more.steps), more.replies.length], [true, true, (await q('select count(*)::int n from public.lead_contacts'))[0].n], 'insight: one reply row per conversation, and the template steps')
+  check(more.replies.every(r => r.by === null || ['cs', 'template', 'ai'].includes(r.by)), true, 'who answered first is CS, a template or the AI Agent')
+  check((await q(`select public.lead_insight_more('2000-01-01', '2000-01-02') m`))[0].m.replies.length, 0, 'insight keeps to its office days')
+  await as(CS_USER, [])
+  await refuses('select public.lead_consent()', [], /Lead View · View/, 'consent needs Lead View · View')
+  await refuses('select public.lead_insight_more(null, null)', [], /Lead View · View/, 'insight needs Lead View · View')
+  await as(CS_USER, ALL)
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

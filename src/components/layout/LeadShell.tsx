@@ -24,7 +24,7 @@ import s from './LeadShell.module.css'
  * theme (`[data-lead-view]`, globals.css) and its two faces hang on the root. The Inbox draws straight on the paper
  * (`bare`); Lead View's other pages keep the white sheet until their own step of the redesign.
  */
-const BARE = new Set(['/leads', '/leads/list', '/leads/info', '/leads/hours', '/leads/rules', '/leads/flows', '/leads/library', '/leads/ai', '/leads/knowledge', '/leads/corrections'])
+const BARE = new Set(['/leads', '/leads/list', '/leads/info', '/leads/hours', '/leads/rules', '/leads/flows', '/leads/library', '/leads/ai', '/leads/knowledge', '/leads/corrections', '/leads/campaigns', '/leads/insight', '/leads/audit'])
 
 export default function LeadShell({ user, initialCollapsed, children }: { user: User; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname() ?? ''

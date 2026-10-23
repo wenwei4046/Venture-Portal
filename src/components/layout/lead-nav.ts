@@ -6,8 +6,8 @@
 //   FILES    General info · Data Center · AI corrections
 //   ADMIN    Business hours · Audit log · Settings
 //
-// A row whose page is not built yet (`href: null`) is drawn greyed, *Soon* — the redesign builds them
-// step by step (`.claude/rules/leads/lead-view.md` › REDESIGN V2). Reply templates are today's Automations page.
+// A row with no page (`href: null`) is drawn greyed, *Soon*; since step 6 (2026-10-23) every row of the handoff is built
+// (`.claude/rules/leads/lead-view.md` › REDESIGN V2). Reply templates are the old Automations page.
 // Every built row asks its page's tab, as every view sidebar does (opensPath).
 
 import { canAccessLeads } from '@/lib/roles'
@@ -35,7 +35,6 @@ export interface LeadNavSection {
 const link = (key: string, label: string, icon: LeadIconName, href: string, exact = false): LeadNavItem => ({
   key, label, icon, href, match: (p) => (exact ? p === href : under(p, href)),
 })
-const soon = (key: string, label: string, icon: LeadIconName): LeadNavItem => ({ key, label, icon, href: null, match: () => false })
 
 export function leadNavSections(): LeadNavSection[] {
   return [
@@ -69,7 +68,7 @@ export function leadNavSections(): LeadNavSection[] {
       label: 'Admin',
       items: [
         link('leads-hours', 'Business hours', 'clock', '/leads/hours'),
-        soon('leads-audit', 'Audit log', 'scroll'),
+        link('leads-audit', 'Audit log', 'scroll', '/leads/audit'),
         link('leads-settings', 'Settings', 'settings', '/leads/settings'),
       ],
     },

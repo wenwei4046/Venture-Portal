@@ -7203,6 +7203,8 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --lv-out-edge: 240 208 190;
   --lv-green: 76 110 80;
   --lv-green-bg: 230 240 231;
+  /* Insight's second series (the handoff's "sand": phones, templates). */
+  --lv-sage: 141 165 143;
   --lv-amber: 214 150 40;
   --lv-amber-bg: 249 238 214;
   --lv-amber-text: 110 74 10;

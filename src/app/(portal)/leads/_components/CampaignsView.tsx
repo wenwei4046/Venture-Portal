@@ -1,113 +1,132 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { HvPage, PageHead, SectHead, btn } from '@/components/hrv/kit'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { countAudience, removeCampaign, saveCampaign, sendCampaign } from '@/lib/leads/actions'
 import {
-  DAY_CHOICES, DEFAULT_AUDIENCE, audienceOf, campaignProblem, personalize, share,
-  type Audience, type AudienceCount, type Campaign, type CampaignChannel,
+  DEFAULT_AUDIENCE, audienceOf, campaignProblem, consentTotals, personalize, resultSteps,
+  type Audience, type AudienceCount, type Campaign, type CampaignChannel, type ConsentRow,
 } from '@/lib/leads/campaign'
 import { whenFull } from '@/lib/leads/time'
 import type { LeadBrand } from '@/lib/leads/types'
-import { Bi, BrandChip } from './bits'
-import s from './lead.module.css'
+import { LeadIcon } from '@/components/layout/lead-icons'
+import s from './campaigns.module.css'
 
 /**
- * Lead View › Campaigns (2026-10-16, the canvas's "Campaigns" board; the user's brief part 3). Every campaign on
- * the left; on the right the one picked — a draft or scheduled one in its editor (brand, channel, who, the count
- * before sending, the message with {name} and up to 3 buttons, a time), a sent one with what came of it.
- * Meta's rule is the database's: whoever wrote in 24 hours, else only who agreed to promotions (charged).
- * Meta is not connected: a send is recorded on each conversation, never delivered; a schedule waits.
+ * Lead View › Campaigns v2 (2026-10-23, the redesign v2 handoff `Campaigns.dc.html`; step 6). Promotions consent in the
+ * header; every campaign on the left; the one picked in the middle — a draft or scheduled one in its editor (1 · who
+ * gets it, 2 · message, 3 · when), a sent one with its results (Sent · Read · Replied · Gave a phone · Bought) — and the
+ * Messenger preview on the right. Meta's rule stays the database's (lead_audience): whoever wrote in 24 hours, else only
+ * who agreed to promotions, never who unsubscribed. Held until Meta is connected, drawn and saying so: the Meta template,
+ * a photo or video, Send test, Read. Meta is not connected: Send now records the message on each conversation; a
+ * schedule is kept but nothing sends it yet. The two "did not buy" filters and Bought need mig 20261023400000.
  */
 
-type Form = { id: string | null; brandId: string; name: string; channel: CampaignChannel; audience: Audience; body: string; buttons: string[]; scheduledAt: string }
+type Form = { id: string | null; brandId: string; name: string; channel: CampaignChannel; audience: Audience; body: string; buttons: string[]; day: string; time: string }
 
-const blank = (brandId: string): Form => ({ id: null, brandId, name: '', channel: 'all', audience: { ...DEFAULT_AUDIENCE }, body: 'Hi {name}! ', buttons: [], scheduledAt: '' })
+const DAYS = [7, 30, 60, 90, 365] as const
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const p2 = (n: number) => String(n).padStart(2, '0')
+/** An instant as the day and time boxes write it, in the browser's own zone (the office's). */
+const dayOf = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}` }
+const timeOfIso = (iso: string) => { const d = new Date(iso); return `${p2(d.getHours())}:${p2(d.getMinutes())}` }
+const shortDay = (day: string) => `${Number(day.slice(8))} ${MON[Number(day.slice(5, 7)) - 1]}`
+
+const blank = (brandId: string): Form => ({ id: null, brandId, name: 'New campaign', channel: 'all', audience: { ...DEFAULT_AUDIENCE, days: 60 }, body: 'Hi {name}! ', buttons: ['I’m interested'], day: '', time: '11:00' })
 const formOf = (c: Campaign): Form => ({
   id: c.id, brandId: c.brandId, name: c.name, channel: c.channel, audience: audienceOf(c.audience), body: c.body, buttons: c.buttons,
-  scheduledAt: c.scheduledAt ? toLocal(c.scheduledAt) : '',
+  day: c.scheduledAt ? dayOf(c.scheduledAt) : '', time: c.scheduledAt ? timeOfIso(c.scheduledAt) : '11:00',
 })
-/** An instant as a datetime-local box writes it, in the browser's own zone (the office's). */
-function toLocal(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
-}
+const STATUS: Record<Campaign['status'], string> = { draft: 'Draft', scheduled: 'Scheduled', sent: 'Sent' }
 
-const STATUS: Record<Campaign['status'], { en: string; zh: string; tone: string }> = {
-  draft: { en: 'Draft', zh: '草稿', tone: 'plum' },
-  scheduled: { en: 'Scheduled', zh: '已排程', tone: 'clay' },
-  sent: { en: 'Sent', zh: '已发送', tone: 'olive' },
-}
-
-export default function CampaignsView({ campaigns, brands, canManage }: { campaigns: Campaign[]; brands: LeadBrand[]; canManage: boolean }) {
-  const [picked, setPicked] = useState<string | 'new' | null>(campaigns[0]?.id ?? (canManage ? 'new' : null))
+export default function CampaignsView({ campaigns, brands, consent, ready, canManage }: {
+  campaigns: Campaign[]
+  brands: LeadBrand[]
+  consent: ConsentRow[]
+  /** Mig 20261023400000 is in: the two "did not buy" filters, Bought and the consent counts. */
+  ready: boolean
+  canManage: boolean
+}) {
+  const [picked, setPicked] = useState<string | null>(campaigns[0]?.id ?? null)
+  const [fresh, setFresh] = useState<Form | null>(campaigns.length === 0 && canManage ? blank(brands[0]?.id ?? '') : null)
   const byBrand = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
-  const current = campaigns.find(c => c.id === picked) ?? null
+  const current = fresh ? null : campaigns.find(c => c.id === picked) ?? null
+  const totals = consentTotals(consent)
+  const startNew = (f: Form) => { setFresh(f); setPicked(null) }
+  const open = (id: string | null) => { setFresh(null); setPicked(id) }
 
   return (
-    <HvPage>
-      <PageHead eyebrow="Lead View" title="Campaigns" right={canManage
-        ? <button type="button" className={btn('primary')} onClick={() => setPicked('new')}><Bi en="+ New campaign" zh="新群发" /></button>
-        : null} />
-      <div className={s.note} style={{ marginBottom: 14, borderRadius: 10 }}>
-        <Bi block en="Meta's rule: customers who messaged in the last 24 hours can be sent to free. Past 24 hours, only customers who agreed to promotional messages (opt-in), and Meta charges per message. The system leaves everyone else out and shows the numbers before sending."
-          zh="Meta 规定：24 小时内有互动的客户可以免费发；超过 24 小时，只能发给同意接收推广消息（opt-in）的客户，且 Meta 按条收费。系统会自动排除不符合的人，并在发送前显示人数。" />
+    <div className={s.page}>
+      <div className={s.head}>
+        <div className={s.titles}>
+          <span className={s.eyebrow}>LEAD VIEW</span>
+          <h1 className={s.title}>Campaigns</h1>
+        </div>
+        <span className={s.consent} title={ready ? undefined : 'Counts come with the database update'}>
+          <span>Promotions consent</span>
+          <span><span className={s.dot} data-tone="green" />Agreed <b>{ready ? totals.agreed : '—'}</b></span>
+          <span><span className={s.dot} />Not asked <b>{ready ? totals.notAsked : '—'}</b></span>
+          <span><span className={s.dot} data-tone="accent" />Unsubscribed <b>{ready ? totals.unsub : '—'}</b></span>
+        </span>
       </div>
-      <div className={s.twoCol}>
-        <section className={s.panel} aria-label="Campaigns">
-          <SectHead title="Campaigns" count={String(campaigns.length)} />
-          {campaigns.length === 0 ? (
-            <div className={s.empty}><Bi block en="No campaigns yet." zh="还没有群发。" /></div>
-          ) : (
-            <div className={s.tableBox}>
-              <table className={s.table}>
-                <thead>
-                  <tr><th>Name</th><th>Brand</th><th>Status</th><th className={s.num}>Sent</th><th className={s.num}>Replied</th><th className={s.num}>Phones</th></tr>
-                </thead>
-                <tbody>
-                  {campaigns.map(c => (
-                    <tr key={c.id} onClick={() => setPicked(c.id)} style={{ cursor: 'pointer', background: c.id === picked ? 'rgb(var(--hv-peach))' : undefined }}>
-                      <td><button type="button" className={s.linkBtn} onClick={() => setPicked(c.id)} aria-current={c.id === picked}>{c.name}</button></td>
-                      <td><BrandChip brand={byBrand.get(c.brandId)} /></td>
-                      <td>
-                        <span className={s.brand} data-tone={STATUS[c.status].tone}>
-                          {STATUS[c.status].en}{c.status === 'scheduled' && c.scheduledAt ? ` ${whenFull(c.scheduledAt)}` : ''}
-                        </span>
-                      </td>
-                      <td className={s.num}>{c.status === 'sent' ? c.sent : '—'}</td>
-                      <td className={s.num}>{c.status === 'sent' ? c.replied : '—'}</td>
-                      <td className={s.num}>{c.status === 'sent' ? c.phones : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      <div className={s.grid}>
+        <section className={s.list} aria-label="Campaigns">
+          <div className={s.listHead}>
+            <span className={s.kicker}>CAMPAIGNS</span>
+            {canManage ? <button type="button" className={s.btn} data-strong="" onClick={() => startNew(blank(brands[0]?.id ?? ''))}>+ New</button> : null}
+          </div>
+          <div className={s.rows}>
+            {fresh ? (
+              <div className={s.row} aria-current="true">
+                <span className={s.rowTop}><span className={s.rowName}>{fresh.name || 'New campaign'}</span><span className={s.tag}>Draft</span></span>
+                <span className={s.rowLine}><span className={s.brand}>{byBrand.get(fresh.brandId)?.name ?? '—'}</span>Not saved yet</span>
+              </div>
+            ) : null}
+            {campaigns.map(c => (
+              <button key={c.id} type="button" className={s.row} aria-current={!fresh && c.id === picked} onClick={() => open(c.id)}>
+                <span className={s.rowTop}><span className={s.rowName}>{c.name}</span><span className={s.tag} data-status={c.status}>{STATUS[c.status]}</span></span>
+                <span className={s.rowLine}>
+                  <span className={s.brand}>{byBrand.get(c.brandId)?.name ?? '—'}</span>
+                  {c.status === 'sent' && c.sentAt ? `${shortDay(dayOf(c.sentAt))} ${dayOf(c.sentAt).slice(0, 4)}${c.bought !== undefined ? ` · ${c.bought} bought` : ''}`
+                    : c.status === 'scheduled' && c.scheduledAt ? `${shortDay(dayOf(c.scheduledAt))}, ${timeOfIso(c.scheduledAt)}` : 'Not scheduled'}
+                </span>
+              </button>
+            ))}
+            {campaigns.length === 0 && !fresh ? <div className={s.empty}>No campaigns yet.</div> : null}
+          </div>
         </section>
-        {picked === 'new' && canManage ? (
-          <Editor key="new" start={blank(brands[0]?.id ?? '')} brands={brands} onDone={id => setPicked(id)} />
+
+        {fresh ? (
+          <Editor key="new" start={fresh} brands={brands} ready={ready} canManage={canManage} onDone={open} />
         ) : current?.status === 'sent' ? (
-          <Results key={current.id} campaign={current} brand={byBrand.get(current.brandId)} />
-        ) : current && canManage ? (
-          <Editor key={current.id} start={formOf(current)} brands={brands} onDone={id => setPicked(id)} />
+          <Results key={current.id} campaign={current} brand={byBrand.get(current.brandId)} canManage={canManage}
+            onDuplicate={() => startNew({ ...formOf(current), id: null, name: `${current.name} (copy)`.slice(0, 60), day: '' })} />
         ) : current ? (
-          <Results key={current.id} campaign={current} brand={byBrand.get(current.brandId)} />
-        ) : null}
+          <Editor key={current.id} start={formOf(current)} brands={brands} ready={ready} canManage={canManage} onDone={open} />
+        ) : (
+          <section className={s.main}><div className={s.empty}>Pick a campaign, or start a new one.</div></section>
+        )}
+
+        <Preview form={fresh ?? (current ? formOf(current) : null)} brand={byBrand.get((fresh ?? current)?.brandId ?? '')} />
       </div>
-    </HvPage>
+    </div>
   )
 }
 
-function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; onDone: (id: string | null) => void }) {
+function Editor({ start, brands, ready, canManage, onDone }: { start: Form; brands: LeadBrand[]; ready: boolean; canManage: boolean; onDone: (id: string | null) => void }) {
+  const router = useRouter()
   const [form, setForm] = useState<Form>(start)
   const [count, setCount] = useState<AudienceCount | null>(null)
-  const [counting, startCounting] = useTransition()
   const [busy, startBusy] = useTransition()
+  const [, startCounting] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [button, setButton] = useState('')
-  const set = (patch: Partial<Form>) => setForm(f => ({ ...f, ...patch }))
-  const setAud = (patch: Partial<Audience>) => setForm(f => ({ ...f, audience: { ...f.audience, ...patch } }))
+  const [note, setNote] = useState('')
+  const dis = !canManage || busy
+  const set = (patch: Partial<Form>) => { setForm(f => ({ ...f, ...patch })); setNote('') }
+  const setAud = (patch: Partial<Audience>) => set({ audience: { ...form.audience, ...patch } })
+  const a = form.audience
+  const recent = a.days < 3650
 
   // Count again a moment after the audience changes.
   const key = JSON.stringify([form.brandId, form.channel, form.audience])
@@ -116,200 +135,197 @@ function Editor({ start, brands, onDone }: { start: Form; brands: LeadBrand[]; o
     const t = window.setTimeout(() => startCounting(async () => {
       const r = await countAudience(form.brandId, form.channel, form.audience)
       setCount(r.ok ? r.data : null)
-      if (!r.ok) setError(r.reason)
     }), 350)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  const scheduledIso = form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null
-  const problem = campaignProblem({ ...form, scheduledAt: scheduledIso })
+  const scheduledIso = form.day && form.time ? new Date(`${form.day}T${form.time}`).toISOString() : null
   const reach = count ? count.window + count.optin : 0
-  const data = () => ({ brandId: form.brandId, name: form.name, channel: form.channel, audience: form.audience, body: form.body, buttons: form.buttons, scheduledAt: scheduledIso })
+  const problem = campaignProblem({ ...form, buttons: form.buttons.filter(b => b.trim()), scheduledAt: scheduledIso })
+  const data = (at: string | null) => ({ brandId: form.brandId, name: form.name, channel: form.channel, audience: form.audience, body: form.body, buttons: form.buttons.map(b => b.trim()).filter(Boolean), scheduledAt: at })
+  const done = (id: string | null, msg: string) => { setNote(msg); onDone(id); router.refresh() }
 
-  const save = (asSchedule: boolean) => startBusy(async () => {
+  const save = (at: string | null, msg: string) => startBusy(async () => {
     setError(null)
-    const r = await saveCampaign(form.id, { ...data(), scheduledAt: asSchedule ? scheduledIso : null })
+    const r = await saveCampaign(form.id, data(at))
     if (!r.ok) { setError(r.reason); return }
-    onDone(r.data)
+    done(r.data, msg)
   })
   const sendNow = () => {
-    if (!window.confirm(`Send "${form.name}" to ${reach} customer${reach === 1 ? '' : 's'} now? (Recorded only — Meta is not connected.)`)) return
+    if (!window.confirm(`Send “${form.name}” to ${reach} customer${reach === 1 ? '' : 's'} now? It is recorded on each conversation — Meta is not connected.`)) return
     startBusy(async () => {
       setError(null)
-      const saved = await saveCampaign(form.id, { ...data(), scheduledAt: null })
+      const saved = await saveCampaign(form.id, data(null))
       if (!saved.ok) { setError(saved.reason); return }
       const r = await sendCampaign(saved.data)
-      if (!r.ok) { setError(r.reason); onDone(saved.data); return }
-      onDone(saved.data)
+      if (!r.ok) setError(r.reason)
+      done(saved.data, '')
     })
   }
   const remove = () => {
-    if (!form.id || !window.confirm(`Remove "${form.name}"?`)) return
+    if (!form.id || !window.confirm(`Remove “${form.name}”?`)) return
     startBusy(async () => {
       const r = await removeCampaign(form.id!)
       if (!r.ok) setError(r.reason)
-      else onDone(null)
+      else done(null, '')
     })
   }
-  const addButton = () => {
-    const b = button.trim()
-    if (!b || form.buttons.length >= 3) return
-    set({ buttons: [...form.buttons, b.slice(0, 20)] })
-    setButton('')
-  }
+  const statusText = note || (start.day && start.id ? `Scheduled. It is kept for ${shortDay(start.day)} at ${start.time} — nothing sends a schedule until Meta is connected.`
+    : problem ?? (reach === 0 ? 'Nobody matches yet.' : `Ready. ${reach} customer${reach === 1 ? '' : 's'} will get it.`))
 
   return (
-    <section className={s.panel} aria-label="Campaign">
-      <SectHead title={form.id ? `Edit · ${form.name}` : 'New campaign'} />
-      <div className={s.fieldGrid}>
-        <label className={`${s.field} ${s.wide}`}><Bi en="Name (only you see it)" zh="名称（内部用）" />
-          <input value={form.name} onChange={e => set({ name: e.target.value })} maxLength={60} placeholder="e.g. 11.11 sofa preview" />
-        </label>
-        <label className={s.field}><Bi en="Brand" zh="品牌" />
-          <select value={form.brandId} onChange={e => set({ brandId: e.target.value })}>
-            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </label>
-        <label className={s.field}><Bi en="Channel" zh="渠道" />
-          <select value={form.channel} onChange={e => set({ channel: e.target.value as CampaignChannel })}>
-            <option value="all">Messenger + Instagram</option>
-            <option value="messenger">Messenger</option>
-            <option value="instagram">Instagram</option>
-          </select>
-        </label>
-      </div>
+    <section className={s.main} aria-label="Campaign">
+      <div className={s.scroll}>
+        <input className={s.name} value={form.name} maxLength={60} disabled={dis} onChange={e => set({ name: e.target.value })} aria-label="Campaign name" />
 
-      <SectHead title="Who" />
-      <div className={s.fieldGrid}>
-        <label className={s.field}><Bi en="Talked with us" zh="有对话" />
-          <select value={form.audience.days} onChange={e => setAud({ days: Number(e.target.value) })}>
-            {DAY_CHOICES.map(d => <option key={d.days} value={d.days}>{d.en}</option>)}
-          </select>
-        </label>
-        <label className={s.field}><Bi en="Interest contains" zh="意向包含" />
-          <input value={form.audience.interest} onChange={e => setAud({ interest: e.target.value })} maxLength={60} placeholder="e.g. sofa" />
-        </label>
-        <label className={s.field}><Bi en="Phone" zh="电话" />
-          <select value={form.audience.phone} onChange={e => setAud({ phone: e.target.value as Audience['phone'] })}>
-            <option value="any">Any</option>
-            <option value="without">No phone yet</option>
-            <option value="with">Have phone</option>
-          </select>
-        </label>
-        <label className={s.field}><Bi en="Handed to sales" zh="已转交" />
-          <select value={form.audience.handed} onChange={e => setAud({ handed: e.target.value as Audience['handed'] })}>
-            <option value="any">Any</option>
-            <option value="no">Not yet</option>
-            <option value="yes">Handed</option>
-          </select>
-        </label>
-        <label className={s.field}><Bi en="Came from" zh="来源" />
-          <select value={form.audience.source} onChange={e => setAud({ source: e.target.value as Audience['source'] })}>
-            <option value="any">Any</option>
-            <option value="ad">An ad</option>
-            <option value="organic">Organic</option>
-          </select>
-        </label>
-        <label className={s.check} style={{ alignSelf: 'end', minHeight: 36 }}>
-          <input type="checkbox" checked={form.audience.tests} onChange={e => setAud({ tests: e.target.checked })} />
-          <Bi en="Include test conversations" zh="包括测试对话" />
-        </label>
-      </div>
-      <div className={s.inline} aria-live="polite">
-        <div className={s.stat}><span className={s.label}>Match</span><span className={s.statValue}>{count ? count.matched : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Will get it</span><span className={s.statValue}>{count ? reach : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Paid (opt-in)</span><span className={s.statValue}>{count ? count.optin : '—'}</span></div>
-        <div className={s.stat}><span className={s.label}>Left out</span><span className={s.statValue}>{count ? count.notOptedIn + count.unsubscribed : '—'}</span></div>
-      </div>
-      {count ? (
-        <span className={s.hint}>
-          {counting ? 'Counting… ' : ''}{count.window} within 24 hours (free) · {count.optin} opted in (Meta charges) · {count.notOptedIn} past 24 hours without consent · {count.unsubscribed} unsubscribed
-
-        </span>
-      ) : null}
-
-      <SectHead title="Message" />
-      <label className={s.field}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Bi en="Message" zh="内容" />
-          <span className={s.spacer} />
-          <button type="button" className={s.linkBtn} onClick={() => set({ body: `${form.body}{name}` })}><Bi en="Insert {name}" zh="插入名字" /></button>
-        </span>
-        <textarea value={form.body} onChange={e => set({ body: e.target.value })} maxLength={1900} rows={5} />
-      </label>
-      <div className={s.inline}>
-        {form.buttons.map((b, i) => (
-          <span key={i} className={s.chipItem}>{b}<button type="button" aria-label={`Remove ${b}`} onClick={() => set({ buttons: form.buttons.filter((_, j) => j !== i) })}>✕</button></span>
-        ))}
-        {form.buttons.length < 3 ? (
-          <>
-            <label className={s.field} style={{ flex: '0 1 200px' }}>
-              <span className="sr-only">New button</span>
-              <input value={button} onChange={e => setButton(e.target.value)} maxLength={20} placeholder="Button, e.g. Book a visit"
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addButton() } }} />
-            </label>
-            <button type="button" className={btn('outline')} onClick={addButton} disabled={!button.trim()}><Bi en="Add button" zh="加按钮" /></button>
-          </>
-        ) : null}
-      </div>
-      <span className={s.hint}><Bi block en="A tapped button comes back as the customer's message, so your keyword automations can answer it." zh="客户点按钮，会变成客户发来的消息，关键词自动回复可以接着回答。" /></span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={s.label}>Preview</span>
-        <div className={s.tryChat} style={{ minHeight: 0 }}>
-          <div className={s.msgOut}>
-            <div className={s.bubbleOut} data-sender="flow" style={{ whiteSpace: 'pre-wrap' }}>{personalize(form.body, count?.sample[0] ?? 'Ann')}</div>
-            {form.buttons.length ? <span className={s.tabs} style={{ justifyContent: 'flex-end' }}>{form.buttons.map((b, i) => <span key={i} className={s.flowButton}>{b}</span>)}</span> : null}
+        <div className={s.section}>
+          <span className={s.kicker}>1 · WHO GETS IT</span>
+          <label className={s.inline}>Brand
+            <select className={s.select} value={form.brandId} disabled={dis} onChange={e => set({ brandId: e.target.value })}>
+              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+          <div className={s.filters}>
+            <div className={s.filter}>
+              <Check on={recent} disabled={dis} onClick={() => setAud({ days: recent ? 3650 : 60 })} />
+              <span>Chatted in the last{' '}
+                <select className={s.mini} value={recent ? a.days : 60} disabled={dis || !recent} onChange={e => setAud({ days: Number(e.target.value) })} aria-label="Days">
+                  {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>{' '}days</span>
+            </div>
+            <div className={s.filter} title={ready ? undefined : 'Comes with the database update'}>
+              <Check on={!!a.notBought} disabled={dis || !ready} onClick={() => setAud({ notBought: !a.notBought })} />
+              <span>Did not buy yet</span>
+            </div>
+            <div className={s.filter}>
+              <Check on={!!a.interest.trim()} disabled={dis} onClick={() => setAud({ interest: a.interest.trim() ? '' : 'sofa' })} />
+              <span>Asked about{' '}
+                <input className={s.mini} style={{ width: 140 }} value={a.interest} maxLength={60} disabled={dis} placeholder="sofas" onChange={e => setAud({ interest: e.target.value })} aria-label="Asked about" />
+              </span>
+            </div>
+            <div className={s.filter} title={ready ? undefined : 'Comes with the database update'}>
+              <Check on={!!a.cameNotBought} disabled={dis || !ready} onClick={() => setAud({ cameNotBought: !a.cameNotBought })} />
+              <span>Came to the showroom but did not buy</span>
+            </div>
+            <div className={s.filter}>
+              <Check on={a.tests} disabled={dis} onClick={() => setAud({ tests: !a.tests })} />
+              <span>Test conversations</span>
+              <span className={s.faint}>until Meta is connected</span>
+            </div>
+            <div className={s.filter} data-locked="">
+              <Check on disabled onClick={() => {}} />
+              <span>Only customers who agreed to promotions</span>
+              <span className={s.faint}>Always on · Meta rule</span>
+            </div>
+          </div>
+          <div className={s.count}>
+            <span className={s.big}>{count ? reach : '…'}</span><span>customers will get this</span>
+            {count ? <span className={s.faint}>{count.optin} agreed · {count.window} wrote in the last 24 hours · {count.notOptedIn + count.unsubscribed} left out</span> : null}
           </div>
         </div>
-      </div>
 
-      <SectHead title="When" />
-      <label className={s.field}><Bi en="Schedule for (optional)" zh="排程时间（可不填）" />
-        <input type="datetime-local" value={form.scheduledAt} onChange={e => set({ scheduledAt: e.target.value })} />
-      </label>
-      <span className={s.hint}><Bi block en="Meta is not connected yet: Send now records the message on each conversation (nothing is delivered), and a scheduled campaign waits until sending is switched on with Meta." zh="Meta 还没串接：现在发送只会记录在每个对话里（不会真的发出）；排程的群发会等到串接 Meta 后才会自动发送。" /></span>
-      {error ? <div className={s.error} role="alert">{error}</div> : null}
-      {problem && (form.name || form.body.trim() !== 'Hi {name}!') ? <span className={s.hint}>{problem}</span> : null}
-      <div className={s.actions}>
-        <button type="button" className={btn('primary')} onClick={sendNow} disabled={busy || !!problem || reach === 0}><Bi en={`Send now (${reach})`} zh="现在发送" /></button>
-        <button type="button" className={btn('outline')} onClick={() => save(true)} disabled={busy || !!problem || !form.scheduledAt}><Bi en="Schedule" zh="排程" /></button>
-        <button type="button" className={btn('outline')} onClick={() => save(false)} disabled={busy || !!campaignProblem({ ...form, scheduledAt: null })}><Bi en="Save draft" zh="存草稿" /></button>
-        {form.id ? <button type="button" className={btn('outline')} onClick={remove} disabled={busy}><Bi en="Remove" zh="删除" /></button> : null}
+        <div className={s.section}>
+          <span className={s.kicker}>2 · MESSAGE</span>
+          <label className={s.inline}>Meta template
+            <select className={s.select} disabled value=""><option value="">—</option></select>
+            <span className={s.tag}>Comes with Meta</span>
+          </label>
+          <textarea className={s.body} rows={4} value={form.body} maxLength={1900} disabled={dis} onChange={e => set({ body: e.target.value })} aria-label="Message" />
+          <span className={s.faint}>{'{name}'} becomes the customer’s first name. Once Meta is connected, changing the text sends the template back to Meta for review, usually within a day.</span>
+          <span className={s.inline}>
+            <button type="button" className={s.btn} disabled title="Photos and videos come with Meta"><LeadIcon name="image" size={14} /> Add photo or video</button>
+            <Link className={s.link} href="/leads/knowledge">or pick from Data Center</Link>
+          </span>
+          <span className={s.kicker} style={{ marginTop: 6 }}>Buttons</span>
+          {form.buttons.map((b, i) => (
+            <span key={i} className={s.btnRow}>
+              <input className={s.input} value={b} maxLength={20} disabled={dis} onChange={e => set({ buttons: form.buttons.map((x, j) => (j === i ? e.target.value : x)) })} aria-label={`Button ${i + 1}`} />
+              <span className={s.faint}>Customer taps it to reply. Goes to the Inbox.</span>
+              {canManage ? <button type="button" className={s.x} title="Remove" disabled={busy} onClick={() => set({ buttons: form.buttons.filter((_, j) => j !== i) })}>×</button> : null}
+            </span>
+          ))}
+          <span className={s.btnRow}>
+            <input className={s.input} value="Stop promotions" disabled aria-label="Stop promotions" data-locked="" />
+            <span className={s.faint}>Required. Removes the customer from promotions.</span>
+          </span>
+          {canManage && form.buttons.length < 3 ? <button type="button" className={s.link} disabled={busy} onClick={() => set({ buttons: [...form.buttons, ''] })}>+ Add button</button> : null}
+        </div>
+
+        <div className={s.section}>
+          <span className={s.kicker}>3 · WHEN</span>
+          <span className={s.inline}>
+            <input type="date" className={s.input} style={{ width: 160 }} value={form.day} disabled={dis} onChange={e => set({ day: e.target.value })} aria-label="Day" />
+            <input type="time" className={s.input} style={{ width: 120 }} value={form.time} disabled={dis} onChange={e => set({ time: e.target.value })} aria-label="Time" />
+            <span className={s.faint}>Replies come into the Inbox. Send during working hours so someone can answer.</span>
+          </span>
+        </div>
+        {error ? <div className={s.error} role="alert">{error}</div> : null}
+      </div>
+      {canManage ? (
+        <div className={s.foot}>
+          <span className={s.statusText}>{statusText}</span>
+          <span className={s.fill} />
+          {form.id ? <button type="button" className={s.btn} data-quiet="" disabled={busy} onClick={remove}>Remove</button> : null}
+          <button type="button" className={s.btn} disabled title="Comes with Meta">Send test to me</button>
+          {start.day && start.id ? <button type="button" className={s.btn} disabled={busy} onClick={() => save(null, 'Schedule cancelled — it is a draft again.')}>Cancel schedule</button> : null}
+          <button type="button" className={s.btn} disabled={busy || !!problem} onClick={() => save(null, 'Saved as a draft.')}>Save draft</button>
+          <button type="button" className={s.btn} disabled={busy || !!problem || reach === 0} onClick={sendNow} title="Recorded on each conversation — Meta is not connected">Send now</button>
+          <button type="button" className={s.btn} data-strong="" disabled={busy || !!problem || !scheduledIso || reach === 0}
+            title={!scheduledIso ? 'Pick a day and time' : undefined} onClick={() => save(scheduledIso, 'Scheduled.')}>
+            {start.day && start.id ? 'Update schedule' : `Schedule for ${reach}`}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function Results({ campaign: c, brand, canManage, onDuplicate }: { campaign: Campaign; brand: LeadBrand | undefined; canManage: boolean; onDuplicate: () => void }) {
+  const steps = resultSteps(c)
+  return (
+    <section className={s.main} aria-label="Results">
+      <div className={s.scroll}>
+        <span className={s.name} style={{ border: 0 }}>{c.name}</span>
+        <span className={s.faint} style={{ fontSize: 14 }}>Sent {c.sentAt ? whenFull(c.sentAt) : '—'} · {brand?.name ?? '—'} · {c.sent} customers{c.sentByName ? ` · by ${c.sentByName}` : ''}</span>
+        <div className={s.results}>
+          {steps.map(r => (
+            <div key={r.label} className={s.result}>
+              <span className={s.faint}>{r.label}</span>
+              <span className={s.big}>{r.n ?? '—'}</span>
+              <span className={s.faint}>{r.rate}</span>
+            </div>
+          ))}
+        </div>
+        <span className={s.faint} style={{ fontSize: 14 }}>
+          {c.phones} customer{c.phones === 1 ? '' : 's'} left a phone{c.bought !== undefined ? ` and ${c.bought} bought` : ''}. Replies went to the Inbox like any chat and were handed to sales the usual way.
+        </span>
+        <span className={s.inline}>
+          {canManage ? <button type="button" className={s.btn} data-strong="" onClick={onDuplicate}>Duplicate as new campaign</button> : null}
+          <Link className={s.link} href="/leads/list">See the leads it brought ↗</Link>
+        </span>
       </div>
     </section>
   )
 }
 
-function Results({ campaign: c, brand }: { campaign: Campaign; brand: LeadBrand | undefined }) {
-  const replied = share(c.replied, c.sent)
-  const phones = share(c.phones, c.sent)
+function Preview({ form, brand }: { form: Form | null; brand: LeadBrand | undefined }) {
   return (
-    <section className={s.panel} aria-label={c.name}>
-      <div className={s.panelHead}>
-        <span className={s.cardTitle}>{c.name}</span>
-        <span className={s.spacer} />
-        <BrandChip brand={brand} />
-      </div>
-      <span className={s.hint}>
-        {c.status === 'sent' && c.sentAt ? `Sent ${whenFull(c.sentAt)} · ${c.sentByName}` : c.status === 'scheduled' && c.scheduledAt ? `Scheduled ${whenFull(c.scheduledAt)}` : 'Draft'}
-      </span>
-      {c.status === 'sent' ? (
-        <div className={s.inline}>
-          <div className={s.stat}><span className={s.label}>Sent</span><span className={s.statValue}>{c.sent}</span></div>
-          <div className={s.stat}><span className={s.label}>Paid</span><span className={s.statValue}>{c.paid}</span></div>
-          <div className={s.stat}><span className={s.label}>Replied</span><span className={s.statValue}>{c.replied}{replied === null ? '' : ` · ${replied}%`}</span></div>
-          <div className={s.stat}><span className={s.label}>Phones</span><span className={s.statValue}>{c.phones}{phones === null ? '' : ` · ${phones}%`}</span></div>
+    <section className={s.preview} aria-label="Preview">
+      <span className={s.kicker}>PREVIEW · MESSENGER</span>
+      {form ? (
+        <div className={s.phone}>
+          <span className={s.phoneHead}><span className={s.avatar}>{(brand?.name ?? '?').slice(0, 1)}</span>{brand?.name ?? '—'}</span>
+          <div className={s.bubble}>{personalize(form.body, 'Jason')}</div>
+          {form.buttons.filter(b => b.trim()).map((b, i) => <span key={i} className={s.pill}>{b}</span>)}
+          <span className={s.pill}>Stop promotions</span>
         </div>
       ) : null}
-      <span className={s.label}>Message</span>
-      <div className={s.tryChat} style={{ minHeight: 0 }}>
-        <div className={s.msgOut}>
-          <div className={s.bubbleOut} data-sender="flow" style={{ whiteSpace: 'pre-wrap' }}>{c.body}</div>
-          {c.buttons.length ? <span className={s.tabs} style={{ justifyContent: 'flex-end' }}>{c.buttons.map((b, i) => <span key={i} className={s.flowButton}>{b}</span>)}</span> : null}
-        </div>
-      </div>
-      {c.status === 'sent' ? <span className={s.hint}><Bi block en="Replied and phones count customers who wrote back, or gave a phone, after it was sent." zh="回复和电话：发送之后有回复、或留下电话的客户数。" /></span> : null}
+      <span className={s.faint}>Meta only allows promotions to customers who agreed to get them. Customers agree by tapping “Yes” on the opt-in question after a chat. Anyone who taps “Stop promotions” is removed at once.</span>
     </section>
   )
+}
+
+function Check({ on, disabled, onClick }: { on: boolean; disabled: boolean; onClick: () => void }) {
+  return <button type="button" role="checkbox" aria-checked={on} className={s.check} disabled={disabled} onClick={onClick}>{on ? '✓' : ''}</button>
 }
