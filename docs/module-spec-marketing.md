@@ -214,12 +214,12 @@ Every question of §5 has its answer here; what is built from each says so in `.
 
 | # | Answer |
 |---|---|
-| 1 | **Each People title is a group** — no Content / Design / Ads layer of Marketing's own: a stage's group is a title of the Marketing department as People Management writes it, the map's lanes and the colours too (asked again: "每个 title 就是一组"). |
-| 2 | A stage not accepted turns red after **4 working hours**; the PIC's wait the same (HR's schedule when set, else 09:00–18:00 Monday–Friday). |
+| 1 | **Each People title is a group** — no Content / Design / Ads layer of Marketing's own: a stage's group is a title of the Marketing department as People Management writes it, the map's lanes and the colours too (asked again: "每个 title 就是一组"; mig `20261025031000`). |
+| 2 | A stage not accepted turns red after **4 working hours**; the PIC's wait the same (HR's schedule when set, else 09:00–18:00 Monday–Friday). Built (mig `20261025031000`): 09:00–13:00 and 14:00–18:00 Monday–Friday less Selangor's holidays — no HR schedule is set or read yet; the PIC's wait counts no holidays. |
 | 4 | HR invites Marketing's people once Marketing's setup is done ("wait marketing set up done"). |
-| 5 | Only MM / AMM approve. |
-| 6 | Nudge in the portal only. |
-| 7 | **Selangor**'s holidays. |
+| 5 | Only MM / AMM approve — the builders offer only them; the database does not refuse another yet. |
+| 6 | Nudge in the portal only — as built. |
+| 7 | **Selangor**'s holidays (mig `20261025031000`). |
 | 8 | A workflow template, a minutes template or a product **never published** may be deleted (mig `20261025004100`). |
 | 9 | A shared option list (Locations) as a dropdown — **the person filling it in adds a missing option on the spot**. |
 | 10 | **One product project, a sub-task per deliverable** (an action × its quantity: four posters are four sub-tasks), each on its action's workflow with its own day; the product shows deliverables done ÷ all. The day is the **start** day (stage 1's owner gets it then; the SLAs run forward). |
@@ -228,7 +228,7 @@ Every question of §5 has its answer here; what is built from each says so in `.
 | 13 | A **campaign is a product project with a run period**: its stages prepare it (a truck event's script, sourcing, approval, decoration …), then it runs a week or a month; the timeline shows which campaign runs when. |
 | 14 | Key dates are **each company's own**. |
 | 15 | A post is a deliverable with a **📣 Post day** date; done = Scheduled, its owner marks it Posted (with its link). |
-| 16 | A canvas date picks **a fixed kind** (Post day, Shoot day, Meeting, Ads go-live, Ads end, Report day). |
+| 16 | A canvas date picks **a fixed kind** (Post day, Shoot day, Meeting, Ads go-live, Ads end, Report day; mig `20261025031000`). |
 | 17 | Progress = stages done ÷ stages (a product: deliverables done ÷ deliverables). |
 | 18 | **All of Marketing** may export a trail. |
 | 19 | Corrections **annotate** a record, never change the project; the manager's. |
