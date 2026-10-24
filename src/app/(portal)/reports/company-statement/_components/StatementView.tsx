@@ -134,7 +134,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                   {item.termsFrom ? (
                     <span
                       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5"
-                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then${item.termsInterestOnOriginal ? `, interest on the original RM ${formatMoneyBare(item.principal)}` : ''}`}
+                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then${item.termsInterestOnOriginal ? `, interest on the original RM ${formatMoneyBare(item.principal)}` : item.termsInterestKeptOn != null ? `, interest on RM ${formatMoneyBare(item.termsInterestKeptOn)} as before` : ''}`}
                     >
                       Terms from {item.termsFrom}
                     </span>

@@ -775,6 +775,8 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
   const interestOnOriginal = formData.get('interest_on_original') === 'on'
+  const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
+  if (interestOnOriginal && interestKeepsBase) return { error: '利息按原本金算、照之前的本金算，只能选一个' }
 
   const { error } = await supabase.rpc('amend_loan_from', {
     p_loan_id: loanId,
@@ -786,6 +788,7 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
     p_interest_on_original: interestOnOriginal,
+    p_interest_keeps_base: interestKeepsBase,
   })
   if (error) return { error: `修改失败: ${error.message}` }
 
