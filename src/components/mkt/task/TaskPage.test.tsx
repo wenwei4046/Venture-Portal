@@ -63,7 +63,7 @@ describe('the task page, for the people who work it', () => {
     expect(submit).toHaveProperty('disabled', true)
     expect(screen.getByText('Fill in Final artwork, Logo checked')).toBeTruthy()
 
-    const link = screen.getByPlaceholderText('https://… (a link to the file)')
+    const link = screen.getByPlaceholderText('or a link — https://…')
     fireEvent.change(link, { target: { value: 'https://drive.google.com/a' } })
     fireEvent.blur(link)
     await waitFor(() => expect(actions.saveMktWork).toHaveBeenCalledWith('p1', { vals: { 'Final artwork': 'https://drive.google.com/a' } }))

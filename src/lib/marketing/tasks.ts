@@ -74,11 +74,26 @@ export interface WorkLink {
   label: string
 }
 
+/** A file of a stage's work (②b-2e, mig 20261025113000): sent to the bucket under stage/ — a File field's, or the
+ * stage's own Files. */
+export interface StageFile {
+  path: string
+  name: string
+  size: number
+  mime: string
+  /** The File field it fills; null: the stage's own Files. */
+  field: string | null
+  /** Who sent it and when (the handoff's "Uploaded by Ali · 25 Oct"). */
+  by: string
+  at: string | null
+}
+
 /** A stage's work as its owner fills it in. */
 export interface StageWork {
   notes: string
   links: WorkLink[]
   vals: Record<string, string | boolean>
+  files: StageFile[]
 }
 
 /** A stage on New Project's form. */
@@ -126,22 +141,24 @@ export function stageDates(base: string, slas: readonly number[], holidays: Read
 }
 
 /** What a stage still needs before it is handed on: each field not filled in (a box not ticked) — a note and a table
- * are not asked for; a stage with no field, a note or a link. Empty = ready. */
+ * are not asked for; a File field is filled by a link or a file of its own; a stage with no field, a note, a file or a
+ * link (as mkt_stage_missing). Empty = ready. */
 export function missingWork(form: readonly FormField[], work: StageWork): string[] {
   const inputs = form.filter(f => f.type !== 'Note' && f.type !== 'Table')
   const out = inputs
     .filter(f => {
       // A field its template marks not required is never asked for (as mkt_stage_missing).
       if (f.req === false) return false
+      if (f.type === 'File' && work.files.some(x => x.field === f.label)) return false
       const v = work.vals[f.label]
       return v === undefined || v === false || (typeof v === 'string' && !v.trim())
     })
     .map(f => f.label)
-  if (inputs.length === 0 && !work.notes.trim() && work.links.length === 0) out.push('a note or a link')
+  if (inputs.length === 0 && !work.notes.trim() && work.links.length === 0 && work.files.length === 0) out.push('a note, a file or a link')
   return out
 }
 
-export const EMPTY_WORK: StageWork = { notes: '', links: [], vals: {} }
+export const EMPTY_WORK: StageWork = { notes: '', links: [], vals: {}, files: [] }
 
 /** A stage's form as the database keeps it (spec.form). */
 export function formFromRow(v: unknown): FormField[] {
@@ -178,7 +195,18 @@ export function workFromRow(v: unknown): StageWork {
     : []
   const vals: Record<string, string | boolean> = {}
   if (isObj(v.vals)) for (const [k, x] of Object.entries(v.vals)) if (typeof x === 'string' || typeof x === 'boolean') vals[k] = x
-  return { notes: typeof v.notes === 'string' ? v.notes : '', links, vals }
+  const files: StageFile[] = Array.isArray(v.files)
+    ? v.files.filter(isObj).filter(f => typeof f.path === 'string' && f.path).map(f => ({
+        path: String(f.path),
+        name: typeof f.name === 'string' && f.name ? f.name : String(f.path).split('/').pop() || 'File',
+        size: Math.max(0, Number(f.size) || 0),
+        mime: typeof f.mime === 'string' ? f.mime : '',
+        field: typeof f.field === 'string' && f.field ? f.field : null,
+        by: typeof f.by === 'string' ? f.by : '',
+        at: typeof f.at === 'string' && f.at ? f.at : null,
+      }))
+    : []
+  return { notes: typeof v.notes === 'string' ? v.notes : '', links, vals, files }
 }
 
 let seq = 0

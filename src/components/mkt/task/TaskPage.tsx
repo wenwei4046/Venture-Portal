@@ -1,20 +1,23 @@
 'use client'
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { acceptMktStage, decideMktStage, putMktFree, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
+import { acceptMktStage, decideMktStage, putMktFree, saveMktStageFiles, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
 import { nameOf, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
-import { missingWork, type FormField, type PickPerson, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
-import type { TaskFile } from '@/lib/marketing/library'
+import { missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
+import { LIB_MAX_BYTES, STAGE_MAX_FILES, stagePath, type TaskFile } from '@/lib/marketing/library'
+import { createClient } from '@/lib/supabase/client'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
+import StageFiles from './StageFiles'
 import TaskLibrary from './TaskLibrary'
 import TaskSubtasks from './TaskSubtasks'
 import s from './task.module.css'
 
 // A task's page (`New Task Page.dc.html`): where it stands and who it is with, what the viewer may do now — Accept,
-// work their stage (its fields, notes and links) and Submit for approval / Complete it, or as its approver Approve /
+// work their stage (its fields, notes, links and files — uploaded, ②b-2e) and Submit for approval / Complete it, or as its approver Approve /
 // Request changes — the stages in a rail, the stage's subtasks (✂️ Split, a delivery, Review delivery — TaskSubtasks),
 // each stage's work, the Free space anybody on the task writes in, a recurring task's runs, and the trail. Every answer
 // comes back with the task as it now stands.
@@ -39,6 +42,7 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
   const [sheet, setSheet] = useState<'map' | 'audit' | null>(null)
   const [reason, setReason] = useState('')
   const [linkDraft, setLinkDraft] = useState('')
+  const [sending, setSending] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -159,6 +163,54 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
     setLinkDraft('')
   }
 
+  // The stage's files: the whole list saved as it now stands — a refused save takes back what was just sent.
+  const keepFiles = (list: StageFile[]) => list.map(f => ({ path: f.path, name: f.name, field: f.field }))
+  const stageFilesSaved = (next: MktTaskPage | null) => {
+    fresh(next)
+    const now = next?.stages[next.project.cur]
+    if (!now || now.idx !== mine?.idx) return
+    setWork(w => (w ? { ...w, files: now.work.files } : w))
+    if (saved.current) saved.current = { ...saved.current, files: now.work.files }
+  }
+  const sendFiles = (field: string | null, list: FileList) =>
+    start(async () => {
+      if (!saved.current) return
+      const db = createClient() as unknown as SupabaseClient
+      const room = STAGE_MAX_FILES - saved.current.files.length
+      const picked = Array.from(list).filter(f => {
+        if (f.size > LIB_MAX_BYTES) say(`${f.name} is over 2 GB — add it as a link.`)
+        return f.size <= LIB_MAX_BYTES
+      })
+      if (picked.length > room) say('Twenty files at most on a stage.')
+      const sent: { path: string; name: string; field: string | null }[] = []
+      for (const [k, f] of picked.slice(0, Math.max(0, room)).entries()) {
+        setSending(`Uploading ${k + 1} of ${Math.min(picked.length, room)} · ${f.name}`)
+        const path = stagePath(f.name, crypto.randomUUID())
+        const put = await db.storage.from('marketing').upload(path, f, { contentType: f.type || undefined })
+        if (put.error) {
+          say(put.error.message || `${f.name} could not be uploaded.`)
+          continue
+        }
+        sent.push({ path, name: f.name, field })
+      }
+      setSending(null)
+      if (!sent.length) return
+      const r = await saveMktStageFiles(p.id, [...keepFiles(saved.current.files), ...sent])
+      if (!r.ok) {
+        await db.storage.from('marketing').remove(sent.map(x => x.path))
+        return say(r.reason)
+      }
+      stageFilesSaved(r.page)
+      say(sent.length === 1 ? `Uploaded ${sent[0].name}` : `${sent.length} files uploaded`)
+    })
+  const dropFile = (path: string) =>
+    start(async () => {
+      if (!saved.current) return
+      const r = await saveMktStageFiles(p.id, keepFiles(saved.current.files.filter(f => f.path !== path)))
+      if (!r.ok) return say(r.reason)
+      stageFilesSaved(r.page)
+    })
+
   const putBlock = async (b: FreeBlock, op: 'put' | 'remove' = 'put') => {
     const r = await putMktFree(p.id, op, { id: b.id, type: b.type, text: b.text, done: b.done })
     if (!r.ok) return say(r.reason)
@@ -231,6 +283,7 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
                 })}
               </div>
             ) : null}
+            {sending ? <span className={s.note} role="status">{sending}</span> : null}
             {mine ? (
               <span className={`${s.note}${holdNote ? ` ${s.noteRed}` : ''}`}>{holdNote || 'Ready'}</span>
             ) : view.note ? (
@@ -335,8 +388,12 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
                     if (f.type === 'Note') return <div key={f.label} className={s.fNote}>{f.label}</div>
                     return (
                       <div key={f.label} className={s.f}>
-                        <span className={s.fLabel}>{f.label} <span className={s.fType}>· {f.type === 'File' ? 'File (link)' : f.type}</span></span>
-                        {INPUT_TYPES.has(f.type) || f.type === 'File' ? (
+                        <span className={s.fLabel}>{f.label} <span className={s.fType}>· {f.type}</span></span>
+                        {f.type === 'File' ? (
+                          <StageFiles files={ww.files.filter(x => x.field === f.label)} live={!!live} busy={pending} label={f.label}
+                            onPick={list => sendFiles(f.label, list)} onRemove={dropFile} />
+                        ) : null}
+                        {INPUT_TYPES.has(f.type) || (f.type === 'File' && (live || (typeof v === 'string' && v) || !ww.files.some(x => x.field === f.label))) ? (
                           !live && f.type === 'File' && typeof v === 'string' && isLink(v) ? (
                             <a className={s.fileChip} href={v} target="_blank" rel="noreferrer">📎 <span>{v}</span></a>
                           ) : (
@@ -345,7 +402,7 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
                               type={f.type === 'Number' ? 'number' : f.type === 'Date' ? 'date' : f.type === 'File' ? 'url' : 'text'}
                               value={typeof v === 'string' ? v : ''}
                               disabled={!live || pending}
-                              placeholder={live ? (f.type === 'File' ? 'https://… (a link to the file)' : 'Fill in…') : '—'}
+                              placeholder={live ? (f.type === 'File' ? 'or a link — https://…' : 'Fill in…') : '—'}
                               onChange={e => live && setWork(cw => (cw ? { ...cw, vals: { ...cw.vals, [f.label]: e.target.value } } : cw))}
                               onBlur={e => live && saveVal(f, e.target.value.trim())}
                             />
@@ -396,8 +453,10 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
                               {live ? <button type="button" className={s.fileX} aria-label="Remove link" onClick={() => setLinks(ww.links.filter((_, j) => j !== k))}>×</button> : null}
                             </span>
                           ))}
-                          {!ww.links.length && !live ? <span className={s.noFiles}>No files</span> : null}
+                          {!ww.links.length && !live && !ww.files.some(x => !x.field) ? <span className={s.noFiles}>No files</span> : null}
                         </div>
+                        <StageFiles files={ww.files.filter(x => !x.field)} live={!!live} busy={pending} label={w.name}
+                          onPick={list => sendFiles(null, list)} onRemove={dropFile} />
                         {live ? (
                           <div className={s.linkAdd}>
                             <input
