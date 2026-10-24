@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import type { SheetRow } from '@/lib/report-sheet'
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { SheetRow, SheetTxn } from '@/lib/report-sheet'
 import { ReportSearchProvider, useReportSearch } from './ReportSearchProvider'
 import SheetReport, { type SheetColumn } from './SheetReport'
 
@@ -124,26 +124,134 @@ describe('the levels', () => {
   })
 })
 
+// 2026-10-24 — the user's drill-down ("我想要这样的概念", then "照样稿做，Monthly 用 A"): an account opens on its
+// whole row onto a ledger of its lines; month by month, onto its months first, read when it opens.
+const txn = (key: string, date: string, debit: number, credit: number, ref: string, more: Partial<SheetTxn> = {}): SheetTxn => ({
+  key, ref, date, text: 'Claude AI Claim · Tan Yong Hong', value: debit - credit, debit, credit,
+  otherSide: '3000 · Cash & Bank - Hong Leong', ref2: 'HV-PV-202610-0520', ...more,
+})
+const cellsOf = (tr: HTMLElement) => within(tr).getAllByRole('cell').map((td) => td.textContent)
+
 describe('a single month’s drill-down', () => {
   const single: SheetRow[] = [
     {
       key: '4100', label: '4100 Interest income', code: '4100', kind: 'account', depth: 1, values: [10, 4],
-      txns: [{ key: '4100:t0', ref: 'HV-JV-202610-0012', date: '2026-10-05', text: 'Loan interest · HOUZS Century', value: 10 }],
+      txns: [txn('4100:t0', '2026-10-05', 0, 10, 'HV-JV-202610-0012', { text: 'Loan interest · HOUZS Century', ref2: null })],
     },
   ]
-
-  it('opens an account onto its journal lines', () => {
+  const draw1 = (rows: SheetRow[]) =>
     render(
       <ReportSearchProvider level={3}>
-        <SheetReport columns={[{ key: 'cur', label: 'October 2026', tone: 'now' }, { key: 'cmp', label: 'September 2026 · compare' }]} rows={single} drill />
+        <SheetReport columns={[{ key: 'cur', label: 'October 2026', tone: 'now' }, { key: 'cmp', label: 'September 2026 · compare' }]} rows={rows} drill drillMonth="2026-10" />
       </ReportSearchProvider>,
     )
+
+  it('opens an account onto its journal lines as a ledger', () => {
+    draw1(single)
     const toggle = within(row('group', 'Interest income')).getByRole('button', { name: /Interest income/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggle)
-    const line = row('txn', 'HV-JV-202610-0012')
-    expect(line).toHaveTextContent('HV-JV-202610-0012 · 05 Oct')
-    expect(line).toHaveTextContent('Loan interest · HOUZS Century')
-    expect(Array.from(line.querySelectorAll('td')).slice(1).map((td) => td.textContent)).toEqual(['10.00', ''])
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const ledger = within(row('drill', 'HV-JV-202610-0012')).getByRole('table')
+    expect(within(ledger).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Date', 'Description', 'Other side', 'Ref. 1', 'Ref. 2', 'Debit', 'Credit',
+    ])
+    const [, line, foot] = within(ledger).getAllByRole('row')
+    expect(cellsOf(line)).toEqual(['2026-10-05', 'Loan interest · HOUZS Century', '3000 · Cash & Bank - Hong Leong', 'HV-JV-202610-0012', '—', '—', '10.00'])
+    expect(foot).toHaveTextContent('1 line · Open in General Ledger ↗ · Oct 2026')
+    expect(cellsOf(foot).slice(1)).toEqual(['0.00', '10.00'])
+    expect(within(foot).getByRole('link', { name: /Open in General Ledger/ })).toHaveAttribute('href', '/reports/ledger?codes=4100&from=2026-10-01&to=2026-10-31')
+    fireEvent.click(toggle)
+    expect(row('drill', 'HV-JV-202610-0012')).toBeUndefined()
+  })
+
+  it('opens on its whole row, and the bridge’s own account has no General Ledger to open', () => {
+    draw1([{ ...single[0], key: 'out:IB-XFER', code: 'IB-XFER', label: 'IB-XFER Internal transfers' }])
+    fireEvent.click(row('group', 'Internal transfers').querySelectorAll('td')[1])
+    const drill = row('drill', 'HV-JV-202610-0012')
+    expect(within(drill).queryByRole('link')).toBeNull()
+    expect(drill).toHaveTextContent('1 line · Oct 2026')
+  })
+})
+
+describe('a month-by-month account opened', () => {
+  const MONTHS: SheetColumn[] = [
+    { key: 'acc', label: 'Accumulated', tone: 'acc' },
+    { key: '2026-10', label: 'Oct 2026', tone: 'now' },
+    { key: '2026-09', label: 'Sep 2026' },
+    { key: '2026-08', label: 'Aug 2026' },
+  ]
+  const PNL: SheetRow[] = [
+    { key: 'title:exp', label: 'Expenses', kind: 'title', depth: 0, values: [] },
+    { key: 'exp:9087', label: '9087 Website & Software', code: '9087', kind: 'account', depth: 1, values: [600, 400, 200, 0] },
+    { key: 'cat:exp', label: 'Total Expenses', kind: 'total', depth: 0, values: [600, 400, 200, 0] },
+  ]
+  const LINES = [txn('a', '2026-09-12', 200, 0, 'JE-202609-0001'), txn('b', '2026-10-04', 150, 0, 'JE-202610-0002'), txn('c', '2026-10-15', 250, 0, 'JE-202610-0003')]
+  const drawM = (rows: SheetRow[], open: (ask: unknown) => Promise<unknown>, report: 'pnl' | 'cash-flow' = 'pnl') =>
+    render(
+      <ReportSearchProvider level={3}>
+        <SheetReport columns={MONTHS} rows={rows} monthly={{ open: open as never, report, segment: 'marketing' }} />
+      </ReportSearchProvider>,
+    )
+  const monthRows = () => Array.from(document.querySelectorAll('tr[data-kind="month"]')) as HTMLElement[]
+
+  it('reads its lines when it opens, lists its months latest first, and opens a month onto its lines', async () => {
+    const open = vi.fn(async () => ({ ok: true, lines: LINES }))
+    drawM(PNL, open)
+    const toggle = within(row('group', 'Website')).getByRole('button', { name: /Website/ })
+    fireEvent.click(toggle)
+    expect(open).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-08', to: '2026-10', code: '9087', side: null })
+    expect(screen.getByRole('status')).toHaveTextContent('Reading the lines…')
+    await waitFor(() => expect(monthRows()).toHaveLength(2))
+    // August has neither lines nor a figure: it is left out.
+    expect(monthRows().map(cellsOf)).toEqual([
+      ['▸Oct 2026', '2 lines', '400.00'],
+      ['▸Sep 2026', '1 line', '200.00'],
+    ])
+    const drill = row('drill', 'month by month')
+    expect(drill).toHaveTextContent('9087 Website & Software · Aug – Oct 2026 · month by month')
+    const foot = drill.querySelector('.sr-months tfoot tr') as HTMLElement
+    expect(foot).toHaveTextContent('3 lines · Open in General Ledger ↗ · Aug – Oct 2026')
+    expect(cellsOf(foot)[1]).toBe('600.00')
+    expect(within(foot).getByRole('link')).toHaveAttribute('href', '/reports/ledger?codes=9087&from=2026-08-01&to=2026-10-31')
+
+    fireEvent.click(monthRows()[0])
+    const ledger = drill.querySelector('.sr-month-lines table') as HTMLElement
+    const [, first, second, end] = within(ledger).getAllByRole('row')
+    expect(cellsOf(first).slice(0, 4)).toEqual(['2026-10-04', 'Claude AI Claim · Tan Yong Hong', '3000 · Cash & Bank - Hong Leong', 'JE-202610-0002'])
+    expect(cellsOf(second)[3]).toBe('JE-202610-0003')
+    expect(end).toHaveTextContent('2 lines · Open in General Ledger ↗ · Oct 2026')
+    expect(cellsOf(end).slice(1)).toEqual(['400.00', '0.00'])
+    expect(within(end).getByRole('link')).toHaveAttribute('href', '/reports/ledger?codes=9087&from=2026-10-01&to=2026-10-31')
+
+    // Folded and opened again, it keeps what it read.
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+    expect(monthRows()).toHaveLength(2)
+    expect(open).toHaveBeenCalledTimes(1)
+  })
+
+  it('says why it could not read the lines, and reads again on Try again', async () => {
+    const open = vi.fn(async () => ({ ok: false, reason: 'These lines are not open to you.' }))
+    drawM(PNL, open)
+    fireEvent.click(within(row('group', 'Website')).getByRole('button', { name: /Website/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('These lines are not open to you.')
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2))
+  })
+
+  it('opens the cash rows with their side, never the receivables under them', async () => {
+    const open = vi.fn(async () => ({ ok: true, lines: LINES }))
+    const cash: SheetRow[] = [
+      { key: 'in:operating:5000', label: '5000 Service revenue', code: '5000', kind: 'account', depth: 1, values: [600, 400, 200, 0] },
+      { key: 'AR_P_carres', label: 'Carres', code: '3033', kind: 'account', depth: 1, values: [80, 80, 0, 0] },
+    ]
+    drawM(cash, open, 'cash-flow')
+    expect(within(row('group', 'Carres')).queryByRole('button')).toBeNull()
+    fireEvent.click(row('group', 'Carres'))
+    expect(open).not.toHaveBeenCalled()
+    fireEvent.click(within(row('group', 'Service revenue')).getByRole('button'))
+    expect(open).toHaveBeenCalledWith({ report: 'cash-flow', segment: 'marketing', from: '2026-08', to: '2026-10', code: '5000', side: 'in' })
+    await waitFor(() => expect(monthRows()).toHaveLength(2))
   })
 })

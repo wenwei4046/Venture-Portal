@@ -93,6 +93,16 @@ describe('buildPnl', () => {
     expect(rev?.txns[0].amount).toBe(1500)
   })
 
+  // 2026-10-24 — the drill-down's ledger: each line's own debit and credit, and the entry's other side.
+  it('gives each drill-down line its debit, credit and the entry’s other side', () => {
+    const [sale] = pnl.revenue.nodes.find((n) => n.code === '5000')!.txns
+    expect(sale).toMatchObject({ debit: 0, credit: 1500, otherSide: '3000 · Bank HL', refNo: null })
+    // An entry with more than one other account names the largest, and counts the rest.
+    const split = [...LINES, ...entry('2026-06-26', [['9000', 1000, 0], ['3000', 0, 600], ['4000', 0, 400]])]
+    const [fee] = buildPnl(split, ACCOUNTS, FILTER).expense.nodes.find((n) => n.code === '9000')!.txns
+    expect(fee).toMatchObject({ debit: 1000, credit: 0, otherSide: '3000 · Bank HL +1' })
+  })
+
   it('respects the segment filter', () => {
     const treasuryOnly = buildPnl(LINES, ACCOUNTS, { ...FILTER, segment: 'treasury' })
     expect(treasuryOnly.otherIncome.current).toBe(50)
@@ -176,6 +186,19 @@ describe('buildCashFlow', () => {
     expect(cf2.inflow.nodes.find((n) => n.code === '5000')?.txns.map((t) => t.amount)).toEqual([1500])
     expect(cf2.outflow.nodes.find((n) => n.code === '5000')?.txns.map((t) => t.amount)).toEqual([-400])
   })
+
+  // 2026-10-24 — the drill-down's Debit / Credit on the cash rows: as far as the cash went, so they add up to the row.
+  it('writes a cash line’s debit and credit at the cash it moved', () => {
+    const [sale] = cf.inflow.nodes.find((n) => n.code === '5000')!.txns
+    expect(sale).toMatchObject({ amount: 1500, debit: 0, credit: 1500, otherSide: '3000 · Bank HL' })
+    // 1,000 of fees, 600 paid from the bank and 400 left owing: the bank's 600 shared out over the two.
+    const split = [...LINES, ...entry('2026-06-26', [['9000', 1000, 0], ['3000', 0, 600], ['4000', 0, 400]])]
+    const cf2 = buildCashFlow(split, ACCOUNTS, FILTER, BANKS)
+    const [fee] = cf2.outflow.nodes.find((n) => n.code === '9000')!.txns
+    expect(fee).toMatchObject({ amount: -428.57, debit: 428.57, credit: 0, otherSide: '3000 · Bank HL +1' })
+    const owing = cf2.outflow.nodes.find((n) => n.code === '4000')!.txns.find((t) => t.date === '2026-06-26')!
+    expect(owing).toMatchObject({ amount: -171.43, debit: 0, credit: 171.43 })
+  })
 })
 
 describe('gl-report-blocks flatten (export path)', async () => {
@@ -245,6 +268,23 @@ describe('applyGlRefs', () => {
       ref_id: 'x',
     }
     expect(applyGlRefs([line], refs)[0].party).toBeUndefined()
+  })
+
+  // 2026-10-24 — the drill-down's Ref. 2: the source document's number; an invoice's words stand without it.
+  it('carries each line’s document number to the drill-down', () => {
+    const withNos = { ...refs, voucherNos: new Map([['pv-1', 'HV-PV-202606-0001']]), creditNoteNos: new Map([['cn-1', 'HV-CN-202606-0002']]) }
+    const sale = entry('2026-06-02', [['3000', 100, 0], ['5000', 0, 100]]).map((l) => ({ ...l, ref_type: 'invoice', ref_id: 'inv-1' }))
+    const paid = entry('2026-06-03', [['9000', 100, 0], ['3000', 0, 100]]).map((l) => ({ ...l, ref_type: 'payment_voucher', ref_id: 'pv-1' }))
+    const credited = entry('2026-06-04', [['5000', 30, 0], ['3000', 0, 30]]).map((l) => ({ ...l, ref_type: 'credit_note', ref_id: 'cn-1' }))
+    const lines = applyGlRefs([...sale, ...paid, ...credited], withNos)
+    expect(lines.map((l) => l.ref_no)).toEqual([
+      'HV-INV-202605-0044', 'HV-INV-202605-0044', 'HV-PV-202606-0001', 'HV-PV-202606-0001', 'HV-CN-202606-0002', 'HV-CN-202606-0002',
+    ])
+    const pnl = buildPnl(lines, ACCOUNTS, FILTER)
+    const revenue = pnl.revenue.nodes.find((n) => n.code === '5000')!.txns
+    expect(revenue.find((t) => t.date === '2026-06-02')).toMatchObject({ description: "Salary - HR - May'26", party: 'HC', refNo: 'HV-INV-202605-0044' })
+    expect(revenue.find((t) => t.date === '2026-06-04')).toMatchObject({ refNo: 'HV-CN-202606-0002' })
+    expect(pnl.expense.nodes.find((n) => n.code === '9000')!.txns[0]).toMatchObject({ party: 'TNB Berhad', refNo: 'HV-PV-202606-0001' })
   })
 })
 

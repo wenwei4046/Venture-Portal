@@ -4,7 +4,7 @@ import type { loadMonthlyCashFlow } from '@/lib/monthly-statements'
 import { fromChoices, rangeLabel, toChoices, type ReportRange } from '@/lib/report-range'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
-import SheetReport from './SheetReport'
+import SheetReport, { type MonthlyDrill } from './SheetReport'
 import { ReportSearchProvider } from './ReportSearchProvider'
 import ReportToolbar from './ReportToolbar'
 import type { ReportSegmentOption } from './report-segments'
@@ -14,7 +14,9 @@ import type { ReportSegmentOption } from './report-segments'
  * Design handoff): five cards, then one control row over the matrix, cut to
  * From. Reports' Cash Flow draws it, and so does a department's page under
  * Dept Pool (2026-10-09) — there with no Segment, the page being the segment.
- * The table is the handoff's own since 2026-10-10 (SheetReport), opened at L3.
+ * The table is the handoff's own since 2026-10-10 (SheetReport), opened at L3;
+ * its cash rows open onto their months and lines (2026-10-24) through the
+ * page's own action.
  */
 export default function MonthlyCashFlowBody({
   cashFlow: { data, rows },
@@ -23,6 +25,7 @@ export default function MonthlyCashFlowBody({
   segmentLabel,
   segment = '',
   segments = [],
+  drill,
 }: {
   cashFlow: Awaited<ReturnType<typeof loadMonthlyCashFlow>>
   range: ReportRange
@@ -32,6 +35,8 @@ export default function MonthlyCashFlowBody({
   segment?: string
   /** Empty = no segment choice. */
   segments?: ReportSegmentOption[]
+  /** The page's action that reads an opened row's lines, and the segment it reads them for. */
+  drill?: Omit<MonthlyDrill, 'report'>
 }) {
   const cut = sliceMatrixMonths(data.columns, rows, range.from)
   // A card reads the Accumulated of its line as cut to From: a flow adds up, an
@@ -65,7 +70,11 @@ export default function MonthlyCashFlowBody({
             segment={segment}
             segments={segments}
           />
-          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} />
+          <SheetReport
+            columns={sheetColumns(cut.columns, nowYM)}
+            rows={sheetFromMatrix(cut.rows)}
+            monthly={drill ? { ...drill, report: 'cash-flow' } : undefined}
+          />
         </section>
       </ReportSearchProvider>
     </>

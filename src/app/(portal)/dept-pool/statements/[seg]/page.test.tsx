@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — the user: 我要把每个 department 的 cash flow, P&L 放过来.
@@ -27,8 +27,10 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
+  openDeptPoolRow: vi.fn(async () => ({ ok: true, lines: [] })),
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
+vi.mock('../../../reports/drill-actions', () => ({ openDeptPoolRow: mocks.openDeptPoolRow }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: mocks.elim, eliminateInterBilling: (l: unknown) => l }))
@@ -154,6 +156,14 @@ describe('a department’s own P&L under Dept Pool', () => {
     render(await page('revenue-department', { view: 'pnl' }))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Revenue Department')
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ segment: ['revenue_department'] }))
+  })
+
+  // 2026-10-24 — an account opens onto its months, then a month onto its lines: the department's own, read
+  // through this page's action.
+  it('opens an account onto the department’s own lines', async () => {
+    render(await page('marketing', { view: 'pnl' }))
+    fireEvent.click(screen.getByRole('button', { name: /4000 Service fees/ }))
+    expect(mocks.openDeptPoolRow).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', code: '4000', side: null })
   })
 })
 

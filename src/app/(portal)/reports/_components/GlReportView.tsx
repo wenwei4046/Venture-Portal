@@ -66,6 +66,7 @@ export default function GlReportView({
         rows={sheetFromBlocks(blocks, cmp)}
         pctBase={pctBase ? (cmp ? [pctBase.current, pctBase.previous] : [pctBase.current]) : undefined}
         drill={!asAt}
+        drillMonth={asAt ? undefined : period}
       />
     </ReportSearchProvider>
   )

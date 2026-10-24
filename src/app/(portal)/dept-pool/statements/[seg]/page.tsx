@@ -11,6 +11,7 @@ import { rangeLabel, reportRange } from '@/lib/report-range'
 import { segmentFilterFor } from '../../../reports/_components/report-segments'
 import MonthlyPnlBody from '../../../reports/_components/MonthlyPnlBody'
 import MonthlyCashFlowBody from '../../../reports/_components/MonthlyCashFlowBody'
+import { openDeptPoolRow } from '../../../reports/drill-actions'
 
 // A department's own P&L and Cash Flow, under Dept Pool (2026-10-09, the
 // user: 我要把每个 department 的 cash flow, P&L 放过来 — Venture, Marketing,
@@ -102,12 +103,15 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
     </div>
   )
 
+  // An account opens onto its months and lines for this segment (2026-10-24), through this page's own action.
+  const drill = { open: openDeptPoolRow, segment: dept.segment }
+
   if (view === 'cash-flow') {
     const cashFlow = await loadMonthlyCashFlow(supabase, args)
     return (
       <div>
         {head}
-        <MonthlyCashFlowBody cashFlow={cashFlow} range={range} nowYM={nowYM} segmentLabel={dept.label} />
+        <MonthlyCashFlowBody cashFlow={cashFlow} range={range} nowYM={nowYM} segmentLabel={dept.label} drill={drill} />
       </div>
     )
   }
@@ -116,7 +120,7 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
   return (
     <div>
       {head}
-      <MonthlyPnlBody pnl={pnl} range={range} nowYM={nowYM} segmentLabel={dept.label} />
+      <MonthlyPnlBody pnl={pnl} range={range} nowYM={nowYM} segmentLabel={dept.label} drill={drill} />
     </div>
   )
 }

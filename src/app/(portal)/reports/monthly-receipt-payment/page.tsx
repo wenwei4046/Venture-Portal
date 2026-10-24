@@ -35,6 +35,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
 import ReportToolbar from '../_components/ReportToolbar'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
+import { openReportRow } from '../drill-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -179,7 +180,13 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
             segment={segment}
             segments={segments}
           />
-          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={receipts} />
+          {/* Its cash rows open as Monthly Cash Flow's do — the same cash (2026-10-24); the receivables do not. */}
+          <SheetReport
+            columns={sheetColumns(cut.columns, nowYM)}
+            rows={sheetFromMatrix(cut.rows)}
+            pctBase={receipts}
+            monthly={{ open: openReportRow.bind(null, 'monthly-receipt-payment'), report: 'cash-flow', segment }}
+          />
         </section>
       </ReportSearchProvider>
     </div>

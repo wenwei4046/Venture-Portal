@@ -136,7 +136,10 @@ describe('the single-month rows', () => {
       section: section('revenue', 'Revenue', [
         node('4000', 'Service fees', 30, 20, { children: [node('4010', 'Marketing fees', 30, 20)] }),
         node('4100', 'Interest income', 10, 5, {
-          txns: [{ date: '2026-10-05', entryNo: 'HV-JV-202610-0012', description: 'Loan interest', segment: 'corporate', party: 'HOUZS Century', amount: 10 }],
+          txns: [{
+            date: '2026-10-05', entryNo: 'HV-JV-202610-0012', description: 'Loan interest', segment: 'corporate', party: 'HOUZS Century', amount: 10,
+            debit: 0, credit: 10, otherSide: '3000 · Cash & Bank - Hong Leong', refNo: null,
+          }],
         }),
       ]),
     },
@@ -165,10 +168,13 @@ describe('the single-month rows', () => {
     expect(rows[4].values).toEqual([40, 25])
   })
 
-  it('keeps each account’s journal lines for the drill-down', () => {
+  it('keeps each account’s journal lines for the drill-down, with their debit, credit, other side and document', () => {
     const rows = sheetFromBlocks(pnl, false)
     expect(rows[3].txns).toEqual([
-      { key: 'revenue:4100:t0', ref: 'HV-JV-202610-0012', date: '2026-10-05', text: 'Loan interest · HOUZS Century', value: 10 },
+      {
+        key: 'revenue:4100:t0', ref: 'HV-JV-202610-0012', date: '2026-10-05', text: 'Loan interest · HOUZS Century', value: 10,
+        debit: 0, credit: 10, otherSide: '3000 · Cash & Bank - Hong Leong', ref2: null,
+      },
     ])
   })
 
