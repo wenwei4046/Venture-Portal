@@ -362,8 +362,9 @@ describe('a folder’s Download as ZIP', () => {
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Open', 'Download as ZIP20.0 MB'])
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Download as ZIP/ }))
     await waitFor(() => expect(flash).toHaveBeenCalledWith('Carres · Brandbook.zip downloaded'))
-    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip', 120000)
-    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip · 1 / 1', 120000)
+    // Each word kept until the next (half an hour) — one video can take minutes to fetch.
+    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip', 1_800_000)
+    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip · 1 / 1', 1_800_000)
     const [files, name] = zip.saveZip.mock.calls[0]
     expect([(files as { id: string }[]).map(f => f.id), name]).toEqual([['x2'], 'Carres · Brandbook'])
     expect(screen.queryByRole('menu')).toBeNull()

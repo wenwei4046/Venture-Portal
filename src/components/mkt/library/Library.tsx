@@ -28,6 +28,9 @@ import s from './library.module.css'
 // (the manager's), 60 days. Each subsidiary's brand profile — its card and banner, ✎ Marketing · Edit's, its history —
 // and its next dates, the Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
 
+/** How long a ZIP's *Preparing …* stays — until its next word, which always comes. */
+const ZIP_WORD_MS = 30 * 60_000
+
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
 type Menu = { kind: 'file' | 'folder'; id: string } | 'new' | 'add' | null
@@ -110,15 +113,16 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
     router.replace(libHref(lib, v, { cat: c }), { scroll: false })
   }
 
-  /** A folder's *Download as ZIP*: made here in the browser, a file at a time, said as it goes. */
+  /** A folder's *Download as ZIP*: made here in the browser, a file at a time, said as it goes — each word kept until the
+   * next (one video can take minutes to fetch), the last one always coming. */
   const zipFolder = async (folderId: string, name: string) => {
     setMenu(null)
     const list = lib.files.filter(f => f.folder === folderId)
     if (zipping || !zipPlan(list).ok) return
     setZipping(true)
-    flash(`Preparing ${name}.zip`, 120_000)
+    flash(`Preparing ${name}.zip`, ZIP_WORD_MS)
     try {
-      await saveZip(list, name, (done, all) => flash(`Preparing ${name}.zip · ${done} / ${all}`, 120_000))
+      await saveZip(list, name, (done, all) => flash(`Preparing ${name}.zip · ${done} / ${all}`, ZIP_WORD_MS))
       flash(`${name}.zip downloaded`)
     } catch {
       flash(`${name}.zip could not be made — download its files one at a time`, FLASH_LONG)
