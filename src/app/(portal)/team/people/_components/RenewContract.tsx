@@ -126,6 +126,7 @@ export default function RenewContract({
           }}
           idPrefix="renew-letter"
           disabled={busy}
+          selectClassName={r.select}
         />
       </div>
       {error ? <div className="sheet-danger mt-0 mb-0">{error}</div> : null}
