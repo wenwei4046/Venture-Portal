@@ -220,3 +220,5 @@ END
 $fn$;
 REVOKE ALL ON FUNCTION public.mkt_pic_calendar(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.mkt_pic_calendar(text) TO anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
