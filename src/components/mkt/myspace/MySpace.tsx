@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { flash } from '@/components/hrv/toast'
@@ -13,6 +14,7 @@ import {
   type PieceKind, type Room, type Space, type SpacePatch, type SpacePicture, type SpaceTheme, type TileKind, type TilePlace,
 } from '@/lib/marketing/space'
 import { createClient } from '@/lib/supabase/client'
+import LobbyTile, { type LobbyEntry } from './LobbyTile'
 import NotesTile from './NotesTile'
 import Onboarding from './Onboarding'
 import PetNode from './PetNode'
@@ -28,10 +30,11 @@ import TrophiesTile from './TrophiesTile'
 import WeekTile from './WeekTile'
 import s from './myspace.module.css'
 
-// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1, ⑦-2 and ⑦-5): the viewer's cover, avatar (and their pet
-// beside it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their board — the
-// room, the pet (its level, XP and energy; fed and worked out), My turn, Waiting on others, Delegated by me, the
-// trophies, This week, Notes and Photo, laid out as they left it. Above it, an
+// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1, ⑦-2, ⑦-4 and ⑦-5): the viewer's cover, avatar (and
+// their pet beside it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their
+// board — the room, the pet (its level, XP and energy; fed and worked out), My turn, Waiting on others, Delegated by me,
+// the trophies, the lobby (a teammate's pet opens their space), This week, Notes and Photo, laid out as they left it.
+// Above it, an
 // Assignment plan that put them on a project, while it is unread. The first visit of somebody on Marketing's roster
 // opens the pet's setup. What they change is saved as they change it (only that part); what is drawn is theirs from
 // then on — a page drawn again by the server never takes it back.
@@ -63,9 +66,14 @@ export interface MySpaceProps {
   petStats: PetStats | null
   /** The viewer's id: the level this device last saw is kept under it. */
   viewer: string
+  /** The lobby's pets, each feeling as its owner's plate is (⑦-4). */
+  lobby: LobbyEntry[]
+  /** The viewer's staff id: their own pet in the lobby is drawn as it is here. */
+  me: string | null
 }
 
 export default function MySpace(p: MySpaceProps) {
+  const router = useRouter()
   const [space, setSpace] = useState<Space>(p.space)
   const [drawer, setDrawer] = useState<DrawerTab | null>(null)
   const [coverPop, setCoverPop] = useState(false)
@@ -297,7 +305,7 @@ export default function MySpace(p: MySpaceProps) {
     setSending(kind)
     try {
       const db = createClient() as unknown as SupabaseClient
-      const path = spacePicturePath(kind, file.name, crypto.randomUUID())
+      const path = spacePicturePath(file.name, crypto.randomUUID())
       const put = await db.storage.from('marketing').upload(path, file, { contentType: file.type })
       if (put.error) {
         flash(put.error.message || `${file.name} could not be uploaded.`)
@@ -323,6 +331,14 @@ export default function MySpace(p: MySpaceProps) {
   const state = mood ?? petState(p.plate, stats?.energy)
   const pet = p.hasPet ? { species: space.pet.species, level, form: formOf(level), img: space.petPath, state, color: space.pet.color } : null
   const petName = space.pet.name || 'Your pet'
+  // The lobby: one's own pet as it is here — its look, its level, how it feels this moment — the others as the page read
+  // them; a pet just set up joins it at once.
+  const mine = p.me && pet && space.pet.onboarded ? {
+    staff: p.me, first: p.first, title: p.role, species: space.pet.species, name: petName, color: space.pet.color, petPath: space.petPath,
+    xp: stats?.xp ?? 0, energy: stats?.energy ?? 64, state,
+  } : null
+  const lobby = [...p.lobby.filter(x => x.staff !== p.me), ...(mine ? [mine] : [])]
+    .sort((a, b) => a.first.localeCompare(b.first) || a.staff.localeCompare(b.staff))
   const roomPlace = placeOf('room')
   const tiles: Partial<Record<TileKind, BoardTile>> = {
     room: roomPlace ? {
@@ -343,6 +359,7 @@ export default function MySpace(p: MySpaceProps) {
     waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} canAccept={p.canEdit} />, red: col('waiting').anyRed },
     delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
     trophies: { body: <TrophiesTile stats={stats} /> },
+    lobby: { bare: true, body: <LobbyTile pets={lobby} me={p.me} home onVisit={staff => router.push(`/marketing?visit=${staff}`)} /> },
     week: { body: <WeekTile week={p.week} /> },
     notes: { bare: true, body: <NotesTile text={space.notes} canEdit={p.canEdit} onChange={t => change('notes', t)} onDone={() => flushKey('notes')} /> },
     photo: { bare: true, body: <PhotoTile path={space.photoPath} canEdit={p.canEdit && !drawer} sending={sending} onPick={() => pick('photo')} /> },

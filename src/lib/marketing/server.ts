@@ -9,7 +9,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
 import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
-import { petStatsFromRow, spaceFromRow, type PetStats, type Space } from './space'
+import { lobbyFromRow, petStatsFromRow, spaceFromRow, visitFromRow, type LobbyPet, type PetStats, type Space, type Visit } from './space'
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
@@ -131,6 +131,22 @@ export async function readPet(): Promise<PetStats | null> {
   const { data, error } = await db.rpc('mkt_pet')
   if (error) throw new Error(error.message)
   return petStatsFromRow(data)
+}
+
+/** The lobby (⑦-4, mig 20261025038000): the pets of Marketing's roster — those with a login and their pet set up. */
+export async function readLobby(): Promise<LobbyPet[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_lobby')
+  if (error) throw new Error(error.message)
+  return lobbyFromRow(data)
+}
+
+/** A teammate's space for a visit (⑦-4): null for anybody off the roster or without a login. */
+export async function readVisit(staff: string): Promise<Visit | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_space_of', { p_staff: staff })
+  if (error) throw new Error(error.message)
+  return visitFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

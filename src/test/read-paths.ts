@@ -425,6 +425,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_space', 'mkt_space_save',
   // The pet's levels (mig 20261025037000): the caller's own pet in numbers read by View; fed and worked out by Edit.
   'mkt_pet', 'mkt_pet_care',
+  // The lobby and a visit (mig 20261025038000): the roster's pets, and a teammate's space — both read by View.
+  'mkt_lobby', 'mkt_space_of',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
