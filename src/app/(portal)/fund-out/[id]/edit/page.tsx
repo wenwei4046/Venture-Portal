@@ -1,8 +1,11 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
-import { requireActionOn, requirePage } from '@/lib/auth'
+import { requireAnyActionOn, requirePage } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
+import { latestTermsRequest } from '@/lib/terms-change-request'
 import LoanAmendForm from '../_components/LoanAmendForm'
 
 interface Props {
@@ -11,7 +14,8 @@ interface Props {
 
 export default async function LoanEditPage({ params }: Props) {
   await requirePage('/fund-out/[id]/edit')
-  await requireActionOn('/fund-out/[id]/edit', 'treasury', 'approve')
+  // Treasury · Approve changes the terms; Treasury · Edit files the change for the Principal (2026-10-24).
+  const user = await requireAnyActionOn('/fund-out/[id]/edit', ['treasury', 'approve'], ['treasury', 'edit'])
   const { id } = await params
   const supabase = await createClient()
 
@@ -25,6 +29,11 @@ export default async function LoanEditPage({ params }: Props) {
   // Only active loans can be amended in-app. Pending ones are edited via the
   // create/approval flow; terminal ones are frozen.
   if (loan.status !== 'active') redirect(`/fund-out/${id}`)
+  // One filed change at a time: while one waits, the loan's page says so (and Withdraw takes it back).
+  const direct = canDo(user, 'treasury', 'approve')
+  if (!direct && (await latestTermsRequest(supabase as unknown as SupabaseClient, 'loan', id))?.status === 'pending') {
+    redirect(`/fund-out/${id}`)
+  }
 
   const { data: company } = await supabase
     .from('companies')
@@ -53,6 +62,7 @@ export default async function LoanEditPage({ params }: Props) {
         compound={(loan as { compound_interest?: boolean }).compound_interest === true}
         nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
         termsFrom={((loan as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
+        direct={direct}
       />
     </div>
   )

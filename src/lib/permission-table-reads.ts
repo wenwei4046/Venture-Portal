@@ -167,6 +167,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   service_contracts: ['billing.create', 'billing.edit', 'billing.view'],
   treasury_config: ['approvals.approve', 'categories.view', 'director_salary.approve', 'director_salary.edit', 'hr_costing.approve', 'settings.manage', 'treasury.approve', 'treasury.view'],
   treasury_terms_history: ['reports.export', 'reports.view', 'treasury.create', 'treasury.view'],
+  // A terms change filed for the Principal (mig 20261025110000): the deal's page (Treasury · View) and Amend terms (· Edit, · Approve).
+  treasury_terms_requests: ['treasury.approve', 'treasury.edit', 'treasury.view'],
   // A person's boxes (mig 20261011010100): People › Permissions and the person window.
   user_permission_tabs: ['accounts.manage', 'accounts.view', 'team.view:own'],
   // A person's sub-department ticks (mig 20261016180000): read as their boxes are.

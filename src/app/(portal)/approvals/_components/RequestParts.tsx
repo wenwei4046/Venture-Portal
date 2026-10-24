@@ -9,7 +9,8 @@ import { sizeOf } from '@/app/(portal)/payments/_components/VoucherDetailBody'
 // One request, drawn in the drawer's hand (2026-10-17 — moved out of the Finance phone app's Approvals, so the
 // computer's Approvals drawer draws the same): the dark hero with its status, then what the desktop's request page
 // shows — whom a voucher pays, from which bank and pool, its pools line by line, its files; a loan's terms; who sent
-// it and when, and how it was decided. On the phone the drawer's parts take the app's sizes (`[data-fin-app]`).
+// it and when, and how it was decided; a terms change's lines as asked beside what they are now. On the phone the
+// drawer's parts take the app's sizes (`[data-fin-app]`).
 
 /** The hero's status: its word and its light. */
 export function heroStatus(status: string, may: boolean): { text: string; light: string } {
@@ -120,6 +121,17 @@ export function RequestBody({ r, openFile }: { r: ApprovalRecordModel; openFile:
           <Line label="Principal" value={rm(r.loan.principal)} mono />
           <Line label="Effective rate" value={r.loan.rate} sub={r.loan.rateSub} mono />
           <Line label="Monthly interest" value={rm(r.loan.monthlyInterest)} sub="At full principal" mono />
+        </Group>
+      ) : null}
+
+      {/* A terms change: each line as asked from the month, what it is now beneath the ones it moves. */}
+      {r.terms ? (
+        <Group n={roman()} title={`Terms change · from ${r.terms.fromLabel}`}>
+          {r.terms.rows.map((row) => (
+            <Line key={row.label} label={row.label} value={row.asked} sub={row.changed ? `Now ${row.now}` : 'As it is'} />
+          ))}
+          {r.terms.rows.length === 0 ? <Line label="Asked" value={r.terms.words} sub={r.terms.why ?? undefined} /> : null}
+          <Line label="Reason" value={r.terms.reason || '—'} />
         </Group>
       ) : null}
 

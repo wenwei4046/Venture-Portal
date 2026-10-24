@@ -35,7 +35,7 @@ export default function DealPageSteps({
   party: string
   amount: number
   status: string
-  /** Amend terms (Treasury · Approve, a live deal). */
+  /** Amend terms (a live deal: Treasury · Approve changes them; Treasury · Edit files the change for the Principal). */
   amendHref?: string | null
   /** Edit (Treasury · Edit, a pending fund source). */
   editHref?: string | null

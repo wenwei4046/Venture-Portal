@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
+import { DialogConfirm, DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { fd } from '@/components/finv/DrawerParts'
 import { HUB_HREF, HUB_TITLE } from '@/lib/fin-app/routes'
@@ -20,7 +20,8 @@ import { VoidRepaymentDialog } from '@/app/(portal)/fund-out/[id]/_components/Vo
 import CreateFundOutDialog from '@/app/(portal)/fund-out/_components/CreateFundOutDialog'
 import RecordFundInDialog from '@/app/(portal)/fund-in/_components/RecordFundInDialog'
 import { exportLoansCSV, setLoanMinPayInterest } from '@/app/(portal)/fund-out/actions'
-import { setFundSourceMinPayInterest } from '@/app/(portal)/fund-in/actions'
+import { setFundSourceMinPayInterest, withdrawTermsChange } from '@/app/(portal)/fund-in/actions'
+import type { TermsRequestNote } from '@/lib/terms-change-request'
 import { openLoanPage } from '@/app/(portal)/fund-out/page-actions'
 import { openSourcePage } from '@/app/(portal)/fund-in/page-actions'
 import type { LoanPageModel } from '@/app/(portal)/fund-out/[id]/_lib/loan-page'
@@ -58,6 +59,8 @@ const rm = (n: number) => `RM ${f2(n)}`
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const pct = (r: number) => `${(r * 100).toFixed(3)}%`
 const signed = (n: number) => (Math.abs(n) < 0.005 ? '—' : `${n > 0 ? '+' : '−'}${f2(Math.abs(n))}`)
+/** 'YYYY-MM' → "Oct 2026". */
+const ymWords = (ym: string) => (/^\d{4}-\d{2}$/.test(ym) ? `${MONTHS[Number(ym.slice(5, 7)) - 1].slice(0, 3)} ${ym.slice(0, 4)}` : ym)
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** A side's step reader: `?id=` a deal (`&from=` its card), `?f=` a card's list, else the hub. */
@@ -100,6 +103,7 @@ type Sheet =
   | { kind: 'void'; id: string; label: string }
   | { kind: 'revert'; from: string }
   | { kind: 'amend' }
+  | { kind: 'terms-withdraw' }
   | { kind: 'edit' }
   | { kind: 'print' }
 
@@ -212,14 +216,43 @@ export default function FundApp({
   const makeBtn: BarButton | null = can.create ? { key: 'create', label: out ? 'Create fund out' : 'Record fund in', kind: 'primary', onClick: () => setMaking(true) } : null
 
   // ── The deal on screen, as its page reads it, and its ⋯ — Request cancellation (an active deal; a loan's shut,
-  // saying why, once a repayment is recorded) ──
+  // saying why, once a repayment is recorded); a terms change waiting for the Principal, to open or withdraw ──
   const recordOn = step.kind === 'record' ? (records.find((x) => x.id === step.id) ?? null) : null
   const loanOn = step.kind === 'record' && page?.side === 'out' && page.loan.id === step.id ? page.loan : null
   const sourceOn = step.kind === 'record' && page?.side === 'in' && page.source.id === step.id ? page.source : null
   const dealOn = loanOn ?? sourceOn
+  const termsAsk = dealOn?.termsRequest ?? null
   const cancelShut = loanOn && loanOn.status === 'active' && loanOn.repayments.length > 0 ? `${plural(loanOn.repayments.length, 'repayment', 'repayments')} recorded — reverse those first` : null
-  const recordMore: DialogMenuItem[] =
-    can.void && dealOn?.status === 'active' && !dealOn.pendingCancel
+  const recordMore: DialogMenuItem[] = [
+    ...(termsAsk?.decides && termsAsk.approvalId
+      ? [
+          {
+            key: 'terms-open',
+            label: 'Open the terms change',
+            sub: `From ${ymWords(termsAsk.fromYM)} · in Approvals`,
+            onClick: () => {
+              setMenu(null)
+              pushIntent()
+              router.push(`/fin-app/page/approvals?id=${encodeURIComponent(termsAsk.approvalId!)}`)
+            },
+          },
+        ]
+      : []),
+    ...(termsAsk?.mayWithdraw
+      ? [
+          {
+            key: 'terms-withdraw',
+            label: 'Withdraw the terms change',
+            sub: `From ${ymWords(termsAsk.fromYM)} · waiting for the Principal`,
+            danger: true,
+            onClick: () => {
+              setMenu(null)
+              setSheet({ kind: 'terms-withdraw' })
+            },
+          },
+        ]
+      : []),
+    ...(can.void && dealOn?.status === 'active' && !dealOn.pendingCancel
       ? [
           {
             key: 'cancel',
@@ -233,7 +266,8 @@ export default function FundApp({
             },
           },
         ]
-      : []
+      : []),
+  ]
 
   // ── The screens ──
   let screen: ReactNode
@@ -245,7 +279,7 @@ export default function FundApp({
     const status = dealOn?.status ?? r?.status ?? null
     const live = status === 'active' || status === 'matured'
     const recordable = loan ? loan.can.recordRepayment : !!source?.repay
-    // Amend terms, as the edit page starts it — an active deal, Treasury · Approve.
+    // Amend terms, as the edit page starts it — an active deal, Treasury · Approve (or · Edit, filed for the Principal).
     const amendTerms = status === 'active' ? ((loan ?? source)?.amend ?? null) : null
     const mayEdit = loan ? loan.can.edit : !!source?.can.financeEdit
     const pendingCancel = dealOn?.pendingCancel ?? null
@@ -337,6 +371,7 @@ export default function FundApp({
               : null
           }
           pendingCancel={live ? pendingCancel : null}
+          termsRequest={live ? termsAsk : null}
         />
       ) : (
         <div className={d.loading}>{refused ?? 'Loading…'}</div>
@@ -481,6 +516,7 @@ export default function FundApp({
           id={loanOn.id}
           party={loanOn.companyName}
           terms={loanOn.amend}
+          direct={loanOn.can.amend}
           today={today}
         />
       ) : null}
@@ -494,7 +530,18 @@ export default function FundApp({
           id={sourceOn.id}
           party={sourceOn.fromLabel}
           terms={sourceOn.amend}
+          direct={sourceOn.can.amend}
           today={today}
+        />
+      ) : null}
+      {dealOn?.termsRequest?.mayWithdraw ? (
+        <TermsWithdrawDialog
+          open={sheet?.kind === 'terms-withdraw'}
+          onClose={() => setSheet(null)}
+          onDone={() => done('Terms change withdrawn — the terms stay as they are')}
+          kind={out ? 'loan' : 'fund_source'}
+          dealId={dealOn.id}
+          note={dealOn.termsRequest}
         />
       ) : null}
       {sourceOn?.edit ? (
@@ -563,7 +610,7 @@ export default function FundApp({
 /**
  * What a deal's full page adds to the drawer's parts, numbered on from them: IV the repayment schedule, V the
  * repayments as recorded, VI the terms over time (each change opens onto its months), VII the repayment
- * settings, VIII a fund source's notes, and a cancellation filed.
+ * settings, VIII a fund source's notes, a cancellation filed, and a terms change filed for the Principal.
  */
 function DealSections({
   plan,
@@ -577,6 +624,7 @@ function DealSections({
   settings,
   notes,
   pendingCancel,
+  termsRequest,
 }: {
   plan: RepaymentPlan
   cancelled: boolean
@@ -590,8 +638,10 @@ function DealSections({
   settings: ItemLine[]
   notes: { text: string | null; action: ItemLine['action'] } | null
   pendingCancel: { by: string; at: string } | null
+  /** Its latest terms change filed for the Principal — waiting, or decided within the month. */
+  termsRequest: TermsRequestNote | null
 }) {
-  const romans = ['IV.', 'V.', 'VI.', 'VII.', 'VIII.', 'IX.']
+  const romans = ['IV.', 'V.', 'VI.', 'VII.', 'VIII.', 'IX.', 'X.']
   let n = 0
   const next = () => romans[n++] ?? ''
 
@@ -648,6 +698,84 @@ function DealSections({
       {pendingCancel ? (
         <RecordItems roman={next()} title="Cancellation" items={[{ key: 'requested', label: `Requested by ${pendingCancel.by}`, sub: pendingCancel.at, chip: { text: 'waiting for Principal', tone: 'wait' } }]} />
       ) : null}
+      {termsRequest ? (
+        <RecordItems
+          roman={next()}
+          title="Terms change"
+          items={[
+            {
+              key: 'terms',
+              label: `From ${ymWords(termsRequest.fromYM)}${termsRequest.line ? ` · ${termsRequest.line}` : ''}`,
+              sub:
+                termsRequest.status === 'pending'
+                  ? `Filed by ${termsRequest.by} · ${termsRequest.at}${termsRequest.reason ? ` · “${termsRequest.reason}”` : ''} — the terms stay as they are until it is approved`
+                  : `Filed by ${termsRequest.by} · ${termsRequest.status === 'approved' ? 'approved' : 'turned down'} by ${termsRequest.decidedBy ?? 'the Principal'}${termsRequest.decidedAt ? ` · ${termsRequest.decidedAt}` : ''}${termsRequest.note ? ` — “${termsRequest.note}”` : ''}`,
+              chip:
+                termsRequest.status === 'pending'
+                  ? { text: 'waiting for Principal', tone: 'wait' }
+                  : termsRequest.status === 'approved'
+                    ? { text: 'approved', tone: 'ledger' }
+                    : { text: 'turned down', tone: 'danger' },
+            },
+          ]}
+        />
+      ) : null}
     </>
+  )
+}
+
+/** Withdraw a terms change still waiting for the Principal — whoever filed it, or the Principal (the page's own action). */
+function TermsWithdrawDialog({
+  open,
+  onClose,
+  onDone,
+  kind,
+  dealId,
+  note,
+}: {
+  open: boolean
+  onClose: () => void
+  onDone: () => void
+  kind: 'loan' | 'fund_source'
+  dealId: string
+  note: TermsRequestNote
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const close = () => {
+    if (busy) return
+    setError(null)
+    onClose()
+  }
+  const go = async () => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await withdrawTermsChange(kind, dealId, note.id)
+      if (res?.error) {
+        setError(res.error)
+        return
+      }
+      onClose()
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That did not go through. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <FinDialog open={open} onClose={close} locked={busy} title="Withdraw the terms change?">
+      <DialogConfirm
+        text={`The change from ${ymWords(note.fromYM)} is taken off the Principal's queue; the terms stay as they are.`}
+        confirmLabel={busy ? 'Working…' : 'Withdraw'}
+        danger
+        busy={busy}
+        error={error}
+        onCancel={close}
+        onConfirm={() => void go()}
+      />
+    </FinDialog>
   )
 }

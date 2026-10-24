@@ -136,6 +136,18 @@ export default function ApprovalFullPage({
             </Card>
           ) : null}
 
+          {r.terms ? (
+            <Card n={++n} title="Terms change" aside={`FROM ${r.terms.fromLabel.toUpperCase()}`}>
+              {/* The month asked, its terms now beside the terms asked (lib/terms-change-request) — what Approve applies. */}
+              {r.terms.rows.length > 0 ? <TermsTable rows={r.terms.rows} fromLabel={r.terms.fromLabel} /> : null}
+              {r.terms.why ? <p className={a.termsWhy}>{r.terms.why}</p> : null}
+              <dl className={s.dl} style={{ marginTop: 14 }}>
+                {r.terms.rows.length === 0 ? <Row label="Asked" value={r.terms.words} /> : null}
+                <Row label="Reason" value={r.terms.reason || '—'} />
+              </dl>
+            </Card>
+          ) : null}
+
           {!v && !r.loan ? (
             <Card n={++n} title="Request">
               <div className={s.lead}>{r.title}</div>
@@ -192,6 +204,32 @@ export default function ApprovalFullPage({
         </aside>
       </div>
     </div>
+  )
+}
+
+/** A terms change's lines: now, and as asked from the month — the ones it moves picked out. */
+export function TermsTable({ rows, fromLabel }: { rows: NonNullable<ApprovalRecordModel['terms']>['rows']; fromLabel: string }) {
+  return (
+    <div className={a.terms}>
+      <span className={a.termsHead} />
+      <span className={a.termsHead}>Now</span>
+      <span className={a.termsHead}>Asked · from {fromLabel}</span>
+      {rows.map((row) => (
+        <TermsLine key={row.label} row={row} />
+      ))}
+    </div>
+  )
+}
+
+function TermsLine({ row }: { row: NonNullable<ApprovalRecordModel['terms']>['rows'][number] }) {
+  return (
+    <>
+      <span className={a.termsLabel}>{row.label}</span>
+      <span className={a.termsNow}>{row.now}</span>
+      <span className={a.termsAsked} data-changed={row.changed ? 'true' : undefined}>
+        {row.asked}
+      </span>
+    </>
   )
 }
 

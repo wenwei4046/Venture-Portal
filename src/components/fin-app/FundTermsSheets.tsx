@@ -38,7 +38,10 @@ const rateProblem = (raw: string) => {
   return Number.isFinite(n) && n >= 0 && n < 100 ? null : 'The rate is from 0 to under 100% a month.'
 }
 
-/** Amend terms — a booked deal's terms, from a month on or the whole deal again (Treasury · Approve). */
+/**
+ * Amend terms — a booked deal's terms, from a month on or the whole deal again (Treasury · Approve). Without Approve
+ * (Treasury · Edit, 2026-10-24) a from-month change is filed for the Principal and applied once approved.
+ */
 export function AmendTermsSheet({
   open,
   onClose,
@@ -47,6 +50,7 @@ export function AmendTermsSheet({
   id,
   party,
   terms,
+  direct = true,
   today,
 }: {
   open: boolean
@@ -56,6 +60,8 @@ export function AmendTermsSheet({
   id: string
   party: string
   terms: AmendTerms
+  /** Treasury · Approve: the change applies now. Without it the change is filed for the Principal. */
+  direct?: boolean
   /** The office's today. */
   today: string
 }) {
@@ -100,7 +106,13 @@ export function AmendTermsSheet({
       const was = d
       onClose()
       reset()
-      onDone(was.mode === 'from' ? `New terms from ${monthWords(was.effectiveFrom)}` : 'Terms saved — the whole deal recalculated')
+      onDone(
+        res.filed
+          ? `Terms change from ${monthWords(was.effectiveFrom)} filed — waiting for the Principal`
+          : was.mode === 'from'
+            ? `New terms from ${monthWords(was.effectiveFrom)}`
+            : 'Terms saved — the whole deal recalculated',
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The terms could not be changed.')
     } finally {
@@ -125,17 +137,22 @@ export function AmendTermsSheet({
               Cancel
             </DialogButton>
             <DialogButton kind="primary" off={!!problem} disabled={busy} onClick={() => void save()}>
-              {busy ? 'Saving…' : from ? `Apply from ${monthWords(d.effectiveFrom)}` : 'Save'}
+              {busy ? (direct ? 'Saving…' : 'Filing…') : !direct ? 'Submit for approval' : from ? `Apply from ${monthWords(d.effectiveFrom)}` : 'Save'}
             </DialogButton>
           </>
         }
       >
-        <Field label="Takes effect" htmlFor="am-mode">
-          <Select id="am-mode" round={12} className={fm.select} value={d.mode} onChange={(e) => set({ mode: e.target.value as AmendDraft['mode'] })}>
-            <option value="from">From a month on</option>
-            <option value="whole">The whole deal again — a correction</option>
-          </Select>
-        </Field>
+        {/* The whole deal again is the Principal's own (a correction); a filed change is a from-month one. */}
+        {direct ? (
+          <Field label="Takes effect" htmlFor="am-mode">
+            <Select id="am-mode" round={12} className={fm.select} value={d.mode} onChange={(e) => set({ mode: e.target.value as AmendDraft['mode'] })}>
+              <option value="from">From a month on</option>
+              <option value="whole">The whole deal again — a correction</option>
+            </Select>
+          </Field>
+        ) : (
+          <Hint>Filed for the Principal — it applies once approved in Approvals; the terms stay as they are till then.</Hint>
+        )}
         {from ? (
           <div className={fm.duo}>
             <Field label="Effective from" htmlFor="am-from">
