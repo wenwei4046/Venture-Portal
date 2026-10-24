@@ -21,6 +21,8 @@ import { fetchAllRowsParallel } from "@/lib/paginate";
  */
 const CRM_WRITES = [
   "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
+  // An appointment online or elsewhere (mig 20261025020000).
+  "crm_book_custom", "crm_move_custom",
   "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_give_to_hod",
   // The redesign (mig 20261009160000).
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
@@ -58,7 +60,7 @@ export type CrmWrite = (typeof CRM_WRITES)[number];
  */
 const TELLS: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign",
-  "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_visit_outcome",
+  "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_set_appointment_state", "crm_visit_outcome",
   "crm_invite", "crm_answer_invite", "crm_remind",
 ]);
 const pushAfter = () => import("@/lib/push/outbox").then(m => m.pushSoon(), () => undefined);
@@ -124,7 +126,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
-  "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
+  "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
   "crm_add_note", "crm_add_contact",
 ]);
@@ -160,7 +162,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
         .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, media_mime, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
         .order("sent_at").order("id").range(from, to), "crm messages"),
-      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at")),
+      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
       read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id, marked_unread")),
       read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),

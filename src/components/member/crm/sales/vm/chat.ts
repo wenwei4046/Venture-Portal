@@ -11,6 +11,7 @@
  * "/" for quick replies; after the reply window, approved templates only.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
+import { customBookVM, customPrefill, type CustomBook } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
 import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf, teamAssignees } from "../../shared/people";
 import { BORDER, chatStripOf, coldLine, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
@@ -165,8 +166,8 @@ export function chatVM(ctx: SalesCtx) {
       radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE_BG : "#fff", borderStyle: "solid", border: mine ? MINE_BG : "#fff",
       textAlign: "left" as const, fg: mine ? "#fff" : INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
-        kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
-        time: timeLabel(cd), room: card.room, addr: card.addr,
+        kind: card.kind, title: card.mode === "online" ? "Online meeting" : card.mode === "other" ? "Appointment" : "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
+        time: timeLabel(cd), room: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr,
         bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
         // Tap the card → Calendar on the visit's date.
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
@@ -262,9 +263,10 @@ export function chatVM(ctx: SalesCtx) {
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
-    apptWhen: nextVisit ? `${dayLabel(new Date(nextVisit.start))}, ${timeLabel(new Date(nextVisit.start))}` : "",
+    // An online / elsewhere visit carries its link and the salesperson's remarks here too (2026-10-24).
+    apptWhen: nextVisit ? [`${dayLabel(new Date(nextVisit.start))}, ${timeLabel(new Date(nextVisit.start))}`, nextVisit.link, nextVisit.remarks].filter(Boolean).join(" · ") : "",
     apptCal: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, chat: null, tab: "calendar", calView: "month", calSel: day0(d), calYM: [d.getFullYear(), d.getMonth()] })); },
-    apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id } })); },
+    apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id, ...customPrefill(nextVisit) } })); },
     apptCancel: () => { if (nextVisit) set(u => ({ ...u, hm: null, cancelAsk: nextVisit.id })); },
     apptBook: goBook,
     infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c, data),
@@ -317,6 +319,8 @@ export function chatVM(ctx: SalesCtx) {
     monthCells: [] as { n: number | string; pick?: () => void; cursor: string; weight: number; deco: string; bg: string; fg: string; border: string }[],
     slots: [] as { t: string; left: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
     bookRemarks: "", confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
+    // Showroom · Online · Other (2026-10-24).
+    bkm: null as CustomBook | null,
     dateLeft: (_: MouseEvent) => {}, dateRight: (_: MouseEvent) => {}, dateWheel: (_: WheelEvent<HTMLElement>) => {}, dateDown: (_: RPointerEvent<HTMLElement>) => {}, dateMove: (_: RPointerEvent<HTMLElement>) => {}, dateUp: (_: RPointerEvent<HTMLElement>) => {}, dateClickGuard: (_: MouseEvent) => {},
     mDown: (_: RPointerEvent<HTMLElement>) => {}, mUp: (_: RPointerEvent<HTMLElement>) => {}, mCancel: () => {}, mClickGuard: (_: MouseEvent) => {},
   };
@@ -353,6 +357,14 @@ export function chatVM(ctx: SalesCtx) {
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
     book = {
       ...book, bookOpen: true,
+      bkm: customBookVM({ b, put, changing: !!b.visitId, now,
+        save: f => oneAtATime(`book:${c.id}`, async () => {
+          if (b.visitId) return act.moveCustom(b.visitId, f);
+          const rb = ui.rebookFor;
+          if (rb && !(await act.outcome(rb.visitId, false, "rebooked"))) return false;
+          return act.bookCustom(c.id, f);
+        }).then(ok => !!ok),
+        done: () => { set(u => ({ ...u, book: null, rebookFor: null })); scrollDown(); } }),
       rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-sel)" : "#fff", dot: b.room === i ? RUST : "transparent",
         pick: () => put({ room: i, slot: null, ...(roomClosed(r, b.day) ? { day: firstOpenDay(i, T) } : {}) }) })),
       monthLabel: gb(dd, { month: "short", year: "numeric" }), monthOpen: !!b.monthOpen,

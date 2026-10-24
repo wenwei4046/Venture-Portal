@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { DEFAULT_LAYOUT, DEFAULT_THEME, KINDS, spaceFromRow, type Space } from '@/lib/marketing/space'
+import { DEFAULT_LAYOUT, DEFAULT_THEME, KINDS, spaceFromRow, type PetStats, type Space } from '@/lib/marketing/space'
 import type { PlateColumn } from '@/lib/marketing/my-space'
 
 // 2026-10-23 — ⑦-1: My Space's own side (`My Space Bento.dc.html`): the board laid out by its owner (Edit layout — the
@@ -9,7 +9,7 @@ import type { PlateColumn } from '@/lib/marketing/my-space'
 // who may not change it sees. The reckoning is lib/marketing/space.test.ts's; the database's
 // tests/member-sql/validate-marketing-spaces.mjs.
 
-const actions = vi.hoisted(() => ({ saveMktSpace: vi.fn(), acceptMktStage: vi.fn() }))
+const actions = vi.hoisted(() => ({ saveMktSpace: vi.fn(), acceptMktStage: vi.fn(), careMktPet: vi.fn() }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }))
 const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
@@ -25,8 +25,11 @@ const props = (over: Partial<MySpaceProps> = {}): MySpaceProps => ({
   name: 'Mei Ling', role: 'Videographer', letter: 'M', avatarBg: 'var(--mk-team-content-bg)', greeting: 'Good morning', first: 'Mei',
   plateLine: 'your plate is clear',
   columns: [column('turn', 'My turn', '👉'), column('delegated', 'Delegated by me', '📤'), column('waiting', 'Waiting on others', '⏳')],
-  week: [], plans: [], plate: { count: 0, red: 0, fresh: false }, hasPet: false, canEdit: true, space: spaceFromRow(null), ...over,
+  week: [], plans: [], plate: { count: 0, red: 0, fresh: false }, hasPet: false, canEdit: true, space: spaceFromRow(null), petStats: null,
+  viewer: 'viewer-1', ...over,
 })
+/** A pet in numbers, as `mkt_pet()` gives it. */
+const stats = (over: Partial<PetStats> = {}): PetStats => ({ xp: 0, energy: 64, snacks: 3, workouts: 0, trophies: [], trophyCount: 0, ...over })
 /** What the database answers a save: the space with what was sent. */
 const answer = (patch: Record<string, unknown>, base: Space = spaceFromRow(null)) =>
   ({ ok: true, space: { ...base, ...patch, saved: true } })
@@ -35,6 +38,7 @@ const root = () => document.querySelector<HTMLElement>('[data-bg]')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.localStorage.clear()
   actions.saveMktSpace.mockImplementation(async (patch: Record<string, unknown>) => answer(patch))
   bucket.upload.mockResolvedValue({ data: { path: 'x' }, error: null })
   bucket.remove.mockResolvedValue({ data: [], error: null })
@@ -95,7 +99,7 @@ describe('Edit layout', () => {
     expect(tile('notes')?.style.top).toBe('546px')
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0]
-    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'waiting', 'delegated', 'week', 'notes'])
+    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'notes'])
     expect(sent.tilesKnown).toEqual([...KINDS].sort())
   })
 
@@ -107,7 +111,7 @@ describe('Edit layout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove This week' }))
     expect(tile('week')).toBeNull()
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
-    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'waiting', 'delegated'])
+    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated'])
   })
 
   it('dragged by its face: moved, drawn over the rest, saved when let go', async () => {
@@ -123,7 +127,7 @@ describe('Edit layout', () => {
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0].layout
     expect(sent.at(-1)).toEqual({ id: 'turn', x: 0.6, y: 40, w: 0.25, h: 364 })
-    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'waiting', 'delegated', 'week', 'turn'])
+    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'turn'])
   })
 
   it('the arrow keys move a tile; with Shift they size it', async () => {
@@ -134,7 +138,7 @@ describe('Edit layout', () => {
     fireEvent.keyDown(face, { key: 'ArrowDown', shiftKey: true })
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const delegated = actions.saveMktSpace.mock.calls[0][0].layout.find((t: { id: string }) => t.id === 'delegated')
-    expect(delegated).toEqual({ id: 'delegated', x: 0.74, y: 182, w: 0.25, h: 194 })
+    expect(delegated).toEqual({ id: 'delegated', x: 0.24, y: 364, w: 0.25, h: 194 })
   })
 
   it('the look — background, accent, corners — saved as keys at once; Reset puts back the board and the look', async () => {
@@ -313,16 +317,16 @@ describe('the pet', () => {
   const settled = spaceFromRow({ layout: [], pet: { species: 'dog', name: 'Bao', color: 'mint', onboarded: true } })
 
   it('lives in the room and beside the avatar; its mood is its owner’s plate', () => {
-    const { rerender } = render(<MySpace {...props({ hasPet: true, space: settled })} />)
+    const { rerender } = render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats() })} />)
     expect(screen.getByText('· Bao Lv 1 · 💤 Sleeping')).toBeTruthy()
-    expect(document.querySelectorAll('[data-state="sleeping"]')).toHaveLength(2)
+    expect(document.querySelectorAll('[data-state="sleeping"]')).toHaveLength(3) // the room's, the avatar's, its tile's
     expect(document.querySelector('[data-state="sleeping"]')?.getAttribute('data-color')).toBe('mint')
     expect(document.querySelector('[data-state="sleeping"]')?.textContent).toBe('🐶')
-    rerender(<MySpace {...props({ hasPet: true, space: settled, plate: { count: 1, red: 0, fresh: false } })} />)
+    rerender(<MySpace {...props({ hasPet: true, space: settled, petStats: stats(), plate: { count: 1, red: 0, fresh: false } })} />)
     expect(screen.getByText('· Bao Lv 1 · 💻 Working')).toBeTruthy()
-    rerender(<MySpace {...props({ hasPet: true, space: settled, plate: { count: 1, red: 0, fresh: true } })} />)
+    rerender(<MySpace {...props({ hasPet: true, space: settled, petStats: stats(), plate: { count: 1, red: 0, fresh: true } })} />)
     expect(screen.getByText('· Bao Lv 1 · ❗ New task!')).toBeTruthy()
-    rerender(<MySpace {...props({ hasPet: true, space: settled, plate: { count: 2, red: 2, fresh: false } })} />)
+    rerender(<MySpace {...props({ hasPet: true, space: settled, petStats: stats(), plate: { count: 2, red: 2, fresh: false } })} />)
     expect(screen.getByText('· Bao Lv 1 · 💦 Overloaded')).toBeTruthy()
   })
 
@@ -331,6 +335,9 @@ describe('the pet', () => {
     expect(document.querySelector('[data-state]')).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText(/Lv 1/)).toBeNull()
+    expect(within(tile('pet') as HTMLElement).getByText('🐾 No pet')).toBeTruthy()
+    expect(within(tile('pet') as HTMLElement).queryByRole('button')).toBeNull()
+    expect(within(tile('trophies') as HTMLElement).getByText('0 projects finished this quarter')).toBeTruthy()
   })
 
   it('the drawer’s Your pet: its name kept once typed, its kind, its colour; Redo pet setup opens the setup again', async () => {
@@ -400,5 +407,84 @@ describe('the first visit’s setup', () => {
     unmount()
     render(<MySpace {...props({ hasPet: true, canEdit: false })} />)
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+// 2026-10-24 — ⑦-5: the pet's level, XP and energy (fed and worked out — the database's, `mkt_pet_care`), a level
+// reached, the trophies (the user's answers 32–34).
+describe('the pet’s tile and the trophies', () => {
+  const settled = spaceFromRow({ layout: [], pet: { species: 'dog', name: 'Bao', color: 'mint', onboarded: true } })
+  const meter = (name: string) => within(tile('pet') as HTMLElement).getByRole('progressbar', { name })
+  const shelf = { trophyCount: 2, trophies: [
+    { track: 'TSK-CAR-2610-004', title: 'Price banner', at: '2026-10-24T03:00:00Z' }, { track: 'MKT-CAR-2610-001', title: 'Post pack', at: '2026-10-20T03:00:00Z' },
+  ] }
+
+  it('its name and level, XP to the next level, its energy, how it feels; the trophies by project', () => {
+    render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 160, energy: 15, snacks: 2, workouts: 1, ...shelf }) })} />)
+    const pet = within(tile('pet') as HTMLElement)
+    expect([pet.getByText('Bao'), pet.getByText('Lv 2')].every(Boolean)).toBe(true)
+    expect([meter('XP').getAttribute('aria-valuenow'), meter('XP').getAttribute('aria-valuetext'), meter('XP').title]).toEqual(['40', '60/150 XP to Lv 3', '60/150 XP to Lv 3'])
+    expect([meter('Energy').getAttribute('aria-valuenow'), (meter('Energy').firstElementChild as HTMLElement).dataset.tone]).toEqual(['15', 'low'])
+    // Under 20 energy it is hungry, whatever is on the plate.
+    expect(pet.getByText('🍽️ Hungry')).toBeTruthy()
+    expect(screen.getByText('· Bao Lv 2 · 🍽️ Hungry')).toBeTruthy()
+    expect(pet.getByRole('button', { name: 'Feed · 2 snacks' }).textContent).toBe('🍙 2')
+    expect(pet.getByRole('button', { name: 'Exercise · 2/3 left today' })).toBeTruthy()
+    const trophies = within(tile('trophies') as HTMLElement)
+    expect(trophies.getAllByRole('img').map(i => [i.textContent, i.getAttribute('aria-label')])).toEqual([
+      ['🏆', 'TSK-CAR-2610-004 · Price banner'], ['🥇', 'MKT-CAR-2610-001 · Post pack'],
+    ])
+    expect(trophies.getByText('2 projects finished this quarter')).toBeTruthy()
+  })
+
+  it('fed: a snack for its energy — it eats; worked out: its XP said; a refusal said, nothing changed', async () => {
+    render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 160, energy: 15, snacks: 2, workouts: 1 }) })} />)
+    actions.careMktPet.mockResolvedValueOnce({ ok: true, pet: stats({ xp: 160, energy: 35, snacks: 1, workouts: 1 }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Feed · 2 snacks' })) })
+    expect(actions.careMktPet).toHaveBeenCalledWith('feed')
+    expect([meter('Energy').getAttribute('aria-valuenow'), (meter('Energy').firstElementChild as HTMLElement).dataset.tone]).toEqual(['35', 'mid'])
+    expect(screen.getByRole('button', { name: 'Feed · 1 snack' })).toBeTruthy()
+    expect(document.querySelectorAll('[data-state="eating"]')).toHaveLength(3)
+
+    actions.careMktPet.mockResolvedValueOnce({ ok: true, pet: stats({ xp: 170, energy: 20, snacks: 1, workouts: 2 }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Exercise · 2/3 left today' })) })
+    expect(actions.careMktPet).toHaveBeenLastCalledWith('workout')
+    expect(flash).toHaveBeenLastCalledWith('+10 XP · Bao worked out')
+    expect(document.querySelectorAll('[data-state="exercising"]')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'Exercise · 1/3 left today' })).toBeTruthy()
+
+    actions.careMktPet.mockResolvedValueOnce({ ok: false, reason: 'Bao is too tired — feed it first.' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Exercise · 1/3 left today' })) })
+    expect(flash).toHaveBeenLastCalledWith('Bao is too tired — feed it first.')
+    expect(meter('XP').getAttribute('aria-valuetext')).toBe('70/150 XP to Lv 3')
+  })
+
+  it('a fourth workout today: no XP, said so', async () => {
+    render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 160, energy: 80, workouts: 3 }) })} />)
+    actions.careMktPet.mockResolvedValueOnce({ ok: true, pet: stats({ xp: 160, energy: 65, workouts: 4 }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Exercise · 0/3 left today' })) })
+    expect(flash).toHaveBeenLastCalledWith('3/3 workouts today. No more XP until tomorrow')
+  })
+
+  it('a level reached since this device last saw it: announced once — it grows, it evolves', () => {
+    window.localStorage.setItem('mkt-pet-level:viewer-1', '2')
+    const { rerender } = render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 250 }) })} />)
+    expect(flash).toHaveBeenCalledWith('Bao reached Lv 3 and evolved into a Dog!')
+    expect(document.querySelectorAll('[data-state="levelUp"]')).toHaveLength(3)
+    expect(window.localStorage.getItem('mkt-pet-level:viewer-1')).toBe('3')
+    const room = document.querySelector<HTMLElement>('[data-room]') as HTMLElement
+    expect((room.querySelector('[data-state] span') as HTMLElement).style.fontSize).toBe('44px') // Lv 3: 38 px, the room at full scale
+    rerender(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 260 }) })} />)
+    expect(flash).toHaveBeenCalledTimes(1)
+  })
+
+  it('the first time this device sees the pet: its level kept, nothing announced; someone who may only look cannot feed it', () => {
+    render(<MySpace {...props({ hasPet: true, space: settled, canEdit: false, petStats: stats({ xp: 1040 }) })} />)
+    expect(flash).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('mkt-pet-level:viewer-1')).toBe('6')
+    expect(meter('XP').getAttribute('aria-valuetext')).toBe('Max level')
+    expect(within(tile('pet') as HTMLElement).queryByRole('button')).toBeNull()
+    const room = document.querySelector<HTMLElement>('[data-room]') as HTMLElement
+    expect((room.querySelector('[data-state] span') as HTMLElement).style.fontSize).toBe('60px') // Lv 6: 52 px
   })
 })

@@ -113,6 +113,6 @@ export function deskVM(ctx: DeskCtx) {
     metaSync: "Meta Ads not connected yet", metaDot: "var(--crm-faint)",
   };
   // 4a's frame (2026-10-18): the Revenue sidebar, the CRM nav, the top bar and each page's head — vm/frame4a.ts.
-  return { ...out, f4: frame4aVM(ctx, out, heads4a(ctx, { ...out, ppCount: data.customers.length, showroomCount: data.rooms.length })) };
+  return { ...out, f4: frame4aVM(ctx, out, heads4a(ctx, { ...out, ppCount: data.customers.length, showroomCount: data.rooms.filter(r => !r.virtual).length })) };
 }
 export type DeskVM = ReturnType<typeof deskVM>;
