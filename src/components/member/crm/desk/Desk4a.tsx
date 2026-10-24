@@ -1783,8 +1783,8 @@ export function DeskChannels4a({ v }: { v: ChannelsBits }) {
   );
 }
 
-type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign" | "pushMessages" | "reminders" | "teamAlerts" | "sendAutoReply" | "ftEven";
-interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean; pushMessages: boolean; reminders: boolean; teamAlerts: boolean; sendAutoReply: boolean; ftEven: boolean }
+type SetKey = "replySoonH" | "replyUrgentH" | "replyOverdueH" | "suggestTemplate" | "autoAssign" | "pushMessages" | "reminders" | "teamAlerts" | "sendAutoReply";
+interface SetVals { replySoonH: number; replyUrgentH: number; replyOverdueH: number; suggestTemplate: boolean; autoAssign: boolean; pushMessages: boolean; reminders: boolean; teamAlerts: boolean; sendAutoReply: boolean }
 interface SettingsBits {
   set4: { title: string; sub: string; rows: { t: string; s: string; v: string; key?: SetKey }[] }[];
   settings4: { can: boolean; cur: SetVals; save: (st: SetVals) => Promise<boolean> };
