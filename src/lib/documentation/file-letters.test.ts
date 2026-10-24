@@ -72,6 +72,17 @@ describe('fileLetters', () => {
     const answer = await fileLetters('staff-1', [a], TYPES)
     expect(answer).toEqual({ filed: [], failed: [{ key: a.key, name: 'a.pdf', reason: 'Check the connection and try again.' }] })
   })
+
+  // The HR app (2026-10-24): its own writes, which ask the app's People part first — the Data center's are not called.
+  it('files through the writes it is handed', async () => {
+    const via = { addLetterType: vi.fn(async () => ({ ok: true as const, id: 'confirm' })), fileLetter: vi.fn(async () => ({ ok: true as const })) }
+    const rows = [{ ...pendingLetter(NEW_LETTER_TYPE), newType: 'Confirmation letter', file: pdf('confirm.pdf') }]
+    expect(await fileLetters('staff-1', rows, TYPES, via)).toEqual({ filed: ['Confirmation letter'], failed: [] })
+    expect(via.addLetterType).toHaveBeenCalledWith('Confirmation letter')
+    expect(via.fileLetter).toHaveBeenCalledWith(expect.objectContaining({ staffId: 'staff-1', typeId: 'confirm', fileName: 'confirm.pdf' }))
+    expect(mocks.addLetterType).not.toHaveBeenCalled()
+    expect(mocks.fileLetter).not.toHaveBeenCalled()
+  })
 })
 
 describe('letterTypeOf', () => {
@@ -84,5 +95,11 @@ describe('letterTypeOf', () => {
   it('passes on a refusal to add one', async () => {
     mocks.addLetterType.mockResolvedValue({ ok: false, reason: 'You may not do that on Documentation.' })
     expect(await letterTypeOf({ typeId: NEW_LETTER_TYPE, newType: 'Agreement letter' }, TYPES)).toEqual({ ok: false, reason: 'You may not do that on Documentation.' })
+  })
+
+  it('adds a new type through the write it is handed', async () => {
+    const via = { addLetterType: vi.fn(async () => ({ ok: false as const, reason: 'This is not open to your account.' })) }
+    expect(await letterTypeOf({ typeId: NEW_LETTER_TYPE, newType: 'Agreement letter' }, TYPES, via)).toEqual({ ok: false, reason: 'This is not open to your account.' })
+    expect(mocks.addLetterType).not.toHaveBeenCalled()
   })
 })

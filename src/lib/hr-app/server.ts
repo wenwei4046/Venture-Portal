@@ -8,6 +8,7 @@ import { ANY_TIME_LABEL, isAnyTime } from '@/lib/member/waiting-start'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
 import { loadDocumentation } from '@/lib/documentation/server'
 import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/model'
+import { letterChoicesFromRow } from '@/lib/documentation/attach'
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
 import { reasonLabel } from '@/lib/hiring/reasons'
@@ -183,6 +184,9 @@ export const PART_PAGE = {
   people: '/team/people',
 } as const satisfies Record<keyof HrAppData['parts'], PageRoute>
 
+/** A person's page, whose boxes People's writes about one person follow — the HR app's person page writes as it. */
+const PERSON_PAGE: PageRoute = '/team/people/[id]'
+
 /** The account as one page of the portal sees it: its writes narrowed to that page's open boxes. */
 export function onPage(user: User, route: PageRoute): User {
   return user.closed?.length ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, route) } : user
@@ -217,9 +221,13 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
       hireCreate: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'create'),
       talentEdit: parts.talent && canDo(onPage(user, PART_PAGE.talent), 'hiring', 'edit'),
       book: parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'create'),
-      // A probation's reminder (2026-10-23) or a contract's (2026-10-24): People · Edit on a person's page, as HR view's
-      // bell asks — never while viewing as somebody.
-      termAck: parts.people && seesTermReminders(user),
+      // A probation's reminder (2026-10-23) or a contract's (2026-10-24) acknowledged, and since 2026-10-24 a probation
+      // confirmed as permanent or extended: People · Edit on a person's page, as HR view's bell asks — never while
+      // viewing as somebody.
+      termEdit: parts.people && seesTermReminders(user),
+      // A letter filed to their record with that step, and Renew's new contract (2026-10-24): Documentation · Create on
+      // the person's page, as People's own forms ask (lib/documentation/letter-choices.ts).
+      letters: parts.people && !user.viewingAs && canDo(onPage(user, PERSON_PAGE), 'documentation', 'create'),
     },
   }
 }
@@ -238,7 +246,7 @@ export function hrTopics(user: User): string[] {
     ...(may.hireApprove ? ['hiring.guest'] : []),
     ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
     ...(may.decide ? ['member.requests'] : []),
-    ...(may.termAck ? ['people.probation'] : []),
+    ...(may.termEdit ? ['people.probation'] : []),
   ]
 }
 
@@ -267,12 +275,14 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [attRead, phones, probationRead, contractRead] = await Promise.all([
+  const [attRead, phones, probationRead, contractRead, letterRead] = await Promise.all([
     attendanceOf(parts, today),
     parts.people ? mobiles() : Promise.resolve({}),
     // The probations and contracts HR is reminded of (2026-10-23 / 10-24): read only for whoever may acknowledge one.
-    may.termAck ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
-    may.termAck ? (async () => (await client()).rpc('contract_reviews'))() : Promise.resolve(null),
+    may.termEdit ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
+    may.termEdit ? (async () => (await client()).rpc('contract_reviews'))() : Promise.resolve(null),
+    // The letter types a step files its letter as (2026-10-24): only for whoever may file one.
+    may.letters ? (async () => (await client()).rpc('hr_letter_type_choices'))() : Promise.resolve(null),
   ])
   const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
@@ -343,6 +353,7 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
     probation: probationRead && !probationRead.error ? reviewsFromRow(probationRead.data, 'probation') : null,
     contract: contractRead && !contractRead.error ? reviewsFromRow(contractRead.data, 'contract') : null,
+    letterTypes: letterRead && !letterRead.error ? letterChoicesFromRow(letterRead.data) : null,
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
     memos: mine.memos,

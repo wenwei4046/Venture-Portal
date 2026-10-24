@@ -241,15 +241,18 @@ export function Field({ label, children, group = false }: { label: string; child
     : <label className={s.field}><span className={s.fieldLabel}>{label}</span>{children}</label>
 }
 
-/** The toast: 2.4 s, ink on white, 110px off the bottom. */
-export function useToast(): [string, (m: string) => void] {
+/** How long a toast that says something did not happen stays — read once, and longer (a letter not filed, 2026-10-24). */
+export const TOAST_LONG = 8000
+
+/** The toast: 2.4 s (or `ms`), ink on white, 110px off the bottom. */
+export function useToast(): [string, (m: string, ms?: number) => void] {
   const [msg, setMsg] = useState('')
   const t = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (t.current) clearTimeout(t.current) }, [])
-  const flash = (m: string) => {
+  const flash = (m: string, ms = 2400) => {
     setMsg(m)
     if (t.current) clearTimeout(t.current)
-    t.current = setTimeout(() => setMsg(''), 2400)
+    t.current = setTimeout(() => setMsg(''), ms)
   }
   return [msg, flash]
 }

@@ -3,7 +3,7 @@
 import { getUser } from '@/lib/auth'
 import { adminMemberAction } from '@/app/(member)/member/actions'
 import { ACCEPT_NOTE } from '@/lib/member/member-services'
-import { openDocumentationFile } from '@/lib/documentation/actions'
+import { addLetterType, fileLetter, openDocumentationFile } from '@/lib/documentation/actions'
 import {
   acknowledgeHiringRequest, cancelHiringRequest, declineHiringRequest, fillHiringRequest, removeHiringTalent, requestHiringInfo,
   saveHiringCandidate, saveTalentNotes, setCandidateStage, submitHiringRequest,
@@ -11,8 +11,9 @@ import {
 import type { CandidateStage, TalentReason } from '@/lib/hiring/types'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
 import { decideRequest } from '@/lib/attendance/actions'
-import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
+import { acknowledgeProbation, confirmProbation, extendProbation } from '@/app/(portal)/team/people/probation-actions'
 import { acknowledgeContract } from '@/app/(portal)/team/people/contract-actions'
+import { renewContract, type RenewOutcome, type RenewalLetter } from '@/app/(portal)/team/people/renew-actions'
 import { appAccess } from './server'
 import type { HrAppData } from './model'
 
@@ -28,9 +29,12 @@ type Act = { ok: true } | { ok: false; reason: string }
 
 const SHUT = 'This is not open to your account.'
 
-async function may(write: keyof HrAppData['may']): Promise<boolean> {
+/** Every one of these writes open to them (Renew asks two: People · Edit, and Documentation · Create for its contract). */
+async function may(...writes: Array<keyof HrAppData['may']>): Promise<boolean> {
   const user = await getUser()
-  return !!user && !!appAccess(user).may[write]
+  if (!user) return false
+  const open = appAccess(user).may
+  return writes.every(write => !!open[write])
 }
 
 const done = (res: { ok: true } | { ok: false; reason: string }): Act => (res.ok ? { ok: true } : { ok: false, reason: res.reason })
@@ -137,11 +141,38 @@ export async function hrAppCancelBooking(id: string): Promise<Act> {
 // ── People: a probation's reminder acknowledged (2026-10-23), a contract's (2026-10-24) — People · Edit on the person's page ──
 
 export async function hrAppProbationAck(id: string): Promise<Act> {
-  return (await may('termAck')) ? done(await acknowledgeProbation(id)) : { ok: false, reason: SHUT }
+  return (await may('termEdit')) ? done(await acknowledgeProbation(id)) : { ok: false, reason: SHUT }
 }
 
 export async function hrAppContractAck(id: string): Promise<Act> {
-  return (await may('termAck')) ? done(await acknowledgeContract(id)) : { ok: false, reason: SHUT }
+  return (await may('termEdit')) ? done(await acknowledgeContract(id)) : { ok: false, reason: SHUT }
+}
+
+// ── …and the step after it (2026-10-24 — the user: "do for hr app as well"): Confirm as permanent, Extend, Renew ──
+
+export async function hrAppConfirmProbation(id: string): Promise<Act> {
+  return (await may('termEdit')) ? done(await confirmProbation(id)) : { ok: false, reason: SHUT }
+}
+
+export async function hrAppExtendProbation(id: string, months: number): Promise<Act> {
+  return (await may('termEdit')) ? done(await extendProbation(id, months)) : { ok: false, reason: SHUT }
+}
+
+/** Renew files the new contract as it renews: People · Edit and Documentation · Create, as its own gate asks. */
+export async function hrAppRenewContract(input: { staffId: string; start: string; months: number; endsWas: string; letter: RenewalLetter }): Promise<RenewOutcome> {
+  return (await may('termEdit', 'letters')) ? renewContract(input) : { ok: false, reason: SHUT }
+}
+
+// ── …a letter filed with that step, to their Data center record (2026-10-24): the Data center's own, Documentation · Create ──
+
+export async function hrAppAddLetterType(name: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  if (!(await may('letters'))) return { ok: false, reason: SHUT }
+  const res = await addLetterType(name)
+  return res.ok ? { ok: true, id: res.id } : { ok: false, reason: res.reason }
+}
+
+export async function hrAppFileLetter(input: { staffId: string; typeId: string; path: string; fileName: string; contentType: string | null; size: number }): Promise<Act> {
+  return (await may('letters')) ? done(await fileLetter(input)) : { ok: false, reason: SHUT }
 }
 
 // ── People › Documentation: a letter's short link, made at the press (never kept) ──

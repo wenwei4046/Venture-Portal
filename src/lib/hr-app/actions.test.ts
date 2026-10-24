@@ -12,26 +12,35 @@ const mocks = vi.hoisted(() => ({
   attDecide: vi.fn(),
   probationAck: vi.fn(),
   contractAck: vi.fn(),
+  confirm: vi.fn(),
+  extend: vi.fn(),
+  renew: vi.fn(),
+  addLetterType: vi.fn(),
+  fileLetter: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ getUser: mocks.user }))
 vi.mock('./server', () => ({ appAccess: mocks.access }))
 vi.mock('@/app/(member)/member/actions', () => ({ adminMemberAction: mocks.decide }))
 vi.mock('@/lib/member/member-services', () => ({ ACCEPT_NOTE: 'Accepted onto the waiting list.' }))
-vi.mock('@/lib/documentation/actions', () => ({ openDocumentationFile: mocks.letter }))
+vi.mock('@/lib/documentation/actions', () => ({ openDocumentationFile: mocks.letter, addLetterType: mocks.addLetterType, fileLetter: mocks.fileLetter }))
 vi.mock('@/lib/hiring/actions', () => ({
   acknowledgeHiringRequest: mocks.acknowledge, cancelHiringRequest: vi.fn(), declineHiringRequest: vi.fn(), fillHiringRequest: vi.fn(),
   removeHiringTalent: vi.fn(), requestHiringInfo: vi.fn(), saveHiringCandidate: vi.fn(), saveTalentNotes: mocks.saveTalentNotes, setCandidateStage: vi.fn(), submitHiringRequest: vi.fn(),
 }))
 vi.mock('@/lib/rooms/actions', () => ({ bookRoom: mocks.bookRoom, cancelBooking: vi.fn() }))
 vi.mock('@/lib/attendance/actions', () => ({ decideRequest: mocks.attDecide }))
-vi.mock('@/app/(portal)/team/people/probation-actions', () => ({ acknowledgeProbation: mocks.probationAck }))
+vi.mock('@/app/(portal)/team/people/probation-actions', () => ({ acknowledgeProbation: mocks.probationAck, confirmProbation: mocks.confirm, extendProbation: mocks.extend }))
 vi.mock('@/app/(portal)/team/people/contract-actions', () => ({ acknowledgeContract: mocks.contractAck }))
+vi.mock('@/app/(portal)/team/people/renew-actions', () => ({ renewContract: mocks.renew }))
 
-import { hrAppAcknowledge, hrAppAttDecide, hrAppBook, hrAppContractAck, hrAppDecide, hrAppLetterLink, hrAppProbationAck, hrAppTalentNotes } from './actions'
+import {
+  hrAppAcknowledge, hrAppAddLetterType, hrAppAttDecide, hrAppBook, hrAppConfirmProbation, hrAppContractAck, hrAppDecide, hrAppExtendProbation, hrAppFileLetter,
+  hrAppLetterLink, hrAppProbationAck, hrAppRenewContract, hrAppTalentNotes,
+} from './actions'
 
 const OPEN = {
   parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, people: true },
-  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termAck: true },
+  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termEdit: true, letters: true },
 }
 const SHUT = { ok: false, reason: 'This is not open to your account.' }
 
@@ -105,9 +114,9 @@ describe('a probation’s reminder, acknowledged from the HR app (2026-10-23)', 
     mocks.probationAck.mockResolvedValue({ ok: false, reason: 'They are not on probation any more — reload the page.' })
     await expect(hrAppProbationAck('st1')).resolves.toEqual({ ok: false, reason: 'They are not on probation any more — reload the page.' })
     mocks.probationAck.mockClear()
-    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termAck: false } })
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termEdit: false } })
     await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
-    // An account whose may carries no termAck at all (an older shape): refused too.
+    // An account whose may carries no termEdit at all (an older shape): refused too.
     mocks.access.mockReturnValue({ ...OPEN, may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true } })
     await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
     expect(mocks.probationAck).not.toHaveBeenCalled()
@@ -121,8 +130,62 @@ describe('a contract’s reminder, acknowledged from the HR app (2026-10-24)', (
     expect(mocks.contractAck).toHaveBeenCalledWith('st2')
     expect(mocks.probationAck).not.toHaveBeenCalled()
     mocks.contractAck.mockClear()
-    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termAck: false } })
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termEdit: false } })
     await expect(hrAppContractAck('st2')).resolves.toEqual(SHUT)
     expect(mocks.contractAck).not.toHaveBeenCalled()
+  })
+})
+
+// The step after the reminder (2026-10-24 — the user: "do for hr app as well"): People's own actions, behind the app's
+// People part — Renew asks Documentation · Create too, for the contract it files.
+describe('a term’s step from the HR app (2026-10-24)', () => {
+  const RENEWAL = {
+    staffId: 'st2', start: '2027-10-01', months: 12, endsWas: '2027-09-30',
+    letter: { typeId: 'cfs', path: 'letters/st2/u/c.pdf', fileName: 'c.pdf', contentType: 'application/pdf', size: 4 },
+  }
+
+  it('Confirm as permanent and Extend go to People’s own actions while People · Edit is open on the person’s page', async () => {
+    mocks.confirm.mockResolvedValue({ ok: true })
+    mocks.extend.mockResolvedValue({ ok: false, reason: 'A probation runs 6 months at most.' })
+    await expect(hrAppConfirmProbation('st1')).resolves.toEqual({ ok: true })
+    expect(mocks.confirm).toHaveBeenCalledWith('st1')
+    await expect(hrAppExtendProbation('st1', 2)).resolves.toEqual({ ok: false, reason: 'A probation runs 6 months at most.' })
+    expect(mocks.extend).toHaveBeenCalledWith('st1', 2)
+    mocks.confirm.mockClear()
+    mocks.extend.mockClear()
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termEdit: false } })
+    await expect(hrAppConfirmProbation('st1')).resolves.toEqual(SHUT)
+    await expect(hrAppExtendProbation('st1', 1)).resolves.toEqual(SHUT)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    expect(mocks.extend).not.toHaveBeenCalled()
+  })
+
+  it('Renew needs both rights — People · Edit, and Documentation · Create for its contract', async () => {
+    mocks.renew.mockResolvedValue({ ok: true, endsOn: '2028-09-30' })
+    await expect(hrAppRenewContract(RENEWAL)).resolves.toEqual({ ok: true, endsOn: '2028-09-30' })
+    expect(mocks.renew).toHaveBeenCalledWith(RENEWAL)
+    mocks.renew.mockClear()
+    for (const shut of [{ termEdit: false }, { letters: false }]) {
+      mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, ...shut } })
+      await expect(hrAppRenewContract(RENEWAL)).resolves.toEqual(SHUT)
+    }
+    expect(mocks.renew).not.toHaveBeenCalled()
+  })
+
+  it('a step’s letter is the Data center’s own filing — and its new type — only while Documentation · Create is theirs', async () => {
+    const letter = { staffId: 'st1', typeId: 'conf', path: 'letters/st1/u/c.pdf', fileName: 'c.pdf', contentType: 'application/pdf', size: 4 }
+    mocks.fileLetter.mockResolvedValue({ ok: true, id: 'L9' })
+    mocks.addLetterType.mockResolvedValue({ ok: true, id: 'T9' })
+    await expect(hrAppFileLetter(letter)).resolves.toEqual({ ok: true })
+    expect(mocks.fileLetter).toHaveBeenCalledWith(letter)
+    await expect(hrAppAddLetterType('Confirmation letter')).resolves.toEqual({ ok: true, id: 'T9' })
+    expect(mocks.addLetterType).toHaveBeenCalledWith('Confirmation letter')
+    mocks.fileLetter.mockClear()
+    mocks.addLetterType.mockClear()
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, letters: false } })
+    await expect(hrAppFileLetter(letter)).resolves.toEqual(SHUT)
+    await expect(hrAppAddLetterType('Confirmation letter')).resolves.toEqual(SHUT)
+    expect(mocks.fileLetter).not.toHaveBeenCalled()
+    expect(mocks.addLetterType).not.toHaveBeenCalled()
   })
 })
