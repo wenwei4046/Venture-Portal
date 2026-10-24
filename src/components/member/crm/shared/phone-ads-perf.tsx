@@ -66,12 +66,13 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [p.customers, p.adNames]);
   const ids = ads.map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
   // Meta's figures, read on the server (CRM · Manage); none on the demo.
-  const [figA, setFigA] = useState<Record<string, MetaFig | null>>({}), [figB, setFigB] = useState<Record<string, MetaFig | null>>({}), [daily, setDaily] = useState<Record<string, Record<string, MetaFig> | null>>({});
-  const wantMeta = p.live && p.manage && keys.some(k => META.has(k)) && ids.length > 0, idKey = ids.join(",");
+  // Drawn from the phone's last answer from the first frame — after the app was closed too — then read again (the owner, 2026-10-24).
+  const idKey = [...ids].sort().join(","), kA = `f|${si}|${ui}`, kD = `d|${si}|${ui}`, kB = `f|${sb}|${ub}`; // by dates only: the answers are by ad, so a new ad keeps the rest on screen
+  const [figA, setFigA] = useState<Record<string, MetaFig | null>>(() => keptGet(kA) ?? {}), [figB, setFigB] = useState<Record<string, MetaFig | null>>(() => keptGet(kB) ?? {}), [daily, setDaily] = useState<Record<string, Record<string, MetaFig> | null>>(() => keptGet(kD) ?? {});
+  const wantMeta = p.live && p.manage && keys.some(k => META.has(k)) && ids.length > 0;
   useEffect(() => {
     if (!wantMeta) return;
     let on = true;
-    const kA = `f|${idKey}|${si}|${ui}`, kD = `d|${idKey}|${si}|${ui}`, kB = `f|${idKey}|${sb}|${ub}`;
     const a0 = keptGet<Record<string, MetaFig | null>>(kA), d0 = keptGet<Record<string, Record<string, MetaFig> | null>>(kD), b0 = keptGet<Record<string, MetaFig | null>>(kB);
     if (a0) setFigA(a0); if (d0) setDaily(d0); if (b0) setFigB(b0);
     void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) { setFigA(x.figs); keptSet(kA, x.figs); } });
