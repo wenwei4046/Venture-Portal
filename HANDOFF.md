@@ -1,5 +1,33 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-25 n (SHIPPED, #754) — an account opens onto a ledger of its lines; month by month onto its months first
+
+Session e73c0205 (handed off from 35e03c3c after m). The user, on the drill-down: "我想要这样的概念 … monthly 也要能点开
+先别做，先确定" → mockup (the ledger table; Monthly A = row → months, B = a month's figure) → "照样稿做，Monthly 用 A：
+点科目整行，先列每个月，再点月份看明细" → "CI 全绿就合并上线，部署好告诉我".
+
+- **Single month** (P&L, Cash Flow, Receipt & Payment): an account opens on its whole row onto a ledger — Date ·
+  Description · Other side · Ref. 1 (JE) · Ref. 2 (PV / OR / invoice / CN no.) · Debit · Credit; foot `N lines · Open in
+  General Ledger ↗ · Oct 2026` (→ `/reports/ledger?codes=&from=&to=`, new tab; hidden for IB-XFER / PY-XFER) + Dr / Cr
+  totals. The old two-line rows are gone. R&P's 未收 rows still open: the invoice as one line, its number Ref. 2, owed = debit.
+- **Month by month** (Monthly P&L, Monthly Cash Flow, Monthly R&P's cash rows — never the AR_ receivables — and Dept
+  Pool's department statements): row → its months latest first (lines, the row's own figure; a month with neither is
+  skipped) → a month → its ledger; foot = lines over the range · GL link over the range · the Accumulated. Lines are read
+  when the row opens: server actions `reports/drill-actions.ts` (`openReportRow(page, ask)` under each Reports page's own
+  gates, bound per page; `openDeptPoolRow(ask)` under Dept Pool's) → `reports/_lib/drill-reads.ts#readMonthlyDrill` (P&L
+  consolidated = inter-billing eliminated; one segment's cash = with the bridge; payroll folded per `listsPayrollByPerson`).
+  Cached per row and scope (report|segment|from|to): another period or segment starts folded and reads afresh.
+- `lib/gl-reports`: `GlTxn` gained `debit` / `credit` / `otherSide` (`otherSideOf`: the entry's other accounts, largest
+  first, `+n`) / `refNo` (`applyGlRefs` → `ref_no` from `payment_vouchers.voucher_no`, the invoice number,
+  `credit_notes.credit_note_no`; an invoice's words alone as `ref_text`). A **cash** line's debit / credit is the cash it
+  moved (k = |share| / |line|) so the ledger adds up to the row; all-cash entries show the line as booked.
+- `SheetReport`: the ledger sits in a sticky box sized to the sheet (ResizeObserver) so it never scrolls away across the
+  months; the month list has fixed columns and an opened month's ledger scrolls in its own box on a phone.
+- **#754 squash-merged `0b86fe14`** → production deploy success 17:41 UTC (CI 7/7 green). No migration.
+- Checked before merge by headless-Chrome screenshots of an RTL dump (memory: visual-check-headless-chrome).
+- Elsewhere (original session 35e03c3c): the user asked for a Dept Pool department page with diagrams / charts like
+  Venture Pool, finer than in / out — mockup only, not built.
+
 ## CHECKPOINT 2026-10-24 m (SHIPPED, #737) — a 利滚利 schedule rolls from the month it turned compounding; tidied
 
 Session 35e03c3c, after l. The user used the new flow for **LO#7** at 09:34–09:35 UTC (Finance Manager filed, Principal
