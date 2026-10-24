@@ -329,10 +329,12 @@ export interface CrmSettings {
   teamAlerts: boolean;
   /** v2 frame 10: off — no auto-reply for anyone, even one set in a Profile. */
   sendAutoReply: boolean;
+  /** Full time evenly (mig 20261025060000): on a Full time day an ad's lead to the full-time person with fewest today, not by the split. */
+  ftEven: boolean;
 }
 
 /** What the CRM did before Settings were stored — and what it reads when the database gives nothing. */
-export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true, teamAlerts: false, sendAutoReply: true };
+export const DEFAULT_CRM_SETTINGS: CrmSettings = { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, suggestTemplate: true, autoAssign: true, pushMessages: true, reminders: true, teamAlerts: false, sendAutoReply: true, ftEven: false };
 
 /** The database's answer, checked: the three lines rising within 1–24 h, else today's values. */
 export function settingsFrom(raw: unknown): CrmSettings {
@@ -341,7 +343,7 @@ export function settingsFrom(raw: unknown): CrmSettings {
   const D = DEFAULT_CRM_SETTINGS;
   const s = n(r.replySoonH, D.replySoonH), u = n(r.replyUrgentH, D.replyUrgentH), o = n(r.replyOverdueH, D.replyOverdueH);
   const lines = s >= 1 && u > s && o > u && o <= 24 ? { replySoonH: s, replyUrgentH: u, replyOverdueH: o } : { replySoonH: D.replySoonH, replyUrgentH: D.replyUrgentH, replyOverdueH: D.replyOverdueH };
-  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false, teamAlerts: r.teamAlerts === true, sendAutoReply: r.sendAutoReply !== false };
+  return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false, teamAlerts: r.teamAlerts === true, sendAutoReply: r.sendAutoReply !== false, ftEven: r.ftEven === true };
 }
 
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
