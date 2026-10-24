@@ -14,7 +14,8 @@ const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const BTN = { border: 0, background: "transparent", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" } as const;
 const ROUND: CSSProperties = { ...BTN, width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" };
 const BOX: CSSProperties = { width: "100%", boxSizing: "border-box", padding: "12px 14px", border: "1px solid var(--crm-line)", borderRadius: "14px", background: "#fff", outline: "none", resize: "none", font: "inherit", lineHeight: 1.5, color: "var(--crm-ink)" };
-const PAGES = [["welcome", "Welcome reply", "Sent once, on a customer's first message"], ["after", "Outside opening hours", "Sent when a customer writes outside these hours"], ["kws", "Keyword replies", "Sent when a message has one of the words"]] as const;
+const PAGES = [["welcome", "Welcome reply", "Sent once, on a customer's first message"], ["after", "Outside opening hours", "Sent when a customer writes outside these hours"], ["away", "Away / holiday", "Sent to everyone who writes between these times, in place of the after-hours reply"], ["kws", "Keyword replies", "Sent when a message has one of the words"]] as const;
+const N = PAGES.length;
 
 function Switch({ on, flip, off }: { on: boolean; flip: () => void; off?: boolean }) {
   return (
@@ -61,13 +62,13 @@ export function Phone4aAutoReply({ a }: { a: { ar: CrmAutoReplySet; readOnly: bo
     <div style={{ display: "flex", flexDirection: "column", gap: "14px", paddingBottom: dirty ? "78px" : "8px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <h1 style={{ flex: 1, margin: 0, fontFamily: TIGHT, fontSize: fs(26), fontWeight: 500, letterSpacing: "-0.02em", color: "var(--crm-ink)" }}>Auto-reply</h1>
-        <button type="button" aria-label="Previous" onClick={() => setPage((page + 2) % 3)} style={ROUND}><Ic name="chevron-left" size={15} /></button>
-        <span style={{ minWidth: "34px", textAlign: "center", fontSize: fs(14), fontVariantNumeric: "tabular-nums" }}>{page + 1} / 3</span>
-        <button type="button" aria-label="Next" onClick={() => setPage((page + 1) % 3)} style={ROUND}><Ic name="chevron-right" size={15} /></button>
+        <button type="button" aria-label="Previous" onClick={() => setPage((page + N - 1) % N)} style={ROUND}><Ic name="chevron-left" size={15} /></button>
+        <span style={{ minWidth: "34px", textAlign: "center", fontSize: fs(14), fontVariantNumeric: "tabular-nums" }}>{page + 1} / {N}</span>
+        <button type="button" aria-label="Next" onClick={() => setPage((page + 1) % N)} style={ROUND}><Ic name="chevron-right" size={15} /></button>
       </div>
       <div style={{ display: "flex", gap: "2px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>
         {PAGES.map(([k, , ], i) => <button key={k} type="button" onClick={() => setPage(i)} aria-pressed={page === i} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "16px", fontSize: fs(12.5), fontWeight: 500,
-          background: page === i ? "#fff" : "transparent", boxShadow: page === i ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: page === i ? "var(--crm-ink)" : "var(--crm-muted)" }}>{k === "welcome" ? "Welcome" : k === "after" ? "After hours" : "Keywords"}</button>)}
+          background: page === i ? "#fff" : "transparent", boxShadow: page === i ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: page === i ? "var(--crm-ink)" : "var(--crm-muted)" }}>{k === "welcome" ? "Welcome" : k === "after" ? "After hours" : k === "away" ? "Away" : "Keywords"}</button>)}
       </div>
       {off && <span style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderRadius: "10px", background: "var(--crm-sel)", fontSize: fs(12), color: "var(--crm-muted)" }}><Ic name="lock" size={12} />{a.who}&apos;s auto-reply · read only</span>}
 
@@ -87,6 +88,20 @@ export function Phone4aAutoReply({ a }: { a: { ar: CrmAutoReplySet; readOnly: bo
         {msg(d.after.text, v => put(x => ({ ...x, after: { ...x.after, text: v } })), "Message sent outside these hours", 10)}
         <Picture img={d.after.img} name={d.after.imgName} off={off} upload={a.upload} set={(img, imgName) => put(x => ({ ...x, after: { ...x.after, img, imgName } }))} />
       </>)}
+      {key === "away" && (() => { const w = d.away ?? { on: false, text: "", from: "", to: "" }, upA = (p: Partial<typeof w>) => put(x => ({ ...x, away: { ...w, ...(x.away ?? {}), ...p } }));
+        const ends = w.from && w.to && w.to <= w.from;
+        return (<>
+          {head(w.on, () => upA({ on: !w.on }))}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: fs(12), color: "var(--crm-muted)" }}>From
+              <input type="datetime-local" value={w.from} readOnly={off} onChange={e => upA({ from: e.target.value })} style={{ ...BOX, padding: "8px 12px" }} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: fs(12), color: "var(--crm-muted)" }}>Until
+              <input type="datetime-local" value={w.to} readOnly={off} onChange={e => upA({ to: e.target.value })} style={{ ...BOX, padding: "8px 12px" }} /></label>
+            {ends && <span style={{ fontSize: fs(12), color: "var(--crm-oxblood)" }}>Until must be after From.</span>}
+          </div>
+          {msg(w.text, v => upA({ text: v }), "e.g. We're on holiday until 2 Jan — we'll reply as soon as we're back.", 10)}
+          <Picture img={w.img} name={w.imgName} off={off} upload={a.upload} set={(img, imgName) => upA({ img, imgName })} />
+        </>); })()}
       {key === "kws" && (<>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           <span style={{ fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500 }}>{title}</span>
