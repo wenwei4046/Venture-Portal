@@ -60,6 +60,21 @@ describe('a resubmit still open waits (the figures)', () => {
     expect(normaliseCycle({ people: [{ row_id: 'x', name: 'X' }] }).people[0].resubmit_open).toBe(false)
   })
 
+  it('says the month waits for the resubmit, not for a PV, once their salary is paid', () => {
+    const headline = (withMei: boolean) => {
+      const cycle = september(withMei)
+      cycle.people.forEach(p => { p.voucher = { id: `pv-${p.name}`, no: null, status: 'paid', payment_date: '2026-10-15', created_at: null, approved_at: null, granularity: 'department', group_id: 'g' } })
+      const groups = groupDepartments(cycle.people)
+      return cycleHeadline({ cycle, groups, rows: statutoryRows(cycle, groups), phase: 'funded', staffFunded: true, directorsFunded: false, today: '2026-10-24', plannedStaffDate: '2026-10-24', plannedDirectorDate: '2026-10-24' })
+    }
+    expect(headline(false)).toMatchObject({
+      word: 'Waiting for a resubmit',
+      detail: '1 statutory PVs paid · 2 people wait for a resubmit on Payroll.',
+      action: { kind: 'payroll', label: 'Open Payroll →', href: '/hr-costing/payroll/2026-09-01' },
+    })
+    expect(headline(true)).toMatchObject({ word: 'Statutory partly paid', action: { kind: 'generate-statutory' } })
+  })
+
   it('leaves KRIS and PETER out of a PV, and counts what they owe as waiting', () => {
     const cycle = september(true)
     const selection = statutorySelection(cycle.people, ['PCB'], cycle.statutory_coverage ?? [], null, 'department')

@@ -938,6 +938,9 @@ interface Progress {
   statApproved: number
   statRemaining: number
   statRemainingAmount: number
+  /** People whose statutory waits for their resubmit (statutoryHeld), and the schemes with anything else to raise. */
+  statWaiting: number
+  statOffered: number
   statDone: boolean
   nextStatDue: string | null
   lastStatPaid: string | null
@@ -989,6 +992,8 @@ function progressOf(groups: DeptGroup[], rows: StatutoryRow[]): Progress {
     statApproved: statutoryVouchers.filter(v => v.status === 'approved').length,
     statRemaining: openRows.filter(r => r.remainingAmount > 0).length,
     statRemainingAmount: round2(openRows.reduce((t, r) => t + r.remainingAmount, 0)),
+    statWaiting: new Set(openRows.flatMap(r => r.heldRowIds)).size,
+    statOffered: openRows.filter(r => round2(r.remainingAmount - r.heldAmount) > 0).length,
     statDone: openRows.length > 0 && openRows.every(r => r.stage === 'paid'),
     nextStatDue: unpaidDue[0] ?? null,
     lastStatPaid: paidStat[paidStat.length - 1] ?? null,
@@ -1122,6 +1127,17 @@ export function cycleHeadline(i: HeadlineInput): Headline {
         due: { label: 'Statutory due', date: due, days: days(due) },
         segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
         action: { kind: 'approvals', label: 'Open payment vouchers →', href: '/payments' },
+      }
+    }
+    // What is left waits for a resubmit (2026-10-24): it is sent from Payroll, not generated here.
+    if (p.statOffered === 0 && p.statWaiting > 0) {
+      return {
+        word: 'Waiting for a resubmit',
+        detail: `${p.statPaid} statutory PVs paid · ${p.statWaiting} ${p.statWaiting === 1 ? 'person waits' : 'people wait'} for a resubmit on Payroll.`,
+        tone: late ? 'danger' : 'alert',
+        due: { label: 'Statutory due', date: due, days: days(due) },
+        segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
+        action: { kind: 'payroll', label: 'Open Payroll →', href: `/hr-costing/payroll/${cycle.period}` },
       }
     }
     return {
