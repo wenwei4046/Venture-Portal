@@ -49,6 +49,11 @@ const show = (k: string, v: number | null | undefined) => { const f = chartFmtOf
 const SHORT: Record<string, string> = { apptrate: "Appt rate", showrate: "Show-up rate", winrate: "Won rate", appt: "Appts", showup: "Showed up", spend: "Spend", cpl: "Per lead", cpappt: "Per appt", msgconv: "Chats started", cpmsg: "Per chat", impr: "Impressions", clicks: "Link clicks", ctr: "CTR", cpc: "CPC", cpm: "CPM" };
 const label = (k: string) => SHORT[k] ?? defOf(k)?.[1] ?? k;
 
+/** Meta's last answers on this phone, by ads and dates: shown at once, read again behind them. */
+const KEPT = "crm-ads-meta-v1";
+function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, T>)[k]; } catch { return undefined; } }
+function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
+
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean;
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
   const cmp = true, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
@@ -66,9 +71,12 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   useEffect(() => {
     if (!wantMeta) return;
     let on = true;
-    void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) setFigA(x.figs); });
-    void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) setDaily(x.days); });
-    if (cmp) void fetchAdInsights(ids, sb, ub).then(x => { if (on && x.ok) setFigB(x.figs); });
+    const kA = `f|${idKey}|${si}|${ui}`, kD = `d|${idKey}|${si}|${ui}`, kB = `f|${idKey}|${sb}|${ub}`;
+    const a0 = keptGet<Record<string, MetaFig | null>>(kA), d0 = keptGet<Record<string, Record<string, MetaFig> | null>>(kD), b0 = keptGet<Record<string, MetaFig | null>>(kB);
+    if (a0) setFigA(a0); if (d0) setDaily(d0); if (b0) setFigB(b0);
+    void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) { setFigA(x.figs); keptSet(kA, x.figs); } });
+    void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) { setDaily(x.days); keptSet(kD, x.days); } });
+    if (cmp) void fetchAdInsights(ids, sb, ub).then(x => { if (on && x.ok) { setFigB(x.figs); keptSet(kB, x.figs); } });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);

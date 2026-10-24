@@ -63,7 +63,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div>
           </div>
           <Phone4aHero items={v.ov.hero4} cols={2} compact />
-          {!!(v.ov.cmpOn && v.ov.cmpHas) && (<>
+          {false && (<>
             <section style={{ flex: "none", padding: "18px", borderRadius: "22px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", display: "flex", flexDirection: "column", gap: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                 <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Comparison</h2>
