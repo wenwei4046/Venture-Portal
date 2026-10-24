@@ -24,7 +24,7 @@ import s from './library.module.css'
 // The Library (`Library.dc.html`, ⑥-1): the rail — every subsidiary with its files, the categories, the Dustbin; the
 // page — everything (a card per subsidiary, the newest files), a subsidiary (its banner, its folders, its newest files),
 // a folder (its files, ⬆ Upload); search across every folder; + New (a folder, an upload, a link folder). A file's ···:
-// Download, Move to…, Move to Dustbin; a folder's: Open, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
+// Download, Move to…, Move to Dustbin; a folder's: Open, Share link, Download as ZIP, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
 // (the manager's), 60 days. Each subsidiary's brand profile — its card and banner, ✎ Marketing · Edit's, its history —
 // and its next dates, the Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
 
