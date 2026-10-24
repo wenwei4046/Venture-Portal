@@ -562,7 +562,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
           ))}
         </aside>
         {sheet ? (
-          <ProjectSheet project={page.project.id} track={page.project.trackId} title={page.project.title} page={page} tab={sheet} onClose={() => setSheet(null)} />
+          <ProjectSheet project={page.project.id} track={page.project.trackId} title={page.project.title} page={page} tab={sheet} manage={can.manage}
+            onClose={() => setSheet(null)} />
         ) : null}
       </div>
 

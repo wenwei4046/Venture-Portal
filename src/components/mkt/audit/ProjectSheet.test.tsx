@@ -9,6 +9,8 @@ import { taskFromRow, type MktTaskPage } from '@/lib/marketing/task'
 
 const readProjectLog = vi.fn()
 vi.mock('./read', () => ({ readProjectLog: (id: string) => readProjectLog(id) }))
+const actions = vi.hoisted(() => ({ correctMktLogRecord: vi.fn() }))
+vi.mock('@/lib/marketing/actions', () => actions)
 
 import ProjectSheet from './ProjectSheet'
 
@@ -124,5 +126,64 @@ describe('a task’s map and replay (④-4)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('its export and its corrections (④-3b — the user’s answers 18, 19, 21)', () => {
+  const opened = async (manage = false) => {
+    readProjectLog.mockResolvedValueOnce(log)
+    render(<ProjectSheet project="p1" track="TSK-CAR-2610-001" title="Price update" page={null} tab="audit" manage={manage} onClose={() => {}} />)
+    await waitFor(() => screen.getByRole('table', { name: 'Formal log' }))
+  }
+
+  it('anybody exports the rows shown — a formal document, the table, CSV — and nobody but the manager corrects', async () => {
+    await opened()
+    fireEvent.click(screen.getByRole('button', { name: /Filter/ }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Filter the log' })).getByRole('checkbox', { name: /^Mei/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Export/ }))
+    expect(within(screen.getByRole('menu', { name: 'Export' })).getAllByRole('menuitem').map(a => [a.textContent, a.getAttribute('href'), a.getAttribute('download')])).toEqual([
+      ['PDF — formal document', '/marketing/projects/p1/log?format=pdf&person=Mei', 'TSK-CAR-2610-001_audit.pdf'],
+      ['PDF — the table', '/marketing/projects/p1/log?format=table&person=Mei', 'TSK-CAR-2610-001_audit_table.pdf'],
+      ['CSV', '/marketing/projects/p1/log?format=csv&person=Mei', 'TSK-CAR-2610-001_audit.csv'],
+    ])
+    expect(screen.queryByRole('button', { name: /^Correct record/ })).toBeNull()
+  })
+
+  it('the manager corrects a record: a record of its own — correction of #3 — and #3 says so', async () => {
+    await opened(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Correct record #3' }))
+    const panel = screen.getByRole('group', { name: 'Correct record #3' })
+    expect(within(panel).getByText('Correct #3 · Submitted · First draft · 21 Oct 17:45')).toBeTruthy()
+    const add = within(panel).getByRole('button', { name: 'Add correction' })
+    expect(add).toHaveProperty('disabled', true)
+    fireEvent.change(within(panel).getByRole('textbox', { name: 'What was wrong, and what is right' }), { target: { value: 'Sent at 18:45, not 17:45.' } })
+    const after = { ...log!, rows: [...log!.rows, { id: 5, at: '2026-10-22T02:00:00Z', actor: 'SIA', action: 'correction', stage: 0, stageName: 'First draft',
+      fromTo: null, reason: 'Sent at 18:45, not 17:45.', version: null, data: null, corrects: 3 }] }
+    actions.correctMktLogRecord.mockResolvedValueOnce({ ok: true, log: after })
+    await act(async () => {
+      fireEvent.click(add)
+    })
+    expect(actions.correctMktLogRecord).toHaveBeenCalledWith('p1', 3, 'Sent at 18:45, not 17:45.')
+    expect(screen.queryByRole('group', { name: 'Correct record #3' })).toBeNull()
+    expect([cells()[2], cells()[4]]).toEqual([
+      '3 · 21 Oct 17:45 · Mei · Submittedcorrected in #5Correct · Mei → SIA · — · First draft v1',
+      '5 · 22 Oct 10:00 · SIA · Correctioncorrection of #3Correct · — · "Sent at 18:45, not 17:45." · —',
+    ])
+    expect(screen.getByText('5 of 5 records')).toBeTruthy()
+  })
+
+  it('a refusal says why and keeps the words', async () => {
+    await opened(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Correct record #2' }))
+    const panel = screen.getByRole('group', { name: 'Correct record #2' })
+    fireEvent.change(within(panel).getByRole('textbox'), { target: { value: 'Opened for Ali, not Mei.' } })
+    actions.correctMktLogRecord.mockResolvedValueOnce({ ok: false, reason: 'Only Marketing’s managers correct a record.' })
+    await act(async () => {
+      fireEvent.click(within(panel).getByRole('button', { name: 'Add correction' }))
+    })
+    expect(within(panel).getByRole('alert').textContent).toBe('Only Marketing’s managers correct a record.')
+    expect((within(panel).getByRole('textbox') as HTMLTextAreaElement).value).toBe('Opened for Ali, not Mei.')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Correct record #2' })).toBeNull()
   })
 })
