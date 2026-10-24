@@ -89,6 +89,8 @@ export interface DeskUi {
   // Ads Performance
   apSel: string[] | null; mDraft: string[] | null; mDrag: number | null; mq: string; mFold: Record<string, boolean>;
   apStF: string;
+  /** Ads Performance shows the ads hidden by a right click too, dimmed, to show them again (2026-10-24). */
+  apShowHidden?: boolean;
   /** Ads Performance's column widths, dragged at a header's right edge (the owner, 2026-10-13); "name" is the Ad column. */
   apW: Record<string, number>;
   /** Insight's ad table: its sort and dragged column widths (as Ads Performance's). */

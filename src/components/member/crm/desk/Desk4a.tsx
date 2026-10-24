@@ -1127,7 +1127,8 @@ interface AdsCell { v: string; cv: string; d: string; dc: string; db: string; ba
 interface AdsBits {
   ap4: {
     cols: { id: string; label: string; arrow: string; num: boolean; sort: () => void }[];
-    rows: { name: string; headline: string; ch: "whatsapp" | "messenger"; cells: AdsCell[] }[];
+    rows: { name: string; headline: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void }[];
+    hiddenN?: number; showHidden?: boolean; toggleHidden?: () => void;
     total: { label: string; cells: AdsCell[] };
     cmp: boolean;
   };
@@ -1135,6 +1136,28 @@ interface AdsBits {
   /** The chart over the table and the table's own fold (2026-10-23); absent in the prototype harness, which keeps 4a's table alone. */
   apChartV?: AdsChartBits & { tableShut: boolean; foldTable: () => void; adsN: number };
   apPager?: { range: string; per: number; sizes: number[]; setPer: (n: number) => void; pages: number; cur: number; go: (i: number) => void };
+}
+
+/**
+ * An ad's name in Ads Performance: a small ↗ beside it opens the ad (the owner, 2026-10-24: "電腦版也要有可以導入看該廣告");
+ * a right click offers View ad and, for CRM · Manage, Hide from Ads Performance / Show again ("右鍵點擊廣告名稱可以選擇hide").
+ */
+function AdName({ r }: { r: { name: string; url?: string; hidden?: boolean; hide?: () => void } }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const item: CSSProperties = { ...BTN, display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", textAlign: "left" };
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }} onContextMenu={e => { if (!r.url && !r.hide) return; e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
+      <span title={r.hide ? "Right click to hide" : undefined} style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.hidden ? "var(--crm-faint)" : "var(--crm-ink)" }}>{r.name}{r.hidden ? " · hidden" : ""}</span>
+      {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={11} /></a>}
+      {menu && <>
+        <span onClick={() => setMenu(null)} onContextMenu={e => { e.preventDefault(); setMenu(null); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+        <span role="menu" style={{ position: "fixed", left: menu.x, top: menu.y, zIndex: 41, minWidth: "210px", padding: "4px 0", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+          {r.url && <a role="menuitem" href={r.url} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)} style={{ ...item, textDecoration: "none" }}><Ic name="arrow-up-right" size={13} />View ad</a>}
+          {r.hide && <button type="button" role="menuitem" onClick={() => { setMenu(null); r.hide!(); }} style={{ ...item, color: r.hidden ? "var(--crm-ink)" : "var(--crm-oxblood)" }}><Ic name={r.hidden ? "plus" : "x"} size={13} />{r.hidden ? "Show in Ads Performance" : "Hide from Ads Performance"}</button>}
+        </span>
+      </>}
+    </span>
+  );
 }
 
 /** Frame 05 · Ads Performance's table: the ad (channel, the name managers typed, Meta's headline), the CRM's figures, Meta's "—", the total under an ink rule. */
@@ -1191,7 +1214,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
           <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <span style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+              <AdName r={r} />
               {r.headline && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.headline}</span>}
             </span>
           </span>
@@ -1205,6 +1228,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
         {A.total.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} total />)}
         <span />
       </div>
+      {!!A.hiddenN && <button type="button" onClick={A.toggleHidden} style={{ ...BTN, margin: "10px 12px 0", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{A.showHidden ? "Leave the hidden ads out" : `Hidden ads (${A.hiddenN}) · show`}</button>}
     </div></div>
   );
   if (!C) return table;
