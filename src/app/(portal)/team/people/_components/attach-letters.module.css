@@ -1,0 +1,74 @@
+/* Letters beside the employment status (2026-10-24, AttachLetters): a row a letter — its type, its file, × — wrapping
+   to two lines where the column is narrow (a person's card), then "+ Attach a letter". The type select and the new
+   type's name wear the host form's own classes; the file is the Data center's drop made small. */
+
+.letters { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.type { flex: 1 1 170px; min-width: 0; }
+.name { flex: 1 1 170px; min-width: 0; }
+
+.file {
+  flex: 1 1 190px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 5px 10px 5px 6px;
+  border: 1px dashed rgb(var(--hv-frame));
+  border-radius: 10px;
+  background: rgb(255 255 255);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-brown));
+}
+.file:hover { border-color: rgb(var(--hv-brown)); }
+.file[data-chosen='true'] { border-style: solid; border-color: rgb(var(--hv-hairline)); color: rgb(var(--hv-ink)); }
+.file[data-disabled='true'] { cursor: default; opacity: 0.6; }
+.tile {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: rgb(var(--hv-olive-bg));
+  color: rgb(var(--hv-olive));
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+.fileName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiddenFile { display: none; }
+
+.remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  color: rgb(var(--hv-brown));
+  cursor: pointer;
+}
+.remove:hover { background: rgb(var(--hv-panel)); color: rgb(var(--hv-ink)); }
+.remove:disabled { cursor: default; opacity: 0.5; }
+
+.add {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(var(--hv-orange-text));
+  cursor: pointer;
+}
+.add:hover { text-decoration: underline; text-underline-offset: 3px; }
+.add:disabled { cursor: default; opacity: 0.5; text-decoration: none; }

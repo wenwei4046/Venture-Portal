@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import type { CardLadder } from '../card-actions'
+import type { LetterChoice } from '@/lib/documentation/attach'
 import Promotion from './Promotion'
 import Employment, { type TermFacts } from './Employment'
 import w from '../../_components/person-well.module.css'
@@ -21,6 +22,7 @@ export default function PersonChanges({
   active,
   probation = null,
   contract = null,
+  letterTypes = null,
   today,
 }: {
   personId: string
@@ -33,6 +35,8 @@ export default function PersonChanges({
   probation?: TermFacts | null
   /** On a contract (2026-10-24): its end and its reminder. */
   contract?: TermFacts | null
+  /** The Data center's letter types (2026-10-24): Renew's new contract, a probation step's letter — null: none filed here. */
+  letterTypes?: readonly LetterChoice[] | null
   /** The office's today (YYYY-MM-DD). */
   today: string
 }) {
@@ -44,7 +48,7 @@ export default function PersonChanges({
       {active ? (
         <Promotion personId={personId} personName={personName} title={title} department={department} ladder={ladder} onDone={done} />
       ) : null}
-      <Employment personId={personId} personName={personName} active={active} probation={probation} contract={contract} today={today} onDone={done} />
+      <Employment personId={personId} personName={personName} active={active} probation={probation} contract={contract} letterTypes={letterTypes} today={today} onDone={done} />
     </div>
   )
 }

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { insert, update, query, rpc, createClient } = vi.hoisted(() => {
-  const insert = vi.fn().mockResolvedValue({ error: null })
+  // Add Staff reads the new person back (2026-10-24): insert → select('id') → single().
+  const filed = { select: vi.fn(), single: vi.fn().mockResolvedValue({ data: { id: 'new-person' }, error: null }) }
+  filed.select.mockReturnValue(filed)
+  const insert = vi.fn().mockReturnValue(filed)
   const update = vi.fn()
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null })
   const query = {
@@ -69,6 +72,11 @@ describe('staff bank account server actions', () => {
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
       bank_name: 'Maybank', bank_account_no: '0012345678', bank_name_2: 'CIMB', bank_account_no_2: '00987654',
     }))
+  })
+
+  // The letters Add Staff took beside the status go to the new person's Data center record after (2026-10-24).
+  it('answers who was filed', async () => {
+    await expect(addStaff(newStaffForm({ bank: 'CIMB', number: '00987654' }))).resolves.toEqual({ id: 'new-person' })
   })
 
   it('updates or clears Account 2 explicitly while preserving the primary fields', async () => {

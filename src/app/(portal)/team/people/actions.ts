@@ -58,8 +58,12 @@ const str = (formData: FormData, key: string): string | null =>
  * what everybody hired before that date got. The reporting line is asked here
  * too, because filing it now is what makes the commission membership the
  * database derives correct on the first write.
+ *
+ * It answers who was filed (2026-10-24): the letters the form took beside the
+ * employment status go to their Data center record once they are on the roster
+ * (lib/documentation/file-letters.ts).
  */
-export async function addStaff(formData: FormData) {
+export async function addStaff(formData: FormData): Promise<{ id: string }> {
   const user = await requireActionOn('/team/people/new', 'team', 'create')
   const supabase = await createClient()
 
@@ -102,7 +106,7 @@ export async function addStaff(formData: FormData) {
     designation = designationForTitle(title, form.departmentId)
   }
 
-  const { error } = await supabase.from('hr_staff_costs').insert({
+  const { data: filed, error } = await supabase.from('hr_staff_costs').insert({
     employee_name: form.name,
     department_id: form.departmentId,
     title_id: form.titleId,
@@ -144,7 +148,7 @@ export async function addStaff(formData: FormData) {
     emergency_contact_phone: form.emergencyContactPhone,
     emergency_contact_relationship: form.emergencyContactRelationship,
     created_by: user.id,
-  })
+  }).select('id').single()
 
   if (error) {
     if (error.code === '23505') throw new Error('Employee already exists')
@@ -159,6 +163,7 @@ export async function addStaff(formData: FormData) {
   revalidatePath('/hr-costing')
   revalidatePath('/team', 'layout')
   revalidatePath('/revenue', 'layout')
+  return { id: filed.id }
 }
 
 /**

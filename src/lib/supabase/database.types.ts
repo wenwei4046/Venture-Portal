@@ -4436,6 +4436,7 @@ export type Database = {
           contract_ack_name: string | null
           contract_end: string | null
           contract_months: number | null
+          contract_start: string | null
           epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
           first_name: string | null
@@ -4499,6 +4500,7 @@ export type Database = {
           contract_ack_end?: string | null
           contract_ack_name?: string | null
           contract_months?: number | null
+          contract_start?: string | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null
@@ -4562,6 +4564,7 @@ export type Database = {
           contract_ack_end?: string | null
           contract_ack_name?: string | null
           contract_months?: number | null
+          contract_start?: string | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null

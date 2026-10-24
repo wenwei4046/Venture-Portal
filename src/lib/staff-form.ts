@@ -297,6 +297,8 @@ export interface StaffRow {
   /** A contract's period and its last day (2026-10-24, mig 20261025013000 — the database's, generated). */
   contract_months?: number | null
   contract_end?: string | null
+  /** The first day of the contract they are on now, once renewed (2026-10-24, mig 20261025052000) — null: the hire date. */
+  contract_start?: string | null
   probation_ack_end?: string | null
   probation_ack_name?: string | null
   probation_ack_at?: string | null

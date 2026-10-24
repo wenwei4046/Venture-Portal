@@ -252,6 +252,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       probation_end: row.probation_end ?? null,
       contract_months: row.contract_months ?? null,
       contract_end: row.contract_end ?? null,
+      contract_start: row.contract_start ?? null,
       probation_ack_end: row.probation_ack_end ?? null,
       probation_ack_name: row.probation_ack_name ?? null,
       probation_ack_at: row.probation_ack_at ?? null,

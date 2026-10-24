@@ -7,9 +7,11 @@ import type { StaffRow, TitleRow } from '@/lib/staff-form'
 // column"). Edit turns each row's value into its field in the same section;
 // the bar at the foot holds Cancel and Save; a refusal is said there.
 
-const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn() }))
+const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn(), fileLetters: vi.fn() }))
 vi.mock('../actions', () => ({ updateStaff: mocks.updateStaff }))
-vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash }))
+vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash, FLASH_LONG: 8000 }))
+// Letters filed with the Employment Status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: mocks.fileLetters }))
 
 import PersonRecord, { type PersonEditor, type PersonRecordView } from './PersonRecord'
 import type { UplineGroup } from '@/lib/upline-choices'
@@ -79,6 +81,7 @@ const editor = (over: Partial<StaffRow> = {}, canSee = { nric: true, bank: true 
 beforeEach(() => {
   mocks.updateStaff.mockReset()
   mocks.flash.mockReset()
+  mocks.fileLetters.mockReset()
 })
 afterEach(cleanup)
 
@@ -252,6 +255,82 @@ describe('Employment Status', () => {
   it('a reader the directory serves has no field for it', () => {
     openEditor(view({ employment: { status: undefined, chip: { label: 'Active', tone: 'ledger' }, value: null } }))
     expect(within(card()).queryByLabelText('Employment Status')).toBeNull()
+  })
+
+  // Letters filed with it (2026-10-24 — the user: "我们 select 那个 state 的时候，我要他能够 attach 一个 form … 当然包括
+  // letter 的 type，当他一选了之后，就自动 attach 进 document data center 里面"): held until Save, each a change.
+  describe('letters filed with it', () => {
+    const TYPES = [
+      { id: 'offer', name: 'Offer letter', compulsory: true },
+      { id: 'confirm', name: 'Confirmation letter', compulsory: false },
+    ]
+    const withLetters = (over: Partial<StaffRow> = {}): PersonEditor => ({ ...editor(over), letterTypes: TYPES })
+    const letter = new File(['%PDF'], 'confirmation.pdf', { type: 'application/pdf' })
+    const attach = (type = 'confirm') => {
+      fireEvent.click(within(card()).getByRole('button', { name: '+ Attach a letter' }))
+      fireEvent.change(within(card()).getByLabelText('Letter type'), { target: { value: type } })
+      fireEvent.change(within(card()).getByLabelText('Letter file'), { target: { files: [letter] } })
+    }
+
+    it('are offered under it to an editor who may file one — and to nobody else', () => {
+      const { unmount } = render(<PersonRecord view={view()} editor={withLetters()} inviteHref={null} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+      expect(within(card()).getByRole('button', { name: '+ Attach a letter' })).toBeInTheDocument()
+      unmount()
+      openEditor()
+      expect(screen.queryByRole('button', { name: '+ Attach a letter' })).toBeNull()
+    })
+
+    it('go with the status: the record saved first, then each letter filed to their record', async () => {
+      mocks.fileLetters.mockResolvedValue({ filed: ['Confirmation letter'], failed: [] })
+      openEditor(view(), withLetters({ employment_status: 'probation', probation_months: 3 }))
+      fireEvent.change(within(card()).getByLabelText('Employment Status'), { target: { value: 'permanent' } })
+      attach()
+      expect(within(bar()).getByText(/2 changes/)).toBeInTheDocument()
+      expect(await save()).toEqual({ employment_status: 'permanent' })
+      expect(mocks.fileLetters).toHaveBeenCalledWith('staff-1', [expect.objectContaining({ typeId: 'confirm', file: letter })], TYPES)
+      expect(mocks.updateStaff.mock.invocationCallOrder[0]).toBeLessThan(mocks.fileLetters.mock.invocationCallOrder[0])
+    })
+
+    it('alone, the letter is filed with no save of the record, and the page reads again', async () => {
+      mocks.fileLetters.mockResolvedValue({ filed: ['Confirmation letter'], failed: [] })
+      openEditor(view(), withLetters())
+      attach()
+      expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(mocks.updateStaff).not.toHaveBeenCalled()
+      expect(mocks.fileLetters).toHaveBeenCalledTimes(1)
+      expect(mocks.flash).toHaveBeenCalledWith("Confirmation letter filed to TEST STAFF's record")
+      expect(screen.queryByRole('form')).toBeNull()
+    })
+
+    it('one that does not go stays, with why, to be sent again', async () => {
+      mocks.fileLetters.mockImplementation(async (_id: string, rows: Array<{ key: string }>) => ({
+        filed: [],
+        failed: [{ key: rows[0].key, name: 'Confirmation letter', reason: 'The file did not arrive. Please upload it again.' }],
+      }))
+      openEditor(view(), withLetters())
+      attach()
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(within(bar()).getByRole('alert')).toHaveTextContent('Confirmation letter was not filed: The file did not arrive. Please upload it again.')
+      expect(within(card()).getByText('confirmation.pdf')).toBeInTheDocument()
+    })
+
+    it('a file with no type is asked for before anything is sent', async () => {
+      openEditor(view(), withLetters())
+      fireEvent.click(within(card()).getByRole('button', { name: '+ Attach a letter' }))
+      fireEvent.change(within(card()).getByLabelText('Letter file'), { target: { files: [letter] } })
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(within(bar()).getByRole('alert')).toHaveTextContent('Choose the letter type for confirmation.pdf.')
+      expect(mocks.updateStaff).not.toHaveBeenCalled()
+      expect(mocks.fileLetters).not.toHaveBeenCalled()
+    })
   })
 })
 

@@ -273,6 +273,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'hr_documentation_log', 'hr_document_add', 'hr_document_delete',
   'hr_letter_type_add', 'hr_letter_type_set_compulsory', 'hr_letter_type_delete', 'hr_letter_file',
   'hr_publish_type_add', 'hr_publish_type_delete', 'hr_publish', 'member_documents', 'member_document_open',
+  // The letter types People's forms offer beside the employment status (mig 20261025052000): Documentation · Create.
+  'hr_letter_type_choices',
   // Withdraw letter and files that really go (mig 20261011170000): each asks Documentation · Edit.
   'hr_letter_withdraw', 'hr_documentation_leftovers', 'hr_documentation_files_removed',
   // Withdraw a published memo (mig 20261011200000): Documentation · Edit.
