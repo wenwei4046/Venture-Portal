@@ -56,7 +56,7 @@ function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStor
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean;
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
-  const cmp = true, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
+  const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
   // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
   const r = p.range, rb = p.cmp ?? before(r);
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
@@ -86,13 +86,15 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const all = p.customers.filter(c => c.adId);
   const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
-  const rows = ads.map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA) })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
-  const delta = (k: string) => {
-    const a = tot[k], b = totB[k]; if (!cmp || a == null || b == null) return null;
-    if (b === 0) return a === 0 ? { t: "±0", good: true } : null;
+  const rows = ads.map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
+  // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
+  const change = (k: string, a: number | null | undefined, b: number | null | undefined) => {
+    if (!cmp || a == null || b == null) return null;
+    if (b === 0) return a === 0 ? { t: "±0", good: true } : { t: "New", good: !LOWER_IS_BETTER.test(k) };
     const d = ((a - b) / Math.abs(b)) * 100, good = LOWER_IS_BETTER.test(k) ? d <= 0 : d >= 0;
     return { t: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(Math.round(d))}%`, good };
   };
+  const delta = (k: string) => change(k, tot[k], totB[k]);
   const chip = (on: boolean): CSSProperties => ({ ...BTN, flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", fontSize: fs(12.5), fontWeight: 500, background: on ? "var(--crm-rust)" : "var(--crm-field)", color: on ? "#fff" : "var(--crm-ink)" });
   const card: CSSProperties = { borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)" };
 
@@ -109,8 +111,8 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>
-          <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "6px" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
-            {p.cmp && <button type="button" aria-label="Back to the period before" onClick={p.clearCompare} style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button>}</span>
+          {cmp && <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "6px" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
+            <button type="button" aria-label="Stop comparing" onClick={p.clearCompare} style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button></span>}
         </div>
       </div>
 
@@ -145,6 +147,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
               {keys.map((k, i) => <span key={k} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
                 <span style={{ fontSize: fs(10.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: COLORS[i], marginRight: "4px" }} />{label(k)}</span>
                 <span style={{ fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{show(k, a.f[k])}</span>
+                {cmp && (() => { const c = change(k, a.f[k], a.fb?.[k]); return <span style={{ fontSize: fs(10.5), fontWeight: 500, whiteSpace: "nowrap", color: c ? (c.good ? "var(--crm-today)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{c ? c.t : "—"}</span>; })()}
               </span>)}
             </span>
             {on && <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", paddingTop: "8px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: fs(12), color: "var(--crm-muted)" }}>
