@@ -1,5 +1,27 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-24 j (OPEN — #728 waits on main's CRM lint; BI#7's start APPLIED) — Liang's BI#7, as the user wants it
+
+Session 35e03c3c, after i. **Supersedes i's "settled" line**: the user then said what BI#7 should be — "interest 1 月重新算，
+10月开始就没有fixed repayment term 和 principal" + "10 月起利息照旧每月 424.83（按 1 月的 51,000 算），不管之后还了多少本金".
+
+- **PR #728 (OPEN, not merged)** — 「从某月起生效」 · 利息照之前的本金算: `treasury_terms_history.next_interest_keeps_base`
+  (mig `20261025100000`, NOT on production yet; dry-run: prosrc md5 `d0a386a0…` / `eb7b444a…`), `p_interest_keeps_base` on
+  both amend RPCs (9 args), `TermsSegment.interestKeepsBase`, forms (desktop + phone), timeline, statement tooltip.
+  Its data step for BI#7, in one checked transaction after the deploy: `revert_terms_change('fund_source', BI#7)` →
+  `amend_fund_source_from(…, '2026-01-01', 0.00833, 51, null, 'Recalculate Interest', false, false, false)` →
+  `amend_fund_source_from(…, '2026-10-01', null, null, null, '10月起无固定期限，利息照1月的51,000算', true, false, true)`.
+  Result: Jan–Sep 2026 1,424.83 (1,000 + 424.83), Oct on 424.83 interest only. **Go-live still needs the user's OK.**
+- **Blocked**: main's "Next.js build check" fails on lint since #726 — `src/components/member/crm/desk/Desk4a.tsx` (a
+  `useState` after an early return). Not ours: **CRM is not this user's area** ("crm 的不是我负责的"). PR #730 (my fix)
+  was opened by misreading "开pr 做" — **do not merge it**; left open, the user may want it closed.
+- **APPLIED 06:38 UTC**: BI#7's first instalment = 5 Apr 2025 (`set_fund_source_repayment_start`, "第一笔是4月") — 19
+  instalments to Oct-26, interest owed 1,248.30 (was 948.30), balance 41,000.
+- Decided: keep **oldest first** ("这样保留 最早的先抵先" — Jan–Jul read paid, the 124.83 a month piles on Aug–Oct);
+  parked: whether the 15 Oct 1,300 (booked 1,000 principal JE-202610-1055 + 300 interest JE-202610-1056) is all interest.
+- **Waiting on the user**: LO#7 (fund out to The Cont, funded by Liang) "要改，等下我确定了怎样改再告诉你". BI#5 / LO#5 /
+  LO#7 also pay from their money's month (first instalment stored a month late) — mentioned, not changed.
+
 ## CHECKPOINT 2026-10-24 i (SHIPPED, #720) — a no-fixed-term deal's earlier fixed months ask their principal; Balance counts principal paid before the first month
 
 Session 35e03c3c. User, on BI#7's schedule (Lim Wei Liang, 60,000, fund in): "帮我检查这个installment 是不是显示错了？ 指检查"
@@ -9,8 +31,9 @@ Squash-merged ac08b0e7; production deploy success 05:26 UTC.
 - What happened first (not by me): 2026-10-24 04:12 UTC the **Principal** account amended BI#7 (4cb7ee6d) from a month on —
   2026-01, cost_rate 0.00833, **no fixed term** (history 2025-05..2025-12 at 0.5% × 60, reason "Recalculate Interest").
   Memory `liang-cont-terms-change-pending` had this side as pending with a different sketch (fixed 1,000 principal on,
-  or no fixed term only from Oct-26) — **settled: the user, "现在的设定是对的：2026 年 1 月起就无固定期限"** — the record
-  stays as it is; don't re-ask. Also 0.833% × 51,000 = 424.83, not the 425 of 10% p.a. — said, not changed.
+  or no fixed term only from Oct-26) — the user first said "现在的设定是对的：2026 年 1 月起就无固定期限", **then corrected
+  it — see j** (fixed 1,000 a month to Sep-26, no fixed term from Oct with the interest kept on 51,000). Also 0.833% ×
+  51,000 = 424.83, not the 425 of 10% p.a. — the user confirmed 424.83.
 - Display bugs it exposed, fixed in `lib/repayment-plan` `openPlan` (a deal whose CURRENT terms are open is drawn
   wholly month by month): (1) a month an earlier fixed segment governs, within that segment's schedule, now asks its
   principal and is set against oldest first as `fixedPlan` does (BI#7 May–Dec 2025: 1,300, had read 300); (2) Balance
