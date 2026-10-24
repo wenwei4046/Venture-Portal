@@ -6,7 +6,7 @@
  * crm_book_typed / changed through crm_move_typed, with no showroom slot, closure or limit. Mine's chat, the Team chat and
  * the desktop's Appointment sheet draw it from one view model.
  */
-import { useState, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { ApptField, ApptType, CrmVisit } from "@/lib/member/crm-data";
 import type { CustomVisit } from "../sales/actions";
 import { dayLabel, timeLabel } from "../sales/vm/common";
@@ -67,6 +67,23 @@ export function customBookVM(o: { b: CustomFields; put: (p: Partial<CustomFields
       void o.save({ type, start: at.toISOString(), answers: kept }).then(ok => { if (ok) o.done(); });
     } : undefined,
   };
+}
+
+/**
+ * The booking sheet's body keeps the tallest height it has had while open, so switching Showroom ⇄ a type never makes the
+ * sheet shrink and jump (the owner, 2026-10-24: "從showroom 點online / other 不要好像跳的感覺"); what is switched to fades in.
+ */
+export function Phone4aKeepHeight({ k, children }: { k: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null), [min, setMin] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const take = () => setMin(m => Math.max(m, el.scrollHeight));
+    take();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(take);
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [k]);
+  return <div ref={ref} key={k} style={{ display: "flex", flexDirection: "column", gap: "inherit", minHeight: min ? `${min}px` : undefined, animation: "fadeIn 160ms ease-out" }}>{children}</div>;
 }
 
 /** Showroom · Online · Other, above the booking sheet. */

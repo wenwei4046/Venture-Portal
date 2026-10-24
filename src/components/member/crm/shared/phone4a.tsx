@@ -14,7 +14,7 @@ import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
 export { Phone4aAdsPerf } from "./phone-ads-perf";
 export { Phone4aAutoReply } from "./auto-reply-pages";
-export { Phone4aBookMode, Phone4aCustomBook } from "./custom-book";
+export { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight } from "./custom-book";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
