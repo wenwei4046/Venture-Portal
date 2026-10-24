@@ -6,26 +6,30 @@ import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { fileRoute } from '@/lib/storage/browser'
-import { flash } from '@/components/hrv/toast'
+import { flash, FLASH_LONG } from '@/components/hrv/toast'
 import {
   addMktLibFolder, addMktLibType, binMktLib, deleteMktLib, fileMktLib, moveMktLib,
 } from '@/lib/marketing/actions'
 import {
   BIN_DAYS, binRows, brandFace, brandLook, extOf, fileKind, folderTiles, LIB_CATS, LIB_MAX_BYTES, LIB_TYPE_COLORS, libDay, libHref, libIndex,
-  libraryPath, libView, listedName, moveTargets, railCounts, shareOf, sizeLabel, typeChoices, viewFiles, type LibCat, type Library as Lib,
+  libraryPath, libView, listedName, moveTargets, railCounts, shareOf, sizeLabel, typeChoices, viewFiles, zipPlan, type LibCat, type Library as Lib,
   type LibFile, type LibSub, type LibView, type SchedItem, type AttachTask,
 } from '@/lib/marketing/library'
 import AttachToTask from './AttachToTask'
 import BrandProfile from './BrandProfile'
 import ShareLink from './ShareLink'
+import { saveZip } from './zip'
 import s from './library.module.css'
 
 // The Library (`Library.dc.html`, ⑥-1): the rail — every subsidiary with its files, the categories, the Dustbin; the
 // page — everything (a card per subsidiary, the newest files), a subsidiary (its banner, its folders, its newest files),
 // a folder (its files, ⬆ Upload); search across every folder; + New (a folder, an upload, a link folder). A file's ···:
-// Download, Move to…, Move to Dustbin; a folder's: Open, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
+// Download, Move to…, Move to Dustbin; a folder's: Open, Share link, Download as ZIP, Move to…, Move to Dustbin. The Dustbin: Restore, Delete now
 // (the manager's), 60 days. Each subsidiary's brand profile — its card and banner, ✎ Marketing · Edit's, its history —
 // and its next dates, the Schedule (⑥-2). Guest share links and Attach to task come next (⑥-3, ⑥-4).
+
+/** How long a ZIP's *Preparing …* stays — until its next word, which always comes. */
+const ZIP_WORD_MS = 30 * 60_000
 
 type Can = { edit: boolean; manage: boolean }
 type At = { co: string | null; folder: string | null; bin: string | null; cat: string | null; q: string | null }
@@ -80,6 +84,7 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
   const [modal, setModal] = useState<Modal>(null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [zipping, setZipping] = useState(false)
   const [newType, setNewType] = useState({ name: '', color: LIB_TYPE_COLORS[0] as string, cat: 'Content' as LibCat, link: false })
   const [link, setLink] = useState({ type: '', url: '', error: '' })
   const picker = useRef<HTMLInputElement>(null)
@@ -106,6 +111,24 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
     setView(v)
     setCat(c)
     router.replace(libHref(lib, v, { cat: c }), { scroll: false })
+  }
+
+  /** A folder's *Download as ZIP*: made here in the browser, a file at a time, said as it goes — each word kept until the
+   * next (one video can take minutes to fetch), the last one always coming. */
+  const zipFolder = async (folderId: string, name: string) => {
+    setMenu(null)
+    const list = lib.files.filter(f => f.folder === folderId)
+    if (zipping || !zipPlan(list).ok) return
+    setZipping(true)
+    flash(`Preparing ${name}.zip`, ZIP_WORD_MS)
+    try {
+      await saveZip(list, name, (done, all) => flash(`Preparing ${name}.zip · ${done} / ${all}`, ZIP_WORD_MS))
+      flash(`${name}.zip downloaded`)
+    } catch {
+      flash(`${name}.zip could not be made — download its files one at a time`, FLASH_LONG)
+    } finally {
+      setZipping(false)
+    }
   }
 
   /** A write: the Library as it now stands, or the refusal in words. */
@@ -411,13 +434,23 @@ export default function Library({ initial, schedules = {}, tasks = {}, can, at }
                         {t.type.link && t.folder.url
                           ? <a role="menuitem" className={s.menuItem} href={t.folder.url} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)}>Open link</a>
                           : <button type="button" role="menuitem" className={s.menuItem} onClick={() => go({ t: 'folder', sub: sub.id, folder: t.folder.id })}>Open</button>}
+                        {can.edit && !t.type.link ? (
+                          <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'share', what: 'folder', id: t.folder.id, name: t.type.name }) }}>
+                            Share link<span className={s.menuHint}>{shareOf(lib, 'folder', t.folder.id) ? 'live' : 'guest'}</span>
+                          </button>
+                        ) : null}
+                        {/* Anybody who sees the Library downloads, a folder as a file (gap 79). */}
+                        {!t.type.link ? (() => {
+                          const plan = zipPlan(lib.files.filter(f => f.folder === t.folder.id))
+                          return (
+                            <button type="button" role="menuitem" className={s.menuItem} disabled={!plan.ok || zipping}
+                              onClick={() => void zipFolder(t.folder.id, `${sub.name} · ${t.type.name}`)}>
+                              Download as ZIP<span className={s.menuHint}>{plan.hint}</span>
+                            </button>
+                          )
+                        })() : null}
                         {can.edit ? (
                           <>
-                            {!t.type.link ? (
-                              <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'share', what: 'folder', id: t.folder.id, name: t.type.name }) }}>
-                                Share link<span className={s.menuHint}>{shareOf(lib, 'folder', t.folder.id) ? 'live' : 'guest'}</span>
-                              </button>
-                            ) : null}
                             <button type="button" role="menuitem" className={s.menuItem} onClick={() => { setMenu(null); setModal({ kind: 'move', what: 'folder', id: t.folder.id, name: t.type.name }) }}>Move to…</button>
                             <button type="button" role="menuitem" className={`${s.menuItem} ${s.menuDanger}`}
                               onClick={() => void run(() => binMktLib('folder', t.folder.id), `Folder moved to Dustbin · ${BIN_DAYS} days`)}>

@@ -284,6 +284,35 @@ export function sizeLabel(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
   return `${bytes} B`
 }
+
+/** A folder's *Download as ZIP* (`Library.dc.html`'s folder menu, "Preparing <folder>.zip"): made in the browser — a ZIP
+ * made by a function stops at 4.5 MB — so for a folder of 1 GB at most, the browser keeping every file until it is saved. */
+export const ZIP_MAX_BYTES = 1024 * 1024 * 1024
+
+/** What a folder's ZIP would hold — its files' count and bytes — whether it may be made (an empty folder, or one over
+ * 1 GB, may not) and the menu's hint. */
+export function zipPlan(files: readonly Pick<LibFile, 'size'>[]): { n: number; bytes: number; ok: boolean; hint: string } {
+  const bytes = files.reduce((t, f) => t + Math.max(0, f.size || 0), 0)
+  if (!files.length) return { n: 0, bytes, ok: false, hint: 'Empty' }
+  return bytes > ZIP_MAX_BYTES
+    ? { n: files.length, bytes, ok: false, hint: `${sizeLabel(bytes)} · over 1 GB` }
+    : { n: files.length, bytes, ok: true, hint: sizeLabel(bytes) }
+}
+
+/** Each file's name inside the ZIP, as its *Download* names it (its name, its extension); a second of one name — in any
+ * letters — numbered "(2)", a character no file system takes made a space. */
+export function zipNames(files: readonly Pick<LibFile, 'name' | 'path'>[]): string[] {
+  const used = new Set<string>()
+  return files.map(f => {
+    const ext = extOf(f.path).toLowerCase()
+    // eslint-disable-next-line no-control-regex -- a name may carry control characters no file system takes
+    const base = f.name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim() || 'file'
+    let name = `${base}.${ext}`
+    for (let k = 2; used.has(name.toLowerCase()); k++) name = `${base} (${k}).${ext}`
+    used.add(name.toLowerCase())
+    return name
+  })
+}
 /** The day, the office's: "2 Oct". */
 export const libDay = (at: string) => {
   const t = at ? officeTime(at) : null

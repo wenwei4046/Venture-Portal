@@ -56,6 +56,8 @@
   border: 0; background: transparent; color: rgb(var(--mk-ink)); text-align: left; text-decoration: none;
 }
 .menuItem:hover { background: rgb(var(--mk-surface-2)); }
+/* A folder's Download as ZIP, empty or over 1 GB — or one being made. */
+.menuItem:disabled { opacity: .45; cursor: not-allowed; background: none; }
 .menuHint { margin-left: auto; font-size: 11px; color: rgb(var(--mk-faint)); }
 .menuDanger { color: rgb(var(--mk-red)); border-top: 1px solid rgb(var(--mk-surface-2)); border-radius: 0 0 6px 6px; margin-top: 2px; }
 

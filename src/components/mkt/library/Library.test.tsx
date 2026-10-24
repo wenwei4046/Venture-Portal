@@ -22,7 +22,10 @@ vi.mock('@/lib/storage/browser', () => ({
   fileRoute: (b: string, p: string, d?: string) => `/files/${b}/${p}${d ? `?download=${encodeURIComponent(d)}` : ''}`,
 }))
 const flash = vi.hoisted(() => vi.fn())
-vi.mock('@/components/hrv/toast', () => ({ flash }))
+vi.mock('@/components/hrv/toast', () => ({ flash, FLASH_LONG: 8000 }))
+// A folder's ZIP is made in the browser (gap 79) — its making is zip.ts's, mocked here.
+const zip = vi.hoisted(() => ({ saveZip: vi.fn() }))
+vi.mock('./zip', () => zip)
 
 import Library from './Library'
 
@@ -346,5 +349,40 @@ describe('a guest link', () => {
     expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: /Share link/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Brandbook — more' }))
     expect(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Share link/ })).toBeTruthy()
+  })
+})
+
+// 2026-10-25 — gap 79: a folder's Download as ZIP (`Library.dc.html`'s folder menu, "Preparing <folder>.zip"), made in
+// the browser — its making zip.ts's, the plan lib/marketing/library.test.ts's.
+describe('a folder’s Download as ZIP', () => {
+  it('anybody who sees the Library makes one — its size the hint, each file said, then downloaded', async () => {
+    zip.saveZip.mockReset().mockImplementation(async (_files: unknown, _name: string, step: (d: number, a: number) => void) => { step(1, 1) })
+    render(<Library initial={lib} can={{ edit: false, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Brandbook — more' }))
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(m => m.textContent)).toEqual(['Open', 'Download as ZIP20.0 MB'])
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Download as ZIP/ }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Carres · Brandbook.zip downloaded'))
+    // Each word kept until the next (half an hour) — one video can take minutes to fetch.
+    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip', 1_800_000)
+    expect(flash).toHaveBeenCalledWith('Preparing Carres · Brandbook.zip · 1 / 1', 1_800_000)
+    const [files, name] = zip.saveZip.mock.calls[0]
+    expect([(files as { id: string }[]).map(f => f.id), name]).toEqual([['x2'], 'Carres · Brandbook'])
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('none for an empty folder or a link folder; one that cannot be made says to download the files one at a time', async () => {
+    const MIN = '30000000-0000-4000-8000-000000000009'
+    const more = libraryFromRow({ ...JSON.parse(JSON.stringify({ today: lib.today, types: lib.types, subs: lib.subs, files: lib.files, trash: [] })),
+      folders: [...lib.folders, { id: MIN, sub: CAR, type: T.minutes, url: null, at: '2026-10-20T02:00:00Z' }] })
+    render(<Library initial={more} can={{ edit: true, manage: false }} at={{ ...AT, co: 'CAR' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Meeting minutes — more' }))
+    const empty = within(screen.getByRole('menu')).getByRole('menuitem', { name: /Download as ZIP/ }) as HTMLButtonElement
+    expect([empty.textContent, empty.disabled]).toEqual(['Download as ZIPEmpty', true])
+    fireEvent.click(screen.getByRole('button', { name: 'Raw footage — more' }))
+    expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: /Download as ZIP/ })).toBeNull()
+    zip.saveZip.mockReset().mockRejectedValue(new Error('KJ showroom: HTTP 404'))
+    fireEvent.click(screen.getByRole('button', { name: 'Product photos — more' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Download as ZIP/ }))
+    await waitFor(() => expect(flash).toHaveBeenCalledWith('Carres · Product photos.zip could not be made — download its files one at a time', 8000))
   })
 })
