@@ -28,7 +28,11 @@ export interface PanelActions extends SalesActions {
   metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
-  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
+  /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
+  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
+  /** Save and apply to all (crm_save_ads_together, 2026-10-24): this setting on every ad listed and every ad already together,
+   *  all of them counted together; how many ads it saved and how many waiting leads it dealt, or false. */
+  saveAdsTogether(ads: { id: string; label: string }[], rule: { mode: "even" | "split"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { saved: number; dealt: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
@@ -47,6 +51,10 @@ export interface PanelActions extends SalesActions {
   /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
   saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
 }
+
+/** The same keys with the same values — as the database compares two saved settings (jsonb: a key missing ≠ a key at 0). */
+const sameValues = (a: Record<string, unknown> = {}, b: Record<string, unknown> = {}) =>
+  [...new Set([...Object.keys(a), ...Object.keys(b)])].every(k => a[k] === b[k]);
 
 export function makePanelActions(base: SalesActions, { live, data, setData }: { live: boolean; data: () => CrmData; setData: Dispatch<SetStateAction<CrmData>> }): PanelActions {
   const write = async (name: Parameters<typeof crmWrite>[0], args: Record<string, unknown>) => {
@@ -120,13 +128,35 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       const tm = rule.mode === "split" ? rule.tm ?? {} : {};
       const r = await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
       if (!r) return false;
+      // The saved row: an ad saved on its own with anything changed has left the ads counted together (mig 20261025121500);
+      // the demo, which saves nothing, asks the same of the rule it had.
+      const row = r.data as { dealt?: number; together?: boolean } | null, old = data().adRules.find(x => x.adId === ad);
+      const together = live ? !!row?.together
+        : !!old?.together && old.mode === rule.mode && old.pm === rule.pm && sameValues(old.split, rule.split) && sameValues(old.pp, rule.pp) && sameValues(old.tm, tm);
       setData(d => ({
         ...d,
         adRules: [...d.adRules.filter(r => r.adId !== ad),
-          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
+          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString(), ...(together ? { together: true } : {}) }] : [])],
       }));
       // The leads it dealt arrive with the next read (every 5 s); the toast says how many.
-      return { dealt: Number((r.data as { dealt?: number } | null)?.dealt ?? 0) };
+      return { dealt: Number(row?.dealt ?? 0), together };
+    },
+    async saveAdsTogether(ads, rule) {
+      const tm = rule.mode === "split" ? rule.tm ?? {} : {};
+      const r = await write("crm_save_ads_together", { p_ads: Object.fromEntries(ads.map(a => [a.id, a.label])), p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
+      if (!r) return false;
+      // Every ad listed and every ad already together now holds this setting, counted together; a new mode starts a new count.
+      const ids = [...new Set([...ads.map(a => a.id), ...data().adRules.filter(x => x.together).map(x => x.adId)])];
+      setData(d => ({
+        ...d,
+        adRules: [...d.adRules.filter(x => !ids.includes(x.adId)), ...ids.map(id => {
+          const old = d.adRules.find(x => x.adId === id);
+          return { adId: id, label: ads.find(a => a.id === id)?.label ?? old?.label ?? "", mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm,
+            startedAt: old && old.mode === rule.mode ? old.startedAt : new Date().toISOString(), together: true };
+        })],
+      }));
+      const got = r.data as { saved?: number; dealt?: number } | null;
+      return { saved: Number(got?.saved ?? ids.length), dealt: Number(got?.dealt ?? 0) };
     },
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;

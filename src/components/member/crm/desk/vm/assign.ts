@@ -1,14 +1,14 @@
 /**
  * Assignment (CRM Desktop rev 1, D1–D6), CRM · Manage only: Organic Leads (Send to), Ads to teams (cards by delivery
  * status, the split editor — Evenly / By team, inside each team Evenly / By % / By max — saved through the phone's own
- * crm_save_ad_assign, "Save and apply to all N ads"), Awaiting reply (Remind, Assign, the chat), Full time lead
- * allocation (days per person, taking turns — crm_save_fulltime 'turns') and Chat progress. Ported from the prototype;
- * the dealer is the database's (crm_assign_contact), unchanged.
+ * crm_save_ad_assign, or "Save and apply to all": every ad counted together, crm_save_ads_together), Awaiting reply
+ * (Remind, Assign, the chat), Full time lead allocation (days per person, taking turns — crm_save_fulltime 'turns') and
+ * Chat progress. Ported from the prototype; the dealer is the database's (crm_assign_contact).
  */
 import type { CrmAdRule } from "@/lib/member/crm-data";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import { urgencyOf } from "../../sales/vm/common";
-import type { DeskCtx } from "./ctx";
+import type { DeskCtx, DeskUi } from "./ctx";
 import { teamLead } from "./names";
 import { first, initials, shortName, teamNameOf } from "./data";
 import { sendTo } from "./inbox";
@@ -89,13 +89,20 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
   // Opening an ad — from its card, from "needs attention", or the first one when Ads to teams opens — always loads its saved
   // split into the editor (the owner, 2026-10-16: Revenue Director set to 100% came back as 25% each — the automatic
   // first-ad open set only `ad`, so the editor drew the default split).
-  const openAdById = (id: string) => { const rule = ruleOf(id);
+  // A refresh or Back restores the open ad but not its draft, which drew the default even split (17 · 17 · 17 · 17 · 16 · 16 —
+  // the owner's screenshot, 2026-10-24) for Save to write: `adDraftWant` tells DeskScreens to load the saved one again.
+  const draftKey = (id: string) => `${id}|${ruleOf(id) ? "rule" : "none"}`;
+  const savedDraft = (id: string): Partial<DeskUi> => { const rule = ruleOf(id);
     // A By % team with somebody locked opens on what the others really get: their saved % scaled to 100.
     const mv0: Record<string, number> = rule ? Object.fromEntries(Object.entries(rule.pp).map(([pid, n]) => [pid, n])) : {};
     if (rule) TA.forEach(t => { if (fromDb(rule.tm?.[t.id]) !== "pct") return; const s = sharedOut(rule.pp, t.people.map(p => p.id), t.all.some(p => lk.has(p.id))); if (s) Object.assign(mv0, s); });
-    set(u => ({ ...u, ad: id, stage: "op", adLog: false, splitTyping: null, adMode: rule?.mode === "even" ? "evenly" : "team",
+    return { adDraftFor: draftKey(id), splitTyping: null, splitTouched: [], mvTyping: null, adMode: rule?.mode === "even" ? "evenly" : "team",
       tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: mv0,
-      split: rule && rule.mode !== "even" ? { ...rule.split } : null })); };
+      split: rule && rule.mode !== "even" ? { ...rule.split } : null }; };
+  const openAdById = (id: string) => set(u => ({ ...u, ad: id, stage: "op", adLog: false, ...savedDraft(id) }));
+  // The open ad's saved setting, loaded again where the draft is not from it — the editor stays as it is, only its numbers.
+  const adDraftWant = ui.ad ? draftKey(ui.ad) : null;
+  const reloadAdDraft = (id: string) => set(u => (u.ad === id ? { ...u, ...savedDraft(id) } : u));
   const segsOf = (r: CrmAdRule | undefined) => r && (r.mode === "split" || r.mode === "people") ? TA.filter(t => (r.split[t.id] ?? 0) > 0).map(t => {
     const m = fromDb(r.tm?.[t.id]), mem = t.people, val = (pid: string) => r.pp[pid] ?? 0;
     const detail = m === "pct" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}%`).join(" · ") : m === "max" ? mem.map(p => `${shortName(p.name, mem.map(x => x.name))} ${val(p.id)}`).join(" · ") : "";
@@ -186,7 +193,6 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     },
     nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
   };
-  const applyN = shownAds.length;
   const adEdit = {
     adOpen, ad: { name: ad?.label ?? "", meta: ad ? `${ad.wa ? "WhatsApp" : "Messenger"} · ${ad.leads} leads` : "", ...adNaming },
     adModes: ([["evenly", "Evenly"], ["team", "By team"]] as const).map(([v, label]) => ({ label, on: v === mode, off: v !== mode, pick: () => patch({ adMode: v }) })),
@@ -221,12 +227,18 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     },
     evenTotal: TA.reduce((a2, t) => a2 + t.people.length, 0),
     evenTeams: TA.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
-    adTeams, closeAd: () => patch({ ad: null }),
-    applyLabel: `Save and apply to all ${applyN}${adSt === "all" ? "" : ` ${adSt.toLowerCase()}`} ads`,
-    applyAll: () => { if (!ad || !draftOk) return; const list = shownAds.some(a => a.id === ad.id) ? shownAds : [...shownAds, ad];
-      void Promise.all(list.map(a => saveOne(a.id, a.label))).then(rs => { const ok = rs.filter(Boolean).length;
-        if (ok) patch({ ad: null, toast: `Applied to ${ok}${adSt === "all" ? "" : ` ${adSt.toLowerCase()}`} ads` }); }); },
-    saveAd: () => { if (!ad || !draftOk) return; void saveOne(ad.id, ad.label).then(r => { if (r) patch({ ad: null, toast: `Saved · ${ad.label}${r.dealt ? ` · ${r.dealt} waiting lead${r.dealt === 1 ? "" : "s"} dealt` : ""}` }); }); },
+    adTeams, closeAd: () => patch({ ad: null }), adDraftWant, reloadAdDraft,
+    // Save and apply to all means calculate together (the owner, 2026-10-24: "它的意思就是 calculate together … 而不是只是抄他的
+    // split 方案"): this setting on every ad in the list, whichever status is picked, and all of them counted together
+    // (crm_save_ads_together, which takes in every ad already together too) — the next lead of any of them goes by all of
+    // their leads this month. Save keeps an ad apart.
+    applyLabel: "Save and apply to all",
+    applyAll: () => { if (!ad || !draftOk) return; const list = ads.some(a => a.id === ad.id) ? ads : [...ads, ad];
+      void ctx.act.saveAdsTogether(list.map(a => ({ id: a.id, label: a.label })), ruleFromDraft()).then(r => {
+        if (r) patch({ ad: null, toast: `Applied to all ${r.saved} ads · counted together${r.dealt ? ` · ${r.dealt} waiting lead${r.dealt === 1 ? "" : "s"} dealt` : ""}` }); }); },
+    // Saved on its own with anything changed, an ad leaves the ads counted together; the toast says so.
+    saveAd: () => { if (!ad || !draftOk) return; const was = !!ruleOf(ad.id)?.together;
+      void saveOne(ad.id, ad.label).then(r => { if (r) patch({ ad: null, toast: `Saved · ${ad.label}${was && !r.together ? " · counted on its own" : ""}${r.dealt ? ` · ${r.dealt} waiting lead${r.dealt === 1 ? "" : "s"} dealt` : ""}` }); }); },
   };
 
   // ── Full time lead allocation (D5): days per person, taking turns; Off = follows Ads to teams.
