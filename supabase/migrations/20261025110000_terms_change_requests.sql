@@ -255,8 +255,7 @@ declare
 begin
   select * into v_r from treasury_terms_requests where id = p_request_id for update;
   if not found then raise exception 'That terms change was not found'; end if;
-  PERFORM public.tab_write_guard(CASE WHEN v_r.record_kind = 'loan' THEN ARRAY['/fund-out'] ELSE ARRAY['/fund-in'] END,
-                                 ARRAY['treasury.edit', 'treasury.approve']);
+  PERFORM public.tab_write_guard(CASE WHEN v_r.record_kind = 'loan' THEN ARRAY['/fund-out'] ELSE ARRAY['/fund-in'] END, ARRAY['treasury.edit', 'treasury.approve']);
   IF auth.uid() IS NOT NULL
      AND v_r.created_by IS DISTINCT FROM auth.uid()
      AND NOT public.has_any_action(ARRAY['approvals.approve']) THEN
@@ -273,6 +272,31 @@ begin
          updated_at = now()
    where id = v_r.approval_id and status = 'pending';
 end $$;
+
+-- The guards the scan reads (tab-write-guards.test.ts): each write asks the pages in the database that the app's gate
+-- in front of it names — the deal's own (Fund IN / Fund OUT) to file and withdraw, Approvals to decide. The bodies
+-- above carry them already; this only checks they are there.
+CREATE OR REPLACE FUNCTION pg_temp.tab_guard(p_sig text, p_pages text, p_wants text[])
+RETURNS void
+LANGUAGE plpgsql AS $g$
+DECLARE
+  v_line text := format('PERFORM public.tab_write_guard(%s, ARRAY[%s]);', p_pages,
+    array_to_string(ARRAY(SELECT quote_literal(w) FROM unnest(p_wants) w), ', '));
+BEGIN
+  IF position(v_line IN (SELECT prosrc FROM pg_proc WHERE oid = p_sig::regprocedure)) = 0 THEN
+    RAISE EXCEPTION '% does not ask its page: % is not in its body', p_sig, v_line;
+  END IF;
+END
+$g$;
+
+SELECT pg_temp.tab_guard('public.file_terms_change(text, uuid, date, numeric, integer, boolean, boolean, boolean, boolean, text)',
+  $$CASE WHEN p_record_kind = 'loan' THEN ARRAY['/fund-out'] ELSE ARRAY['/fund-in'] END$$, ARRAY['treasury.edit']);
+SELECT pg_temp.tab_guard('public.withdraw_terms_change(uuid)',
+  $$CASE WHEN v_r.record_kind = 'loan' THEN ARRAY['/fund-out'] ELSE ARRAY['/fund-in'] END$$, ARRAY['treasury.edit', 'treasury.approve']);
+SELECT pg_temp.tab_guard('public.approve_terms_change(uuid, text)',
+  $$ARRAY['/approvals']$$, ARRAY['approvals.approve', 'treasury.approve']);
+SELECT pg_temp.tab_guard('public.reject_terms_change(uuid, text)',
+  $$ARRAY['/approvals']$$, ARRAY['approvals.approve', 'treasury.approve']);
 
 revoke all on function file_terms_change(text, uuid, date, numeric, integer, boolean, boolean, boolean, boolean, text) from public, anon;
 revoke all on function approve_terms_change(uuid, text) from public, anon;
