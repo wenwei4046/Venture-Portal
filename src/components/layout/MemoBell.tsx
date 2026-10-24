@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { Drawer } from '@/components/hrv/overlay'
 import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
-import { PROBATION_NOTICE_DAYS, probationEndLine } from '@/lib/employment-status'
-import { officeTime, officeToday } from '@/lib/office-time'
-import { acknowledged, dueReviews, reviewsFromRow, waitingCount, type ProbationReview } from '@/lib/probation-reviews'
+import { acknowledgeContract } from '@/app/(portal)/team/people/contract-actions'
+import { NOTICE_DAYS, termEndLine } from '@/lib/employment-status'
+import { officeToday } from '@/lib/office-time'
+import { TERM_KINDS, TERM_LABEL, ackLine, acknowledged, dueReviews, reviewsFromRow, waitingCount, type TermKind, type TermReview } from '@/lib/term-reviews'
 import MemoCard, { openMemoFileIn } from '@/components/memos/MemoCard'
 import SignaturePad, { SignatureImage } from '@/components/memos/SignaturePad'
 import { markMyMemo, myMemoSignature, openMemoFile } from '@/lib/memos/actions'
@@ -41,21 +42,24 @@ import s from './memo-bell.module.css'
  *
  * In HR's view it is the Notifications bell too (2026-10-23 — the user, circling
  * it: "at least show up in this notification side, in desktop view"): a
- * probation ending within PROBATION_NOTICE_DAYS, or past and still open, for
- * whoever may act on it (`seesProbationReminders`) — the shared hr@ as well,
- * which has no memos. Read the same way (`probation_reviews()`); Acknowledge
- * records who and when, the name opens their page for the next step. A
- * reminder counts until it is acknowledged, and is listed until they are
- * confirmed, extended past the window or their employment ends.
+ * probation ending within NOTICE_DAYS, or past and still open, for whoever may
+ * act on it (`seesTermReminders`) — the shared hr@ as well, which has no memos.
+ * Read the same way (`probation_reviews()`); Acknowledge records who and when,
+ * the name opens their page for the next step. A contract's end the same way
+ * (2026-10-24, `contract_reviews()`), and each term is reminded twice — 30 days
+ * before, then 15 (the user: "need 30 days and 15 days before remind, 2
+ * reminder"): a reminder counts until it is acknowledged, the second again
+ * after the first's, and is listed until they are confirmed, extended or
+ * renewed past the window, or their employment ends.
  */
-export default function MemoBell({ memos: memosOn = true, probation: probationOn = false }: {
+export default function MemoBell({ memos: memosOn = true, terms: termsOn = false }: {
   /** One's own memos — a login a People record names. */
   memos?: boolean
-  /** HR view's probation reminders. */
-  probation?: boolean
+  /** HR view's reminders of a probation or a contract ending. */
+  terms?: boolean
 }) {
   const [memos, setMemos] = useState<MyMemo[] | null>(null)
-  const [reviews, setReviews] = useState<ProbationReview[] | null>(null)
+  const [terms, setTerms] = useState<Record<TermKind, TermReview[] | null>>({ probation: null, contract: null })
   const [ackBusy, setAckBusy] = useState<string | null>(null)
   const [ackError, setAckError] = useState('')
   const [open, setOpen] = useState(false)
@@ -66,8 +70,14 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
   const [signed, setSigned] = useState<ReadonlyMap<string, string>>(() => new Map())
 
   const read = useCallback(async () => {
-    // Each read on its own: a refusal of one leaves the other — and the bell stays as it was.
+    // Each read on its own: a refusal of one leaves the others — and the bell stays as it was.
     const db = createClient() as unknown as SupabaseClient
+    // A refusal keeps the list it had — or, never read, none, so the drawer does not wait on it.
+    const keep = (kind: TermKind) => (reading: PromiseLike<{ data: unknown; error: unknown }>) =>
+      Promise.resolve(reading).then(
+        ({ data, error: failed }) => setTerms(prev => ({ ...prev, [kind]: failed ? (prev[kind] ?? []) : reviewsFromRow(data, kind) })),
+        () => setTerms(prev => ({ ...prev, [kind]: prev[kind] ?? [] })),
+      )
     await Promise.all([
       memosOn
         ? Promise.resolve(db.rpc('my_memos')).then(
@@ -77,15 +87,10 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
             () => undefined,
           )
         : null,
-      // A refusal keeps the list it had — or, never read, none, so the drawer does not wait on it.
-      probationOn
-        ? Promise.resolve(db.rpc('probation_reviews')).then(
-            ({ data, error: failed }) => setReviews(prev => (failed ? (prev ?? []) : reviewsFromRow(data))),
-            () => setReviews(prev => prev ?? []),
-          )
-        : null,
+      termsOn ? keep('probation')(db.rpc('probation_reviews')) : null,
+      termsOn ? keep('contract')(db.rpc('contract_reviews')) : null,
     ])
-  }, [memosOn, probationOn])
+  }, [memosOn, termsOn])
 
   useEffect(() => {
     void read()
@@ -97,30 +102,38 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
   }, [read])
 
   const today = officeToday()
-  const due = reviews ? dueReviews(reviews, today) : []
-  const toAcknowledge = reviews ? waitingCount(reviews, today) : 0
-  const count = (memos ? memoBellCount(memos) : 0) + toAcknowledge
+  // The probations, then the contracts, each waiting ones first, soonest first.
+  const due = TERM_KINDS.map(kind => {
+    const list = terms[kind]
+    return { kind, rows: list ? dueReviews(list, today) : [], waiting: list ? waitingCount(list, today) : 0 }
+  })
+  const toAcknowledge = due.map(d => ({ kind: d.kind, n: d.waiting }))
+  const count = (memos ? memoBellCount(memos) : 0) + toAcknowledge.reduce((sum, t) => sum + t.n, 0)
   const shown = memos ? memosInOrder(memos) : []
   const picked = pick ? shown.find(m => m.id === pick) ?? null : null
   const waiting = shown.filter(memoWaiting).length
-  const word = probationOn ? 'Notifications' : 'Memos'
-  const reading = (memosOn && memos === null) || (probationOn && reviews === null)
-  const sub = probationOn
+  const word = termsOn ? 'Notifications' : 'Memos'
+  const reading = (memosOn && memos === null) || (termsOn && TERM_KINDS.some(kind => terms[kind] === null))
+  const anyDue = due.some(d => d.rows.length > 0)
+  const sub = termsOn
     ? [
-        toAcknowledge ? `${toAcknowledge} probation${toAcknowledge === 1 ? '' : 's'} to acknowledge` : null,
+        ...toAcknowledge.map(t => (t.n ? `${t.n} ${t.kind}${t.n === 1 ? '' : 's'} to acknowledge` : null)),
         waiting ? `${waiting} memo${waiting === 1 ? '' : 's'} waiting` : null,
       ].filter(Boolean).join(' · ') || (reading ? 'Reading…' : 'Nothing waiting for you')
     : memos === null ? 'Reading…' : waiting ? `${waiting} waiting for your acknowledgement` : 'Nothing waiting for you'
 
-  // HR acknowledges a probation's reminder: who and when, for the end it stands at now.
-  async function acknowledgeReview(r: ProbationReview) {
+  // HR acknowledges a term's reminder: who and when, for the end it stands at now.
+  async function acknowledgeReview(r: TermReview) {
     if (ackBusy) return
     setAckBusy(r.id)
     setAckError('')
     try {
-      const res = await acknowledgeProbation(r.id)
+      const res = await (r.kind === 'contract' ? acknowledgeContract : acknowledgeProbation)(r.id)
       if (!res.ok) return setAckError(res.reason)
-      setReviews(list => list?.map(x => (x.id === r.id ? { ...x, ackEnd: res.endsOn || x.endsOn, ackName: res.ackName || x.ackName, ackAt: res.ackAt || new Date().toISOString() } : x)) ?? list)
+      setTerms(prev => ({
+        ...prev,
+        [r.kind]: prev[r.kind]?.map(x => (x.id === r.id ? { ...x, ackEnd: res.endsOn || x.endsOn, ackName: res.ackName || x.ackName, ackAt: res.ackAt || new Date().toISOString() } : x)) ?? prev[r.kind],
+      }))
     } catch {
       setAckError('Could not acknowledge. Check the connection and try again.')
     } finally {
@@ -220,45 +233,48 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
           </div>
         ) : (
           <div className={s.list}>
-            {/* Probations ending (HR's view, 2026-10-23): those waiting for Acknowledge first, soonest first. */}
-            {due.length > 0 ? (
-              <>
-                <div className={s.section}>Probation ending</div>
-                {due.map(r => {
-                  const done = acknowledged(r)
-                  return (
-                    <div key={r.id} className={s.row} data-unread={done ? undefined : 'true'}>
-                      <span className={s.rowTag} data-tone="probation">PROB</span>
-                      <Link href={`/team/people/${r.id}`} className={s.rowText} onClick={() => setOpen(false)}>
-                        <span className={s.rowTitle}>{r.name}</span>
-                        <span className={s.rowMeta}>
-                          {r.endsOn ? probationEndLine(r.endsOn, today) : ''}
-                          {r.department ? ` · ${r.department}` : ''}
-                        </span>
-                        {done ? (
+            {/* A probation or a contract ending (HR's view, 2026-10-23 / 10-24): each under its word, those waiting
+                for Acknowledge first, soonest first. */}
+            {due.map(({ kind, rows }) =>
+              rows.length > 0 ? (
+                <Fragment key={kind}>
+                  <div className={s.section}>{TERM_LABEL[kind]} ending</div>
+                  {rows.map(r => {
+                    const done = acknowledged(r, today)
+                    const said = ackLine(r, today)
+                    return (
+                      <div key={r.id} className={s.row} data-unread={done ? undefined : 'true'}>
+                        <span className={s.rowTag} data-tone={kind}>{kind === 'contract' ? 'CONT' : 'PROB'}</span>
+                        <Link href={`/team/people/${r.id}`} className={s.rowText} onClick={() => setOpen(false)}>
+                          <span className={s.rowTitle}>{r.name}</span>
                           <span className={s.rowMeta}>
-                            Acknowledged by {r.ackName ?? 'HR'}
-                            {r.ackAt ? ` · ${officeTime(r.ackAt).format('D MMM')}` : ''}
+                            {r.endsOn ? termEndLine(r.endsOn, today) : ''}
+                            {r.department ? ` · ${r.department}` : ''}
                           </span>
-                        ) : null}
-                      </Link>
-                      {done ? (
-                        <span className={s.chip} data-tone="ledger">Acknowledged</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`${s.chip} ${s.chipButton}`}
-                          data-tone="alert"
-                          onClick={() => void acknowledgeReview(r)}
-                          disabled={ackBusy !== null}
-                          aria-busy={ackBusy === r.id || undefined}
-                        >
-                          {ackBusy === r.id ? 'Recording…' : 'Acknowledge'}
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
+                          {said ? <span className={s.rowMeta}>{said}</span> : null}
+                        </Link>
+                        {done ? (
+                          <span className={s.chip} data-tone="ledger">Acknowledged</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`${s.chip} ${s.chipButton}`}
+                            data-tone="alert"
+                            onClick={() => void acknowledgeReview(r)}
+                            disabled={ackBusy !== null}
+                            aria-busy={ackBusy === r.id || undefined}
+                          >
+                            {ackBusy === r.id ? 'Recording…' : 'Acknowledge'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </Fragment>
+              ) : null,
+            )}
+            {anyDue ? (
+              <>
                 {ackError ? <div className={s.err} role="alert">{ackError}</div> : null}
                 {memosOn ? <div className={s.section}>Memos</div> : null}
               </>
@@ -280,8 +296,8 @@ export default function MemoBell({ memos: memosOn = true, probation: probationOn
               </button>
             ))}
             {memosOn && memos !== null && shown.length === 0 ? <div className={s.empty}>No memos for you yet.</div> : null}
-            {!memosOn && reviews !== null && due.length === 0 ? (
-              <div className={s.empty}>No probation ends in the next {PROBATION_NOTICE_DAYS} days.</div>
+            {!memosOn && !reading && !anyDue ? (
+              <div className={s.empty}>No probation or contract ends in the next {NOTICE_DAYS} days.</div>
             ) : null}
           </div>
         )}

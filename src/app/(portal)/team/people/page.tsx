@@ -62,8 +62,11 @@ interface RosterRow {
   employment_status?: string | null
   probation_end?: string | null
   probation_ack_end?: string | null
-  /** A contract's last day (2026-10-24) — the staff table's, as the probation's. */
+  probation_ack_at?: string | null
+  /** A contract's last day and its reminder's acknowledgement (2026-10-24) — the staff table's, as the probation's. */
   contract_end?: string | null
+  contract_ack_end?: string | null
+  contract_ack_at?: string | null
   title_id: string | null
   reports_to: string | null
   titles: { name: string; level_id: string | null; template_id: string | null } | null
@@ -106,7 +109,7 @@ export default async function PeopleManagementPage({
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, employment_status, probation_end, probation_ack_end, contract_end, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, first_name, last_name, employee_code, designation, user_id, status, resignation_date, hire_date, employment_status, probation_end, probation_ack_end, probation_ack_at, contract_end, contract_ack_end, contract_ack_at, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -353,7 +356,15 @@ function personRow(
     employmentStatus,
     hireDate: r.hire_date ?? null,
     employmentChip: active
-      ? statusChip({ status: employmentStatus, probationEnd, probationAcked: !!probationEnd && r.probation_ack_end === probationEnd, contractEnd }, today)
+      ? statusChip({
+          status: employmentStatus,
+          probationEnd,
+          contractEnd,
+          // The reminder's acknowledgement for the term they are on (reminded 30 and 15 days before, 2026-10-24).
+          ack: employmentStatus === 'contract'
+            ? { ackEnd: r.contract_ack_end ?? null, ackAt: r.contract_ack_at ?? null }
+            : { ackEnd: r.probation_ack_end ?? null, ackAt: r.probation_ack_at ?? null },
+        }, today)
       : null,
     accountEmail: r.users?.email ?? null,
     accountActive: r.users?.is_active ?? null,

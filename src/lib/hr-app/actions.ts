@@ -12,6 +12,7 @@ import type { CandidateStage, TalentReason } from '@/lib/hiring/types'
 import { bookRoom, cancelBooking } from '@/lib/rooms/actions'
 import { decideRequest } from '@/lib/attendance/actions'
 import { acknowledgeProbation } from '@/app/(portal)/team/people/probation-actions'
+import { acknowledgeContract } from '@/app/(portal)/team/people/contract-actions'
 import { appAccess } from './server'
 import type { HrAppData } from './model'
 
@@ -133,10 +134,14 @@ export async function hrAppCancelBooking(id: string): Promise<Act> {
   return res.ok ? { ok: true } : { ok: false, reason: res.reason }
 }
 
-// ── People: a probation's reminder acknowledged (2026-10-23) — People · Edit on the person's page ──
+// ── People: a probation's reminder acknowledged (2026-10-23), a contract's (2026-10-24) — People · Edit on the person's page ──
 
 export async function hrAppProbationAck(id: string): Promise<Act> {
-  return (await may('probationAck')) ? done(await acknowledgeProbation(id)) : { ok: false, reason: SHUT }
+  return (await may('termAck')) ? done(await acknowledgeProbation(id)) : { ok: false, reason: SHUT }
+}
+
+export async function hrAppContractAck(id: string): Promise<Act> {
+  return (await may('termAck')) ? done(await acknowledgeContract(id)) : { ok: false, reason: SHUT }
 }
 
 // ── People › Documentation: a letter's short link, made at the press (never kept) ──

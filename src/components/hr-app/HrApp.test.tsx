@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AttConfig, AttLedger, AttMonth, AttRequest, AttStep } from '@/lib/attendance/types'
 import type { HrAppData } from '@/lib/hr-app/model'
-import type { ProbationReview } from '@/lib/probation-reviews'
+import type { TermReview } from '@/lib/term-reviews'
 
 const itSupport = vi.hoisted(() => ({ render: vi.fn() }))
 vi.mock('@/components/it-support/ItSupport', () => ({
@@ -320,13 +320,13 @@ describe('the bell (2026-10-11)', () => {
 // A probation ending (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送"): Home lists the ones
 // waiting, the person's page acknowledges one, a tapped push or a bell notice opens the person.
 describe('a probation ending (2026-10-23)', () => {
-  const review = (over: Partial<ProbationReview> = {}): ProbationReview => ({
-    id: 's2', name: 'Nurul Huda', code: 'HV040', department: 'HR', title: 'HR Executive', hireDate: '2026-07-23', months: 3,
+  const review = (over: Partial<TermReview> = {}): TermReview => ({
+    kind: 'probation', id: 's2', name: 'Nurul Huda', code: 'HV040', department: 'HR', title: 'HR Executive', hireDate: '2026-07-23', months: 3,
     endsOn: '2026-10-22', ackEnd: null, ackName: null, ackAt: null, ...over,
   })
   const acked = review({ id: 's3', name: 'Kar Jun', endsOn: '2026-10-20', ackEnd: '2026-10-20', ackName: 'Grace Lim', ackAt: '2026-10-14T01:00:00Z' })
   const withProbation = (over: Partial<HrAppData> = {}): HrAppData =>
-    ({ ...data, probation: [review(), acked], may: { ...data.may, probationAck: true }, ...over })
+    ({ ...data, probation: [review(), acked], may: { ...data.may, termAck: true }, ...over })
 
   it('Home lists those waiting and its line counts them; one opens the person, whose page acknowledges it', async () => {
     const ack = vi.fn(async () => ({ ok: true as const }))
@@ -353,7 +353,7 @@ describe('a probation ending (2026-10-23)', () => {
     expect(screen.getByText('Acknowledged by Grace Lim · 14 Oct 2026')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
     cleanup()
-    render(<HrApp data={withProbation({ may: { ...data.may, probationAck: false } })} actions={{ ...actions, probationAck: done }} />)
+    render(<HrApp data={withProbation({ may: { ...data.may, termAck: false } })} actions={{ ...actions, probationAck: done }} />)
     tab('People')
     fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
     expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()
@@ -376,6 +376,43 @@ describe('a probation ending (2026-10-23)', () => {
     expect(screen.getByText('PROB')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Probation ending · Nurul Huda'))
     expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+  })
+
+  // A contract (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder"): its own list on Home, its own
+  // Acknowledge and tag — and each term is reminded 30 days before its end, then again 15.
+  it('a contract ending: Home’s own list and line; the person’s page acknowledges it by its own action', async () => {
+    const ack = vi.fn(async () => ({ ok: true as const }))
+    const probationAck = vi.fn(async () => ({ ok: true as const }))
+    const contract = [review({ kind: 'contract', months: 12, endsOn: '2026-11-03' })] // 20 days from 14 Oct: the first reminder
+    render(<HrApp data={withProbation({ probation: [], contract })} actions={{ ...actions, probationAck, contractAck: ack }} />)
+    expect(screen.getByText('1 request waiting for HR · 1 contract ending · 1 not in yet · 1 late · October closes 3 Nov.')).toBeInTheDocument()
+    expect(screen.getByText('Contract ending')).toBeInTheDocument()
+    expect(screen.queryByText('Probation ending')).toBeNull()
+    expect(screen.getByText('CONT')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('12 months · ends 3 Nov 2026 · in 20 days')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await waitFor(() => expect(ack).toHaveBeenCalledWith('s2'))
+    expect(probationAck).not.toHaveBeenCalled()
+  })
+
+  it('the first reminder’s acknowledgement does not answer the second: listed and offered again', () => {
+    // Acknowledged on 1 Oct, 21 days before its end — the first reminder's; 8 days left on 14 Oct, the second stands.
+    const first = review({ ackEnd: '2026-10-22', ackName: 'Grace Lim', ackAt: '2026-10-01T02:00:00Z' })
+    render(<HrApp data={withProbation({ probation: [first] })} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.getByText('Probation ending')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('30-day reminder acknowledged by Grace Lim · 1 Oct 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+  })
+
+  it('a contract’s notice is tagged CONT', () => {
+    const notices = { unread: 1, items: [{ id: 'n10', kind: 'people' as const, title: 'Contract ending · Nurul Huda', body: 'Ends 3 Nov 2026 · in 20 days · HR',
+      refKind: 'hr_staff' as const, refId: 's2', at: new Date().toISOString(), read: false }] }
+    render(<HrApp data={withProbation({ probation: [], notices })} actions={{ ...actions, probationAck: done }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    expect(screen.getByText('CONT')).toBeInTheDocument()
+    expect(screen.queryByText('PROB')).toBeNull()
   })
 })
 

@@ -4,18 +4,24 @@ import path from 'node:path'
 import {
   CONTRACT_MONTH_CHOICES,
   EMPLOYMENT_STATUSES,
+  NOTICE_DAYS,
   NOT_SET,
-  PROBATION_NOTICE_DAYS,
+  REMINDER_DAYS,
+  REMINDER_HINT,
+  ackWords,
+  answeredReminder,
   contractEnd,
   daysFrom,
   employmentStatusOf,
   monthsLabel,
-  probationDue,
   probationEnd,
-  probationEndLine,
+  reminderAcknowledged,
+  reminderDue,
+  reminderOf,
   statusChip,
   statusColumns,
   statusLine,
+  termEndLine,
   whenLabel,
 } from './employment-status'
 
@@ -67,17 +73,46 @@ describe('contractEnd — the database’s contract_end to the day', () => {
   })
 })
 
-describe('the reminder’s window', () => {
+// Two reminders (2026-10-24 — the user: "need 30 days and 15 days before remind, 2 reminder, then for probation need same
+// as well"): a probation's end and a contract's alike.
+describe('the reminders', () => {
   const today = '2026-10-23'
 
-  it('opens 15 days before the end (the user, 2026-10-24) and stays open past it', () => {
-    expect(PROBATION_NOTICE_DAYS).toBe(15)
-    expect(probationDue('2026-11-06', today)).toBe(true) // 14 days
-    expect(probationDue('2026-11-07', today)).toBe(true) // 15 days
-    expect(probationDue('2026-11-08', today)).toBe(false) // 16 days
-    expect(probationDue('2026-10-23', today)).toBe(true)
-    expect(probationDue('2026-09-30', today)).toBe(true)
-    expect(probationDue(null, today)).toBe(false)
+  it('the first 30 days before the end, the second 15 days before — and open past the end', () => {
+    expect(REMINDER_DAYS).toEqual([30, 15])
+    expect(NOTICE_DAYS).toBe(30)
+    expect(reminderOf('2026-11-23', today)).toBeNull() // 31 days
+    expect(reminderOf('2026-11-22', today)).toBe(30) // 30 days: the first
+    expect(reminderOf('2026-11-08', today)).toBe(30) // 16 days
+    expect(reminderOf('2026-11-07', today)).toBe(15) // 15 days: the second
+    expect(reminderOf('2026-10-23', today)).toBe(15) // today
+    expect(reminderOf('2026-09-30', today)).toBe(15) // ended, still open
+    expect(reminderOf(null, today)).toBeNull()
+    expect(reminderDue('2026-11-22', today)).toBe(true)
+    expect(reminderDue('2026-11-23', today)).toBe(false)
+    expect(reminderDue(null, today)).toBe(false)
+    expect(REMINDER_HINT).toBe('HR is reminded 30 and 15 days before.')
+  })
+
+  it('an acknowledgement answers the reminder that stood on the office’s day it was given — the first’s never the second', () => {
+    const end = '2026-11-22'
+    const first = { ackEnd: end, ackAt: '2026-10-25T03:00:00Z' } // 28 days before
+    const second = { ackEnd: end, ackAt: '2026-11-07T03:00:00Z' } // 15 days before
+    expect(answeredReminder(end, first)).toBe(30)
+    expect(answeredReminder(end, second)).toBe(15)
+    // 00:30 on 7 Nov the office's time is 6 Nov by UTC's clock: the office's day decides.
+    expect(answeredReminder(end, { ackEnd: end, ackAt: '2026-11-06T16:30:00Z' })).toBe(15)
+    expect(answeredReminder(end, { ackEnd: '2026-10-01', ackAt: '2026-09-20T03:00:00Z' })).toBeNull() // for another end
+    expect(answeredReminder(end, { ackEnd: null, ackAt: null })).toBeNull()
+    // The first acknowledged: done until the second opens — then it waits again.
+    expect(reminderAcknowledged(end, first, '2026-10-30')).toBe(true)
+    expect(reminderAcknowledged(end, first, '2026-11-07')).toBe(false)
+    expect(reminderAcknowledged(end, second, '2026-11-07')).toBe(true)
+    expect(reminderAcknowledged(end, second, '2026-11-30')).toBe(true)
+    expect(ackWords(end, first, '2026-10-30')).toBe('Acknowledged')
+    expect(ackWords(end, first, '2026-11-07')).toBe('30-day reminder acknowledged')
+    expect(ackWords(end, second, '2026-11-07')).toBe('Acknowledged')
+    expect(ackWords(end, { ackEnd: null, ackAt: null }, '2026-11-07')).toBeNull()
   })
 
   it('counts whole days, and says them', () => {
@@ -88,8 +123,8 @@ describe('the reminder’s window', () => {
     expect(whenLabel('2026-10-23', today)).toBe('today')
     expect(whenLabel('2026-10-22', today)).toBe('yesterday')
     expect(whenLabel('2026-10-20', today)).toBe('3 days ago')
-    expect(probationEndLine('2026-11-01', today)).toBe('Ends 1 Nov 2026 · in 9 days')
-    expect(probationEndLine('2026-10-20', today)).toBe('Ended 20 Oct 2026 · 3 days ago')
+    expect(termEndLine('2026-11-01', today)).toBe('Ends 1 Nov 2026 · in 9 days')
+    expect(termEndLine('2026-10-20', today)).toBe('Ended 20 Oct 2026 · 3 days ago')
   })
 })
 
@@ -103,19 +138,27 @@ describe('the chip an active person wears', () => {
     expect(statusChip({ status: undefined }, today)).toEqual({ label: 'Active', tone: 'ledger' })
   })
 
-  it('reads Contract on peach, its end in the hint — however near (nobody is reminded of it)', () => {
+  it('reads Contract on peach, its end in the hint — and how near, from its first reminder on (2026-10-24)', () => {
     expect(statusChip({ status: 'contract', contractEnd: '2027-09-30' }, today)).toEqual({ label: 'Contract', tone: 'runOn', title: 'Contract ends 30 Sep 2027 · in 342 days' })
-    expect(statusChip({ status: 'contract', contractEnd: '2026-10-25' }, today).label).toBe('Contract')
+    expect(statusChip({ status: 'contract', contractEnd: '2026-11-22' }, today)).toEqual({ label: 'Contract · 30d left', tone: 'runOn', title: 'Contract ends 22 Nov 2026 · in 30 days' })
+    expect(statusChip({ status: 'contract', contractEnd: '2026-10-25' }, today).label).toBe('Contract · 2d left')
+    const acked = statusChip({ status: 'contract', contractEnd: '2026-10-30', ack: { ackEnd: '2026-10-30', ackAt: '2026-10-22T03:00:00Z', ackName: 'LI SEAN' } }, today)
+    expect(acked.title).toBe('Contract ends 30 Oct 2026 · in 7 days — Acknowledged by LI SEAN')
     expect(statusChip({ status: 'contract', contractEnd: null }, today)).toMatchObject({ label: 'Contract', title: 'Contract — its end is counted from the hire date, which is missing' })
   })
 
-  it('reads Probation, then how near its end once HR is being told', () => {
+  it('reads Probation, then how near its end from its first reminder — 30 days before', () => {
     expect(statusChip({ status: 'probation', probationEnd: '2026-12-31' }, today)).toMatchObject({ label: 'Probation', tone: 'alert', title: 'Probation ends 31 Dec 2026 · in 69 days' })
+    expect(statusChip({ status: 'probation', probationEnd: '2026-11-23' }, today).label).toBe('Probation')
+    expect(statusChip({ status: 'probation', probationEnd: '2026-11-22' }, today).label).toBe('Probation · 30d left')
     expect(statusChip({ status: 'probation', probationEnd: '2026-11-01' }, today).label).toBe('Probation · 9d left')
     expect(statusChip({ status: 'probation', probationEnd: '2026-10-23' }, today).label).toBe('Probation · ends today')
-    const ended = statusChip({ status: 'probation', probationEnd: '2026-10-20', probationAcked: true, ackName: 'LI SEAN' }, today)
+    const ended = statusChip({ status: 'probation', probationEnd: '2026-10-20', ack: { ackEnd: '2026-10-20', ackAt: '2026-10-21T03:00:00Z', ackName: 'LI SEAN' } }, today)
     expect(ended.label).toBe('Probation · ended')
     expect(ended.title).toBe('Probation ended 20 Oct 2026 · 3 days ago — Acknowledged by LI SEAN')
+    // Only the first reminder acknowledged, once the second stands: the hint says which.
+    const second = statusChip({ status: 'probation', probationEnd: '2026-11-01', ack: { ackEnd: '2026-11-01', ackAt: '2026-10-05T03:00:00Z', ackName: 'LI SEAN' } }, today)
+    expect(second.title).toBe('Probation ends 1 Nov 2026 · in 9 days — 30-day reminder acknowledged by LI SEAN')
     expect(statusChip({ status: 'probation', probationEnd: null }, today).label).toBe('Probation')
   })
 })

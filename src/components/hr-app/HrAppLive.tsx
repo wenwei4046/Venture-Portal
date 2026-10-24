@@ -5,7 +5,7 @@ import { useMemo, useTransition } from 'react'
 import { setViewAs } from '@/components/layout/view-as-actions'
 import {
   hrAppAcknowledge, hrAppAddCandidate, hrAppAttDecide, hrAppBook, hrAppCancelBooking, hrAppCancelHire, hrAppCandidateStage, hrAppDecide, hrAppDecline,
-  hrAppFill, hrAppLetterLink, hrAppNewHire, hrAppProbationAck, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
+  hrAppContractAck, hrAppFill, hrAppLetterLink, hrAppNewHire, hrAppProbationAck, hrAppRemoveTalent, hrAppRequestInfo, hrAppTalentNotes,
 } from '@/lib/hr-app/actions'
 import type { HrAppData } from '@/lib/hr-app/model'
 import { readNotices, removePushSubscription, reportPushTrouble, savePushSubscription } from '@/lib/push/actions'
@@ -42,8 +42,9 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     attDecide: hrAppAttDecide,
     book: hrAppBook,
     bookCancel: hrAppCancelBooking,
-    // People (2026-10-23): a probation's reminder, acknowledged on the person's page.
+    // People (2026-10-23): a probation's reminder, acknowledged on the person's page; a contract's (2026-10-24).
     probationAck: hrAppProbationAck,
+    contractAck: hrAppContractAck,
     // The account's own, not a module's: the portal's one action, which asks for a personal login itself.
     changePassword: changeMyPassword,
     // …and the email it signs in with, by request (2026-10-16): HR approves it.

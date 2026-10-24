@@ -4,10 +4,10 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { HrIconName } from '@/components/hrv/icons'
 import { CHIP_C, type GenPage, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type ProbationRow, type RequestView, type TodayKey, type TodayRow,
+  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type TermRow, type RequestView, type TodayKey, type TodayRow,
 } from '@/lib/hr-app/hr-view'
 import {
-  CAND_STAGE, MAJOR_EVENTS, MEMBER_KIND, PROBATION_TAG, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
+  CAND_STAGE, CONTRACT_TAG, MAJOR_EVENTS, MEMBER_KIND, PROBATION_TAG, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
   type CandStage, type HrCandidate, type HrHire, type HrMemberRequest, type HrTalent,
 } from '@/lib/hr-app/model'
 import type { Notice } from '@/lib/push/notices'
@@ -46,7 +46,7 @@ export interface HomeItem {
   go: () => void
 }
 
-export function HomeScreen({ first, summary, quick, cats, memos, openMemo, probation = [], openPerson }: {
+export function HomeScreen({ first, summary, quick, cats, memos, openMemo, probation = [], contract = [], openPerson }: {
   first: string
   summary: string
   quick: HomeItem[]
@@ -55,7 +55,9 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo, proba
   memos: MyMemo[]
   openMemo: (id: string) => void
   /** The probations still waiting for Acknowledge (2026-10-23): drawn only while there are some — each opens the person. */
-  probation?: ProbationRow[]
+  probation?: TermRow[]
+  /** The contracts, the same way (2026-10-24). */
+  contract?: TermRow[]
   openPerson?: (id: string) => void
 }) {
   return (
@@ -76,17 +78,19 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo, proba
           </Card>
         </div>
       ) : null}
-      {probation.length && openPerson ? (
-        <div className={s.group}>
-          <SectHead label="Probation ending" count={probation.length} />
-          <Card>
-            {probation.map((p, i) => (
-              <Row key={p.id} first={i === 0} onClick={() => openPerson(p.id)} title={p.name} sub={p.sub} right={<Chev />}
-                lead={<Avatar bg={PROBATION_TAG.bg} fg={PROBATION_TAG.fg} font={9.5}>{PROBATION_TAG.tag}</Avatar>} />
-            ))}
-          </Card>
-        </div>
-      ) : null}
+      {([['Probation ending', probation, PROBATION_TAG], ['Contract ending', contract, CONTRACT_TAG]] as const).map(([label, rows, tag]) =>
+        rows.length && openPerson ? (
+          <div key={label} className={s.group}>
+            <SectHead label={label} count={rows.length} />
+            <Card>
+              {rows.map((p, i) => (
+                <Row key={p.id} first={i === 0} onClick={() => openPerson(p.id)} title={p.name} sub={p.sub} right={<Chev />}
+                  lead={<Avatar bg={tag.bg} fg={tag.fg} font={9.5}>{tag.tag}</Avatar>} />
+              ))}
+            </Card>
+          </div>
+        ) : null,
+      )}
       <div className={s.group}>
         <SectHead label="Quick actions" />
         <div className={s.grid4}>

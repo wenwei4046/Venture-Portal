@@ -26,11 +26,11 @@ import { STARTING_REASONS, whyOrder } from '@/lib/hiring/reasons'
 import type { TalentReason } from '@/lib/hiring/types'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, probationFacts, probationRows,
-  requestView, todayCounts, todayRows, type TodayKey,
+  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, requestView,
+  termFacts, termRows, todayCounts, todayRows, type TodayKey,
 } from '@/lib/hr-app/hr-view'
-import { probationDue } from '@/lib/employment-status'
-import { acknowledged } from '@/lib/probation-reviews'
+import { reminderDue } from '@/lib/employment-status'
+import { acknowledged } from '@/lib/term-reviews'
 import {
   CAND_STAGE, CHIP, HR_APP_VIEWS, MEMBER_KIND, bookingTimes, candChip, clashOf, dayLabel, hm, hourFrom, isPendingHire, isPendingRequest, positionLabel,
   type CandStage, type HrAppData, type HrAppView, type HrHire,
@@ -96,6 +96,8 @@ export interface HrAppActions {
   myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** A probation's reminder acknowledged (2026-10-23) — People · Edit on the person's page. Absent: no button. */
   probationAck?(id: string): Promise<ActResult>
+  /** A contract's, the same way (2026-10-24). */
+  contractAck?(id: string): Promise<ActResult>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -230,9 +232,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const lowLeave = bRows.filter(r => r.low).length
   const pendingHires = d.parts.hiring ? d.hires.filter(isPendingHire).length : 0
   const attShut = (open: boolean) => (!open ? 'This is not open to your account.' : !att ? d.attError ?? 'Attendance could not be read.' : null)
-  // The probations HR is reminded of (2026-10-23): Home lists those waiting for Acknowledge; a person's page acknowledges.
+  // The probations and contracts HR is reminded of (2026-10-23 / 10-24): Home lists those waiting for Acknowledge; a
+  // person's page acknowledges.
   const probation = useMemo(() => (d.viewingAs ? [] : d.probation ?? []), [d.viewingAs, d.probation])
-  const probRows = useMemo(() => probationRows(probation, d.today), [probation, d.today])
+  const contract = useMemo(() => (d.viewingAs ? [] : d.contract ?? []), [d.viewingAs, d.contract])
+  const probRows = useMemo(() => termRows(probation, d.today), [probation, d.today])
+  const contRows = useMemo(() => termRows(contract, d.today), [contract, d.today])
 
   // ── Moving about ──
   const push = (p: Page) => {
@@ -302,7 +307,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       setReqF('members')
       setStack(d.requests.some(r => r.id === id) ? [{ k: 'mreq', id }] : [])
     } else if (kind === 'hr_staff') {
-      // A probation ending (2026-10-23): the person, over People — or People itself once they have left the lists.
+      // A probation or a contract ending (2026-10-23 / 10-24): the person, over People — or People itself once they have
+      // left the lists.
       setTab(d.parts.people ? 'people' : 'home')
       setStack(att?.config.people.some(p => p.id === id) || d.staff.some(p => p.id === id) ? [{ k: 'person', id }] : [])
     } else {
@@ -358,10 +364,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
   const attPerson = top?.k === 'person' && att ? att.config.people.find(p => p.id === top.id) ?? null : null
   const staffPerson = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
-  // Their probation (2026-10-23): its facts on the page, and Acknowledge while HR is being told and nobody has yet.
-  const pr = top?.k === 'person' ? probation.find(r => r.id === top.id) ?? null : null
-  const prFacts = pr ? probationFacts(pr, d.today) : []
-  const prAck = !!pr && probationDue(pr.endsOn, d.today) && !acknowledged(pr) && !!d.may.probationAck && !d.viewingAs && !!actions.probationAck
+  // Their probation (2026-10-23) or contract (2026-10-24): its facts on the page, and Acknowledge while a reminder stands
+  // that nobody has acknowledged yet.
+  const pr = top?.k === 'person' ? probation.find(r => r.id === top.id) ?? contract.find(r => r.id === top.id) ?? null : null
+  const prFacts = pr ? termFacts(pr, d.today) : []
+  const prAction = pr?.kind === 'contract' ? actions.contractAck : actions.probationAck
+  const prAck = !!pr && reminderDue(pr.endsOn, d.today) && !acknowledged(pr, d.today) && !!d.may.termAck && !d.viewingAs && !!prAction
 
   // Opening a memo is reading it: the login's receipt, the same in every view.
   const memoOpen = mm && memoUnread(mm) && !d.viewingAs ? mm.id : null
@@ -559,8 +567,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       <div ref={scrollerRef} className={s.scroller}>
         {main && tab === 'home' ? (
           <HomeScreen first={d.greetName} quick={quick} cats={cats} memos={d.viewingAs ? [] : memos.filter(memoWaiting)} openMemo={id => push({ k: 'memo', id })}
-            probation={probRows} openPerson={id => push({ k: 'person', id })}
-            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null, probRows.length)} />
+            probation={probRows} contract={contRows} openPerson={id => push({ k: 'person', id })}
+            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null, { probation: probRows.length, contract: contRows.length })} />
         ) : null}
         {main && tab === 'today' ? (
           <TodayScreen rows={tRows} counts={tCounts} filter={todayF} setFilter={setTodayF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.today)} />
@@ -643,10 +651,10 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
           </button>
         </div>
       ) : null}
-      {top?.k === 'person' && pr && prAck && actions.probationAck ? (
+      {top?.k === 'person' && pr && prAck && prAction ? (
         <div className={s.actBar}>
           <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy}
-            onClick={() => { const ack = actions.probationAck; if (ack) run(() => ack(pr.id), undefined, 'Acknowledged') }}>{busy ? 'Recording…' : 'Acknowledge'}</button>
+            onClick={() => run(() => prAction(pr.id), undefined, 'Acknowledged')}>{busy ? 'Recording…' : 'Acknowledge'}</button>
         </div>
       ) : null}
       {top?.k === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (

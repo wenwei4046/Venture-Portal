@@ -4430,6 +4430,10 @@ export type Database = {
           probation_ack_name: string | null
           probation_end: string | null
           probation_months: number | null
+          contract_ack_at: string | null
+          contract_ack_by: string | null
+          contract_ack_end: string | null
+          contract_ack_name: string | null
           contract_end: string | null
           contract_months: number | null
           epf_category: Database["public"]["Enums"]["epf_part"]
@@ -4490,6 +4494,10 @@ export type Database = {
           probation_ack_end?: string | null
           probation_ack_name?: string | null
           probation_months?: number | null
+          contract_ack_at?: string | null
+          contract_ack_by?: string | null
+          contract_ack_end?: string | null
+          contract_ack_name?: string | null
           contract_months?: number | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
@@ -4549,6 +4557,10 @@ export type Database = {
           probation_ack_end?: string | null
           probation_ack_name?: string | null
           probation_months?: number | null
+          contract_ack_at?: string | null
+          contract_ack_by?: string | null
+          contract_ack_end?: string | null
+          contract_ack_name?: string | null
           contract_months?: number | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null

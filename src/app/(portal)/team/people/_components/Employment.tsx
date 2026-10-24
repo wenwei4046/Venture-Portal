@@ -3,23 +3,23 @@
 import { useState, useTransition } from 'react'
 import { btn } from '@/components/hrv/kit'
 import { Select } from '@/components/hrv/select'
-import { officeTime } from '@/lib/office-time'
 import {
   EXTEND_MONTH_CHOICES,
   dayLabel,
   monthsLabel,
-  probationDue,
   probationEnd,
-  probationEndLine,
+  reminderDue,
+  termEndLine,
 } from '@/lib/employment-status'
-import { acknowledged } from '@/lib/probation-reviews'
+import { ackLine, acknowledged } from '@/lib/term-reviews'
 import { deactivateStaff, reactivateStaff } from '../actions'
 import { acknowledgeProbation, confirmProbation, extendProbation } from '../probation-actions'
+import { acknowledgeContract } from '../contract-actions'
 import PersonWell from '../../_components/PersonWell'
 import w from '../../_components/person-well.module.css'
 
-/** A probation as the person's page acts on it (2026-10-23). */
-export interface ProbationFacts {
+/** A probation or a contract as the person's page acts on it (2026-10-23; a contract 2026-10-24). */
+export interface TermFacts {
   hireDate: string | null
   months: number | null
   /** Its last day — the database's, from the hire date and the months; null without a hire date. */
@@ -44,20 +44,24 @@ export interface ProbationFacts {
  *
  * On probation (2026-10-23 — the user: "if the probation is almost end, then it will notification hr acknowledge for
  * further action") a second line: the period and its end, Acknowledge while HR is being told and has not, then the
- * further action — Confirm as permanent or Extend; ending their employment is Deactivate, above it.
+ * further action — Confirm as permanent or Extend; ending their employment is Deactivate, above it. On a contract
+ * (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder") the same line with Acknowledge alone: renewing it
+ * or making them permanent is the card's Employment Status, above.
  */
 export default function Employment({
   personId,
   personName,
   active,
   probation = null,
+  contract = null,
   today,
   onDone,
 }: {
   personId: string
   personName: string
   active: boolean
-  probation?: ProbationFacts | null
+  probation?: TermFacts | null
+  contract?: TermFacts | null
   /** The office's today (YYYY-MM-DD). */
   today: string
   onDone: () => void
@@ -126,13 +130,21 @@ export default function Employment({
       </div>
 
       {active && probation ? <ProbationLine personId={personId} personName={personName} probation={probation} today={today} onDone={onDone} /> : null}
+      {active && contract ? <ContractLine personId={personId} contract={contract} today={today} onDone={onDone} /> : null}
     </PersonWell>
   )
 }
 
+/** A term's period and its end: "3 months · ends 31 Oct 2026 · in 8 days". */
+function termValue(t: TermFacts, today: string): string {
+  return [t.months ? monthsLabel(t.months) : null, t.endsOn ? termEndLine(t.endsOn, today, true) : 'its end is counted from the hire date, which is missing']
+    .filter(Boolean)
+    .join(' · ')
+}
+
 /**
  * The probation's line: "3 months · ends 31 Oct 2026 · in 8 days", who acknowledged its reminder, and its steps —
- * Acknowledge (only while HR is being told and nobody has), Confirm as permanent, Extend by 1–3 months.
+ * Acknowledge (only while a reminder stands that nobody has), Confirm as permanent, Extend by 1–3 months.
  */
 function ProbationLine({
   personId,
@@ -143,7 +155,7 @@ function ProbationLine({
 }: {
   personId: string
   personName: string
-  probation: ProbationFacts
+  probation: TermFacts
   today: string
   onDone: () => void
 }) {
@@ -152,8 +164,9 @@ function ProbationLine({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const due = probationDue(probation.endsOn, today)
-  const acked = acknowledged(probation)
+  const due = reminderDue(probation.endsOn, today)
+  const acked = acknowledged(probation, today)
+  const said = ackLine(probation, today, 'D MMM YYYY')
   const extendedEnd = probation.months ? probationEnd(probation.hireDate, probation.months + Number(by)) : null
 
   function go(fn: () => Promise<{ ok: true } | { ok: false; reason: string }>) {
@@ -182,17 +195,10 @@ function ProbationLine({
           ) : step === 'extend' ? (
             <>Extend it by {monthsLabel(Number(by))}{extendedEnd ? ` — to end ${dayLabel(extendedEnd)}` : ''}?</>
           ) : (
-            [probation.months ? monthsLabel(probation.months) : null, probation.endsOn ? probationEndLine(probation.endsOn, today, true) : 'its end is counted from the hire date, which is missing']
-              .filter(Boolean)
-              .join(' · ')
+            termValue(probation, today)
           )}
         </span>
-        {acked && step === 'idle' ? (
-          <span className={w.note}>
-            Acknowledged by {probation.ackName ?? 'HR'}
-            {probation.ackAt ? ` · ${officeTime(probation.ackAt).format('D MMM YYYY')}` : ''}
-          </span>
-        ) : null}
+        {said && step === 'idle' ? <span className={w.note}>{said}</span> : null}
         {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
       </div>
 
@@ -238,6 +244,48 @@ function ProbationLine({
           </>
         )}
       </span>
+    </div>
+  )
+}
+
+/**
+ * The contract's line (2026-10-24): "12 months · ends 30 Sep 2027 · in 30 days", who acknowledged its reminder, and
+ * Acknowledge while a reminder stands that nobody has.
+ */
+function ContractLine({ personId, contract, today, onDone }: { personId: string; contract: TermFacts; today: string; onDone: () => void }) {
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const said = ackLine(contract, today, 'D MMM YYYY')
+  const waiting = reminderDue(contract.endsOn, today) && !acknowledged(contract, today)
+
+  function acknowledge() {
+    setError(null)
+    startTransition(async () => {
+      try {
+        const done = await acknowledgeContract(personId)
+        if (!done.ok) return setError(done.reason)
+        onDone()
+      } catch {
+        setError('Could not save. Check the connection and try again.')
+      }
+    })
+  }
+
+  return (
+    <div className={`${w.line} ${w.lineRule}`}>
+      <div className={w.lineText}>
+        <span className={w.label}>Contract</span>
+        <span className={w.value}>{termValue(contract, today)}</span>
+        {said ? <span className={w.note}>{said}</span> : null}
+        {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
+      </div>
+      {waiting ? (
+        <span className={w.actions}>
+          <button type="button" onClick={acknowledge} disabled={pending} className={btn('primary')}>
+            {pending ? 'Acknowledging…' : 'Acknowledge'}
+          </button>
+        </span>
+      ) : null}
     </div>
   )
 }

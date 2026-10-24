@@ -203,10 +203,10 @@ export default function PersonWindow({
 function EmploymentChip({ staff }: { staff: PersonCardData['staff'] }) {
   const end = staff.employment_status === 'probation' ? (staff.probation_end ?? null) : null
   const contractEnd = staff.employment_status === 'contract' ? (staff.contract_end ?? null) : null
-  const chip = statusChip(
-    { status: staff.employment_status, probationEnd: end, probationAcked: !!end && staff.probation_ack_end === end, ackName: staff.probation_ack_name, contractEnd },
-    officeToday(),
-  )
+  const ack = staff.employment_status === 'contract'
+    ? { ackEnd: staff.contract_ack_end ?? null, ackAt: staff.contract_ack_at ?? null, ackName: staff.contract_ack_name ?? null }
+    : { ackEnd: staff.probation_ack_end ?? null, ackAt: staff.probation_ack_at ?? null, ackName: staff.probation_ack_name ?? null }
+  const chip = statusChip({ status: staff.employment_status, probationEnd: end, contractEnd, ack }, officeToday())
   const label = chip.label === 'Probation' && end ? `Probation · ends ${dayLabel(end)}`
     : chip.label === 'Contract' && contractEnd ? `Contract · ends ${dayLabel(contractEnd)}`
     : chip.label

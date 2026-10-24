@@ -300,6 +300,10 @@ export interface StaffRow {
   probation_ack_end?: string | null
   probation_ack_name?: string | null
   probation_ack_at?: string | null
+  /** A contract's reminder, acknowledged for which end, by whom and when (2026-10-24, mig 20261025046500). */
+  contract_ack_end?: string | null
+  contract_ack_name?: string | null
+  contract_ack_at?: string | null
   epf_category: string
   socso_category: string
   is_epf_exempt: boolean
