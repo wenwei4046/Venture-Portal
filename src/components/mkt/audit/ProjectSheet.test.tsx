@@ -228,10 +228,12 @@ describe('a product project’s map and replay', () => {
     readProjectLog.mockReset()
     readProjectLog.mockResolvedValue(productLog)
     render(<ProjectSheet project="p7" track="MKT-CAR-2610-007" title="Carres · Post pack · Oct 2026" page={null} product={product} tab="map" onClose={() => {}} />)
+    // Drawn once its log is read — never again under the viewer (a review's find: it used to redraw when the log came).
+    expect(screen.getByText('Reading the log…')).toBeTruthy()
+    expect(readProjectLog).toHaveBeenCalledWith('p7')
+    expect(await screen.findByText('Now at 🔗 Kelvin approves the minutes')).toBeTruthy()
     expect(screen.getAllByRole('tab').map(t => `${t.textContent}${t.getAttribute('aria-selected') === 'true' ? '*' : ''}`))
       .toEqual(['Map*', 'Audit trail', '🗺️ Map view*', '☰ List view'])
-    expect(readProjectLog).toHaveBeenCalledWith('p7')
-    expect(screen.getByText('Now at 🔗 Kelvin approves the minutes')).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '☰ List view' }))
     expect(screen.getAllByRole('row').slice(1).map(r => r.textContent)).toEqual([
       '01🛡️Created by SIAMARKETING MANAGERSIAPost pack v1Done20 Oct',
@@ -243,5 +245,19 @@ describe('a product project’s map and replay', () => {
     fireEvent.click(screen.getByRole('tab', { name: '▶ Replay' }))
     // Drawn again from the formal log: both records, not the page's one.
     await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy())
+  })
+
+  it('reads the log again when the page gains a newer record — a save landing after it opened (a review’s find)', async () => {
+    readProjectLog.mockReset()
+    readProjectLog.mockResolvedValue(productLog)
+    const open = (p: typeof product) =>
+      <ProjectSheet project="p7" track="MKT-CAR-2610-007" title="Carres · Post pack · Oct 2026" page={null} product={p} tab="map" onClose={() => {}} />
+    const { rerender } = render(open(product))
+    await screen.findByText('Now at 🔗 Kelvin approves the minutes')
+    rerender(open({ ...product, trail: [{ at: '2026-10-21T03:00:00Z', actor: 'SIA', action: 'edited after approval', reason: 'Objective', data: null }, ...product.trail] }))
+    await waitFor(() => expect(readProjectLog).toHaveBeenCalledTimes(2))
+    rerender(open({ ...product, trail: [{ at: '2026-10-21T03:00:00Z', actor: 'SIA', action: 'edited after approval', reason: 'Objective', data: null }, ...product.trail] }))
+    expect(await screen.findByText('Now at 🔗 Kelvin approves the minutes')).toBeTruthy()
+    expect(readProjectLog).toHaveBeenCalledTimes(2)
   })
 })

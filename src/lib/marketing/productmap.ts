@@ -7,7 +7,8 @@
 // Pure.
 
 import { shortDay } from './board'
-import { deliverableState, productEventText, runsLine, type ProductDeliverable, type ProductProjectPage } from './project'
+import { picNames } from './clients'
+import { bothWaiting, deliverableState, productEventText, runsLine, type ProductDeliverable, type ProductProjectPage } from './project'
 import { groupEmoji, groupLabel, groupTone } from './groups'
 import { nameOf, trailTime } from './task'
 import {
@@ -36,7 +37,9 @@ export function productMap(page: ProductProjectPage, log?: readonly ProductMapEv
   const who = (id: string | null | undefined) => nameOf(page.team, id)
   const doc = page.minutes.find(m => m.intake) ?? page.minutes[0] ?? null
   const picSigns = !!doc?.template.rules.pic
-  const pics = [p.pic, p.pic2].filter(Boolean).join(' & ') || 'PIC'
+  const pics = picNames(p.pic, p.pic2) || 'PIC'
+  // Both PICs sign off and one has: whom it still waits for, as the page says it.
+  const firstIn = bothWaiting(page)
   const owner = p.ownerName || who(p.owner)
   const home: MapLaneId = page.team.find(t => t.id === p.owner)?.title || '—'
   const started = p.status === 'active' || p.status === 'paused' || p.status === 'done'
@@ -72,7 +75,8 @@ export function productMap(page: ProductProjectPage, log?: readonly ProductMapEv
     switch (e.action) {
       case 'created':
         note('start', e)
-        if (src) line(lit, 'src', 'start', mk(e, actor))
+        // The line from where it was opened is lit from Replay's start (replayAt); the record says who opened it.
+        if (src) meta.set(flowKey('src', 'start'), mk(e, actor))
         // The intake meeting's minutes open with the project.
         line(lit, 'start', 'min', mk(e, `${actor} → ${owner}`))
         at = 'min'
@@ -125,8 +129,9 @@ export function productMap(page: ProductProjectPage, log?: readonly ProductMapEv
         break
       case 'work started': case 'run made':
         note('work', e)
-        // The deliverables drawn are the latest month's: an earlier month's lines are not on the map.
-        if (e.action === 'work started' || typeof e.data?.run !== 'number' || e.data.run === latest) {
+        // The deliverables drawn are the latest month's — their lines made by its record: the work started (the first
+        // month), or that month's run made. An earlier month's lines are not on the map.
+        if (e.action === 'work started' ? latest <= 1 : typeof e.data?.run !== 'number' || e.data.run === latest) {
           for (const d of delivs) line(lit, 'work', dId(d), mk(e, `${actor} → ${d.title}`))
         }
         at = 'work'
@@ -169,7 +174,7 @@ export function productMap(page: ProductProjectPage, log?: readonly ProductMapEv
         id, kind: 'gate', lane: 'appr', col, title: 'approves the minutes', full: `${pics} approves the minutes`, person: pics, icon: '🔗',
         date: picOk ? mapDay(p.picReply?.at) : waiting && p.linkSentAt ? `Since ${mapDay(p.linkSentAt)}` : '',
         tone: picOk ? 'done' : waiting ? 'waiting' : 'draft', current: waiting, future: !picOk && !waiting && !p.linkSentAt, handoff: 'PIC via link',
-        status: waiting ? `Waiting for ${pics}` : picOk ? 'Approved' : skipped && started ? 'Started before approval' : sentBack ? 'Changes requested' : 'Planned',
+        status: waiting ? firstIn ?? `Waiting for ${pics}` : picOk ? 'Approved' : skipped && started ? 'Started before approval' : sentBack ? 'Changes requested' : 'Planned',
       })
     }
     if (id === 'work') {

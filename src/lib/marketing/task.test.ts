@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { approvalText, eventText, newFromHref, opensFrom, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
+import { approvalText, eventText, newFromHref, newProjectKey, opensFrom, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
 
 // A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
 // New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
@@ -211,5 +211,15 @@ describe('opened from another project', () => {
     expect([opensFrom({ kind: 'quick', series: null }), opensFrom({ kind: 'recurring', series: 's1' }), opensFrom({ kind: 'deliverable', series: null }),
       opensFrom({ kind: 'product', series: null }), opensFrom({ kind: 'recurring', series: null })]).toEqual([true, true, true, true, false])
     expect(newFromHref('TSK-CAR-2610-001')).toBe('/marketing/new?from=TSK-CAR-2610-001')
+  })
+})
+
+// 2026-10-25 — a review's find: New Project stayed mounted from ?from=A to the top bar's + New Project, its source kept.
+describe('New Project’s own for each address', () => {
+  it('a different source, subsidiary or client form is a new one; the same address the same', () => {
+    expect(newProjectKey('p0')).not.toBe(newProjectKey(null))
+    expect(newProjectKey('p0', 'CAR')).not.toBe(newProjectKey('p0'))
+    expect(newProjectKey(undefined, undefined, '1')).not.toBe(newProjectKey(undefined))
+    expect(newProjectKey('p0', 'CAR', '1')).toBe(newProjectKey('p0', 'CAR', '1'))
   })
 })

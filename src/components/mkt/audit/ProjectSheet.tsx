@@ -34,11 +34,20 @@ export default function ProjectSheet({ project, track, title, page, product = nu
 }) {
   // undefined: not read yet / reading; null: could not be read.
   const [log, setLog] = useState<ProjectLog | null | undefined>(undefined)
-  // A product project's map from its page's trail, then from the formal log's every record once it is read.
-  const map = useMemo(() => (page && page.stages.length ? taskMap(page) : product ? productMap(product, log?.rows) : null), [page, product, log])
-  const [on, setOn] = useState<Tab>(map ? tab : 'audit')
+  // The product page's newest record when its log was read: a newer one (a save landing meanwhile) reads it again.
+  const head = product?.trail[0] ? `${product.trail[0].at}|${product.trail[0].action}` : ''
+  const [readFor, setReadFor] = useState(head)
+  if (readFor !== head) {
+    setReadFor(head)
+    if (log !== undefined) setLog(undefined)
+  }
+  // A task's map from its page; a product project's (④-4d) once its formal log is read — every record, so Replay starts
+  // at the first and the map is never drawn again under the viewer (from the page's own trail if the log cannot be read).
+  const mapped = !!(page && page.stages.length) || !!product
+  const map = useMemo(() => (page && page.stages.length ? taskMap(page) : product && log !== undefined ? productMap(product, log?.rows) : null), [page, product, log])
+  const [on, setOn] = useState<Tab>(mapped ? tab : 'audit')
   const [mode, setMode] = useState<'replay' | 'log'>('log')
-  const wantLog = !!product || (on === 'audit' && (mode === 'log' || !map))
+  const wantLog = !!product || (on === 'audit' && (mode === 'log' || !mapped))
   useEffect(() => {
     if (!wantLog || log !== undefined) return
     let live = true
@@ -61,17 +70,16 @@ export default function ProjectSheet({ project, track, title, page, product = nu
           <button type="button" className={s.close} aria-label="Close" onClick={onClose} autoFocus>×</button>
         </div>
         <div className={s.tabs} role="tablist" aria-label={track}>
-          {map ? (
+          {mapped ? (
             <button type="button" role="tab" aria-selected={on === 'map'} className={`${s.tab}${on === 'map' ? ` ${s.tabOn}` : ''}`} onClick={() => setOn('map')}>Map</button>
           ) : null}
           <button type="button" role="tab" aria-selected={on === 'audit'} className={`${s.tab}${on === 'audit' ? ` ${s.tabOn}` : ''}`} onClick={() => setOn('audit')}>Audit trail</button>
         </div>
         <div className={s.body}>
-          {/* Drawn again from the full log once it is read: its Replay from the first record. */}
-          {on === 'map' && map ? <TaskMap key={product && log ? 'log' : 'page'} map={map} track={track} /> : null}
+          {on === 'map' && mapped ? (map ? <TaskMap map={map} track={track} /> : <div className={s.wait}>Reading the log…</div>) : null}
           {on === 'audit' ? (
             <>
-              {map ? (
+              {mapped ? (
                 <div className={s.modes} role="tablist" aria-label="Audit trail">
                   {(['replay', 'log'] as const).map(m => (
                     <button key={m} type="button" role="tab" aria-selected={mode === m} className={`${s.mode}${mode === m ? ` ${s.modeOn}` : ''}`} onClick={() => setMode(m)}>
@@ -80,7 +88,7 @@ export default function ProjectSheet({ project, track, title, page, product = nu
                   ))}
                 </div>
               ) : null}
-              {map && mode === 'replay' ? <TaskMap key={product && log ? 'log' : 'page'} map={map} mode="replay" track={track} />
+              {mapped && mode === 'replay' && map ? <TaskMap map={map} mode="replay" track={track} />
                 : log === undefined ? <div className={s.wait}>Reading the log…</div>
                 : log === null ? <div className={s.wait}>Could not read the log</div>
                 : <AuditLog log={log} project={project} manage={manage} onLog={setLog} />}

@@ -177,11 +177,9 @@ export function taskMap(page: MktTaskPage): TaskMap {
     switch (e.action) {
       case 'created':
         note('start', e)
-        // Opened from another: the line from it is made with the record.
-        if (src) {
-          lit.push(flowKey('src', 'start'))
-          meta.set(flowKey('src', 'start'), mk(e, e.actor || '—'))
-        }
+        // Opened from another: the line from it says who opened it (it is lit from Replay's start — a deliverable or
+        // a run has no created record).
+        if (src) meta.set(flowKey('src', 'start'), mk(e, e.actor || '—'))
         at = 'start'
         break
       case 'opened': {
@@ -484,9 +482,10 @@ export function taskMap(page: MktTaskPage): TaskMap {
 
 /** What the map shows after the first `step` records: the lines lit, the stations reached, where the work stands. */
 export function replayAt(map: TaskMap, step: number): { lit: Set<string>; seen: Set<string>; at: string | null; last: ReplayStep | null } {
-  const lit = new Set<string>()
-  // Where it was opened from was there before it.
-  const seen = new Set<string>(map.nodes.some(n => n.id === 'src') ? ['src', 'start'] : ['start'])
+  // Where it was opened from was there before it, and its line with it — whether or not a record made it.
+  const src = map.nodes.some(n => n.id === 'src')
+  const lit = new Set<string>(src ? [flowKey('src', 'start')] : [])
+  const seen = new Set<string>(src ? ['src', 'start'] : ['start'])
   let at: string | null = 'start'
   for (const s of map.steps.slice(0, Math.max(0, step))) {
     for (const k of s.edges) {

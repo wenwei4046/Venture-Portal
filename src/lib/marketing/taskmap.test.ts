@@ -171,17 +171,17 @@ describe('a project opened from another', () => {
     expect(opened.stations.start.facts[2]).toEqual(['Handoff', 'Opened from MKT-CAR-2610-003'])
   })
 
-  it('lists it first; Replay has it there from the start, its line made with the created record', () => {
+  it('lists it first; Replay has it and its line from the start — the created record only says who opened it', () => {
     expect(mapRows(opened)[0]).toMatchObject({ no: '01', title: 'MKT-CAR-2610-003 · Carres · Social Media · Oct 2026', handoff: 'Product project · Opened from', status: 'In progress' })
-    expect(opened.steps[0]).toMatchObject({ at: 'start', edges: ['src>start'] })
-    expect([...replayAt(opened, 0).seen].sort()).toEqual(['src', 'start'])
-    expect(replayAt(opened, 1).lit.has('src>start')).toBe(true)
+    expect(opened.steps[0]).toMatchObject({ at: 'start', edges: [] })
+    const start = replayAt(opened, 0)
+    expect([[...start.seen].sort(), [...start.lit]]).toEqual([['src', 'start'], ['src>start']])
   })
 
   it('a project opened from nowhere draws none', () => {
     expect(map.nodes.some(n => n.id === 'src')).toBe(false)
     expect(map.stations.start.facts[2]).toEqual(['Handoff', 'Created'])
-    expect([...replayAt(map, 0).seen]).toEqual(['start'])
+    expect([[...replayAt(map, 0).seen], [...replayAt(map, 0).lit]]).toEqual([['start'], []])
   })
 })
 
@@ -198,6 +198,13 @@ describe('a deliverable’s map', () => {
     expect(m.nodes[1]).toMatchObject({ id: 'start', handoff: 'Opened from MKT-CAR-2610-003' })
     expect(m.stations.src.open).toEqual({ href: '/marketing/projects/MKT-CAR-2610-003', label: 'Open MKT-CAR-2610-003' })
     expect(m.stations.src.facts[2]).toEqual(['Handoff', 'Opened MKT-CAR-2610-003-D01 from it'])
+  })
+
+  it('its line lit in Replay though a deliverable has no created record (a review’s find)', () => {
+    const m = taskMap(taskFromRow({ ...raw, project: { ...raw.project, kind: 'deliverable', trackId: 'MKT-CAR-2610-003-D01', parent },
+      events: raw.events.filter(e => e.action !== 'created') }) as MktTaskPage)
+    expect(m.steps.flatMap(s => s.edges)).not.toContain('src>start')
+    for (const step of [0, m.steps.length]) expect(replayAt(m, step).lit.has('src>start')).toBe(true)
   })
 
   it('one opened from another project starts at that one', () => {

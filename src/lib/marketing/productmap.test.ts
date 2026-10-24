@@ -146,6 +146,25 @@ describe('a product project’s map — its work', () => {
     expect(m.nodes[3].status).toBe('Every month on the 5th · next 5 Dec 2026')
   })
 
+  it('a recurring project’s Replay: the latest month’s line made by its own run, not by the first month’s start (a review’s find)', () => {
+    const p = page({ status: 'active', linkSentAt: SENT.at, picReply: { decision: 'approved', name: 'Kelvin Tan', at: APPROVED.at },
+      runs: { day: 5, first: '2026-10-01', made: 2, until: null } }, [CREATED, SENT, APPROVED], { deliverables: [
+      D('d2', 1, { trackId: 'MKT-CAR-2610-007-D02', deliv: { group: 'Graphic design', item: 'Image post', n: 1, of: 1, run: 2 } }),
+    ] })
+    const m = productMap(p, [CREATED, SENT, APPROVED, STARTED, ev('2026-11-05T01:00:00Z', 'Someone', 'run made', { data: { run: 2, month: '2026-11', made: 1 } })])
+    expect(m.steps.slice(-2).map(s => `${s.text} [${s.edges.join(' ')}]`)).toEqual([
+      'Rachel started the work · 2 deliverables []', "Nov 2026's work made · 1 deliverable [work>dd2]",
+    ])
+  })
+
+  it('with both PICs signing off, one in: the gate says whom it still waits for (a review’s find)', () => {
+    const m = productMap(page({ status: 'waiting_pic', linkSentAt: SENT.at, pic2: 'Mary', picOk: { sent: 1, 1: { name: 'Kelvin Tan', at: '2026-10-21T05:00:00Z' } } },
+      [CREATED, SENT, ev('2026-10-21T05:00:00Z', 'Kelvin Tan (PIC)', 'pic approved', { reason: 'Kickoff', data: { waiting: 'Mary' } })],
+      { minutes: { template: { id: 't1', version: 1, name: 'Kickoff', fields: [], rules: { sign: true, pic: true, picAll: true } } } }))
+    expect(m.nodes.find(n => n.id === 'pic')).toMatchObject({ person: 'Kelvin and Mary', full: 'Kelvin and Mary approves the minutes', status: 'Kelvin Tan approved · waiting for Mary' })
+    expect(m.steps.at(-1)).toMatchObject({ at: 'pic', edges: [] })
+  })
+
   it('opened from another project (④-4c): its station first', () => {
     const m = started({ source: { id: 'p0', trackId: 'TSK-CAR-2610-004', title: 'Banner for the fair', kind: 'quick', status: 'done', owner: 'Mei' } })
     expect(rows(m).slice(0, 2)).toEqual([

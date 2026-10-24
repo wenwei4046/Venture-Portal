@@ -479,9 +479,10 @@ describe('its map', () => {
     render(<ProductProject initial={page(RACHEL)} can={MANAGER} />)
     fireEvent.click(screen.getByRole('button', { name: 'Map' }))
     const sheet = screen.getByRole('dialog', { name: 'Task map' })
-    expect(within(sheet).getByText('Now at Meeting minutes · Kickoff')).toBeTruthy()
-    expect(within(sheet).getByRole('button', { name: 'Kelvin approves the minutes · Planned' })).toBeTruthy()
     await waitFor(() => expect(readProjectLog).toHaveBeenCalledWith('p1'))
+    // The log could not be read: drawn from the page's own trail.
+    expect(await within(sheet).findByText('Now at Meeting minutes · Kickoff')).toBeTruthy()
+    expect(within(sheet).getByRole('button', { name: 'Kelvin approves the minutes · Planned' })).toBeTruthy()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Task map' })).toBeNull()
   })
