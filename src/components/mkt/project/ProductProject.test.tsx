@@ -141,6 +141,17 @@ describe('a product project, for the manager who writes its minutes', () => {
     expect(shares[1]).toMatch(/^https:\/\/wa\.me\/60132221111\?text=Hi%20Hana%2C.*def456$/)
   })
 
+  it('the template asks both PICs (②b-2d-2b): whose approval is in, and whom the minutes wait for', () => {
+    const both = { ...ready, status: 'sent', template: { id: 't1', version: 1, name: 'Kickoff', fields: FIELDS,
+      rules: { sign: true, pic: true, picAll: true, project: true, file: true, lock: true } } }
+    const two = { ...waiting, pic2: 'Hana', whatsapp2: '+60 13-222 1111', link2: 'def456' }
+    const { unmount } = render(<ProductProject initial={page(RACHEL, two, both)} can={MANAGER} />)
+    expect(screen.queryByText(/approved · waiting for/)).toBeNull()
+    unmount()
+    render(<ProductProject initial={page(RACHEL, { ...two, picOk: { sent: 1, '2': { name: 'Hana Lee', at: '2026-10-24T06:00:00Z' } } }, both)} can={MANAGER} />)
+    expect(screen.getByText('Hana Lee approved · waiting for Kelvin')).toBeTruthy()
+  })
+
   it('starts before the PIC approves only with a reason, kept on the page', async () => {
     render(<ProductProject initial={page(RACHEL, waiting, ready)} can={MANAGER} />)
     fireEvent.click(screen.getByRole('button', { name: 'Start before approval…' }))

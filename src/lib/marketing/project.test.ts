@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attendeesOf, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
+  attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
   productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage,
 } from './project'
 
@@ -18,7 +18,7 @@ const FIELDS = [
   { name: 'Budget note', type: 'Short text', req: false, pic: false, lock: false },
   { name: 'Signatures', type: 'Signature', req: true, pic: true, lock: false },
 ]
-const RULES = { sign: true, pic: true, project: true, file: true, lock: true }
+const RULES = { sign: true, pic: true, picAll: false, project: true, file: true, lock: true }
 
 function page(project: Record<string, unknown> = {}, minutes: Record<string, unknown> = {}, trail: object[] = []): ProductProjectPage {
   return productProjectFromRow({
@@ -152,6 +152,7 @@ describe('where it stands', () => {
 
   it('the trail in words, newest first, on the office’s clock', () => {
     const pp = page({}, {}, [
+      { at: '2026-10-25T11:00:00Z', actor: 'Hana Lee (PIC)', action: 'pic approved', reason: 'Kickoff', data: { pic: 2, waiting: 'Kelvin' } },
       { at: '2026-10-25T10:00:00Z', actor: 'Kelvin Tan (PIC)', action: 'pic approved', reason: 'Kickoff' },
       { at: '2026-10-25T09:00:00Z', actor: 'Kelvin (PIC)', action: 'pic changes', reason: 'Add Penang' },
       { at: '2026-10-25T08:00:00Z', actor: 'RACHEL', action: 'resent', reason: 'Kelvin' },
@@ -161,6 +162,7 @@ describe('where it stands', () => {
       { at: '2026-10-24T04:00:00Z', actor: 'SITI', action: 'signed', reason: 'Kickoff' },
     ])
     expect(productTrail(pp).map(l => `${l.t} ${l.text}`)).toEqual([
+      '25 Oct 19:00 Hana Lee (PIC) approved Kickoff on the link · waiting for Kelvin',
       '25 Oct 18:00 Kelvin Tan (PIC) approved Kickoff on the link',
       '25 Oct 17:00 Kelvin (PIC) asked for changes on the link: "Add Penang"',
       '25 Oct 16:00 RACHEL resent to Kelvin',
@@ -202,5 +204,18 @@ describe('the save and the link', () => {
     expect(linkUrl('https://venture.example/', 'abc')).toBe('https://venture.example/t/abc')
     expect(whatsappUrl('+60 12-345 6789', 'Hi Kelvin: https://x/t/abc')).toBe('https://wa.me/60123456789?text=Hi%20Kelvin%3A%20https%3A%2F%2Fx%2Ft%2Fabc')
     expect(whatsappUrl('12', 'x')).toBeNull()
+  })
+})
+
+describe('the minutes waiting for both PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const both = { ...RULES, picAll: true }
+  it('says whose approval is in and whom they wait for — only while they wait, with two PICs, the template asking both', () => {
+    const pp = (project: Record<string, unknown>, rules = both) => page({ status: 'waiting_pic', pic2: 'Hana', ...project }, { template: { id: 't1', version: 1, name: 'Kickoff', fields: FIELDS, rules } })
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBe('Kelvin Tan approved · waiting for Hana')
+    expect(bothWaiting(pp({ picOk: { '2': { name: 'Hana Lee', at: null } } }))).toBe('Hana Lee approved · waiting for Kelvin')
+    expect(bothWaiting(pp({ picOk: null }))).toBeNull()
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }, RULES))).toBeNull()
+    expect(bothWaiting(pp({ pic2: null, picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
+    expect(bothWaiting(pp({ status: 'approved', picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
   })
 })

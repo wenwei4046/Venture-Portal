@@ -15,8 +15,9 @@ export type MktSubtaskStatus = 'working' | 'ready' | 'revising' | 'approved'
  * — the user, 2026-10-24: "每个 title 就是一组"). */
 export type MktGroup = string
 
-/** One level of a stage's approval: a person in the portal, or the subsidiary's PIC through the link. */
-export type MktApprover = { kind: 'person'; staff: string } | { kind: 'pic' }
+/** One level of a stage's approval: a person in the portal, or the subsidiary's PIC through the link — `all`: both PICs,
+ * when the project has two (2026-10-24 — the user's answer 29; either one's otherwise). */
+export type MktApprover = { kind: 'person'; staff: string } | { kind: 'pic'; all?: boolean }
 
 export interface MktPerson {
   id: string
@@ -148,7 +149,7 @@ const oneOf = <T extends string>(v: unknown, all: readonly T[], fallback: T): T 
 
 function approver(v: unknown): MktApprover | null {
   if (!isObj(v)) return null
-  if (v.kind === 'pic') return { kind: 'pic' }
+  if (v.kind === 'pic') return v.all === true ? { kind: 'pic', all: true } : { kind: 'pic' }
   if (v.kind === 'person' && str(v.staff)) return { kind: 'person', staff: str(v.staff) }
   return null
 }

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { answerPicStage } from '@/lib/marketing/pic-actions'
-import { nameOk, stageReasonOk, workLastLine, workState, workWaiting, type PicNo, type PicPage, type PicWork as Work } from '@/lib/marketing/pic'
+import { bothState, nameOk, stageReasonOk, workLastLine, workState, workWaiting, type PicNo, type PicPage, type PicWork as Work } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
 import s from './pic.module.css'
 
@@ -14,13 +14,13 @@ import s from './pic.module.css'
 
 const TONE: Record<Tone, string> = { waiting: s.waiting, done: s.done, red: s.red, draft: s.draft }
 
-function Item({ code, work, today, you, onPage }: { code: string; work: Work; today: string; you: PicNo; onPage: (p: PicPage | null) => void }) {
+function Item({ code, work, today, you, other, onPage }: { code: string; work: Work; today: string; you: PicNo; other: string | null; onPage: (p: PicPage | null) => void }) {
   const [step, setStep] = useState<'choose' | 'approve' | 'changes'>('choose')
   const [name, setName] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
-  const st = workState(work, today, you)
+  const st = workState(work, today, you, other)
   const stage = work.stage
   const waiting = !!stage?.waiting
   const go = (to: typeof step) => {
@@ -54,6 +54,11 @@ function Item({ code, work, today, you, onPage }: { code: string; work: Work; to
         <>
           <div className={s.workStage}>{stage.name} · version {stage.ver}</div>
           {stage.note ? <div className={s.workNote}>{stage.note}</div> : null}
+          {/* A level asking both PICs, the other's approval in (②b-2d-2b). */}
+          {(() => {
+            const both = bothState(stage.both, stage.ok, you, other)
+            return both && !both.mine ? <div className={s.workBoth}>{both.theirs} approved this version — waiting for you</div> : null
+          })()}
           {stage.fields.length ? (
             <dl className={s.fields}>
               {stage.fields.map(f => (
@@ -133,7 +138,7 @@ export default function PicWork({ code, page, onPage }: { code: string; page: Pi
       </div>
       <div className={s.workList}>
         {[...page.work].sort((a, b) => Number(!!b.stage?.waiting) - Number(!!a.stage?.waiting)).map(w => (
-          <Item key={w.id} code={code} work={w} today={page.today} you={page.you} onPage={onPage} />
+          <Item key={w.id} code={code} work={w} today={page.today} you={page.you} other={page.other} onPage={onPage} />
         ))}
       </div>
     </section>

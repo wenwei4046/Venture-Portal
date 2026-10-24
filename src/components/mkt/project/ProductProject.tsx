@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { beginMktProduct, fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
 import {
-  canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
+  bothWaiting, canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
   stepsOf, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { picNames } from '@/lib/marketing/clients'
@@ -94,7 +94,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
       savedRef.current = now
       // The page comes back when the PIC must approve again — or when the second PIC changed (their link made or gone).
       if (r.page) setPage(r.page)
-      if (r.reapproval) say(`Changed after approval · back to ${now.pic.trim() || 'the PIC'}`)
+      if (r.reapproval) say(`Changed after approval · back to ${picNames(now.pic, now.pic2) || 'the PIC'}`)
       if (editRef.current === now) setSave({ state: 'saved' })
       return true
     })
@@ -153,6 +153,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const stale = save.state === 'error' && save.stale
   const readOnly = !writes || pending || stale
   const picName = picNames(edit.pic, edit.pic2) || 'the PIC'
+  // Both PICs sign off (②b-2d-2b): whose approval is in, whom the minutes wait for.
+  const halfway = bothWaiting(page)
   const live = { ...doc, vals: edit.vals }
   const pics = { name: edit.pic, whatsapp: edit.whatsapp, name2: edit.pic2, whatsapp2: edit.whatsapp2 }
   const problems = sendProblems(live, pics, page.team)
@@ -388,9 +390,10 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
                   // No reply after 4 working hours: red (2026-10-24 — the user's answer 2, the PIC's wait as a stage's).
                   const hours = now ? workingHours(pr.linkSentAt, now, new Set()) : 0
                   return hours >= ACCEPT_HOURS
-                    ? <div className={`${p.wait} ${p.waitLate}`}>Sent {trailTime(pr.linkSentAt)} · no reply · {Math.floor(hours)} working hours</div>
+                    ? <div className={`${p.wait} ${p.waitLate}`}>Sent {trailTime(pr.linkSentAt)}{halfway ? '' : ' · no reply'} · {Math.floor(hours)} working hours</div>
                     : <div className={p.wait}>Sent {trailTime(pr.linkSentAt)}</div>
                 })() : null}
+                {halfway ? <div className={p.wait}>{halfway}</div> : null}
                 {pr.status === 'changes' && can.manage ? (
                   <button type="button" className={p.primary} disabled={pending} onClick={resend}>Resend to {picName}</button>
                 ) : null}

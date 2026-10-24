@@ -29,7 +29,10 @@ describe('what the builder reads', () => {
     expect([t.id, t.name, t.rev, t.version, t.changed, t.publishedBy]).toEqual(['t1', 'Kickoff', 3, 2, false, 'Sia Josiah'])
     expect(t.fields.map(f => f.name)).toEqual(['Project (from Projects)', 'Attendees', 'Shot list']) // a kind it cannot hold is left out
     expect(t.fields[2].cols).toEqual([{ name: 'Shot', type: 'Text' }, { name: 'Due', type: 'Date' }])
-    expect(t.rules).toEqual({ sign: true, pic: false, project: true, file: false, lock: false })
+    expect(t.rules).toEqual({ sign: true, pic: false, picAll: false, project: true, file: false, lock: false })
+    // Both PICs sign off only where a PIC signs off (②b-2d-2b — the user's answer 29).
+    expect([minutesTemplatesFromRow({ templates: [{ id: 'a', rules: { pic: true, picAll: true } }] })[0].rules.picAll,
+      minutesTemplatesFromRow({ templates: [{ id: 'b', rules: { pic: false, picAll: true } }] })[0].rules.picAll]).toEqual([true, false])
   })
 
   it('reads nothing as no templates', () => {
@@ -43,7 +46,7 @@ describe('making a template', () => {
     expect(f.map(x => [x.name, x.type, x.lock])).toEqual([
       ['Project (from Projects)', 'Project link', true], ['Meeting date', 'Date', false], ['Attendees', 'People', true], ['Signatures', 'Signature', false],
     ])
-    expect(NEW_RULES).toEqual({ sign: false, pic: false, project: true, file: true, lock: true })
+    expect(NEW_RULES).toEqual({ sign: false, pic: false, picAll: false, project: true, file: true, lock: true })
   })
 
   it('is named “New minutes”, then “New minutes 2”', () => {
