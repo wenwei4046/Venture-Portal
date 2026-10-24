@@ -101,8 +101,10 @@ export function adsPerfVM(ctx: DeskCtx) {
   // Every ad, as Ads to teams lists them (the owner, 2026-10-22: "全部的广告也要在这里"): the ones that brought leads, and the
   // ones added before their first lead (adNames' `added`, crm_add_ad) with 0s.
   const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
-  // An ad hidden on the phone's Ads performance (crm_hide_ad) is left out here too.
-  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => !data.adNames?.[id]?.hidden).map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
+  // An ad hidden by a right click on its name (crm_hide_ad, CRM · Manage; the owner, 2026-10-24: "hide ads 的部分只需要在電腦版，
+  // 你幫我做右鍵點擊廣告名稱可以選擇hide") is left out — the list and the total — unless *Hidden ads · show* is on.
+  const hiddenN = new Set([...data.customers.map(c => c.adId ?? ""), ...added].filter(id => id && data.adNames?.[id]?.hidden)).size;
+  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
     return { id, name: cs[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !cs.length || cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
@@ -212,7 +214,12 @@ export function adsPerfVM(ctx: DeskCtx) {
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
       rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+        // The ad itself (the newest https link Meta sent with its leads, else Ads Manager), and hiding it from this list.
+        url: a.id.startsWith("ch:") ? "" : [...a.cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${a.id}`,
+        hidden: !!data.adNames?.[a.id]?.hidden,
+        hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
+      hiddenN, showHidden: !!ui.apShowHidden, toggleHidden: () => patch({ apShowHidden: !ui.apShowHidden }),
       total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,
     },
