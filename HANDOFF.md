@@ -1,5 +1,34 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-24 l (SHIPPED, #736 + mig 20261025110000) — Finance files a terms change, the Principal approves it
+
+Session 35e03c3c, after k. The user found Fund OUT's terms could not be changed from their account ("fund out 我发现我不能
+自己改term？") — Amend terms needs **Treasury · Approve**, which also approves vouchers / loans / fund sources, so the
+Finance Manager (Treasury · Edit) could change neither side. User: "finance manager 可以改条款，但是经过principal approve
+不就可以了？" → mockup (filed → approved → applied) → "可以" → "好了就跑pr 上线".
+
+- **Migration `20261025110000_terms_change_requests`** applied first (09:09 UTC, one transaction refusing itself unless
+  the four bodies' prosrc md5 = PGlite's: file `a0e117f4…`, approve `23d4798d…`, reject `ff845649…`, withdraw
+  `06845f5e…`; schema_migrations row created_by `claude-terms-requests`; `NOTIFY pgrst`). Adds approval type
+  `terms_change` (no domain → only `approvals.approve`), table `treasury_terms_requests` (one pending per deal; SELECT only
+  for authenticated — Supabase's default privileges grant ALL, revoked; `permission_table_reads` treasury.view/edit/approve;
+  audit `none`), RPCs `file_terms_change` (Treasury · Edit; the amend's checks incl. a loan's base rate), `approve_terms_change`
+  (applies via `amend_*_from` in the same transaction — a refused amend approves nothing; history reason gets
+  `（提交：<filer>）`), `reject_terms_change`, `withdraw_terms_change` (filer or approvals.approve).
+- **#736 squash-merged `93757f92`** → production deploy success 09:26 UTC (CI 7/7 green; merged after the migration and the smoke test). No page
+  had read the new table yet when checked (edge logs: only the two probes).
+- Smoke test on production in one ROLLBACK transaction, as the real accounts: the Finance Manager filed LO#7 at 0.6% from
+  2026-11 (title `Change terms · The Cont [LO#7] · RM 60,000.00 · from 2026-11 · 0.600%/mo`), could not approve it
+  ("you may not decide this request"); the Principal approved → LO#7 0.6%, terms from 2026-11, 41 months left, history
+  2025-04..2026-10 at 0.5% reason `smoke test （提交：Finance Manager）`. Rolled back: LO#7 0.5% · 60 · no history, 0 requests.
+  Live API (publishable key): `rpc/file_terms_change` and `treasury_terms_requests` → 401 permission denied (in the cache).
+- App: Edit-only holders' Amend terms files the from-month change ("提交给 Principal 核准"; 整条重算 stays the
+  Principal's); the deal page shows the waiting / approved / turned-down strip (30 days) with Withdraw / Open in Approvals;
+  Approvals (page, drawer, phone) lays the month's terms now beside as asked (`lib/terms-change-request.ts`).
+- Also answered: Aug–Oct 2026 BI#7 payments of 1,300 are all recorded — oldest-first moves each month's 124.83 shortfall
+  forward (kept as the user said: "这样保留 最早的先抵先").
+- Still the user's: LO#7's terms change (how, not yet said); the Balance-column / OUTSTANDING wording raised in k.
+
 ## CHECKPOINT 2026-10-24 k (SHIPPED, #728 + mig 20261025100000 + data) — BI#7 and LO#7 done as the user wants them
 
 Session 35e03c3c, closing j. User: "做" (twice) → in order, each step checked:
