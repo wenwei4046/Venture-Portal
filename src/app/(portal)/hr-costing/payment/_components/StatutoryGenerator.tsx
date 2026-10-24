@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BODIES, shortDate, type BodyKey, type DeptGroup, type Granularity, type StatutoryCoverage, type StatutoryRow } from '@/lib/payment-cycle'
+import { BODIES, shortDate, statutoryHeld, statutoryPayable, type BodyKey, type DeptGroup, type Granularity, type StatutoryCoverage, type StatutoryRow } from '@/lib/payment-cycle'
 import { statutorySelection } from '@/lib/statutory-selection'
 import { formatMoneyBare } from '@/lib/utils'
 import { generateStatutorySelection } from '../actions'
@@ -88,13 +88,17 @@ export default function StatutoryGenerator({ period, body, mode, groups, rows, c
           <div className="pay-table-wrap"><table className="pay-statement-table"><thead><tr>
             {mode === 'employee' ? <th><input type="checkbox" aria-label="Select all remaining employees" checked={selection.count > 0 && selection.count === selection.eligible.length} disabled={locked || selection.eligible.length === 0} onChange={e => setSelectedIds(current => ({ ...current, [group.key]: e.target.checked ? selection.eligible.map(person => person.row_id) : [] }))} /></th> : null}
             <th>Employee</th>{schemes.map(scheme => <th className="num" key={scheme}>{scheme}</th>)}<th>Status</th>
-          </tr></thead><tbody>{group.people.map(person => <tr key={person.row_id}>
-            {mode === 'employee' ? <td><input type="checkbox" aria-label={`Select ${person.name}`} checked={pickedIds.has(person.row_id)} disabled={locked || !eligibleIds.has(person.row_id)} onChange={e => setSelectedIds(current => ({ ...current, [group.key]: e.target.checked ? [...selection.rowIds, person.row_id] : selection.rowIds.filter(id => id !== person.row_id) }))} /></td> : null}
-            <td>{person.name}{person.code ? <small>{person.code}</small> : null}</td>{schemes.map(scheme => {
-              const line = statutorySelection([person], [scheme], coverage, null, mode).lines[0]
-              return <td className="num" key={scheme}>{line ? formatMoneyBare(line.amount) : '—'}</td>
-            })}<td className="pay-muted">{eligibleIds.has(person.row_id) ? 'To generate' : coverage.some(line => line.scope === person.scope && line.row_id === person.row_id && schemes.includes(line.scheme)) ? 'Already covered' : 'No contribution'}</td>
-          </tr>)}</tbody></table></div>
+          </tr></thead><tbody>{group.people.map(person => {
+            // Unlocked for a resubmit: what was sent is being put right, so it waits (2026-10-24).
+            const waits = !eligibleIds.has(person.row_id) && statutoryHeld(person) && schemes.some(scheme => statutoryPayable(coverage, person, scheme) > 0)
+            return <tr key={person.row_id}>
+              {mode === 'employee' ? <td><input type="checkbox" aria-label={`Select ${person.name}`} checked={pickedIds.has(person.row_id)} disabled={locked || !eligibleIds.has(person.row_id)} onChange={e => setSelectedIds(current => ({ ...current, [group.key]: e.target.checked ? [...selection.rowIds, person.row_id] : selection.rowIds.filter(id => id !== person.row_id) }))} /></td> : null}
+              <td>{person.name}{person.code ? <small>{person.code}</small> : null}</td>{schemes.map(scheme => {
+                const line = statutorySelection([person], [scheme], coverage, null, mode).lines[0]
+                return <td className="num" key={scheme}>{line ? formatMoneyBare(line.amount) : '—'}</td>
+              })}<td className="pay-muted" title={waits ? `Send ${person.name}'s resubmit on HR › Payroll first` : undefined}>{eligibleIds.has(person.row_id) ? 'To generate' : waits ? 'Resubmit open' : coverage.some(line => line.scope === person.scope && line.row_id === person.row_id && schemes.includes(line.scheme)) ? 'Already covered' : 'No contribution'}</td>
+            </tr>
+          })}</tbody></table></div>
           {!funded ? <p className="pay-muted">{group.name} funding is not complete yet.</p> : null}
         </div>
       </div>}

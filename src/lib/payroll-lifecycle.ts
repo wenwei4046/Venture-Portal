@@ -6,7 +6,8 @@
 //   Submit to Finance sends everybody Completed since the last press as one
 //   BATCH; a Resubmit or a Second payroll (right-click) unlocks somebody
 //   already sent, whose amounts may then only go up — the next batch carries
-//   the difference. The two differ only in WHY (a correction, or a planned
+//   the difference. An employee deduction no PV pays yet may come down, the
+//   net pay rising by as much (2026-10-24, KRIS's PCB 1,821.90 → 647.90). The two differ only in WHY (a correction, or a planned
 //   second payment such as a sub-department that pays on the 15th), which is
 //   recorded so it can be traced (2026-09-27). Total Close ends the month.
 //
@@ -139,8 +140,8 @@ export function rowStatusView(row: LifecycleRow): StatusView {
         return {
           label: `${topupKindLabel(row.topupKind)} · editing`,
           detail: where
-            ? `Unlocked ${dayLabel(row.topupOpenedAt)} — change it on ${where}; amounts can only go up`
-            : `Unlocked ${dayLabel(row.topupOpenedAt)} — amounts can only go up, then Complete`,
+            ? `Unlocked ${dayLabel(row.topupOpenedAt)} — change it on ${where}; amounts can only go up, but a deduction no PV pays yet may come down`
+            : `Unlocked ${dayLabel(row.topupOpenedAt)} — amounts can only go up (a deduction no PV pays yet may come down), then Complete`,
           tone: 'accent',
         }
       }

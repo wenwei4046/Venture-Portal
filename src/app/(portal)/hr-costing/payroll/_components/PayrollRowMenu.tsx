@@ -230,7 +230,7 @@ export default function PayrollRowMenu({ row, period, anchor, actions, status, o
             {confirm.kind === 'second_payroll'
               ? <>A planned second payment of their <strong>{month}</strong> pay — e.g. a sub-department that pays on the 15th — recorded as a second payroll, not a correction.</>
               : <>A correction: unlocks their <strong>{month}</strong> pay to put right what was sent — recorded as a resubmit.</>}
-            {' '}Amounts can only go up.
+            {' '}Amounts can only go up — a deduction no PV pays yet, such as PCB, may come down.
             {where
               ? <> Change it on <strong>{where}</strong>{row.origin === 'revenue' ? ' (reopen and close them again)' : ' and Complete it there'}, </>
               : <> Edit the row and Complete it, </>}

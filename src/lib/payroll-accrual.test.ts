@@ -213,3 +213,53 @@ describe('posting a batch\'s accrual', () => {
     expect(db.rpcs.some(r => r.fn === 'post_journal_entry_as_caller')).toBe(false)
   })
 })
+
+// 2026-10-24 (HR: "kris and peter PCB I updated amount Kris - RM647.90 Peter -
+// RM1429.15"): a resubmit may lower a deduction no PV pays yet. September's
+// batch #4, as production's dry run built it: KRIS PCB −1,174.00 and PETER
+// −392.75, their net pay up by the same, nothing to fund. The payable that came
+// down goes on the debit side — before, a negative credit was dropped and the
+// JV either came out empty (and was skipped) or out of balance.
+const revenueSepResubmit = {
+  segment: 'revenue_department', gross: '0.00', non_statutory_allowance: '0.00', epf_er: '0.00', epf_ee: '0.00',
+  socso_er: '0.00', socso_ee: '0.00', eis_er: '0.00', eis_ee: '0.00', pcb: '-1566.75', withholding_tax: '0.00',
+  net: '1566.75', skbbk: '0.00',
+}
+
+describe('a resubmit that lowered a deduction (Revenue Sep\'26 batch #4)', () => {
+  it('moves the PCB payable to the salary payable: Dr 4074 / Cr 4070', () => {
+    const sums = batchAccrualSums(revenueSepResubmit, { segment: 'revenue_department', salary: '0.00', basic: '0.00', travelling: '0.00', accommodation: '0.00', food: '0.00' })
+    expect(sums.deductions).toBe(0)
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(lines.map(l => [l.accountCode, l.debit ?? null, l.credit ?? null])).toEqual([
+      ['4070', null, 1566.75],
+      ['4074', 1566.75, null],
+    ])
+    expect(lines.find(l => l.accountCode === '4074')?.description).toBe("PCB Payable - Sep'26")
+    expect(accrualTotal(sums)).toBe(1566.75)
+  })
+
+  it('balances a lowered employee EPF beside a raised employer EPF', () => {
+    // EPF employee −100, employer +100: KWSP owes the same, the net pay +100 is funded by the CTC +100.
+    const lines = buildAccrualLines(batchAccrualSums({ ...revenueSepResubmit, pcb: 0, epf_er: 100, epf_ee: -100, net: 100 }), "Sep'26")
+    expect(totals(lines)).toEqual({ dr: 100, cr: 100 })
+    expect(lines.map(l => l.accountCode)).toEqual(['9081', '4070'])
+  })
+
+  it('posts the batch as the HR user', async () => {
+    const db = recordingSupabase(
+      call => (call.table === 'payroll_batches' ? { data: { batch_no: 4 } } : {}),
+      fn =>
+        fn === 'payroll_batch_accrual_sums' ? { data: [revenueSepResubmit] }
+        : fn === 'payroll_batch_commission_split' ? { data: [] }
+        : fn === 'get_payroll_accrual_totals_for' ? { data: [] }
+        : fn === 'post_journal_entry_as_caller' ? { data: 'je-new' }
+        : {},
+    )
+    const result = await postPayrollBatchAccrualJVs(db.client as never, { periodMonth: '2026-09-01', batchId: 'batch-4', userId: 'hr-manager' })
+    expect(result.posted).toEqual(['revenue_department'])
+    const post = db.rpcs.find(r => r.fn === 'post_journal_entry_as_caller')?.args as { p_description: string; p_lines: Array<{ account_code: string; debit: number | null; credit: number | null }> }
+    expect(post.p_description).toBe("Revenue Department Salary - Sep'26 · batch #4")
+    expect(post.p_lines.map(l => [l.account_code, l.debit, l.credit])).toEqual([['4070', null, 1566.75], ['4074', 1566.75, null]])
+  })
+})
