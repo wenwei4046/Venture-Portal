@@ -4,6 +4,7 @@
  * by status with a total, and the Ads table (Meta's figures "—" until Meta is connected). Numbers are the phone's
  * (panel/vm/common.ts numbersOf) over the chosen period.
  */
+import { withoutHiddenAds } from "@/lib/member/crm-data";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import { ALL, crmFigures, fmt } from "./adsperf";
 import { columnSizer } from "./columns";
@@ -66,7 +67,9 @@ export function wonIn(ctx: Pick<DeskCtx, "data">, r: { a: number; b: number }) {
   return { n: ids.length, amount: Math.round(amount), ids };
 }
 
-export function insightVM(ctx: DeskCtx) {
+export function insightVM(ctx0: DeskCtx) {
+  // An ad hidden from Ads Performance leaves Insight's figures too (2026-10-24).
+  const ctx = { ...ctx0, data: withoutHiddenAds(ctx0.data) };
   const { data, now, patch, teams } = ctx;
   const { r, name } = insightRange(ctx);
   const inR = (iso: string) => { const t = new Date(iso); const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(); return d >= r.a && d <= r.b; };

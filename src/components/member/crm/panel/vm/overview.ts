@@ -5,12 +5,13 @@
  * and Team performance — the Director first, then each team; a team opens to
  * its people, a person opens their own CRM.
  */
+import { withoutHiddenAds } from "@/lib/member/crm-data";
 import { urgencyOf } from "../../sales/vm/common";
 import { jobTitle } from "../../shared/people";
 import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, inRange, ini, numbersOf, pct, periodRange, seatOf, tagOf, type PanelCtx } from "./common";
 
 export function overviewVM(ctx: PanelCtx) {
-  const { ui, set, patch, data, me, now, teams, directors } = ctx;
+  const { ui, set, patch, me, now, teams, directors } = ctx, data = withoutHiddenAds(ctx.data);
   const cur = periodRange(ui.period, ui.ovRange, now);
   const isC = ui.period === "custom" && !!ui.ovRange;
   const all = numbersOf(data.customers, data.visits, cur, now);

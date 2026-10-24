@@ -46,6 +46,11 @@ export function apptTypesFrom(raw: unknown): ApptType[] {
     .map(t => ({ id: t.id, label: t.label, on: t.on !== false, base: t.base === "online" ? "online" : "place",
       fields: (Array.isArray(t.fields) ? t.fields : []).filter(f => f && typeof f.id === "string" && kinds.has(f.kind)).map(f => ({ id: f.id, label: String(f.label ?? ""), kind: f.kind, ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) })) }));
 }
+/** The customers less the ones from an ad hidden from Ads Performance (crm_hide_ad) — Insight leaves them out too (the owner, 2026-10-24: "這裡的數據也是要減掉hide 的廣告"). */
+export function withoutHiddenAds(d: CrmData): CrmData {
+  const hid = d.adNames ? new Set(Object.entries(d.adNames).filter(([, n]) => n.hidden).map(([id]) => id)) : null;
+  return hid?.size ? { ...d, customers: d.customers.filter(c => !(c.adId && hid.has(c.adId))) } : d;
+}
 /** What a typed appointment keeps, as crm_appt_values() works it out: kind, the name it goes by, link, place, remarks. */
 export function apptValues(t: ApptType, answers: Record<string, string>): { kind: "online" | "other"; name: string; link?: string; place?: string; remarks?: string } {
   const v = (f: ApptField) => (answers[f.id] ?? "").trim();
