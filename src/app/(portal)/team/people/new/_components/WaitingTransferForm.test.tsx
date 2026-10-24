@@ -9,9 +9,12 @@ import type { WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const flash = vi.fn()
-vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m) }))
+vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m), FLASH_LONG: 8000 }))
 const transferFromWaitingList = vi.hoisted(() => vi.fn())
 vi.mock('../../waiting-transfer-actions', () => ({ transferFromWaitingList }))
+// The letters filed with the status (2026-10-24) go to the Data center once they are an employee.
+const fileLetters = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters }))
 
 import WaitingTransferForm from './WaitingTransferForm'
 

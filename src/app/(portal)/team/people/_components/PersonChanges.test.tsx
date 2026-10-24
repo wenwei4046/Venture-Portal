@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   confirmProbation: vi.fn(),
   extendProbation: vi.fn(),
   acknowledgeContract: vi.fn(),
+  renewContract: vi.fn(),
+  letterTypeOf: vi.fn(),
+  upload: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
 vi.mock('../promote-actions', () => ({ promoteStaff: vi.fn() }))
@@ -20,7 +23,10 @@ vi.mock('../probation-actions', () => ({
   confirmProbation: mocks.confirmProbation,
   extendProbation: mocks.extendProbation,
 }))
-vi.mock('../contract-actions', () => ({ acknowledgeContract: mocks.acknowledgeContract }))
+vi.mock('../contract-actions', () => ({ acknowledgeContract: mocks.acknowledgeContract, renewContract: mocks.renewContract }))
+// Renew files the new contract (2026-10-24): its type, the file up, then renewContract.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: vi.fn(), letterTypeOf: mocks.letterTypeOf }))
+vi.mock('@/lib/documentation/upload', () => ({ uploadDocumentationFile: mocks.upload }))
 
 import PersonChanges from './PersonChanges'
 import type { CardLadder } from '../card-actions'
@@ -36,7 +42,8 @@ const ladder = (over: Partial<CardLadder> = {}): CardLadder => ({
 const TODAY = '2026-10-23'
 
 beforeEach(() => {
-  for (const m of [mocks.refresh, mocks.acknowledgeProbation, mocks.confirmProbation, mocks.extendProbation, mocks.acknowledgeContract]) m.mockReset()
+  for (const m of [mocks.refresh, mocks.acknowledgeProbation, mocks.confirmProbation, mocks.extendProbation, mocks.acknowledgeContract,
+    mocks.renewContract, mocks.letterTypeOf, mocks.upload]) m.mockReset()
 })
 afterEach(cleanup)
 

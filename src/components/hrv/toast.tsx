@@ -19,8 +19,11 @@ function emit() {
   for (const l of listeners) l()
 }
 
-/** Show a message for 2.2 seconds (the prototype's `flash`). */
-export function flash(message: string) {
+/**
+ * Show a message for 2.2 seconds (the prototype's `flash`) — or longer, for one that says something did not happen and
+ * is read only once (a letter that was not filed, 2026-10-24).
+ */
+export function flash(message: string, ms = 2200) {
   if (timer) clearTimeout(timer)
   current = { id: (current?.id ?? 0) + 1, message }
   emit()
@@ -28,8 +31,11 @@ export function flash(message: string) {
     current = null
     timer = null
     emit()
-  }, 2200)
+  }, ms)
 }
+
+/** How long a toast that says what did not happen stays (a letter not filed). */
+export const FLASH_LONG = 8000
 
 function subscribe(l: Listener) {
   listeners.add(l)

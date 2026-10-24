@@ -271,3 +271,6 @@
 @media (max-width: 560px) {
   .facts { grid-template-columns: minmax(0, 1fr); }
 }
+/* Letters filed with the Employment Status (2026-10-24, AttachLetters): under its dropdowns, the type and file stacked
+ where the card is narrow. */
+.letters { margin-top: 10px; }

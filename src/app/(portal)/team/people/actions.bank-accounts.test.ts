@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { insert, update, query, rpc, createClient } = vi.hoisted(() => {
-  const insert = vi.fn().mockResolvedValue({ error: null })
+  // Add Staff reads the new person back (2026-10-24): insert → select('id') → single().
+  const filed = { select: vi.fn(), single: vi.fn().mockResolvedValue({ data: { id: 'new-person' }, error: null }) }
+  filed.select.mockReturnValue(filed)
+  const insert = vi.fn().mockReturnValue(filed)
   const update = vi.fn()
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null })
   const query = {

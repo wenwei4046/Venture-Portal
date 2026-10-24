@@ -11,7 +11,8 @@
  *
  * Contract (2026-10-24 — LI SEAN asked on IT-0006 for the Revenue team's contract status; the user: "can add with one
  * is Contract, then need pick time period as well, 6 month, 12 month, 18, 24, until 36"): a period counted from the
- * hire date the same way (mig 20261025013000: `contract_months`, `contract_end` generated).
+ * hire date the same way (mig 20261025013000: `contract_months`, `contract_end` generated) — and, once renewed, from the
+ * day the new one starts (mig 20261025052000: `contract_start`; lib/contract-renewal.ts).
  *
  * Either one's end — a TERM's — is reminded twice: 30 days before, then 15 (REMINDER_DAYS).
  *
@@ -100,9 +101,25 @@ export function probationEnd(hireDate: string | null | undefined, months: number
   return ymdOf(utcDay(ty, tm, Math.min(d, last)) - 86_400_000)
 }
 
-/** A contract's last day, counted the same way — the database's `contract_end` (mig 20261025013000) to the day. */
-export function contractEnd(hireDate: string | null | undefined, months: number | null | undefined): string | null {
-  return probationEnd(hireDate, months)
+/**
+ * A contract's last day, counted the same way from its first — the hire date, until a renewal starts the contract they
+ * are on now (`contract_start`, 2026-10-24) — the database's `contract_end` (migs 20261025013000, 20261025052000) to the
+ * day.
+ */
+export function contractEnd(startsOn: string | null | undefined, months: number | null | undefined): string | null {
+  return probationEnd(startsOn, months)
+}
+
+/** A YYYY-MM-DD that is a real day. */
+export function isDay(v: unknown): v is string {
+  const p = typeof v === 'string' ? parts(v) : null
+  return p !== null && ymdOf(utcDay(p[0], p[1] - 1, p[2])) === v
+}
+
+/** The day after a YYYY-MM-DD: 30 Sep 2027 → 1 Oct 2027. */
+export function dayAfter(ymd: string): string {
+  const p = parts(ymd)
+  return p ? ymdOf(utcDay(p[0], p[1] - 1, p[2] + 1)) : ymd
 }
 
 /** Whole days from `from` to `to` (both YYYY-MM-DD) — positive when `to` is later. */

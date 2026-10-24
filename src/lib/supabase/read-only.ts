@@ -53,6 +53,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'member_documents',
   // …and the Data center's own folders and files, and one's path (mig 20261012220000).
   'hr_drive', 'hr_drive_file',
+  // …the letter types People's forms offer beside the employment status (mig 20261025052000): STABLE, reading only.
+  'hr_letter_type_choices',
   // …Publish › Preview and a memo's file (mig 20261012210000): both STABLE, reading only.
   'hr_memo_preview', 'memo_attachment',
   // …a letter's signature, and one's own on a memo (mig 20261021013000): both STABLE, reading only.

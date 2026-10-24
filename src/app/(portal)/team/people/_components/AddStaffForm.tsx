@@ -33,6 +33,10 @@ import {
   monthsLabel,
   probationEnd,
 } from '@/lib/employment-status'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
+import { failedWords, filedWords, lettersRefusal, lettersToFile, startingLetters, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
+import AttachLetters from './AttachLetters'
 
 export interface AddStaffDepartment {
   id: string
@@ -61,6 +65,12 @@ interface Props {
    *  accounts are not asked here — somebody who has it adds them later.
    *  Absent: asked, as before. */
   canSeeBank?: boolean
+  /**
+   * The Data center's letter types (2026-10-24), for the letters filed with the
+   * status — their offer letter and the rest; null or absent: the adder may not
+   * file one (Documentation · Create), and none is asked.
+   */
+  letterTypes?: readonly LetterChoice[] | null
 }
 
 const ZERO = '0.00'
@@ -108,7 +118,7 @@ const tickTile = (on: boolean) =>
  * number plus one. The form shows which that will be and nothing more — a
  * disabled input is not submitted, which is the point.
  */
-export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode, canSeeBank = true }: Props) {
+export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode, canSeeBank = true, letterTypes = null }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -130,6 +140,9 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
   const [contractMonths, setContractMonths] = useState(String(DEFAULT_CONTRACT_MONTHS))
   const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, Number(probationMonths)) : null
   const contractEnds = employmentStatus === 'contract' ? contractEnd(hireDate, Number(contractMonths)) : null
+  // The letters filed with the status (2026-10-24 — the user: "新员工进来的时候，他 put 那个 status，然后能够 attach 他的
+  // offer letter"): a row for each compulsory type to start, filed to their Data center record once they are added.
+  const [letters, setLetters] = useState<PendingLetter[]>(() => (letterTypes ? startingLetters(letterTypes) : []))
 
   const department = departments.find(d => d.id === departmentId) ?? null
   const isCommissionDept = department?.payroll_source === 'commission'
@@ -218,12 +231,21 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
     startTransition(async () => {
       try {
         // Checked against Malaysia's list here first, so the refusal reads at once (the server asks again).
-        const refused = addressRefusal(address, await loadMalaysia())
+        const refused = addressRefusal(address, await loadMalaysia()) ?? (letterTypes ? lettersRefusal(letters) : null)
         if (refused) {
           setError(refused)
           return
         }
-        await addStaff(formData)
+        const added = await addStaff(formData)
+        // On the roster now: the letters go to their record. One that does not go is said and left for the Data center —
+        // the person is filed, so this form is not sent again.
+        if (letterTypes && added?.id && lettersToFile(letters).length > 0) {
+          const name = String(formData.get('name') ?? '').trim()
+          const filed = await fileLetters(added.id, letters, letterTypes)
+          const failed = failedWords(filed.failed)
+          if (failed) flash(`${name} added. ${failed}`, FLASH_LONG)
+          else flash(filedWords(filed.filed, name) ?? `${name} added`)
+        }
         router.push('/team/people')
         router.refresh()
       } catch (err) {
@@ -495,6 +517,23 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
               </p>
             </div>
           </>
+        ) : null}
+        {letterTypes ? (
+          <div className="sm:col-span-2">
+            <span className={labelBase}>
+              Letters <span className={hintBase}>optional</span>
+            </span>
+            <AttachLetters
+              types={letterTypes}
+              rows={letters}
+              onChange={setLetters}
+              idPrefix="staff-letter"
+              disabled={isPending}
+              selectBare
+              selectClassName={textInput}
+              inputClassName={textInput}
+            />
+          </div>
         ) : null}
       </div>
 

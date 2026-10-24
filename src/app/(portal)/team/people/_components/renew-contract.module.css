@@ -1,0 +1,30 @@
+/* Renew on the contract's line (2026-10-24, RenewContract): under the line's words, the whole width of the well —
+   the new contract's first day, its period and its end side by side where they fit, the contract itself, then Renew
+   and Cancel. The fields are the person page's own: white, a hairline, radius 10. */
+
+.renew { flex: 1 1 100%; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.fields { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.fields > .field { flex: 1 1 150px; }
+.field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+
+.input,
+.select {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+}
+.input {
+  display: block;
+  padding: 8px 11px;
+  border: 1px solid rgb(var(--hv-hairline));
+  border-radius: 10px;
+  background: rgb(255 255 255);
+  outline: none;
+}
+.input:hover { border-color: rgb(var(--hv-frame)); }
+.input:focus { border-color: rgb(var(--hv-accent)); }
+/* The end the database will keep, at a field's height so the row lines up. */
+.ends { display: flex; align-items: center; min-height: 36px; }

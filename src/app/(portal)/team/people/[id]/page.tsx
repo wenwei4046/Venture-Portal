@@ -16,6 +16,7 @@ import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
 import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
+import { letterChoicesOn } from '@/lib/documentation/letter-choices'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import PersonWell from '../../_components/PersonWell'
@@ -85,6 +86,9 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
         return null
       })
     : Promise.resolve(null)
+  // …and the Data center's letter types (2026-10-24): letters filed with the status on the card, and Renew's new
+  // contract — none for an editor who may not file one (Documentation · Create).
+  const letters = mayEdit && direct ? letterChoicesOn(supabase, '/team/people/[id]').catch(() => null) : Promise.resolve(null)
 
   // The row without its NRIC and account numbers, which come through the
   // reader beside it — the table no longer hands them out (2026-10-09, PR4).
@@ -144,7 +148,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
       )
     : null
 
-  const [card, uplineChoices] = await Promise.all([changes, uplines])
+  const [card, uplineChoices, letterTypes] = await Promise.all([changes, uplines, letters])
   const active = staff.status !== 'inactive'
   // Their login's email is HR's to change here since 2026-10-22 — a full-access title's only whoever manages
   // permissions' (the editor would choose where that login's mail goes), as Invite user keeps it.
@@ -239,6 +243,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                 reportsTo: row.reports_to ?? null,
                 uplines: active ? uplineChoices : null,
                 emailHeld,
+                letterTypes,
               }
             : null
         }
@@ -276,19 +281,21 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                   }
                 : null
             }
-            // A contract's reminder (2026-10-24): Acknowledge — renewing it is the card's Employment Status.
+            // A contract's reminder (2026-10-24): Acknowledge — and Renew, from the day after its end.
             contract={
               card.active && card.staff.employment_status === 'contract'
                 ? {
                     hireDate: card.staff.hire_date ?? null,
                     months: card.staff.contract_months ?? null,
                     endsOn: card.staff.contract_end ?? null,
+                    startsOn: card.staff.contract_start ?? card.staff.hire_date ?? null,
                     ackEnd: card.staff.contract_ack_end ?? null,
                     ackName: card.staff.contract_ack_name ?? null,
                     ackAt: card.staff.contract_ack_at ?? null,
                   }
                 : null
             }
+            renew={letterTypes ? { types: letterTypes } : null}
             today={today}
           />
         ) : null}

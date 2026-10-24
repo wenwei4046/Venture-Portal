@@ -4,7 +4,10 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { btn, hv } from '@/components/hrv/kit'
-import { flash } from '@/components/hrv/toast'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
+import { failedWords, filedWords, lettersRefusal, lettersToFile, startingLetters, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
+import AttachLetters from '../../_components/AttachLetters'
 import { BANK_NAMES } from '@/lib/banks'
 import { revenuePath } from '@/lib/revenue'
 import { defaultHireDate, missingFields, transferBanner, transferRefusal, type TransferInput, type WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
@@ -38,6 +41,7 @@ export default function WaitingTransferForm({
   managers,
   today,
   blocked,
+  letterTypes = null,
 }: {
   facts: WaitingTransferFacts
   subSlug: string
@@ -47,6 +51,8 @@ export default function WaitingTransferForm({
   today: string
   /** Why it cannot be sent at all (the sub-department is full, the title cannot see NRIC) — or null. */
   blocked: string | null
+  /** The Data center's letter types, for the letters filed with the status (2026-10-24); null: none asked. */
+  letterTypes?: readonly LetterChoice[] | null
 }) {
   const router = useRouter()
   const [name, setName] = useState(facts.newPerson ?? '')
@@ -58,6 +64,8 @@ export default function WaitingTransferForm({
   const [employmentStatus, setEmploymentStatus] = useState('')
   const [probationMonths, setProbationMonths] = useState<number>(DEFAULT_PROBATION_MONTHS)
   const [contractMonths, setContractMonths] = useState<number>(DEFAULT_CONTRACT_MONTHS)
+  // The letters filed with the status (2026-10-24), as on Add Staff: a row for each compulsory type to start.
+  const [letters, setLetters] = useState<PendingLetter[]>(() => (letterTypes ? startingLetters(letterTypes) : []))
   const [nric, setNric] = useState('')
   const [phone, setPhone] = useState(facts.contact ?? '')
   const [email, setEmail] = useState('')
@@ -87,6 +95,11 @@ export default function WaitingTransferForm({
       setError(refused)
       return
     }
+    const refusedLetters = letterTypes ? lettersRefusal(letters) : null
+    if (refusedLetters) {
+      setError(refusedLetters)
+      return
+    }
     setBusy(true)
     setError(null)
     const done = await transferFromWaitingList(input)
@@ -95,7 +108,16 @@ export default function WaitingTransferForm({
       setError(done.reason)
       return
     }
-    flash(`${name.trim()} is now an employee in ${sub}${done.code ? ` · ${done.code}` : ''}`)
+    const added = `${name.trim()} is now an employee in ${sub}${done.code ? ` · ${done.code}` : ''}`
+    // An employee now: the letters go to their record — one that does not is said, and left for the Data center.
+    if (letterTypes && lettersToFile(letters).length > 0) {
+      const filed = await fileLetters(done.staffId, letters, letterTypes)
+      const failed = failedWords(filed.failed)
+      if (failed) flash(`${added}. ${failed}`, FLASH_LONG)
+      else flash([added, filedWords(filed.filed, name.trim())].filter(Boolean).join(' · '))
+    } else {
+      flash(added)
+    }
     router.push('/team/people')
   }
 
@@ -179,6 +201,13 @@ export default function WaitingTransferForm({
                   ))}
                   {contractEnds ? <span className={s.basisNote}>ends {dayLabel(contractEnds)}</span> : null}
                 </div>
+              </>
+            ) : null}
+
+            {letterTypes ? (
+              <>
+                <span className={s.label}>Letters</span>
+                <AttachLetters types={letterTypes} rows={letters} onChange={setLetters} idPrefix="transfer-letter" disabled={busy} />
               </>
             ) : null}
 

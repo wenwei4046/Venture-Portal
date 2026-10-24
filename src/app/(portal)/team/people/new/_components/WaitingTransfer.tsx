@@ -5,6 +5,9 @@ import { officeToday } from '@/lib/office-time'
 import { revenuePath } from '@/lib/revenue'
 import { sees } from '@/lib/sensitive'
 import { fullText } from '@/lib/commission/waiting-transfer'
+import { createClient } from '@/lib/supabase/server'
+import type { LetterChoice } from '@/lib/documentation/attach'
+import { letterChoicesOn } from '@/lib/documentation/letter-choices'
 import { loadWaitingTransfer, type WaitingTransferRead } from '../_lib/waiting-transfer'
 import WaitingTransferForm from './WaitingTransferForm'
 import s from './waiting-transfer.module.css'
@@ -17,9 +20,13 @@ import s from './waiting-transfer.module.css'
  * applicant has left the list, or when the sub-department is full.
  */
 export default async function WaitingTransfer({ requestId, viewer }: { requestId: string; viewer: User }) {
-  const read: WaitingTransferRead = viewer.permissions.includes('member_requests_manage')
-    ? await loadWaitingTransfer(requestId)
-    : { ok: false, reason: 'Transferring from the waiting list needs HR request management access.' }
+  // …and the Data center's letter types, for the letters filed with the status (2026-10-24), read beside it.
+  const [read, letterTypes]: [WaitingTransferRead, LetterChoice[] | null] = await Promise.all([
+    viewer.permissions.includes('member_requests_manage')
+      ? loadWaitingTransfer(requestId)
+      : Promise.resolve<WaitingTransferRead>({ ok: false, reason: 'Transferring from the waiting list needs HR request management access.' }),
+    createClient().then(supabase => letterChoicesOn(supabase, '/team/people/new')),
+  ])
   const head = <PageHead eyebrow="People · Management" title="People" />
 
   if (!read.ok) {
@@ -56,6 +63,7 @@ export default async function WaitingTransfer({ requestId, viewer }: { requestId
         managers={read.managers}
         today={officeToday()}
         blocked={blocked}
+        letterTypes={letterTypes}
       />
     </HvPage>
   )

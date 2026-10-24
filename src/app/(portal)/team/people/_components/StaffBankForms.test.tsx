@@ -4,6 +4,8 @@ import AddStaffForm from './AddStaffForm'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => ({ addStaff: vi.fn() }))
+// The letters filed with the status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: vi.fn() }))
 
 describe('staff bank account forms', () => {
   it('keeps the optional second pair separate from Account 1 on add', () => {

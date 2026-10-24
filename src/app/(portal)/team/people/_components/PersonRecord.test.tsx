@@ -7,9 +7,11 @@ import type { StaffRow, TitleRow } from '@/lib/staff-form'
 // column"). Edit turns each row's value into its field in the same section;
 // the bar at the foot holds Cancel and Save; a refusal is said there.
 
-const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn() }))
+const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn(), fileLetters: vi.fn() }))
 vi.mock('../actions', () => ({ updateStaff: mocks.updateStaff }))
-vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash }))
+vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash, FLASH_LONG: 8000 }))
+// Letters filed with the Employment Status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: mocks.fileLetters }))
 
 import PersonRecord, { type PersonEditor, type PersonRecordView } from './PersonRecord'
 import type { UplineGroup } from '@/lib/upline-choices'

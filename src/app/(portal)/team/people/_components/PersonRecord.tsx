@@ -18,7 +18,7 @@ import {
 import { btn, Chip } from '@/components/hrv/kit'
 import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
-import { flash } from '@/components/hrv/toast'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
 import { initialsOf } from '@/lib/people-roster'
 import { keptParts } from '@/lib/person-name'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
@@ -55,8 +55,11 @@ import {
   type EmploymentStatus,
   type StatusChip,
 } from '@/lib/employment-status'
+import { failedWords, filedWords, lettersCount, lettersRefusal, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
 import { updateStaff } from '../actions'
 import PersonWell from '../../_components/PersonWell'
+import AttachLetters from './AttachLetters'
 import s from './person-record.module.css'
 
 /**
@@ -135,6 +138,11 @@ export interface PersonEditor {
    * null: theirs to change — the login moves with it.
    */
   emailHeld?: string | null
+  /**
+   * The Data center's letter types (2026-10-24): letters filed with the Employment Status — "+ Attach a letter" under
+   * it — when Save is pressed. Absent or null: this editor may not file one (Documentation · Create).
+   */
+  letterTypes?: readonly LetterChoice[] | null
 }
 
 /** The editor while editing; null while the page reads. */
@@ -177,16 +185,23 @@ export default function PersonRecord({
   // turn — and sent whole when it changed, as a bank account is.
   const addressWas = useMemo<Address>(() => (editor ? addressOf(editor.staff) : EMPTY_ADDRESS), [editor])
   const [address, setAddress] = useState<Address>(addressWas)
+  // Letters filed with the Employment Status (2026-10-24, the user: "我们 select 那个 state 的时候，我要他能够 attach 一个
+  // form"): held until Save, then each filed to their Data center record — a letter counts as a change.
+  const [letters, setLetters] = useState<PendingLetter[]>([])
+  // What the save says once the fresh record is in: "Saved", or the letters filed with it.
+  const savedWords = useRef<{ message: string; ms?: number }>({ message: 'Saved' })
 
   const ed = editing ? editor : null
   const addressChanged = ed !== null && !sameAddress(address, addressWas)
-  const count = changed.size + (ed && mode !== initialMode ? 1 : 0) + (addressChanged ? 1 : 0)
+  const fieldsCount = changed.size + (ed && mode !== initialMode ? 1 : 0) + (addressChanged ? 1 : 0)
+  const count = fieldsCount + (ed ? lettersCount(letters) : 0)
   const busy = saving || settling
 
   function enter() {
     setMode(initialMode)
     setChanged(new Set())
     setAddress(addressWas)
+    setLetters([])
     setError(null)
     setEditing(true)
   }
@@ -194,6 +209,7 @@ export default function PersonRecord({
   const leave = useCallback(() => {
     setEditing(false)
     setChanged(new Set())
+    setLetters([])
     setError(null)
     // The old Edit address lands here with ?edit=1 — leaving edit leaves it.
     const url = new URL(window.location.href)
@@ -208,7 +224,7 @@ export default function PersonRecord({
     if (!settling || view === savedFrom.current) return
     setSettling(false)
     leave()
-    flash('Saved')
+    saidSaved(savedWords.current)
   }, [settling, view, leave])
 
   // …and should it never come, the page reads anyway.
@@ -217,7 +233,7 @@ export default function PersonRecord({
     const late = setTimeout(() => {
       setSettling(false)
       leave()
-      flash('Saved')
+      saidSaved(savedWords.current)
     }, 6000)
     return () => clearTimeout(late)
   }, [settling, leave])
@@ -263,6 +279,11 @@ export default function PersonRecord({
     // change made since this page was opened.
     const data = changedFormData(event.currentTarget, changedFields(event.currentTarget), mode !== initialMode ? payModeFields(mode) : {})
     if (addressChanged) for (const [name, value] of addressFormEntries(address)) data.set(name, value)
+    const refusedLetters = editor.letterTypes ? lettersRefusal(letters) : null
+    if (refusedLetters) {
+      setError(refusedLetters)
+      return
+    }
     setError(null)
     startSaving(async () => {
       try {
@@ -272,12 +293,32 @@ export default function PersonRecord({
           setError(refused)
           return
         }
-        const outcome = await updateStaff(editor.staff.id, data)
-        if (outcome.ok) {
-          savedFrom.current = view
+        // The record as it is drawn now: the fresh one is whatever lands after it.
+        savedFrom.current = view
+        if (fieldsCount > 0) {
+          const outcome = await updateStaff(editor.staff.id, data)
+          if (!outcome.ok) {
+            setError(outcome.reason)
+            return
+          }
+        }
+        // Then the letters (2026-10-24), each to their Data center record.
+        const filed = editor.letterTypes && lettersCount(letters) > 0 ? await fileLetters(editor.staff.id, letters, editor.letterTypes) : null
+        const failed = filed ? failedWords(filed.failed) : null
+        const name = editor.staff.employee_name
+        if (fieldsCount > 0) {
+          savedWords.current = failed
+            ? { message: `Saved. ${failed}`, ms: FLASH_LONG }
+            : { message: (filed && filedWords(filed.filed, name)) ? `Saved · ${filedWords(filed.filed, name)}` : 'Saved' }
           setSettling(true)
+        } else if (failed && filed) {
+          // Letters alone, and some did not go: those stay, with why, to be sent again.
+          const kept = new Set(filed.failed.map(f => f.key))
+          setLetters(rows => rows.filter(r => kept.has(r.key)))
+          setError(filed.filed.length ? `${filedWords(filed.filed, name)}. ${failed}` : failed)
         } else {
-          setError(outcome.reason)
+          leave()
+          flash((filed && filedWords(filed.filed, name)) ?? 'Saved')
         }
       } catch {
         setError('Could not save. Check the connection and try again.')
@@ -466,14 +507,33 @@ export default function PersonRecord({
             view.employment.status === undefined
               ? undefined
               : e => (
-                  <EmploymentStatusField
-                    current={e.staff.employment_status ?? null}
-                    months={e.staff.probation_months ?? null}
-                    contractMonths={e.staff.contract_months ?? null}
-                    onSwitch={() => {
-                      if (form.current) setChanged(changedFields(form.current))
-                    }}
-                  />
+                  <>
+                    <EmploymentStatusField
+                      current={e.staff.employment_status ?? null}
+                      months={e.staff.probation_months ?? null}
+                      contractMonths={e.staff.contract_months ?? null}
+                      onSwitch={() => {
+                        if (form.current) setChanged(changedFields(form.current))
+                      }}
+                    />
+                    {/* The letters that come with it — their offer letter, a confirmation — filed on Save (2026-10-24). */}
+                    {e.letterTypes ? (
+                      <div className={s.letters}>
+                        <AttachLetters
+                          types={e.letterTypes}
+                          rows={letters}
+                          onChange={next => {
+                            setLetters(next)
+                            setError(null)
+                          }}
+                          idPrefix="person-letter"
+                          disabled={busy}
+                          selectClassName={s.select}
+                          inputClassName={s.input}
+                        />
+                      </div>
+                    ) : null}
+                  </>
                 )
           }
         />
@@ -844,6 +904,12 @@ export default function PersonRecord({
       </Editing.Provider>
     </div>
   )
+}
+
+/** What a save says once it is read again — longer when a letter with it did not go. */
+function saidSaved(words: { message: string; ms?: number }) {
+  if (words.ms) flash(words.message, words.ms)
+  else flash(words.message)
 }
 
 /** A well of the record: its icon and title in caps over its facts, two to a row. */

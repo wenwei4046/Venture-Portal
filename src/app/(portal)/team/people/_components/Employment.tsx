@@ -12,18 +12,22 @@ import {
   termEndLine,
 } from '@/lib/employment-status'
 import { ackLine, acknowledged } from '@/lib/term-reviews'
+import type { LetterChoice } from '@/lib/documentation/attach'
 import { deactivateStaff, reactivateStaff } from '../actions'
 import { acknowledgeProbation, confirmProbation, extendProbation } from '../probation-actions'
 import { acknowledgeContract } from '../contract-actions'
 import PersonWell from '../../_components/PersonWell'
 import w from '../../_components/person-well.module.css'
+import RenewContract from './RenewContract'
 
 /** A probation or a contract as the person's page acts on it (2026-10-23; a contract 2026-10-24). */
 export interface TermFacts {
   hireDate: string | null
   months: number | null
-  /** Its last day — the database's, from the hire date and the months; null without a hire date. */
+  /** Its last day — the database's, from its first day and the months; null without a hire date. */
   endsOn: string | null
+  /** A contract's first day: the hire date, until a renewal starts the one they are on now (2026-10-24). */
+  startsOn?: string | null
   ackEnd: string | null
   ackName: string | null
   ackAt: string | null
@@ -45,8 +49,9 @@ export interface TermFacts {
  * On probation (2026-10-23 — the user: "if the probation is almost end, then it will notification hr acknowledge for
  * further action") a second line: the period and its end, Acknowledge while HR is being told and has not, then the
  * further action — Confirm as permanent or Extend; ending their employment is Deactivate, above it. On a contract
- * (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder") the same line with Acknowledge alone: renewing it
- * or making them permanent is the card's Employment Status, above.
+ * (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder") the same line with Acknowledge, and Renew (the
+ * same day — "按一下 renew，就可以再选一次是几个月 … 同时要 attach 一个新的 contract") for whoever may file its new contract;
+ * making them permanent is the card's Employment Status, above.
  */
 export default function Employment({
   personId,
@@ -54,6 +59,7 @@ export default function Employment({
   active,
   probation = null,
   contract = null,
+  renew = null,
   today,
   onDone,
 }: {
@@ -62,6 +68,8 @@ export default function Employment({
   active: boolean
   probation?: TermFacts | null
   contract?: TermFacts | null
+  /** Renew's letter types — null for a viewer who may not file the new contract (Documentation · Create). */
+  renew?: { types: readonly LetterChoice[] } | null
   /** The office's today (YYYY-MM-DD). */
   today: string
   onDone: () => void
@@ -130,14 +138,15 @@ export default function Employment({
       </div>
 
       {active && probation ? <ProbationLine personId={personId} personName={personName} probation={probation} today={today} onDone={onDone} /> : null}
-      {active && contract ? <ContractLine personId={personId} contract={contract} today={today} onDone={onDone} /> : null}
+      {active && contract ? <ContractLine personId={personId} personName={personName} contract={contract} renew={renew} today={today} onDone={onDone} /> : null}
     </PersonWell>
   )
 }
 
-/** A term's period and its end: "3 months · ends 31 Oct 2026 · in 8 days". */
+/** A term's period and its end: "3 months · ends 31 Oct 2026 · in 8 days" — "· from 1 Oct 2027" once a contract is renewed. */
 function termValue(t: TermFacts, today: string): string {
-  return [t.months ? monthsLabel(t.months) : null, t.endsOn ? termEndLine(t.endsOn, today, true) : 'its end is counted from the hire date, which is missing']
+  const renewedFrom = t.startsOn && t.startsOn !== t.hireDate ? `from ${dayLabel(t.startsOn)}` : null
+  return [t.months ? monthsLabel(t.months) : null, renewedFrom, t.endsOn ? termEndLine(t.endsOn, today, true) : 'its end is counted from the hire date, which is missing']
     .filter(Boolean)
     .join(' · ')
 }
@@ -249,14 +258,31 @@ function ProbationLine({
 }
 
 /**
- * The contract's line (2026-10-24): "12 months · ends 30 Sep 2027 · in 30 days", who acknowledged its reminder, and
- * Acknowledge while a reminder stands that nobody has.
+ * The contract's line (2026-10-24): "12 months · ends 30 Sep 2027 · in 30 days", who acknowledged its reminder,
+ * Acknowledge while a reminder stands that nobody has — and Renew, which opens under the line (RenewContract).
  */
-function ContractLine({ personId, contract, today, onDone }: { personId: string; contract: TermFacts; today: string; onDone: () => void }) {
+function ContractLine({
+  personId,
+  personName,
+  contract,
+  renew,
+  today,
+  onDone,
+}: {
+  personId: string
+  personName: string
+  contract: TermFacts
+  renew: { types: readonly LetterChoice[] } | null
+  today: string
+  onDone: () => void
+}) {
+  const [renewing, setRenewing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const said = ackLine(contract, today, 'D MMM YYYY')
   const waiting = reminderDue(contract.endsOn, today) && !acknowledged(contract, today)
+  // Renewed from its end: without one (no hire date) there is nothing to count the new contract from.
+  const mayRenew = renew !== null && !!contract.endsOn
 
   function acknowledge() {
     setError(null)
@@ -276,15 +302,35 @@ function ContractLine({ personId, contract, today, onDone }: { personId: string;
       <div className={w.lineText}>
         <span className={w.label}>Contract</span>
         <span className={w.value}>{termValue(contract, today)}</span>
-        {said ? <span className={w.note}>{said}</span> : null}
+        {said && !renewing ? <span className={w.note}>{said}</span> : null}
         {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
       </div>
-      {waiting ? (
+      {!renewing && (waiting || mayRenew) ? (
         <span className={w.actions}>
-          <button type="button" onClick={acknowledge} disabled={pending} className={btn('primary')}>
-            {pending ? 'Acknowledging…' : 'Acknowledge'}
-          </button>
+          {waiting ? (
+            <button type="button" onClick={acknowledge} disabled={pending} className={btn('primary')}>
+              {pending ? 'Acknowledging…' : 'Acknowledge'}
+            </button>
+          ) : null}
+          {mayRenew ? (
+            <button type="button" onClick={() => setRenewing(true)} disabled={pending} className={btn('outline')}>
+              Renew
+            </button>
+          ) : null}
         </span>
+      ) : null}
+      {renewing && renew ? (
+        <RenewContract
+          personId={personId}
+          personName={personName}
+          contract={contract}
+          types={renew.types}
+          onCancel={() => setRenewing(false)}
+          onDone={() => {
+            setRenewing(false)
+            onDone()
+          }}
+        />
       ) : null}
     </div>
   )

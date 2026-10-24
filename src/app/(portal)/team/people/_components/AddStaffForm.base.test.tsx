@@ -6,6 +6,8 @@ import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staf
 const actions = vi.hoisted(() => ({ addStaff: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => actions)
+// The letters filed with the status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: vi.fn() }))
 // Each test waits for ITS OWN submit (CI flake on #582, 2026-10-20): the submit awaits Malaysia's list before it calls
 // addStaff, so on a busy runner `toHaveBeenCalled` passed on an earlier test's call and read its empty address — and
 // the late call then landed in the next test.
