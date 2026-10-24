@@ -6,7 +6,7 @@
 import type { CustomFields } from "../../shared/custom-book";
 import type { Dispatch, SetStateAction } from "react";
 import type { MetaAdRow, MetaFig } from "@/lib/member/crm-ad-names-meta";
-import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
+import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
@@ -100,6 +100,9 @@ export interface DeskUi {
   srEdit: string | null;
   /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
   srAt: number;
+  /** Showrooms' two pages: the showrooms, or Appointment types (2026-10-24), and the types' draft until Save. */
+  srPage: "rooms" | "types";
+  atDraft: ApptType[] | null;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
   srBlkOpen: boolean;
@@ -237,7 +240,7 @@ export const initialDeskUi = (): DeskUi => ({
   calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
-  srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
+  srEdit: null, srAt: 0, srPage: "rooms", atDraft: null, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
   mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaFrom: null, lbaTo: null, lbaSt: "all", lbaQ: "", lbaSort: null, lbaPick: null, lbaPickShut: false, lbaLead: null, lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, rpTeam: "all", rpQ: "", rpPick: null, rpPickShut: false, rpLead: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},

@@ -4,6 +4,7 @@
  * move a customer, undo either, the ad rules and full-time allocation, the
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
+import type { ApptType } from "@/lib/member/crm-data";
 import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
@@ -19,6 +20,8 @@ export interface PanelActions extends SalesActions {
   nameAd(ad: string, name: string): Promise<boolean>;
   /** Take an ad off Ads performance, or put it back (crm_hide_ad); its leads stay. */
   hideAd(ad: string, on: boolean): Promise<boolean>;
+  /** Showrooms › Appointment types, saved whole (crm_save_appt_types). */
+  saveApptTypes(types: ApptType[]): Promise<boolean>;
   /** Adds an ad before its first lead (crm_add_ad, CRM · Manage; 2026-10-22): it joins Ads to teams with its run. */
   addAd(ad: { id: string; name: string; status: string; start: string | null; end: string | null; page?: string | null; pageName?: string | null }): Promise<boolean>;
   /** Meta's ads in the connected ad accounts; also adds, by itself, every one running or about to run (`sync`). */
@@ -97,6 +100,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
         if (nm) names[ad] = { name: nm, source: "manual" }; else delete names[ad];
         return { ...d, adNames: names, customers: d.customers.map(c => (c.adId === ad ? { ...c, ad: nm || c.adHeadline || `Ad ${ad}` } : c)) };
       });
+      return true;
+    },
+    async saveApptTypes(types) {
+      if (!(await write("crm_save_appt_types", { p_types: types }))) return false;
+      setData(d => ({ ...d, apptTypes: types }));
       return true;
     },
     async hideAd(ad, on) {

@@ -23,6 +23,8 @@ const CRM_WRITES = [
   "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
   // An appointment online or elsewhere (mig 20261025020000).
   "crm_book_custom", "crm_move_custom",
+  // Appointment types (mig 20261025040000).
+  "crm_book_typed", "crm_move_typed", "crm_save_appt_types",
   "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_give_to_hod",
   // The redesign (mig 20261009160000).
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
@@ -60,7 +62,7 @@ export type CrmWrite = (typeof CRM_WRITES)[number];
  */
 const TELLS: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign",
-  "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_set_appointment_state", "crm_visit_outcome",
+  "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_visit_outcome",
   "crm_invite", "crm_answer_invite", "crm_remind",
 ]);
 const pushAfter = () => import("@/lib/push/outbox").then(m => m.pushSoon(), () => undefined);
@@ -122,11 +124,11 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
-  "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
+  "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
   "crm_add_note", "crm_add_contact",
 ]);
@@ -162,7 +164,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
         .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, media_mime, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
         .order("sent_at").order("id").range(from, to), "crm messages"),
-      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks")),
+      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks, type_id, answers")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
       read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id, marked_unread")),
       read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),
@@ -193,7 +195,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, adNames: more.adNames, settings: more.settings, locked: more.locked,
+      forms: more.forms, notes: more.notes, stars: more.stars, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
@@ -211,7 +213,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -230,8 +232,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("locked", true)),
     // Showrooms' staff-only remarks and the deleted ones (mig 20261024150000).
     soft<{ id: string; remarks: string | null; deleted_at: string | null }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at")),
+    // Appointment types (mig 20261025040000): null before it, so the two built in stay.
+    (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
   ]);
-  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id) };
+  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

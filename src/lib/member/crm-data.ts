@@ -21,6 +21,40 @@ export interface CrmPerson {
   title?: string;
 }
 
+/**
+ * Appointment types beside Showroom (mig 20261025040000; the owner, 2026-10-24: set on the desktop's Showrooms › Appointment
+ * types, "做成類似customer form 一樣的"): each online or at a place, with its own questions. An online type sends its first
+ * Link answer to the customer as the meeting link; a place type its Place answer as the location; the rest is staff-only.
+ */
+export type ApptFieldKind = "text" | "long" | "link" | "number" | "choice" | "place";
+export interface ApptField { id: string; label: string; kind: ApptFieldKind; required?: boolean; options?: string[] }
+export interface ApptType { id: string; label: string; on: boolean; base: "online" | "place"; fields: ApptField[] }
+export const APPT_FIELD_KINDS: { k: ApptFieldKind; label: string }[] = [
+  { k: "text", label: "Short text" }, { k: "long", label: "Long text" }, { k: "link", label: "Link" },
+  { k: "number", label: "Number" }, { k: "choice", label: "Choice" }, { k: "place", label: "Place (sent to the customer)" },
+];
+/** The two built in, as crm_appt_types_in_force() has them. */
+export const DEFAULT_APPT_TYPES: ApptType[] = [
+  { id: "online", label: "Online", on: true, base: "online", fields: [{ id: "link", label: "Meeting link", kind: "link" }, { id: "remarks", label: "Remarks", kind: "long" }] },
+  { id: "other", label: "Other", on: true, base: "place", fields: [{ id: "place", label: "Place", kind: "place", required: true }, { id: "remarks", label: "Remarks", kind: "long" }] },
+];
+/** crm_appt_types_read()'s answer as types; anything else = the two built in. */
+export function apptTypesFrom(raw: unknown): ApptType[] {
+  if (!Array.isArray(raw)) return DEFAULT_APPT_TYPES;
+  const kinds = new Set(APPT_FIELD_KINDS.map(k => k.k));
+  return raw.filter((t): t is ApptType => !!t && typeof t === "object" && typeof (t as ApptType).id === "string" && typeof (t as ApptType).label === "string")
+    .map(t => ({ id: t.id, label: t.label, on: t.on !== false, base: t.base === "online" ? "online" : "place",
+      fields: (Array.isArray(t.fields) ? t.fields : []).filter(f => f && typeof f.id === "string" && kinds.has(f.kind)).map(f => ({ id: f.id, label: String(f.label ?? ""), kind: f.kind, ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) })) }));
+}
+/** What a typed appointment keeps, as crm_appt_values() works it out: kind, the name it goes by, link, place, remarks. */
+export function apptValues(t: ApptType, answers: Record<string, string>): { kind: "online" | "other"; name: string; link?: string; place?: string; remarks?: string } {
+  const v = (f: ApptField) => (answers[f.id] ?? "").trim();
+  const link = t.base === "online" ? t.fields.filter(f => f.kind === "link").map(v).find(Boolean) : undefined;
+  const place = t.base === "place" ? t.fields.filter(f => f.kind === "place").map(v).find(Boolean) : undefined;
+  const remarks = (answers.remarks ?? "").trim() || undefined;
+  return { kind: t.base === "online" ? "online" : "other", name: t.base === "online" ? t.label : place ?? t.label, ...(link ? { link } : {}), ...(place ? { place } : {}), ...(remarks ? { remarks } : {}) };
+}
+
 export interface CrmCard {
   kind: "Confirmed" | "Updated" | "Cancelled" | "Reminder"; start: string; room: string; addr: string;
   /** An appointment online or elsewhere (2026-10-24): what it is, and an online one's meeting link. */
@@ -100,6 +134,10 @@ export interface CrmVisit {
   link?: string;
   place?: string;
   remarks?: string;
+  /** Its appointment type (an id of ApptType; mig 20261025040000), the name it goes by, and every answer typed. */
+  typeId?: string;
+  label?: string;
+  answers?: Record<string, string>;
 }
 
 /**
@@ -260,6 +298,8 @@ export interface CrmData {
   notes?: CrmNote[];
   /** Settings › General (mig 20261018100000, crm_settings_read): the reply lines, the template button, auto-assign. */
   settings?: CrmSettings;
+  /** The appointment types beside Showroom (mig 20261025040000); the two built in until it is read. */
+  apptTypes?: ApptType[];
 }
 
 /** Settings › General, editable round 1 (the owner, 2026-10-18: "可以，照这三项做"). */
@@ -362,6 +402,7 @@ export interface CrmVisitRow {
   id: string; contact_id: string; showroom: string; start_at: string; minutes: number; state: CrmVisitState;
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
   kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
+  type_id?: string | null; answers?: Record<string, string> | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -401,6 +442,8 @@ export interface CrmDataRows {
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null; hidden_at?: string | null }[];
   locked?: string[];
+  /** crm_appt_types_read()'s answer (mig 20261025040000); absent before it. */
+  apptTypes?: unknown;
   /** crm_settings_read()'s answer; absent before the migration. */
   settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
@@ -490,14 +533,14 @@ export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
   return {
     id: a.id, customerId: a.contact_id, showroomId: custom ? virtualRoomId(a.id) : a.showroom, start: a.start_at, minutes: a.minutes, state: a.state,
     outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
-    ...(custom ? { kind: custom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}) } : {}),
+    ...(custom ? { kind: custom, typeId: a.type_id ?? custom, label: a.showroom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}), ...(a.answers ? { answers: a.answers } : {}) } : {}),
     ...(a.remarks ? { remarks: a.remarks } : {}),
   };
 };
 /** The room an online / elsewhere visit is named by. */
 export const virtualRoomId = (visitId: string) => `visit:${visitId}`;
-export function virtualRoom(v: Pick<CrmVisit, "id" | "kind" | "place">): CrmRoom {
-  const name = v.kind === "online" ? "Online meeting" : v.place || "Other place";
+export function virtualRoom(v: Pick<CrmVisit, "id" | "kind" | "place" | "label">): CrmRoom {
+  const name = v.label || (v.kind === "online" ? "Online meeting" : v.place || "Other place");
   return { id: virtualRoomId(v.id), name, active: false, address: v.kind === "other" ? (v.place ?? "") : "", slots: [], cap: 0, weekly: [], blocks: [], virtual: true };
 }
 
@@ -557,6 +600,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     notifDeleted: rows.staffPrefs[0]?.notif_deleted ?? [],
     recentEmoji: rows.staffPrefs[0]?.recent_emoji ?? [],
     settings: settingsFrom(rows.settings),
+    apptTypes: apptTypesFrom(rows.apptTypes),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),

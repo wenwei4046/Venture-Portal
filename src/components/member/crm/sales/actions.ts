@@ -9,7 +9,7 @@ import {
   crmWrite, fetchCrmTemplates, reactToMessage, forwardCrmMessage, sendCrmMedia, sendCrmMessage, sendCrmTemplate, type CrmWrite,
 } from "@/app/(member)/member/crm-actions";
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
-import { virtualRoom } from "@/lib/member/crm-data";
+import { apptValues, virtualRoom, visitFromRow, type ApptType, type CrmVisitRow } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
@@ -78,7 +78,8 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 
 /** The words a visit card sends the customer (the chat draws them as the card), with the way there. */
 /** An appointment online or somewhere else: its kind, start (ISO), meeting link, place and the salesperson's remarks. */
-export interface CustomVisit { kind: "online" | "other"; start: string; link?: string; place?: string; remarks?: string }
+/** An appointment of one of the Control panel's types (mig 20261025040000): the type, its start (ISO) and what was typed. */
+export interface CustomVisit { type: ApptType; start: string; answers: Record<string, string> }
 
 /** A visit's card: its room's name and address, and an online / elsewhere one's kind and link. */
 export function visitCard(kind: CrmCard["kind"], v: Pick<CrmVisit, "start" | "kind" | "link">, rm: { name: string; address: string } | undefined): CrmCard {
@@ -235,11 +236,12 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       return true;
     },
     async bookCustom(customerId, f) {
-      const r = await write("crm_book_custom", { p_contact: customerId, p_kind: f.kind, p_start: f.start, p_link: f.link ?? null, p_place: f.place ?? null, p_remarks: f.remarks ?? null, p_minutes: 60 });
+      const r = await write("crm_book_typed", { p_contact: customerId, p_type: f.type.id, p_start: f.start, p_answers: f.answers, p_minutes: 60 });
       if (!r.ok) return false;
-      const saved = r.data as { id: string } | null;
-      const v: CrmVisit = { id: saved?.id ?? uid(), customerId, showroomId: "", start: f.start, minutes: 60, state: "booked", outcome: null, remindedAt: null,
-        kind: f.kind, ...(f.link?.trim() ? { link: f.link.trim() } : {}), ...(f.place?.trim() ? { place: f.place.trim() } : {}), ...(f.remarks?.trim() ? { remarks: f.remarks.trim() } : {}) };
+      // The database's own row when there is one; else (the demo) worked out here as the database would.
+      const row = r.data as CrmVisitRow | null, val = apptValues(f.type, f.answers);
+      const v: CrmVisit = row?.id ? visitFromRow(row) : { id: uid(), customerId, showroomId: "", start: f.start, minutes: 60, state: "booked", outcome: null, remindedAt: null,
+        kind: val.kind, typeId: f.type.id, label: val.name, answers: f.answers, ...(val.link ? { link: val.link } : {}), ...(val.place ? { place: val.place } : {}), ...(val.remarks ? { remarks: val.remarks } : {}) };
       const vr = virtualRoom(v);
       setData(d => ({ ...d, visits: [...d.visits, { ...v, showroomId: vr.id }], rooms: [...d.rooms, vr] }));
       patchCustomer(customerId, c => ({ ...c, status: "appointment", lost: undefined, previous: undefined }));
@@ -247,10 +249,12 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       return true;
     },
     async moveCustom(visitId, f) {
-      if (!(await write("crm_move_custom", { p_appointment: visitId, p_kind: f.kind, p_start: f.start, p_link: f.link ?? null, p_place: f.place ?? null, p_remarks: f.remarks ?? null })).ok) return false;
+      const r = await write("crm_move_typed", { p_appointment: visitId, p_type: f.type.id, p_start: f.start, p_answers: f.answers });
+      if (!r.ok) return false;
       const old = visit(visitId);
       if (!old) return true;
-      const v: CrmVisit = { ...old, start: f.start, kind: f.kind, link: f.kind === "online" && f.link?.trim() ? f.link.trim() : undefined, place: f.kind === "other" ? f.place?.trim() : undefined, remarks: f.remarks?.trim() || undefined };
+      const row = r.data as CrmVisitRow | null, val = apptValues(f.type, f.answers);
+      const v: CrmVisit = row?.id ? visitFromRow(row) : { ...old, start: f.start, kind: val.kind, typeId: f.type.id, label: val.name, answers: f.answers, link: val.link, place: val.place, remarks: val.remarks };
       const vr = virtualRoom(v);
       setData(d => ({ ...d, visits: d.visits.map(x => (x.id === visitId ? { ...v, showroomId: vr.id } : x)), rooms: [...d.rooms.filter(r => r.id !== vr.id), vr] }));
       await sendCard(old.customerId, visitCard("Updated", v, vr));

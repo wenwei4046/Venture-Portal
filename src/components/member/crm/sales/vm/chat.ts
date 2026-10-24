@@ -10,6 +10,7 @@
  * replies · Auto replies) · Camera in one pill, the mic held to record or Send;
  * "/" for quick replies; after the reply window, approved templates only.
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { customBookVM, customPrefill, type CustomBook } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
@@ -357,7 +358,7 @@ export function chatVM(ctx: SalesCtx) {
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
     book = {
       ...book, bookOpen: true,
-      bkm: customBookVM({ b, put, changing: !!b.visitId, now,
+      bkm: customBookVM({ b, put, changing: !!b.visitId, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
         save: f => oneAtATime(`book:${c.id}`, async () => {
           if (b.visitId) return act.moveCustom(b.visitId, f);
           const rb = ui.rebookFor;
