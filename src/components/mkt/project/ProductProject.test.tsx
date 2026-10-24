@@ -350,3 +350,40 @@ describe('a recurring product project’s months', () => {
     expect(screen.queryByRole('button', { name: 'Change day' })).toBeNull()
   })
 })
+
+// 2026-10-24 — ④-2b: a campaign (the user's answer 13) — its run in the header, its intake's *Campaign period* written.
+describe('a campaign', () => {
+  const PERIOD = { name: 'Campaign period', type: 'Campaign period', req: true, pic: true, lock: false }
+  const withPeriod = (vals: Record<string, unknown>) => ({
+    ...ready, vals: { ...ready.vals, ...vals },
+    template: { id: 't1', version: 1, name: 'Kickoff', fields: [...FIELDS.slice(0, 4), PERIOD, ...FIELDS.slice(4)], rules: { sign: true, pic: true, project: true, file: true, lock: true } },
+  })
+
+  it('its run in the header: before it, then live', () => {
+    const { unmount } = render(<ProductProject initial={page(RACHEL, { status: 'active', campaign: { from: '2026-11-09', until: '2026-11-12' } }, ready)} can={MANAGER} />)
+    expect(screen.getByLabelText('Campaign').textContent).toBe('📢 Runs 9 – 12 Nov 2026 · in 16 days')
+    unmount()
+    render(<ProductProject initial={page(RACHEL, { status: 'active', campaign: { from: '2026-10-20', until: '2026-10-30' } }, ready)} can={MANAGER} />)
+    expect(screen.getByLabelText('Campaign').textContent).toBe('📢 Live · 20 – 30 Oct 2026 · ends 30 Oct')
+  })
+
+  it('no run, no line', () => {
+    render(<ProductProject initial={page(RACHEL, { status: 'active' }, ready)} can={MANAGER} />)
+    expect(screen.queryByLabelText('Campaign')).toBeNull()
+  })
+
+  it('the intake’s Campaign period: its two days, the last not before the first — only what changed saved', async () => {
+    render(<ProductProject initial={page(RACHEL, {}, withPeriod({ 'Campaign period': { from: '2026-11-09', to: null } }))} can={MANAGER} />)
+    const from = screen.getByLabelText('Campaign period from') as HTMLInputElement
+    const to = screen.getByLabelText('Campaign period to') as HTMLInputElement
+    expect([from.value, to.value, to.getAttribute('min')]).toEqual(['2026-11-09', '', '2026-11-09'])
+    expect(screen.getByText(/Campaign period is empty/)).toBeTruthy()
+    expect(screen.queryByLabelText('Campaign')).toBeNull()
+    fireEvent.change(to, { target: { value: '2026-11-12' } })
+    // The header follows it as typed.
+    expect(screen.getByLabelText('Campaign').textContent).toBe('📢 Runs 9 – 12 Nov 2026 · in 16 days')
+    await waitFor(() => expect(actions.fillMktMinutes).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.fillMktMinutes.mock.calls[0]).toEqual(['m1', 'p1', 3, { vals: { 'Campaign period': { from: '2026-11-09', to: '2026-11-12' } } }])
+    expect(screen.queryByText(/Campaign period is empty/)).toBeNull()
+  })
+})

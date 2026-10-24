@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMinutesField, colTypeOf, minutesFieldsPayload, minutesPatch, minutesProblems, minutesSummary, minutesTemplatesFromRow, minutesWarnings,
-  newMinutesFields, newMinutesName, NEW_RULES, type MinutesField,
+  newMinutesFields, newMinutesName, NEW_RULES, ONCE_TYPES, type MinutesField,
 } from './minutes'
 
 // 2026-10-23 — the Minutes Builder (`Minutes Builder.dc.html`, ③ of the handoff): what the builder reads, sums up,
@@ -106,5 +106,19 @@ describe('only what changed is saved', () => {
 
   it('a locked field is sent required', () => {
     expect(minutesFieldsPayload([field({ type: 'People', lock: true, req: false })])[0]).toMatchObject({ req: true, lock: true })
+  })
+})
+
+// 2026-10-24 — ④-2b: a campaign's run period, a kind of its own (the user's answer 13), kept once.
+describe('a campaign period', () => {
+  it('is added once, refused twice, and is no content for the PIC', () => {
+    expect(ONCE_TYPES).toEqual(['Project link', 'Campaign period'])
+    const base = newMinutesFields()
+    const one = addMinutesField(base, 'Campaign period', 'Campaign period')
+    expect(one.find(f => f.type === 'Campaign period')).toMatchObject({ name: 'Campaign period', req: false, pic: true })
+    expect(minutesProblems(one)).toEqual([])
+    expect(minutesProblems(addMinutesField(one, 'Another', 'Campaign period'))).toEqual(['Minutes keep one campaign period'])
+    expect(minutesWarnings(one, { ...NEW_RULES, pic: true })).toEqual(['PIC signs off but can’t see any content field'])
+    expect(minutesFieldsPayload(one).find(f => f.type === 'Campaign period')).toEqual({ name: 'Campaign period', type: 'Campaign period', req: false, pic: true, lock: false })
   })
 })

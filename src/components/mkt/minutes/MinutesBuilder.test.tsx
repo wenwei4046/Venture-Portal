@@ -173,3 +173,21 @@ describe('the Minutes Builder', () => {
     expect(actions.saveMktMinutes).not.toHaveBeenCalled()
   })
 })
+
+// 2026-10-24 — ④-2b: a campaign's run period, a kind of its own (the user's answer 13) — added once, tried as two days.
+describe('a campaign period', () => {
+  it('is added once — then no longer offered — and the Preview asks its two days', () => {
+    builder()
+    fireEvent.change(screen.getByRole('textbox', { name: 'New field name' }), { target: { value: 'Campaign period' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Campaign period' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add field' }))
+    expect(screen.getAllByRole('textbox', { name: 'Field name' }).map(i => (i as HTMLInputElement).value).slice(-2)).toEqual(['Campaign period', 'Signatures'])
+    expect(screen.queryByRole('button', { name: 'Campaign period' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Short text' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    fireEvent.change(screen.getByLabelText('Campaign period from'), { target: { value: '2026-11-09' } })
+    fireEvent.change(screen.getByLabelText('Campaign period to'), { target: { value: '2026-11-12' } })
+    expect((screen.getByLabelText('Campaign period to') as HTMLInputElement).value).toBe('2026-11-12')
+    expect(actions.saveMktMinutes).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ vals: expect.anything() }))
+  })
+})

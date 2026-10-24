@@ -3,10 +3,13 @@
 // keep, locked) and its completion rules — what the foot sums up and warns of, what publishing refuses (as
 // mkt_minutes_check does), and only what changed, for the save. Pure.
 
-export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature'] as const
+export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period'] as const
 export type MinutesType = (typeof MINUTES_TYPES)[number]
 /** The kinds a field is added as (the handoff's TYPES): the project link and the signatures come with every template. */
-export const ADDABLE_TYPES: readonly MinutesType[] = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table']
+export const ADDABLE_TYPES: readonly MinutesType[] = ['Short text', 'Long text', 'Date', 'Campaign period', 'Number', 'People', 'Project link', 'Free space', 'Table']
+/** The kinds a template keeps once: the project it is for, and a campaign's run period (the user's answer 13 — its
+ * project runs once). */
+export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period']
 export const MINUTES_COL_TYPES = ['Text', 'Number', 'Date', 'Person'] as const
 export type MinutesColType = (typeof MINUTES_COL_TYPES)[number]
 export const COL_GLYPH: Record<MinutesColType, string> = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' }
@@ -142,7 +145,7 @@ export function minutesSummary(fields: readonly MinutesField[]): string {
 export function minutesWarnings(fields: readonly MinutesField[], rules: MinutesRules): string[] {
   const out: string[] = []
   if (rules.sign && !fields.some(f => f.type === 'Signature')) out.push('“Every attendee signs” is on, but there is no Signatures field')
-  if (rules.pic && !fields.some(f => f.pic && f.type !== 'People' && f.type !== 'Project link' && f.type !== 'Date' && f.type !== 'Signature')) {
+  if (rules.pic && !fields.some(f => f.pic && f.type !== 'People' && f.type !== 'Project link' && f.type !== 'Date' && f.type !== 'Campaign period' && f.type !== 'Signature')) {
     out.push('PIC signs off but can’t see any content field')
   }
   return out
@@ -156,6 +159,7 @@ export function minutesProblems(fields: readonly MinutesField[]): string[] {
   else if (new Set(names).size !== names.length) out.push('Two fields share a name')
   if (fields.some(f => f.type === 'Table' && (f.cols ?? []).some(c => !c.name.trim()))) out.push('A table column has no name')
   if (!fields.some(f => f.type === 'Project link') || !fields.some(f => f.type === 'People' && f.lock)) out.push('Minutes keep their project and attendees')
+  if (fields.filter(f => f.type === 'Campaign period').length > 1) out.push('Minutes keep one campaign period')
   return out
 }
 

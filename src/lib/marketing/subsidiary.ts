@@ -1,11 +1,13 @@
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): where its work stands (the stat cards), its dates by Month,
 // Week or Timeline — stage due dates and the runs to come, coloured by group (a People title), red once passed undone, HR's holidays as
 // key dates — its projects with how far each has come, and the newest lines of their trails. All from the board
-// (mkt_board) and its feed (mkt_sub_feed). The handoff's campaigns, posts, shoots and ads have no source yet (open
-// questions 13–16): the page draws what exists. Pure.
+// (mkt_board) and its feed (mkt_sub_feed). Its campaigns (④-2b — the user's answer 13: a product project with a run
+// period): the card of those running, the timeline's own rows with their overlaps, the days they run. Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, shortDay, type MktBoard, type MktGroup, type MktProjectKind } from './board'
+import {
+  addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, periodWords, shortDay, type MktBoard, type MktGroup, type MktProjectKind,
+} from './board'
 import { sameGroup } from './groups'
 import type { CalEvent, CalTone } from './calendar'
 import { productEventText } from './project'
@@ -14,7 +16,7 @@ import { eventFromRow, eventText, type MktTaskPage, type TaskEvent } from './tas
 
 // ── The stat cards ───────────────────────────────────────────────────────────────
 export interface SubStat {
-  key: 'running' | 'pic' | 'week' | 'done' | 'overdue'
+  key: 'campaigns' | 'running' | 'pic' | 'week' | 'done' | 'overdue'
   emoji: string
   label: string
   value: number
@@ -22,8 +24,8 @@ export interface SubStat {
   red: boolean
 }
 
-/** Its projects running, those waiting for the PIC, the stages due this week, the projects done this month, the
- * stages overdue. */
+/** Its campaigns running today (the next one's day when none is), its projects running, those waiting for the PIC, the
+ * stages due this week, the projects done this month, the stages overdue. */
 export function subStats(board: MktBoard, sub: string, events: readonly CalEvent[]): SubStat[] {
   const rows = projectRows(board).filter(r => r.sub?.id === sub)
   const open = rows.filter(r => r.open)
@@ -35,7 +37,11 @@ export function subStats(board: MktBoard, sub: string, events: readonly CalEvent
   const done = board.projects.filter(p => p.sub === sub && p.status === 'done' && !!p.doneAt && officeTime(p.doneAt).format('YYYY-MM') === month)
   // Paused (a project, or a series between runs) is open but not running.
   const running = open.filter(r => !r.label.endsWith('Paused'))
+  const camps = subCampaigns(board, sub)
+  const live = camps.filter(c => c.live).length
+  const next = camps.find(c => c.from > board.today)
   return [
+    { key: 'campaigns', emoji: '📢', label: 'Campaigns running', value: live, sub: !live && next ? `next ${shortDay(next.from)}` : '', red: false },
     { key: 'running', emoji: '📁', label: 'Projects running', value: running.length, sub: '', red: false },
     { key: 'pic', emoji: '🔗', label: 'Waiting for PIC', value: open.filter(r => r.label.includes('Waiting for PIC')).length, sub: '', red: false },
     { key: 'week', emoji: '⏱', label: 'Due this week', value: due.filter(e => e.tone === 'waiting' && e.day >= board.today && e.day <= weekEnd).length, sub: '', red: false },
@@ -45,8 +51,9 @@ export function subStats(board: MktBoard, sub: string, events: readonly CalEvent
 }
 
 // ── The filter (the handoff's Type · Department · Status) ────────────────────────
-export type SubType = 'due' | 'run'
+export type SubType = 'campaign' | 'due' | 'run'
 export const SUB_TYPES: readonly { key: SubType; label: string; icon: string }[] = [
+  { key: 'campaign', label: 'Campaign', icon: '📢' },
   { key: 'due', label: 'Stage due date', icon: '⏱' },
   { key: 'run', label: 'Recurring run', icon: '🔁' },
 ]
@@ -70,6 +77,66 @@ export function passesSub(e: CalEvent, f: SubFilter): boolean {
   return (!f.types.length || f.types.includes(type))
     && (!f.teams.length || f.teams.some(g => sameGroup(g, e.team)))
     && (!f.statuses.length || f.statuses.includes(e.tone))
+}
+
+/** A campaign through the filter: by type and status (ran = done, else waiting); a group asked hides it — a campaign is a
+ * project, not one group's work. */
+export function passesCampaign(c: SubCampaign, f: SubFilter): boolean {
+  return (!f.types.length || f.types.includes('campaign')) && !f.teams.length && (!f.statuses.length || f.statuses.includes(c.ran ? 'done' : 'waiting'))
+}
+
+// ── Campaigns (④-2b — the user's answer 13) ──────────────────────────────────────
+export interface SubCampaign {
+  id: string
+  trackId: string
+  title: string
+  /** Its title without the subsidiary's name before it. */
+  short: string
+  from: string
+  until: string
+  /** Running today. */
+  live: boolean
+  /** Its run is over. */
+  ran: boolean
+}
+
+/** The subsidiary's campaigns (a product project with a run period, not cancelled), by their first day. */
+export function subCampaigns(board: MktBoard, sub: string): SubCampaign[] {
+  const name = board.subs.find(x => x.id === sub)?.name ?? ''
+  const out: SubCampaign[] = []
+  for (const p of board.projects) {
+    if (p.sub !== sub || !p.campaign || p.status === 'cancelled' || p.parent) continue
+    const { from, until } = p.campaign
+    const short = name && p.title.startsWith(`${name} · `) ? p.title.slice(name.length + 3) : p.title
+    out.push({ id: p.id, trackId: p.trackId, title: p.title, short, from, until, live: board.today >= from && board.today <= until, ran: board.today > until })
+  }
+  return out.sort((a, b) => a.from.localeCompare(b.from) || a.title.localeCompare(b.title))
+}
+
+/** "9 – 12 Nov", "28 Nov – 3 Dec", "9 Nov": a span within the timeline's weeks, no year. */
+export const spanWords = (from: string, until: string) =>
+  from === until ? shortDay(from) : from.slice(0, 7) === until.slice(0, 7) ? `${+from.slice(8, 10)} – ${shortDay(until)}` : `${shortDay(from)} – ${shortDay(until)}`
+
+/** The campaigns running on a day (the Month's and the Week's). */
+export const campaignsOn = (list: readonly SubCampaign[], day: string) => list.filter(c => c.from <= day && c.until >= day)
+
+export interface CampaignOverlap { a: SubCampaign; b: SubCampaign; from: string; until: string }
+
+/** Each two campaigns that run on the same days, and those days. */
+export function campaignOverlaps(list: readonly SubCampaign[]): CampaignOverlap[] {
+  const out: CampaignOverlap[] = []
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const from = list[i].from > list[j].from ? list[i].from : list[j].from
+    const until = list[i].until < list[j].until ? list[i].until : list[j].until
+    if (from <= until) out.push({ a: list[i], b: list[j], from, until })
+  }
+  return out
+}
+
+/** Under the timeline (the handoff's): "No campaign overlaps", or "1 overlap: Truck event overlaps Showroom Weekends (9 – 12 Nov)". */
+export function overlapNote(ov: readonly CampaignOverlap[]): string {
+  if (!ov.length) return 'No campaign overlaps'
+  return `${ov.length} overlap${ov.length === 1 ? '' : 's'}: ${ov.map(o => `${o.a.short} overlaps ${o.b.short} (${spanWords(o.from, o.until)})`).join(', ')}`
 }
 
 // ── Key dates: HR's holidays, flagged ────────────────────────────────────────────
@@ -150,6 +217,35 @@ export function timelineBars(board: MktBoard, rows: readonly SubProjectRow[], w:
   return out
 }
 
+export interface TimelineCampaign extends SubCampaign {
+  left: number
+  width: number
+  /** "9 – 12 Nov 2026" */
+  range: string
+  /** What its bar says: "Truck event · 9 – 12 Nov". */
+  label: string
+}
+
+/** Each campaign whose run touches the window, clipped to it (the timeline's 📢 Campaigns). */
+export function timelineCampaigns(list: readonly SubCampaign[], w: TimelineWindow): TimelineCampaign[] {
+  const end = addDays(w.start, w.days - 1)
+  return list.filter(c => c.until >= w.start && c.from <= end).map(c => {
+    const a = c.from < w.start ? w.start : c.from
+    const b = c.until > end ? end : c.until
+    return { ...c, left: pct(w, a), width: ((daysBetween(a, b) + 1) / w.days) * 100, range: periodWords(c.from, c.until), label: `${c.short} · ${spanWords(c.from, c.until)}` }
+  })
+}
+
+/** The days two campaigns share, on the timeline's ⚠️ Overlaps row — clipped to the window. */
+export function timelineOverlaps(ov: readonly CampaignOverlap[], w: TimelineWindow): { key: string; left: number; width: number; title: string }[] {
+  const end = addDays(w.start, w.days - 1)
+  return ov.filter(o => o.until >= w.start && o.from <= end).map(o => {
+    const a = o.from < w.start ? w.start : o.from
+    const b = o.until > end ? end : o.until
+    return { key: `${o.a.id}:${o.b.id}`, left: pct(w, a), width: ((daysBetween(a, b) + 1) / w.days) * 100, title: `${o.a.short} overlaps ${o.b.short} · ${spanWords(o.from, o.until)}` }
+  })
+}
+
 /** The timeline's head: each month's name where it starts, each Monday's day. */
 export function timelineHeads(w: TimelineWindow): { months: { name: string; left: number }[]; weeks: { n: number; left: number }[] } {
   const months: { name: string; left: number }[] = []
@@ -192,6 +288,8 @@ const FEED_EMOJI: Record<string, string> = {
   closed: '🏁', nudged: '👋', paused: '⏸', resumed: '▶', ended: '⏹', 'link sent': '🔗', resent: '🔗', 'pic approved': '🔗',
   'pic changes': '🔗', signed: '✍️', 'minutes completed': '📝', 'edited after approval': '✏️', 'started before approval': '⚡',
   attached: '📚', detached: '📚', replaced: '🔁',
+  'work started': '▶', 'run made': '🔁', 'run day': '📅', 'amount set': '💰', 'billing confirmed': '💰', 'billing withdrawn': '💰', stopped: '⏹',
+  'campaign period': '📢',
 }
 
 /** "just now", "12 min ago", "3h ago", "yesterday", else the day — `now` an instant (ms). */
@@ -208,7 +306,9 @@ export function agoLabel(at: string, now: number, today: string): string {
 }
 
 /** What only a product project's trail says (its minutes and its PIC's link); its stages read as a task's do. */
-const PRODUCT_ACTIONS = new Set(['created', 'signed', 'link sent', 'minutes completed', 'edited after approval', 'started before approval', 'resent', 'pic approved', 'pic changes'])
+const PRODUCT_ACTIONS = new Set(['created', 'signed', 'link sent', 'minutes completed', 'edited after approval', 'started before approval', 'resent', 'pic approved', 'pic changes',
+  // Its work, its months, its billing (never a figure), its owner replaced, its campaign period — the product page's own words.
+  'work started', 'run made', 'run day', 'closed', 'amount set', 'billing confirmed', 'billing withdrawn', 'stopped', 'replaced', 'campaign period'])
 
 /** A feed line: what happened on which project, in the trail's own words. */
 export function feedLine(e: SubFeedEvent): { key: string; emoji: string; text: string; href: string } {

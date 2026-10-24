@@ -73,6 +73,11 @@ export function projectRows(board: MktBoard): ProjectRow[] {
         break
       }
     }
+    // A campaign running (the user's answer 13): Live — once its work started, while it runs.
+    if (p.campaign && (p.status === 'active' || p.status === 'done') && board.today >= p.campaign.from && board.today <= p.campaign.until) {
+      if (tone !== 'red') tone = 'waiting'
+      label = tone === 'red' ? label : 'Live'
+    }
     if (late && tone !== 'done') {
       tone = 'red'
       label = `Overdue · ${label}`

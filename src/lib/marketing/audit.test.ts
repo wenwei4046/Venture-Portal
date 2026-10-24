@@ -86,6 +86,14 @@ describe('a project’s formal log', () => {
       ['Monthly run made', 'Nov 2026'], ['Run day changed', '—'], ['Plan carried', '—']])
   })
 
+  it('a campaign’s period (④-2b): its days — or taken off — in the Reason column', () => {
+    const log = projectLogFromRow({ track: 'MKT-CAR-2610-007', title: 'Truck event', kind: 'product', rows: [
+      { id: 50, at: '2026-10-24T01:00:00Z', actor: 'Josiah', action: 'campaign period', data: { from: '2026-11-09', until: '2026-11-12' } },
+      { id: 51, at: '2026-10-24T02:00:00Z', actor: 'Josiah', action: 'campaign period', data: { from: null, until: null } },
+    ] })!
+    expect(auditRows(log).map(r => [r.action, r.reason])).toEqual([['Campaign period', '9 – 12 Nov 2026'], ['Campaign period', 'Taken off']])
+  })
+
   it('filters by person, action and stage — each value as first named, counted over the whole log', () => {
     const rows = auditRows(task)
     const groups = auditGroups(rows, NO_AUDIT_FILTER)

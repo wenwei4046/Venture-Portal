@@ -46,3 +46,21 @@ describe('Projects', () => {
     expect(scopeFor('banner')).toBe('open')
   })
 })
+
+// 2026-10-24 — ④-2b: a campaign is Live while it runs, once its work started (the handoff's *Live*).
+describe('a campaign running', () => {
+  it('is Live while it runs — done or not — and itself before and after', () => {
+    const at = (today: string, status: string) => projectRows(boardFromRow({
+      today,
+      subs: [{ id: CAR, code: 'CAR', name: 'Carres' }],
+      projects: [{ id: id(9), trackId: 'MKT-CAR-2611-009', kind: 'product', sub: CAR, title: 'Truck event', status, cur: 0,
+        campaign: { from: '2026-11-09', until: '2026-11-12' }, updatedAt: '2026-11-01T01:00:00Z' }],
+    }))[0]
+    expect([at('2026-11-10', 'active').label, at('2026-11-10', 'active').tone]).toEqual(['Live', 'waiting'])
+    expect([at('2026-11-10', 'done').label, at('2026-11-10', 'done').tone]).toEqual(['Live', 'waiting'])
+    expect(at('2026-11-08', 'active').label).toBe('In progress')
+    expect(at('2026-11-13', 'done').label).toBe('Done')
+    // Its minutes not approved yet: not live, whatever the day.
+    expect(at('2026-11-10', 'waiting_pic').label).toBe('Waiting for PIC')
+  })
+})

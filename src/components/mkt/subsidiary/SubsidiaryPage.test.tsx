@@ -171,3 +171,55 @@ describe('its details, the manager’s to edit (②b-2d-2a, the user’s answer 
     expect((within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Billing email' }) as HTMLInputElement).value).toBe('acc@acme.my')
   })
 })
+
+// 2026-10-24 — ④-2b: its campaigns (the user's answer 13 — a product project with a run period; the timeline shows which
+// runs when): the card, the days they run in Month and Week, the timeline's rows with their overlap, the filter.
+describe('its campaigns', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-10T02:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
+  const C1 = '30000000-0000-0000-0000-000000000001'
+  const C2 = '30000000-0000-0000-0000-000000000002'
+  const cboard = boardFromRow({
+    today: '2026-11-10',
+    me: MEI,
+    team: [{ id: MEI, full: 'Mei Ling', first: 'Mei' }],
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }],
+    projects: [
+      { id: C1, trackId: 'MKT-CAR-2611-001', kind: 'product', sub: CAR, title: 'Carres · 11.11 Rental Deal · Nov 2026', status: 'active', cur: 0,
+        campaign: { from: '2026-11-09', until: '2026-11-12' }, createdAt: '2026-10-20T01:00:00Z', updatedAt: '2026-11-01T01:00:00Z' },
+      { id: C2, trackId: 'MKT-CAR-2611-002', kind: 'product', sub: CAR, title: 'Carres · Showroom Weekends · Nov 2026', status: 'active', cur: 0,
+        campaign: { from: '2026-11-07', until: '2026-11-29' }, createdAt: '2026-10-21T01:00:00Z', updatedAt: '2026-11-02T01:00:00Z' },
+    ],
+  })
+
+  it('counts those running, draws them on the days they run, Live in the projects', () => {
+    render(<SubsidiaryPage board={cboard} sub={sub} feed={[]} />)
+    expect(screen.getByText('Campaigns running').parentElement?.parentElement?.textContent).toContain('2')
+    const month = document.querySelector('[class*="grid"]') as HTMLElement
+    const deal = within(month).getAllByRole('link', { name: /11\.11 Rental Deal/ })
+    expect(deal.length).toBe(4)
+    expect(deal.every(a => a.getAttribute('href') === '/marketing/projects/MKT-CAR-2611-001')).toBe(true)
+    expect(within(month).getAllByRole('link', { name: /Showroom Weekends/ }).length).toBe(23)
+    expect(within(screen.getByRole('table', { name: 'Projects' })).getAllByText('Live').length).toBe(2)
+    fireEvent.click(screen.getByRole('tab', { name: 'Week' }))
+    const week = document.querySelector('[class*="week"]') as HTMLElement
+    expect(within(week).getAllByText('Campaign').length).toBe(11) // the deal 9–12, the weekends every day of the week
+  })
+
+  it('the timeline: their own rows, where they share days, the note under it — and the filter hides them', () => {
+    render(<SubsidiaryPage board={cboard} sub={sub} feed={[]} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
+    expect(screen.getByText('Campaign / project')).toBeTruthy()
+    for (const head of ['Campaigns', 'Overlaps', 'Projects']) expect(screen.getAllByText(head).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: '11.11 Rental Deal · Nov 2026 · 9 – 12 Nov' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2611-001')
+    expect(screen.getByLabelText('Overlaps').querySelectorAll('span').length).toBe(1)
+    expect(screen.getByText('1 overlap: Showroom Weekends · Nov 2026 overlaps 11.11 Rental Deal · Nov 2026 (9 – 12 Nov)')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter' })).getByRole('button', { name: /Stage due date/ }))
+    expect(screen.queryByText('Campaign / project')).toBeNull()
+    expect(screen.queryByText(/overlap/)).toBeNull()
+  })
+})

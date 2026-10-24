@@ -75,6 +75,14 @@ export interface MktProject {
   createdAt: string
   updatedAt: string
   doneAt: string | null
+  /** A campaign's run period (the user's answer 13 — its intake minutes' *Campaign period*). */
+  campaign: MktCampaign | null
+}
+
+/** The days a campaign runs, both 'YYYY-MM-DD'. */
+export interface MktCampaign {
+  from: string
+  until: string
 }
 
 export interface MktStage {
@@ -229,7 +237,15 @@ export function projectFromRow(p: Record<string, unknown>): MktProject {
     createdAt: str(p.createdAt),
     updatedAt: str(p.updatedAt),
     doneAt: strOrNull(p.doneAt),
+    campaign: campaignFromRow(p.campaign),
   }
+}
+
+/** A campaign's run period: both days, the end on or after the start — else none. */
+export function campaignFromRow(v: unknown): MktCampaign | null {
+  if (!isObj(v)) return null
+  const from = day(v.from), until = day(v.until)
+  return from && until && until >= from ? { from, until } : null
 }
 
 export function stageFromRow(s: Record<string, unknown>): MktStage {
@@ -347,6 +363,19 @@ export function workingHours(fromIso: string, to: Date, holidays: ReadonlySet<st
 
 /** "21 Oct" */
 export const shortDay = (d: string) => `${+d.slice(8, 10)} ${MON[+d.slice(5, 7) - 1]}`
+/** A run in words: "9 – 12 Nov 2026", "28 Nov – 3 Dec 2026", "28 Dec 2026 – 3 Jan 2027", "9 Nov 2026" for a day. */
+export function periodWords(from: string, until: string): string {
+  if (from === until) return `${shortDay(from)} ${from.slice(0, 4)}`
+  if (from.slice(0, 4) !== until.slice(0, 4)) return `${shortDay(from)} ${from.slice(0, 4)} – ${shortDay(until)} ${until.slice(0, 4)}`
+  if (from.slice(0, 7) !== until.slice(0, 7)) return `${shortDay(from)} – ${shortDay(until)} ${until.slice(0, 4)}`
+  return `${+from.slice(8, 10)} – ${shortDay(until)} ${until.slice(0, 4)}`
+}
+/** A trail line's run period in words (its data's from and until), else null. */
+export function periodOf(data: Record<string, unknown> | null | undefined): string | null {
+  const from = data?.from, until = data?.until
+  return typeof from === 'string' && typeof until === 'string' && DAY_RE.test(from) && DAY_RE.test(until) ? periodWords(from, until) : null
+}
+
 /** "Tue 21 Oct" */
 export const longDay = (d: string) => `${WD[weekdayOf(d)]} ${shortDay(d)}`
 export const WEEKDAYS = WD

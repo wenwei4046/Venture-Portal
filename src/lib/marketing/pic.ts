@@ -4,7 +4,7 @@
 // the progress, the card after an answer, and what an answer asks. Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { shortDay } from './board'
+import { periodWords, shortDay } from './board'
 import { picOkFromRow, type PicOk, type Tone } from './task'
 
 export type PicStatus = 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done'
@@ -133,6 +133,12 @@ const strs = (v: unknown) => (Array.isArray(v) ? v.map(x => (typeof x === 'strin
 export const isPicCode = (code: string) => /^[0-9a-f]{32}$/i.test(code)
 
 function valueFromRow(type: string, v: unknown): PicValue {
+  // A campaign's run period, in words (the user's answer 13) — once both its days are picked.
+  if (type === 'Campaign period') {
+    if (!isObj(v)) return null
+    const from = str(v.from), to = str(v.to)
+    return /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) ? periodWords(from, to) : null
+  }
   if (type === 'Table' || type === 'Free space') {
     if (!isObj(v)) return null
     const rows = (Array.isArray(v.rows) ? v.rows : []).filter(Array.isArray).map(strs).filter(r => r.some(c => c.trim()))

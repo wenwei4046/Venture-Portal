@@ -3,7 +3,10 @@
 // attended and signed), what is still missing before they go to the PIC, the step it stands at (Subsidiary & product ·
 // Meeting minutes · Tracking link · PIC response), and only what changed, for the save. Pure.
 
-import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
+import {
+  campaignFromRow, daysBetween, longDay, periodOf, periodWords, personFromRow, shortDay, subFromRow, type MktCampaign, type MktPerson, type MktProjectStatus,
+  type MktStageStatus, type MktSub,
+} from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
 import { delivFromRow, ordinal, picOkFromRow, runMadeText, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
 import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './billing'
@@ -12,8 +15,17 @@ import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
 const STATUSES: readonly ProductStatus[] = ['minutes', 'waiting_pic', 'changes', 'approved', 'active', 'paused', 'done', 'cancelled']
 
-/** What a field holds: text (a date, a number as written), people (ids), a table's rows, the Free space's columns and rows. */
-export type MinutesValue = string | string[] | { rows: string[][]; cols?: string[] }
+/** What a field holds: text (a date, a number as written), people (ids), a table's rows, the Free space's columns and rows,
+ * a campaign's run period. */
+export type MinutesValue = string | string[] | { rows: string[][]; cols?: string[] } | MinutesPeriod
+
+/** A *Campaign period* as written (the user's answer 13): its two days, '' while one is not picked yet. */
+export interface MinutesPeriod {
+  from: string
+  to: string
+}
+
+export const isPeriod = (v: MinutesValue | undefined | null): v is MinutesPeriod => !!v && typeof v === 'object' && !Array.isArray(v) && 'from' in v
 
 export interface MinutesDoc {
   id: string
@@ -71,6 +83,8 @@ export interface ProductProjectPage {
     product: { id: string; version: number; name: string; kind: 'one' | 'recurring'; note: string } | null
     /** A recurring one's months, once its work started (②b-2f). */
     runs: ProductRuns | null
+    /** A campaign's run period (the user's answer 13), from its intake minutes. */
+    campaign: MktCampaign | null
   }
   minutes: MinutesDoc[]
   trail: { at: string; actor: string; action: string; reason: string; data: Record<string, unknown> | null }[]
@@ -115,6 +129,7 @@ const strRows = (v: unknown): string[][] => (Array.isArray(v) ? v.filter(Array.i
 function valueFromRow(v: unknown): MinutesValue | null {
   if (typeof v === 'string') return v
   if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string')
+  if (isObj(v) && ('from' in v || 'to' in v) && !('rows' in v)) return { from: str(v.from), to: str(v.to) }
   if (isObj(v)) return { rows: strRows(v.rows), ...(Array.isArray(v.cols) ? { cols: v.cols.map(c => (typeof c === 'string' ? c : '')) } : {}) }
   return null
 }
@@ -171,6 +186,27 @@ export function nextRun(r: ProductRuns): string | null {
 }
 
 /** Its months in a line: "Every month on the 5th · next 5 Nov 2026" — "Every month on the 5th · ended Dec 2026". */
+/** Where a campaign stands today (the user's answer 13): before its run — "Runs 9 – 12 Nov 2026 · in 16 days"; running —
+ * "Live · 9 – 12 Nov 2026 · ends 12 Nov"; after — "Ran 9 – 12 Nov 2026". */
+export function campaignLine(c: MktCampaign, today: string): { text: string; live: boolean } {
+  const words = periodWords(c.from, c.until)
+  if (today && today < c.from) {
+    const n = daysBetween(today, c.from)
+    return { text: `Runs ${words} · ${n === 1 ? 'tomorrow' : `in ${n} days`}`, live: false }
+  }
+  if (today && today <= c.until) return { text: `Live · ${words}${c.until === today ? ' · ends today' : ` · ends ${shortDay(c.until)}`}`, live: true }
+  return { text: `${today ? 'Ran' : 'Runs'} ${words}`, live: false }
+}
+
+/** The intake's *Campaign period* as written (④-2b): its run once both days are in, the end on or after the start — null
+ * while not; undefined when its template has none (the project's run is then as saved). */
+export function typedCampaign(fields: readonly MinutesField[], vals: Readonly<Record<string, MinutesValue>>): MktCampaign | null | undefined {
+  const f = fields.find(x => x.type === 'Campaign period')
+  if (!f) return undefined
+  const v = vals[f.name]
+  return isPeriod(v) && v.from && v.to && v.to >= v.from ? { from: v.from, until: v.to } : null
+}
+
 export function runsLine(r: ProductRuns): string {
   const next = nextRun(r)
   const [y, m, d] = (next ?? '').split('-')
@@ -226,6 +262,7 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
             kind: product.kind === 'recurring' ? 'recurring' : 'one', note: str(product.note) }
         : null,
       runs: runsFromRow(p.runs),
+      campaign: campaignFromRow(p.campaign),
     },
     minutes: rows(v.minutes).map(minutesFromRow),
     trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason), data: isObj(e.data) ? e.data : null })),
@@ -337,7 +374,7 @@ export function productPicksFromRow(v: unknown): ProductPick[] {
 // ── Reckoned from the minutes ───────────────────────────────────────────────────
 
 const blank = (v: MinutesValue | undefined) =>
-  v === undefined ? true : typeof v === 'string' ? !v.trim() : Array.isArray(v) ? v.length === 0 : !v.rows.some(r => r.some(c => c.trim()))
+  v === undefined ? true : typeof v === 'string' ? !v.trim() : Array.isArray(v) ? v.length === 0 : isPeriod(v) ? !v.from || !v.to : !v.rows.some(r => r.some(c => c.trim()))
 
 /** The required fields still empty (as mkt_minutes_missing says) — the project link fills itself, signatures are their own. */
 export function minutesMissing(fields: readonly MinutesField[], vals: Readonly<Record<string, MinutesValue>>): string[] {
@@ -420,7 +457,7 @@ export function fillPatch(saved: MinutesEdit, now: MinutesEdit, intake: boolean)
   for (const k of new Set([...Object.keys(saved.vals), ...Object.keys(now.vals)])) {
     if (same(saved.vals[k], now.vals[k])) continue
     const v = now.vals[k]
-    vals[k] = v === undefined || (typeof v === 'string' && !v.trim()) || (Array.isArray(v) && v.length === 0) ? null : v
+    vals[k] = v === undefined || (typeof v === 'string' && !v.trim()) || (Array.isArray(v) && v.length === 0) || (isPeriod(v) && !v.from && !v.to) ? null : v
   }
   if (Object.keys(vals).length) patch.vals = vals
   if (now.notes !== saved.notes) patch.notes = now.notes
@@ -482,6 +519,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'billing withdrawn' ? `${who} withdrew the billing for ${billMonth(e.data?.month)}`
     : e.action === 'stopped' ? `${who} stopped the project · billed to ${billMonth(e.data?.until)}`
     : e.action === 'replaced' ? `${who} replaced ${typeof e.data?.swap === 'string' ? e.data.swap : 'a person'} as the owner${e.reason ? ` · "${e.reason}"` : ''}`
+    // A campaign's run period (④-2b — the user's answer 13), as the intake minutes set it.
+    : e.action === 'campaign period' ? (periodOf(e.data) ? `${who} set the campaign period · ${periodOf(e.data)}` : `${who} took the campaign period off`)
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }
 
