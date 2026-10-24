@@ -12,6 +12,7 @@ import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
+import BillCard from './BillCard'
 import Deliverables from './Deliverables'
 import MinutesForm from './MinutesForm'
 import p from './project.module.css'
@@ -22,7 +23,8 @@ import t from '../task/task.module.css'
 // are typed (only what changed, never over another's save); the attendees' signatures; the internal meeting notes;
 // and at the side where it stands — what is still missing, the tracking link made and shared, the PIC's answer, the
 // manager starting before approval — with the trail. Then the work: *Plan assignments →* makes its deliverables (②b-2a),
-// listed above the minutes, each planned on its own Assignment Plan.
+// listed above the minutes, each planned on its own Assignment Plan. The manager's Billing card under it (②b-2b): the
+// amount, when it is billed, *Stop* for a recurring one.
 
 const TONE = { red: t.red, waiting: t.waiting, done: t.done, draft: t.draft } as const
 
@@ -443,6 +445,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </div>
             ) : null}
           </div>
+
+          {can.manage && page.bill ? <BillCard key={`${page.bill.amount}:${page.bill.until}`} page={page} bill={page.bill} onPage={setPage} say={say} /> : null}
 
           <div className={p.trail} aria-label="Audit trail">
             <div className={t.trailHead}>

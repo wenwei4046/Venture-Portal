@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { billingFromRow, clientBillFromRow, type BillingPage, type ClientBill } from './billing'
 import { boardFromRow, type MktBoard } from './board'
 import { chatListFromRow, type ChatList } from './chat'
 import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
@@ -92,6 +93,22 @@ export async function readProductProject(key: string): Promise<ProductProjectPag
   const { data, error } = await db.rpc('mkt_product_project', { p_key: key })
   if (error) throw new Error(error.message)
   return productProjectFromRow(data)
+}
+
+/** The month's billing (②b-2b, mig 20261025121000) — the manager's: its lines, their clients, the months still open. */
+export async function readBilling(month: string | null): Promise<BillingPage | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_billing', month ? { p_month: month } : {})
+  if (error) throw new Error(error.message)
+  return billingFromRow(data)
+}
+
+/** An outside client's billing details, for its page's Edit — the manager's; null for a group company. */
+export async function readClientBill(sub: string): Promise<ClientBill | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_client_bill', { p_sub: sub })
+  if (error) throw new Error(error.message)
+  return clientBillFromRow(data)
 }
 
 /** A subsidiary's ⚡ Recent activity: the newest lines of its projects' trails (mig 20261024005000). */

@@ -54,11 +54,13 @@ const ACTION: Record<string, string> = {
   reassigned: 'Reassigned', replaced: 'Replaced',
   subtask: 'Subtask created', delivered: 'Delivered', 'delivery returned': 'Delivery returned', 'delivery approved': 'Delivery approved',
   'subtask removed': 'Subtask taken back',
+  'amount set': 'Amount set', 'billing confirmed': 'Billing confirmed', 'billing withdrawn': 'Billing withdrawn', stopped: 'Stopped',
 }
 const TONE: Record<string, AuditTone> = {
-  approved: 'green', completed: 'green', 'pic approved': 'green', 'delivery approved': 'green',
+  approved: 'green', completed: 'green', 'pic approved': 'green', 'delivery approved': 'green', 'billing confirmed': 'green',
   changes: 'red', 'pic changes': 'red', 'delivery returned': 'red',
   submitted: 'amber', 'link sent': 'amber', resent: 'amber', reassigned: 'amber', replaced: 'amber', delivered: 'amber',
+  'billing withdrawn': 'amber', stopped: 'amber',
 }
 /** A subtask's lines: the version is the subtask's own ("Subtitles BM + EN v2"), not its stage's. */
 const OF_SUBTASK = new Set(['subtask', 'delivered', 'delivery returned', 'delivery approved', 'subtask removed'])

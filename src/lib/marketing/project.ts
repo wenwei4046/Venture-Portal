@@ -6,6 +6,7 @@
 import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
 import { delivFromRow, picOkFromRow, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
+import { monthLabel, projectBillFromRow, type ProjectBill } from './billing'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -73,6 +74,8 @@ export interface ProductProjectPage {
   trail: { at: string; actor: string; action: string; reason: string; data: Record<string, unknown> | null }[]
   /** Its deliverables, once the work started (②b-2a). */
   deliverables: ProductDeliverable[]
+  /** Its billing — the amount, a recurring one's months, what was confirmed (②b-2b): the manager's, null for anybody else. */
+  bill: ProjectBill | null
 }
 
 /** A deliverable as its product's page lists it: where it stands, its stage now and whose. */
@@ -179,6 +182,7 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
     minutes: rows(v.minutes).map(minutesFromRow),
     trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason), data: isObj(e.data) ? e.data : null })),
     deliverables: rows(v.deliverables).map(deliverableFromRow),
+    bill: projectBillFromRow(v.bill),
   }
 }
 
@@ -260,6 +264,8 @@ export interface ProductPick {
   description: string
   actions: number
   intake: { id: string; name: string; version: number; fields: number }
+  /** Its list price — offered as the project's amount (②b-2b): a one-time project's whole, a recurring one's a month. */
+  price: number | null
 }
 
 export function productPicksFromRow(v: unknown): ProductPick[] {
@@ -275,6 +281,7 @@ export function productPicksFromRow(v: unknown): ProductPick[] {
       description: str(p.description),
       actions: typeof p.actions === 'number' ? p.actions : 0,
       intake: { id: str(i.id), name: str(i.name), version: typeof i.version === 'number' ? i.version : 1, fields: typeof i.fields === 'number' ? i.fields : 0 },
+      price: typeof p.price === 'number' ? p.price : typeof p.price === 'string' && Number.isFinite(Number(p.price)) ? Number(p.price) : null,
     }
   })
 }
@@ -399,6 +406,9 @@ export function productStatus(status: ProductStatus): { label: string; tone: Ton
 }
 
 /** One line of a product project's trail in the store's words (mkt_log's actions on a product project). */
+/** '2026-10' (a trail line's month) → 'Oct 2026'. */
+const billMonth = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}$/.test(v) ? monthLabel(`${v}-01`) : 'a month')
+
 export function productEventText(e: { actor: string; action: string; reason: string | null; data?: Record<string, unknown> | null }, product: { name: string; version: number } | null): string {
   const who = e.actor || 'Somebody'
   const n = Number(e.data?.deliverables) || 0
@@ -415,6 +425,11 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link${typeof e.data?.waiting === 'string' && e.data.waiting ? ` · waiting for ${e.data.waiting}` : ''}`
     : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason ?? ''}"`
     // Replace Person (④-5): the project's owner — the swap kept in the line's data.
+    // Billing (②b-2b): never its figure — amounts are the manager's, the trail everybody's.
+    : e.action === 'amount set' ? `${who} set the amount`
+    : e.action === 'billing confirmed' ? `${who} confirmed the billing for ${billMonth(e.data?.month)}`
+    : e.action === 'billing withdrawn' ? `${who} withdrew the billing for ${billMonth(e.data?.month)}`
+    : e.action === 'stopped' ? `${who} stopped the project · billed to ${billMonth(e.data?.until)}`
     : e.action === 'replaced' ? `${who} replaced ${typeof e.data?.swap === 'string' ? e.data.swap : 'a person'} as the owner${e.reason ? ` · "${e.reason}"` : ''}`
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }

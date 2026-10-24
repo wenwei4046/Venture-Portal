@@ -65,10 +65,11 @@ describe('a product project as the page reads it', () => {
     expect(productProjectFromRow({ project: { track: 'MKT-X' } })).toBeNull()
   })
 
-  it('reads New Project’s products on sale', () => {
+  it('reads New Project’s products on sale — each with its list price, offered as the amount (②b-2b)', () => {
     expect(productPicksFromRow([{ id: 'pr', code: 'P-001', name: 'Social Media Package A', kind: 'recurring', version: 2, note: '4 posts', description: '',
-      actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 } }])).toEqual([{ id: 'pr', code: 'P-001', name: 'Social Media Package A',
-      kind: 'recurring', version: 2, note: '4 posts', description: '', actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 } }])
+      actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 }, price: 3000 }])).toEqual([{ id: 'pr', code: 'P-001', name: 'Social Media Package A',
+      kind: 'recurring', version: 2, note: '4 posts', description: '', actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 }, price: 3000 }])
+    expect(productPicksFromRow([{ id: 'pr', price: '450.50' }, { id: 'p2' }]).map(p => p.price)).toEqual([450.5, null])
   })
 })
 

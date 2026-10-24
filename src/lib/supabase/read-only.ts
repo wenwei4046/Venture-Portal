@@ -101,6 +101,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_chat_list', 'mkt_chat_thread',
   // Replace Person (mig 20261025036000): who stands where, one person's places — STABLE.
   'mkt_replace_people', 'mkt_replace_places',
+  // Billing (mig 20261025121000): the month's lines, an outside client's billing details — STABLE.
+  'mkt_billing', 'mkt_client_bill',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

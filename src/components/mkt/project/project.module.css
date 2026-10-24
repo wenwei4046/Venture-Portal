@@ -187,3 +187,14 @@
   .delRow { flex-wrap: wrap; }
   .delMain { flex-basis: 100%; }
 }
+
+/* A product project's billing (②b-2b), the manager's side card. */
+.billKind { font-size: .76em; font-weight: 500; padding: 2px 8px; border-radius: 999px; border: 1px solid rgb(var(--mk-line)); color: rgb(var(--mk-text-2)); }
+.billAmount { font-family: var(--mk-mono); font-size: 13px; font-weight: 600; }
+.billEdit { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.billEdit .input { flex: 1; min-width: 0; }
+.billEdit .primary { width: auto; height: 34px; padding: 0 14px; }
+.billEdit .ghost { flex: none; padding: 0 12px; }
+.billWords { margin-top: 8px; }
+.billLinks { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.billStop { color: rgb(var(--mk-red-deep)); }
