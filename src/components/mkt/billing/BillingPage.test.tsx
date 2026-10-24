@@ -13,7 +13,7 @@ vi.mock('@/lib/marketing/actions', () => actions)
 import BillingPage from './BillingPage'
 
 const ADDR = { line1: 'No 8, Jalan Kenari 5', line2: '', postcode: '47100', city: 'Puchong', state: 'Selangor', country: 'Malaysia' }
-const line = (over: Record<string, unknown>) => ({ title: 't', status: 'active', doneAt: null, from: null, until: null, bill: null, ...over })
+const line = (over: Record<string, unknown>): Record<string, unknown> => ({ title: 't', status: 'active', doneAt: null, from: null, until: null, bill: null, ...over })
 const ROW = {
   today: '2026-10-24', month: '2026-10-01', now: '2026-10-01',
   lines: [

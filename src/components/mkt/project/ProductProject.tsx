@@ -9,12 +9,13 @@ import {
 } from '@/lib/marketing/project'
 import { picNames } from '@/lib/marketing/clients'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
-import { trailTime } from '@/lib/marketing/task'
+import { ordinal, trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import BillCard from './BillCard'
 import Deliverables from './Deliverables'
 import MinutesForm from './MinutesForm'
+import RunDay, { RUN_DAYS } from './RunDay'
 import p from './project.module.css'
 import t from '../task/task.module.css'
 
@@ -53,6 +54,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   // The second PIC's two fields: shown once named, or once the manager asks for them.
   const [second, setSecond] = useState(() => !!initial.project.pic2)
   const [origin, setOrigin] = useState('')
+  // A recurring one's run day, asked as its work starts (②b-2f): today's, the 28th at most.
+  const [runAsk, setRunAsk] = useState(false)
+  const [runDay, setRunDay] = useState(() => Math.min(Number(initial.today.slice(8, 10)) || 1, 28))
 
   const pr = page.project
   const doc = intakeOf(page)
@@ -182,8 +186,11 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const sign = () => act(() => signMktMinutes(doc.id, pr.id), 'Signed')
   const send = () => act(() => sendMktMinutes(doc.id, pr.id, revRef.current), rules.pic ? `Tracking link ready · share it with ${picName}` : 'Minutes complete · approved')
   const resend = () => act(() => resendMktProject(pr.id), `Resent to ${picName}`)
-  // The work starts: each action × its quantity a deliverable, each to plan (②b-2a).
-  const beginWork = () => act(() => beginMktProduct(pr.id), 'Deliverables made · plan each one')
+  // The work starts: each action × its quantity a deliverable, each to plan (②b-2a); a recurring one asks its run day
+  // first — each month's work made on it after (②b-2f).
+  const recurring = pr.product?.kind === 'recurring'
+  const beginWork = () => (recurring ? setRunAsk(true) : act(() => beginMktProduct(pr.id), 'Deliverables made · plan each one'))
+  const beginRuns = () => act(() => beginMktProduct(pr.id, runDay), `Deliverables made · every month on the ${ordinal(runDay)}`, () => setRunAsk(false))
   const override = () => act(() => overrideMktProject(pr.id, reason.trim()), 'Started before approval · kept in the trail', () => {
     setModal(false)
     setReason('')
@@ -412,6 +419,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
                   <div className={`${p.barFill}${progress.all && progress.done >= progress.all ? ` ${p.barDone}` : ''}`}
                     style={{ width: `${progress.all ? Math.round((progress.done / progress.all) * 100) : 0}%` }} />
                 </div>
+                <RunDay page={page} manage={can.manage} onPage={setPage} say={say} />
               </>
             ) : null}
 
@@ -479,6 +487,26 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
             <div className={t.dialogBtns}>
               <button type="button" className={t.dialogBtn} onClick={() => setModal(false)} disabled={pending}>Cancel</button>
               <button type="button" className={`${t.dialogBtn} ${t.dialogOk}`} disabled={pending || reason.trim().length < 5} onClick={override}>Start anyway</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {runAsk ? (
+        <div className={t.scrim} onClick={() => !pending && setRunAsk(false)}>
+          <div className={t.dialog} role="dialog" aria-modal="true" aria-label="Its monthly run" onClick={e => e.stopPropagation()}>
+            <div>
+              <div className={t.dialogTitle}>Every month on the {ordinal(runDay)}</div>
+              <div className={t.dialogSub}>Each month’s work made on this day · its plan carried from the month before</div>
+            </div>
+            <label className={p.dialogField}>
+              <span className={p.dialogLabel}>Run day</span>
+              <select className={p.input} value={runDay} onChange={e => setRunDay(Number(e.target.value))}>
+                {RUN_DAYS.map(d => <option key={d} value={d}>{ordinal(d)}</option>)}
+              </select>
+            </label>
+            <div className={t.dialogBtns}>
+              <button type="button" className={t.dialogBtn} onClick={() => setRunAsk(false)} disabled={pending}>Cancel</button>
+              <button type="button" className={`${t.dialogBtn} ${t.dialogOk}`} disabled={pending} onClick={beginRuns}>Start the work</button>
             </div>
           </div>
         </div>

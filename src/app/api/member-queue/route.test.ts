@@ -8,6 +8,7 @@ const calls = vi.hoisted(() => [] as string[])
 const answers = vi.hoisted(() => ({
   terms: { data: 3 as number | null, error: null as { code: string } | null },
   purge: { data: null as null, error: null as { code: string } | null },
+  runs: { data: 2 as number | null, error: null as { code: string } | null },
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({
@@ -17,6 +18,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (name === 'member_run_due_replacements') return { data: { ran: 0, failed: 0 }, error: null }
       if (name === 'notify_term_ends') return answers.terms
       if (name === 'mkt_lib_purge') return answers.purge
+      if (name === 'mkt_product_runs_due') return answers.runs
       return { data: 0, error: null }
     },
   }),
@@ -36,6 +38,7 @@ beforeEach(() => {
   calls.length = 0
   answers.terms = { data: 3, error: null }
   answers.purge = { data: null, error: null }
+  answers.runs = { data: 2, error: null }
   process.env.CRON_SECRET = SECRET
 })
 afterEach(() => {
@@ -74,6 +77,19 @@ describe('the hourly sweep', () => {
     answers.purge = { data: null, error: { code: '42883' } }
     expect((await sweep()).status).toBe(200)
     expect(error).toHaveBeenCalledWith('Marketing Dustbin purge failed', '42883')
+  })
+
+  // ②b-2f — the user's answer 12: a recurring Marketing product runs every month on its run day, worked or not.
+  it("makes Marketing's recurring products' months before the pushes go; a failure is logged by its code and stops nothing", async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    expect((await sweep()).status).toBe(200)
+    expect(calls.indexOf('mkt_product_runs_due')).toBeGreaterThan(-1)
+    expect(calls.indexOf('mkt_product_runs_due')).toBeLessThan(calls.indexOf('flushPush'))
+    expect(info).toHaveBeenCalledWith('Marketing monthly runs made', 2)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    answers.runs = { data: null, error: { code: '42883' } }
+    expect((await sweep()).status).toBe(200)
+    expect(error).toHaveBeenCalledWith('Marketing monthly runs failed', '42883')
   })
 
   it('answers nobody without the cron secret — nothing is written', async () => {

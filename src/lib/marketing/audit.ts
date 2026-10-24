@@ -56,6 +56,7 @@ const ACTION: Record<string, string> = {
   subtask: 'Subtask created', delivered: 'Delivered', 'delivery returned': 'Delivery returned', 'delivery approved': 'Delivery approved',
   'subtask removed': 'Subtask taken back',
   'amount set': 'Amount set', 'billing confirmed': 'Billing confirmed', 'billing withdrawn': 'Billing withdrawn', stopped: 'Stopped',
+  'run made': 'Monthly run made', 'run day': 'Run day changed', carried: 'Plan carried',
 }
 const TONE: Record<string, AuditTone> = {
   approved: 'green', completed: 'green', 'pic approved': 'green', 'delivery approved': 'green', 'billing confirmed': 'green',
@@ -69,7 +70,7 @@ const OF_SUBTASK = new Set(['subtask', 'delivered', 'delivery returned', 'delive
 const TO_PIC = new Set(['link sent', 'resent'])
 const OF_MINUTES = new Set(['signed', 'minutes completed', 'pic approved'])
 /** Billing's lines (②b-2b): the month they are for, in the Version column — never a figure. */
-const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until' }
+const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until', 'run made': 'month' }
 const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced', 'delivery returned'])
 const NONE = '—'
 

@@ -5,8 +5,8 @@
 
 import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { delivFromRow, picOkFromRow, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
-import { monthLabel, projectBillFromRow, type ProjectBill } from './billing'
+import { delivFromRow, ordinal, picOkFromRow, runMadeText, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
+import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './billing'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -69,6 +69,8 @@ export interface ProductProjectPage {
     override: { by: string; at: string | null; reason: string } | null
     createdAt: string | null
     product: { id: string; version: number; name: string; kind: 'one' | 'recurring'; note: string } | null
+    /** A recurring one's months, once its work started (②b-2f). */
+    runs: ProductRuns | null
   }
   minutes: MinutesDoc[]
   trail: { at: string; actor: string; action: string; reason: string; data: Record<string, unknown> | null }[]
@@ -76,6 +78,15 @@ export interface ProductProjectPage {
   deliverables: ProductDeliverable[]
   /** Its billing — the amount, a recurring one's months, what was confirmed (②b-2b): the manager's, null for anybody else. */
   bill: ProjectBill | null
+}
+
+/** A recurring product project's months (②b-2f — the user's answer 12): made each month on its run day, from its first
+ * month ('YYYY-MM-01'), so many made so far, to the month it was stopped. */
+export interface ProductRuns {
+  day: number
+  first: string
+  made: number
+  until: string | null
 }
 
 /** A deliverable as its product's page lists it: where it stands, its stage now and whose. */
@@ -140,6 +151,42 @@ function minutesFromRow(m: Record<string, unknown>): MinutesDoc {
   }
 }
 
+function runsFromRow(v: unknown): ProductRuns | null {
+  if (!isObj(v)) return null
+  const day = Number(v.day), made = Number(v.made)
+  const first = typeof v.first === 'string' && /^\d{4}-\d{2}-01/.test(v.first) ? v.first.slice(0, 10) : null
+  if (!first || !Number.isInteger(day) || day < 1 || day > 28) return null
+  const until = typeof v.until === 'string' && /^\d{4}-\d{2}-01/.test(v.until) ? v.until.slice(0, 10) : null
+  return { day, first, made: Number.isInteger(made) && made >= 1 ? made : 1, until }
+}
+
+/** Run k's month ('YYYY-MM-01'). */
+export const runMonth = (r: ProductRuns, k: number) => shiftMonth(r.first, k - 1)
+
+/** The next month's run day ('YYYY-MM-DD'), or null once the month it was stopped is made. */
+export function nextRun(r: ProductRuns): string | null {
+  const month = runMonth(r, r.made + 1)
+  if (r.until && month > r.until) return null
+  return `${month.slice(0, 8)}${String(r.day).padStart(2, '0')}`
+}
+
+/** Its months in a line: "Every month on the 5th · next 5 Nov 2026" — "Every month on the 5th · ended Dec 2026". */
+export function runsLine(r: ProductRuns): string {
+  const next = nextRun(r)
+  const [y, m, d] = (next ?? '').split('-')
+  return `Every month on the ${ordinal(r.day)} · ${next ? `next ${+d} ${monthLabel(`${y}-${m}-01`).split(' ')[0]} ${y}` : `ended ${monthLabel(r.until ?? r.first)}`}`
+}
+
+/** A recurring project's deliverables by month, the latest first — each month by category as deliverableGroups. */
+export function deliverableRuns(list: readonly ProductDeliverable[], r: ProductRuns): { run: number; month: string; list: ProductDeliverable[] }[] {
+  const runs = new Map<number, ProductDeliverable[]>()
+  for (const d of list) {
+    const k = d.deliv?.run ?? 1
+    runs.set(k, [...(runs.get(k) ?? []), d])
+  }
+  return [...runs.entries()].sort((a, b) => b[0] - a[0]).map(([run, rows]) => ({ run, month: monthLabel(runMonth(r, run)), list: rows }))
+}
+
 /** mkt_product_project(key): the page, or null (no such product project). */
 export function productProjectFromRow(v: unknown): ProductProjectPage | null {
   if (!isObj(v) || !isObj(v.project)) return null
@@ -178,6 +225,7 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
         ? { id: str(product.id), version: typeof product.version === 'number' ? product.version : 1, name: str(product.name),
             kind: product.kind === 'recurring' ? 'recurring' : 'one', note: str(product.note) }
         : null,
+      runs: runsFromRow(p.runs),
     },
     minutes: rows(v.minutes).map(minutesFromRow),
     trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason), data: isObj(e.data) ? e.data : null })),
@@ -413,7 +461,10 @@ export function productEventText(e: { actor: string; action: string; reason: str
   const who = e.actor || 'Somebody'
   const n = Number(e.data?.deliverables) || 0
   return e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
-    : e.action === 'work started' ? `${who} started the work · ${n} deliverable${n === 1 ? '' : 's'}`
+    : e.action === 'work started' ? `${who} started the work · ${n} deliverable${n === 1 ? '' : 's'}${Number(e.data?.runDay) ? ` · every month on the ${ordinal(Number(e.data?.runDay))}` : ''}`
+    // A recurring one's months (②b-2f).
+    : e.action === 'run made' ? runMadeText(e.data)
+    : e.action === 'run day' ? `${who} moved the monthly run to the ${ordinal(Number(e.data?.to) || 1)}`
     : e.action === 'closed' ? 'Every deliverable done · project closed'
     : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
     : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`

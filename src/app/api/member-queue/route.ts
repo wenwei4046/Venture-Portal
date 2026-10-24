@@ -46,6 +46,11 @@ export async function GET(request: Request) {
     const termEnds = await db.rpc('notify_term_ends')
     if (termEnds.error) console.error('Term end notices failed', termEnds.error.code ?? 'unknown')
     else if (termEnds.data) console.info('Term end notices written', termEnds.data)
+    // A recurring Marketing product's month (mig 20261025131000 — the user's answer 12: it runs every month on its run
+    // day): made even when nobody works that day, its people told — then sent by the flush below. A count only.
+    const marketingRuns = await db.rpc('mkt_product_runs_due')
+    if (marketingRuns.error) console.error('Marketing monthly runs failed', marketingRuns.error.code ?? 'unknown')
+    else if (marketingRuns.data) console.info('Marketing monthly runs made', marketingRuns.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
