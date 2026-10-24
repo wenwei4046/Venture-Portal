@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { approvalText, eventText, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
+import { approvalText, eventText, newFromHref, opensFrom, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
 
 // A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
 // New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
@@ -180,5 +180,36 @@ describe('a post’s mark', () => {
     const ev = (action: string, data: Record<string, unknown>) => ({ id: 1, at: '', actor: 'Ali', action, stage: 0, stageName: 'Schedule', fromTo: null, reason: null, version: null, data })
     expect(eventText(ev('posted', { field: 'Post day', link: 'https://x.my/1' }), pg)).toBe('Ali marked Post day posted')
     expect(eventText(ev('unposted', { field: 'Post day' }), pg)).toBe('Ali took back Post day’s posted mark')
+  })
+})
+
+// 2026-10-25 — ④-4c (the user's answer 23): a project opened from inside another keeps it — its page says which, its
+// created record names it, and the one it was opened from says so on its trail.
+describe('opened from another project', () => {
+  const SRC = { id: 'p0', trackId: 'MKT-CAR-2610-003', title: 'Carres · Social Media · Oct 2026', kind: 'product', status: 'active', owner: 'Rachel' }
+  it('reads where it was opened from — none when from nowhere, or the source read wrong', () => {
+    expect(taskFromRow(row([stage(0, {})], { source: SRC }))!.project.source).toEqual(SRC)
+    expect(taskFromRow(row([stage(0, {})]))!.project.source).toBeNull()
+    expect(taskFromRow(row([stage(0, {})], { source: { trackId: 'X' } }))!.project.source).toBeNull()
+    expect(taskFromRow(row([stage(0, {})], { source: { id: 'p0', kind: 'nonsense', status: 'nonsense' } }))!.project.source)
+      .toEqual({ id: 'p0', trackId: '', title: '', kind: 'quick', status: 'active', owner: '' })
+  })
+
+  it('words its created record, and the record on the one it was opened from', () => {
+    const page = taskFromRow(row([stage(0, {})]))!
+    const ev = (action: string, data: Record<string, unknown> | null, actor = 'Mei') =>
+      eventText({ id: 1, at: '', actor, action, stage: null, stageName: null, fromTo: null, reason: null, version: null, data }, page)
+    expect(ev('created', { kind: 'quick', stages: 2, from: SRC.trackId })).toBe('Mei created quick task "Price update" · 2 stages · from MKT-CAR-2610-003')
+    expect(ev('created', { kind: 'recurring', stages: 2, rule: { freq: 'daily', start: '2026-10-26', endMode: 'count', count: 2 }, from: 'TSK-CAR-2610-004' }))
+      .toMatch(/^Mei created recurring task "Price update" · .+ · from TSK-CAR-2610-004$/)
+    expect(ev('created', { kind: 'quick', stages: 2, from: '' })).toBe('Mei created quick task "Price update" · 2 stages')
+    expect(ev('opened project', { id: 'p9', track: 'TSK-CAR-2610-007', title: 'Resize for Instagram' })).toBe('Mei opened TSK-CAR-2610-007 "Resize for Instagram" from this project')
+    expect(ev('opened project', null, '')).toBe('Somebody opened a project from this project')
+  })
+
+  it('a project may be opened from anything but a series’ pattern — its runs are the work', () => {
+    expect([opensFrom({ kind: 'quick', series: null }), opensFrom({ kind: 'recurring', series: 's1' }), opensFrom({ kind: 'deliverable', series: null }),
+      opensFrom({ kind: 'product', series: null }), opensFrom({ kind: 'recurring', series: null })]).toEqual([true, true, true, true, false])
+    expect(newFromHref('TSK-CAR-2610-001')).toBe('/marketing/new?from=TSK-CAR-2610-001')
   })
 })

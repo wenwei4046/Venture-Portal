@@ -3,7 +3,8 @@
 // to, the reason, the version — filtered by person, action and stage. Read from mkt_project_log; nothing on it is
 // ever edited: a mistake is corrected by a record of its own, *correction of #n* (④-3b — the user's answer 19, the
 // manager's). Exported by anybody in Marketing (answers 18, 21): the rows shown, as a formal document, as the table,
-// as the handoff's CSV. Not yet: the Attachment column (no record holds a file of its own). Pure.
+// as the handoff's CSV. A project opened from another (④-4c) says from which in From → To; the other, to which. Not
+// yet: the Attachment column (no record holds a file of its own). Pure.
 
 import { monthLabel } from './billing'
 import { periodOf, type MktProjectKind } from './board'
@@ -75,6 +76,7 @@ const ACTION: Record<string, string> = {
   'campaign period': 'Campaign period',
   posted: 'Marked posted', unposted: 'Posted mark taken back',
   correction: 'Correction',
+  'opened project': 'Project opened from it',
 }
 const TONE: Record<string, AuditTone> = {
   posted: 'green',
@@ -124,7 +126,10 @@ export function auditRows(log: ProjectLog): AuditRow[] {
       tone: TONE[e.action] ?? 'grey',
       stage: e.stageName || (e.stage != null ? `Stage ${e.stage + 1}` : NONE),
       fromTo: TO_PIC.has(e.action) ? (reason ? `→ ${reason} (PIC)` : NONE)
-        : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
+        // Opened from another (④-4c — answer 23): from the project it was opened from; on that one's log, to the new one.
+        : e.action === 'created' && typeof e.data?.from === 'string' && e.data.from ? `${e.data.from} →`
+        : e.action === 'opened project' ? (typeof e.data?.track === 'string' && e.data.track ? `→ ${e.data.track}${typeof e.data.title === 'string' && e.data.title ? ` · ${e.data.title}` : ''}` : NONE)
+        : e.fromTo ?(e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
       // A campaign's run period (④-2b): its days, or that it was taken off.
       reason: e.action === 'campaign period' ? periodOf(e.data) ?? 'Taken off'
         // A post's mark (④-2c): its field, and the link it was posted at.

@@ -71,14 +71,17 @@ export interface NewTaskInput {
   brief: string
   stages: Record<string, unknown>[]
   recur: Record<string, unknown> | null
+  /** The project it is opened from (④-4c — answer 23), none for none. */
+  from?: string | null
 }
 
-/** New Project: a quick task, or a recurring one and its runs. */
+/** New Project: a quick task, or a recurring one and its runs — opened from another, or from nowhere. */
 export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: string; track: string; open: string }>> {
   await requireActionOn('/marketing/new', 'marketing', 'create')
   if (!isId(input.sub)) return { ok: false, reason: 'Pick who the task is for.' }
   if (input.kind !== 'quick' && input.kind !== 'recurring') return { ok: false, reason: 'Pick a quick task or a recurring task.' }
   if (!Array.isArray(input.stages) || input.stages.length === 0) return { ok: false, reason: 'A task has 1 to 20 stages.' }
+  if (input.from != null && !isId(input.from)) return { ok: false, reason: 'The project it is opened from is not there.' }
   const { data, error } = await (await client()).rpc('mkt_task_create', {
     p_subsidiary: input.sub,
     p_kind: input.kind,
@@ -87,6 +90,7 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
     p_brief: String(input.brief ?? ''),
     p_stages: input.stages,
     p_recur: input.kind === 'recurring' ? input.recur : null,
+    ...(input.from ? { p_source: input.from } : {}),
   })
   if (error) return { ok: false, reason: words(error, 'The task could not be created. Please try again.') }
   freshen()
@@ -440,13 +444,17 @@ async function freshProject(db: SupabaseClient, project: string): Promise<Produc
 
 /** New Project › 📦 Product project: made on the product's version in effect, its intake minutes ready to fill in — with
  * the manager's amount (②b-2b: a quote; the list price when none is typed). */
-export async function startMktProduct(sub: string, product: string, amount?: number | null): Promise<Done<{ id: string; track: string }>> {
+export async function startMktProduct(sub: string, product: string, amount?: number | null, from?: string | null): Promise<Done<{ id: string; track: string }>> {
   await requireActionOn('/marketing/new', 'marketing', 'manage')
   if (!isId(sub)) return { ok: false, reason: 'Pick who the project is for.' }
   if (!isId(product)) return { ok: false, reason: 'Pick a product.' }
   const a = amountOf(amount)
   if (a === undefined) return { ok: false, reason: 'An amount in ringgit above zero, at most two decimals.' }
-  const { data, error } = await (await client()).rpc('mkt_product_start', { p_sub: sub, p_product: product, ...(a === null ? {} : { p_amount: a }) })
+  // Opened from another (④-4c — answer 23).
+  if (from != null && !isId(from)) return { ok: false, reason: 'The project it is opened from is not there.' }
+  const { data, error } = await (await client()).rpc('mkt_product_start', {
+    p_sub: sub, p_product: product, ...(a === null ? {} : { p_amount: a }), ...(from ? { p_source: from } : {}),
+  })
   if (error) return { ok: false, reason: words(error, 'The project could not be started. Please try again.') }
   freshen()
   const r = (data ?? {}) as { id?: string; track?: string }

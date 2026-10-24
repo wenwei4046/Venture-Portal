@@ -5,9 +5,9 @@
 
 import { officeTime } from '@/lib/office-time'
 import {
-  approverNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, stageFromRow, subFromRow,
-  postedFromRow, subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktPosted, type MktProject, type MktProjectStatus, type MktStage,
-  type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
+  approverNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, sourceFromRow, stageFromRow, subFromRow,
+  postedFromRow, subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktPosted, type MktProject, type MktProjectStatus, type MktSource,
+  type MktStage, type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
 import { monthLabel } from './billing'
 import { isManagerTitle } from './groups'
@@ -101,6 +101,8 @@ export interface TaskProject extends MktProject {
   pic2: string | null
   /** Its posts marked posted (④-2c — answer 15): "<stage>:<field>" → when, by whom, the link. */
   posted: Record<string, MktPosted>
+  /** The project it was opened from (④-4c — answer 23); a run's, its series'. */
+  source: MktSource | null
 }
 
 export interface MktTaskPage {
@@ -194,6 +196,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free),
       parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true, pic2: strOrNull(p.pic2),
       posted: Object.fromEntries(Object.entries(isObj(p.posted) ? p.posted : {}).flatMap(([k, x]) => { const m = postedFromRow(x); return m ? [[k, m]] : [] })),
+      source: sourceFromRow(p.source),
     },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
@@ -213,7 +216,15 @@ export interface TaskViewer {
   edit: boolean
   approve: boolean
   manage: boolean
+  /** Marketing · Create — opens a project from this one (④-4c). */
+  create?: boolean
 }
+
+/** A project may be opened from it (④-4c — answer 23): anything but a series' pattern — its runs are the work. */
+export const opensFrom = (p: { kind: MktProject['kind']; series: string | null }) => !(p.kind === 'recurring' && !p.series)
+
+/** New Project, opened from this one. */
+export const newFromHref = (trackId: string) => `/marketing/new?from=${encodeURIComponent(trackId)}`
 
 export interface RailStage {
   idx: number
@@ -593,6 +604,18 @@ export function runsResumedText(actor: string, data: Record<string, unknown> | n
   return `${actor} resumed the monthly runs · from ${billMonthWords(data?.from)}${left ? ` · ${left}` : ''}`
 }
 
+/** Opened from another (④-4c — answer 23): a 'created' record's " · from TSK-CAR-2610-004", '' for none. */
+export function fromWords(data: Record<string, unknown> | null | undefined): string {
+  return typeof data?.from === 'string' && data.from ? ` · from ${data.from}` : ''
+}
+
+/** "Mei opened TSK-CAR-2610-007 "Resize for Instagram" from this project" — on the trail of the one it was opened from. */
+export function openedProjectText(actor: string, data: Record<string, unknown> | null | undefined): string {
+  const track = typeof data?.track === 'string' && data.track ? data.track : 'a project'
+  const title = typeof data?.title === 'string' && data.title ? ` "${data.title}"` : ''
+  return `${actor || 'Somebody'} opened ${track}${title} from this project`
+}
+
 /** A trail line's month ('2026-10') in words ('Oct 2026'). */
 function billMonthWords(v: unknown): string {
   if (typeof v !== 'string' || !/^[0-9]{4}-[0-9]{2}$/.test(v)) return 'a month'
@@ -607,10 +630,12 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'created': {
       const kind = e.data?.kind
       const rule = ruleFromRow(e.data?.rule)
-      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}`
+      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}${fromWords(e.data)}`
       const count = Number(e.data?.stages) || page.stages.length
-      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}`
+      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}${fromWords(e.data)}`
     }
+    // A project opened from this one (④-4c — answer 23).
+    case 'opened project': return openedProjectText(e.actor, e.data)
     case 'opened': return `Stage ${n} · ${stage} opened for ${e.fromTo ?? '—'}`
     case 'accepted': return `${e.actor} accepted Stage ${n} · ${stage}`
     case 'picked': return `${e.actor} picked ${e.fromTo ?? '—'} for ${stage}`

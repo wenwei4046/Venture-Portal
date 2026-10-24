@@ -283,3 +283,19 @@ describe('a deliverable on its task page (②b-2a)', () => {
     expect(screen.queryByRole('link', { name: /Plan it|Assignment plan/ })).toBeNull()
   })
 })
+
+// 2026-10-25 — ④-4c (the user's answer 23): a project opened from inside another.
+describe('opened from another project', () => {
+  it('says which, a link to it — and offers Marketing · Create to open a project from this one', () => {
+    const p = page(SITI, {})
+    p.project.source = { id: 'p0', trackId: 'MKT-CAR-2610-003', title: 'Carres · Social Media · Oct 2026', kind: 'product', status: 'active', owner: 'Rachel' }
+    const { unmount } = render(<TaskPage initial={p} can={{ ...ALL, create: true }} />)
+    const from = screen.getByRole('link', { name: '↳ Opened from MKT-CAR-2610-003' })
+    expect([from.getAttribute('href'), from.getAttribute('title')]).toEqual(['/marketing/projects/MKT-CAR-2610-003', 'Carres · Social Media · Oct 2026'])
+    expect(screen.getByRole('link', { name: '+ Open a project from here' }).getAttribute('href')).toBe('/marketing/new?from=TSK-CAR-2610-001')
+    unmount()
+    render(<TaskPage initial={page(SITI, {})} can={ALL} />)
+    expect(screen.queryByRole('link', { name: /Opened from/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: '+ Open a project from here' })).toBeNull()
+  })
+})

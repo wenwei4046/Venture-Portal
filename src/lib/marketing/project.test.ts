@@ -333,3 +333,22 @@ describe('a campaign’s run period', () => {
     expect(read.minutes[0].vals['Campaign period']).toEqual({ from: '2026-11-09', to: '' })
   })
 })
+
+// 2026-10-25 — ④-4c (the user's answer 23): a product project opened from inside another, and one opened from it.
+describe('opened from another project', () => {
+  it('reads where it was opened from, and words its trail', () => {
+    const SRC = { id: 'p0', trackId: 'TSK-CAR-2610-004', title: 'Banner for the fair', kind: 'quick', status: 'done', owner: 'Mei' }
+    const pp = productProjectFromRow({ project: { id: 'p', track: 'MKT-CAR-2610-005', status: 'minutes', source: SRC } })!
+    expect(pp.project.source).toEqual(SRC)
+    expect(productProjectFromRow({ project: { id: 'p', track: 'T' } })!.project.source).toBeNull()
+    pp.project.product = { id: 'x', version: 1, name: 'Post pack', kind: 'one', note: '' }
+    pp.trail = [
+      { at: '2026-10-25T03:00:00Z', actor: 'Mei', action: 'opened project', reason: '', data: { id: 'p9', track: 'TSK-CAR-2610-008', title: 'Teaser' } },
+      { at: '2026-10-25T02:00:00Z', actor: 'SIA', action: 'created', reason: '', data: { product: 'Post pack', version: 1, from: 'TSK-CAR-2610-004' } },
+    ]
+    expect(productTrail(pp).map(l => l.text)).toEqual([
+      'Mei opened TSK-CAR-2610-008 "Teaser" from this project',
+      'SIA started the project · Post pack v1 · from TSK-CAR-2610-004',
+    ])
+  })
+})

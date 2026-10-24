@@ -15,6 +15,13 @@
 .stepLine { flex: 1; height: 1px; background: rgb(var(--mk-line)); margin: 0 12px; min-width: 16px; }
 
 .lead { margin-top: 28px; font-size: 1.5em; font-weight: 600; }
+/* Opened from another project (④-4c): its Track ID, its title, × to open it from nowhere. */
+.from { display: flex; align-items: center; gap: 8px; margin-top: 10px; max-width: 100%; width: fit-content; padding: 5px 6px 5px 12px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 999px; background: rgb(var(--mk-white)); font-size: .92em; color: rgb(var(--mk-muted)); min-width: 0; }
+.fromTrack { font-family: var(--mk-mono); font-size: 12px; color: rgb(var(--mk-ink)); text-decoration: none; white-space: nowrap; }
+.fromTrack:hover { text-decoration: underline; }
+.fromTitle { color: rgb(var(--mk-text-2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fromX { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 0; background: transparent; color: rgb(var(--mk-muted)); font: inherit; font-size: 1.1em; line-height: 1; cursor: pointer; }
+.fromX:hover { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-ink)); }
 .label { display: flex; align-items: center; gap: 8px; margin: 26px 0 10px; font-size: .75em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
 
 .subs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }

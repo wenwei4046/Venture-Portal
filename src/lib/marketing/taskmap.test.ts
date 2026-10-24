@@ -10,7 +10,7 @@ const SITI = 's-siti'
 const MEI = 's-mei'
 const ev = (id: number, at: string, actor: string, action: string, more: Record<string, unknown> = {}) => ({ id, at, actor, action, ...more })
 
-const page = taskFromRow({
+const raw = {
   today: '2026-10-26',
   me: RACHEL,
   team: [
@@ -44,7 +44,8 @@ const page = taskFromRow({
     ev(11, '2026-10-25T03:00:00Z', 'Rachel', 'approved', { stage: 1, stageName: 'Redesign', fromTo: 'PIC', version: 'v2' }),
     ev(12, '2026-10-25T04:00:00Z', 'Rachel', 'free', { data: { op: 'put' } }),
   ],
-}) as MktTaskPage
+}
+const page = taskFromRow(raw) as MktTaskPage
 
 const map = taskMap(page)
 
@@ -136,5 +137,50 @@ describe('the task map', () => {
     expect(edgePath(s0, boxOf(map.nodes[2], map.lanes), false).d).toBe('M486,225 C526,225 474,375 512,375')
     expect(edgePath(g, boxOf(map.nodes[2], map.lanes), true).d.startsWith('M790,108')).toBe(true)
     expect(mapSize(map)).toEqual({ w: 1340, h: 450 })
+  })
+})
+
+// 2026-10-25 — ④-4c (the user's answer 23: "a project may be opened from inside another, its source kept, a line on the
+// map"): the road starts at the project it was opened from.
+describe('a project opened from another', () => {
+  const SRC = { id: 'p0', trackId: 'MKT-CAR-2610-003', title: 'Carres · Social Media · Oct 2026', kind: 'product', status: 'active', owner: 'Rachel' }
+  const opened = taskMap(taskFromRow({
+    ...raw,
+    project: { ...raw.project, source: SRC },
+    events: raw.events.map(e => (e.action === 'created' ? { ...e, data: { kind: 'quick', stages: 3, from: SRC.trackId } } : e)),
+  }) as MktTaskPage)
+
+  it('starts at it: its station before Created (tagged Opened from), a line to it — unlabelled, the two sharing a lane', () => {
+    expect(opened.nodes.slice(0, 3).map(n => `${n.id} ${n.lane}@${n.col} ${n.tone} · ${n.full} · ${n.person} · ${n.tag ?? '-'} | ${n.handoff} | ${n.status}`)).toEqual([
+      'src SOCIAL MEDIA SPECIALIST@0 done · MKT-CAR-2610-003 · Carres · Social Media · Oct 2026 · Rachel · Opened from | Product project | In progress',
+      'start SOCIAL MEDIA SPECIALIST@1 done · Created by Rachel · Rachel · - | Opened from MKT-CAR-2610-003 | Done',
+      's0 SOCIAL MEDIA SPECIALIST@2 done · First draft · Mei · - | 🔒 Assigned | Done',
+    ])
+    expect(opened.edges[0]).toEqual({
+      key: 'src>start', from: 'src', to: 'start', kind: 'solid', label: null,
+      meta: { t: '20 Oct 09:00', who: 'Rachel', what: 'Rachel created quick task "Price update" · 3 stages · from MKT-CAR-2610-003', reason: '' },
+    })
+    expect(opened.edges.slice(1).map(e => e.key)).toEqual(map.edges.map(e => e.key))
+  })
+
+  it('opens it from its panel', () => {
+    expect(opened.stations.src).toEqual({
+      facts: [['Track ID', 'MKT-CAR-2610-003'], ['Person', 'Rachel'], ['Handoff', 'Opened TSK-CAR-2610-001 from it'], ['Kind', 'Product project'], ['Status', 'In progress']],
+      files: [], versions: [], audit: [], open: { href: '/marketing/projects/MKT-CAR-2610-003', label: 'Open MKT-CAR-2610-003' },
+    })
+    expect(opened.stations.start.facts[2]).toEqual(['Handoff', 'Opened from MKT-CAR-2610-003'])
+  })
+
+  it('lists it first; Replay has it there from the start, its line made with the created record', () => {
+    expect(mapRows(opened)[0]).toMatchObject({ no: '01', title: 'MKT-CAR-2610-003 · Carres · Social Media · Oct 2026', handoff: 'Product project · Opened from', status: 'In progress' })
+    expect(opened.steps[0]).toMatchObject({ at: 'start', edges: ['src>start'] })
+    expect([...replayAt(opened, 0).seen].sort()).toEqual(['src', 'start'])
+    expect(replayAt(opened, 1).lit.has('src>start')).toBe(true)
+  })
+
+  it('a project opened from nowhere draws none', () => {
+    expect(map.nodes.some(n => n.id === 'src')).toBe(false)
+    expect(map.stations.start.facts[2]).toEqual(['Handoff', 'Created'])
+    expect([...replayAt(map, 0).seen]).toEqual(['start'])
   })
 })

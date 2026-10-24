@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { requireAuth, requirePage } from '@/lib/auth'
+import { mayActOn, requireAuth, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { readBoard, readOptionLists, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
 import { builderPeople } from '@/lib/marketing/tasks'
@@ -21,9 +21,10 @@ export default async function MarketingProjectPage({ params, searchParams }: {
 }) {
   await requirePage('/marketing/projects/[id]')
   const user = await requireAuth()
-  const [{ id }, sp] = await Promise.all([params, searchParams])
+  // Whether a project may be opened from this one (④-4c): New Project's own gate.
+  const [{ id }, sp, create] = await Promise.all([params, searchParams, mayActOn('/marketing/new', 'marketing', 'create')])
   const key = decodeURIComponent(id)
-  const can = { edit: canDo(user, 'marketing', 'edit'), approve: canDo(user, 'marketing', 'approve'), manage: canDo(user, 'marketing', 'manage') }
+  const can = { edit: canDo(user, 'marketing', 'edit'), approve: canDo(user, 'marketing', 'approve'), manage: canDo(user, 'marketing', 'manage'), create }
   // A Track ID says which; an id is read as a task first, and a product project's read on its own page.
   const page = PRODUCT_TRACK.test(key) ? null : await readTask(key)
   if (page && page.project.kind !== 'product') {
@@ -50,5 +51,5 @@ export default async function MarketingProjectPage({ params, searchParams }: {
   }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()
-  return <ProductProject key={product.project.id} initial={product} can={{ edit: can.edit, manage: can.manage }} />
+  return <ProductProject key={product.project.id} initial={product} can={{ edit: can.edit, manage: can.manage, create: can.create }} />
 }
