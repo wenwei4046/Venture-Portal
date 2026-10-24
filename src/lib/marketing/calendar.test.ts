@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boardFromRow } from './board'
-import { ALL_LAYERS, addMonths, calendarEvents, listDays, monthCells, passes, readWindow, weekCells, weekLabel } from './calendar'
+import { ALL_LAYERS, addMonths, calendarEvents, eventRows, LAYERS, listDays, monthCells, passes, postState, readWindow, weekCells, weekLabel } from './calendar'
 
 const MEI = '00000000-0000-0000-0000-00000000000a'
 const ALI = '00000000-0000-0000-0000-00000000000d'
@@ -54,7 +54,7 @@ describe('the Calendar', () => {
     expect(only({})).toBe(7)
     expect(only({ subs: [HK] })).toBe(1)
     expect(only({ who: ALI })).toBe(2)
-    expect(only({ layers: { post: true, due: false, meet: true } })).toBe(0)
+    expect(only({ layers: { post: true, due: false, meet: true, ads: true } })).toBe(0)
   })
 
   it('lays a month out Monday first, with its neighbours greyed', () => {
@@ -83,5 +83,61 @@ describe('the Calendar', () => {
     expect((Date.parse(w.to) - Date.parse(w.from)) / 864e5).toBeLessThanOrEqual(400)
     expect(addMonths('2026-12-01', 1)).toBe('2027-01-01')
     expect(addMonths('2026-01-01', -1)).toBe('2025-12-01')
+  })
+})
+
+// 2026-10-24 — ⑧-1: a task's dates marked for the calendar (answers 15, 16) — posts, shoots and meetings, ads and reports,
+// each in its layer; a post's state.
+describe('a task’s dates on the Calendar', () => {
+  const D1 = '30000000-0000-0000-0000-000000000001'
+  const D2 = '30000000-0000-0000-0000-000000000002'
+  const dboard = boardFromRow({
+    today: '2026-11-08',
+    me: MEI,
+    team: [{ id: MEI, full: 'Mei Ling', first: 'Mei' }, { id: ALI, full: 'Ali Hassan', first: 'Ali' }],
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }],
+    projects: [
+      { id: D1, trackId: 'MKT-CAR-2611-001-D01', kind: 'deliverable', sub: CAR, title: 'Image post 1/1', status: 'active', cur: 0, owner: MEI },
+      { id: D2, trackId: 'MKT-CAR-2611-001-D02', kind: 'deliverable', sub: CAR, title: 'Image post 2/2', status: 'done', cur: 0, owner: MEI },
+    ],
+    stages: [
+      { project: D1, idx: 0, name: 'Schedule', owner: ALI, status: 'accepted', dept: 'SOCIAL MEDIA SPECIALIST' },
+      { project: D2, idx: 0, name: 'Schedule', owner: ALI, status: 'done' },
+    ],
+    dates: [
+      { project: D1, stage: 0, field: 'Post day', kind: 'post', day: '2026-11-09', pic: true },
+      { project: D1, stage: 0, field: 'Shoot day', kind: 'shoot', day: '2026-11-02', pic: false },
+      { project: D1, stage: 0, field: 'Ads go-live', kind: 'ads_live', day: '2026-11-10', pic: false },
+      { project: D1, stage: 0, field: 'Report day', kind: 'report', day: '2026-11-01', pic: false },
+      { project: D2, stage: 0, field: 'Post day', kind: 'post', day: '2026-11-05', pic: true, posted: { at: '2026-11-05T02:00:00Z', name: 'Ali', link: 'https://instagram.com/p/abc' } },
+      // Not a kind, not a day, no project: dropped.
+      { project: D1, stage: 0, field: 'X', kind: 'party', day: '2026-11-03' },
+      { project: D1, stage: 0, field: 'Y', kind: 'post', day: 'soon' },
+      { stage: 0, field: 'Z', kind: 'post', day: '2026-11-04' },
+    ],
+  })
+
+  it('reads them — a known kind, a day, its project — and draws each in its layer', () => {
+    expect(dboard.dates.map(d => d.field)).toEqual(['Post day', 'Shoot day', 'Ads go-live', 'Report day', 'Post day'])
+    const evs = calendarEvents(dboard)
+    expect(evs.map(e => `${e.day} ${e.kind} ${e.icon} ${e.title} · ${e.line2} · ${e.label} · ${e.tone}`)).toEqual([
+      '2026-11-01 ads 📊 Image post 1/1 · Report day · Schedule · Report day · done',
+      '2026-11-02 meet 🎬 Image post 1/1 · Shoot day · Schedule · Shoot day · meet',
+      '2026-11-05 post 📣 Image post 2/2 · Post day · Posted · Posted · done',
+      '2026-11-09 post 📣 Image post 1/1 · Post day · In production · In production · waiting',
+      '2026-11-10 ads 📈 Image post 1/1 · Ads go-live · Schedule · Ads go-live · waiting',
+    ])
+    const posted = evs.find(e => e.postLink)!
+    expect([posted.postLink, posted.who, posted.people, posted.team]).toEqual(['https://instagram.com/p/abc', 'Ali', [ALI], null])
+    expect(eventRows(posted, () => '')).toContainEqual({ k: 'Posted', v: 'https://instagram.com/p/abc' })
+    expect(eventRows(evs[0], () => '')).toContainEqual({ k: 'Date', v: 'Report day · Schedule' })
+    expect(LAYERS.map(l => l.key)).toEqual(['post', 'due', 'meet', 'ads'])
+    expect(evs.filter(e => passes(e, { layers: { ...ALL_LAYERS, ads: false }, subs: [], who: null })).map(e => e.kind)).toEqual(['meet', 'post', 'post'])
+  })
+
+  it('a post’s state: Posted, Scheduled, Draft, Overdue, In production', () => {
+    const at = (status: string, day: string, posted = false) => postState({ status } as never, { day, posted: posted ? { at: '', name: 'Ali', link: 'https://x.my' } : null }, '2026-11-08').label
+    expect([at('done', '2026-11-01', true), at('done', '2026-11-01'), at('planning', '2026-11-01'), at('active', '2026-11-01'), at('active', '2026-11-08'), at('active', '2026-11-09')])
+      .toEqual(['Posted', 'Scheduled', 'Draft', 'Overdue', 'In production', 'In production'])
   })
 })

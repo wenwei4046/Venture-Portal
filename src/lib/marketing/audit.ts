@@ -58,8 +58,10 @@ const ACTION: Record<string, string> = {
   'amount set': 'Amount set', 'billing confirmed': 'Billing confirmed', 'billing withdrawn': 'Billing withdrawn', stopped: 'Stopped',
   'run made': 'Monthly run made', 'run day': 'Run day changed', carried: 'Plan carried',
   'campaign period': 'Campaign period',
+  posted: 'Marked posted', unposted: 'Posted mark taken back',
 }
 const TONE: Record<string, AuditTone> = {
+  posted: 'green',
   approved: 'green', completed: 'green', 'pic approved': 'green', 'delivery approved': 'green', 'billing confirmed': 'green',
   changes: 'red', 'pic changes': 'red', 'delivery returned': 'red',
   submitted: 'amber', 'link sent': 'amber', resent: 'amber', reassigned: 'amber', replaced: 'amber', delivered: 'amber',
@@ -98,6 +100,8 @@ export function auditRows(log: ProjectLog): AuditRow[] {
         : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
       // A campaign's run period (④-2b): its days, or that it was taken off.
       reason: e.action === 'campaign period' ? periodOf(e.data) ?? 'Taken off'
+        // A post's mark (⑧-1): its field, and the link it was posted at.
+        : e.action === 'posted' || e.action === 'unposted' ? [e.data?.field, e.action === 'posted' ? e.data?.link : null].filter(x => typeof x === 'string' && x).join(' · ') || NONE
         : TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: OF_SUBTASK.has(e.action) && typeof e.data?.title === 'string' ? (e.version ? `${e.data.title} ${e.version}` : e.data.title)
         : OF_MONTH[e.action] ? monthOfLine(e.data?.[OF_MONTH[e.action]])

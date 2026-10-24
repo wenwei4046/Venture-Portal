@@ -153,6 +153,30 @@ export interface MktBoard {
   stages: MktStage[]
   subtasks: MktSubtask[]
   holidays: MktHoliday[]
+  /** A task's dates marked for the calendar (⑧-1 — answers 15, 16), once filled, by day. */
+  dates: MktTaskDate[]
+}
+
+/** The kinds of date a task's field puts on the calendar (answer 16 — tasks.ts' CAL_KINDS). */
+export type MktDateKind = 'post' | 'shoot' | 'meeting' | 'ads_live' | 'ads_end' | 'report'
+const DATE_KINDS: readonly MktDateKind[] = ['post', 'shoot', 'meeting', 'ads_live', 'ads_end', 'report']
+
+/** A post marked posted (answer 15): when, by whom, its link. */
+export interface MktPosted {
+  at: string
+  name: string
+  link: string
+}
+
+/** A Date field of a task's stage marked for the calendar, filled: its kind, the PIC's calendar or not, a post's mark. */
+export interface MktTaskDate {
+  project: string
+  stage: number
+  field: string
+  kind: MktDateKind
+  day: string
+  pic: boolean
+  posted: MktPosted | null
 }
 
 const TEAMS: readonly MktTeam[] = ['manager', 'content', 'social', 'design', 'ads', 'brand']
@@ -186,7 +210,7 @@ function recur(v: unknown): MktRecur | null {
   return { runs, status: oneOf(v.status, ['active', 'paused', 'ended'] as const, 'active'), rule: isObj(v.rule) ? v.rule : null }
 }
 
-export const EMPTY_BOARD: MktBoard = { today: '', me: null, team: [], subs: [], projects: [], stages: [], subtasks: [], holidays: [] }
+export const EMPTY_BOARD: MktBoard = { today: '', me: null, team: [], subs: [], projects: [], stages: [], subtasks: [], holidays: [], dates: [] }
 
 /** One person of the roster as the database answers them. */
 export function personFromRow(p: Record<string, unknown>): MktPerson {
@@ -239,6 +263,12 @@ export function projectFromRow(p: Record<string, unknown>): MktProject {
     doneAt: strOrNull(p.doneAt),
     campaign: campaignFromRow(p.campaign),
   }
+}
+
+/** A post's mark (answer 15): its link and who, else none. */
+export function postedFromRow(v: unknown): MktPosted | null {
+  if (!isObj(v) || typeof v.link !== 'string' || !v.link) return null
+  return { at: str(v.at), name: str(v.name) || 'Somebody', link: v.link }
 }
 
 /** A campaign's run period: both days, the end on or after the start — else none. */
@@ -319,6 +349,13 @@ export function boardFromRow(v: unknown): MktBoard {
     stages: list(v.stages).filter(s => str(s.project)).map(stageFromRow),
     subtasks: list(v.subtasks).filter(x => str(x.id) && str(x.project) && str(x.assignee)).map(subtaskFromRow),
     holidays: holidaysFromRow(v.holidays),
+    dates: list(v.dates).flatMap(d => {
+      const kind = DATE_KINDS.find(k => k === d.kind)
+      const when = day(d.day)
+      return kind && when && str(d.project) && str(d.field)
+        ? [{ project: str(d.project), stage: Math.max(0, int(d.stage)), field: str(d.field), kind, day: when, pic: d.pic === true, posted: postedFromRow(d.posted) }]
+        : []
+    }),
   }
 }
 

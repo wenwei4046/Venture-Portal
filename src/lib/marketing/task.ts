@@ -6,7 +6,7 @@
 import { officeTime } from '@/lib/office-time'
 import {
   approverNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, stageFromRow, subFromRow,
-  subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktProject, type MktProjectStatus, type MktStage,
+  postedFromRow, subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktPosted, type MktProject, type MktProjectStatus, type MktStage,
   type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
 import { monthLabel } from './billing'
@@ -99,6 +99,8 @@ export interface TaskProject extends MktProject {
   locked: boolean
   /** The project's second PIC (the user's answer 29), null for none. */
   pic2: string | null
+  /** Its posts marked posted (⑧-1 — answer 15): "<stage>:<field>" → when, by whom, the link. */
+  posted: Record<string, MktPosted>
 }
 
 export interface MktTaskPage {
@@ -191,6 +193,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
     project: {
       ...base, brief: strOrNull(p.brief), qType, createdBy: strOrNull(p.createdBy), free: freeFromRow(p.free),
       parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true, pic2: strOrNull(p.pic2),
+      posted: Object.fromEntries(Object.entries(isObj(p.posted) ? p.posted : {}).flatMap(([k, x]) => { const m = postedFromRow(x); return m ? [[k, m]] : [] })),
     },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
@@ -655,6 +658,9 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
       const start = typeof e.data?.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.data.start) ? ` · starts ${shortDay(e.data.start)}` : ''
       return `Plan carried from ${from}${start}`
     }
+    // A post marked posted, or the mark taken back (⑧-1 — answer 15).
+    case 'posted': return `${e.actor} marked ${typeof e.data?.field === 'string' ? e.data.field : 'the post'} posted`
+    case 'unposted': return `${e.actor} took back ${typeof e.data?.field === 'string' ? e.data.field : 'the post'}’s posted mark`
     default: return `${e.actor} · ${e.action}`
   }
 }

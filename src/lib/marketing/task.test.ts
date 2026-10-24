@@ -167,3 +167,15 @@ describe('a PIC level, with one or two PICs (②b-2d-2b, the user’s answer 29)
     expect(approvalText([], page!.stages[0])).toBe('🔗 Both PICs')
   })
 })
+
+// 2026-10-24 — ⑧-1: a post marked posted, or the mark taken back — the trail's words; the page reads the marks.
+describe('a post’s mark', () => {
+  it('reads the marks and words the trail’s lines', () => {
+    const pg = taskFromRow({ project: { id: 'p1', trackId: 'T', kind: 'deliverable', sub: 's', title: 'x', status: 'done', cur: 0,
+      posted: { '0:Post day': { at: '2026-11-10T02:00:00Z', name: 'Ali', link: 'https://x.my/1' }, '1:Bad': { name: 'nobody' } } }, stages: [] })!
+    expect(pg.project.posted).toEqual({ '0:Post day': { at: '2026-11-10T02:00:00Z', name: 'Ali', link: 'https://x.my/1' } })
+    const ev = (action: string, data: Record<string, unknown>) => ({ id: 1, at: '', actor: 'Ali', action, stage: 0, stageName: 'Schedule', fromTo: null, reason: null, version: null, data })
+    expect(eventText(ev('posted', { field: 'Post day', link: 'https://x.my/1' }), pg)).toBe('Ali marked Post day posted')
+    expect(eventText(ev('unposted', { field: 'Post day' }), pg)).toBe('Ali took back Post day’s posted mark')
+  })
+})

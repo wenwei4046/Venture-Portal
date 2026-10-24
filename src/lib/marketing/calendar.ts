@@ -5,10 +5,10 @@
 // are drawn, empty, until then. Pure.
 
 import {
-  addDays, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktGroup, type MktSub,
+  addDays, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktGroup, type MktDateKind, type MktProject, type MktSub, type MktTaskDate,
 } from './board'
 
-export type CalKind = 'post' | 'due' | 'meet'
+export type CalKind = 'post' | 'due' | 'meet' | 'ads'
 export type CalTone = 'draft' | 'waiting' | 'done' | 'red' | 'meet'
 export type CalView = 'month' | 'week' | 'list'
 
@@ -33,12 +33,16 @@ export interface CalEvent {
   recur: boolean
   /** The stage's group (a People title) — a subsidiary's page colours and filters by it (④-2). */
   team?: MktGroup | null
+  /** A post marked posted: its link (⑧-1). */
+  postLink?: string | null
 }
 
 export const LAYERS: readonly { key: CalKind; icon: string; label: string }[] = [
   { key: 'post', icon: '📣', label: 'Posts' },
   { key: 'due', icon: '⏱', label: 'Stage due dates' },
   { key: 'meet', icon: '🗓️', label: 'Shoots & meetings' },
+  // A task's ads and reports days (⑧-1 — the user's answer 16 keeps them as kinds; the handoff's three layers have none).
+  { key: 'ads', icon: '📈', label: 'Ads & reports' },
 ]
 
 export const LEGEND: readonly { tone: CalTone; label: string }[] = [
@@ -114,7 +118,60 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
       })
     }
   }
+  // A task's dates marked for the calendar (⑧-1 — answers 15, 16): its posts, its shoots and meetings, its ads and reports.
+  const byId = new Map(board.projects.map(p => [p.id, p]))
+  for (const d of board.dates) {
+    const p = byId.get(d.project)
+    if (!p || p.status === 'cancelled') continue
+    const s = ix.stagesOf(p.id).find(x => x.idx === d.stage) ?? null
+    const owner = s?.owner ?? p.owner
+    const who = first(owner)
+    const k = DATE_KIND[d.kind]
+    const post = d.kind === 'post' ? postState(p, d, board.today) : null
+    const past = !!board.today && d.day < board.today
+    const tone: CalTone = post ? post.tone : k.layer === 'meet' ? 'meet' : p.status === 'done' || past ? 'done' : 'waiting'
+    out.push({
+      id: `d:${p.id}:${d.stage}:${d.field}`,
+      kind: k.layer,
+      day: d.day,
+      title: p.title,
+      sub: ix.sub(p.sub) ?? null,
+      trackId: p.trackId,
+      line2: post ? `${d.field} · ${post.label}` : s ? `${d.field} · ${s.name}` : d.field,
+      people: owner ? [owner] : [],
+      who,
+      tone,
+      label: post ? post.label : k.label,
+      icon: k.icon,
+      kindLabel: k.label,
+      time: null,
+      quick: p.kind === 'quick',
+      recur: false,
+      team: s?.dept || null,
+      ...(d.posted ? { postLink: d.posted.link } : {}),
+    })
+  }
   return out.sort((a, b) => a.day.localeCompare(b.day) || (a.time ?? '').localeCompare(b.time ?? '') || a.id.localeCompare(b.id))
+}
+
+/** Where each kind of a task's date goes: its layer, its glyph, its name (answer 16's kinds). */
+export const DATE_KIND: Record<MktDateKind, { layer: CalKind; icon: string; label: string }> = {
+  post: { layer: 'post', icon: '📣', label: 'Post day' },
+  shoot: { layer: 'meet', icon: '🎬', label: 'Shoot day' },
+  meeting: { layer: 'meet', icon: '🗓️', label: 'Meeting' },
+  ads_live: { layer: 'ads', icon: '📈', label: 'Ads go-live' },
+  ads_end: { layer: 'ads', icon: '🛑', label: 'Ads end' },
+  report: { layer: 'ads', icon: '📊', label: 'Report day' },
+}
+
+/** A post's state (answer 15 — the handoff's postStatus): Posted with its link, Scheduled once its task is done, Draft
+ * while its deliverable is not planned, Overdue once its day has passed, else In production. */
+export function postState(p: Pick<MktProject, 'status'>, d: Pick<MktTaskDate, 'day' | 'posted'>, today: string): { label: string; tone: CalTone } {
+  if (d.posted) return { label: 'Posted', tone: 'done' }
+  if (p.status === 'done') return { label: 'Scheduled', tone: 'done' }
+  if (p.status === 'planning') return { label: 'Draft', tone: 'draft' }
+  if (today && d.day < today) return { label: 'Overdue', tone: 'red' }
+  return { label: 'In production', tone: 'waiting' }
 }
 
 export interface CalFilter {
@@ -125,7 +182,7 @@ export interface CalFilter {
   who: string | null
 }
 
-export const ALL_LAYERS: Record<CalKind, boolean> = { post: true, due: true, meet: true }
+export const ALL_LAYERS: Record<CalKind, boolean> = { post: true, due: true, meet: true, ads: true }
 
 export function passes(e: CalEvent, f: CalFilter): boolean {
   return f.layers[e.kind] && (!f.subs.length || (!!e.sub && f.subs.includes(e.sub.id))) && (!f.who || e.people.includes(f.who))
@@ -208,7 +265,8 @@ export function eventRows(e: CalEvent, nameOf: (id: string) => string): { k: str
     { k: 'Date', v: longDay(e.day) + (e.time ? ` · ${e.time}` : '') },
   ]
   if (e.kind === 'due') rows.push({ k: 'Stage', v: e.line2 }, { k: 'Assignee', v: e.who })
-  if (e.kind === 'post') rows.push({ k: 'Type', v: e.line2 }, { k: 'Now with', v: e.who })
+  if (e.kind === 'post') rows.push({ k: 'Type', v: e.line2 }, { k: 'Now with', v: e.who }, ...(e.postLink ? [{ k: 'Posted', v: e.postLink }] : []))
+  if (e.kind === 'ads') rows.push({ k: 'Date', v: e.line2 }, { k: 'Owner', v: e.who })
   if (e.kind === 'meet') rows.push({ k: 'Attendees', v: e.people.map(nameOf).join(', ') || '—' })
   return rows
 }

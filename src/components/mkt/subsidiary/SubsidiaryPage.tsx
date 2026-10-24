@@ -16,7 +16,7 @@ import ClientEdit from './ClientEdit'
 import s from './subsidiary.module.css'
 
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PICs — the manager edits them, and a client's
-// name (②b-2d-2a); where its work stands (six cards — its campaigns running first);
+// name (②b-2d-2a); where its work stands (the handoff's five cards — campaigns running, posts, shoots, ads live, overdue);
 // its dates by Month, Week or Timeline — its campaigns (④-2b) on the days they run, the timeline's own rows with their
 // overlaps — — coloured by group (a People title), red once passed undone, done faded — with
 // HR's holidays as ⚑ key dates and the handoff's filter (type, group, status); ⚡ Recent activity from its projects' trails; and its
@@ -33,7 +33,7 @@ type View = 'month' | 'week' | 'timeline'
 
 const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encodeURIComponent(trackId)}` : '/marketing/projects')
 const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM(e.team) : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
-const evEmoji = (e: CalEvent) => (e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
+const evEmoji = (e: CalEvent) => (e.kind !== 'due' ? e.icon : e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
 const campClass = (c: SubCampaign) => `${s.item} ${s.team_brand}${c.ran ? ` ${s.faded}` : ''}`
 
 export default function SubsidiaryPage({ board, sub: initial, feed, manage = false, bill: billOnFile = null, openEdit = false }: {
@@ -230,7 +230,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                     ))}
                     {[...c.events].sort((a, b) => Number(b.tone === 'red') - Number(a.tone === 'red')).map(e => (
                       <Link key={e.id} href={href(e.trackId)} className={`${evClass(e)} ${s.witem}`}>
-                        <span className={s.witemKind}><span aria-hidden="true">{evEmoji(e)}</span>{e.recur ? 'Run opens' : 'Stage due'}</span>
+                        <span className={s.witemKind}><span aria-hidden="true">{evEmoji(e)}</span>{e.kind !== 'due' ? e.kindLabel : e.recur ? 'Run opens' : 'Stage due'}</span>
                         <span className={s.witemTitle}>{e.title}</span>
                         <span className={s.witemLine}>{e.line2}</span>
                       </Link>
@@ -302,6 +302,12 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
 
           <div className={s.legend}>
             <span><span aria-hidden="true">📢</span> Campaign</span>
+            <span><span aria-hidden="true">📣</span> Post</span>
+            <span><span aria-hidden="true">🎬</span> Shoot day</span>
+            <span><span aria-hidden="true">🗓️</span> Meeting</span>
+            <span><span aria-hidden="true">📈</span> Ads go-live</span>
+            <span><span aria-hidden="true">🛑</span> Ads end</span>
+            <span><span aria-hidden="true">📊</span> Report day</span>
             <span><span aria-hidden="true">⏱</span> Stage due date</span>
             <span><span aria-hidden="true">⚡</span> Quick task</span>
             <span><span aria-hidden="true">🔁</span> Recurring run</span>

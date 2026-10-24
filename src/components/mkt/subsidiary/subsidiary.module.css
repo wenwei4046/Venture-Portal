@@ -28,7 +28,7 @@
 .editWide { width: 560px; }
 .editBody { display: flex; flex-direction: column; gap: 14px; max-height: min(64vh, 640px); overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
 
-.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
 .stat { padding: 14px 16px; border-radius: 12px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line-2)); }
 .statRed { background: rgb(var(--mk-red-bg)); border-color: rgb(var(--mk-red-line)); }
 .statLabel { display: flex; align-items: center; gap: 6px; font-size: .85em; color: rgb(var(--mk-muted)); }
