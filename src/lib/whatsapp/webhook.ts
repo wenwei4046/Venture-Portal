@@ -58,6 +58,8 @@ interface WaMessage {
   button?: { text?: string };
   interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
   location?: { latitude?: number; longitude?: number; name?: string; address?: string };
+  /** A reaction to one of ours: the emoji (empty = taken off) and the message it is on. */
+  reaction?: { emoji?: string; message_id?: string };
   /** A click-to-WhatsApp ad: which ad the customer came from. */
   referral?: { source_type?: string; source_id?: string; source_url?: string; headline?: string; body?: string; ctwa_clid?: string; media_type?: string };
 }
@@ -97,6 +99,8 @@ export interface WaStatusUpdate {
 
 export interface WaDelivery {
   messages: WaInboundMessage[];
+  /** A customer's reactions, apart from their messages (2026-10-24): set on the message they react to (crm_their_reactions). */
+  reactions: { target: string; emoji: string }[];
   statuses: WaStatusUpdate[];
   /** Changes that were not WhatsApp messages/statuses (other fields Meta may send) — logged, not applied. */
   ignored: number;
@@ -140,7 +144,7 @@ function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, str
 
 /** Meta's delivery → flat rows. Tolerates anything unexpected; never throws on shape. */
 export function parseDelivery(body: unknown): WaDelivery {
-  const out: WaDelivery = { messages: [], statuses: [], ignored: 0 };
+  const out: WaDelivery = { messages: [], reactions: [], statuses: [], ignored: 0 };
   const entries = (body as { entry?: { changes?: { field?: string; value?: WaValue }[] }[] })?.entry;
   if (!Array.isArray(entries)) return out;
   for (const entry of entries) {
@@ -150,7 +154,11 @@ export function parseDelivery(body: unknown): WaDelivery {
       const phoneNumberId = v.metadata.phone_number_id;
       // Each contact's name under every id it carries — its number and its BSUID — so either finds it.
       const names = new Map((v.contacts ?? []).flatMap(c => [c.wa_id, c.user_id].filter((k): k is string => !!k).map(k => [k, c.profile?.name ?? ""] as const)));
-      for (const m of v.messages ?? []) { const row = readMessage(m, phoneNumberId, names); if (row) out.messages.push(row); }
+      for (const m of v.messages ?? []) {
+        // A reaction is not a message of its own — it was an empty bubble (the owner, 2026-10-24: "為什麼看不到客戶的訊息").
+        if (m.type === "reaction") { if (m.reaction?.message_id) out.reactions.push({ target: m.reaction.message_id, emoji: m.reaction.emoji ?? "" }); continue; }
+        const row = readMessage(m, phoneNumberId, names); if (row) out.messages.push(row);
+      }
       for (const s of v.statuses ?? []) {
         if (!s.id || !["sent", "delivered", "read", "failed"].includes(s.status ?? "")) continue;
         out.statuses.push({

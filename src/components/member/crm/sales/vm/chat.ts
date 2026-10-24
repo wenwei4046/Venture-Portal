@@ -163,7 +163,7 @@ export function chatVM(ctx: SalesCtx) {
     const by = mine && m.by && m.by !== c.assignedTo && !m.auto ? nameOf(m.by) : m.auto ? "Auto-reply" : "";
     return {
       // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
-      sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
+      sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction || m.theirReaction ? "14px" : "0",
       radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE_BG : "#fff", borderStyle: "solid", border: mine ? MINE_BG : "#fff",
       textAlign: "left" as const, fg: mine ? "#fff" : INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
@@ -203,7 +203,8 @@ export function chatVM(ctx: SalesCtx) {
         });
       }, () => { patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }); focusDraft(); }) },
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
-      reaction: m.myReaction ?? "", rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
+      // Ours and the customer's side by side (2026-10-24: their reaction was an empty bubble).
+      reaction: [m.myReaction, m.theirReaction].filter(Boolean).join(""), rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
     };
   });
 

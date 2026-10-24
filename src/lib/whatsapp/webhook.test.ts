@@ -103,7 +103,7 @@ describe("parsing a delivery", () => {
     const d = parseDelivery(delivery({ ...base, messages: [
       { id: "a", from: "601", type: "interactive", interactive: { button_reply: { title: "Yes, Saturday" } } },
       { id: "b", from: "601", type: "location", location: { latitude: 3.1, longitude: 101.6, name: "Home" } },
-      { id: "c", from: "601", type: "reaction" },
+      { id: "c", from: "601", type: "contacts" },
     ] }));
     expect(d.messages.map(m => [m.kind, m.body])).toEqual([["button", "Yes, Saturday"], ["location", "Home · 3.1,101.6"], ["other", null]]);
   });
@@ -123,8 +123,8 @@ describe("parsing a delivery", () => {
   it("ignores other fields and other products, and never throws on odd shapes", () => {
     expect(parseDelivery(delivery({ ...base }, "account_update")).ignored).toBe(1);
     expect(parseDelivery(delivery({ messaging_product: "instagram", metadata: { phone_number_id: "x" } })).ignored).toBe(1);
-    expect(parseDelivery(null)).toEqual({ messages: [], statuses: [], ignored: 0 });
-    expect(parseDelivery({ entry: "nope" })).toEqual({ messages: [], statuses: [], ignored: 0 });
+    expect(parseDelivery(null)).toEqual({ messages: [], reactions: [], statuses: [], ignored: 0 });
+    expect(parseDelivery({ entry: "nope" })).toEqual({ messages: [], reactions: [], statuses: [], ignored: 0 });
     expect(parseDelivery(delivery({ ...base, messages: [{ type: "text" }] })).messages).toEqual([]); // no id / from
   });
 });

@@ -75,6 +75,8 @@ export interface CrmChatMessage {
   auto?: boolean;
   replyTo?: string;
   myReaction?: string;
+  /** The customer's reaction to this message (mig 20261025050000). */
+  theirReaction?: string;
   card?: CrmCard;
   media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string; mime?: string };
 }
@@ -396,6 +398,7 @@ export interface CrmContactRowX extends CrmContactRow {
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
   my_reaction?: string | null;
+  their_reaction?: string | null;
   card?: CrmCard | null;
 }
 export interface CrmVisitRow {
@@ -483,6 +486,7 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
     ...(row.direction === "out" && row.sent_by ? { by: row.sent_by } : {}),
     ...(row.reply_to ? { replyTo: row.reply_to } : {}),
     ...(row.my_reaction ? { myReaction: row.my_reaction } : {}),
+    ...(row.their_reaction ? { theirReaction: row.their_reaction } : {}),
     ...(row.card ? { card: row.card } : {}),
   };
 }

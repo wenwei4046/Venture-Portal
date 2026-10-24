@@ -95,7 +95,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       ...media,
       key: m.id, id: m.id, day: hide ? "" : day, sys: "", inn: !mine && !hide && !appt, out: mine && !hide && !appt,
       text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at),
-      starred: star, hasReaction: !!rx, reaction: rx, rxGap: rx ? "14px" : "0",
+      starred: star, hasReaction: !!(rx || m.theirReaction), reaction: rx + (m.theirReaction ?? ""), rxGap: rx || m.theirReaction ? "14px" : "0",
       // The ⌄ button sits 6px outside the bubble: crossing that gap leaves the message, so the button waits a moment before
       // it goes (the owner, 2026-10-15: "mouse 過去，他會消失"); coming back — or reaching the button — keeps it.
       enter: () => { clearTimeout(hoverOut); if (ui.msgHov !== m.id) patch({ msgHov: m.id }); },

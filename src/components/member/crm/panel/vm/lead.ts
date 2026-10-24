@@ -85,7 +85,7 @@ export function leadVM(ctx: PanelCtx) {
       // flow-root: the bubble holds the floated time (INLINE_TIME).
       vis: al.hidden.has(m.id) ? "none" : "flow-root",
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
-      reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
+      reaction: [m.myReaction, m.theirReaction].filter(Boolean).join(""), rxGap: m.myReaction || m.theirReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
       // data-mine: the quote in our own orange bubble is drawn light, as in Mine's chat (crm.module.css) — it was the dark
       // default on the orange, unreadable (the owner, 2026-10-23).
