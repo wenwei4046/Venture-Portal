@@ -127,7 +127,7 @@ export function panelAppVM(ctx: PanelCtx) {
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.
     pfAdmin: ctx.data.can.manage,
     chromeBg: "var(--crm-page)",
-    cl: calendarListVM(ctx, cal ?? (ov0 && ui.cLs === "leads" ? { cLeadIds: ov0.leadIds, cUpV: [], cCameV: [], cRangeBtn: ov0.heroLabel } : undefined)), ci: calendarInfoVM(ctx),
+    cl: calendarListVM(ctx, cal ?? (ov0 && ui.cLs === "leads" ? { cLeadIds: ui.cLsWho ? ov0.leadIds.filter(id => { const w = ctx.data.customers.find(c => c.id === id)?.assignedTo; return !!w && ui.cLsWho!.includes(w); }) : ov0.leadIds, cUpV: [], cCameV: [], cRangeBtn: ov0.heroLabel } : undefined)), ci: calendarInfoVM(ctx),
     ov: ov0 ?? off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),
     ld,

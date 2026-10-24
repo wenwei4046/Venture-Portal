@@ -40,6 +40,8 @@ export interface PanelUi {
   /** rev 1011 §5: Calendar › Customer info (a visit, or a list row), and the Leads / Upcoming / Showed up list open. */
   calInfo: string | null;
   cLs: "leads" | "up" | "came" | false;
+  /** The Leads list for these people only (Team Insight's Revenue Director row, 2026-10-24); null = everybody's. */
+  cLsWho?: string[] | null;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
   asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
