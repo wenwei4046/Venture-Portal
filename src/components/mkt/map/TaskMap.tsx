@@ -40,7 +40,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
   const paths = useMemo(() => new Map(map.edges.map(e => {
     const a = boxes.get(e.from)
     const b = boxes.get(e.to)
-    return [e.key, a && b ? edgePath(a, b, e.kind === 'return') : null]
+    return [e.key, a && b ? edgePath(a, b, e.kind === 'return', e.rise === true, e.drop === true) : null]
   })), [map, boxes])
 
   const clampZ = useCallback((v: number) => Math.min(Math.min(1.6, (VH - 20) / CH), Math.max(0.3, v)), [CH])

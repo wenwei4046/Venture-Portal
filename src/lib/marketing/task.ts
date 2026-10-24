@@ -5,10 +5,11 @@
 
 import { officeTime } from '@/lib/office-time'
 import {
-  approverNow, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, stageFromRow, subFromRow,
-  subtaskFromRow, type MktHoliday, type MktPerson, type MktProject, type MktProjectStatus, type MktStage,
-  type MktStageStatus, type MktSub, type MktSubtask,
+  approverNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, stageFromRow, subFromRow,
+  subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktProject, type MktProjectStatus, type MktStage,
+  type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
+import { isManagerTitle } from './groups'
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
 
@@ -249,6 +250,8 @@ export interface TaskView {
   mine: TaskStage | null
   /** Who the task waits on now (for Nudge): its stage's owner, or its approver — never the PIC. */
   waitingOn: string | null
+  /** The viewer's stage: its subtasks not approved yet — it is handed on only once every one is (②b-2c). */
+  subsOut: number
 }
 
 export function nameOf(team: readonly MktPerson[], id: string | null | undefined): string {
@@ -289,6 +292,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const working = amOwner && (cur.status === 'accepted' || cur.status === 'changes')
   const amApprover = open && cur.status === 'review' && appr?.kind === 'person' && !!me && appr.staff === me
   const missing = working ? missingWork(cur.form, cur.work) : []
+  const subsOut = working ? page.subtasks.filter(t => t.stage === cur.idx && t.status !== 'approved').length : 0
 
   const actions: TaskView['actions'] = []
   let note = ''
@@ -298,9 +302,10 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     note = 'New · just assigned to you'
   }
   if (working && can.edit) {
-    actions.push(cur.appr.length ? { key: 'submit', label: 'Submit for approval', disabled: missing.length > 0 } : { key: 'complete', label: 'Complete stage', disabled: missing.length > 0 })
-    note = missing.length ? `Fill in ${missing.join(', ')}` : 'Ready'
-    noteRed = missing.length > 0
+    const held = missing.length > 0 || subsOut > 0
+    actions.push(cur.appr.length ? { key: 'submit', label: 'Submit for approval', disabled: held } : { key: 'complete', label: 'Complete stage', disabled: held })
+    note = missing.length ? `Fill in ${missing.join(', ')}` : subsOut ? subsOutText(subsOut) : 'Ready'
+    noteRed = held
   }
   if (amApprover && can.approve) {
     actions.push({ key: 'changes', label: 'Request changes', disabled: false }, { key: 'approve', label: 'Approve', disabled: false })
@@ -417,7 +422,101 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     missing,
     mine: working ? cur : null,
     waitingOn: open && cur.status !== 'review' ? cur.owner : open && appr?.kind === 'person' ? appr.staff : null,
+    subsOut,
   }
+}
+
+/** "2 subtasks not approved yet" — why a stage is not handed on. */
+export const subsOutText = (n: number) => `${n} subtask${n === 1 ? '' : 's'} not approved yet`
+
+// ── Subtasks (②b-2c): ✂️ Split into subtasks, a delivery, Review delivery ──────────────────
+
+/** One subtask of the stage now, as its list draws it (`Task Page.dc.html` › Subtasks · <stage>). */
+export interface SubtaskRow {
+  id: string
+  title: string
+  who: string
+  /** "Due 24 Oct". */
+  due: string
+  label: string
+  tone: Tone
+  /** Returned three times or more: the row framed in red. */
+  red: boolean
+  status: MktSubtaskStatus
+  returns: number
+  delivery: MktDelivery | null
+  /** Why it was last returned, while it is being revised. */
+  returned: string | null
+  /** The stage's owner: a delivery to review now. */
+  canReview: boolean
+  /** The stage's owner: not approved yet, so it may be taken back. */
+  canRemove: boolean
+  /** The viewer's own, to deliver now. */
+  mine: boolean
+}
+
+export interface SubtaskView {
+  stage: string
+  /** The stage's own deadline — a subtask's is on or before it. */
+  stageDue: string | null
+  rows: SubtaskRow[]
+  /** The stage's owner, working it, on a stage that splits. */
+  canSplit: boolean
+  /** A delivery returned three times (the handoff's red line): whose, and who has been told. */
+  alert: { text: string; tail: string } | null
+}
+
+export function subtaskView(page: MktTaskPage, can: TaskViewer): SubtaskView | null {
+  const { project: p, team, today, me } = page
+  const cur = page.stages[p.cur]
+  if (!cur || (p.kind === 'recurring' && !p.series)) return null
+  const open = p.status === 'active' && !(p.startsOn && today && p.startsOn > today)
+  const working = open && (cur.status === 'accepted' || cur.status === 'changes')
+  const owner = !!me && cur.owner === me && can.edit
+  const lastReturn = (id: string) => [...page.events].reverse().find(e => e.action === 'delivery returned' && e.data?.subtask === id)?.reason ?? null
+  const rows: SubtaskRow[] = page.subtasks
+    .filter(t => t.stage === cur.idx)
+    .map(t => {
+      const who = nameOf(team, t.assignee)
+      const late = t.status !== 'approved' && t.status !== 'ready' && !!t.dueOn && !!today && t.dueOn < today
+      const red = t.status !== 'approved' && t.returns >= 3
+      const days = late ? daysBetween(t.dueOn as string, today) : 0
+      const label = t.status === 'approved' ? 'Approved'
+        : red ? `Returned ${t.returns} times`
+        : t.status === 'revising' ? `Returned ${t.returns}× · ${who} is revising`
+        : t.status === 'ready' ? (me && t.assignee === me ? `Delivered v${t.delivery?.v ?? 1} · waiting for ${nameOf(team, cur.owner)}` : 'Ready')
+        : late ? `Overdue ${days} day${days === 1 ? '' : 's'}` : 'In progress'
+      return {
+        id: t.id, title: t.title, who, due: t.dueOn ? `Due ${shortDay(t.dueOn)}` : '', label,
+        tone: t.status === 'approved' ? 'done' : red || late ? 'red' : 'waiting', red, status: t.status, returns: t.returns,
+        delivery: t.delivery, returned: t.status === 'revising' ? lastReturn(t.id) : null,
+        canReview: owner && working && t.status === 'ready',
+        canRemove: owner && working && t.status !== 'approved',
+        mine: working && can.edit && !!me && t.assignee === me && (t.status === 'working' || t.status === 'revising'),
+      } satisfies SubtaskRow
+    })
+  const canSplit = owner && working && cur.split
+  if (!rows.length && !canSplit) return null
+  const worst = rows.find(r => r.red)
+  let alert: SubtaskView['alert'] = null
+  if (worst) {
+    const told = team.filter(x => x.user && isManagerTitle(x.title) && x.id !== cur.owner).map(x => x.first || x.full)
+    const ownerName = nameOf(team, cur.owner)
+    alert = {
+      text: `${worst.who}'s delivery has been returned ${worst.returns} times.`,
+      tail: can.manage ? `Check in with ${worst.who} and ${ownerName} before it slips further.`
+        : told.length ? `${told.join(' and ')} ${told.length === 1 ? 'has' : 'have'} been notified.` : '',
+    }
+  }
+  return { stage: cur.name, stageDue: cur.dueOn, rows, canSplit, alert }
+}
+
+/** "84 MB" · "1.1 MB" · "38 KB" — a delivered file's size. */
+export function sizeText(n: number): string {
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1).replace(/\.0$/, '')} GB`
+  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1).replace(/\.0$/, '')} MB`
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`
+  return `${n} B`
 }
 
 // ── The trail, in the store's words ─────────────────────────────────────────
@@ -448,6 +547,9 @@ function parentFromRow(v: unknown): TaskProject['parentProject'] {
 
 /** How a replaced person stood in the place (④-5) — doing a stage says nothing more. */
 const REPLACED_AS: Record<string, string> = { cand: ' as a 🔓 candidate', appr: ' as approver', subtask: ' on a subtask', project: ' as the owner', series: ' in the plan' }
+
+/** A subtask's line names the subtask (its trail data keeps the title it had). */
+const subTitle = (e: TaskEvent) => (typeof e.data?.title === 'string' ? e.data.title : 'a subtask')
 
 /** " · starts Mon 2 Nov" — a plan's start day, as the trail says it. */
 const planStart = (e: TaskEvent) => (typeof e.data?.start === 'string' ? ` · starts ${longDay(e.data.start)}` : '')
@@ -499,6 +601,18 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
       const sub = e.data?.role === 'subtask' && typeof e.data.subtask === 'string' ? ` "${e.data.subtask}"` : ''
       return `${e.actor} replaced ${e.fromTo ?? '—'}${role}${sub}${stage ? ` · ${stage}` : ''}${e.reason ? ` · "${e.reason}"` : ''}`
     }
+    // Subtasks (②b-2c), in the handoff's words ("Ali created subtask "Thumbnail" → Siti").
+    case 'subtask': {
+      const due = typeof e.data?.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.data.due) ? ` · due ${shortDay(e.data.due)}` : ''
+      return `${e.actor} created subtask "${subTitle(e)}" → ${e.fromTo ?? '—'}${due}`
+    }
+    case 'delivered': {
+      const n = Array.isArray(e.data?.files) ? e.data.files.length : 0
+      return `${e.actor} delivered "${subTitle(e)}"${v} → ${e.fromTo ?? '—'}${n ? ` · ${n} file${n === 1 ? '' : 's'}` : ''}`
+    }
+    case 'delivery returned': return `${e.actor} returned "${subTitle(e)}"${v} to ${e.fromTo ?? '—'}: "${e.reason ?? ''}"`
+    case 'delivery approved': return `${e.actor} approved "${subTitle(e)}"${v}`
+    case 'subtask removed': return `${e.actor} took back subtask "${subTitle(e)}" from ${e.fromTo ?? '—'}`
     // The PIC on their link (②b-2d).
     case 'pic approved': return `${e.actor} approved ${stage}${v} on the link${e.fromTo ? ` → ${e.fromTo}` : ''}`
     case 'pic changes': {

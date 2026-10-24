@@ -448,5 +448,10 @@ export function tidyFileName(name: string): string {
 }
 /** library/<uuid>/<name> — the bucket's INSERT policy asks for library/, the Library's row for this shape. */
 export const libraryPath = (fileName: string, uuid: string) => `library/${uuid}/${tidyFileName(fileName)}`
+/** subtask/<uuid>/<name> — a subtask's delivered file (mig 20261025101000: its own INSERT policy; mkt_subtask_deliver
+ * asks for this shape). */
+export const subtaskPath = (fileName: string, uuid: string) => `subtask/${uuid}/${tidyFileName(fileName)}`
+/** Files one delivery holds at most (the database's ten). */
+export const SUB_MAX_FILES = 10
 /** The name a file is listed under: its own, without its ending. */
 export const listedName = (fileName: string) => fileName.replace(/\.[a-z0-9]{1,6}$/i, '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'File'

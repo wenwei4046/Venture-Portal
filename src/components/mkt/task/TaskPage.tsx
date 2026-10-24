@@ -4,25 +4,33 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { acceptMktStage, decideMktStage, putMktFree, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
-import { nameOf, seriesView, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
-import { missingWork, type FormField, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
+import { nameOf, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
+import { missingWork, type FormField, type PickPerson, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
 import type { TaskFile } from '@/lib/marketing/library'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import TaskLibrary from './TaskLibrary'
+import TaskSubtasks from './TaskSubtasks'
 import s from './task.module.css'
 
 // A task's page (`New Task Page.dc.html`): where it stands and who it is with, what the viewer may do now — Accept,
 // work their stage (its fields, notes and links) and Submit for approval / Complete it, or as its approver Approve /
-// Request changes — the stages in a rail, each stage's work, the Free space anybody on the task writes in, a recurring
-// task's runs, and the trail. Every answer comes back with the task as it now stands.
+// Request changes — the stages in a rail, the stage's subtasks (✂️ Split, a delivery, Review delivery — TaskSubtasks),
+// each stage's work, the Free space anybody on the task writes in, a recurring task's runs, and the trail. Every answer
+// comes back with the task as it now stands.
 
 const TONE: Record<Tone, string> = { red: s.red, waiting: s.waiting, done: s.done, draft: s.draft }
 const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person', 'Select', 'Multi-select'])
 const blockId = () => (Math.random().toString(36).slice(2) + '00000000').slice(0, 10)
 const isLink = (v: string) => /^https?:\/\/\S+$/i.test(v.trim())
 
-export default function TaskPage({ initial, can, files = [] }: { initial: MktTaskPage; can: TaskViewer; files?: TaskFile[] }) {
+export default function TaskPage({ initial, can, files = [], splitPeople = [] }: {
+  initial: MktTaskPage
+  can: TaskViewer
+  files?: TaskFile[]
+  /** Whom ✂️ Split into subtasks offers — read only for the owner of a stage that splits. */
+  splitPeople?: PickPerson[]
+}) {
   const router = useRouter()
   const [page, setPage] = useState(initial)
   const [pending, start] = useTransition()
@@ -56,6 +64,8 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
     saved.current = mine?.work ?? null
   }
   const missing = mine && work ? missingWork(mine.form, work) : view.missing
+  /** Why the viewer's stage is not handed on yet: its fields first, then its subtasks. */
+  const holdNote = missing.length ? `Fill in ${missing.join(', ')}` : view.subsOut ? subsOutText(view.subsOut) : ''
 
   // The Free space: block by block.
   const [freeFor, setFreeFor] = useState(p.id)
@@ -206,7 +216,7 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
             {view.actions.length ? (
               <div className={s.actions}>
                 {view.actions.map(a => {
-                  const ready = a.key === 'submit' || a.key === 'complete' ? missing.length === 0 : !a.disabled
+                  const ready = a.key === 'submit' || a.key === 'complete' ? !holdNote : !a.disabled
                   return (
                     <button
                       key={a.key}
@@ -222,7 +232,7 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
               </div>
             ) : null}
             {mine ? (
-              <span className={`${s.note}${missing.length ? ` ${s.noteRed}` : ''}`}>{missing.length ? `Fill in ${missing.join(', ')}` : 'Ready'}</span>
+              <span className={`${s.note}${holdNote ? ` ${s.noteRed}` : ''}`}>{holdNote || 'Ready'}</span>
             ) : view.note ? (
               <span className={`${s.note}${view.noteRed ? ` ${s.noteRed}` : ''}`}>{view.note}</span>
             ) : null}
@@ -251,6 +261,7 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
             </div>
           ))}
         </div>
+        <TaskSubtasks part="list" page={page} can={can} people={splitPeople} onPage={fresh} say={say} />
       </div>
 
       {view.banner ? <div className={`${s.banner} ${TONE[view.banner.tone]}`}>{view.banner.text}</div> : null}
@@ -268,6 +279,8 @@ export default function TaskPage({ initial, can, files = [] }: { initial: MktTas
               <div className={s.reqText}>{view.requirements.text}</div>
             </div>
           </div>
+
+          <TaskSubtasks part="deliver" page={page} can={can} onPage={fresh} say={say} />
 
           {!view.isSeries ? (
             <TaskLibrary project={page.project.id} sub={page.project.sub} initial={files}
