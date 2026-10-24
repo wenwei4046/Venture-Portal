@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   dateWords, isPicCode, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
+  stageReasonOk, workState, workWaiting,
 } from './pic'
 
 // 2026-10-23 — the PIC's link (⑤-1, `PIC Link.dc.html`): what mkt_pic_page answers the stranger holding a product
@@ -82,6 +83,16 @@ describe('where it stands, for the PIC', () => {
       .toEqual(['You approved the minutes:done:25 Oct', 'Work starts:cur'])
   })
 
+  it('minutes that asked no sign-off never went to the PIC: the team completed them — never “sent to you”, never “you approved” (2026-10-24, the preview walk)', () => {
+    const states = (p: PicPage) => picTimeline(p).map(t => `${t.label}:${t.state}${t.date ? `:${t.date}` : ''}`)
+    const work = [{ id: 'd1', title: 'Banner', status: 'active', stages: 1, done: 0, stage: { idx: 0, name: 'Design', status: 'review', ver: 1, waiting: true, fields: [], links: [] } }]
+    expect(states(page({ status: 'active', sentAt: null, work })))
+      .toEqual(['Kick-off meeting:done:23 Oct', 'Minutes completed by the team:done', 'The work:cur'])
+    // Sent once and answered: as before.
+    expect(states(page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:00:00Z' }, work }))[2])
+      .toBe('You approved the minutes:done:25 Oct')
+  })
+
   it('after an answer, the card with its receipt — never for a reply that no longer stands', () => {
     expect(picAnswered(page({ status: 'approved', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z' } })))
       .toEqual({ approved: true, title: 'Approved', text: 'You approved the meeting minutes. The team has been told.', quote: '',
@@ -104,5 +115,27 @@ describe('an answer', () => {
     expect(picRefusal({ code: '42501', message: 'permission denied for function mkt_pic_answer' }, 'fallback')).toBe('fallback')
     expect(picRefusal({ code: '23514', message: 'new row violates check constraint "mkt_minutes_check"' }, 'fallback')).toBe('fallback')
     expect(picRefusal(null, 'fallback')).toBe('fallback')
+  })
+})
+
+describe('the work on the PIC’s link (②b-2d)', () => {
+  const w = (over: Record<string, unknown>) => page({ status: 'active', work: [{ id: 'd1', title: 'Poster 1/2', status: 'active', stages: 2, done: 0,
+    stage: { idx: 0, name: 'Design', status: 'accepted', ver: 0, waiting: false, fields: [{ name: 'Due', type: 'Date', value: '2026-11-05' }, { name: 'OK', type: 'Checkbox', value: false }], links: [] }, last: null, ...over }] }).work[0]
+  it('says where each deliverable stands, in the PIC’s words', () => {
+    expect(workState(w({}), '2026-10-24')).toEqual({ label: 'In progress · Design', tone: 'draft' })
+    expect(workState(w({ startsOn: '2026-11-02' }), '2026-10-24')).toEqual({ label: 'Starts 2 Nov', tone: 'draft' })
+    expect(workState(w({ stage: { name: 'Design', status: 'review', ver: 1, waiting: true } }), '2026-10-24')).toEqual({ label: 'Waiting for your approval', tone: 'waiting' })
+    expect(workState(w({ status: 'done' }), '2026-10-24')).toEqual({ label: 'Done', tone: 'done' })
+    expect(workState(w({ stage: { name: 'Design', status: 'changes', ver: 1, waiting: false }, last: { action: 'pic changes', name: 'Kelvin (PIC)', reason: 'Bigger', stage: 'Design', version: 'v1', at: 'x' } }), '2026-10-24'))
+      .toEqual({ label: 'The team is making your changes', tone: 'draft' })
+    expect(w({}).stage?.fields.map(f => f.value)).toEqual(['5 Nov 2026', null]) // a date in words; a box not ticked is nothing yet
+  })
+  it('counts what waits for them, and the progress says so', () => {
+    const p = page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin', reason: '', at: '2026-10-24T03:00:00Z' }, work: [
+      { id: 'a', title: 'A', status: 'done', stages: 1, done: 1 }, { id: 'b', title: 'B', status: 'active', stages: 2, done: 1, stage: { name: 'X', status: 'review', ver: 1, waiting: true } },
+    ] })
+    expect(workWaiting(p.work)).toBe(1)
+    expect(picTimeline(p).at(-1)).toEqual({ label: 'The work', state: 'cur', date: '', sub: '1 of 2 done · 1 waiting for you' })
+    expect([stageReasonOk('meh'), stageReasonOk('Bigger logo'), stageReasonOk('x'.repeat(1001))]).toEqual([false, true, false])
   })
 })

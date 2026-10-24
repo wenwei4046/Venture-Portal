@@ -455,6 +455,12 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'replanned': return `${e.actor} changed the plan${planStart(e)}`
     case 'plan changed': return `${e.actor} changed the plan`
     case 'reassigned': return `${e.actor} moved ${stage}: ${e.fromTo ?? '—'}${e.reason ? ` · "${e.reason}"` : ''}`
+    // The PIC on their link (②b-2d).
+    case 'pic approved': return `${e.actor} approved ${stage}${v} on the link${e.fromTo ? ` → ${e.fromTo}` : ''}`
+    case 'pic changes': {
+      const to = typeof e.data?.to === 'string' ? ` · back to ${e.data.to}` : ''
+      return `${e.actor} requested changes on ${stage}${v} on the link: "${e.reason ?? ''}"${to}`
+    }
     default: return `${e.actor} · ${e.action}`
   }
 }
