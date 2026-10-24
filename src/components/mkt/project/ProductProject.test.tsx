@@ -380,6 +380,24 @@ describe('a recurring product project’s months', () => {
     expect([...list.querySelectorAll('[class*="delMonthName"]')].map(n => n.textContent)).toEqual(['Dec 2026', 'Oct 2026', 'Sep 2026'])
   })
 
+  it('says which is under way: Pausing… in the question, Resuming… on the line — never the other', async () => {
+    let answer!: (v: unknown) => void
+    actions.pauseMktProduct.mockReturnValue(new Promise(r => { answer = r }))
+    render(<ProductProject initial={page(RACHEL, { status: 'active', runs }, ready, [], made)} can={MANAGER} />)
+    fireEvent.click(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Pause…' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: /^Pause / })).getByRole('button', { name: 'Pause' }))
+    expect(within(screen.getByRole('dialog', { name: /^Pause / })).getByRole('button', { name: 'Pausing…' })).toBeTruthy()
+    await act(async () => answer({ ok: true, page: page(RACHEL, { status: 'paused', runs }, ready, [], made) }))
+    const line = screen.getByLabelText('Monthly run')
+    await waitFor(() => expect(within(line).getByRole('button', { name: 'Resume' })).toBeTruthy())
+    expect(within(line).queryByRole('button', { name: 'Resuming…' })).toBeNull()
+    actions.pauseMktProduct.mockReturnValue(new Promise(r => { answer = r }))
+    fireEvent.click(within(line).getByRole('button', { name: 'Resume' }))
+    expect(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Resuming…' })).toBeTruthy()
+    await act(async () => answer({ ok: true, page: page(RACHEL, { status: 'active', runs }, ready, [], made) }))
+    await waitFor(() => expect(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Pause…' })).toBeTruthy())
+  })
+
   it('a refusal is said; no Pause once stopped, nor for the staff', async () => {
     const first = render(<ProductProject initial={page(RACHEL, { status: 'paused', runs }, ready, [], made)} can={MANAGER} />)
     actions.pauseMktProduct.mockResolvedValue({ ok: false, reason: 'It has stopped — no month is left to resume.' })

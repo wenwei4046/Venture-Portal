@@ -25,6 +25,8 @@ export default function RunDay({ page, manage, onPage, say }: {
   const [editing, setEditing] = useState(false)
   const [day, setDay] = useState(runs?.day ?? 1)
   const [pausing, setPausing] = useState(false)
+  // Which of the two is under way — the transition's pending outlives the pause into the paused line.
+  const [doing, setDoing] = useState<'pause' | 'resume' | null>(null)
   const [pending, start] = useTransition()
   if (!runs) return null
   // Running or paused, not stopped: its months are the manager's to move, pause and resume.
@@ -37,14 +39,17 @@ export default function RunDay({ page, manage, onPage, say }: {
       setEditing(false)
       say(`Every month on the ${ordinal(day)}`)
     })
-  const pause = (to: boolean) =>
+  const pause = (to: boolean) => {
+    setDoing(to ? 'pause' : 'resume')
     start(async () => {
       const r = await pauseMktProduct(page.project.id, to)
+      setDoing(null)
       if (!r.ok) return say(r.reason)
       if (r.page) onPage(r.page)
       setPausing(false)
       say(to ? 'Paused · no month’s work until it is resumed' : resumedWords(runs, r.page?.project.runs ?? null))
     })
+  }
   return (
     <div className={p.runLine} aria-label="Monthly run">
       <span className={p.wait}>{runsLine(runs, status === 'paused')}</span>
@@ -53,7 +58,7 @@ export default function RunDay({ page, manage, onPage, say }: {
       ) : null}
       {open && !editing ? (
         status === 'paused'
-          ? <button type="button" className={p.textBtn} disabled={pending} onClick={() => pause(false)}>{pending ? 'Resuming…' : 'Resume'}</button>
+          ? <button type="button" className={p.textBtn} disabled={pending} onClick={() => pause(false)}>{doing === 'resume' ? 'Resuming…' : 'Resume'}</button>
           : <button type="button" className={p.textBtn} disabled={pending} onClick={() => setPausing(true)}>Pause…</button>
       ) : null}
       {editing ? (
@@ -75,7 +80,7 @@ export default function RunDay({ page, manage, onPage, say }: {
             </div>
             <div className={t.dialogBtns}>
               <button type="button" className={t.dialogBtn} onClick={() => setPausing(false)} disabled={pending}>Cancel</button>
-              <button type="button" className={`${t.dialogBtn} ${t.dialogOk}`} disabled={pending} onClick={() => pause(true)}>{pending ? 'Pausing…' : 'Pause'}</button>
+              <button type="button" className={`${t.dialogBtn} ${t.dialogOk}`} disabled={pending} onClick={() => pause(true)}>{doing === 'pause' ? 'Pausing…' : 'Pause'}</button>
             </div>
           </div>
         </div>
