@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
-  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage,
+  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine
 } from './project'
 
 // 2026-10-23 — a 📦 product project before its work starts (②b-1, `New Project.dc.html` steps 2–4): the page as
@@ -174,6 +174,30 @@ describe('where it stands', () => {
       '24 Oct 13:00 RACHEL sent the tracking link to Kelvin',
       '24 Oct 12:00 SITI signed Kickoff',
       '24 Oct 09:00 RACHEL started the project · Social Media Package A v2',
+    ])
+  })
+
+  // ②b-2f: a recurring product's months.
+  it('a recurring product’s months: read, the next run day, its line, its deliverables by month, its trail', () => {
+    const pp = productProjectFromRow({ project: { id: 'p', track: 'T', status: 'active', runs: { day: 5, first: '2026-09-01', made: 2, until: null } } })!
+    const r = pp.project.runs!
+    expect(r).toEqual({ day: 5, first: '2026-09-01', made: 2, until: null })
+    expect(productProjectFromRow({ project: { id: 'p', runs: { day: 31, first: '2026-09-01', made: 1 } } })!.project.runs).toBeNull()
+    expect([runMonth(r, 1), runMonth(r, 3), nextRun(r), runsLine(r)]).toEqual(['2026-09-01', '2026-11-01', '2026-11-05', 'Every month on the 5th · next 5 Nov 2026'])
+    expect([nextRun({ ...r, until: '2026-10-01' }), runsLine({ ...r, until: '2026-10-01' })]).toEqual([null, 'Every month on the 5th · ended Oct 2026'])
+    expect(runsLine({ ...r, day: 22, made: 4 })).toBe('Every month on the 22nd · next 22 Jan 2027')
+    const del = (id: string, run?: number) => ({ id, trackId: id, title: id, status: 'planning' as const, cur: 0, deliv: { group: '', item: id, n: 1, of: 1, ...(run ? { run } : {}) },
+      workflow: null, startsOn: null, dueOn: null, doneAt: null, stages: 1, done: 0, stage: null })
+    expect(deliverableRuns([del('D01', 1), del('D02', 2), del('D03', 2), del('D00')], r).map(m => [m.run, m.month, m.list.map(x => x.id)]))
+      .toEqual([[2, 'Oct 2026', ['D02', 'D03']], [1, 'Sep 2026', ['D01', 'D00']]])
+    pp.trail = [
+      { at: '2026-10-05T01:00:00Z', actor: 'Someone', action: 'run made', reason: '', data: { run: 2, month: '2026-10', made: 4, toPlan: 1 } },
+      { at: '2026-10-04T01:00:00Z', actor: 'Josiah', action: 'run day', reason: '', data: { from: 1, to: 5 } },
+      { at: '2026-09-02T01:00:00Z', actor: 'Josiah', action: 'work started', reason: '', data: { deliverables: 4, runDay: 1 } },
+    ]
+    expect(productTrail(pp).map(l => l.text)).toEqual([
+      "Oct 2026's work made · 4 deliverables · 1 to plan", 'Josiah moved the monthly run to the 5th',
+      'Josiah started the work · 4 deliverables · every month on the 1st',
     ])
   })
 

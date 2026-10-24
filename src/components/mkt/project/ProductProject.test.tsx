@@ -17,6 +17,7 @@ const actions = vi.hoisted(() => ({
   beginMktProduct: vi.fn(),
   setMktProjectAmount: vi.fn(),
   stopMktProduct: vi.fn(),
+  setMktRunDay: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }))
@@ -185,10 +186,16 @@ describe('a product project, for the manager who writes its minutes', () => {
         workflow: 'Reel · Locked', stages: 2, done: 2, stage: { idx: 1, name: 'Edit', status: 'done', owner: RACHEL } },
     ]
     actions.beginMktProduct.mockResolvedValue({ ok: true, deliverables: 3, page: page(RACHEL, { ...approved, status: 'active' }, ready, [], made) })
+    // A recurring product (②b-2f): its run day asked first — today's offered.
+    fireEvent.click(screen.getByRole('button', { name: 'Plan assignments →' }))
+    const ask = screen.getByRole('dialog', { name: 'Its monthly run' })
+    expect(within(ask).getByText('Every month on the 24th')).toBeTruthy()
+    fireEvent.change(within(ask).getByRole('combobox', { name: 'Run day' }), { target: { value: '5' } })
+    expect(within(ask).getByText('Every month on the 5th')).toBeTruthy()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Plan assignments →' }))
+      fireEvent.click(within(ask).getByRole('button', { name: 'Start the work' }))
     })
-    await waitFor(() => expect(actions.beginMktProduct).toHaveBeenCalledWith('p1'))
+    await waitFor(() => expect(actions.beginMktProduct).toHaveBeenCalledWith('p1', 5))
     const list = await screen.findByRole('region', { name: 'Deliverables' })
     expect(list.textContent).toContain('1/3 done')
     expect(list.textContent).toContain('1 to plan')
@@ -199,8 +206,19 @@ describe('a product project, for the manager who writes its minutes', () => {
       'D03ReelReel · LockedDone',
     ])
     expect(screen.getByRole('link', { name: 'Plan' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-001-D01?plan=1')
-    expect(screen.getByText('Deliverables made · plan each one')).toBeTruthy()
+    expect(screen.getByText('Deliverables made · every month on the 5th')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Plan assignments →' })).toBeNull()
+  })
+
+  it('a one-time product starts at once — no run day', async () => {
+    const one = { status: 'approved', link: 'abc123', product: { id: 'pr', version: 1, name: 'Post pack', kind: 'one', note: '' } }
+    render(<ProductProject initial={page(RACHEL, one, ready)} can={MANAGER} />)
+    actions.beginMktProduct.mockResolvedValue({ ok: true, deliverables: 1, page: page(RACHEL, { ...one, status: 'active' }, ready) })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Plan assignments →' }))
+    })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(actions.beginMktProduct).toHaveBeenCalledWith('p1'))
   })
 
   it('the staff read the deliverables, and plan none', () => {
@@ -294,5 +312,41 @@ describe('a product project’s billing, the manager’s', () => {
     unmount()
     render(<ProductProject initial={one} can={{ edit: true, manage: false }} />)
     expect(screen.queryByLabelText('Billing')).toBeNull()
+  })
+})
+
+// 2026-10-24 — ②b-2f: a recurring product's months (the user's answer 12) — its line, its day moved by the manager, its
+// deliverables by month. The database's side is tests/member-sql/validate-marketing-product-runs.mjs.
+describe('a recurring product project’s months', () => {
+  const runs = { day: 5, first: '2026-09-01', made: 2, until: null }
+  const d = (id: string, run: number, title: string) => ({ id, trackId: `MKT-CAR-2610-001-${id}`, title, status: 'planning', cur: 0, stages: 2, done: 0, stage: null,
+    deliv: { group: 'Graphic design', item: 'Image post', n: 1, of: 1, run } })
+  const made = [d('D01', 1, 'Image post 1/1'), d('D02', 2, 'Image post 1/1 · Oct 2026')]
+
+  it('its line and its deliverables by month, the latest first; the manager moves its day', async () => {
+    render(<ProductProject initial={page(RACHEL, { status: 'active', runs }, ready, [], made)} can={MANAGER} />)
+    const line = screen.getByLabelText('Monthly run')
+    expect(within(line).getByText('Every month on the 5th · next 5 Nov 2026')).toBeTruthy()
+    const list = screen.getByRole('region', { name: 'Deliverables' })
+    expect([...list.querySelectorAll('[class*="delMonthName"]')].map(n => n.textContent)).toEqual(['Oct 2026', 'Sep 2026'])
+    expect(within(screen.getByLabelText('Oct 2026')).getByText('Image post 1/1 · Oct 2026')).toBeTruthy()
+    fireEvent.click(within(line).getByRole('button', { name: 'Change day' }))
+    fireEvent.change(within(line).getByRole('combobox', { name: 'Run day' }), { target: { value: '12' } })
+    actions.setMktRunDay.mockResolvedValue({ ok: true, page: page(RACHEL, { status: 'active', runs: { ...runs, day: 12 } }, ready, [], made) })
+    await act(async () => {
+      fireEvent.click(within(line).getByRole('button', { name: 'Save' }))
+    })
+    expect(actions.setMktRunDay).toHaveBeenCalledWith('p1', 12)
+    await waitFor(() => expect(screen.getByText('Every month on the 12th · next 12 Nov 2026')).toBeTruthy())
+  })
+
+  it('stopped: its last month named, its day no longer moved; the staff read it and move nothing', () => {
+    const { unmount } = render(<ProductProject initial={page(RACHEL, { status: 'active', runs: { ...runs, made: 2, until: '2026-10-01' } }, ready, [], made)} can={MANAGER} />)
+    expect(screen.getByText('Every month on the 5th · ended Oct 2026')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Change day' })).toBeNull()
+    unmount()
+    render(<ProductProject initial={page(SITI, { status: 'active', runs }, ready, [], made)} can={{ edit: true, manage: false }} />)
+    expect(screen.getByText('Every month on the 5th · next 5 Nov 2026')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Change day' })).toBeNull()
   })
 })

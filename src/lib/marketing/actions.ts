@@ -477,16 +477,28 @@ export async function resendMktProject(project: string): Promise<Done<{ page: Pr
   return { ok: true, page: await freshProject(db, project) }
 }
 
-/** The work starts (②b-2a): the product's deliverables made — each action × its quantity — each to be planned. */
-export async function beginMktProduct(project: string): Promise<Done<{ page: ProductProjectPage | null; deliverables: number }>> {
+/** The work starts (②b-2a): the product's deliverables made — each action × its quantity — each to be planned; a
+ * recurring one's every month after on its run day (②b-2f — the user's answer 12). */
+export async function beginMktProduct(project: string, runDay?: number | null): Promise<Done<{ page: ProductProjectPage | null; deliverables: number }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
   if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
   const db = await client()
-  const { data, error } = await db.rpc('mkt_product_begin', { p_project: project })
+  const { data, error } = await db.rpc('mkt_product_begin', { p_project: project, ...(Number.isInteger(runDay) ? { p_run_day: runDay } : {}) })
   if (error) return { ok: false, reason: words(error, 'The work could not be started. Please try again.') }
   freshen()
   const made = data && typeof data === 'object' ? Number((data as { deliverables?: unknown }).deliverables) || 0 : 0
   return { ok: true, page: await freshProject(db, project), deliverables: made }
+}
+
+/** A recurring product project's run day moved (②b-2f): the months not made yet are made on the new day. */
+export async function setMktRunDay(project: string, day: number): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  if (!Number.isInteger(day) || day < 1 || day > 28) return { ok: false, reason: 'Pick a day from the 1st to the 28th.' }
+  const { data, error } = await (await client()).rpc('mkt_product_run_day', { p_project: project, p_day: day })
+  if (error) return { ok: false, reason: words(error, 'The run day could not be saved. Please try again.') }
+  freshen()
+  return { ok: true, page: productProjectFromRow(data) }
 }
 
 /** A deliverable's Assignment Plan saved (②b-2a): its start day, each stage's person, approvals, days and subtasks —

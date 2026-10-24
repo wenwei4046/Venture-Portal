@@ -76,6 +76,16 @@ describe('a project’s formal log', () => {
     ])
   })
 
+  it('a recurring product’s months (②b-2f): made, its day moved, a plan carried — the month in the Version column', () => {
+    const log = projectLogFromRow({ track: 'MKT-CAR-2610-007', title: 'Social media', kind: 'product', rows: [
+      { id: 40, at: '2026-11-05T01:00:00Z', actor: 'Someone', action: 'run made', data: { run: 2, month: '2026-11', made: 4, toPlan: 0 } },
+      { id: 41, at: '2026-11-06T01:00:00Z', actor: 'Josiah', action: 'run day', data: { from: 5, to: 10 } },
+      { id: 42, at: '2026-11-05T01:00:00Z', actor: 'Someone', action: 'carried', data: { from: 'MKT-CAR-2610-007-D01', start: '2026-11-05' } },
+    ] })!
+    expect(auditRows(log).map(r => [r.action, r.version])).toEqual([
+      ['Monthly run made', 'Nov 2026'], ['Run day changed', '—'], ['Plan carried', '—']])
+  })
+
   it('filters by person, action and stage — each value as first named, counted over the whole log', () => {
     const rows = auditRows(task)
     const groups = auditGroups(rows, NO_AUDIT_FILTER)

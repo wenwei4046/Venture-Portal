@@ -83,6 +83,8 @@ export interface TaskDeliv {
   item: string
   n: number
   of: number
+  /** Its month's run (②b-2f): 1 the month the work started, then one a month — a recurring product's alone. */
+  run?: number
 }
 
 export interface TaskProject extends MktProject {
@@ -559,7 +561,21 @@ export function delivFromRow(v: unknown): TaskDeliv | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = v as Record<string, unknown>
   const n = Number(r.n), of = Number(r.of)
-  return { group: String(r.group ?? ''), item: String(r.item ?? ''), n: Number.isFinite(n) ? n : 1, of: Number.isFinite(of) ? of : 1 }
+  const run = Number(r.run)
+  return { group: String(r.group ?? ''), item: String(r.item ?? ''), n: Number.isFinite(n) ? n : 1, of: Number.isFinite(of) ? of : 1,
+    ...(Number.isInteger(run) && run >= 1 ? { run } : {}) }
+}
+
+/** 1 → '1st', 2 → '2nd', 11 → '11th', 22 → '22nd' (a run day). */
+export function ordinal(n: number): string {
+  const tens = n % 100, ones = n % 10
+  return `${n}${tens >= 11 && tens <= 13 ? 'th' : ones === 1 ? 'st' : ones === 2 ? 'nd' : ones === 3 ? 'rd' : 'th'}`
+}
+
+/** A recurring product's month made (②b-2f) — its words wherever its trail is read. */
+export function runMadeText(data: Record<string, unknown> | null | undefined): string {
+  const made = Number(data?.made) || 0, toPlan = Number(data?.toPlan) || 0
+  return `${billMonthWords(data?.month)}'s work made · ${made} deliverable${made === 1 ? '' : 's'}${toPlan ? ` · ${toPlan} to plan` : ''}`
 }
 
 /** A trail line's month ('2026-10') in words ('Oct 2026'). */
@@ -631,6 +647,14 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'billing confirmed': return `${e.actor} confirmed the billing for ${billMonthWords(e.data?.month)}`
     case 'billing withdrawn': return `${e.actor} withdrew the billing for ${billMonthWords(e.data?.month)}`
     case 'stopped': return `${e.actor} stopped the project · billed to ${billMonthWords(e.data?.until)}`
+    // A recurring product's months (②b-2f): made each month on its run day, a deliverable's plan carried from the month before.
+    case 'run made': return runMadeText(e.data)
+    case 'run day': return `${e.actor} moved the monthly run to the ${ordinal(Number(e.data?.to) || 1)}`
+    case 'carried': {
+      const from = typeof e.data?.from === 'string' ? e.data.from.slice(e.data.from.lastIndexOf('-') + 1) : 'last month'
+      const start = typeof e.data?.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.data.start) ? ` · starts ${shortDay(e.data.start)}` : ''
+      return `Plan carried from ${from}${start}`
+    }
     default: return `${e.actor} · ${e.action}`
   }
 }

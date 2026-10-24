@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { approvalText, eventText, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
+import { approvalText, eventText, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
 
 // A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
 // New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
@@ -117,6 +117,13 @@ describe('a task’s page', () => {
     expect([replaced('owner'), replaced('appr'), replaced('subtask', { subtask: 'Thumbnail' })]).toEqual([
       'Josiah replaced Siti → Hafiz · Redesign · "Resigned"', 'Josiah replaced Siti → Hafiz as approver · Redesign · "Resigned"',
       'Josiah replaced Siti → Hafiz on a subtask "Thumbnail" · Redesign · "Resigned"'])
+    // A recurring product's months (②b-2f): made each run day, a plan carried, the day moved.
+    const months = (action: string, data: Record<string, unknown>) =>
+      eventText({ id: 12, at: '', actor: 'Josiah', action, stage: null, stageName: null, fromTo: null, reason: null, version: null, data }, page)
+    expect([months('run made', { run: 3, month: '2026-11', made: 1, toPlan: 0 }), months('run day', { from: 1, to: 22 }),
+      months('carried', { from: 'MKT-CAR-2610-001-D03', start: '2026-11-05' })]).toEqual([
+      "Nov 2026's work made · 1 deliverable", 'Josiah moved the monthly run to the 22nd', 'Plan carried from D03 · starts 5 Nov'])
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 28].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '28th'])
     // Billing (②b-2b), as a subsidiary's feed reads a product project's trail: its month, never its figure.
     const billing = (action: string, data: Record<string, unknown> | null) =>
       eventText({ id: 11, at: '', actor: 'Josiah', action, stage: null, stageName: null, fromTo: null, reason: null, version: null, data }, page)

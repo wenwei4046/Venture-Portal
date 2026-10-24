@@ -450,6 +450,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Billing (mig 20261025121000), all Marketing · Manage: the month's lines read, confirmed and withdrawn; a product
   // project's amount changed, a recurring one stopped; an outside client's billing details read for its page.
   'mkt_billing', 'mkt_bill_confirm', 'mkt_bill_withdraw', 'mkt_project_bill_set', 'mkt_product_stop', 'mkt_client_bill',
+  // A recurring product's months (mig 20261025131000): its run day moved by Marketing · Manage; the months due made by the
+  // hourly sweep (the service role) as by every Marketing write.
+  'mkt_product_run_day', 'mkt_product_runs_due',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

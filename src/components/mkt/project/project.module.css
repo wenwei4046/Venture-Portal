@@ -198,3 +198,12 @@
 .billWords { margin-top: 8px; }
 .billLinks { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
 .billStop { color: rgb(var(--mk-red-deep)); }
+
+/* A recurring product's months (②b-2f): the line under its deliverables' bar, its day changed; its deliverables by month. */
+.runLine { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; }
+.runEdit { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 4px; }
+.runEdit .input { flex: 1; min-width: 0; }
+.runEdit .primary { width: auto; height: 34px; padding: 0 14px; }
+.runEdit .ghost { flex: none; padding: 0 12px; }
+.delMonth + .delMonth { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgb(var(--mk-line-2)); }
+.delMonthName { font-size: .78em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-ink)); margin-bottom: 6px; }
