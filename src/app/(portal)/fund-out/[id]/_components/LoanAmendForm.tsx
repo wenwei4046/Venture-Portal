@@ -41,6 +41,8 @@ export default function LoanAmendForm({
   // 从某月起改成无固定期限 (user 2026-09-22): no monthly principal from X,
   // repayments in any size; the flat interest stays on the principal owed at X.
   const [noFixedTerm, setNoFixedTerm] = useState(false)
+  // What the interest from X is on (2026-10-23 / 24): the principal owed at X, the original principal, or the base the terms before used — one of them.
+  const [interestBasis, setInterestBasis] = useState<'owed' | 'original' | 'kept'>('owed')
 
   const field =
     'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border'
@@ -120,10 +122,17 @@ export default function LoanAmendForm({
               </span>
             </label>
             <label className="flex items-start gap-2 mt-3 cursor-pointer">
-              <input id="interest_on_original" name="interest_on_original" type="checkbox" className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <input id="interest_on_original" name="interest_on_original" type="checkbox" checked={interestBasis === 'original'} onChange={(e) => setInterestBasis(e.target.checked ? 'original' : 'owed')} className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
               <span className="text-sm font-sans text-graphite">
                 利息按原本金算
                 <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起的利息 = 原本金 × 新利率，不按生效月初剩余本金算；每月本金照旧 = 剩余本金 ÷ 剩余期数。</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 mt-3 cursor-pointer">
+              <input id="interest_keeps_base" name="interest_keeps_base" type="checkbox" checked={interestBasis === 'kept'} onChange={(e) => setInterestBasis(e.target.checked ? 'kept' : 'owed')} className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <span className="text-sm font-sans text-graphite">
+                利息照之前的本金算
+                <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起的利息 = 之前算利息用的本金 × 新利率，不按生效月初剩余本金算，之后还了本金也不变（例如 1 月起按 51,000 算，10 月改无固定期限后照样按 51,000）。</span>
               </span>
             </label>
           </div>
