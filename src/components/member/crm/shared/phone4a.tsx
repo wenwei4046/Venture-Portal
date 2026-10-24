@@ -13,6 +13,7 @@ import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
 export { Phone4aAdsPerf } from "./phone-ads-perf";
+export { Phone4aAutoReply } from "./auto-reply-pages";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
@@ -537,24 +538,25 @@ export function Phone4aRoom({ r }: { r: { q4: Room4 } }) {
         <a href={q.waze} target="_blank" rel="noopener" style={chip}><Ic name="map-pin" size={15} />Waze</a>
       </div>
       <RoomHours h={q.hours} />
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 14px 14px 16px", border: "1px solid var(--crm-line)", borderRadius: "16px" }}>
-        <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
-          <span style={{ fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)" }}>Visits per slot</span>
-          <span style={{ fontSize: fs(14), color: "var(--crm-muted)" }}>Each slot is one hour</span>
+      {/* The size of the Mon – Sun row above (the owner, 2026-10-24: "跟mon-sun 的欄位一樣大小，看起來整齊"). */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "42px", padding: "0 6px 0 14px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "14px" }}>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: "6px" }}>
+          <span style={{ fontSize: fs(14), color: "var(--crm-ink)" }}>Visits per slot</span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>1 slot = 1 hour</span>
         </span>
-        <span style={{ display: "flex", alignItems: "center", height: "40px", border: "1px solid var(--crm-line)", borderRadius: "20px" }}>
-          <button type="button" onClick={q.capMinus} aria-label="Fewer" style={{ ...BTN, width: "40px", height: "40px", fontSize: fs(18), color: q.capMinus ? "var(--crm-ink)" : "var(--crm-line)" }}>−</button>
-          <span style={{ minWidth: "26px", textAlign: "center", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(18), fontVariantNumeric: "tabular-nums" }}>{q.cap}</span>
-          <button type="button" onClick={q.capPlus} aria-label="More" style={{ ...BTN, width: "40px", height: "40px", fontSize: fs(18), color: q.capPlus ? "var(--crm-ink)" : "var(--crm-line)" }}>+</button>
+        <span style={{ display: "flex", alignItems: "center", height: "30px", border: "1px solid var(--crm-line)", borderRadius: "15px" }}>
+          <button type="button" onClick={q.capMinus} aria-label="Fewer" style={{ ...BTN, width: "30px", height: "30px", fontSize: fs(15), color: q.capMinus ? "var(--crm-ink)" : "var(--crm-line)" }}>−</button>
+          <span style={{ minWidth: "22px", textAlign: "center", fontFamily: TIGHT, fontWeight: 500, fontSize: fs(15), fontVariantNumeric: "tabular-nums" }}>{q.cap}</span>
+          <button type="button" onClick={q.capPlus} aria-label="More" style={{ ...BTN, width: "30px", height: "30px", fontSize: fs(15), color: q.capPlus ? "var(--crm-ink)" : "var(--crm-line)" }}>+</button>
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {/* v3 T07: the weekly slots fold to one row; tapped, the 24 × 7 grid opens. */}
-        <button type="button" onClick={() => setGrid(!grid)} aria-expanded={grid} style={{ ...BTN, display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", border: "1px solid var(--crm-line)", borderRadius: "14px", textAlign: "left" }}>
-          <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="calendar" size={18} /></span>
-          <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
-            <span style={{ fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Weekly slots</span>
-            <span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{grid ? "12 am – 11 pm · tap to open or close" : "Tap to paint open hours on the grid"}</span>
+        <button type="button" onClick={() => setGrid(!grid)} aria-expanded={grid} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "42px", padding: "0 14px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "14px", textAlign: "left" }}>
+          <span style={{ display: "flex", color: "var(--crm-ink)" }}><Ic name="calendar" size={15} /></span>
+          <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: "6px" }}>
+            <span style={{ fontSize: fs(14), color: "var(--crm-ink)" }}>Weekly slots</span>
+            <span style={{ fontSize: fs(12), color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{grid ? "tap a cell to open or close" : "tap to paint the grid"}</span>
           </span>
           <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: grid ? "rotate(90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-right" size={15} /></span>
         </button>
