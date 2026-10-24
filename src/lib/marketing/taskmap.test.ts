@@ -184,3 +184,24 @@ describe('a project opened from another', () => {
     expect([...replayAt(map, 0).seen]).toEqual(['start'])
   })
 })
+
+// 2026-10-25 — ④-4d: a deliverable's road starts at its product project — the handoff's first station, *Requested*
+// ("Opened from Social Media project").
+describe('a deliverable’s map', () => {
+  const parent = { id: 'pp', trackId: 'MKT-CAR-2610-003', title: 'Carres · Social Media · Oct 2026', status: 'active' }
+  const deliverable = (more: Record<string, unknown> = {}) =>
+    taskMap(taskFromRow({ ...raw, project: { ...raw.project, kind: 'deliverable', trackId: 'MKT-CAR-2610-003-D01', parent, ...more } }) as MktTaskPage)
+
+  it('starts at its product project, its panel opening it', () => {
+    const m = deliverable()
+    expect(m.nodes[0]).toMatchObject({ id: 'src', col: 0, title: 'MKT-CAR-2610-003', person: '—', tag: 'Opened from', handoff: 'Product project', status: 'In progress' })
+    expect(m.nodes[1]).toMatchObject({ id: 'start', handoff: 'Opened from MKT-CAR-2610-003' })
+    expect(m.stations.src.open).toEqual({ href: '/marketing/projects/MKT-CAR-2610-003', label: 'Open MKT-CAR-2610-003' })
+    expect(m.stations.src.facts[2]).toEqual(['Handoff', 'Opened MKT-CAR-2610-003-D01 from it'])
+  })
+
+  it('one opened from another project starts at that one', () => {
+    const m = deliverable({ source: { id: 'p0', trackId: 'TSK-CAR-2610-004', title: 'Banner', kind: 'quick', status: 'done', owner: 'Mei' } })
+    expect(m.nodes[0]).toMatchObject({ id: 'src', title: 'TSK-CAR-2610-004', person: 'Mei', handoff: 'Quick task' })
+  })
+})

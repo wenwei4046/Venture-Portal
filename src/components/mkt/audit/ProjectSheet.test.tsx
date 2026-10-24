@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { projectLogFromRow } from '@/lib/marketing/audit'
+import { productProjectFromRow } from '@/lib/marketing/project'
 import { taskFromRow, type MktTaskPage } from '@/lib/marketing/task'
 
 // 2026-10-23 — ④-3 / ④-4: a project's Map and Audit trail (`Task Map.dc.html`, `Audit Trail.dc.html`) over its page.
@@ -197,5 +198,50 @@ describe('its export and its corrections (④-3b — the user’s answers 18, 19
     expect((within(panel).getByRole('textbox') as HTMLTextAreaElement).value).toBe('Opened for Ali, not Mei.')
     fireEvent.click(within(panel).getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('group', { name: 'Correct record #2' })).toBeNull()
+  })
+})
+
+// 2026-10-25 — ④-4d (the user's answers 22, 23): a product project's Map — its intake and its work — drawn from its page,
+// then again from the formal log's every record once it is read.
+describe('a product project’s map and replay', () => {
+  const product = productProjectFromRow({
+    today: '2026-10-22', me: 's-sia',
+    team: [{ id: 's-sia', user: 'u1', full: 'SIA JOSIAH', first: 'SIA', title: 'MARKETING MANAGER' }],
+    sub: { id: 'sub', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, pic: 'Kelvin' },
+    project: { id: 'p7', track: 'MKT-CAR-2610-007', title: 'Carres · Post pack · Oct 2026', status: 'waiting_pic', owner: 's-sia', ownerName: 'SIA', pic: 'Kelvin',
+      linkSentAt: '2026-10-21T02:00:00Z', createdAt: '2026-10-20T01:00:00Z', product: { id: 'pr', version: 1, name: 'Post pack', kind: 'one', note: '' } },
+    minutes: [{ id: 'm1', title: 'Kickoff', intake: true, status: 'sent', rev: 2, vals: {}, signed: {},
+      template: { id: 't1', version: 1, name: 'Kickoff', fields: [], rules: { sign: true, pic: true } } }],
+    // The page's trail: its newest records only.
+    trail: [{ at: '2026-10-21T02:00:00Z', actor: 'SIA', action: 'link sent', reason: 'Kelvin' }],
+    deliverables: [],
+  })!
+  const productLog = projectLogFromRow({
+    track: 'MKT-CAR-2610-007', title: 'Carres · Post pack · Oct 2026', kind: 'product',
+    rows: [
+      { id: 20, at: '2026-10-20T01:00:00Z', actor: 'SIA', action: 'created', data: { product: 'Post pack', version: 1 } },
+      { id: 21, at: '2026-10-21T02:00:00Z', actor: 'SIA', action: 'link sent', reason: 'Kelvin' },
+    ],
+  })
+
+  it('opens on its intake — Created, the minutes, the PIC’s approval waiting, the work ahead — and replays the whole log', async () => {
+    readProjectLog.mockReset()
+    readProjectLog.mockResolvedValue(productLog)
+    render(<ProjectSheet project="p7" track="MKT-CAR-2610-007" title="Carres · Post pack · Oct 2026" page={null} product={product} tab="map" onClose={() => {}} />)
+    expect(screen.getAllByRole('tab').map(t => `${t.textContent}${t.getAttribute('aria-selected') === 'true' ? '*' : ''}`))
+      .toEqual(['Map*', 'Audit trail', '🗺️ Map view*', '☰ List view'])
+    expect(readProjectLog).toHaveBeenCalledWith('p7')
+    expect(screen.getByText('Now at 🔗 Kelvin approves the minutes')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '☰ List view' }))
+    expect(screen.getAllByRole('row').slice(1).map(r => r.textContent)).toEqual([
+      '01🛡️Created by SIAMARKETING MANAGERSIAPost pack v1Done20 Oct',
+      '02🛡️Meeting minutes · KickoffMARKETING MANAGERSIAIntake meetingDone21 Oct',
+      '03🔗Kelvin approves the minutesApprovalsKelvinPIC via linkWaiting for KelvinSince 21 Oct',
+      '04🛡️Plan assignmentsMARKETING MANAGERSIAPlan assignmentsPlanned',
+    ])
+    fireEvent.click(screen.getByRole('tab', { name: 'Audit trail' }))
+    fireEvent.click(screen.getByRole('tab', { name: '▶ Replay' }))
+    // Drawn again from the formal log: both records, not the page's one.
+    await waitFor(() => expect(screen.getByText('2 / 2')).toBeTruthy())
   })
 })

@@ -22,6 +22,8 @@ const actions = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }))
+const readProjectLog = vi.hoisted(() => vi.fn())
+vi.mock('../audit/read', () => ({ readProjectLog }))
 
 import ProductProject from './ProductProject'
 
@@ -467,5 +469,20 @@ describe('opened from another project', () => {
     render(<ProductProject initial={page(RACHEL)} can={MANAGER} />)
     expect(screen.queryByRole('link', { name: /Opened from/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '+ Open a project from here' })).toBeNull()
+  })
+})
+
+// 2026-10-25 — ④-4d (the user's answers 22, 23): the product project's Map — its intake on the map — beside its Formal log.
+describe('its map', () => {
+  it('Map opens the sheet on the intake: Created, the minutes being written, the PIC and the work ahead', async () => {
+    readProjectLog.mockResolvedValue(null)
+    render(<ProductProject initial={page(RACHEL)} can={MANAGER} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Map' }))
+    const sheet = screen.getByRole('dialog', { name: 'Task map' })
+    expect(within(sheet).getByText('Now at Meeting minutes · Kickoff')).toBeTruthy()
+    expect(within(sheet).getByRole('button', { name: 'Kelvin approves the minutes · Planned' })).toBeTruthy()
+    await waitFor(() => expect(readProjectLog).toHaveBeenCalledWith('p1'))
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Task map' })).toBeNull()
   })
 })

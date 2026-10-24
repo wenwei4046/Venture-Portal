@@ -5,13 +5,14 @@
 // A stage split into subtasks (②b-2c) branches: each subtask its own station in its person's lane (tagged Subtask,
 // 🔓 picked by the stage's owner, a dashed line to it), then the stage's mini gate Review delivery — a delivery's line up
 // to it, a return's red line back. A project opened from another (④-4c — answer 23) starts at that one: its station
-// before Created (tagged *Opened from*), a line to it, its panel opening it. Drawn from the task page (its stages,
-// approvers, subtasks and trail). Pure.
+// before Created (tagged *Opened from*), a line to it, its panel opening it — a deliverable at its product project
+// (④-4d: the handoff's *Requested — Opened from Social Media project*). Drawn from the task page (its stages,
+// approvers, subtasks and trail). Pure. A product project's own map: productmap.ts.
 
 import { officeTime } from '@/lib/office-time'
-import { KIND_WORDS, shortDay, STATUS_WORDS, type MktSubtask } from './board'
+import { KIND_WORDS, shortDay, STATUS_WORDS, type MktSource, type MktSubtask } from './board'
 import { groupEmoji, groupLabel, groupTone, type MktTone } from './groups'
-import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent } from './task'
+import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent, type TaskProject } from './task'
 
 /** 'appr', or a group (a People title; '—' for a stage of none). */
 export type MapLaneId = string
@@ -81,8 +82,33 @@ const day = (at: string | null | undefined) => {
   const t = at ? officeTime(at) : null
   return t?.isValid() ? shortDay(t.format('YYYY-MM-DD')) : ''
 }
-const flowKey = (a: string, b: string) => `${a}>${b}`
-const backKey = (a: string, b: string) => `${a}>${b}~back`
+/** A moment's day as a station shows it ('25 Oct'), '' for none — the product project's map's too (productmap.ts). */
+export const mapDay = day
+export const flowKey = (a: string, b: string) => `${a}>${b}`
+export const backKey = (a: string, b: string) => `${a}>${b}~back`
+
+/** Where a project's road starts when it came from another (④-4c — answer 23): the project it was opened from, else a
+ * deliverable's product project (the handoff's first station, *Requested* — "Opened from Social Media project"). */
+export function originOf(p: { source: MktSource | null; parentProject?: TaskProject['parentProject'] }): MktSource | null {
+  if (p.source) return p.source
+  const pp = p.parentProject
+  return pp ? { id: pp.id, trackId: pp.trackId, title: pp.title, kind: 'product', status: pp.status, owner: '' } : null
+}
+
+/** That project's station, before Created: its Track ID, its owner, tagged *Opened from*; its panel opens it. */
+export function originStation(src: MktSource, lane: MapLaneId, col: number, track: string): { node: MapNode; station: Station } {
+  const node: MapNode = {
+    id: 'src', kind: 'card', lane, col, title: src.trackId, full: `${src.trackId} · ${src.title}`, person: src.owner || '—', icon: '',
+    date: '', tone: 'done', current: false, future: false, tag: 'Opened from', stage: null, handoff: KIND_WORDS[src.kind], status: STATUS_WORDS[src.status],
+  }
+  return {
+    node,
+    station: {
+      facts: [['Track ID', src.trackId], ['Person', node.person], ['Handoff', `Opened ${track} from it`], ['Kind', node.handoff], ['Status', node.status]],
+      files: [], versions: [], audit: [], open: { href: `/marketing/projects/${encodeURIComponent(src.trackId)}`, label: `Open ${src.trackId}` },
+    },
+  }
+}
 /** A delivered or a stage's own file's link, signed at the click (lib/storage/browser.ts › fileRoute's shape —
  * Marketing's code keeps out of the storage modules). */
 const fileHref = (path: string) => `/files/marketing/${path.split('/').map(encodeURIComponent).join('/')}`
@@ -97,7 +123,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const picName = page.sub?.pic || 'PIC'
   const active = p.status === 'active'
   const created = events.find(e => e.action === 'created')
-  const src = p.source
+  const src = originOf(p)
 
   // ── The road: where it was opened from, the start, then each stage — its subtasks off to the side, its Review
   // delivery — and its approvers ──
@@ -313,14 +339,8 @@ export function taskMap(page: MktTaskPage): TaskMap {
 
   const returnsTo = (idx: number) => [...backs.values()].filter(b => b.to === `s${idx}`).reduce((n, b) => n + b.n, 0)
   const nodes: MapNode[] = road.map((r, col) => {
-    if (r.id === 'src' && src) {
-      // The project it was opened from — its own road, behind this one's start.
-      return {
-        id: 'src', kind: 'card', lane: startLane, col, title: src.trackId, full: `${src.trackId} · ${src.title}`, person: src.owner || '—', icon: '',
-        date: '', tone: 'done', current: false, future: false, tag: 'Opened from', stage: null,
-        handoff: KIND_WORDS[src.kind], status: STATUS_WORDS[src.status],
-      }
-    }
+    // The project it was opened from — its own road, behind this one's start.
+    if (r.id === 'src' && src) return originStation(src, startLane, col, p.trackId).node
     if (r.id === 'start') {
       const by = created?.actor || who(p.owner)
       return {
@@ -431,10 +451,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const subById = new Map(road.filter(r => r.sub).map(r => [r.id, r.sub as MktSubtask]))
   for (const n of nodes) {
     if (n.id === 'src' && src) {
-      stations.src = {
-        facts: [['Track ID', src.trackId], ['Person', n.person], ['Handoff', `Opened ${p.trackId} from it`], ['Kind', n.handoff], ['Status', n.status]],
-        files: [], versions: [], audit: [], open: { href: `/marketing/projects/${encodeURIComponent(src.trackId)}`, label: `Open ${src.trackId}` },
-      }
+      stations.src = originStation(src, n.lane, n.col, p.trackId).station
       continue
     }
     const s = n.stage != null ? stages.find(x => x.idx === n.stage) : null

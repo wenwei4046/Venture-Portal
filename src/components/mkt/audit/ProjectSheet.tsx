@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ProjectLog } from '@/lib/marketing/audit'
+import { productMap } from '@/lib/marketing/productmap'
+import type { ProductProjectPage } from '@/lib/marketing/project'
 import type { MktTaskPage } from '@/lib/marketing/task'
 import { taskMap } from '@/lib/marketing/taskmap'
 import TaskMap from '../map/TaskMap'
@@ -11,28 +13,32 @@ import s from './audit.module.css'
 
 // A project's Map and Audit trail (the handoff's tabs of the product task page, `Task Map.dc.html` and
 // `Audit Trail.dc.html`), opened from the trail's head on its page — over the page until the product task page comes
-// with the Assignment plan (②b-2). The Map and Replay are drawn from the task's stages and trail; the formal log is
-// read when it opens. A product project's intake has no stages to map: its log alone.
+// with the Assignment plan (②b-2). A task's Map and Replay are drawn from its stages and trail; a product project's
+// (④-4d — answers 22, 23) from its intake and its deliverables, its trail the formal log's — read when the sheet
+// opens, as the formal log is.
 
 type Tab = 'map' | 'audit'
 
-export default function ProjectSheet({ project, track, title, page, tab, manage = false, onClose }: {
+export default function ProjectSheet({ project, track, title, page, product = null, tab, manage = false, onClose }: {
   project: string
   track: string
   title: string
-  /** The task page — its stages and trail draw the Map and Replay; null for a product project's intake. */
+  /** The task page — its stages and trail draw the Map and Replay; null for a product project. */
   page: MktTaskPage | null
+  /** A product project's page — its intake and deliverables draw its Map and Replay. */
+  product?: ProductProjectPage | null
   tab: Tab
   /** Marketing · Manage: a record of the formal log may be corrected (④-3b). */
   manage?: boolean
   onClose: () => void
 }) {
-  const map = useMemo(() => (page && page.stages.length ? taskMap(page) : null), [page])
-  const [on, setOn] = useState<Tab>(map ? tab : 'audit')
-  const [mode, setMode] = useState<'replay' | 'log'>('log')
   // undefined: not read yet / reading; null: could not be read.
   const [log, setLog] = useState<ProjectLog | null | undefined>(undefined)
-  const wantLog = on === 'audit' && (mode === 'log' || !map)
+  // A product project's map from its page's trail, then from the formal log's every record once it is read.
+  const map = useMemo(() => (page && page.stages.length ? taskMap(page) : product ? productMap(product, log?.rows) : null), [page, product, log])
+  const [on, setOn] = useState<Tab>(map ? tab : 'audit')
+  const [mode, setMode] = useState<'replay' | 'log'>('log')
+  const wantLog = !!product || (on === 'audit' && (mode === 'log' || !map))
   useEffect(() => {
     if (!wantLog || log !== undefined) return
     let live = true
@@ -61,7 +67,8 @@ export default function ProjectSheet({ project, track, title, page, tab, manage 
           <button type="button" role="tab" aria-selected={on === 'audit'} className={`${s.tab}${on === 'audit' ? ` ${s.tabOn}` : ''}`} onClick={() => setOn('audit')}>Audit trail</button>
         </div>
         <div className={s.body}>
-          {on === 'map' && map ? <TaskMap map={map} track={track} /> : null}
+          {/* Drawn again from the full log once it is read: its Replay from the first record. */}
+          {on === 'map' && map ? <TaskMap key={product && log ? 'log' : 'page'} map={map} track={track} /> : null}
           {on === 'audit' ? (
             <>
               {map ? (
@@ -73,7 +80,7 @@ export default function ProjectSheet({ project, track, title, page, tab, manage 
                   ))}
                 </div>
               ) : null}
-              {map && mode === 'replay' ? <TaskMap map={map} mode="replay" track={track} />
+              {map && mode === 'replay' ? <TaskMap key={product && log ? 'log' : 'page'} map={map} mode="replay" track={track} />
                 : log === undefined ? <div className={s.wait}>Reading the log…</div>
                 : log === null ? <div className={s.wait}>Could not read the log</div>
                 : <AuditLog log={log} project={project} manage={manage} onLog={setLog} />}
