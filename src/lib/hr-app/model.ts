@@ -9,6 +9,7 @@ import { formatIntlDate } from '@/lib/utils'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
+import type { LetterChoice } from '@/lib/documentation/attach'
 import type { AttConfig, AttLedger, AttMonth, AttRequest } from '@/lib/attendance/types'
 import type { HiringBankReason, HiringField } from '@/lib/hiring/types'
 import type { TermReview } from '@/lib/term-reviews'
@@ -180,11 +181,21 @@ export interface HrAppData {
   may: {
     attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean
     /**
-     * Acknowledge the reminder of a probation's end (2026-10-23) or a contract's (2026-10-24): People · Edit on a
-     * person's page. Absent reads as no.
+     * People · Edit on a person's page: Acknowledge the reminder of a probation's end (2026-10-23) or a contract's
+     * (2026-10-24), and since 2026-10-24 a probation's Confirm as permanent and Extend. Absent reads as no.
      */
-    termAck?: boolean
+    termEdit?: boolean
+    /**
+     * Documentation · Create on a person's page (2026-10-24): a letter filed with Confirm as permanent or Extend — and,
+     * with termEdit, Renew, which files the new contract. Absent reads as no.
+     */
+    letters?: boolean
   }
+  /**
+   * The Data center's letter types a step's letter is filed as (2026-10-24, `hr_letter_type_choices()`): null while
+   * they may not file one. Absent reads as none.
+   */
+  letterTypes?: LetterChoice[] | null
   /**
    * The probations HR is reminded of (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"): everybody active on
    * probation (`probation_reviews()`, lib/term-reviews.ts), for whoever may acknowledge one. Null while they may

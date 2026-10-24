@@ -326,7 +326,7 @@ describe('a probation ending (2026-10-23)', () => {
   })
   const acked = review({ id: 's3', name: 'Kar Jun', endsOn: '2026-10-20', ackEnd: '2026-10-20', ackName: 'Grace Lim', ackAt: '2026-10-14T01:00:00Z' })
   const withProbation = (over: Partial<HrAppData> = {}): HrAppData =>
-    ({ ...data, probation: [review(), acked], may: { ...data.may, termAck: true }, ...over })
+    ({ ...data, probation: [review(), acked], may: { ...data.may, termEdit: true }, ...over })
 
   it('Home lists those waiting and its line counts them; one opens the person, whose page acknowledges it', async () => {
     const ack = vi.fn(async () => ({ ok: true as const }))
@@ -353,7 +353,7 @@ describe('a probation ending (2026-10-23)', () => {
     expect(screen.getByText('Acknowledged by Grace Lim · 14 Oct 2026')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
     cleanup()
-    render(<HrApp data={withProbation({ may: { ...data.may, termAck: false } })} actions={{ ...actions, probationAck: done }} />)
+    render(<HrApp data={withProbation({ may: { ...data.may, termEdit: false } })} actions={{ ...actions, probationAck: done }} />)
     tab('People')
     fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
     expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()

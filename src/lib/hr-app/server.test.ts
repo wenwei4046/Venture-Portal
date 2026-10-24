@@ -30,7 +30,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
   it('with nothing unticked, every part and every write their cells hold', () => {
     expect(appAccess(hrUser({}))).toEqual({
       parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false },
-      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termAck: false },
+      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termEdit: false, letters: false },
     })
   })
 
@@ -40,7 +40,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     const closed = ['hr.hiring_requests.view', 'hr.hiring_requests.create', 'hr.hiring_requests.edit', 'hr.hiring_requests.approve', 'hr.talent_bank.edit']
     const access = appAccess(hrUser({ tabs, closed }))
     expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
-    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true, termAck: false })
+    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true, termEdit: false, letters: false })
   })
 
   it('Member services’ Edit unticked: its requests still show, nothing is decided from the app', () => {
@@ -63,7 +63,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
   // the topic that tells the phone of either.
   it('People · Edit on a person’s page: a probation’s or a contract’s Acknowledge — and people.probation, whose notices reach the phone', () => {
     const people = hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all' }, permissions: [...HR_KEYS, 'team'] })
-    expect(appAccess(people).may.termAck).toBe(true)
+    expect(appAccess(people).may.termEdit).toBe(true)
     expect(hrTopics(people)).toEqual(['hiring.guest', 'rooms.guest', 'member.requests', 'people.probation'])
     // The person page's Edit unticked, People · View only, or viewing as somebody: neither.
     for (const user of [
@@ -71,7 +71,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
       hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all' }, permissions: [...HR_KEYS, 'team'] }),
       { ...people, viewingAs: { id: 'x', name: 'Somebody' } },
     ]) {
-      expect(appAccess(user).may.termAck).toBe(false)
+      expect(appAccess(user).may.termEdit).toBe(false)
       expect(hrTopics(user)).not.toContain('people.probation')
     }
   })

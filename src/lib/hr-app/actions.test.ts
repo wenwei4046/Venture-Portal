@@ -31,7 +31,7 @@ import { hrAppAcknowledge, hrAppAttDecide, hrAppBook, hrAppContractAck, hrAppDec
 
 const OPEN = {
   parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, people: true },
-  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termAck: true },
+  may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termEdit: true },
 }
 const SHUT = { ok: false, reason: 'This is not open to your account.' }
 
@@ -105,9 +105,9 @@ describe('a probation’s reminder, acknowledged from the HR app (2026-10-23)', 
     mocks.probationAck.mockResolvedValue({ ok: false, reason: 'They are not on probation any more — reload the page.' })
     await expect(hrAppProbationAck('st1')).resolves.toEqual({ ok: false, reason: 'They are not on probation any more — reload the page.' })
     mocks.probationAck.mockClear()
-    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termAck: false } })
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termEdit: false } })
     await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
-    // An account whose may carries no termAck at all (an older shape): refused too.
+    // An account whose may carries no termEdit at all (an older shape): refused too.
     mocks.access.mockReturnValue({ ...OPEN, may: { attDecide: true, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true } })
     await expect(hrAppProbationAck('st1')).resolves.toEqual(SHUT)
     expect(mocks.probationAck).not.toHaveBeenCalled()
@@ -121,7 +121,7 @@ describe('a contract’s reminder, acknowledged from the HR app (2026-10-24)', (
     expect(mocks.contractAck).toHaveBeenCalledWith('st2')
     expect(mocks.probationAck).not.toHaveBeenCalled()
     mocks.contractAck.mockClear()
-    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termAck: false } })
+    mocks.access.mockReturnValue({ ...OPEN, may: { ...OPEN.may, termEdit: false } })
     await expect(hrAppContractAck('st2')).resolves.toEqual(SHUT)
     expect(mocks.contractAck).not.toHaveBeenCalled()
   })
