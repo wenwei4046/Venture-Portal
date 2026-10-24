@@ -1,5 +1,28 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-24 m (SHIPPED, #737) — a 利滚利 schedule rolls from the month it turned compounding; tidied
+
+Session 35e03c3c, after l. The user used the new flow for **LO#7** at 09:34–09:35 UTC (Finance Manager filed, Principal
+approved): from 2026-01, 4% /mo, compounding, no fixed term (the A of the old A/B/C choice — the monthly roll). Then, on
+its schedule: "我要如何看total 现在overdue 多少？这些要整理一下，然后英文字体" → mockup (before/after, font A/B) →
+"照整理后的样子做，算法一起修正，数字字体保留 A（Chivo Mono）" → "全绿就合并上线".
+
+- **The figures were wrong**: `compoundPlan` rolled every month as compounding, LO#7's flat 2025 months too (300 → 295 →
+  289.98…), so January rolled from 50,817.88, not the 51,000 `compoundRoll` (Company Statement) rolls from — October
+  read 2,342.88. Now a deal flat before keeps those months as their terms asked (payments before the switch oldest
+  first) and rolls from the switch on the segment's base. LO#7: Apr–Dec 2025 1,300 paid each (59,000 → 51,000); Jan
+  2,040 due / 1,300 paid / 740 to balance … Sep 1,012.74 to balance (58,831.27 = compoundRoll's); Oct **2,353.25 overdue
+  19 days**; owed 61,184.52; 7,831.27 rolled in; due 33,584.52 = 23,400 + 7,831.27 + 2,353.25.
+- **`RepaymentPlan`** gained `overdue` / `overdueSince` / `overdueDays` (overdueOf's rule, rows marked `late`) and
+  `compound` (term breaks, owed now, paid to date, rolled-in interest); 利滚利 rows carry `paid` / `toBalance`; remarks
+  `Part paid · 740.00 to balance`, `Unpaid · x to balance`, `Paid <date> · <ref>`.
+- **Table**: a no-fixed-term head says `· OVERDUE RM x` (every open plan); a 利滚利 deal gets four figures over the table,
+  Due / Paid / To balance / Balance / Overdue, a line where its terms change, and `Due = Paid + To balance + Overdue`.
+  Fixed / flat plans unchanged; figures stay Chivo Mono (the user kept A).
+- **#737 squash-merged `3a611ef2`** → production deploy success 10:24 UTC (CI 7/7 green). No migration.
+- Not changed (raised, the user did not ask): the side panel's *Outstanding* (principal only — LO#7 shows 42,000 while
+  61,184.52 is owed) and the print sheet's columns.
+
 ## CHECKPOINT 2026-10-24 l (SHIPPED, #736 + mig 20261025110000) — Finance files a terms change, the Principal approves it
 
 Session 35e03c3c, after k. The user found Fund OUT's terms could not be changed from their account ("fund out 我发现我不能
