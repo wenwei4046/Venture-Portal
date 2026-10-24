@@ -1,6 +1,32 @@
 # HOUZS Venture Portal — Session Handoff
 
-## CHECKPOINT 2026-10-24 j (OPEN — #728 waits on main's CRM lint; BI#7's start APPLIED) — Liang's BI#7, as the user wants it
+## CHECKPOINT 2026-10-24 k (SHIPPED, #728 + mig 20261025100000 + data) — BI#7 and LO#7 done as the user wants them
+
+Session 35e03c3c, closing j. User: "做" (twice) → in order, each step checked:
+
+- **Migration `20261025100000`** applied first (07:3x UTC, one transaction refusing itself unless prosrc md5 = PGlite's
+  `d0a386a0…` / `eb7b444a…`, anon no EXECUTE, no non-9-arg RPC left; schema_migrations row, created_by
+  `claude-terms-keeps-base`; `NOTIFY pgrst`). → **#728 squash-merged `3d864c58`** (CI 7/7 green after main's lint was
+  fixed by the CRM owner in #729 and a package.json conflict with #711 resolved) → production deploy success 07:36 UTC.
+- **BI#7 data** (one checked transaction, as the system): `revert_terms_change` → `amend_fund_source_from(…, '2026-01-01',
+  0.00833, 51, …)` → `amend_fund_source_from(…, '2026-10-01', null, null, null, …, true, false, true)`. Now history
+  2025-04..2025-12 0.5% × 60, 2026-01..2026-09 0.833% × 51 (kept → true); the record 0.833%, no fixed term from
+  2026-10, first instalment 5 Apr 2025; 38 repayment rows untouched; HC's two rows untouched (4 history rows in all).
+- Live API checked with the publishable key: `treasury_terms_history?select=…,next_interest_keeps_base` 200 (RLS-empty);
+  `rpc/amend_fund_source_from` with 9 args → 401 *permission denied* (found in the schema cache, refused to anon).
+- BI#7 now reads (production rows through the merged code): Apr–Dec 2025 1,300 paid; Jan–Sep 2026 **1,424.83**
+  (oldest first: Jan–Jul paid, Aug part paid 1,026.19 · short 398.64, Sep part paid 1,000 · short 424.83); Oct
+  **424.83** interest only, overdue; owed 1,248.30; balance 41,000.
+- **LO#7** (fund out to The Cont, funded by Liang): first instalment set to 5 Apr 2025 too (`set_loan_repayment_start`,
+  07:13 UTC, after a dry-run) — its 18 payments meet Apr-25..Sep-26, October reads unpaid. Its page's "matures
+  05 Apr 2030" (disbursement + 60) is a month after the last row (5 Mar 2030) — said, not changed. Its terms change:
+  still the user's to define.
+- #730 (my CRM lint PR, opened by mistake) **closed** — CRM is not this user's area.
+- Raised, not changed (the user to decide): a fixed plan's Balance column is "still to collect, principal + interest"
+  (LO#7: 76,700 after row 1) while a no-fixed-term plan's is principal owed; the schedule header's OUTSTANDING
+  (54,600) vs the panel's Outstanding (42,000 principal).
+
+## CHECKPOINT 2026-10-24 j (SUPERSEDED by k) — Liang's BI#7, as the user wants it
 
 Session 35e03c3c, after i. **Supersedes i's "settled" line**: the user then said what BI#7 should be — "interest 1 月重新算，
 10月开始就没有fixed repayment term 和 principal" + "10 月起利息照旧每月 424.83（按 1 月的 51,000 算），不管之后还了多少本金".
