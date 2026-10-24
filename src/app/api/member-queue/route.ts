@@ -40,11 +40,12 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
-    // Probations ending within 15 days (mig 20261024223000; 15, not 14, since 20261025012000): once to each HR app holder who may still acknowledge
-    // it, asked as them — then sent by the flush below. A count only (the names are people's).
-    const probationDue = await db.rpc('notify_probation_due')
-    if (probationDue.error) console.error('Probation notices failed', probationDue.error.code ?? 'unknown')
-    else if (probationDue.data) console.info('Probation notices written', probationDue.data)
+    // A probation or a contract ending (mig 20261024223000; both, 30 and again 15 days before, since 20261025046500): each
+    // reminder once to each HR app holder who may still acknowledge it, asked as them — then sent by the flush below. A
+    // count only (the names are people's).
+    const termEnds = await db.rpc('notify_term_ends')
+    if (termEnds.error) console.error('Term end notices failed', termEnds.error.code ?? 'unknown')
+    else if (termEnds.data) console.info('Term end notices written', termEnds.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())

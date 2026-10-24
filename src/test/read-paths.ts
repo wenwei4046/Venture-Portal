@@ -360,8 +360,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Employment status (mig 20261024214500): HR view's bell reads who is on probation, and Acknowledge writes the
   // reminder's acknowledgement — both People · Edit with the HR scope; Acknowledge on the person page's box too.
   'probation_reviews', 'probation_acknowledge',
-  // …and the phone (mig 20261024223000): the hourly sweep's notices of a probation ending, the service role's alone.
-  'notify_probation_due',
+  // …a contract's the same way (mig 20261025046500): who is on a contract, and its reminder's acknowledgement.
+  'contract_reviews', 'contract_acknowledge',
+  // …and the phone (mig 20261024223000; a contract's too, 30 and 15 days before, since 20261025046500): the hourly
+  // sweep's notices of a probation or a contract ending, the service role's alone.
+  'notify_term_ends',
   // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
   // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',

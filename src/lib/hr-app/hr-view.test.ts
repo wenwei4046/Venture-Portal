@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { AttConfig, AttLedger, AttMonth, AttPerson, AttRequest, AttStep } from '@/lib/attendance/types'
 import { genPage } from './gen-pages'
 import {
-  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, levelRows, orgRows, peopleGroups, personView, probationFacts,
-  probationRows, recordsView, requestView, todayCounts, todayRows, type HrAtt,
+  approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, levelRows, orgRows, peopleGroups, personView, recordsView,
+  requestView, termFacts, termRows, todayCounts, todayRows, type HrAtt,
 } from './hr-view'
 import type { HrAppData } from './model'
-import type { ProbationReview } from '@/lib/probation-reviews'
+import type { TermReview } from '@/lib/term-reviews'
 
 // HR Mobile (2026-10-17, the handoff `design_handoff_hr_mobile`): Today, Approve, a person, Leave balances, Month close,
 // Records, the org chart and the levels — HR › Attendance's own facts in the handoff's words.
@@ -133,46 +133,59 @@ describe('a person, the balances, the close', () => {
   it('Home’s line', () => {
     expect(homeSummary(4, { present: 7, late: 3, notin: 2, leave: 1 }, '2026-10-01')).toBe('4 requests waiting for HR · 2 not in yet · 3 late · October closes 3 Nov.')
     expect(homeSummary(1, null, null)).toBe('1 request waiting for HR.')
-    // The probations still waiting for Acknowledge (2026-10-23): after the requests, only while some wait.
-    expect(homeSummary(4, { present: 7, late: 3, notin: 2, leave: 1 }, '2026-10-01', 2)).toBe('4 requests waiting for HR · 2 probations ending · 2 not in yet · 3 late · October closes 3 Nov.')
-    expect(homeSummary(0, null, null, 1)).toBe('0 requests waiting for HR · 1 probation ending.')
-    expect(homeSummary(0, null, null, 0)).toBe('0 requests waiting for HR.')
+    // The probations and contracts still waiting for Acknowledge (2026-10-23 / 10-24): after the requests, only while some wait.
+    expect(homeSummary(4, { present: 7, late: 3, notin: 2, leave: 1 }, '2026-10-01', { probation: 2 })).toBe('4 requests waiting for HR · 2 probations ending · 2 not in yet · 3 late · October closes 3 Nov.')
+    expect(homeSummary(0, null, null, { probation: 1 })).toBe('0 requests waiting for HR · 1 probation ending.')
+    expect(homeSummary(0, null, null, { probation: 1, contract: 2 })).toBe('0 requests waiting for HR · 1 probation ending · 2 contracts ending.')
+    expect(homeSummary(0, null, null, { contract: 1 })).toBe('0 requests waiting for HR · 1 contract ending.')
+    expect(homeSummary(0, null, null, { probation: 0, contract: 0 })).toBe('0 requests waiting for HR.')
   })
 })
 
-// A probation ending (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"): Home lists them; a person's page says where it stands.
-describe('a probation ending', () => {
+// A probation ending (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"); a contract, and each reminded 30 and again 15
+// days before (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder"): Home lists them; a person's page says
+// where it stands.
+describe('a probation or a contract ending', () => {
   const TODAY = '2026-10-23'
-  const review = (over: Partial<ProbationReview>): ProbationReview => ({
-    id: 's1', name: 'LI SEAN', code: 'HV040', department: 'HR', title: 'HR EXECUTIVE', hireDate: '2026-08-01', months: 3,
+  const review = (over: Partial<TermReview>): TermReview => ({
+    kind: 'probation', id: 's1', name: 'LI SEAN', code: 'HV040', department: 'HR', title: 'HR EXECUTIVE', hireDate: '2026-08-01', months: 3,
     endsOn: '2026-10-31', ackEnd: null, ackName: null, ackAt: null, ...over,
   })
 
   it('Home: those waiting for Acknowledge, soonest first, in the bell’s words', () => {
-    const rows = probationRows([
+    const rows = termRows([
       review({ id: 'a', name: 'LATER ONE', endsOn: '2026-11-05' }),
       review({ id: 'b', name: 'SOONER ONE', endsOn: '2026-10-25', department: null }),
-      review({ id: 'c', name: 'TOLD ALREADY', endsOn: '2026-10-28', ackEnd: '2026-10-28', ackName: 'HR Manager' }),
-      review({ id: 'd', name: 'NOT YET', endsOn: '2026-11-08' }), // 16 days: past the 15
+      review({ id: 'c', name: 'TOLD ALREADY', endsOn: '2026-10-28', ackEnd: '2026-10-28', ackName: 'HR Manager', ackAt: '2026-10-22T02:00:00Z' }),
+      review({ id: 'd', name: 'NOT YET', endsOn: '2026-11-23' }), // 31 days: before the first reminder
       review({ id: 'e', name: 'ENDED', endsOn: '2026-10-20' }),
       review({ id: 'f', name: 'NO END', endsOn: null }),
+      // Its first reminder acknowledged 27 days before the end; 9 days left, the second waits.
+      review({ id: 'g', name: 'FIRST ONLY', endsOn: '2026-11-01', ackEnd: '2026-11-01', ackName: 'HR Manager', ackAt: '2026-10-05T02:00:00Z' }),
+      review({ id: 'h', name: 'A MONTH OUT', endsOn: '2026-11-08' }), // 16 days: the first reminder
     ], TODAY)
     expect(rows).toEqual([
       { id: 'e', name: 'ENDED', sub: 'Ended 20 Oct 2026 · 3 days ago · HR' },
       { id: 'b', name: 'SOONER ONE', sub: 'Ends 25 Oct 2026 · in 2 days' },
+      { id: 'g', name: 'FIRST ONLY', sub: 'Ends 1 Nov 2026 · in 9 days · HR' },
       { id: 'a', name: 'LATER ONE', sub: 'Ends 5 Nov 2026 · in 13 days · HR' },
+      { id: 'h', name: 'A MONTH OUT', sub: 'Ends 8 Nov 2026 · in 16 days · HR' },
     ])
   })
 
-  it('a person’s page: the period and its end, and who acknowledged it for that end', () => {
-    expect(probationFacts(review({}), TODAY)).toEqual([{ k: 'Probation', v: '3 months · ends 31 Oct 2026 · in 8 days', mono: false }])
-    expect(probationFacts(review({ ackEnd: '2026-10-31', ackName: 'HR Manager', ackAt: '2026-10-23T14:31:23Z' }), TODAY)).toEqual([
+  it('a person’s page: the period and its end, and who acknowledged which reminder for that end', () => {
+    expect(termFacts(review({}), TODAY)).toEqual([{ k: 'Probation', v: '3 months · ends 31 Oct 2026 · in 8 days', mono: false }])
+    expect(termFacts(review({ ackEnd: '2026-10-31', ackName: 'HR Manager', ackAt: '2026-10-23T14:31:23Z' }), TODAY)).toEqual([
       { k: 'Probation', v: '3 months · ends 31 Oct 2026 · in 8 days', mono: false },
       { k: 'Reminder', v: 'Acknowledged by HR Manager · 23 Oct 2026', mono: false },
     ])
+    // Only the first reminder acknowledged, and the second stands: said so — and the app offers Acknowledge again.
+    expect(termFacts(review({ endsOn: '2026-11-05', ackEnd: '2026-11-05', ackName: 'HR Manager', ackAt: '2026-10-10T02:00:00Z' }), TODAY)[1]).toEqual(
+      { k: 'Reminder', v: '30-day reminder acknowledged by HR Manager · 10 Oct 2026', mono: false })
     // Acknowledged for an end before an extension: told again, so no Reminder line.
-    expect(probationFacts(review({ months: 4, endsOn: '2026-11-30', ackEnd: '2026-10-31', ackName: 'HR Manager' }), TODAY).map(f => f.k)).toEqual(['Probation'])
-    expect(probationFacts(review({ endsOn: null }), TODAY)[0].v).toBe('3 months · no end — the hire date is missing')
+    expect(termFacts(review({ months: 4, endsOn: '2026-11-30', ackEnd: '2026-10-31', ackName: 'HR Manager', ackAt: '2026-10-20T02:00:00Z' }), TODAY).map(f => f.k)).toEqual(['Probation'])
+    expect(termFacts(review({ endsOn: null }), TODAY)[0].v).toBe('3 months · no end — the hire date is missing')
+    expect(termFacts(review({ kind: 'contract', months: 12, endsOn: '2027-09-30' }), TODAY)).toEqual([{ k: 'Contract', v: '12 months · ends 30 Sep 2027 · in 342 days', mono: false }])
   })
 })
 

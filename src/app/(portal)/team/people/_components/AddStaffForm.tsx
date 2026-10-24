@@ -27,7 +27,7 @@ import {
   EMPLOYMENT_STATUSES,
   EMPLOYMENT_STATUS_LABEL,
   PROBATION_MONTH_CHOICES,
-  PROBATION_NOTICE_DAYS,
+  REMINDER_HINT,
   contractEnd,
   dayLabel,
   monthsLabel,
@@ -452,7 +452,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                 className={readOnlyMono}
               />
               <p id="staff-probation-end-hint" className={helpText}>
-                HR is reminded {PROBATION_NOTICE_DAYS} days before.
+                {REMINDER_HINT}
               </p>
             </div>
           </>
@@ -487,8 +487,12 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
                 value={contractEnds ? dayLabel(contractEnds) : 'Pick the hire date first'}
                 readOnly
                 disabled
+                aria-describedby="staff-contract-end-hint"
                 className={readOnlyMono}
               />
+              <p id="staff-contract-end-hint" className={helpText}>
+                {REMINDER_HINT}
+              </p>
             </div>
           </>
         ) : null}

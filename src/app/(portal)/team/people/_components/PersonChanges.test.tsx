@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   acknowledgeProbation: vi.fn(),
   confirmProbation: vi.fn(),
   extendProbation: vi.fn(),
+  acknowledgeContract: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
 vi.mock('../promote-actions', () => ({ promoteStaff: vi.fn() }))
@@ -19,10 +20,11 @@ vi.mock('../probation-actions', () => ({
   confirmProbation: mocks.confirmProbation,
   extendProbation: mocks.extendProbation,
 }))
+vi.mock('../contract-actions', () => ({ acknowledgeContract: mocks.acknowledgeContract }))
 
 import PersonChanges from './PersonChanges'
 import type { CardLadder } from '../card-actions'
-import type { ProbationFacts } from './Employment'
+import type { TermFacts } from './Employment'
 
 const ladder = (over: Partial<CardLadder> = {}): CardLadder => ({
   level: 'L3',
@@ -34,7 +36,7 @@ const ladder = (over: Partial<CardLadder> = {}): CardLadder => ({
 const TODAY = '2026-10-23'
 
 beforeEach(() => {
-  for (const m of [mocks.refresh, mocks.acknowledgeProbation, mocks.confirmProbation, mocks.extendProbation]) m.mockReset()
+  for (const m of [mocks.refresh, mocks.acknowledgeProbation, mocks.confirmProbation, mocks.extendProbation, mocks.acknowledgeContract]) m.mockReset()
 })
 afterEach(cleanup)
 
@@ -73,10 +75,10 @@ describe('Promotion and Employment, as wells', () => {
 
 // 2026-10-23 — the user: "if the probation is almost end, then it will notification hr acknowledge for further action".
 describe('a probation in the Employment well', () => {
-  const probation = (over: Partial<ProbationFacts> = {}): ProbationFacts => ({
+  const probation = (over: Partial<TermFacts> = {}): TermFacts => ({
     hireDate: '2026-08-02', months: 3, endsOn: '2026-11-01', ackEnd: null, ackName: null, ackAt: null, ...over,
   })
-  const draw = (p: ProbationFacts | null) =>
+  const draw = (p: TermFacts | null) =>
     render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active probation={p} today={TODAY} />)
 
   it('reads its period and end; while HR is being told, Acknowledge leads', async () => {
@@ -132,5 +134,59 @@ describe('a probation in the Employment well', () => {
   it('off probation, no such line', () => {
     draw(null)
     expect(within(well('Employment')).queryByText('Probation')).toBeNull()
+  })
+
+  // Two reminders (2026-10-24 — the user: "need 30 days and 15 days before remind, 2 reminder, then for probation need
+  // same as well"): the first opens 30 days before, and its acknowledgement does not answer the second.
+  it('Acknowledge from the first reminder — 30 days before — and again at the second, the first’s said under the line', () => {
+    const { unmount } = draw(probation({ months: 3, endsOn: '2026-11-17' })) // 25 days: the first
+    expect(within(well('Employment')).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    unmount()
+
+    draw(probation({ ackEnd: '2026-11-01', ackName: 'LI SEAN', ackAt: '2026-10-05T02:00:00Z' })) // the first's, 27 days before
+    expect(within(well('Employment')).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    expect(within(well('Employment')).getByText('30-day reminder acknowledged by LI SEAN · 5 Oct 2026')).toBeInTheDocument()
+  })
+})
+
+// A contract (2026-10-24): its period and end, and Acknowledge at each reminder — renewing it is the card's own edit.
+describe('a contract in the Employment well', () => {
+  const contract = (over: Partial<TermFacts> = {}): TermFacts => ({
+    hireDate: '2025-11-23', months: 12, endsOn: '2026-11-22', ackEnd: null, ackName: null, ackAt: null, ...over,
+  })
+  const draw = (c: TermFacts | null) =>
+    render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active contract={c} today={TODAY} />)
+
+  it('reads its period and end; from 30 days before, Acknowledge — by its own action, and nothing else', async () => {
+    draw(contract())
+    expect(within(well('Employment')).getByText('Contract')).toBeInTheDocument()
+    expect(within(well('Employment')).getByText('12 months · ends 22 Nov 2026 · in 30 days')).toBeInTheDocument()
+    expect(within(well('Employment')).queryByRole('button', { name: 'Confirm as permanent' })).toBeNull()
+    expect(within(well('Employment')).queryByRole('button', { name: 'Extend' })).toBeNull()
+    mocks.acknowledgeContract.mockResolvedValue({ ok: true, endsOn: '2026-11-22', ackName: 'LI SEAN', ackAt: '2026-10-23T02:00:00Z' })
+    await act(async () => {
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Acknowledge' }))
+    })
+    expect(mocks.acknowledgeContract).toHaveBeenCalledWith('p1')
+    expect(mocks.acknowledgeProbation).not.toHaveBeenCalled()
+    expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('no Acknowledge before the first reminder, nor once acknowledged; a refusal is said in the well', async () => {
+    const { unmount } = draw(contract({ endsOn: '2026-11-23' })) // 31 days
+    expect(within(well('Employment')).queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    unmount()
+
+    const again = draw(contract({ ackEnd: '2026-11-22', ackName: 'LI SEAN', ackAt: '2026-10-23T02:00:00Z' }))
+    expect(within(well('Employment')).queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    expect(within(well('Employment')).getByText('Acknowledged by LI SEAN · 23 Oct 2026')).toBeInTheDocument()
+    again.unmount()
+
+    draw(contract({ endsOn: '2026-10-30' }))
+    mocks.acknowledgeContract.mockResolvedValue({ ok: false, reason: 'They are not on a contract any more — reload the page.' })
+    await act(async () => {
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Acknowledge' }))
+    })
+    expect(within(well('Employment')).getByText('They are not on a contract any more — reload the page.')).toBeInTheDocument()
   })
 })

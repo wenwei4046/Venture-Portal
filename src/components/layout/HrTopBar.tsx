@@ -13,7 +13,7 @@ import MemoBell from './MemoBell'
 import ViewAsPersonPicker from './ViewAsPersonPicker'
 import { MeDesktop } from '@/components/me/MeDesktop'
 import { isHrView } from '@/lib/hr-view'
-import { seesProbationReminders } from '@/lib/probation-reviews'
+import { seesTermReminders } from '@/lib/term-reviews'
 
 /** The select's value while a person is viewed (2026-10-11). */
 const VIEWING = '__viewing'
@@ -31,8 +31,9 @@ export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; 
   const clock = officeClock()
   const displayName = user.name || getRoleLabel(user.role)
   const personal = user.personalLogin === true && !user.viewingAs
-  // HR's own view (not the Principal's or Finance's, which wear this bar too): the probations ending (2026-10-23).
-  const probation = isHrView(user.role) && seesProbationReminders(user)
+  // HR's own view (not the Principal's or Finance's, which wear this bar too): the probations ending (2026-10-23), and
+  // the contracts (2026-10-24).
+  const terms = isHrView(user.role) && seesTermReminders(user)
 
   const signOut = async () => {
     const supabase = createClient()
@@ -54,8 +55,9 @@ export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; 
             login a People record names, never while viewing as somebody. */}
         {personal ? <MeDesktop hostLabel={viewLabel.replace(/ view$/, '')} /> : null}
         {/* One's own memos, as in every view (2026-10-12): a login a People record names, never while viewing as somebody.
-            In HR's view also the probations ending (2026-10-23) for whoever may act on them — the shared hr@ too. */}
-        {(personal || probation) ? <MemoBell memos={personal} probation={probation} /> : null}
+            In HR's view also the probations and contracts ending (2026-10-23 / 10-24) for whoever may act on them —
+            the shared hr@ too. */}
+        {(personal || terms) ? <MemoBell memos={personal} terms={terms} /> : null}
         {user.canSwitchView ? (
           <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} />
         ) : (

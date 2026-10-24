@@ -11,7 +11,7 @@ import { fullAccessTemplate } from '@/lib/invite'
 import { keptParts } from '@/lib/person-name'
 import { addressLines, addressOf } from '@/lib/address/address'
 import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, loginEmailHeld, payModeOf, tenureLabel } from '@/lib/person-record'
-import { employmentStatusOf, probationDue, statusChip, statusLine, whenLabel } from '@/lib/employment-status'
+import { employmentStatusOf, reminderDue, statusChip, statusLine, whenLabel } from '@/lib/employment-status'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
@@ -160,8 +160,12 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
   // reader's row carries none.
   const employmentStatus = row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status)
   const probationEnds: string | null = employmentStatus === 'probation' ? (row.probation_end ?? null) : null
-  const probationAcked = !!probationEnds && row.probation_ack_end === probationEnds
   const contractEnds: string | null = employmentStatus === 'contract' ? (row.contract_end ?? null) : null
+  // The term they are on — its end, and its reminder's acknowledgement (2026-10-24: reminded 30 and 15 days before).
+  const termEnds = probationEnds ?? contractEnds
+  const termAck = employmentStatus === 'contract'
+    ? { ackEnd: row.contract_ack_end ?? null, ackAt: row.contract_ack_at ?? null, ackName: row.contract_ack_name ?? null }
+    : { ackEnd: row.probation_ack_end ?? null, ackAt: row.probation_ack_at ?? null, ackName: row.probation_ack_name ?? null }
   const view: PersonRecordView = {
     name: staff.employee_name,
     firstName: parts.first,
@@ -175,13 +179,13 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     reportsTo: upline,
     employment: {
       status: employmentStatus,
-      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, probationAcked, ackName: row.probation_ack_name ?? null, contractEnd: contractEnds }, today),
+      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, contractEnd: contractEnds, ack: termAck }, today),
       value: employmentStatus
         ? [
             employmentStatus === 'contract'
               ? statusLine(employmentStatus, row.contract_months ?? null, contractEnds)
               : statusLine(employmentStatus, row.probation_months ?? null, probationEnds),
-            probationEnds && probationDue(probationEnds, today) ? whenLabel(probationEnds, today) : null,
+            termEnds && reminderDue(termEnds, today) ? whenLabel(termEnds, today) : null,
           ]
             .filter(Boolean)
             .join(' · ')
@@ -269,6 +273,19 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                     ackEnd: card.staff.probation_ack_end ?? null,
                     ackName: card.staff.probation_ack_name ?? null,
                     ackAt: card.staff.probation_ack_at ?? null,
+                  }
+                : null
+            }
+            // A contract's reminder (2026-10-24): Acknowledge — renewing it is the card's Employment Status.
+            contract={
+              card.active && card.staff.employment_status === 'contract'
+                ? {
+                    hireDate: card.staff.hire_date ?? null,
+                    months: card.staff.contract_months ?? null,
+                    endsOn: card.staff.contract_end ?? null,
+                    ackEnd: card.staff.contract_ack_end ?? null,
+                    ackName: card.staff.contract_ack_name ?? null,
+                    ackAt: card.staff.contract_ack_at ?? null,
                   }
                 : null
             }

@@ -185,7 +185,8 @@ describe('Add Staff — the hire date and the employment status', () => {
     expect(screen.getByLabelText('Probation ends')).toHaveValue('1 Feb 2027')
     fireEvent.change(months, { target: { value: '6' } })
     expect(screen.getByLabelText('Probation ends')).toHaveValue('1 May 2027')
-    expect(screen.getByText('HR is reminded 15 days before.')).toBeInTheDocument()
+    // Reminded twice (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder").
+    expect(screen.getByText('HR is reminded 30 and 15 days before.')).toBeInTheDocument()
 
     fireEvent.change(status(), { target: { value: 'permanent' } })
     expect(screen.queryByLabelText('Probation period')).toBeNull()
@@ -225,6 +226,8 @@ describe('Add Staff — the hire date and the employment status', () => {
     expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2027')
     fireEvent.change(months, { target: { value: '36' } })
     expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2029')
+    // A contract's end is reminded the same way as a probation's (2026-10-24).
+    expect(screen.getByLabelText('Contract ends')).toHaveAccessibleDescription('HR is reminded 30 and 15 days before.')
 
     await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
     await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())

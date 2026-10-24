@@ -23,7 +23,7 @@ import { loadMyMemos } from '@/lib/memos/server'
 import { NO_MEMOS } from '@/lib/memos/model'
 import { loadMyDocuments } from '@/lib/documentation/my-docs'
 import { loadBoard, loadLedger, loadRequests } from '@/lib/attendance/server'
-import { reviewsFromRow, seesProbationReminders } from '@/lib/probation-reviews'
+import { reviewsFromRow, seesTermReminders } from '@/lib/term-reviews'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -210,9 +210,9 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
       hireCreate: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'create'),
       talentEdit: parts.talent && canDo(onPage(user, PART_PAGE.talent), 'hiring', 'edit'),
       book: parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'create'),
-      // A probation's reminder (2026-10-23): People · Edit on a person's page, as HR view's bell asks — never while
-      // viewing as somebody.
-      probationAck: parts.people && seesProbationReminders(user),
+      // A probation's reminder (2026-10-23) or a contract's (2026-10-24): People · Edit on a person's page, as HR view's
+      // bell asks — never while viewing as somebody.
+      termAck: parts.people && seesTermReminders(user),
     },
   }
 }
@@ -220,7 +220,8 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
 /**
  * What HR's new work they are told of (2026-10-11, mig 20261011180000): the parts the app shows them and may act
  * in. The database keeps only those their own actions hold (`notification_topics_sync`). A probation ending
- * (2026-10-23, mig 20261024223000): whoever may acknowledge it. Since 2026-10-24 (mig 20261025003000) every topic is
+ * (2026-10-23, mig 20261024223000) or a contract (2026-10-24 — the same topic, `notify_term_ends`): whoever may
+ * acknowledge it. Since 2026-10-24 (mig 20261025003000) every topic is
  * asked again, as its holder, whenever it tells (`notification_topic_may`), so no permission change forgets one —
  * a page's tab, which the database cannot ask, is asked here.
  */
@@ -230,7 +231,7 @@ export function hrTopics(user: User): string[] {
     ...(may.hireApprove ? ['hiring.guest'] : []),
     ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
     ...(may.decide ? ['member.requests'] : []),
-    ...(may.probationAck ? ['people.probation'] : []),
+    ...(may.termAck ? ['people.probation'] : []),
   ]
 }
 
@@ -259,11 +260,12 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [attRead, phones, probationRead] = await Promise.all([
+  const [attRead, phones, probationRead, contractRead] = await Promise.all([
     attendanceOf(parts, today),
     parts.people ? mobiles() : Promise.resolve({}),
-    // The probations HR is reminded of (2026-10-23): read only for whoever may acknowledge one.
-    may.probationAck ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
+    // The probations and contracts HR is reminded of (2026-10-23 / 10-24): read only for whoever may acknowledge one.
+    may.termAck ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
+    may.termAck ? (async () => (await client()).rpc('contract_reviews'))() : Promise.resolve(null),
   ])
   const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
@@ -332,7 +334,8 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     parts,
     may,
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
-    probation: probationRead && !probationRead.error ? reviewsFromRow(probationRead.data) : null,
+    probation: probationRead && !probationRead.error ? reviewsFromRow(probationRead.data, 'probation') : null,
+    contract: contractRead && !contractRead.error ? reviewsFromRow(contractRead.data, 'contract') : null,
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
     memos: mine.memos,

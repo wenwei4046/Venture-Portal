@@ -13,8 +13,8 @@ vi.mock('./view-as-actions', () => ({ setViewAs: vi.fn() }))
 vi.mock('./ViewAsPersonPicker', () => ({ default: () => null }))
 vi.mock('@/components/me/MeDesktop', () => ({ MeDesktop: () => null }))
 vi.mock('./MemoBell', () => ({
-  default: ({ memos = true, probation = false }: { memos?: boolean; probation?: boolean }) => (
-    <div data-testid="bell">{`memos:${memos} probation:${probation}`}</div>
+  default: ({ memos = true, terms = false }: { memos?: boolean; terms?: boolean }) => (
+    <div data-testid="bell">{`memos:${memos} terms:${terms}`}</div>
   ),
 }))
 
@@ -35,22 +35,22 @@ const bell = () => screen.queryByTestId('bell')?.textContent ?? null
 describe('HR view’s bell', () => {
   it('the shared hr@: no memos, the probations ending', () => {
     render(<HrTopBar user={user({})} />)
-    expect(bell()).toBe('memos:false probation:true')
+    expect(bell()).toBe('memos:false terms:true')
   })
 
   it('an HR person’s own login: both', () => {
     render(<HrTopBar user={user({ personalLogin: true })} />)
-    expect(bell()).toBe('memos:true probation:true')
+    expect(bell()).toBe('memos:true terms:true')
   })
 
   it('a personal login that may not edit people: memos only', () => {
     render(<HrTopBar user={user({ personalLogin: true, actions: { 'team.view': 'all' } })} />)
-    expect(bell()).toBe('memos:true probation:false')
+    expect(bell()).toBe('memos:true terms:false')
   })
 
   it('not in Finance’s or the Principal’s view, which wear this bar too', () => {
     render(<HrTopBar user={user({ role: 'finance', personalLogin: true })} viewLabel="Finance view" />)
-    expect(bell()).toBe('memos:true probation:false')
+    expect(bell()).toBe('memos:true terms:false')
     cleanup()
     render(<HrTopBar user={user({ role: 'principal' })} viewLabel="Principal view" />)
     expect(bell()).toBeNull()

@@ -18,8 +18,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
   // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
   | 'mkt_project'
-  // People (2026-10-23, mig 20261024223000): a probation ending within 15 days (since mig 20261025012000), to whoever may acknowledge it — the
-  // person on probation (their People record's id); the HR app's bell lists it, a tap opens them there.
+  // People (2026-10-23, mig 20261024223000): a probation ending — and since mig 20261025046500 a contract, each 30 and
+  // again 15 days before — to whoever may acknowledge it: the person (their People record's id); the HR app's bell
+  // lists it, a tap opens them there.
   | 'hr_staff'
 
 export interface Notice {
@@ -88,7 +89,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'share_request') return `/member?share=${id}`
   // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.
   if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
-  // A probation ending (2026-10-23): the person, in the HR app — HR's acts on it there, whichever app the phone signed up in.
+  // A probation or a contract ending (2026-10-23 / 10-24): the person, in the HR app — HR's acts on it there, whichever
+  // app the phone signed up in.
   if (n.refKind === 'hr_staff') return `/hr-app?open=person:${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
@@ -148,7 +150,7 @@ export function crmPushFromRow(v: unknown): CrmPush | null {
 export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it' | 'person'; id: string }
 
 /**
- * What the HR app's `?open=` names: a hire, a booking, a member request, a memo, a person (a probation ending,
+ * What the HR app's `?open=` names: a hire, a booking, a member request, a memo, a person (a probation or a contract ending,
  * 2026-10-23) — or one's own request in Me (`me:`).
  */
 export function openTarget(raw: string | null | undefined): OpenTarget | null {
