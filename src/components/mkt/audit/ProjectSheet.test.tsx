@@ -108,6 +108,18 @@ describe('a task’s map and replay (④-4)', () => {
     ])
   })
 
+  // ④-4c (the user's answer 23): opened from another project — its station first, its panel opening it.
+  it('starts at the project it was opened from: its station before Created, its panel a link to it', () => {
+    const opened = { ...task, project: { ...task.project, source: { id: 'p0', trackId: 'MKT-CAR-2610-003', title: 'Social Media', kind: 'product' as const, status: 'active' as const, owner: 'SIA' } } }
+    sheet(opened, 'map')
+    fireEvent.click(screen.getByRole('button', { name: 'MKT-CAR-2610-003 · Social Media · In progress' }))
+    const panel = screen.getByRole('complementary', { name: 'MKT-CAR-2610-003 · Social Media' })
+    expect(within(panel).getByRole('link', { name: 'Open MKT-CAR-2610-003 →' }).getAttribute('href')).toBe('/marketing/projects/MKT-CAR-2610-003')
+    expect(within(panel).getByText('Opened TSK-CAR-2610-001 from it')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '☰ List view' }))
+    expect(screen.getAllByRole('row')[1].textContent).toBe('01📣MKT-CAR-2610-003 · Social MediaSOCIAL MEDIA SPECIALISTSIAProduct project · Opened fromIn progress')
+  })
+
   it('replays the trail on the Audit trail tab, record by record', () => {
     readProjectLog.mockResolvedValue(log)
     vi.useFakeTimers()

@@ -265,6 +265,30 @@ export function projectFromRow(p: Record<string, unknown>): MktProject {
   }
 }
 
+/** The project a project was opened from (④-4c — the user's answer 23): a task, a run, a deliverable or a product
+ * project — where it stands and whose it is (a run's page reads its series'). */
+export interface MktSource {
+  id: string
+  trackId: string
+  title: string
+  kind: MktProjectKind
+  status: MktProjectStatus
+  /** Its owner's name, '' for none. */
+  owner: string
+}
+
+export function sourceFromRow(v: unknown): MktSource | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
+  return { id: v.id, trackId: str(v.trackId), title: str(v.title), kind: oneOf(v.kind, KINDS, 'quick'), status: oneOf(v.status, PSTATUS, 'active'), owner: str(v.owner) }
+}
+
+/** A project's kind and where it stands, in words — the source a project was opened from says both. */
+export const KIND_WORDS: Record<MktProjectKind, string> = { quick: 'Quick task', recurring: 'Recurring task', deliverable: 'Deliverable', product: 'Product project' }
+export const STATUS_WORDS: Record<MktProjectStatus, string> = {
+  minutes: 'Draft', waiting_pic: 'Waiting for PIC', changes: 'Changes requested', approved: 'Approved', planning: 'Planning', active: 'In progress',
+  paused: 'Paused', done: 'Done', cancelled: 'Cancelled',
+}
+
 /** A post's mark (answer 15): its link and who, else none. */
 export function postedFromRow(v: unknown): MktPosted | null {
   if (!isObj(v) || typeof v.link !== 'string' || !v.link) return null

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   boxOf, edgePath, LANE_H, mapRows, mapSize, replayAt, type MapEdge, type MapNode, type MapTone, type TaskMap as Model,
@@ -50,10 +51,11 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
     return Math.min(max, Math.max(min, v))
   }, [vw, CW])
 
-  // Fit: the whole road if it fits, else from its start (Replay) or with where it stands in view.
+  // Fit: the whole road if it fits, else from its start — where it was opened from, when it was (Replay) — or with where
+  // it stands in view.
   const fit = useCallback((width: number) => {
     const zz = clampZ(Math.max(replay ? 0.45 : 0.62, Math.min(1, (width - 24) / CW)))
-    const start = boxes.get('start')
+    const start = boxes.get(map.nodes[0]?.id ?? 'start')
     const here = map.nodes.find(n => n.current)
     const startPx = TAG_W + 12 - ((start?.l ?? 0) - 10) * zz
     const hx = here ? boxes.get(here.id)?.cx ?? 0 : 0
@@ -308,6 +310,7 @@ export default function TaskMap({ map, mode = 'map', track }: { map: Model; mode
               </div>
               <div className={s.panelTitle}>{node.full}</div>
               <span className={`${s.pill} ${TONE[node.tone]}`}><span className={s.pillDot} aria-hidden="true" />{node.status}</span>
+              {panel.open ? <Link href={panel.open.href} className={s.panelOpen}>{panel.open.label} →</Link> : null}
             </div>
             <div className={s.facts}>
               {panel.facts.map(([k, v]) => <div key={k} className={s.fact}><span className={s.factK}>{k}</span><span>{v}</span></div>)}

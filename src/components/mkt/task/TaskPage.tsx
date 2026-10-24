@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { acceptMktStage, decideMktStage, putMktFree, saveMktStageFiles, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
-import { nameOf, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
+import {
+  nameOf, newFromHref, opensFrom, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone,
+} from '@/lib/marketing/task'
 import { missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
 import { LIB_MAX_BYTES, STAGE_MAX_FILES, stagePath, type TaskFile } from '@/lib/marketing/library'
 import { sameAnswer, type OptionLists } from '@/lib/marketing/options'
@@ -267,6 +269,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
           ) : null}
           <span className={s.crumbText}>{p.title}</span>
           <span className={s.grow} />
+          {/* A project opened from this one (④-4c — answer 23): Marketing · Create's; never from a series' pattern. */}
+          {can.create && opensFrom(p) ? <Link href={newFromHref(p.trackId)} className={s.crumbLink}>+ Open a project from here</Link> : null}
           <span className={s.ver}>{view.version}</span>
         </div>
         <div className={s.headRow}>
@@ -274,6 +278,11 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
             <div className={s.idRow}>
               <span className={s.track}>{p.trackId}</span>
               <span className={`${s.pill} ${TONE[view.tone]}`}><span className={s.pillDot} aria-hidden="true" />{view.status}</span>
+              {p.source ? (
+                <Link href={`/marketing/projects/${encodeURIComponent(p.source.trackId)}`} className={s.from} title={p.source.title}>
+                  ↳ Opened from <span className={s.fromTrack}>{p.source.trackId}</span>
+                </Link>
+              ) : null}
             </div>
             <div className={s.title}>{p.title}</div>
           </div>

@@ -148,6 +148,10 @@ describe('a subsidiary’s page', () => {
       // A deliverable's post marked (④-2c) — the task's words.
       { id: 10, at: '2026-10-22T04:00:00Z', actor: 'Ali', action: 'posted', stage: 0, data: { field: 'Post day', link: 'https://x.my/1' },
         project: { id: id(4), track: 'MKT-CAR-2610-008-D01', title: 'Image post 1/1', kind: 'deliverable' } },
+      // Opened from another (④-4c — answer 23): on the one it was opened from, and the new one's created record.
+      { id: 9, at: '2026-10-22T03:00:00Z', actor: 'Mei', action: 'opened project', data: { id: id(5), track: 'TSK-CAR-2610-009', title: 'Teaser' }, project: p },
+      { id: 8, at: '2026-10-22T03:00:00Z', actor: 'Mei', action: 'created', data: { kind: 'quick', stages: 2, from: 'MKT-CAR-2610-008' },
+        project: { id: id(5), track: 'TSK-CAR-2610-009', title: 'Teaser', kind: 'quick' } },
     ])
     expect(feed.map(e => `${feedLine(e).emoji} ${feedLine(e).text}`)).toEqual([
       '📢 Mei set the campaign period · 9 – 12 Nov 2026',
@@ -158,6 +162,8 @@ describe('a subsidiary’s page', () => {
       "🔁 Nov 2026's work made · 2 deliverables · 1 to plan",
       '💰 Mei confirmed the billing for Oct 2026',
       '📣 Ali marked Post day posted',
+      '🔀 Mei opened TSK-CAR-2610-009 "Teaser" from this project',
+      '✨ Mei created quick task "Teaser" · 2 stages · from MKT-CAR-2610-008',
     ])
   })
 

@@ -58,7 +58,7 @@ describe('New Project’s product projects', () => {
     })
     // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — such waits raced on CI).
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-MVS-2610-001'))
-    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b', 8000)
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b', 8000, null)
     expect(actions.createMktTask).not.toHaveBeenCalled()
   })
 
@@ -91,7 +91,7 @@ describe('New Project’s product projects', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open meeting minutes →' }))
     })
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-CAR-2610-001'))
-    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-b', 7500.5)
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-b', 7500.5, null)
 
     fireEvent.click(screen.getByRole('radio', { name: /Event day/ }))
     expect((screen.getByRole('textbox', { name: 'Amount' }) as HTMLInputElement).value).toBe('')
@@ -166,5 +166,54 @@ describe('New Project’s + Add subsidiary', () => {
     expect((screen.getByRole('textbox', { name: 'Company or client name' }) as HTMLInputElement).value).toBe('Carres')
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('textbox', { name: 'Company or client name' })).toBeNull()
+  })
+})
+
+// 2026-10-25 — ④-4c (the user's answer 23): New Project opened from another project (?from=) keeps it — × opens it
+// from nowhere.
+describe('New Project opened from another project', () => {
+  const FROM = { id: 'p0', trackId: 'TSK-CAR-2610-004', title: 'Banner for the fair' }
+  const MEI = { id: 's1', first: 'Mei', hint: '', group: 'SOCIAL MEDIA SPECIALIST' }
+  const openFrom = (p: ProductPick[] | null) =>
+    render(<NewProject today="2026-10-24" me="s1" subs={subs} people={[MEI]} approvers={[]} holidays={[]} firstSub="sub-car" products={p} from={FROM} />)
+  // One stage, Mei's: the starter's other two taken off.
+  const oneStage = () => {
+    for (const name of [/Publish/, /Redesign/]) {
+      fireEvent.click(screen.getAllByRole('button', { name }).find(b => b.getAttribute('tabindex') === '0')!)
+      fireEvent.click(screen.getByRole('button', { name: 'Remove stage' }))
+    }
+  }
+
+  it('says which — its Track ID a link to it — and a product project started keeps it', async () => {
+    openFrom(products)
+    expect(screen.getByRole('link', { name: 'TSK-CAR-2610-004' }).getAttribute('href')).toBe('/marketing/projects/TSK-CAR-2610-004')
+    expect(screen.getByText('Banner for the fair')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: /Product project/ }))
+    actions.startMktProduct.mockResolvedValue({ ok: true, id: 'p9', track: 'MKT-CAR-2610-001' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open meeting minutes →' }))
+    })
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-CAR-2610-001'))
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-a', 3000, 'p0')
+  })
+
+  it('a quick task keeps it too — and once × takes it off, it is opened from nowhere', async () => {
+    openFrom(null)
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Resize for Instagram' } })
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task & open →' }))
+    })
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/t9'))
+    expect(actions.createMktTask.mock.calls[0][0]).toMatchObject({ sub: 'sub-car', kind: 'quick', title: 'Resize for Instagram', from: 'p0' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Not from TSK-CAR-2610-004' }))
+    expect(screen.queryByText('Banner for the fair')).toBeNull()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task & open →' }))
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(2))
+    expect(actions.createMktTask.mock.calls[1][0]).toMatchObject({ from: null })
   })
 })

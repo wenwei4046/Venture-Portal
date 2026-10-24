@@ -44,6 +44,7 @@ export default function NewProject({
   products,
   canAddSub = false,
   addFirst = false,
+  from = null,
 }: {
   today: string
   me: string | null
@@ -59,6 +60,8 @@ export default function NewProject({
   canAddSub?: boolean
   /** Open with the client form (the sidebar's + Add subsidiary). */
   addFirst?: boolean
+  /** The project it is opened from (④-4c — ?from=), none for none. */
+  from?: { id: string; trackId: string; title: string } | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -84,6 +87,8 @@ export default function NewProject({
   const [billRefusal, setBillRefusal] = useState<string | null>(null)
   // Each product's amount as typed (②b-2b — the user's answer 43: a quote, typed now); its list price until then.
   const [amounts, setAmounts] = useState<Record<string, number | null>>({})
+  // Where it is opened from (④-4c) — dropped with its ×, then it is opened from nowhere.
+  const [source, setSource] = useState(from)
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
@@ -143,7 +148,7 @@ export default function NewProject({
     setError(null)
     if (isProduct) {
       start(async () => {
-        const r = await startMktProduct(sub, product, amount)
+        const r = await startMktProduct(sub, product, amount, source?.id ?? null)
         if (!r.ok) {
           setError(r.reason)
           return
@@ -161,6 +166,7 @@ export default function NewProject({
         brief: brief.trim(),
         stages: stagesPayload(stages),
         recur: isRec ? rulePayload(rule) : null,
+        from: source?.id ?? null,
       })
       if (!r.ok) {
         setError(r.reason)
@@ -189,6 +195,14 @@ export default function NewProject({
       </div>
 
       <div className={s.lead}>Start a project</div>
+      {source ? (
+        <div className={s.from}>
+          <span>↳ Opened from</span>
+          <Link href={`/marketing/projects/${encodeURIComponent(source.trackId)}`} className={s.fromTrack}>{source.trackId}</Link>
+          <span className={s.fromTitle}>{source.title}</span>
+          <button type="button" className={s.fromX} aria-label={`Not from ${source.trackId}`} onClick={() => setSource(null)}>×</button>
+        </div>
+      ) : null}
 
       <div className={s.label}>
         Subsidiary

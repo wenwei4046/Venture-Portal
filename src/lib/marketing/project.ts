@@ -4,11 +4,13 @@
 // Meeting minutes · Tracking link · PIC response), and only what changed, for the save. Pure.
 
 import {
-  campaignFromRow, daysBetween, longDay, periodOf, periodWords, personFromRow, shortDay, subFromRow, type MktCampaign, type MktPerson, type MktProjectStatus,
-  type MktStageStatus, type MktSub,
+  campaignFromRow, daysBetween, longDay, periodOf, periodWords, personFromRow, shortDay, sourceFromRow, subFromRow, type MktCampaign, type MktPerson,
+  type MktProjectStatus, type MktSource, type MktStageStatus, type MktSub,
 } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { delivFromRow, ordinal, picOkFromRow, runMadeText, runsResumedText, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
+import {
+  delivFromRow, fromWords, openedProjectText, ordinal, picOkFromRow, runMadeText, runsResumedText, trailTime, type PicOk, type TaskDeliv, type Tone,
+} from './task'
 import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './billing'
 
 /** A product project's way to its work. */
@@ -85,6 +87,8 @@ export interface ProductProjectPage {
     runs: ProductRuns | null
     /** A campaign's run period (the user's answer 13), from its intake minutes. */
     campaign: MktCampaign | null
+    /** The project it was opened from (④-4c — answer 23). */
+    source: MktSource | null
   }
   minutes: MinutesDoc[]
   trail: { at: string; actor: string; action: string; reason: string; data: Record<string, unknown> | null }[]
@@ -281,6 +285,7 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
         : null,
       runs: runsFromRow(p.runs),
       campaign: campaignFromRow(p.campaign),
+      source: sourceFromRow(p.source),
     },
     minutes: rows(v.minutes).map(minutesFromRow),
     trail: rows(v.trail).map(e => ({ at: str(e.at), actor: str(e.actor), action: str(e.action), reason: str(e.reason), data: isObj(e.data) ? e.data : null })),
@@ -516,7 +521,9 @@ const billMonth = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}$/.test
 export function productEventText(e: { actor: string; action: string; reason: string | null; data?: Record<string, unknown> | null }, product: { name: string; version: number } | null): string {
   const who = e.actor || 'Somebody'
   const n = Number(e.data?.deliverables) || 0
-  return e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}`
+  return e.action === 'created' ? `${who} started the project${product ? ` · ${product.name} v${product.version}` : ''}${fromWords(e.data)}`
+    // A project opened from this one (④-4c — answer 23).
+    : e.action === 'opened project' ? openedProjectText(who, e.data)
     : e.action === 'work started' ? `${who} started the work · ${n} deliverable${n === 1 ? '' : 's'}${Number(e.data?.runDay) ? ` · every month on the ${ordinal(Number(e.data?.runDay))}` : ''}`
     // A recurring one's months (②b-2f).
     : e.action === 'run made' ? runMadeText(e.data)

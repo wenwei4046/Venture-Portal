@@ -9,7 +9,7 @@ import {
 } from '@/lib/marketing/project'
 import { picNames } from '@/lib/marketing/clients'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
-import { ordinal, trailTime } from '@/lib/marketing/task'
+import { newFromHref, ordinal, trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import BillCard from './BillCard'
@@ -38,7 +38,7 @@ const editOf = (page: ProductProjectPage): MinutesEdit => {
     pic2: page.project.pic2, whatsapp2: page.project.whatsapp2 }
 }
 
-export default function ProductProject({ initial, can }: { initial: ProductProjectPage; can: { edit: boolean; manage: boolean } }) {
+export default function ProductProject({ initial, can }: { initial: ProductProjectPage; can: { edit: boolean; manage: boolean; create?: boolean } }) {
   const [page, setPage] = useState(initial)
   const [edit, setEdit] = useState<MinutesEdit>(() => editOf(initial))
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
@@ -223,6 +223,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </>
         ) : null}
         <span className={p.crumbText}>{pr.track}</span>
+        <span className={p.grow} />
+        {/* A project opened from this one (④-4c — answer 23): Marketing · Create's. */}
+        {can.create ? <Link href={newFromHref(pr.track)} className={p.crumbLink}>+ Open a project from here</Link> : null}
       </div>
 
       <div className={p.steps}>
@@ -254,6 +257,14 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </>
             ) : null}
             <span>Owner {pr.ownerName ?? '—'}</span>
+            {pr.source ? (
+              <>
+                <span>·</span>
+                <Link href={`/marketing/projects/${encodeURIComponent(pr.source.trackId)}`} className={t.from} title={pr.source.title}>
+                  ↳ Opened from <span className={t.fromTrack}>{pr.source.trackId}</span>
+                </Link>
+              </>
+            ) : null}
             {campaign ? (
               <>
                 <span>·</span>

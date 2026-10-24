@@ -191,3 +191,25 @@ describe('a record corrected, and the log exported (④-3b — the user’s answ
     expect(pdfText('Mei → SIA · “Logo” — 50% … ✓ 李 😀\nnext')).toBe('Mei -> SIA · “Logo” — 50% … ? ? ?\nnext')
   })
 })
+
+// 2026-10-25 — ④-4c (the user's answer 23): a project opened from another says from which; the other, to which.
+describe('opened from another project', () => {
+  it('From → To: from the project it was opened from; on that one’s log, to the new one', () => {
+    const rows = auditRows(projectLogFromRow({
+      track: 'TSK-CAR-2610-009', title: 'Teaser', kind: 'quick',
+      rows: [
+        { id: 1, at: '2026-10-25T02:00:00Z', actor: 'Mei', action: 'created', data: { kind: 'quick', stages: 2, from: 'MKT-CAR-2610-008' } },
+        { id: 2, at: '2026-10-25T03:00:00Z', actor: 'Mei', action: 'opened project', data: { id: 'p9', track: 'TSK-CAR-2610-010', title: 'Resize' } },
+        { id: 3, at: '2026-10-25T04:00:00Z', actor: 'Mei', action: 'opened project', data: { id: 'p10', track: 'TSK-CAR-2610-011' } },
+        { id: 4, at: '2026-10-25T05:00:00Z', actor: 'Mei', action: 'opened project', data: null },
+      ],
+    })!)
+    expect(rows.map(r => `${r.action} · ${r.fromTo} · ${r.reason} · ${r.version}`)).toEqual([
+      'Task created · MKT-CAR-2610-008 → · — · —',
+      'Project opened from it · → TSK-CAR-2610-010 · Resize · — · —',
+      'Project opened from it · → TSK-CAR-2610-011 · — · —',
+      'Project opened from it · — · — · —',
+    ])
+    expect(auditRows(task)[0].fromTo).toBe('—')
+  })
+})

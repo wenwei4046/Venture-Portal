@@ -167,6 +167,8 @@
 .panelX { width: 26px; height: 26px; border-radius: 6px; border: 0; background: transparent; color: rgb(var(--mk-muted)); font: inherit; font-size: 16px; cursor: pointer; }
 .panelX:hover { background: rgb(var(--mk-surface-2)); }
 .panelTitle { font-size: 1.3em; font-weight: 600; overflow-wrap: anywhere; }
+/* The project it was opened from (④-4c): its own page. */
+.panelOpen { font-size: .92em; font-weight: 500; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .facts { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; font-size: .92em; border-bottom: 1px solid rgb(var(--mk-surface-2)); }
 .fact { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; overflow-wrap: anywhere; }
 .factK { color: rgb(var(--mk-muted)); }

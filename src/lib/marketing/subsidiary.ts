@@ -301,7 +301,7 @@ const FEED_EMOJI: Record<string, string> = {
   'pic changes': '🔗', signed: '✍️', 'minutes completed': '📝', 'edited after approval': '✏️', 'started before approval': '⚡',
   attached: '📚', detached: '📚', replaced: '🔁',
   'work started': '▶', 'run made': '🔁', 'run day': '📅', 'runs paused': '⏸', 'runs resumed': '▶', 'amount set': '💰', 'billing confirmed': '💰', 'billing withdrawn': '💰', stopped: '⏹',
-  'campaign period': '📢', posted: '📣', unposted: '📣',
+  'campaign period': '📢', posted: '📣', unposted: '📣', 'opened project': '🔀',
 }
 
 /** "just now", "12 min ago", "3h ago", "yesterday", else the day — `now` an instant (ms). */
@@ -320,7 +320,9 @@ export function agoLabel(at: string, now: number, today: string): string {
 /** What only a product project's trail says (its minutes and its PIC's link); its stages read as a task's do. */
 const PRODUCT_ACTIONS = new Set(['created', 'signed', 'link sent', 'minutes completed', 'edited after approval', 'started before approval', 'resent', 'pic approved', 'pic changes',
   // Its work, its months, its billing (never a figure), its owner replaced, its campaign period — the product page's own words.
-  'work started', 'run made', 'run day', 'runs paused', 'runs resumed', 'closed', 'amount set', 'billing confirmed', 'billing withdrawn', 'stopped', 'replaced', 'campaign period'])
+  'work started', 'run made', 'run day', 'runs paused', 'runs resumed', 'closed', 'amount set', 'billing confirmed', 'billing withdrawn', 'stopped', 'replaced', 'campaign period',
+  // A project opened from it (④-4c — answer 23).
+  'opened project'])
 
 /** A feed line: what happened on which project, in the trail's own words. */
 export function feedLine(e: SubFeedEvent): { key: string; emoji: string; text: string; href: string } {

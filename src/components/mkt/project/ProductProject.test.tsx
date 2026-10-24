@@ -454,3 +454,18 @@ describe('a campaign', () => {
     expect(screen.queryByText(/Campaign period is empty/)).toBeNull()
   })
 })
+
+// 2026-10-25 — ④-4c (the user's answer 23): a product project opened from inside another, and one opened from it.
+describe('opened from another project', () => {
+  it('says which, a link to it — and offers Marketing · Create to open a project from this one', () => {
+    const SRC = { id: 'p0', trackId: 'TSK-CAR-2610-004', title: 'Banner for the fair', kind: 'quick', status: 'done', owner: 'Mei' }
+    const { unmount } = render(<ProductProject initial={page(RACHEL, { source: SRC })} can={{ ...MANAGER, create: true }} />)
+    const from = screen.getByRole('link', { name: '↳ Opened from TSK-CAR-2610-004' })
+    expect([from.getAttribute('href'), from.getAttribute('title')]).toEqual(['/marketing/projects/TSK-CAR-2610-004', 'Banner for the fair'])
+    expect(screen.getByRole('link', { name: '+ Open a project from here' }).getAttribute('href')).toBe('/marketing/new?from=MKT-CAR-2610-001')
+    unmount()
+    render(<ProductProject initial={page(RACHEL)} can={MANAGER} />)
+    expect(screen.queryByRole('link', { name: /Opened from/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: '+ Open a project from here' })).toBeNull()
+  })
+})

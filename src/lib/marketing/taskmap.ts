@@ -4,10 +4,12 @@
 // says when, who and what; a station its facts, versions and own records. Replay walks the trail record by record.
 // A stage split into subtasks (②b-2c) branches: each subtask its own station in its person's lane (tagged Subtask,
 // 🔓 picked by the stage's owner, a dashed line to it), then the stage's mini gate Review delivery — a delivery's line up
-// to it, a return's red line back. Drawn from the task page (its stages, approvers, subtasks and trail). Pure.
+// to it, a return's red line back. A project opened from another (④-4c — answer 23) starts at that one: its station
+// before Created (tagged *Opened from*), a line to it, its panel opening it. Drawn from the task page (its stages,
+// approvers, subtasks and trail). Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { shortDay, type MktSubtask } from './board'
+import { KIND_WORDS, shortDay, STATUS_WORDS, type MktSubtask } from './board'
 import { groupEmoji, groupLabel, groupTone, type MktTone } from './groups'
 import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent } from './task'
 
@@ -61,6 +63,8 @@ export interface Station {
   files: { name: string; href: string }[]
   versions: { v: string; t: string }[]
   audit: { t: string; e: string }[]
+  /** The project it was opened from: its own page. */
+  open?: { href: string; label: string }
 }
 
 export interface TaskMap {
@@ -93,9 +97,11 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const picName = page.sub?.pic || 'PIC'
   const active = p.status === 'active'
   const created = events.find(e => e.action === 'created')
+  const src = p.source
 
-  // ── The road: the start, then each stage — its subtasks off to the side, its Review delivery — and its approvers ──
-  const road: RoadItem[] = [{ id: 'start', kind: 'card', stage: null, level: -1 }]
+  // ── The road: where it was opened from, the start, then each stage — its subtasks off to the side, its Review
+  // delivery — and its approvers ──
+  const road: RoadItem[] = [...(src ? [{ id: 'src', kind: 'card' as const, stage: null, level: -1 }] : []), { id: 'start', kind: 'card', stage: null, level: -1 }]
   const subsOf = (idx: number) => page.subtasks.filter(t => t.stage === idx)
   for (const s of stages) {
     road.push({ id: `s${s.idx}`, kind: 'card', stage: s.idx, level: -1 })
@@ -145,6 +151,11 @@ export function taskMap(page: MktTaskPage): TaskMap {
     switch (e.action) {
       case 'created':
         note('start', e)
+        // Opened from another: the line from it is made with the record.
+        if (src) {
+          lit.push(flowKey('src', 'start'))
+          meta.set(flowKey('src', 'start'), mk(e, e.actor || '—'))
+        }
         at = 'start'
         break
       case 'opened': {
@@ -302,12 +313,20 @@ export function taskMap(page: MktTaskPage): TaskMap {
 
   const returnsTo = (idx: number) => [...backs.values()].filter(b => b.to === `s${idx}`).reduce((n, b) => n + b.n, 0)
   const nodes: MapNode[] = road.map((r, col) => {
+    if (r.id === 'src' && src) {
+      // The project it was opened from — its own road, behind this one's start.
+      return {
+        id: 'src', kind: 'card', lane: startLane, col, title: src.trackId, full: `${src.trackId} · ${src.title}`, person: src.owner || '—', icon: '',
+        date: '', tone: 'done', current: false, future: false, tag: 'Opened from', stage: null,
+        handoff: KIND_WORDS[src.kind], status: STATUS_WORDS[src.status],
+      }
+    }
     if (r.id === 'start') {
       const by = created?.actor || who(p.owner)
       return {
         id: 'start', kind: 'card', lane: startLane, col, title: 'Created', full: `Created by ${by}`, person: by, icon: '',
         date: day(created?.at ?? p.createdAt), tone: 'done', current: false, future: false, tag: null, stage: null,
-        handoff: 'Created', status: 'Done',
+        handoff: src ? `Opened from ${src.trackId}` : 'Created', status: 'Done',
       }
     }
     const s = stages.find(x => x.idx === r.stage)!
@@ -386,6 +405,8 @@ export function taskMap(page: MktTaskPage): TaskMap {
     edges.push({
       key: flowKey(from, to), from, to,
       kind: !reached ? 'future' : picked ? 'dashed' : 'solid',
+      // The line from where it was opened goes unlabelled: the two share a lane, its label would sit under *Created* —
+      // the source's card says *Opened from*.
       label: reached && picked ? `picked by ${byId.get(before(to) ?? '')?.person ?? '—'}` : null,
       meta: meta.get(flowKey(from, to)) ?? null,
     })
@@ -409,6 +430,13 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const stations: Record<string, Station> = {}
   const subById = new Map(road.filter(r => r.sub).map(r => [r.id, r.sub as MktSubtask]))
   for (const n of nodes) {
+    if (n.id === 'src' && src) {
+      stations.src = {
+        facts: [['Track ID', src.trackId], ['Person', n.person], ['Handoff', `Opened ${p.trackId} from it`], ['Kind', n.handoff], ['Status', n.status]],
+        files: [], versions: [], audit: [], open: { href: `/marketing/projects/${encodeURIComponent(src.trackId)}`, label: `Open ${src.trackId}` },
+      }
+      continue
+    }
     const s = n.stage != null ? stages.find(x => x.idx === n.stage) : null
     const t = subById.get(n.id)
     const approval = t || n.mini ? `👤 ${who(s?.owner)} reviews the delivery`
@@ -440,7 +468,8 @@ export function taskMap(page: MktTaskPage): TaskMap {
 /** What the map shows after the first `step` records: the lines lit, the stations reached, where the work stands. */
 export function replayAt(map: TaskMap, step: number): { lit: Set<string>; seen: Set<string>; at: string | null; last: ReplayStep | null } {
   const lit = new Set<string>()
-  const seen = new Set<string>(['start'])
+  // Where it was opened from was there before it.
+  const seen = new Set<string>(map.nodes.some(n => n.id === 'src') ? ['src', 'start'] : ['start'])
   let at: string | null = 'start'
   for (const s of map.steps.slice(0, Math.max(0, step))) {
     for (const k of s.edges) {
