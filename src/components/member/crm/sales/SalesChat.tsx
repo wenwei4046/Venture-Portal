@@ -10,7 +10,7 @@ import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
+import { Phone4aBookMode, Phone4aCustomBook, Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";
 
@@ -440,7 +440,8 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                 </svg>
               </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <Phone4aBookMode m={v.bkm} />
+{!v.bkm || v.bkm.showroom ? (<><div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)" }}>Showroom</span>
               {(v.rooms).map((r, r_i) => (<Fragment key={r_i}>
                 <div onClick={r.pick} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "48px", boxSizing: "border-box", padding: "0 14px", borderRadius: "14px", border: `1.5px solid ${r.border}`, background: r.bg, cursor: "pointer" }}>
@@ -521,7 +522,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
                 </Fragment>))}
               </div>
             </div>
-            <Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span>
+            <Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook} style={{ minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", background: v.confirmBg, color: "#fff", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", textAlign: "center", cursor: "pointer" }}>{v.confirmLabel}</span></>) : (<Phone4aCustomBook m={v.bkm} />)}
           </div>
         </div>
       </>)}

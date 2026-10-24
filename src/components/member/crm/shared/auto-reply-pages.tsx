@@ -34,7 +34,7 @@ function Switch({ on, flip, off }: { on: boolean; flip: () => void; off?: boolea
  * A time, picked from a grid instead of the phone's wheel (the owner, 2026-10-24: "時間表改一下，好醜"): the hours as
  * 24 chips, the minutes as 00 · 15 · 30 · 45; a minute closes it. "08:00".
  */
-function TimePick({ value, set, open, toggle, off }: { value: string; set: (v: string) => void; open: boolean; toggle: () => void; off: boolean }) {
+export function TimePick({ value, set, open, toggle, off }: { value: string; set: (v: string) => void; open: boolean; toggle: () => void; off: boolean }) {
   const [h, m] = /^\d{2}:\d{2}$/.test(value) ? value.split(":") : ["", ""];
   const mins = ["00", "15", "30", "45"]; if (m && !mins.includes(m)) mins.push(m);
   const chip = (on: boolean): CSSProperties => ({ ...BTN, height: "32px", borderRadius: "10px", fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums",

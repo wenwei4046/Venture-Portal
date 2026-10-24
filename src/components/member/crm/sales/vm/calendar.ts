@@ -6,6 +6,7 @@
  * Show-up rate = showed ÷ visits already due (crm.ts).
  */
 import { createElement, type ChangeEvent, type MouseEvent, type ReactNode } from "react";
+import { customPrefill } from "../../shared/custom-book";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel, type PEvent, type SalesCtx } from "./common";
 import type { OutcomeAsk } from "../ui";
@@ -72,7 +73,7 @@ export function calendarVM(ctx: SalesCtx) {
   const ask = (a: Shown, mode?: "noshow"): OutcomeAsk => ({ visitId: a.v.id, customerId: a.c.id, name: a.c.name, when: vLabel(a), room: a.room, ...(mode ? { mode } : {}) });
   const change = (a: Shown) => () => {
     const ri = Math.max(0, data.rooms.filter(r => r.active).findIndex(r => r.id === a.v.showroomId));
-    set(u => ({ ...u, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: day0(a.at), slot: timeLabel(a.at), visitId: a.v.id }, hist: [...u.hist, u.tab].slice(-20) }));
+    set(u => ({ ...u, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: day0(a.at), slot: timeLabel(a.at), visitId: a.v.id, ...customPrefill(a.v) }, hist: [...u.hist, u.tab].slice(-20) }));
   };
 
   // ── The outcome popup ──

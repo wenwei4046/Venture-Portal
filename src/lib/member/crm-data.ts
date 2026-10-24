@@ -21,7 +21,11 @@ export interface CrmPerson {
   title?: string;
 }
 
-export interface CrmCard { kind: "Confirmed" | "Updated" | "Cancelled" | "Reminder"; start: string; room: string; addr: string }
+export interface CrmCard {
+  kind: "Confirmed" | "Updated" | "Cancelled" | "Reminder"; start: string; room: string; addr: string;
+  /** An appointment online or elsewhere (2026-10-24): what it is, and an online one's meeting link. */
+  mode?: "online" | "other"; link?: string;
+}
 
 export interface CrmChatMessage {
   id: string;
@@ -89,6 +93,13 @@ export interface CrmVisit {
   state: CrmVisitState;
   outcome: "follow_up" | "won" | "lost" | "rebooked" | null;
   remindedAt: string | null;
+  /** Online or somewhere else instead of a showroom (the owner, 2026-10-24; mig 20261025020000): its link, its place, the
+   * salesperson's remarks. Such a visit's showroomId names a room made for it (`virtual`, not active) so every place that
+   * names a visit by its room reads "Online meeting" or the place. */
+  kind?: "online" | "other";
+  link?: string;
+  place?: string;
+  remarks?: string;
 }
 
 /**
@@ -119,6 +130,8 @@ export interface CrmRoom {
   remarks?: string;
   /** Deleted (soft): left out of every list, kept so past visits keep the showroom's name. */
   deleted?: boolean;
+  /** Made for one online / elsewhere visit (crmDataFromRows), never a showroom: no list, picker or count shows it. */
+  virtual?: boolean;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
@@ -348,6 +361,7 @@ export interface CrmMessageRowX extends CrmMessageRow {
 export interface CrmVisitRow {
   id: string; contact_id: string; showroom: string; start_at: string; minutes: number; state: CrmVisitState;
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
+  kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -471,10 +485,21 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}),
 });
 
-export const visitFromRow = (a: CrmVisitRow): CrmVisit => ({
-  id: a.id, customerId: a.contact_id, showroomId: a.showroom, start: a.start_at, minutes: a.minutes, state: a.state,
-  outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
-});
+export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
+  const custom = a.kind === "online" || a.kind === "other" ? a.kind : null;
+  return {
+    id: a.id, customerId: a.contact_id, showroomId: custom ? virtualRoomId(a.id) : a.showroom, start: a.start_at, minutes: a.minutes, state: a.state,
+    outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
+    ...(custom ? { kind: custom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}) } : {}),
+    ...(a.remarks ? { remarks: a.remarks } : {}),
+  };
+};
+/** The room an online / elsewhere visit is named by. */
+export const virtualRoomId = (visitId: string) => `visit:${visitId}`;
+export function virtualRoom(v: Pick<CrmVisit, "id" | "kind" | "place">): CrmRoom {
+  const name = v.kind === "online" ? "Online meeting" : v.place || "Other place";
+  return { id: virtualRoomId(v.id), name, active: false, address: v.kind === "other" ? (v.place ?? "") : "", slots: [], cap: 0, weekly: [], blocks: [], virtual: true };
+}
 
 /** Saved auto-replies over the defaults, so a half-saved set still has every part. */
 export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAutoReplySet {
@@ -514,7 +539,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     adNames,
     lockedStaff: rows.locked ?? [],
     visits: rows.visits.map(visitFromRow),
-    rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
+    rooms: [...[...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow), ...rows.visits.map(visitFromRow).filter(v => v.kind).map(virtualRoom)],
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
     starredMessages: (rows.stars ?? []).map(s => s.message_id),

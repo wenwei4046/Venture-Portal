@@ -10,7 +10,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aChip, Phone4aHero, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aChip, Phone4aCustomBook, Phone4aHero, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -437,7 +437,8 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                 <span style={{ flex: "none", alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-rule)" }}>
                 </span>
                 <h2 style={{ flex: "none", margin: "0", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Book a visit · {v.ld.ld.name}</h2>
-                <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <Phone4aBookMode m={v.ld.lx.bkm} />
+{!v.ld.lx.bkm || v.ld.lx.bkm.showroom ? (<><div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
                   <span style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)" }}>Showroom</span>
                   {(v.ld.lx.rooms).map((r, r_i) => (<Fragment key={r_i}>
                     <div onClick={r.pick} style={{ display: "flex", alignItems: "center", gap: "12px", height: "46px", boxSizing: "border-box", padding: "0 14px", borderRadius: "14px", border: `1.5px solid ${r.bd}`, background: r.bg, cursor: "pointer" }}>
@@ -505,7 +506,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                     </Fragment>))}
                   </div>
                 </div>
-                <Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm} style={{ flex: "none", height: "48px", borderRadius: "24px", background: v.ld.lx.bookBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.bookLabel}</span>
+                <Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm} style={{ flex: "none", height: "48px", borderRadius: "24px", background: v.ld.lx.bookBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>{v.ld.lx.bookLabel}</span></>) : (<Phone4aCustomBook m={v.ld.lx.bkm} />)}
               </div>
             </div>
           </>)}

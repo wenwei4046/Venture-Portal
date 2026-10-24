@@ -7,6 +7,7 @@
  * Director answer anyone (crm_can_reply).
  */
 import type { ChangeEvent } from "react";
+import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
@@ -65,8 +66,8 @@ export function leadVM(ctx: PanelCtx) {
   const visitCard = (card: CrmChatMessage["card"]) => {
     const cd = card ? new Date(card.start) : null;
     return { ev: card && cd ? {
-      kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
-      time: timeLabel(cd), room: card.room, addr: card.addr,
+      kind: card.kind, title: card.mode === "online" ? "Online meeting" : card.mode === "other" ? "Appointment" : "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
+      time: timeLabel(cd), room: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr,
       bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ lead: null, tab: "calendar", cView: "grid", cDay: day0(cd), cGM: [cd.getFullYear(), cd.getMonth()] }),
     } : null };
@@ -155,9 +156,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     if (!c || !nextVisit) { openBook(); return; }
     patch({ pMenu: false });
     const v = nextVisit, d = new Date(v.start), rm = data.rooms.find(r => r.id === v.showroomId);
-    const where = `${(rm?.name ?? "Showroom").replace(/ showroom$/i, "")} · ${dayLabel(d)}, ${timeLabel(d)}`;
+    const where = [`${(rm?.name ?? "Showroom").replace(/ showroom$/i, "")} · ${dayLabel(d)}, ${timeLabel(d)}`, v.link, v.remarks].filter(Boolean).join(" · ");
     openActions({ title: "Appointment", sub: where, actions: [
-      { label: "Change", primary: true, run: () => patch({ pBook: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === v.showroomId)), day: day0(d), slot: timeLabel(d), view: "month", visitId: v.id } }) },
+      { label: "Change", primary: true, run: () => patch({ pBook: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === v.showroomId)), day: day0(d), slot: timeLabel(d), view: "month", visitId: v.id, ...customPrefill(v) } }) },
       { label: "Cancel visit", danger: true, run: () => openActions({ title: "Cancel this visit?", sub: `${where}. ${c.name} is told it is cancelled.`, actions: [
         { label: "Yes, cancel visit", danger: true, run: () => { void oneAtATime(`book:${c.id}`, () => act.cancelVisit(v.id)).then(ok => { if (ok) act.toast(`Visit cancelled for ${c.name}`); }); } },
         { label: "Keep it", run: () => {} },
@@ -339,6 +340,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
+    bkm: B && c ? customBookVM({ b: B, put: p => setB(p), changing: !!B.visitId, now,
+      save: f => oneAtATime(`book:${c.id}`, () => (B.visitId ? act.moveCustom(B.visitId, f) : act.bookCustom(c.id, f))).then(ok => !!ok),
+      done: () => { patch({ pBook: null }); act.toast(`${B.mode === "online" ? "Online meeting" : "Appointment"} ${B.visitId ? "changed" : "booked"} for ${c.name}`); } }) : null,
     bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm, bookRemarks: book?.remarks ?? "",
   };
 }
