@@ -292,6 +292,10 @@ await one(`SELECT public.mkt_product_stop($1)`, [R])
 await refuses(`SELECT public.mkt_product_run_day($1, 12)`, [R], /stopped/, 'a stopped project’s day stays')
 await asSystem()
 check(await one(`SELECT public.mkt_product_runs_due()`), 0, 'stopped this month, this month made: nothing more')
+// A month on, its work still open: no month made past the one it was stopped in.
+await q(`UPDATE public.mkt_projects SET bill_from = $2, bill_until = $3, run_day = 1 WHERE id = $1`, [R, await back(4), await back(1)])
+check(await one(`SELECT public.mkt_product_runs_due()`), 0, 'a month past its stop, its work still open: nothing made')
+check((await kids(R)).filter(k => k.deliv.run === 5).length, 0, '…no fifth month')
 await q(`UPDATE public.mkt_projects SET status = 'done', done_at = now() WHERE parent_id = $1`, [R])
 await q(`SELECT public.mkt_product_settle($1)`, [R])
 check(await peek1(`SELECT status FROM public.mkt_projects WHERE id = $1`, [R]), 'done', 'every month made and done: closed')
@@ -314,10 +318,15 @@ if (DAY < 28) {
   check(await peek1(`SELECT status FROM public.mkt_projects WHERE id = $1`, [W]), 'done', '…and done: closed')
 }
 
-// ── Begun last month: this month made on the next ask ───────────────────────────────────────────────────────
+// ── Begun last month: this month made on the next ask; a plan carried never starts before today ────────────
 const L = await started(PLAN, 1)
+const [L1] = (await kids(L)).map(k => k.id)
+await one(`SELECT public.mkt_deliverable_plan($1, $2::jsonb)`, [L1, JSON.stringify({ start: TODAY, stages: [
+  { owner: S.ali, appr: [], sla: 2 }, { owner: S.mei, appr: [], sla: 1 }] })])
 await asSystem()
 await q(`UPDATE public.mkt_projects SET bill_from = $2 WHERE id = $1`, [L, ONE])
+await q(`UPDATE public.mkt_projects SET starts_on = ($2::date - interval '2 months')::date WHERE id = $1`, [L1, TODAY])
 check(await one(`SELECT public.mkt_product_runs_due()`), 1, 'its month made on the next ask')
+check((await kids(L)).find(k => k.deliv.run === 2).start, TODAY, 'carried from a start two months back: it starts today, never before')
 
 console.log(`marketing product runs: ${checks} checks passed`)
