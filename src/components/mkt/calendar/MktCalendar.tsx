@@ -8,6 +8,7 @@ import {
   ALL_LAYERS, LAYERS, LEGEND, addMonths, eventRows, listDays, monthCells, monthLabel, monthOf, passes, weekCells, weekLabel,
   type CalEvent, type CalKind, type CalTone, type CalView,
 } from '@/lib/marketing/calendar'
+import { linkPlace } from '@/lib/marketing/posts'
 import u from '../ui/page.module.css'
 import s from './calendar.module.css'
 
@@ -169,7 +170,8 @@ export default function MktCalendar(p: MktCalendarProps) {
                 {eventRows(selEvent, nameOf).map(r => (
                   <div key={r.k} className={s.prow}>
                     <span className={s.prowK}>{r.k}</span>
-                    <span className={s.prowV}>{r.v}</span>
+                    {/* A post's link once posted (④-2c) opens the post. */}
+                    <span className={s.prowV}>{r.k === 'Posted' ? <a href={r.v} target="_blank" rel="noopener noreferrer">{linkPlace(r.v)} ↗</a> : r.v}</span>
                   </div>
                 ))}
               </div>

@@ -103,6 +103,29 @@ export async function acceptMktStage(project: string): Promise<Done<{ page: MktT
   return { ok: true, page: await fresh(db, project) }
 }
 
+/** A post marked posted with its link (④-2c — the user's answer 15) — its owner's (the task's, the stage's) or the
+ * manager's, once its task is done. Answered with the task as it now stands. */
+export async function markMktPost(project: string, stage: number, field: string, link: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !Number.isInteger(stage) || stage < 0 || typeof field !== 'string' || !field) return { ok: false, reason: 'That post is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_post_mark', { p_project: project, p_stage: stage, p_field: field.slice(0, 200), p_link: String(link ?? '').slice(0, 600) })
+  if (error) return { ok: false, reason: words(error, 'The post could not be marked. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** A post's posted mark taken back (④-2c) — its owner's or the manager's. */
+export async function unmarkMktPost(project: string, stage: number, field: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !Number.isInteger(stage) || stage < 0 || typeof field !== 'string' || !field) return { ok: false, reason: 'That post is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_post_unmark', { p_project: project, p_stage: stage, p_field: field.slice(0, 200) })
+  if (error) return { ok: false, reason: words(error, 'The mark could not be taken back. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
 /** Your stage's work: only what changed — a field cleared is sent as null. */
 export async function saveMktWork(project: string, work: Partial<{ notes: string; links: StageWork['links']; vals: Record<string, string | boolean | null> }>): Promise<Done<{ missing: string[] }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')

@@ -1,0 +1,32 @@
+/* A task's posts on its page (④-2c — the user's answer 15): a row a Post day, its state, its link once posted. */
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row {
+  display: flex; align-items: center; gap: 10px 14px; padding: 8px 12px; border-radius: 8px; border: 1px solid rgb(var(--mk-line-2));
+  background: rgb(var(--mk-white)); font-size: .96em; flex-wrap: wrap;
+}
+.field { font-weight: 500; }
+.day { font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid; font-size: .82em; font-weight: 500; white-space: nowrap; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.done { background: rgb(var(--mk-done-bg)); color: rgb(var(--mk-done)); border-color: rgb(var(--mk-done-line)); }
+.waiting { background: rgb(var(--mk-wait-bg)); color: rgb(var(--mk-wait)); border-color: rgb(var(--mk-wait-line)); }
+.red { background: rgb(var(--mk-red-bg)); color: rgb(var(--mk-red)); border-color: rgb(var(--mk-red-line)); }
+.draft { background: rgb(var(--mk-draft-bg)); color: rgb(var(--mk-draft)); border-color: rgb(var(--mk-draft-line)); }
+.posted { color: rgb(var(--mk-text-2)); font-size: .92em; min-width: 0; overflow-wrap: anywhere; }
+.link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.grow { flex: 1; }
+.markBtn {
+  height: 28px; padding: 0 12px; border-radius: 6px; border: 0; background: var(--mk-primary); color: rgb(var(--mk-ink-2)); display: inline-flex;
+  align-items: center; font: inherit; font-size: .92em; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.markBtn:hover:not(:disabled) { background: var(--mk-primary-hover); }
+.markBtn:disabled { cursor: not-allowed; opacity: .45; }
+.takeBack { height: 28px; padding: 0 8px; border-radius: 6px; border: 0; background: none; color: rgb(var(--mk-muted)); font: inherit; font-size: .86em; cursor: pointer; white-space: nowrap; }
+.takeBack:hover:not(:disabled) { color: rgb(var(--mk-red)); }
+.ask { display: flex; align-items: center; gap: 6px; flex: 1 1 280px; min-width: 0; }
+.input {
+  flex: 1; min-width: 0; height: 28px; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 6px; padding: 0 8px;
+  font: inherit; font-size: .92em; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); outline: none;
+}
+.input:focus { border-color: rgb(var(--mk-stat-hover)); }
+.cancel { height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: inherit; font: inherit; font-size: .9em; cursor: pointer; }

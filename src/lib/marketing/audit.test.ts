@@ -118,3 +118,14 @@ describe('a project’s formal log', () => {
     expect(projectLogFromRow({ track: 'X', kind: 'odd', rows: [1, { id: 2, action: 'accepted' }] })).toMatchObject({ kind: 'quick', rows: [{ id: 2 }] })
   })
 })
+
+describe('a post’s mark on the formal log (④-2c)', () => {
+  it('Marked posted, green, its field and link; taken back, its field', () => {
+    const log = projectLogFromRow({ track: 'MKT-CAR-2611-001-D01', title: 'Image post', kind: 'deliverable', rows: [
+      { id: 60, at: '2026-11-10T02:00:00Z', actor: 'Ali', action: 'posted', stage: 0, stageName: 'Schedule', data: { field: 'Post day', link: 'https://x.my/1' } },
+      { id: 61, at: '2026-11-10T03:00:00Z', actor: 'Ali', action: 'unposted', stage: 0, stageName: 'Schedule', data: { field: 'Post day' } },
+    ] })!
+    expect(auditRows(log).map(r => [r.action, r.tone, r.stage, r.reason])).toEqual([
+      ['Marked posted', 'green', 'Schedule', 'Post day · https://x.my/1'], ['Posted mark taken back', 'grey', 'Schedule', 'Post day']])
+  })
+})

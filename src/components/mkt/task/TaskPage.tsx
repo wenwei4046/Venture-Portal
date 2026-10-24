@@ -13,6 +13,7 @@ import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import StageFiles from './StageFiles'
 import TaskLibrary from './TaskLibrary'
+import TaskPosts from './TaskPosts'
 import TaskSubtasks from './TaskSubtasks'
 import s from './task.module.css'
 
@@ -332,6 +333,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
               <div className={s.reqText}>{view.requirements.text}</div>
             </div>
           </div>
+
+          <TaskPosts page={page} can={can} onPage={fresh} say={say} />
 
           <TaskSubtasks part="deliver" page={page} can={can} onPage={fresh} say={say} />
 

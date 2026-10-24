@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { boardFromRow } from './board'
 import { calendarEvents } from './calendar'
 import {
-  agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates, NO_FILTER, overlapNote, passesCampaign, passesSub, spanWords,
+  adsLive, agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates, NO_FILTER, overlapNote, passesCampaign, passesSub, spanWords,
   subCampaigns, subFeedFromRow, subProjects, subStats, timelineBars, timelineCampaigns, timelineHeads, timelineLeft, timelineOverlaps,
   timelineTitle, timelineWindow,
 } from './subsidiary'
@@ -56,14 +56,13 @@ const board = boardFromRow({
 const events = calendarEvents(board).filter(e => e.sub?.id === CAR)
 
 describe('a subsidiary’s page', () => {
-  it('opens on where its work stands — this week to Sunday, the office’s month, red only when overdue', () => {
-    // Due this week: the run's stage on Friday the 23rd — not the 28th (next week), nor a run to come.
+  it('opens on the handoff’s five cards — red only when overdue', () => {
+    // No campaign, post, shoot or ads date yet: the stage due on the 21st is late.
     expect(subStats(board, CAR, events).map(s => `${s.label} ${s.value}${s.sub ? ` ${s.sub}` : ''}${s.red ? ' red' : ''}`)).toEqual([
       'Campaigns running 0',
-      'Projects running 3',
-      'Waiting for PIC 1',
-      'Due this week 1',
-      'Done this month 2',
+      'Posts 0',
+      'Shoots 0',
+      'Ads live 0',
       'Overdue 1 needs action red',
     ])
     expect(subStats(board, HK, calendarEvents(board).filter(e => e.sub?.id === HK)).find(s => s.key === 'overdue')).toMatchObject({ value: 0, red: false, sub: '' })
@@ -144,6 +143,9 @@ describe('a subsidiary’s page', () => {
       { id: 13, at: '2026-10-22T07:00:00Z', actor: 'Mei', action: 'work started', data: { deliverables: 2, runDay: 5 }, project: p },
       { id: 12, at: '2026-10-22T06:00:00Z', actor: 'Someone', action: 'run made', data: { month: '2026-11', made: 2, toPlan: 1 }, project: p },
       { id: 11, at: '2026-10-22T05:00:00Z', actor: 'Mei', action: 'billing confirmed', data: { month: '2026-10' }, project: p },
+      // A deliverable's post marked (④-2c) — the task's words.
+      { id: 10, at: '2026-10-22T04:00:00Z', actor: 'Ali', action: 'posted', stage: 0, data: { field: 'Post day', link: 'https://x.my/1' },
+        project: { id: id(4), track: 'MKT-CAR-2610-008-D01', title: 'Image post 1/1', kind: 'deliverable' } },
     ])
     expect(feed.map(e => `${feedLine(e).emoji} ${feedLine(e).text}`)).toEqual([
       '📢 Mei set the campaign period · 9 – 12 Nov 2026',
@@ -151,6 +153,7 @@ describe('a subsidiary’s page', () => {
       '▶ Mei started the work · 2 deliverables · every month on the 5th',
       "🔁 Nov 2026's work made · 2 deliverables · 1 to plan",
       '💰 Mei confirmed the billing for Oct 2026',
+      '📣 Ali marked Post day posted',
     ])
   })
 
@@ -234,5 +237,59 @@ describe('its campaigns', () => {
     expect(passesCampaign(live, { ...NO_FILTER, types: ['campaign'] })).toBe(true)
     expect(passesCampaign(live, { ...NO_FILTER, teams: ['GRAPHIC DESIGNER'] })).toBe(false)
     expect([passesCampaign(ran, { ...NO_FILTER, statuses: ['done'] }), passesCampaign(live, { ...NO_FILTER, statuses: ['done'] })]).toEqual([true, false])
+  })
+})
+
+// 2026-10-24 — ④-2c: its posts, shoots and ads on the cards (the handoff's five), and the filter's kinds of date.
+describe('its task dates', () => {
+  const D = (n: number) => `40000000-0000-0000-0000-${String(n).padStart(12, '0')}`
+  const dboard = boardFromRow({
+    today: '2026-11-10',
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }, { id: HK, code: 'HK', name: 'Hookka' }],
+    projects: [
+      { id: D(1), trackId: 'MKT-CAR-2611-001-D01', kind: 'deliverable', sub: CAR, title: 'Post 1', status: 'done', cur: 0 },
+      { id: D(2), trackId: 'MKT-CAR-2611-001-D02', kind: 'deliverable', sub: CAR, title: 'Post 2', status: 'active', cur: 0 },
+      { id: D(3), trackId: 'MKT-CAR-2611-002-D01', kind: 'deliverable', sub: CAR, title: 'Ads 1', status: 'active', cur: 0 },
+      { id: D(4), trackId: 'MKT-CAR-2611-002-D02', kind: 'deliverable', sub: CAR, title: 'Ads 2', status: 'active', cur: 0 },
+      { id: D(5), trackId: 'MKT-HK-2611-001-D01', kind: 'deliverable', sub: HK, title: 'Hookka post', status: 'active', cur: 0 },
+      { id: D(6), trackId: 'MKT-CAR-2611-003-D01', kind: 'deliverable', sub: CAR, title: 'Cancelled', status: 'cancelled', cur: 0 },
+    ],
+    dates: [
+      { project: D(1), stage: 0, field: 'Post day', kind: 'post', day: '2026-11-03', posted: { at: 'x', name: 'Ali', link: 'https://x.my/1' } },
+      { project: D(2), stage: 0, field: 'Post day', kind: 'post', day: '2026-11-20' },
+      { project: D(2), stage: 0, field: 'Post day 2', kind: 'post', day: '2026-12-01' },
+      { project: D(2), stage: 0, field: 'Shoot day', kind: 'shoot', day: '2026-11-04' },
+      { project: D(3), stage: 0, field: 'Ads go-live', kind: 'ads_live', day: '2026-11-01' },
+      { project: D(3), stage: 0, field: 'Ads end', kind: 'ads_end', day: '2026-11-30' },
+      { project: D(4), stage: 0, field: 'Ads go-live', kind: 'ads_live', day: '2026-11-01' },
+      { project: D(4), stage: 0, field: 'Ads end', kind: 'ads_end', day: '2026-11-05' },
+      { project: D(5), stage: 0, field: 'Post day', kind: 'post', day: '2026-11-12' },
+      { project: D(6), stage: 0, field: 'Post day', kind: 'post', day: '2026-11-12' },
+    ],
+  })
+
+  it('counts this month’s posts and how many are posted, its shoots, its ads live — never another company’s or a cancelled one', () => {
+    expect(subStats(dboard, CAR, []).map(s => `${s.label} ${s.value}${s.sub ? ` ${s.sub}` : ''}`)).toEqual([
+      'Campaigns running 0', 'Posts 2 1 posted', 'Shoots 1', 'Ads live 1', 'Overdue 0'])
+  })
+
+  it('ads live: gone live on or before today, not ended before today', () => {
+    const d = (kind: 'ads_live' | 'ads_end', day: string, project = 'p') => ({ project, stage: 0, field: kind, kind, day, pic: false, posted: null })
+    expect(adsLive([d('ads_live', '2026-11-10')], '2026-11-10')).toBe(1)
+    expect(adsLive([d('ads_live', '2026-11-11')], '2026-11-10')).toBe(0)
+    expect(adsLive([d('ads_live', '2026-11-01'), d('ads_end', '2026-11-10')], '2026-11-10')).toBe(1) // ends today: still live
+    expect(adsLive([d('ads_live', '2026-11-01'), d('ads_end', '2026-11-09')], '2026-11-10')).toBe(0)
+    expect(adsLive([d('ads_live', '2026-11-01'), d('ads_end', '2026-11-03'), d('ads_live', '2026-11-08')], '2026-11-10')).toBe(1) // live again
+    expect(adsLive([d('ads_end', '2026-11-30')], '2026-11-10')).toBe(0)
+    expect(adsLive([d('ads_live', '2026-11-01', 'a'), d('ads_live', '2026-11-02', 'b')], '2026-11-10')).toBe(2)
+  })
+
+  it('filters by its kinds of date', () => {
+    const evs = calendarEvents(dboard).filter(e => e.sub?.id === CAR)
+    const only = (types: string[]) => evs.filter(e => passesSub(e, { ...NO_FILTER, types: types as never })).map(e => `${e.kind} ${e.line2}`)
+    expect(only(['post'])).toEqual(['post Post day · Posted', 'post Post day · In production', 'post Post day 2 · In production'])
+    expect(only(['meet'])).toEqual(['meet Shoot day'])
+    expect(only(['ads']).length).toBe(4)
+    expect(only(['due'])).toEqual([])
   })
 })

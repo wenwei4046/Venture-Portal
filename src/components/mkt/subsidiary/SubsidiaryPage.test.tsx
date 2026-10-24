@@ -223,3 +223,42 @@ describe('its campaigns', () => {
     expect(screen.queryByText(/overlap/)).toBeNull()
   })
 })
+
+// 2026-10-24 — ④-2c: its tasks' dates (the user's answers 15, 16) — the handoff's cards count them, the Month and the Week
+// draw them by their kind, the filter keeps a kind.
+describe('its task dates', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-10T02:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
+  const D1 = '50000000-0000-0000-0000-000000000001'
+  const dboard = boardFromRow({
+    today: '2026-11-10',
+    me: MEI,
+    team: [{ id: MEI, full: 'Mei Ling', first: 'Mei' }],
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }],
+    projects: [{ id: D1, trackId: 'MKT-CAR-2611-001-D01', kind: 'deliverable', sub: CAR, title: 'Image post 1/1', status: 'done', cur: 0, owner: MEI }],
+    stages: [{ project: D1, idx: 0, name: 'Schedule', owner: MEI, status: 'done' }],
+    dates: [
+      { project: D1, stage: 0, field: 'Post day', kind: 'post', day: '2026-11-09', pic: true, posted: { at: '2026-11-09T02:00:00Z', name: 'Mei', link: 'https://x.my/1' } },
+      { project: D1, stage: 0, field: 'Shoot day', kind: 'shoot', day: '2026-11-04', pic: false },
+    ],
+  })
+
+  it('the cards count them; the Month and the Week draw them by kind; the filter keeps a kind', () => {
+    render(<SubsidiaryPage board={dboard} sub={sub} feed={[]} />)
+    const card = (label: string) => screen.getByText(label).parentElement?.parentElement?.textContent ?? ''
+    expect(card('Posts')).toContain('1')
+    expect(card('Posts')).toContain('1 posted')
+    expect(card('Shoots')).toContain('1')
+    const month = () => document.querySelector('[class*="grid"]') as HTMLElement
+    expect(within(month()).getAllByRole('link', { name: /Image post 1\/1/ }).map(a => a.getAttribute('title'))).toEqual([
+      'Image post 1/1 · Shoot day · Schedule · Shoot day', 'Image post 1/1 · Post day · Posted · Posted'])
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter' })).getByRole('button', { name: 'Post' }))
+    expect(within(month()).getAllByRole('link', { name: /Image post 1\/1/ }).length).toBe(1)
+    fireEvent.click(screen.getByRole('tab', { name: 'Week' }))
+    expect(screen.getAllByText('Post day').length).toBeGreaterThan(0)
+  })
+})

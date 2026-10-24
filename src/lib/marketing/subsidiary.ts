@@ -7,6 +7,7 @@
 import { officeTime } from '@/lib/office-time'
 import {
   addDays, daysBetween, indexBoard, mondayOf, MONTH_NAMES, MONTH_SHORT, periodWords, shortDay, type MktBoard, type MktGroup, type MktProjectKind,
+  type MktTaskDate,
 } from './board'
 import { sameGroup } from './groups'
 import type { CalEvent, CalTone } from './calendar'
@@ -16,7 +17,7 @@ import { eventFromRow, eventText, type MktTaskPage, type TaskEvent } from './tas
 
 // ── The stat cards ───────────────────────────────────────────────────────────────
 export interface SubStat {
-  key: 'campaigns' | 'running' | 'pic' | 'week' | 'done' | 'overdue'
+  key: 'campaigns' | 'posts' | 'shoots' | 'ads' | 'overdue'
   emoji: string
   label: string
   value: number
@@ -24,36 +25,47 @@ export interface SubStat {
   red: boolean
 }
 
-/** Its campaigns running today (the next one's day when none is), its projects running, those waiting for the PIC, the
- * stages due this week, the projects done this month, the stages overdue. */
+/** The handoff's five cards (④-2c): its campaigns running today (the next one's day when none is), its posts this month
+ * (how many posted), its shoots this month, its ads live today, its stages overdue. */
 export function subStats(board: MktBoard, sub: string, events: readonly CalEvent[]): SubStat[] {
-  const rows = projectRows(board).filter(r => r.sub?.id === sub)
-  const open = rows.filter(r => r.open)
-  // This week runs to Sunday, as My Space's does.
-  const weekEnd = addDays(mondayOf(board.today), 6)
-  const due = events.filter(e => e.kind === 'due' && !e.recur)
-  const overdue = due.filter(e => e.tone === 'red').length
+  const overdue = events.filter(e => e.kind === 'due' && !e.recur && e.tone === 'red').length
   const month = board.today.slice(0, 7)
-  const done = board.projects.filter(p => p.sub === sub && p.status === 'done' && !!p.doneAt && officeTime(p.doneAt).format('YYYY-MM') === month)
-  // Paused (a project, or a series between runs) is open but not running.
-  const running = open.filter(r => !r.label.endsWith('Paused'))
   const camps = subCampaigns(board, sub)
   const live = camps.filter(c => c.live).length
   const next = camps.find(c => c.from > board.today)
+  const mine = new Set(board.projects.filter(p => p.sub === sub && p.status !== 'cancelled').map(p => p.id))
+  const dates = board.dates.filter(d => mine.has(d.project))
+  const posts = dates.filter(d => d.kind === 'post' && d.day.slice(0, 7) === month)
+  const posted = posts.filter(d => d.posted).length
   return [
     { key: 'campaigns', emoji: '📢', label: 'Campaigns running', value: live, sub: !live && next ? `next ${shortDay(next.from)}` : '', red: false },
-    { key: 'running', emoji: '📁', label: 'Projects running', value: running.length, sub: '', red: false },
-    { key: 'pic', emoji: '🔗', label: 'Waiting for PIC', value: open.filter(r => r.label.includes('Waiting for PIC')).length, sub: '', red: false },
-    { key: 'week', emoji: '⏱', label: 'Due this week', value: due.filter(e => e.tone === 'waiting' && e.day >= board.today && e.day <= weekEnd).length, sub: '', red: false },
-    { key: 'done', emoji: '✅', label: 'Done this month', value: done.length, sub: '', red: false },
+    { key: 'posts', emoji: '🖼️', label: 'Posts', value: posts.length, sub: posts.length ? `${posted} posted` : '', red: false },
+    { key: 'shoots', emoji: '🎥', label: 'Shoots', value: dates.filter(d => d.kind === 'shoot' && d.day.slice(0, 7) === month).length, sub: '', red: false },
+    { key: 'ads', emoji: '📣', label: 'Ads live', value: adsLive(dates, board.today), sub: '', red: false },
     { key: 'overdue', emoji: '🔴', label: 'Overdue', value: overdue, sub: overdue ? 'needs action' : '', red: overdue > 0 },
   ]
 }
 
+/** The tasks whose ads run today: an Ads go-live on or before today, and no Ads end from it until yesterday. */
+export function adsLive(dates: readonly MktTaskDate[], today: string): number {
+  const by = new Map<string, MktTaskDate[]>()
+  for (const d of dates) if (d.kind === 'ads_live' || d.kind === 'ads_end') by.set(d.project, [...(by.get(d.project) ?? []), d])
+  let n = 0
+  for (const list of by.values()) {
+    const went = list.filter(d => d.kind === 'ads_live' && d.day <= today).map(d => d.day).sort().at(-1)
+    if (went && !list.some(d => d.kind === 'ads_end' && d.day >= went && d.day < today)) n++
+  }
+  return n
+}
+
 // ── The filter (the handoff's Type · Department · Status) ────────────────────────
-export type SubType = 'campaign' | 'due' | 'run'
+export type SubType = 'campaign' | 'post' | 'meet' | 'ads' | 'due' | 'run'
 export const SUB_TYPES: readonly { key: SubType; label: string; icon: string }[] = [
   { key: 'campaign', label: 'Campaign', icon: '📢' },
+  // A task's dates (④-2c — answer 16).
+  { key: 'post', label: 'Post', icon: '📣' },
+  { key: 'meet', label: 'Shoot / meeting', icon: '🎬' },
+  { key: 'ads', label: 'Ads & reports', icon: '📈' },
   { key: 'due', label: 'Stage due date', icon: '⏱' },
   { key: 'run', label: 'Recurring run', icon: '🔁' },
 ]
@@ -73,7 +85,7 @@ export const NO_FILTER: SubFilter = { types: [], teams: [], statuses: [] }
 export const filterCount = (f: SubFilter) => f.types.length + f.teams.length + f.statuses.length
 
 export function passesSub(e: CalEvent, f: SubFilter): boolean {
-  const type: SubType = e.recur ? 'run' : 'due'
+  const type: SubType = e.kind === 'due' ? (e.recur ? 'run' : 'due') : e.kind
   return (!f.types.length || f.types.includes(type))
     && (!f.teams.length || f.teams.some(g => sameGroup(g, e.team)))
     && (!f.statuses.length || f.statuses.includes(e.tone))
@@ -289,7 +301,7 @@ const FEED_EMOJI: Record<string, string> = {
   'pic changes': '🔗', signed: '✍️', 'minutes completed': '📝', 'edited after approval': '✏️', 'started before approval': '⚡',
   attached: '📚', detached: '📚', replaced: '🔁',
   'work started': '▶', 'run made': '🔁', 'run day': '📅', 'amount set': '💰', 'billing confirmed': '💰', 'billing withdrawn': '💰', stopped: '⏹',
-  'campaign period': '📢',
+  'campaign period': '📢', posted: '📣', unposted: '📣',
 }
 
 /** "just now", "12 min ago", "3h ago", "yesterday", else the day — `now` an instant (ms). */
