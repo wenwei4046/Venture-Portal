@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { taskFromRow, type MktTaskPage } from './task'
 import { linkPlace, postLinkOk, taskPosts } from './posts'
 
-// 2026-10-24 — ⑧-1: a task's posts (the user's answer 15) — each Post day its stages hold once filled, where it stands,
+// 2026-10-24 — ④-2c: a task's posts (the user's answer 15) — each Post day its stages hold once filled, where it stands,
 // and whether the viewer marks it: its owner (the task's, the stage's) or the manager. The database's side is
 // tests/member-sql/validate-marketing-task-dates.mjs.
 

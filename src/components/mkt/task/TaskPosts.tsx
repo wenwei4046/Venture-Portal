@@ -8,7 +8,7 @@ import type { MktTaskPage, TaskViewer } from '@/lib/marketing/task'
 import s from './task.module.css'
 import p from './posts.module.css'
 
-// A task's posts (⑧-1 — the user's answer 15: "a post is a deliverable with a 📣 Post day; done = Scheduled, its owner
+// A task's posts (④-2c — the user's answer 15: "a post is a deliverable with a 📣 Post day; done = Scheduled, its owner
 // marks it Posted, with its link"): each Post day its stages hold and where it stands — In production, Overdue,
 // Scheduled, Posted — and, once the task is done, its owner's (the task's, the stage's) or the manager's *Mark posted…*
 // with the link, or *Take back*.

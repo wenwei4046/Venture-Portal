@@ -103,7 +103,7 @@ export async function acceptMktStage(project: string): Promise<Done<{ page: MktT
   return { ok: true, page: await fresh(db, project) }
 }
 
-/** A post marked posted with its link (⑧-1 — the user's answer 15) — its owner's (the task's, the stage's) or the
+/** A post marked posted with its link (④-2c — the user's answer 15) — its owner's (the task's, the stage's) or the
  * manager's, once its task is done. Answered with the task as it now stands. */
 export async function markMktPost(project: string, stage: number, field: string, link: string): Promise<Done<{ page: MktTaskPage | null }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
@@ -115,7 +115,7 @@ export async function markMktPost(project: string, stage: number, field: string,
   return { ok: true, page: await fresh(db, project) }
 }
 
-/** A post's posted mark taken back (⑧-1) — its owner's or the manager's. */
+/** A post's posted mark taken back (④-2c) — its owner's or the manager's. */
 export async function unmarkMktPost(project: string, stage: number, field: string): Promise<Done<{ page: MktTaskPage | null }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
   if (!isId(project) || !Number.isInteger(stage) || stage < 0 || typeof field !== 'string' || !field) return { ok: false, reason: 'That post is not there.' }

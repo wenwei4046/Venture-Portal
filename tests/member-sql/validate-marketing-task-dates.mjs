@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261025151000 (2026-10-24 — Marketing ⑧-1: a task's dates on the calendar and its
+// Local PostgreSQL regression for 20261025151000 (2026-10-24 — Marketing ④-2c: a task's dates on the calendar and its
 // posts; the user's answers 15 and 16, the handoff's "Dates sync from task fields marked Show on calendar"). Marketing's
 // migrations up to campaigns run; then this one, twice. What is under test: who may call what; the board's dates — each
 // Date field marked for the calendar once filled, its kind, the PIC's or not — never a date not marked, an emptied one

@@ -86,7 +86,7 @@ describe('the Calendar', () => {
   })
 })
 
-// 2026-10-24 — ⑧-1: a task's dates marked for the calendar (answers 15, 16) — posts, shoots and meetings, ads and reports,
+// 2026-10-24 — ④-2c: a task's dates marked for the calendar (answers 15, 16) — posts, shoots and meetings, ads and reports,
 // each in its layer; a post's state.
 describe('a task’s dates on the Calendar', () => {
   const D1 = '30000000-0000-0000-0000-000000000001'

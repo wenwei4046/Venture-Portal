@@ -1,4 +1,4 @@
--- 2026-10-24 — Marketing ⑧-1: a task's dates on the calendar, and its posts (the user's answers 15 and 16; the handoff's
+-- 2026-10-24 — Marketing ④-2c: a task's dates on the calendar, and its posts (the user's answers 15 and 16; the handoff's
 -- "📌 Dates sync from task fields marked 'Show on calendar'"). A canvas Date field marked for the calendar — its kind, one
 -- of six (answer 16): 📣 Post day, 🎬 Shoot day, 🗓️ Meeting, 📈 Ads go-live, 🛑 Ads end, 📊 Report day — puts its date on
 -- the board once it is filled. A post (answer 15: "a deliverable with a 📣 Post day; done = Scheduled, its owner marks it
@@ -116,7 +116,7 @@ BEGIN
         -- A campaign while it runs, and for 60 days after — or in the range asked (answer 13).
         OR p.campaign_until >= v_today - 60
         OR (p_from IS NOT NULL AND p_to IS NOT NULL AND p.campaign_from <= p_to AND p.campaign_until >= p_from)
-        -- …or a date of its marked for the calendar in the range asked (⑧-1).
+        -- …or a date of its marked for the calendar in the range asked (④-2c).
         OR (p_from IS NOT NULL AND p_to IS NOT NULL AND EXISTS (
               SELECT 1 FROM public.mkt_stages s
                CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(s.spec -> 'form') = 'array' THEN s.spec -> 'form' ELSE '[]'::jsonb END) f
@@ -161,7 +161,7 @@ BEGIN
                              'by', t.created_by, 'createdAt', t.created_at, 'updatedAt', t.updated_at)
                            ORDER BY t.created_at, t.id)
                             FROM public.mkt_subtasks t WHERE t.project_id = ANY (v_ids)), '[]'::jsonb),
-    -- A task's dates on the calendar (⑧-1 — answers 15, 16): each Date field marked for it, once filled — its kind, the
+    -- A task's dates on the calendar (④-2c — answers 15, 16): each Date field marked for it, once filled — its kind, the
     -- PIC's or not, a post's mark.
     'dates', coalesce((SELECT jsonb_agg(jsonb_build_object(
                          'project', s.project_id, 'stage', s.idx, 'field', f ->> 'label', 'kind', f -> 'cal' ->> 'kind',
@@ -220,7 +220,7 @@ BEGIN
       'recur', v_p.recur, 'startsOn', v_p.starts_on, 'dueOn', v_p.due_on, 'createdAt', v_p.created_at,
       'createdBy', (SELECT u.name FROM public.users u WHERE u.id = v_p.created_by),
       'updatedAt', v_p.updated_at, 'doneAt', v_p.done_at,
-      -- Its posts marked posted (⑧-1 — answer 15): "<stage>:<field>" → when, by whom, the link.
+      -- Its posts marked posted (④-2c — answer 15): "<stage>:<field>" → when, by whom, the link.
       'posted', v_p.posted,
       'free', CASE WHEN jsonb_typeof(v_p.canvas -> 'free') = 'array' THEN v_p.canvas -> 'free' ELSE '[]'::jsonb END,
       -- A deliverable (②b-2a): its product project, what it is of it, whether its template is locked.

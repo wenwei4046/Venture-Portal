@@ -100,7 +100,7 @@ export function auditRows(log: ProjectLog): AuditRow[] {
         : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
       // A campaign's run period (④-2b): its days, or that it was taken off.
       reason: e.action === 'campaign period' ? periodOf(e.data) ?? 'Taken off'
-        // A post's mark (⑧-1): its field, and the link it was posted at.
+        // A post's mark (④-2c): its field, and the link it was posted at.
         : e.action === 'posted' || e.action === 'unposted' ? [e.data?.field, e.action === 'posted' ? e.data?.link : null].filter(x => typeof x === 'string' && x).join(' · ') || NONE
         : TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: OF_SUBTASK.has(e.action) && typeof e.data?.title === 'string' ? (e.version ? `${e.data.title} ${e.version}` : e.data.title)

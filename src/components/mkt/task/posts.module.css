@@ -1,4 +1,4 @@
-/* A task's posts on its page (⑧-1 — the user's answer 15): a row a Post day, its state, its link once posted. */
+/* A task's posts on its page (④-2c — the user's answer 15): a row a Post day, its state, its link once posted. */
 .list { display: flex; flex-direction: column; gap: 6px; }
 .row {
   display: flex; align-items: center; gap: 10px 14px; padding: 8px 12px; border-radius: 8px; border: 1px solid rgb(var(--mk-line-2));

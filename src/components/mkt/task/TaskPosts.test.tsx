@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { taskFromRow, type MktTaskPage } from '@/lib/marketing/task'
 
-// 2026-10-24 — ⑧-1 on the task page: its posts (the user's answer 15) — each Post day, where it stands, its link once
+// 2026-10-24 — ④-2c on the task page: its posts (the user's answer 15) — each Post day, where it stands, its link once
 // posted; once the task is done its owner (the task's, the stage's) or the manager marks it posted with the link, or takes
 // the mark back. Against the actions the page calls (the database's side: tests/member-sql/validate-marketing-task-dates.mjs).
 

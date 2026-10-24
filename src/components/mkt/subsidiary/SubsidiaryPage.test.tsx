@@ -224,7 +224,7 @@ describe('its campaigns', () => {
   })
 })
 
-// 2026-10-24 — ⑧-1: its tasks' dates (the user's answers 15, 16) — the handoff's cards count them, the Month and the Week
+// 2026-10-24 — ④-2c: its tasks' dates (the user's answers 15, 16) — the handoff's cards count them, the Month and the Week
 // draw them by their kind, the filter keeps a kind.
 describe('its task dates', () => {
   beforeEach(() => {

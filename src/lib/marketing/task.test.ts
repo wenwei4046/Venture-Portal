@@ -168,7 +168,7 @@ describe('a PIC level, with one or two PICs (②b-2d-2b, the user’s answer 29)
   })
 })
 
-// 2026-10-24 — ⑧-1: a post marked posted, or the mark taken back — the trail's words; the page reads the marks.
+// 2026-10-24 — ④-2c: a post marked posted, or the mark taken back — the trail's words; the page reads the marks.
 describe('a post’s mark', () => {
   it('reads the marks and words the trail’s lines', () => {
     const pg = taskFromRow({ project: { id: 'p1', trackId: 'T', kind: 'deliverable', sub: 's', title: 'x', status: 'done', cur: 0,

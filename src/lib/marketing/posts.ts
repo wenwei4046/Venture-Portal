@@ -1,4 +1,4 @@
-// A task's posts (⑧-1 — the user's answer 15: "a post is a deliverable with a 📣 Post day; done = Scheduled, its owner
+// A task's posts (④-2c — the user's answer 15: "a post is a deliverable with a 📣 Post day; done = Scheduled, its owner
 // marks it Posted, with its link"): each Post day its stages hold, where it stands, and whether the viewer marks it —
 // its owner (the task's, the stage's) or the manager, as mkt_post_mark asks. Pure.
 

@@ -236,7 +236,7 @@ describe('its campaigns', () => {
   })
 })
 
-// 2026-10-24 — ⑧-1: its posts, shoots and ads on the cards (the handoff's five), and the filter's kinds of date.
+// 2026-10-24 — ④-2c: its posts, shoots and ads on the cards (the handoff's five), and the filter's kinds of date.
 describe('its task dates', () => {
   const D = (n: number) => `40000000-0000-0000-0000-${String(n).padStart(12, '0')}`
   const dboard = boardFromRow({

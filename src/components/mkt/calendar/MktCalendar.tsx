@@ -170,7 +170,7 @@ export default function MktCalendar(p: MktCalendarProps) {
                 {eventRows(selEvent, nameOf).map(r => (
                   <div key={r.k} className={s.prow}>
                     <span className={s.prowK}>{r.k}</span>
-                    {/* A post's link once posted (⑧-1) opens the post. */}
+                    {/* A post's link once posted (④-2c) opens the post. */}
                     <span className={s.prowV}>{r.k === 'Posted' ? <a href={r.v} target="_blank" rel="noopener noreferrer">{linkPlace(r.v)} ↗</a> : r.v}</span>
                   </div>
                 ))}

@@ -153,7 +153,7 @@ export interface MktBoard {
   stages: MktStage[]
   subtasks: MktSubtask[]
   holidays: MktHoliday[]
-  /** A task's dates marked for the calendar (⑧-1 — answers 15, 16), once filled, by day. */
+  /** A task's dates marked for the calendar (④-2c — answers 15, 16), once filled, by day. */
   dates: MktTaskDate[]
 }
 

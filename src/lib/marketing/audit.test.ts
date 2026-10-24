@@ -119,7 +119,7 @@ describe('a project’s formal log', () => {
   })
 })
 
-describe('a post’s mark on the formal log (⑧-1)', () => {
+describe('a post’s mark on the formal log (④-2c)', () => {
   it('Marked posted, green, its field and link; taken back, its field', () => {
     const log = projectLogFromRow({ track: 'MKT-CAR-2611-001-D01', title: 'Image post', kind: 'deliverable', rows: [
       { id: 60, at: '2026-11-10T02:00:00Z', actor: 'Ali', action: 'posted', stage: 0, stageName: 'Schedule', data: { field: 'Post day', link: 'https://x.my/1' } },

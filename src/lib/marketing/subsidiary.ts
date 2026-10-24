@@ -25,7 +25,7 @@ export interface SubStat {
   red: boolean
 }
 
-/** The handoff's five cards (⑧-1): its campaigns running today (the next one's day when none is), its posts this month
+/** The handoff's five cards (④-2c): its campaigns running today (the next one's day when none is), its posts this month
  * (how many posted), its shoots this month, its ads live today, its stages overdue. */
 export function subStats(board: MktBoard, sub: string, events: readonly CalEvent[]): SubStat[] {
   const overdue = events.filter(e => e.kind === 'due' && !e.recur && e.tone === 'red').length
@@ -62,7 +62,7 @@ export function adsLive(dates: readonly MktTaskDate[], today: string): number {
 export type SubType = 'campaign' | 'post' | 'meet' | 'ads' | 'due' | 'run'
 export const SUB_TYPES: readonly { key: SubType; label: string; icon: string }[] = [
   { key: 'campaign', label: 'Campaign', icon: '📢' },
-  // A task's dates (⑧-1 — answer 16).
+  // A task's dates (④-2c — answer 16).
   { key: 'post', label: 'Post', icon: '📣' },
   { key: 'meet', label: 'Shoot / meeting', icon: '🎬' },
   { key: 'ads', label: 'Ads & reports', icon: '📈' },

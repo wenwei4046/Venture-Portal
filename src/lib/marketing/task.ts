@@ -99,7 +99,7 @@ export interface TaskProject extends MktProject {
   locked: boolean
   /** The project's second PIC (the user's answer 29), null for none. */
   pic2: string | null
-  /** Its posts marked posted (⑧-1 — answer 15): "<stage>:<field>" → when, by whom, the link. */
+  /** Its posts marked posted (④-2c — answer 15): "<stage>:<field>" → when, by whom, the link. */
   posted: Record<string, MktPosted>
 }
 
@@ -658,7 +658,7 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
       const start = typeof e.data?.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.data.start) ? ` · starts ${shortDay(e.data.start)}` : ''
       return `Plan carried from ${from}${start}`
     }
-    // A post marked posted, or the mark taken back (⑧-1 — answer 15).
+    // A post marked posted, or the mark taken back (④-2c — answer 15).
     case 'posted': return `${e.actor} marked ${typeof e.data?.field === 'string' ? e.data.field : 'the post'} posted`
     case 'unposted': return `${e.actor} took back ${typeof e.data?.field === 'string' ? e.data.field : 'the post'}’s posted mark`
     default: return `${e.actor} · ${e.action}`

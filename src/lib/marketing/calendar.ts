@@ -33,7 +33,7 @@ export interface CalEvent {
   recur: boolean
   /** The stage's group (a People title) — a subsidiary's page colours and filters by it (④-2). */
   team?: MktGroup | null
-  /** A post marked posted: its link (⑧-1). */
+  /** A post marked posted: its link (④-2c). */
   postLink?: string | null
 }
 
@@ -41,7 +41,7 @@ export const LAYERS: readonly { key: CalKind; icon: string; label: string }[] = 
   { key: 'post', icon: '📣', label: 'Posts' },
   { key: 'due', icon: '⏱', label: 'Stage due dates' },
   { key: 'meet', icon: '🗓️', label: 'Shoots & meetings' },
-  // A task's ads and reports days (⑧-1 — the user's answer 16 keeps them as kinds; the handoff's three layers have none).
+  // A task's ads and reports days (④-2c — the user's answer 16 keeps them as kinds; the handoff's three layers have none).
   { key: 'ads', icon: '📈', label: 'Ads & reports' },
 ]
 
@@ -118,7 +118,7 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
       })
     }
   }
-  // A task's dates marked for the calendar (⑧-1 — answers 15, 16): its posts, its shoots and meetings, its ads and reports.
+  // A task's dates marked for the calendar (④-2c — answers 15, 16): its posts, its shoots and meetings, its ads and reports.
   const byId = new Map(board.projects.map(p => [p.id, p]))
   for (const d of board.dates) {
     const p = byId.get(d.project)
