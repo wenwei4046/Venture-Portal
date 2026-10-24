@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addable, addedTile, boardHeight, boardOf, clampPlace, DEFAULT_LAYOUT, DEFAULT_ROOM, DEFAULT_THEME, dragged, formOf, knownAfter, layoutToRow,
-  newPiece, NO_PET, nudged, petFromRow, petState, pictureProblem, readingOrder, removedTile, roomFromRow, roomScale, sameLayout, spaceFromRow,
-  spacePatchOf, spacePicturePath, toFront, twoAbreast, type TilePlace,
+  addable, addedTile, boardHeight, boardOf, clampPlace, DEFAULT_LAYOUT, DEFAULT_ROOM, DEFAULT_THEME, dragged, energyTone, exerciseTitle, formOf,
+  knownAfter, layoutToRow, levelOf, levelUpWords, newPiece, NO_PET, nudged, petFromRow, petSize, petState, petStatsFromRow, pictureProblem,
+  readingOrder, removedTile, roomFromRow, roomScale, sameLayout, spaceFromRow, spacePatchOf, spacePicturePath, toFront, trophyShelf, twoAbreast,
+  workoutWords, xpBar, type TilePlace,
 } from './space'
 
 // 2026-10-23 — ⑦-1: My Space's own side (`My Space Bento.dc.html`) — the board its owner lays out (the prototype's
@@ -12,12 +13,13 @@ import {
 const t = (id: string, x: number, y: number, w: number, h: number): TilePlace => ({ id, x, y, w, h })
 
 describe('the board as read', () => {
-  it('before the first save: the prototype’s board without what is not here yet — the room top left, My turn beside it', () => {
+  it('before the first save: the prototype’s board without what is not here yet — the room top left, My turn beside it, the pet and the trophies on the right', () => {
     const s = spaceFromRow(null)
     expect(s.saved).toBe(false)
     expect(s.layout).toEqual(DEFAULT_LAYOUT)
     expect(s.layout.map(x => [x.id, x.x, x.y, x.w, x.h])).toEqual([
-      ['room', 0, 0, 0.5, 364], ['turn', 0.5, 0, 0.25, 364], ['waiting', 0.75, 0, 0.25, 182], ['delegated', 0.75, 182, 0.25, 182], ['week', 0, 364, 0.5, 182],
+      ['room', 0, 0, 0.5, 364], ['turn', 0.5, 0, 0.25, 364], ['pet', 0.75, 0, 0.25, 182], ['trophies', 0.75, 182, 0.25, 182],
+      ['waiting', 0, 364, 0.25, 182], ['delegated', 0.25, 364, 0.25, 182], ['week', 0.5, 364, 0.5, 182],
     ])
     expect([s.theme, s.cover, s.coverPath, s.avatarPath, s.photoPath, s.status, s.notes]).toEqual([DEFAULT_THEME, 0, null, null, null, '', ''])
     expect([s.room, s.pet, s.petPath]).toEqual([DEFAULT_ROOM, NO_PET, null])
@@ -25,7 +27,7 @@ describe('the board as read', () => {
 
   it('a saved board as its owner left it; a kind this page does not draw yet kept as it was', () => {
     const s = spaceFromRow({
-      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['delegated', 'room', 'turn', 'waiting', 'week'],
+      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['delegated', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'],
       theme: { bg: 'mint', accent: 'blue', corners: 'round' }, cover: 2, coverPath: null, avatarPath: 'space/a/me.png', status: 'Shooting', notes: 'Call PIC',
       photoPath: 'mine/b/beach.jpg', at: '2026-10-23T03:00:00Z', room: {}, pet: {},
     })
@@ -39,7 +41,7 @@ describe('the board as read', () => {
   })
 
   it('a tile taken off stays off; a kind shipped since the board was saved joins it once, under the rest', () => {
-    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['room', 'turn', 'waiting', 'week'])
+    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['pet', 'room', 'trophies', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated'])
     expect(b[2]).toEqual(t('delegated', 0, 364, 0.25, 182))
   })
@@ -47,18 +49,25 @@ describe('the board as read', () => {
   it('a board saved before the room came (⑦-1) gets the room once, two by two, under the rest', () => {
     const saved = [t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182), t('delegated', 0.75, 0, 0.25, 182), t('week', 0.5, 182, 0.5, 182)]
     const b = boardOf(saved, ['delegated', 'notes', 'photo', 'turn', 'waiting', 'week'])
-    expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week', 'room'])
+    expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week', 'room', 'pet', 'trophies'])
     expect(b[4]).toEqual(t('room', 0, 364, 0.5, 364))
     expect(boardOf(saved, knownAfter(['delegated', 'turn', 'waiting', 'week'])).map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week'])
   })
 
+  it('a board saved before the pet’s tile and the trophies came (⑦-5) gets them once, one by one, under the rest', () => {
+    const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182), t('week', 0, 364, 0.5, 182)]
+    const b = boardOf(saved, ['delegated', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
+    expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'week', 'pet', 'trophies'])
+    expect(b.slice(4)).toEqual([t('pet', 0, 546, 0.25, 182), t('trophies', 0, 728, 0.25, 182)])
+  })
+
   it('My turn and Waiting are always on it — whatever came back', () => {
-    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'turn', 'waiting', 'delegated', 'week'])
+    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week'])
     expect(b.map(x => x.id)).toEqual(['week', 'turn', 'waiting'])
   })
 
   it('each kind once; a tile out of bounds brought back in', () => {
-    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'turn', 'waiting', 'delegated', 'week'])
+    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week'])
     expect(b).toEqual([t('turn', 0.5, 0, 0.5, 110), t('waiting', 0, 0, 0.14, 2000)])
   })
 
@@ -101,11 +110,11 @@ describe('Edit layout', () => {
 
   it('the tile last moved goes on top (last); My turn and Waiting cannot be taken off', () => {
     const b = DEFAULT_LAYOUT
-    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'waiting', 'delegated', 'week', 'turn'])
+    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'turn'])
     expect(removedTile(b, 'turn')).toBe(b)
     expect(removedTile(b, 'waiting')).toBe(b)
-    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'delegated'])
-    expect(removedTile(b, 'room').map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week'])
+    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated'])
+    expect(removedTile(b, 'pet').map(x => x.id)).toEqual(['room', 'turn', 'trophies', 'waiting', 'delegated', 'week'])
   })
 
   it('a tile added: its own size, under everything; the drawer offers only those not on the board', () => {
@@ -149,7 +158,7 @@ describe('a save', () => {
 
   it('a tile without its numbers is left out; the kinds the board has offered are remembered', () => {
     expect(spacePatchOf({ layout: [t('turn', 0, 0, 0.5, 364), { id: 'week', x: Number.NaN, y: 0, w: 0.5, h: 182 }] }).layout).toEqual([t('turn', 0, 0, 0.5, 364)])
-    expect(knownAfter(['room'])).toEqual(['delegated', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
+    expect(knownAfter(['room'])).toEqual(['delegated', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
   })
 
   it('the same board — to four places and whole pixels, in its order', () => {
@@ -217,7 +226,9 @@ describe('the pet', () => {
     expect(petFromRow({ species: 'tiger', name: 'x'.repeat(20), color: '#f00', onboarded: 'yes' })).toEqual({ species: 'cat', name: 'x'.repeat(16), color: 'original', onboarded: false })
   })
 
-  it('looks as its owner’s plate is: overloaded, a new task, working, asleep', () => {
+  it('looks as its owner’s plate is: hungry, overloaded, a new task, working, asleep', () => {
+    expect(petState({ count: 1, red: 2, fresh: true }, 19)).toBe('hungry')
+    expect(petState({ count: 1, red: 2, fresh: true }, 20)).toBe('overload')
     expect(petState({ count: 1, red: 2, fresh: true })).toBe('overload')
     expect(petState({ count: 4, red: 0, fresh: false })).toBe('overload')
     expect(petState({ count: 1, red: 0, fresh: true })).toBe('newTask')
@@ -236,5 +247,53 @@ describe('the pet', () => {
     expect(spacePatchOf({ room: { wall: 'sky', floor: 'grass', items: [] } })).toEqual({ room: { wall: 'sky', floor: 'grass', items: [] } })
     expect(spacePatchOf({ pet: { species: 'bird', name: 'Kopi', color: 'sky', onboarded: true } })).toEqual({ pet: { species: 'bird', name: 'Kopi', color: 'sky', onboarded: true } })
     expect(spacePatchOf({ petPath: '' })).toEqual({ petPath: null })
+  })
+})
+
+// 2026-10-24 — ⑦-5: the pet's levels, XP and energy, the trophies (the user's answers 32–34; the database's side:
+// tests/member-sql/validate-marketing-pet.mjs).
+describe('the pet’s levels', () => {
+  it('Lv 1–6 at 0 · 100 · 250 · 450 · 700 · 1000 XP; it grows in the room', () => {
+    expect([0, 99, 100, 249, 250, 450, 699, 700, 999, 1000, 5000].map(levelOf)).toEqual([1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6])
+    expect([0, 1, 3, 6, 9].map(petSize)).toEqual([30, 30, 38, 52, 52])
+  })
+
+  it('the XP bar: how far into its level, its tooltip in words — the last full', () => {
+    expect(xpBar(0)).toEqual({ level: 1, pct: 0, label: '0/100 XP to Lv 2' })
+    expect(xpBar(160)).toEqual({ level: 2, pct: 40, label: '60/150 XP to Lv 3' })
+    expect(xpBar(520)).toEqual({ level: 4, pct: 28, label: '70/250 XP to Lv 5' })
+    expect(xpBar(1040)).toEqual({ level: 6, pct: 100, label: 'Max level' })
+  })
+
+  it('the energy bar red under 20, amber under 50; three workouts a day earn XP', () => {
+    expect([0, 19, 20, 49, 50, 100].map(energyTone)).toEqual(['low', 'low', 'mid', 'mid', 'high', 'high'])
+    expect([0, 2, 3, 5].map(exerciseTitle)).toEqual(['Exercise · 3/3 left today', 'Exercise · 1/3 left today', 'Exercise · 0/3 left today', 'Exercise · 0/3 left today'])
+    expect([workoutWords('Kopi', true), workoutWords('Kopi', false)]).toEqual(['+10 XP · Kopi worked out', '3/3 workouts today. No more XP until tomorrow'])
+  })
+
+  it('a level reached — evolved when its form changes; one’s own animal does not', () => {
+    expect(levelUpWords('Kopi', 'cat', 1, 2, false)).toBe('Kopi reached Lv 2!')
+    expect(levelUpWords('Kopi', 'cat', 2, 3, false)).toBe('Kopi reached Lv 3 and evolved into a Cat!')
+    expect(levelUpWords('Rex', 'dragon', 4, 6, false)).toBe('Rex reached Lv 6 and evolved into a Dragon!')
+    expect(levelUpWords('Bao', 'dog', 2, 3, true)).toBe('Bao reached Lv 3!')
+  })
+
+  it('read from the database — off the roster, none', () => {
+    expect(petStatsFromRow(null)).toBeNull()
+    expect(petStatsFromRow({ xp: 130, energy: 104, snacks: '2', workouts: 1, trophyCount: 1, trophies: [
+      { track: 'TSK-CAR-2610-004', title: 'Price banner', at: '2026-10-24T03:00:00Z' }, { title: 'no track' }, 'x',
+    ] })).toEqual({ xp: 130, energy: 100, snacks: 2, workouts: 1, trophyCount: 1, trophies: [{ track: 'TSK-CAR-2610-004', title: 'Price banner', at: '2026-10-24T03:00:00Z' }] })
+    expect(petStatsFromRow({})).toEqual({ xp: 0, energy: 0, snacks: 0, workouts: 0, trophies: [], trophyCount: 0 })
+  })
+})
+
+describe('the trophies', () => {
+  const stats = (n: number) => ({ xp: 0, energy: 64, snacks: 3, workouts: 0, trophyCount: n,
+    trophies: Array.from({ length: Math.min(6, n) }, (_, i) => ({ track: `TSK-CAR-2610-00${i + 1}`, title: `Story ${i + 1}`, at: '' })) })
+  it('one a project finished this quarter, each named by its project; two still to win greyed', () => {
+    expect(trophyShelf(null)).toEqual({ got: [], locked: ['🏆', '🥇'], line: '0 projects finished this quarter' })
+    expect(trophyShelf(stats(1))).toEqual({ got: [{ emoji: '🏆', name: 'TSK-CAR-2610-001 · Story 1' }], locked: ['🥇', '🎖️'], line: '1 project finished this quarter' })
+    const nine = trophyShelf(stats(9))
+    expect([nine.got.map(g => g.emoji).join(''), nine.locked, nine.line]).toEqual(['🏆🥇🎖️🏅🥈🎗️', [], '9 projects finished this quarter'])
   })
 })

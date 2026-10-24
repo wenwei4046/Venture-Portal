@@ -1,9 +1,9 @@
 /* My Space (`My Space.dc.html` → `My Space Bento.dc.html`), value for value: the cover (a preset or a picture) with
    Change cover, the avatar, the name, the status, Edit layout, the greeting, and the board its owner lays out — tiles
    placed anywhere (x and w fractions of the board's width, y and h px), moved and resized by eight handles while the
-   drawer is open; the drawer's Add a tile, Page background, Accent, Tile corners, Reset and Done. The room, the pet,
-   the chat, the lobby and the trophies come with ⑦-2 onwards. The look is a key on the page (data-bg, data-accent,
-   data-corners) — its colours are tokens in globals.css. */
+   drawer is open; the drawer's Add a tile, Page background, Accent, Tile corners, Reset and Done. The room and the pet
+   (⑦-2), the pet's tile and the trophies (⑦-5); the chat and the lobby come later. The look is a key on the page
+   (data-bg, data-accent, data-corners) — its colours are tokens in globals.css. */
 
 .page { max-width: 1240px; margin: 0 auto; padding: 20px 28px 64px; box-sizing: border-box; color: rgb(var(--mk-ink)); }
 
@@ -373,6 +373,40 @@ button.photo:disabled { cursor: wait; }
 .petShadow { border-radius: 50%; background: rgb(0 0 0 / .14); margin-top: -2px; }
 .coverPet { position: absolute; left: 112px; bottom: -40px; z-index: 2; }
 .petLine { color: rgb(var(--mk-muted)); white-space: nowrap; }
+
+/* ── ⑦-5: the pet's tile, the trophies ─────────────────────────────────────────── */
+.petTile { position: absolute; inset: 0; padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
+.petTileNode {
+  width: 52px; flex: none; display: flex; justify-content: center; align-items: flex-end; height: 100%; padding-bottom: 12px;
+  box-sizing: border-box;
+}
+.petTileMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: .84em; }
+.petTileHead { display: flex; align-items: center; gap: 6px; }
+.petTileName { font-weight: 600; font-size: 1.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.petLv {
+  flex: none; white-space: nowrap; font-size: .9em; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+  background: var(--sp-accent); color: var(--sp-accent-ink);
+}
+.bar { height: 6px; border-radius: 3px; background: rgb(var(--mk-line-2)); overflow: hidden; }
+.barFill { height: 100%; background: var(--sp-accent); transition: width .4s; }
+.barFill[data-tone='low'] { background: rgb(var(--mk-red-dot)); }
+.barFill[data-tone='mid'] { background: rgb(var(--mk-wait-dot)); }
+.barFill[data-tone='high'] { background: rgb(var(--mk-done-dot)); }
+.petTileState { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgb(var(--mk-text-2)); }
+.petCare { display: flex; gap: 6px; }
+.careBtn {
+  flex: 1; min-width: 0; height: 28px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white));
+  display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; font: inherit; color: rgb(var(--mk-ink));
+  padding: 0;
+}
+.careBtn:hover { border-color: rgb(var(--mk-stat-hover)); }
+.careBtn:disabled { cursor: wait; opacity: .7; }
+.petNone { margin: auto; font-size: .86em; color: rgb(var(--mk-muted)); }
+.trophies { position: absolute; inset: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.trophiesHead { font-weight: 600; font-size: .96em; }
+.trophyRow { display: flex; flex-wrap: wrap; gap: 4px; font-size: 26px; line-height: 1.1; }
+.trophyLocked { opacity: .25; filter: grayscale(1); }
+.trophyLine { font-size: .8em; color: rgb(var(--mk-muted)); margin-top: auto; }
 @keyframes pIdle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes pNew { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-12px) scale(1.05); } }
 @keyframes pBusy { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }

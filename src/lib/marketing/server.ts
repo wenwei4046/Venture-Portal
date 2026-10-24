@@ -9,7 +9,7 @@ import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
 import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
-import { spaceFromRow, type Space } from './space'
+import { petStatsFromRow, spaceFromRow, type PetStats, type Space } from './space'
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
@@ -122,6 +122,15 @@ export async function readSpace(): Promise<Space> {
   const { data, error } = await db.rpc('mkt_space')
   if (error) throw new Error(error.message)
   return spaceFromRow(data)
+}
+
+/** The viewer's pet in numbers — its XP, energy, snacks, today's workouts and this quarter's trophies (⑦-5, mig
+ * 20261025037000); null off Marketing's roster. */
+export async function readPet(): Promise<PetStats | null> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_pet')
+  if (error) throw new Error(error.message)
+  return petStatsFromRow(data)
 }
 
 /** One project by its id or Track ID — its stages' work, its trail, its series (mig 20261023234000); null when none. */

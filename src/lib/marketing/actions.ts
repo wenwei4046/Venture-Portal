@@ -13,7 +13,7 @@ import { productBookFromRow, type ProductBook, type ProductStatus } from './prod
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { replaceDoneFromRow, type ReplaceDone } from './replace'
 import { workflowsFromRow, type WfTemplate } from './workflows'
-import { spaceFromRow, spacePatchOf, type Space, type SpacePatch } from './space'
+import { petStatsFromRow, spaceFromRow, spacePatchOf, type PetStats, type Space, type SpacePatch } from './space'
 import {
   libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, taskFilesFromRow, type Library, type LibProfile, type ShareExpiry,
   type TaskFile,
@@ -610,4 +610,16 @@ export async function saveMktSpace(patch: SpacePatch): Promise<Done<{ space: Spa
   if (error) return { ok: false, reason: words(error, 'Your space could not be saved. Please try again.') }
   revalidatePath('/marketing')
   return { ok: true, space: spaceFromRow(data) }
+}
+
+/** The viewer's pet fed (a snack, +20 energy) or worked out (−15 energy, +10 XP the first three a day) — ⑦-5, mig
+ * 20261025037000. Marketing · Edit; the database asks the roster and the pet set up. */
+export async function careMktPet(what: 'feed' | 'workout'): Promise<Done<{ pet: PetStats }>> {
+  await requireActionOn('/marketing', 'marketing', 'edit')
+  const { data, error } = await (await client()).rpc('mkt_pet_care', { p_what: what === 'workout' ? 'workout' : 'feed' })
+  if (error) return { ok: false, reason: words(error, 'Your pet could not be looked after. Please try again.') }
+  const pet = petStatsFromRow(data)
+  if (!pet) return { ok: false, reason: 'Your pet could not be looked after. Please try again.' }
+  revalidatePath('/marketing')
+  return { ok: true, pet }
 }

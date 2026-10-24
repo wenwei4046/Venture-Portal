@@ -1,8 +1,9 @@
 // My Space's own side (`My Space Bento.dc.html`; ⑦-1, migs 20261024007500 and 20261024007600; ⑦-2, mig
-// 20261024007700): the board its owner lays out — tiles moved and resized anywhere, added and taken off — the page's
-// background, the accent and the corners, the cover (one of four, or a picture), the avatar, the status, the Notes and
-// Photo tiles; the room (its wall, its floor, its furniture) and the pet's look (its kind or one's own animal, its name,
-// its colour). The prototype kept it in the browser; here it is the login's row (`mkt_space()` /
+// 20261024007700; ⑦-5, mig 20261025037000): the board its owner lays out — tiles moved and resized anywhere, added and
+// taken off — the page's background, the accent and the corners, the cover (one of four, or a picture), the avatar, the
+// status, the Notes and Photo tiles; the room (its wall, its floor, its furniture) and the pet's look (its kind or one's
+// own animal, its name, its colour); the pet's level, XP and energy and the trophies (`mkt_pet()` /
+// `mkt_pet_care(what)`). The prototype kept it in the browser; here it is the login's row (`mkt_space()` /
 // `mkt_space_save(patch)`). Pure: the page draws what this returns, and sends what it makes.
 //
 // The board's measures are the prototype's: x and w are fractions of its width, y and h pixels; a column is a quarter
@@ -10,8 +11,8 @@
 
 import { tidyFileName } from './library'
 
-/** The tiles a board offers today (the pet's own tile, the chat, the lobby and the trophies come later). */
-export type TileKind = 'room' | 'turn' | 'waiting' | 'delegated' | 'week' | 'notes' | 'photo'
+/** The tiles a board offers today (the chat and the lobby come later). */
+export type TileKind = 'room' | 'pet' | 'turn' | 'waiting' | 'delegated' | 'trophies' | 'week' | 'notes' | 'photo'
 export interface TilePlace { id: string; x: number; y: number; w: number; h: number }
 
 export const RW = 182
@@ -23,9 +24,11 @@ const MAXH = 2000
 
 export const TILES: Record<TileKind, { emoji: string; label: string; size: [number, number] }> = {
   room: { emoji: '🏠', label: 'Room', size: [2, 2] },
+  pet: { emoji: '🐾', label: 'Pet', size: [1, 1] },
   turn: { emoji: '👉', label: 'My turn', size: [1, 2] },
   waiting: { emoji: '⏳', label: 'Waiting', size: [1, 1] },
   delegated: { emoji: '📤', label: 'Delegated', size: [1, 1] },
+  trophies: { emoji: '🏆', label: 'Trophies', size: [1, 1] },
   week: { emoji: '🗓️', label: 'This week', size: [1, 1] },
   notes: { emoji: '📝', label: 'Notes', size: [1, 1] },
   photo: { emoji: '🖼️', label: 'Photo', size: [1, 1] },
@@ -35,16 +38,17 @@ export const KINDS = Object.keys(TILES) as TileKind[]
 /** Always on the board, "so nobody hides their work". */
 export const LOCKED: readonly string[] = ['turn', 'waiting']
 /** On a board until its owner takes them off — a kind shipped later joins a saved board once (tilesKnown). */
-const DEFAULT_ON: TileKind[] = ['room', 'turn', 'waiting', 'delegated', 'week']
+const DEFAULT_ON: TileKind[] = ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week']
 
 export const isKind = (id: string): id is TileKind => (KINDS as string[]).includes(id)
 
 const place = (id: TileKind, c: number, r: number, w: number, h: number): TilePlace => ({ id, x: c * CW, y: r * RW, w: w * CW, h: h * RW })
-/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the pet's tile, the chat, the
- * trophies, the lobby) — the room top left, two by two; My turn beside it, two rows high; Waiting and Delegated on the
- * right; This week under the room. */
+/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the chat, the lobby) — the room top
+ * left, two by two; My turn beside it, two rows high; the pet and the trophies on the right; Waiting, Delegated and
+ * This week under the room. */
 export const DEFAULT_LAYOUT: TilePlace[] = [
-  place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('waiting', 3, 0, 1, 1), place('delegated', 3, 1, 1, 1), place('week', 0, 2, 2, 1),
+  place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('pet', 3, 0, 1, 1), place('trophies', 3, 1, 1, 1),
+  place('waiting', 0, 2, 1, 1), place('delegated', 1, 2, 1, 1), place('week', 2, 2, 2, 1),
 ]
 
 // ── The look: keys, never colours (the colours are tokens in globals.css) ───────────
@@ -109,10 +113,74 @@ export interface Pet { species: SpeciesKey; name: string; color: PetColor; onboa
 export const NO_PET: Pet = { species: 'cat', name: '', color: 'original', onboarded: false }
 export const NAME_IDEAS = ['Mochi', 'Bao', 'Kopi', 'Sambal', 'Teh Tarik', 'Durian']
 export const PET_NAME_MAX = 16
-/** The prototype's sizes by level (px); its levels, XP and energy come with ⑦-5 — until then a pet is at level 1. */
+/** The pet in the room, by level (px — the prototype's SIZE): it grows. */
 export const PET_SIZE = [30, 34, 38, 42, 46, 52]
 export const formOf = (level: number) => (level <= 2 ? 0 : level <= 4 ? 1 : 2)
 export const FORM_LEVELS = ['Lv 1–2', 'Lv 3–4', 'Lv 5–6']
+
+// ── ⑦-5: the pet's levels, XP and energy; the trophies (mig 20261025037000) ─────────────
+/** The XP each level begins at (the prototype's LEVELS): Lv 1–6. */
+export const LEVELS = [0, 100, 250, 450, 700, 1000]
+export const levelOf = (xp: number) => Math.max(1, LEVELS.filter(x => xp >= x).length)
+export const petSize = (level: number) => PET_SIZE[Math.min(PET_SIZE.length, Math.max(1, level)) - 1]
+/** The XP bar: how far into its level (its tooltip in words); the last level is full. */
+export function xpBar(xp: number): { level: number; pct: number; label: string } {
+  const level = levelOf(xp)
+  const cur = LEVELS[level - 1]
+  const next = LEVELS[level]
+  if (next == null) return { level, pct: 100, label: 'Max level' }
+  return { level, pct: Math.round(((xp - cur) / (next - cur)) * 100), label: `${xp - cur}/${next - cur} XP to Lv ${level + 1}` }
+}
+/** The energy bar's colour: red under 20 (the pet is hungry), amber under 50. */
+export const energyTone = (energy: number): 'low' | 'mid' | 'high' => (energy < 20 ? 'low' : energy < 50 ? 'mid' : 'high')
+/** Workouts a day that earn XP (the office's day). */
+export const WORKOUTS_A_DAY = 3
+export const exerciseTitle = (workouts: number) => `Exercise · ${Math.max(0, WORKOUTS_A_DAY - workouts)}/${WORKOUTS_A_DAY} left today`
+
+/** A project finished this quarter where its owner did a stage. */
+export interface Trophy { track: string; title: string; at: string }
+/** `mkt_pet()` / `mkt_pet_care(what)`: the pet in numbers — XP (stages finished, workouts), energy 0–100, snacks to
+ * feed, today's workouts — and this quarter's trophies (six listed at most, all counted). */
+export interface PetStats { xp: number; energy: number; snacks: number; workouts: number; trophies: Trophy[]; trophyCount: number }
+
+/** What the database hands over; null — off Marketing's roster, no pet. */
+export function petStatsFromRow(row: unknown): PetStats | null {
+  if (!isObject(row)) return null
+  const whole = (v: unknown) => Math.max(0, Math.round(num(v) ?? 0))
+  const trophies: Trophy[] = []
+  for (const t of Array.isArray(row.trophies) ? row.trophies : []) {
+    if (isObject(t) && typeof t.track === 'string' && t.track) trophies.push({ track: t.track, title: text(t.title), at: text(t.at) })
+  }
+  return {
+    xp: whole(row.xp), energy: Math.min(100, whole(row.energy)), snacks: whole(row.snacks), workouts: whole(row.workouts),
+    trophies: trophies.slice(0, TROPHY_SET.length), trophyCount: Math.max(whole(row.trophyCount), trophies.length),
+  }
+}
+
+/** The trophy shelf (the prototype's): one a project, six at most — each named by its project — then two still to win,
+ * greyed. */
+export const TROPHY_SET = ['🏆', '🥇', '🎖️', '🏅', '🥈', '🎗️']
+export function trophyShelf(stats: PetStats | null): { got: { emoji: string; name: string }[]; locked: string[]; line: string } {
+  const n = stats?.trophyCount ?? 0
+  const shown = Math.min(TROPHY_SET.length, n)
+  return {
+    got: TROPHY_SET.slice(0, shown).map((emoji, i) => {
+      const t = stats?.trophies[i]
+      return { emoji, name: t ? `${t.track} · ${t.title}` : '' }
+    }),
+    locked: TROPHY_SET.slice(shown, shown + 2),
+    line: `${n} project${n === 1 ? '' : 's'} finished this quarter`,
+  }
+}
+
+/** A level reached — and, its kind's form changed, what it evolved into (one's own animal does not evolve). */
+export function levelUpWords(name: string, species: SpeciesKey, from: number, to: number, ownAnimal: boolean): string {
+  const evolved = !ownAnimal && formOf(to) > formOf(from)
+  return `${name} reached Lv ${to}${evolved ? ` and evolved into a ${SPECIES[species].names[formOf(to)]}!` : '!'}`
+}
+/** A workout done: its XP, or none — three a day earn it. */
+export const workoutWords = (name: string, earned: boolean) =>
+  earned ? `+10 XP · ${name} worked out` : `${WORKOUTS_A_DAY}/${WORKOUTS_A_DAY} workouts today. No more XP until tomorrow`
 
 export type PetState = 'idle' | 'newTask' | 'busy' | 'overload' | 'sleeping' | 'eating' | 'exercising' | 'levelUp' | 'hungry'
 /** Each state's words and the bubble over the pet (the prototype's STATES). */
@@ -122,9 +190,10 @@ export const PET_STATES: Record<PetState, { label: string; bubble: string }> = {
   exercising: { label: 'Working out', bubble: '💪' }, levelUp: { label: 'Level up!', bubble: '✨' }, hungry: { label: 'Hungry', bubble: '🍽️' },
 }
 
-/** How the pet looks with what is on its owner's plate (the prototype's myState, energy aside until ⑦-5): overloaded
+/** How the pet looks with what is on its owner's plate (the prototype's myState): hungry under 20 energy, overloaded
  * with two things late or four on the plate, a new stage to accept, working, or asleep with nothing on it. */
-export function petState(plate: { count: number; red: number; fresh: boolean }): PetState {
+export function petState(plate: { count: number; red: number; fresh: boolean }, energy = 100): PetState {
+  if (energy < 20) return 'hungry'
   if (plate.red >= 2 || plate.count >= 4) return 'overload'
   if (plate.fresh) return 'newTask'
   if (plate.count >= 1) return 'busy'
