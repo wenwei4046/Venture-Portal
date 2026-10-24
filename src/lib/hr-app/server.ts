@@ -97,8 +97,12 @@ export function bookingOf(b: Booking): HrBooking {
 /** "3200–3800" → "3,200–3,800": a range answer as the app writes money. */
 const grouped = (v: string) => v.split('–').map(x => x.trim()).map(x => (/^\d+(\.\d+)?$/.test(x) ? Number(x).toLocaleString('en-US') : x)).join('–')
 
-/** A hiring request as the app draws it — the requester form's answers by the handoff's own field ids. */
-export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): HrHire {
+/**
+ * A hiring request as the app draws it — the requester form's answers by the handoff's own field ids; a candidate not
+ * selected says why the Talent Bank keeps them, in HR's words, as the request's page does (2026-10-24).
+ */
+export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people' | 'talents' | 'talentReasons'>): HrHire {
+  const why = (talentId: string | null) => reasonLabel(board.talentReasons, board.talents.find(t => t.id === talentId)?.reason) || undefined
   const a = (id: string) => (r.answers[id] ?? '').trim()
   const n = Number(a('headcount'))
   return {
@@ -123,7 +127,10 @@ export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): Hr
     hired: r.hiredNames.length ? r.hiredNames.join(', ') : null,
     source: r.hiredThrough,
     cost: r.hiringCost === null ? null : r.hiringCost.toLocaleString('en-US', { maximumFractionDigits: 2 }),
-    candidates: r.candidates.map(c => ({ id: c.id, name: c.name, phone: c.phone || undefined, note: c.note || undefined, source: c.source, stage: c.stage })),
+    candidates: r.candidates.map(c => ({
+      id: c.id, name: c.name, phone: c.phone || undefined, note: c.note || undefined, source: c.source, stage: c.stage,
+      ...(c.stage === 'rejected' ? { why: why(c.talentId) } : {}),
+    })),
     events: r.events.map(e => ({ what: e.what, when: hiringDay(e.at), who: e.who, note: e.note || undefined })),
   }
 }

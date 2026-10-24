@@ -94,10 +94,11 @@ const REQUEST: HiringRequest = {
   events: [{ what: 'Submitted', who: 'Kar Jun', note: '', at: '2026-10-09T01:00:00Z' }, { what: 'Acknowledged', who: 'Grace Lim', note: 'Grace Lim owns it', at: '2026-10-09T03:00:00Z' }],
 }
 const PEOPLE = [{ id: 'grace', name: 'Grace Lim', title: 'HR Manager', department: 'HR' }]
+const BOARD = { people: PEOPLE, talents: [] as HiringTalent[], talentReasons: TALENT_REASONS }
 
 describe('a hiring request, as the app draws it', () => {
   it('reads the requester form by the handoff’s field ids, the money grouped, the days as the portal writes them', () => {
-    expect(hireOf(REQUEST, { people: PEOPLE })).toEqual({
+    expect(hireOf(REQUEST, BOARD)).toEqual({
       id: 'HR-205', status: 'acknowledged', position: 'Senior Revenue Specialist', headcount: 2, dept: 'Revenue · IR', budget: '3,200–3,800',
       start: 'Within 1 month', employment: 'Full-time', reason: 'Expansion', age: '25–40', gender: 'Any', race: 'Any', jd: 'Lead fair sales for IR.',
       notes: undefined, ownerName: 'Grace Lim', requester: 'Kar Jun', company: null, when: '9 Oct 2026', hired: null, source: null, cost: null,
@@ -107,9 +108,29 @@ describe('a hiring request, as the app draws it', () => {
   })
 
   it('says who was hired, through what and at what cost once it is filled; one headcount when none is given', () => {
-    const filled = hireOf({ ...REQUEST, status: 'filled', answers: { ...REQUEST.answers, headcount: '' }, hiredNames: ['Melissa Ong', 'Ryan Tan'], hiredThrough: 'Jobstreet', hiringCost: 1450 }, { people: [] })
+    const filled = hireOf({ ...REQUEST, status: 'filled', answers: { ...REQUEST.answers, headcount: '' }, hiredNames: ['Melissa Ong', 'Ryan Tan'], hiredThrough: 'Jobstreet', hiringCost: 1450 }, { ...BOARD, people: [] })
     expect(filled).toMatchObject({ headcount: 1, hired: 'Melissa Ong, Ryan Tan', source: 'Jobstreet', cost: '1,450', ownerName: null })
-    expect(hireOf({ ...REQUEST, requesterCompany: 'HOUZS Interior Sdn Bhd' }, { people: PEOPLE }).company).toBe('HOUZS Interior Sdn Bhd')
+    expect(hireOf({ ...REQUEST, requesterCompany: 'HOUZS Interior Sdn Bhd' }, BOARD).company).toBe('HOUZS Interior Sdn Bhd')
+  })
+
+  // The phone's Not selected fold (2026-10-24): why the Talent Bank keeps them, as the request's page says it.
+  it('a candidate not selected says why the Talent Bank keeps them, in HR’s words', () => {
+    const t: HiringTalent = {
+      id: 't9', no: 'T-009', name: 'Nur Iman', phone: '', email: '', position: 'Senior Revenue Specialist', department: 'Revenue',
+      fromRequest: 'HR-205', notes: '', reason: 'failed_interview', files: [], savedBy: 'Grace Lim', savedAt: '2026-10-20T08:00:00Z', events: [],
+    }
+    const r: HiringRequest = {
+      ...REQUEST,
+      candidates: [...REQUEST.candidates, { id: 'c2', name: 'Nur Iman', phone: '', source: 'Applied', stage: 'rejected', talentId: 't9', answers: {}, note: 'Asked for RM 4,000', files: [] }],
+    }
+    const [running, out] = hireOf(r, { ...BOARD, talents: [t] }).candidates
+    expect(running).not.toHaveProperty('why')
+    expect(out).toEqual({ id: 'c2', name: 'Nur Iman', phone: undefined, note: 'Asked for RM 4,000', source: 'Applied', stage: 'rejected', why: 'Failed interview' })
+    // Renamed in Form settings: the new name.
+    const renamed = TALENT_REASONS.map(x => (x.id === 'failed_interview' ? { ...x, name: 'Interview failed' } : x))
+    expect(hireOf(r, { ...BOARD, talents: [t], talentReasons: renamed }).candidates[1].why).toBe('Interview failed')
+    // No record of theirs in the bank: nothing said.
+    expect(hireOf(r, BOARD).candidates[1].why).toBeUndefined()
   })
 
   it('keeps somebody in the Talent Bank by their own words', () => {
