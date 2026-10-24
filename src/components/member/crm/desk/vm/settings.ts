@@ -223,7 +223,6 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       { t: "Team inbox alerts", s: cur.teamAlerts ? "Managers get alerts for their own people's chats" : "Off · each person hears of their own customers only", v: cur.teamAlerts ? "On" : "Off", key: "teamAlerts" }] },
     { title: "New leads", sub: "What happens when a lead arrives", rows: [
       { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams · an ad with no split goes to the Revenue Director" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
-      { t: "Full time evenly", s: cur.ftEven ? "On a Full time day, every ad lead goes to the full-time person with the fewest today, across all teams · not by the ad's split" : "Off · on a Full time day, leads follow the ad's split among the full-time teams", v: cur.ftEven ? "On" : "Off", key: "ftEven" },
       { t: "Send auto-reply", s: cur.sendAutoReply ? "The person's own auto-reply, if set in their Profile" : "Off · no auto-reply for anyone", v: cur.sendAutoReply ? "On" : "Off", key: "sendAutoReply" }] },
   ];
   const settings4 = {

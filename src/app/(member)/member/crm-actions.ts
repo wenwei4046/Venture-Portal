@@ -25,8 +25,6 @@ const CRM_WRITES = [
   "crm_book_custom", "crm_move_custom",
   // Appointment types (mig 20261025040000).
   "crm_book_typed", "crm_move_typed", "crm_save_appt_types",
-  // Full time evenly (mig 20261025060000).
-  "crm_set_ft_even",
   "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_give_to_hod",
   // The redesign (mig 20261009160000).
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
@@ -128,7 +126,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types", "crm_set_ft_even",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
