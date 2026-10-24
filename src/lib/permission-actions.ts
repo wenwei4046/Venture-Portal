@@ -191,7 +191,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.edit': 'all',
   'hiring.view': 'all',
   // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's; a task started (Create), worked as its
-  // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000.
+  // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000. The formal log's files (④-3b — the
+  // user's answer 18: all of Marketing may export a trail) ask View: the matrix's Marketing row has no Export cell.
+  'marketing.view': 'all',
   'marketing.create': 'all',
   'marketing.edit': 'all',
   'marketing.approve': 'all',

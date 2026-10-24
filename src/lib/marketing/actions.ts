@@ -7,6 +7,7 @@ import { addressFromParts, addressRefusal, cleanAddress, isEmptyAddress } from '
 import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
+import { correctionOk, projectLogFromRow, type ProjectLog } from './audit'
 import { billingFromRow, clientBillFromRow, type BillingPage } from './billing'
 import { subFromRow, type MktSub } from './board'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
@@ -124,6 +125,18 @@ export async function unmarkMktPost(project: string, stage: number, field: strin
   if (error) return { ok: false, reason: words(error, 'The mark could not be taken back. Please try again.') }
   freshen()
   return { ok: true, page: await fresh(db, project) }
+}
+
+/** A record of the formal log corrected (④-3b — the user's answer 19, the manager's): a record of its own, *correction
+ * of #n*; the record and the project untouched. Answered with the log as it now stands. */
+export async function correctMktLogRecord(project: string, record: number, text: string): Promise<Done<{ log: ProjectLog | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project) || !Number.isSafeInteger(record) || record < 1) return { ok: false, reason: 'That record is not there.' }
+  if (!correctionOk(String(text ?? ''))) return { ok: false, reason: 'Say what was wrong and what is right — 5 to 500 characters.' }
+  const { data, error } = await (await client()).rpc('mkt_log_correct', { p_project: project, p_event: record, p_text: String(text).trim() })
+  if (error) return { ok: false, reason: words(error, 'The correction could not be added. Please try again.') }
+  freshen()
+  return { ok: true, log: projectLogFromRow(data) }
 }
 
 /** Your stage's work: only what changed — a field cleared is sent as null. */

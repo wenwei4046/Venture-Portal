@@ -16,13 +16,15 @@ import s from './audit.module.css'
 
 type Tab = 'map' | 'audit'
 
-export default function ProjectSheet({ project, track, title, page, tab, onClose }: {
+export default function ProjectSheet({ project, track, title, page, tab, manage = false, onClose }: {
   project: string
   track: string
   title: string
   /** The task page — its stages and trail draw the Map and Replay; null for a product project's intake. */
   page: MktTaskPage | null
   tab: Tab
+  /** Marketing · Manage: a record of the formal log may be corrected (④-3b). */
+  manage?: boolean
   onClose: () => void
 }) {
   const map = useMemo(() => (page && page.stages.length ? taskMap(page) : null), [page])
@@ -74,7 +76,7 @@ export default function ProjectSheet({ project, track, title, page, tab, onClose
               {map && mode === 'replay' ? <TaskMap map={map} mode="replay" track={track} />
                 : log === undefined ? <div className={s.wait}>Reading the log…</div>
                 : log === null ? <div className={s.wait}>Could not read the log</div>
-                : <AuditLog log={log} />}
+                : <AuditLog log={log} project={project} manage={manage} onLog={setLog} />}
             </>
           ) : null}
         </div>

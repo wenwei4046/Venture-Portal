@@ -481,7 +481,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </div>
         </aside>
       </div>
-      {logOpen ? <ProjectSheet project={pr.id} track={pr.track} title={pr.title} page={null} tab="audit" onClose={() => setLogOpen(false)} /> : null}
+      {logOpen ? <ProjectSheet project={pr.id} track={pr.track} title={pr.title} page={null} tab="audit" manage={can.manage} onClose={() => setLogOpen(false)} /> : null}
 
       {modal ? (
         <div className={t.scrim} onClick={() => !pending && setModal(false)}>

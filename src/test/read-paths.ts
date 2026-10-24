@@ -420,8 +420,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_sub_add', 'mkt_sub_edit', 'mkt_sub_cal_link',
   // A subsidiary's page (mig 20261024005000): its projects' newest trail lines, by Marketing · View.
   'mkt_sub_feed',
-  // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View.
-  'mkt_project_log',
+  // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View; a record of it corrected
+  // by a record of its own, Marketing · Manage (mig 20261025171000).
+  'mkt_project_log', 'mkt_log_correct',
   // Marketing's Library (mig 20261024007000): read by View; folders added, files filed, moved, binned and restored by
   // Edit; folder types made and the Dustbin emptied for good by Manage.
   'mkt_library', 'mkt_lib_type_add', 'mkt_lib_folder_add', 'mkt_lib_file_add', 'mkt_lib_move', 'mkt_lib_bin', 'mkt_lib_restore',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  auditChips, auditCount, auditGroups, auditRows, NO_AUDIT_FILTER, passesAudit, projectLogFromRow, toggleAudit,
+  actionCell, auditChips, auditCount, auditCsv, auditExportHref, auditExportOf, auditFileName, auditFilterOf, auditGroups, auditQuery, auditRows,
+  correctionOk, NO_AUDIT_FILTER, passesAudit, pdfText, projectLogFromRow, toggleAudit,
 } from './audit'
 
 // 2026-10-23 — ④-3: a project's formal log (`Audit Trail.dc.html`), from mkt_project_log.
@@ -127,5 +128,56 @@ describe('a post’s mark on the formal log (④-2c)', () => {
     ] })!
     expect(auditRows(log).map(r => [r.action, r.tone, r.stage, r.reason])).toEqual([
       ['Marked posted', 'green', 'Schedule', 'Post day · https://x.my/1'], ['Posted mark taken back', 'grey', 'Schedule', 'Post day']])
+  })
+})
+
+describe('a record corrected, and the log exported (④-3b — the user’s answers 18, 19, 21)', () => {
+  const corrected = projectLogFromRow({ track: 'TSK-CAR-2610-001', title: 'Price update', kind: 'quick', rows: [
+    ...task.rows,
+    { id: 7, at: '2026-10-22T04:00:00Z', actor: 'SIA', action: 'correction', stage: 0, stageName: 'First draft', reason: 'Sent on 21 Oct at 18:45', corrects: 4 },
+    { id: 8, at: '2026-10-22T05:00:00Z', actor: 'SIA', action: 'correction', stage: 0, stageName: 'First draft', reason: 'At 18:50, the scan says', corrects: 7 },
+    { id: 9, at: '2026-10-22T06:00:00Z', actor: 'SIA', action: 'correction', reason: 'Of a record not on this log', corrects: 999 },
+  ] })!
+
+  it('a correction: its words quoted, the number of the record it corrects; the record the numbers of its corrections', () => {
+    const rows = auditRows(corrected)
+    expect(rows.map(r => [r.no, r.action, r.reason, r.corrects, r.correctedIn])).toEqual([
+      [1, 'Task created', '—', null, []], [2, 'Stage opened', '—', null, []], [3, 'Accepted', '—', null, []],
+      [4, 'Submitted', '—', null, [7]], [5, 'Changes requested', '"Logo too small"', null, []], [6, 'Nudged', '—', null, []],
+      [7, 'Correction', '"Sent on 21 Oct at 18:45"', 4, [8]], [8, 'Correction', '"At 18:50, the scan says"', 7, []],
+      [9, 'Correction', '"Of a record not on this log"', null, []],
+    ])
+    expect([rows[6].id, rows[6].stage, actionCell(rows[6]), actionCell(rows[3])]).toEqual([7, 'First draft', 'Correction (correction of #4)', 'Submitted'])
+    expect([correctionOk('    '), correctionOk('typo'), correctionOk(' Wrong day '), correctionOk('x'.repeat(500)), correctionOk('x'.repeat(501))])
+      .toEqual([false, false, true, true, false])
+  })
+
+  it('the filter in the address and back — an export is of the rows shown', () => {
+    const f = { person: ['Mei', 'SIA'], action: ['Submitted'], stage: [] }
+    expect(auditQuery(f)).toBe('person=Mei&person=SIA&action=Submitted')
+    expect(auditFilterOf(new URLSearchParams(auditQuery(f)))).toEqual(f)
+    expect(auditFilterOf(new URLSearchParams('person=&stage=First+draft&x=1'))).toEqual({ person: [], action: [], stage: ['First draft'] })
+    expect(auditExportHref('p 1', 'table', f)).toBe('/marketing/projects/p%201/log?format=table&person=Mei&person=SIA&action=Submitted')
+    expect(auditExportHref('p1', 'csv', NO_AUDIT_FILTER)).toBe('/marketing/projects/p1/log?format=csv')
+    expect([auditExportOf('table'), auditExportOf('csv'), auditExportOf('pdf'), auditExportOf(null), auditExportOf('xls')]).toEqual(['table', 'csv', 'pdf', 'pdf', 'pdf'])
+    expect([auditFileName('TSK-CAR-2610-001', 'pdf'), auditFileName('TSK-CAR-2610-001', 'table'), auditFileName('TSK-CAR-2610-001', 'csv'), auditFileName('', 'csv')])
+      .toEqual(['TSK-CAR-2610-001_audit.pdf', 'TSK-CAR-2610-001_audit_table.pdf', 'TSK-CAR-2610-001_audit.csv', 'project_audit.csv'])
+  })
+
+  it('the CSV: the table’s columns, each time whole, a correction with its record — a formula never a formula', () => {
+    const rows = auditRows(corrected).filter(r => [4, 5, 7].includes(r.no))
+    const odd = { ...rows[0], no: 10, actor: '=HYPERLINK("x")', reason: 'A, "quoted" line' }
+    expect(auditCsv([...rows, odd], at => `W${at.slice(0, 10)}`)).toBe([
+      '#,Time,Actor,Action,From → To,Reason,Version',
+      '4,W2026-10-21,Mei,Submitted,Mei → SIA,—,First draft v1',
+      '5,W2026-10-22,SIA,Changes requested,→ Mei,"""Logo too small""",First draft v1',
+      '7,W2026-10-22,SIA,Correction (correction of #4),—,"""Sent on 21 Oct at 18:45""",—',
+      `10,W2026-10-21,"'=HYPERLINK(""x"")",Submitted,Mei → SIA,"A, ""quoted"" line",First draft v1`,
+      '',
+    ].join('\r\n'))
+  })
+
+  it('a PDF’s words in what its Helvetica draws: an arrow as ->, anything else outside it a ?', () => {
+    expect(pdfText('Mei → SIA · “Logo” — 50% … ✓ 李 😀\nnext')).toBe('Mei -> SIA · “Logo” — 50% … ? ? ?\nnext')
   })
 })

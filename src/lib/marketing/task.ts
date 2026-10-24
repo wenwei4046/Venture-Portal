@@ -661,6 +661,8 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     // A post marked posted, or the mark taken back (④-2c — answer 15).
     case 'posted': return `${e.actor} marked ${typeof e.data?.field === 'string' ? e.data.field : 'the post'} posted`
     case 'unposted': return `${e.actor} took back ${typeof e.data?.field === 'string' ? e.data.field : 'the post'}’s posted mark`
+    // A record of the formal log corrected (④-3b — answer 19): the correction is a record of its own.
+    case 'correction': return `${e.actor} added a correction to the log: “${e.reason ?? ''}”`
     default: return `${e.actor} · ${e.action}`
   }
 }

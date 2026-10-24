@@ -1,18 +1,24 @@
 // A project's formal log (`Audit Trail.dc.html`, ④-3): every record of its trail, oldest first and numbered, in the
 // handoff's columns — when, who, what (a dot: green approved, red sent back, amber handed on for a decision), from →
 // to, the reason, the version — filtered by person, action and stage. Read from mkt_project_log; nothing on it is
-// ever edited. Not yet: corrections (question 19), Export (question 18), the Attachment column (no record holds a file
-// until Marketing's R2 bucket). Pure.
+// ever edited: a mistake is corrected by a record of its own, *correction of #n* (④-3b — the user's answer 19, the
+// manager's). Exported by anybody in Marketing (answers 18, 21): the rows shown, as a formal document, as the table,
+// as the handoff's CSV. Not yet: the Attachment column (no record holds a file of its own). Pure.
 
 import { monthLabel } from './billing'
 import { periodOf, type MktProjectKind } from './board'
 import { eventFromRow, trailTime, type TaskEvent } from './task'
 
+/** A record of the log: a trail line — and, a correction's, the record it corrects (④-3b). */
+export interface LogEvent extends TaskEvent {
+  corrects: number | null
+}
+
 export interface ProjectLog {
   track: string
   title: string
   kind: MktProjectKind
-  rows: TaskEvent[]
+  rows: LogEvent[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -25,14 +31,18 @@ export function projectLogFromRow(v: unknown): ProjectLog | null {
     track: str(v.track),
     title: str(v.title),
     kind: v.kind === 'product' || v.kind === 'recurring' || v.kind === 'deliverable' ? v.kind : 'quick',
-    rows: (Array.isArray(v.rows) ? v.rows : []).filter(isObj).map(eventFromRow),
+    rows: (Array.isArray(v.rows) ? v.rows : []).filter(isObj).map(r => ({ ...eventFromRow(r), corrects: Number(r.corrects) || null })),
   }
 }
 
 export type AuditTone = 'green' | 'red' | 'amber' | 'grey'
 
 export interface AuditRow {
+  /** The record's own id — what a correction names. */
+  id: number
   no: number
+  /** When, as written (an export writes it whole). */
+  at: string
   time: string
   actor: string
   action: string
@@ -41,6 +51,10 @@ export interface AuditRow {
   fromTo: string
   reason: string
   version: string
+  /** A correction: the number of the record it corrects. */
+  corrects: number | null
+  /** The numbers of the corrections of it. */
+  correctedIn: number[]
 }
 
 const ACTION: Record<string, string> = {
@@ -59,6 +73,7 @@ const ACTION: Record<string, string> = {
   'run made': 'Monthly run made', 'run day': 'Run day changed', carried: 'Plan carried',
   'campaign period': 'Campaign period',
   posted: 'Marked posted', unposted: 'Posted mark taken back',
+  correction: 'Correction',
 }
 const TONE: Record<string, AuditTone> = {
   posted: 'green',
@@ -74,7 +89,7 @@ const TO_PIC = new Set(['link sent', 'resent'])
 const OF_MINUTES = new Set(['signed', 'minutes completed', 'pic approved'])
 /** Billing's lines (②b-2b): the month they are for, in the Version column — never a figure. */
 const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until', 'run made': 'month' }
-const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced', 'delivery returned'])
+const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced', 'delivery returned', 'correction'])
 const NONE = '—'
 
 const monthOfLine = (v: unknown) => (typeof v === 'string' && /^[0-9]{4}-[0-9]{2}$/.test(v) ? monthLabel(`${v}-01`) : NONE)
@@ -84,13 +99,23 @@ function actionWords(e: TaskEvent, kind: MktProjectKind): string {
   return ACTION[e.action] ?? (e.action ? e.action[0].toUpperCase() + e.action.slice(1) : NONE)
 }
 
-/** The log's rows, oldest first, numbered from 1. */
+/** The log's rows, oldest first, numbered from 1 — a correction with the number of the record it corrects, a record
+ * with the numbers of its corrections. */
 export function auditRows(log: ProjectLog): AuditRow[] {
+  const noOf = new Map(log.rows.map((e, i) => [e.id, i + 1]))
+  const corrections = new Map<number, number[]>()
+  log.rows.forEach((e, i) => {
+    if (e.corrects && noOf.has(e.corrects)) corrections.set(e.corrects, [...(corrections.get(e.corrects) ?? []), i + 1])
+  })
   return log.rows.map((e, i) => {
     const reason = e.reason ?? ''
     const product = e.action === 'created' && typeof e.data?.product === 'string' ? `${e.data.product} v${Number(e.data.version) || 1}` : ''
     return {
+      id: e.id,
       no: i + 1,
+      at: e.at,
+      corrects: e.corrects ? noOf.get(e.corrects) ?? null : null,
+      correctedIn: corrections.get(e.id) ?? [],
       time: trailTime(e.at),
       actor: e.actor || NONE,
       action: actionWords(e, log.kind),
@@ -141,3 +166,53 @@ export const auditCount = (shown: number, all: number) => `${shown} of ${all} re
 
 export const toggleAudit = (f: AuditFilter, g: AuditGroup, v: string): AuditFilter =>
   ({ ...f, [g]: f[g].includes(v) ? f[g].filter(x => x !== v) : [...f[g], v] })
+
+// ── A correction (④-3b — the user's answer 19, the manager's) ──────────────────────────────────────────
+/** What was wrong and what is right — as mkt_log_correct asks (5–500). */
+export const correctionOk = (words: string) => words.trim().length >= 5 && words.trim().length <= 500
+
+// ── Export (④-3b — answers 18, 21: anybody in Marketing; a formal document and the table, and the handoff's CSV) ──
+export type AuditExport = 'pdf' | 'table' | 'csv'
+export const AUDIT_EXPORTS: readonly { key: AuditExport; label: string }[] = [
+  { key: 'pdf', label: 'PDF — formal document' },
+  { key: 'table', label: 'PDF — the table' },
+  { key: 'csv', label: 'CSV' },
+]
+export const auditExportOf = (v: string | null): AuditExport => (v === 'table' || v === 'csv' ? v : 'pdf')
+
+/** The filter in an address (`person=Mei&action=Approved`) — an export is of the rows shown. */
+export function auditQuery(f: AuditFilter): string {
+  const q = new URLSearchParams()
+  for (const { key } of AUDIT_GROUPS) for (const v of f[key]) q.append(key, v)
+  return q.toString()
+}
+export function auditFilterOf(q: URLSearchParams): AuditFilter {
+  const of = (k: AuditGroup) => q.getAll(k).filter(Boolean).slice(0, 60).map(v => v.slice(0, 200))
+  return { person: of('person'), action: of('action'), stage: of('stage') }
+}
+
+/** Where an export of the log is fetched (a GET route, the portal's file downloads' way). */
+export const auditExportHref = (project: string, format: AuditExport, f: AuditFilter) =>
+  `/marketing/projects/${encodeURIComponent(project)}/log?${[`format=${format}`, auditQuery(f)].filter(Boolean).join('&')}`
+export const auditFileName = (track: string, format: AuditExport) =>
+  `${(track || 'project').replace(/[^A-Za-z0-9-]/g, '')}_audit${format === 'table' ? '_table' : ''}.${format === 'csv' ? 'csv' : 'pdf'}`
+
+export const AUDIT_HEADS = ['#', 'Time', 'Actor', 'Action', 'From → To', 'Reason', 'Version'] as const
+/** A record's action as an export writes it — a correction's with the record it corrects. */
+export const actionCell = (r: Pick<AuditRow, 'action' | 'corrects'>) => (r.corrects ? `${r.action} (correction of #${r.corrects})` : r.action)
+
+const csvCell = (v: string | number) => {
+  const s = String(v)
+  return /[",\r\n]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"` : s
+}
+/** The rows as the handoff's CSV: the table's columns, each time whole (the office's clock) — a cell a spreadsheet
+ * would read as a formula is written as text. */
+export function auditCsv(rows: readonly AuditRow[], whole: (at: string) => string): string {
+  const lines = [[...AUDIT_HEADS], ...rows.map(r => [r.no, whole(r.at) || r.time, r.actor, actionCell(r), r.fromTo, r.reason, r.version])]
+  return `${lines.map(l => l.map(csvCell).join(',')).join('\r\n')}\r\n`
+}
+
+const WIN_ANSI_MORE = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ')
+/** Words a PDF's own Helvetica can draw (WinAnsi, as every portal PDF): an arrow as `->`, anything else outside it `?`. */
+export const pdfText = (s: string) =>
+  s.replace(/→/g, '->').replace(/[^\n\x20-\x7e\xa0-\xff]/gu, c => (WIN_ANSI_MORE.has(c) ? c : '?'))
