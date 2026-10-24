@@ -25,7 +25,7 @@ import { teamMineSwap } from "../../shared/team-mine";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
 import type { KeyboardEvent } from "react";
-import { first, ini, type PanelCtx } from "./common";
+import { first, ini, periodRange, type PanelCtx } from "./common";
 
 /** The ad editor's numbers (rev 1011 §8): Enter moves to the next visible number box and selects it; on the last one the
  * keyboard closes. Never a submit. The prototype's own handler, over the page (the app has no screen-label root). */
@@ -112,7 +112,14 @@ export function panelAppVM(ctx: PanelCtx) {
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
-    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: ctx.data.can.manage },
+    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: ctx.data.can.manage,
+      // Insight's period and its sheet (the owner, 2026-10-24: "日曆顏色有點突兀，換成跟insight 一樣的 … 無法自定義要對比的時間段").
+      range: periodRange(ui.period, ui.ovRange, now), cmp: ui.cmp,
+      chips: (([["day", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: ui.period === k, pick: () => set(u => ({ ...u, period: k, ovRange: null })) }))),
+      custom: ui.period === "custom",
+      openDates: () => set(u => ({ ...u, ovSheet: { a: periodRange(u.period, u.ovRange, now).a, b: periodRange(u.period, u.ovRange, now).b, per: u.period === "custom" ? null : (u.period as "day" | "week" | "month"), ca: u.cmp?.a ?? null, cb: u.cmp?.b ?? null, tab: "a", only: false, cm: [new Date(periodRange(u.period, u.ovRange, now).a).getFullYear(), new Date(periodRange(u.period, u.ovRange, now).a).getMonth()], step: 0 } })),
+      openCompare: () => set(u => { const r = periodRange(u.period, u.ovRange, now), c = u.cmp; return { ...u, ovSheet: { a: r.a, b: r.b, per: u.period === "custom" ? null : (u.period as "day" | "week" | "month"), ca: c?.a ?? null, cb: c?.b ?? null, tab: "b", only: true, cm: c ? [new Date(c.a).getFullYear(), new Date(c.a).getMonth()] : [new Date(r.a).getMonth() ? new Date(r.a).getFullYear() : new Date(r.a).getFullYear() - 1, (new Date(r.a).getMonth() + 11) % 12], step: 0 } }; }),
+      clearCompare: () => set(u => ({ ...u, cmp: null })) },
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).

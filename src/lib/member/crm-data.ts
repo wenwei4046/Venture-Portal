@@ -129,6 +129,9 @@ export interface CrmAutoReply { on: boolean; text: string; img?: string | null; 
 export interface CrmAutoReplySet {
   welcome: CrmAutoReply;
   after: CrmAutoReply & { from: string; to: string };
+  /** Away / holiday (2026-10-24, the owner: "休假 / 不在时段 增加這個"): from and to are the office's date and time,
+   * "2026-12-24T18:00"; inside them it is sent in place of the after-hours reply. */
+  away?: CrmAutoReply & { from: string; to: string };
   kws: (CrmAutoReply & { id: string; words: string })[];
 }
 
@@ -314,6 +317,7 @@ export const DEFAULT_QUICK_REPLIES: Omit<CrmQuickReply, "id">[] = [
 export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
   welcome: { on: false, text: "" },
   after: { on: false, text: "", from: "08:00", to: "20:00" },
+  away: { on: false, text: "", from: "", to: "" },
   kws: [],
 };
 
@@ -479,6 +483,7 @@ export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAu
   return {
     welcome: { ...d.welcome, ...(saved.welcome ?? {}) },
     after: { ...d.after, ...(saved.after ?? {}) },
+    away: { ...d.away!, ...(saved.away ?? {}) },
     kws: Array.isArray(saved.kws) ? saved.kws : d.kws,
   };
 }

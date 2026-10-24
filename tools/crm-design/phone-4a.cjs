@@ -208,6 +208,9 @@ function sales(name, body) {
   if (name === "SalesChat") body = chat(body, "v.cl");
   if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
+  // Auto-reply: one page at a time with Save (the owner, 2026-10-24: "auto reply 做成分頁式 … 記得要有save").
+  if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profAuto) && (<>"), e = body.indexOf("\n      </>)}", a); if (a < 0 || e < 0) throw new Error("phone-4a: auto-reply page");
+    body = body.slice(0, a) + "{!!(v.profAuto) && (<Phone4aAutoReply a={v.ar12} />)}" + body.slice(e + "\n      </>)}".length); }
   // v3 M12 (the owner, 2026-10-23: "要" — Mine's Profile as the prototype too): the main page is Phone4aProfile.
   if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profMain) && (<>"), b = body.indexOf("{!!(v.teamOpen) && (<>", a); if (a < 0 || b < 0) throw new Error("phone-4a: mine profile main");
     body = body.slice(0, a) + "{!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}\n      " + body.slice(b); }
