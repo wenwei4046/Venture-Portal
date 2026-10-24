@@ -101,6 +101,23 @@ export interface MktStage {
   doneAt: string | null
 }
 
+/** A file a subtask's delivery holds — sent to the bucket under subtask/ (mig 20261025101000). */
+export interface MktDeliveryFile {
+  path: string
+  name: string
+  size: number
+  mime: string
+}
+
+/** A subtask's delivery as it stands (the task page's read; the board's has none): v1, v2 … */
+export interface MktDelivery {
+  v: number
+  files: MktDeliveryFile[]
+  links: { url: string; label: string }[]
+  note: string | null
+  at: string | null
+}
+
 export interface MktSubtask {
   id: string
   project: string
@@ -110,6 +127,7 @@ export interface MktSubtask {
   dueOn: string | null
   status: MktSubtaskStatus
   returns: number
+  delivery: MktDelivery | null
 }
 
 export interface MktHoliday {
@@ -247,6 +265,21 @@ export function subtaskFromRow(t: Record<string, unknown>): MktSubtask {
     dueOn: day(t.dueOn),
     status: oneOf(t.status, TSTATUS, 'working'),
     returns: Math.max(0, int(t.returns)),
+    delivery: deliveryFromRow(t.delivery),
+  }
+}
+
+export function deliveryFromRow(v: unknown): MktDelivery | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const d = v as Record<string, unknown>
+  const n = int(d.v)
+  if (n < 1) return null
+  return {
+    v: n,
+    files: list(d.files).filter(f => str(f.path)).map(f => ({ path: str(f.path), name: str(f.name) || str(f.path).split('/').pop() || 'File', size: Math.max(0, int(f.size)), mime: str(f.mime) })),
+    links: list(d.links).filter(l => str(l.url)).map(l => ({ url: str(l.url), label: str(l.label) })),
+    note: strOrNull(d.note),
+    at: strOrNull(d.at),
   }
 }
 

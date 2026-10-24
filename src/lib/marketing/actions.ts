@@ -129,6 +129,61 @@ export async function decideMktStage(project: string, approve: boolean, reason?:
   return { ok: true, page: await fresh(db, project) }
 }
 
+// ── Subtasks (mig 20261025101000): split off the stage now by its owner, delivered by their assignee, reviewed by the
+// stage's owner, or taken back — each answered with the task as it now stands. ──────────────────────────────────
+
+/** ✂️ Split into subtasks: one deliverable for somebody else on the roster, due on or before the stage's own deadline. */
+export async function addMktSubtask(project: string, title: string, assignee: string, due: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
+  if (!isId(assignee)) return { ok: false, reason: 'Pick who does it.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(due ?? ''))) return { ok: false, reason: 'Give it a deadline.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_subtask_add', { p_project: project, p_title: String(title ?? '').slice(0, 200), p_assignee: assignee, p_due: due })
+  if (error) return { ok: false, reason: words(error, 'The subtask could not be made. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** A delivery: the files just sent to the bucket (subtask/…), links and/or a note — v1, v2 … */
+export async function deliverMktSubtask(project: string, subtask: string, note: string, links: { url: string; label: string }[],
+  files: { path: string; name: string }[]): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !isId(subtask)) return { ok: false, reason: 'That subtask is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_subtask_deliver', {
+    p_subtask: subtask,
+    p_note: String(note ?? '').slice(0, 2000),
+    p_links: (Array.isArray(links) ? links : []).slice(0, 20).map(l => ({ url: String(l?.url ?? '').slice(0, 600), label: String(l?.label ?? '').slice(0, 200) })),
+    p_files: (Array.isArray(files) ? files : []).slice(0, 20).map(f => ({ path: String(f?.path ?? '').slice(0, 1100), name: String(f?.name ?? '').slice(0, 300) })),
+  })
+  if (error) return { ok: false, reason: words(error, 'The delivery could not be sent. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** Review delivery, by the stage's owner: approve it, or return it with a reason. */
+export async function reviewMktSubtask(project: string, subtask: string, approve: boolean, reason?: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !isId(subtask)) return { ok: false, reason: 'That subtask is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_subtask_review', { p_subtask: subtask, p_approve: approve === true, p_reason: approve === true ? null : String(reason ?? '').slice(0, 2000) })
+  if (error) return { ok: false, reason: words(error, 'The review could not be saved. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** A subtask not approved yet, taken back by the stage's owner. */
+export async function removeMktSubtask(project: string, subtask: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !isId(subtask)) return { ok: false, reason: 'That subtask is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_subtask_remove', { p_subtask: subtask })
+  if (error) return { ok: false, reason: words(error, 'The subtask could not be taken back. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
 /** The manager's Nudge: a notice to whoever the task waits on, at most one an hour. */
 export async function nudgeMkt(project: string): Promise<Done<{ who: string; already: boolean }>> {
   await requireActionOn('/marketing/tracking', 'marketing', 'manage')

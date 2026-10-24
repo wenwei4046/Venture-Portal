@@ -2,10 +2,12 @@
 // are on (a People title since 2026-10-24) — its stations (a stage's card; each approver's gate, 👤 a person or 🔗 the PIC) joined by its hand-offs: solid
 // once made, dashed when the stage before picked who, red when sent back (returned ×n), faint while planned. A line
 // says when, who and what; a station its facts, versions and own records. Replay walks the trail record by record.
-// Drawn from the task page (its stages, approvers and trail) — subtasks have no writer yet, so none is drawn. Pure.
+// A stage split into subtasks (②b-2c) branches: each subtask its own station in its person's lane (tagged Subtask,
+// 🔓 picked by the stage's owner, a dashed line to it), then the stage's mini gate Review delivery — a delivery's line up
+// to it, a return's red line back. Drawn from the task page (its stages, approvers, subtasks and trail). Pure.
 
 import { officeTime } from '@/lib/office-time'
-import { shortDay } from './board'
+import { shortDay, type MktSubtask } from './board'
 import { groupEmoji, groupLabel, groupTone, type MktTone } from './groups'
 import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent } from './task'
 
@@ -33,6 +35,8 @@ export interface MapNode {
   stage: number | null
   handoff: string
   status: string
+  /** The handoff's small gate: a stage's Review delivery. */
+  mini?: boolean
 }
 
 export interface MapMeta { t: string; who: string; what: string; reason: string }
@@ -44,6 +48,10 @@ export interface MapEdge {
   kind: 'solid' | 'dashed' | 'return' | 'future'
   label: string | null
   meta: MapMeta | null
+  /** A delivery's line: up out of the subtask's top into its stage's lane — never through the subtasks beside it. */
+  rise?: boolean
+  /** A subtask's dashed line: down into the card's top from above — never in from the card beside it. */
+  drop?: boolean
 }
 
 export interface ReplayStep { t: string; text: string; edges: string[]; at: string | null }
@@ -71,6 +79,11 @@ const day = (at: string | null | undefined) => {
 }
 const flowKey = (a: string, b: string) => `${a}>${b}`
 const backKey = (a: string, b: string) => `${a}>${b}~back`
+/** A delivered file's link, signed at the click (lib/storage/browser.ts › fileRoute's shape — Marketing's code keeps
+ * out of the storage modules). */
+const deliveryHref = (path: string) => `/files/marketing/${path.split('/').map(encodeURIComponent).join('/')}`
+
+type RoadItem = { id: string; kind: 'card' | 'gate'; stage: number | null; level: number; sub?: MktSubtask; review?: true }
 
 export function taskMap(page: MktTaskPage): TaskMap {
   const p = page.project
@@ -81,13 +94,26 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const active = p.status === 'active'
   const created = events.find(e => e.action === 'created')
 
-  // ── The road: the start, then each stage and its approvers in turn ──────────────
-  const road: { id: string; kind: 'card' | 'gate'; stage: number | null; level: number }[] = [{ id: 'start', kind: 'card', stage: null, level: -1 }]
+  // ── The road: the start, then each stage — its subtasks off to the side, its Review delivery — and its approvers ──
+  const road: RoadItem[] = [{ id: 'start', kind: 'card', stage: null, level: -1 }]
+  const subsOf = (idx: number) => page.subtasks.filter(t => t.stage === idx)
   for (const s of stages) {
     road.push({ id: `s${s.idx}`, kind: 'card', stage: s.idx, level: -1 })
+    const subs = subsOf(s.idx)
+    for (const t of subs) road.push({ id: `t${t.id}`, kind: 'card', stage: s.idx, level: -1, sub: t })
+    if (subs.length) road.push({ id: `r${s.idx}`, kind: 'gate', stage: s.idx, level: -1, review: true })
     s.appr.forEach((_, k) => road.push({ id: `g${s.idx}-${k}`, kind: 'gate', stage: s.idx, level: k }))
   }
-  const before = (id: string) => road[road.findIndex(r => r.id === id) - 1]?.id ?? null
+  /** The road itself — a subtask is off it, joined by lines of its own. */
+  const main = road.filter(r => !r.sub)
+  const before = (id: string) => main[main.findIndex(r => r.id === id) - 1]?.id ?? null
+  /** Along the road from a stage's card to the station after it: through its Review delivery when it has subtasks. */
+  const via = (i: number, to: string) => (main.some(r => r.id === `r${i}`) ? [flowKey(`s${i}`, `r${i}`), flowKey(`r${i}`, to)] : [flowKey(`s${i}`, to)])
+  /** The station of the subtask a line is about — none once it was taken back. */
+  const subNode = (e: TaskEvent) => {
+    const id = typeof e.data?.subtask === 'string' ? `t${e.data.subtask}` : null
+    return id && road.some(r => r.id === id) ? id : null
+  }
   /** The station a stage hands on to when its last approver approves (or it completes): the next stage's card. */
   const nextCard = (idx: number) => {
     const n = stages.find(s => s.idx > idx)
@@ -139,8 +165,10 @@ export function taskMap(page: MktTaskPage): TaskMap {
         if (!card || i == null) break
         level.set(i, 0)
         const gate = `g${i}-0`
-        lit.push(flowKey(card, gate))
-        meta.set(flowKey(card, gate), mk(e, `${e.actor || '—'} → ${e.fromTo ?? '—'}`))
+        for (const k of via(i, gate)) {
+          lit.push(k)
+          meta.set(k, mk(e, `${e.actor || '—'} → ${e.fromTo ?? '—'}`))
+        }
         note(card, e)
         version(card, e.version, 'Submitted', e.at)
         version(gate, e.version, 'Waiting since', e.at)
@@ -180,11 +208,58 @@ export function taskMap(page: MktTaskPage): TaskMap {
         if (!card || i == null) break
         const next = nextCard(i)
         if (next) {
-          lit.push(flowKey(card, next))
-          meta.set(flowKey(card, next), mk(e, e.actor || '—'))
+          for (const k of via(i, next)) {
+            lit.push(k)
+            meta.set(k, mk(e, e.actor || '—'))
+          }
         }
         note(card, e)
         at = next ?? card
+        break
+      }
+      // A subtask (②b-2c): split off to its person, delivered up to Review delivery, returned, approved.
+      case 'subtask': {
+        const t = subNode(e)
+        if (card) note(card, e)
+        if (!t || !card) break
+        lit.push(flowKey(card, t))
+        meta.set(flowKey(card, t), mk(e, `${e.actor || '—'} → ${e.fromTo ?? '—'}`))
+        note(t, e)
+        at = t
+        break
+      }
+      case 'delivered': {
+        const t = subNode(e)
+        if (!t || i == null) { if (card) note(card, e); break }
+        const rev = `r${i}`
+        lit.push(flowKey(t, rev))
+        meta.set(flowKey(t, rev), mk(e, `${e.actor || '—'} → ${e.fromTo ?? '—'}`))
+        note(t, e)
+        note(rev, e)
+        version(t, e.version, 'Delivered', e.at)
+        at = rev
+        break
+      }
+      case 'delivery returned': {
+        const t = subNode(e)
+        if (!t || i == null) { if (card) note(card, e); break }
+        const rev = `r${i}`
+        const key = backKey(rev, t)
+        backs.set(key, { from: rev, to: t, n: (backs.get(key)?.n ?? 0) + 1, meta: mk(e, `${e.actor || '—'} → ${e.fromTo ?? '—'}`) })
+        lit.push(key)
+        note(rev, e)
+        note(t, e)
+        version(t, e.version, 'Returned', e.at)
+        at = t
+        break
+      }
+      case 'delivery approved': {
+        const t = subNode(e)
+        if (!t || i == null) { if (card) note(card, e); break }
+        note(`r${i}`, e)
+        note(t, e)
+        version(t, e.version, 'Approved', e.at)
+        at = card
         break
       }
       case 'changes': {
@@ -223,6 +298,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const startLane: MapLaneId = laneOf(stages[0]?.dept)
   addLane(startLane)
   stages.forEach(s => addLane(laneOf(s.dept)))
+  for (const r of road) if (r.sub) addLane(laneOf(page.team.find(x => x.id === r.sub?.assignee)?.title ?? ''))
 
   const returnsTo = (idx: number) => [...backs.values()].filter(b => b.to === `s${idx}`).reduce((n, b) => n + b.n, 0)
   const nodes: MapNode[] = road.map((r, col) => {
@@ -238,6 +314,34 @@ export function taskMap(page: MktTaskPage): TaskMap {
     const stageDone = s.status === 'done' || p.status === 'done' || s.idx < p.cur
     const here = active && s.idx === p.cur && !stageDone
     const late = !!(s.dueOn && page.today && s.dueOn < page.today)
+    if (r.sub) {
+      // A subtask: its person's lane, picked by the stage's owner; done once handed in (Review delivery is where it is).
+      const t = r.sub
+      const person = page.team.find(x => x.id === t.assignee)
+      const handedIn = t.status === 'ready' || t.status === 'approved' || stageDone
+      const tLate = !handedIn && !!(t.dueOn && page.today && t.dueOn < page.today)
+      const current = here && !handedIn
+      const tone: MapTone = handedIn ? 'done' : tLate || t.returns >= 3 ? 'red' : 'waiting'
+      return {
+        id: r.id, kind: 'card', lane: laneOf(person?.title ?? ''), col, title: t.title, full: t.title, person: who(t.assignee), icon: '',
+        date: t.dueOn ? (handedIn ? shortDay(t.dueOn) : `Due ${shortDay(t.dueOn)}`) : '', tone, current, future: false,
+        tag: t.returns ? `returned ×${t.returns}` : 'Subtask', stage: s.idx, handoff: `🔓 Picked by ${who(s.owner)}`,
+        status: t.status === 'approved' || stageDone ? 'Approved' : t.status === 'ready' ? 'Delivered · waiting for review'
+          : t.status === 'revising' ? 'Revising' : tLate ? 'Overdue' : 'In progress',
+      }
+    }
+    if (r.review) {
+      // The stage's Review delivery, its owner's: waiting while a delivery is in, done once every subtask is approved.
+      const subs = subsOf(s.idx)
+      const passed = stageDone || subs.every(t => t.status === 'approved')
+      const current = here && !passed && subs.some(t => t.status === 'ready')
+      const tone: MapTone = passed ? 'done' : current ? 'waiting' : 'draft'
+      return {
+        id: r.id, kind: 'gate', lane: laneOf(s.dept), col, title: 'Review delivery', full: `Review delivery by ${who(s.owner)}`, person: who(s.owner),
+        icon: '', date: '', tone, current, future: tone === 'draft', tag: null, stage: s.idx, handoff: 'Owner of the stage',
+        status: current ? `Waiting for ${who(s.owner)}` : TONE_LABEL[tone], mini: true,
+      }
+    }
     if (r.kind === 'card') {
       // Handed in, its approvers deciding: the card's part is done (the handoff draws it so) — the gate is where it is.
       const handedIn = here && s.status === 'review'
@@ -272,9 +376,9 @@ export function taskMap(page: MktTaskPage): TaskMap {
 
   // ── The lines: along the road, then each send-back ─────────────────────────────
   const edges: MapEdge[] = []
-  for (let k = 1; k < road.length; k++) {
-    const from = road[k - 1].id
-    const to = road[k].id
+  for (let k = 1; k < main.length; k++) {
+    const from = main[k - 1].id
+    const to = main[k].id
     const target = byId.get(to)!
     const reached = !target.future
     const s = stages.find(x => x.idx === target.stage)
@@ -286,24 +390,42 @@ export function taskMap(page: MktTaskPage): TaskMap {
       meta: meta.get(flowKey(from, to)) ?? null,
     })
   }
+  // A subtask's own lines: dashed out to it (its person picked by the stage's owner), up to Review delivery once delivered.
+  const labelled = new Set<number>()
+  for (const r of road) {
+    if (!r.sub || r.stage == null) continue
+    const card = `s${r.stage}`
+    const rev = `r${r.stage}`
+    const owner = stages.find(x => x.idx === r.stage)?.owner
+    // One label a stage: its subtasks' lines would all say the same.
+    const label = labelled.has(r.stage) ? null : `picked by ${who(owner)}`
+    labelled.add(r.stage)
+    edges.push({ key: flowKey(card, r.id), from: card, to: r.id, kind: 'dashed', label, meta: meta.get(flowKey(card, r.id)) ?? null, drop: true })
+    edges.push({ key: flowKey(r.id, rev), from: r.id, to: rev, kind: r.sub.delivery || r.sub.status === 'ready' || r.sub.status === 'approved' ? 'solid' : 'future', label: null, meta: meta.get(flowKey(r.id, rev)) ?? null, rise: true })
+  }
   for (const [key, b] of backs) edges.push({ key, from: b.from, to: b.to, kind: 'return', label: `returned ×${b.n}`, meta: b.meta })
 
   // ── Each station's own panel ───────────────────────────────────────────────────
   const stations: Record<string, Station> = {}
+  const subById = new Map(road.filter(r => r.sub).map(r => [r.id, r.sub as MktSubtask]))
   for (const n of nodes) {
     const s = n.stage != null ? stages.find(x => x.idx === n.stage) : null
-    const approval = n.kind === 'gate'
-      ? (n.icon === '🔗' ? '🔗 PIC approves via link' : '👤 Internal approver')
+    const t = subById.get(n.id)
+    const approval = t || n.mini ? `👤 ${who(s?.owner)} reviews the delivery`
+      : n.kind === 'gate' ? (n.icon === '🔗' ? '🔗 PIC approves via link' : '👤 Internal approver')
       : s && s.appr.length ? s.appr.map(a => (a.kind === 'pic' ? `🔗 ${picName}` : `👤 ${who(a.staff)}`)).join(' → ') : '— No approval'
+    const due = t ? t.dueOn : s?.dueOn
     stations[n.id] = {
       facts: [
         ['Track ID', p.trackId],
         ['Person', n.person],
         ['Handoff', n.handoff],
-        [n.status === 'Done' ? 'Completed' : 'Deadline', n.status === 'Done' ? n.date || '—' : s?.dueOn ? shortDay(s.dueOn) : '—'],
+        [n.status === 'Done' || n.status === 'Approved' ? 'Completed' : 'Deadline', n.status === 'Done' ? n.date || '—' : due ? shortDay(due) : '—'],
         ['Approval', n.id === 'start' ? '—' : approval],
       ],
-      files: n.kind === 'card' && s ? s.work.links.map(l => ({ name: l.label || l.url, href: l.url })) : [],
+      files: t
+        ? [...(t.delivery?.files ?? []).map(f => ({ name: f.name, href: deliveryHref(f.path) })), ...(t.delivery?.links ?? []).map(l => ({ name: l.label || l.url, href: l.url }))]
+        : n.kind === 'card' && s ? s.work.links.map(l => ({ name: l.label || l.url, href: l.url })) : [],
       versions: [...(versions.get(n.id) ?? new Map<string, string>())].map(([v, t]) => ({ v, t })),
       audit: own.get(n.id) ?? [],
     }
@@ -350,10 +472,10 @@ const FIRST_X = 140
 
 export interface Box { w: number; h: number; cx: number; cy: number; l: number; r: number; t: number; b: number }
 
-export function boxOf(n: Pick<MapNode, 'kind' | 'col' | 'lane'>, lanes: readonly MapLane[]): Box {
+export function boxOf(n: Pick<MapNode, 'kind' | 'col' | 'lane' | 'mini'>, lanes: readonly MapLane[]): Box {
   const li = Math.max(0, lanes.findIndex(l => l.id === n.lane))
-  const w = n.kind === 'gate' ? 140 : 172
-  const h = n.kind === 'gate' ? 74 : 80
+  const w = n.kind === 'gate' ? (n.mini ? 112 : 140) : 172
+  const h = n.kind === 'gate' ? (n.mini ? 58 : 74) : 80
   const cx = MAP_OFF + FIRST_X + n.col * COL_W
   const cy = li * LANE_H + LANE_H / 2
   return { w, h, cx, cy, l: cx - w / 2, r: cx + w / 2, t: cy - h / 2, b: cy + h / 2 }
@@ -366,7 +488,7 @@ export const mapSize = (map: TaskMap) => ({
 
 /** A line's curve: along the road from one's right to the next's left; a send-back from the gate's foot round to the
  * stage's head. Returns the SVG path and its middle (for its label). */
-export function edgePath(A: Box, B: Box, back: boolean): { d: string; mid: [number, number] } {
+export function edgePath(A: Box, B: Box, back: boolean, rise = false, drop = false): { d: string; mid: [number, number] } {
   const c = (p0: number[], p1: number[], p2: number[], p3: number[]) => ({
     d: `M${p0[0]},${p0[1]} C${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`,
     mid: [(p0[0] + 3 * p1[0] + 3 * p2[0] + p3[0]) / 8, (p0[1] + 3 * p1[1] + 3 * p2[1] + p3[1]) / 8] as [number, number],
@@ -376,6 +498,10 @@ export function edgePath(A: Box, B: Box, back: boolean): { d: string; mid: [numb
     if (B.t > A.b) return c([A.cx - 10, A.b - 4], [A.cx - 120, A.b + 110], [B.cx + 80, B.t - 110], [B.cx + 40, B.t - 2])
     return c([A.cx - 10, A.t + 4], [A.cx - 90, A.t - 70], [B.cx + 60, B.t - 70], [B.cx + 20, B.t - 2])
   }
+  // A delivery's line into a gate in a lane above: up from the card's top, then along that lane.
+  if (rise && B.cy < A.t) return c([A.cx, A.t], [A.cx, B.cy], [A.cx, B.cy], [B.l - 2, B.cy])
+  // A subtask's dashed line into a card in a lane below: down into its top-left.
+  if (drop && B.t > A.b) return c([A.r, A.cy], [A.r + 60, A.cy], [B.l + 30, B.t - 70], [B.l + 30, B.t - 2])
   const dx = Math.max(40, (B.l - A.r) / 2)
   return c([A.r, A.cy], [A.r + dx, A.cy], [B.l - dx, B.cy], [B.l - 2, B.cy])
 }

@@ -32,9 +32,18 @@ export default async function MarketingProjectPage({ params, searchParams }: {
       const { people, approvers } = builderPeople(await readBoard())
       return <AssignmentPlan key={page.project.id} initial={page} people={people} approvers={approvers} />
     }
-    // A task's files from the Library (⑥-4) — a series is a pattern, never a task with files.
-    const files = page.project.kind === 'recurring' && !page.project.series ? [] : await readTaskFiles(page.project.id)
-    return <TaskPage key={page.project.id} initial={page} can={can} files={files} />
+    // A task's files from the Library (⑥-4) — a series is a pattern, never a task with files. The owner of a stage that
+    // splits, working it, is offered the roster to split it to (②b-2c): somebody else with a login, with their plate.
+    const cur = page.project.status === 'active' ? page.stages[page.project.cur] : undefined
+    const splits = can.edit && !!cur?.split && !!page.me && cur.owner === page.me && (cur.status === 'accepted' || cur.status === 'changes')
+    const [files, board] = await Promise.all([
+      page.project.kind === 'recurring' && !page.project.series ? [] : readTaskFiles(page.project.id),
+      splits ? readBoard() : null,
+    ])
+    const splitPeople = board
+      ? builderPeople(board).people.filter(p => p.id !== page.me && board.team.some(t => t.id === p.id && !!t.user))
+      : []
+    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} />
   }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()
