@@ -68,7 +68,18 @@ describe('the Minutes Builder', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Lock after complete' }))
     await waitFor(() => expect(actions.saveMktMinutes).toHaveBeenCalledTimes(2), { timeout: 3000 })
-    expect(actions.saveMktMinutes.mock.calls[1]).toEqual(['t1', 4, { rules: { sign: true, pic: true, project: true, file: true, lock: false } }])
+    expect(actions.saveMktMinutes.mock.calls[1]).toEqual(['t1', 4, { rules: { sign: true, pic: true, picAll: false, project: true, file: true, lock: false } }])
+  })
+
+  it('Both PICs sign off: beneath PIC signs off, only while it is on — turning that off takes it along (the user’s answer 29)', async () => {
+    builder()
+    fireEvent.click(screen.getByRole('switch', { name: 'Both PICs sign off' }))
+    await waitFor(() => expect(actions.saveMktMinutes).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.saveMktMinutes.mock.calls[0][2]).toEqual({ rules: { sign: true, pic: true, picAll: true, project: true, file: true, lock: true } })
+    fireEvent.click(screen.getByRole('switch', { name: 'PIC signs off on the link' }))
+    expect(screen.queryByRole('switch', { name: 'Both PICs sign off' })).toBeNull()
+    await waitFor(() => expect(actions.saveMktMinutes).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    expect(actions.saveMktMinutes.mock.calls[1][2]).toEqual({ rules: { sign: true, pic: false, picAll: false, project: true, file: true, lock: true } })
   })
 
   it('a change undone before its save goes sends nothing and says Saved', async () => {

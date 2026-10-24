@@ -26,11 +26,13 @@ export interface MinutesField {
   cols?: { name: string; type: MinutesColType }[]
 }
 
-export type RuleKey = 'sign' | 'pic' | 'project' | 'file' | 'lock'
+export type RuleKey = 'sign' | 'pic' | 'picAll' | 'project' | 'file' | 'lock'
 export type MinutesRules = Record<RuleKey, boolean>
-export const RULES: readonly { key: RuleKey; name: string; hint: string }[] = [
+/** `under`: shown beneath that rule, only while it is on (2026-10-24 — both PICs sign off, the user's answer 29). */
+export const RULES: readonly { key: RuleKey; name: string; hint: string; under?: RuleKey }[] = [
   { key: 'sign', name: 'Every attendee signs', hint: 'Complete stays locked until all attendees sign' },
   { key: 'pic', name: 'PIC signs off on the link', hint: 'The PIC approves the minutes before the tracking link is created' },
+  { key: 'picAll', name: 'Both PICs sign off', hint: 'With two PICs on a project, the minutes wait for both', under: 'pic' },
   { key: 'project', name: 'Must link a project', hint: 'Pulls the subsidiary, product and dates from the project' },
   { key: 'file', name: 'File to Library on complete', hint: 'Saved in the subsidiary’s Library → Minutes folder' },
   { key: 'lock', name: 'Lock after complete', hint: 'No edits once signed off · changes need a new version' },
@@ -76,7 +78,7 @@ export function minutesFieldFromRow(v: unknown): MinutesField | null {
 
 export function rulesFromRow(v: unknown): MinutesRules {
   const r = isObj(v) ? v : {}
-  return { sign: r.sign === true, pic: r.pic === true, project: r.project === true, file: r.file === true, lock: r.lock === true }
+  return { sign: r.sign === true, pic: r.pic === true, picAll: r.pic === true && r.picAll === true, project: r.project === true, file: r.file === true, lock: r.lock === true }
 }
 
 /** mkt_minutes_templates(): the templates as they were made. */
@@ -106,7 +108,7 @@ export function newMinutesFields(): MinutesField[] {
     { key: fieldKey(), name: 'Signatures', type: 'Signature', req: true, pic: true, lock: false },
   ]
 }
-export const NEW_RULES: MinutesRules = { sign: false, pic: false, project: true, file: true, lock: true }
+export const NEW_RULES: MinutesRules = { sign: false, pic: false, picAll: false, project: true, file: true, lock: true }
 
 /** "New minutes", "New minutes 2" … — a name not taken. */
 export function newMinutesName(taken: readonly string[]): string {

@@ -23,7 +23,8 @@ import {
  * 20261024004000) — New Project's quick and recurring tasks, a stage accepted, worked, handed on, approved or sent back,
  * Nudge, a series paused or ended, the Free space; the Workflow Builder's, the Minutes Builder's and the Product Builder's
  * drafts saved and published (a workflow cloned, a product retired or reactivated); a 📦 product project started, its
- * intake minutes written, signed, sent to the PIC, started before approval, resent; Marketing's own client added.
+ * intake minutes written, signed, sent to the PIC, started before approval, resent; Marketing's own client added, a
+ * client's details edited (mig 20261025034000).
  * Each asks its gate here and its cell again in
  * the database, which also decides whose stage it is. A refusal answers `{ ok: false, reason }` in words (production
  * masks a thrown message).
@@ -332,7 +333,8 @@ export async function startMktProduct(sub: string, product: string): Promise<Don
 }
 
 /** Minutes written: only what changed, on the minutes the page last saw. A change the PIC sees after they approved sends
- * the project back to them — the page then comes back as it now stands. */
+ * the project back to them — the page then comes back as it now stands; so it does when the second PIC changed (their
+ * own link made, or gone — mig 20261025034000). */
 export async function fillMktMinutes(minutes: string, project: string, rev: number, patch: Record<string, unknown>): Promise<Done<{ rev: number; reapproval: boolean; page: ProductProjectPage | null }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
   if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
@@ -342,8 +344,9 @@ export async function fillMktMinutes(minutes: string, project: string, rev: numb
   const { data, error } = await db.rpc('mkt_minutes_fill', { p_minutes: minutes, p_rev: rev, p_patch: patch })
   if (error) return { ok: false, reason: words(error, 'The minutes could not be saved. Please try again.') }
   const r = (data ?? {}) as { rev?: number; reapproval?: boolean }
-  if (r.reapproval) freshen()
-  return { ok: true, rev: Number(r.rev ?? rev + 1), reapproval: r.reapproval === true, page: r.reapproval ? await freshProject(db, project) : null }
+  const again = r.reapproval === true || 'pic2' in patch
+  if (again) freshen()
+  return { ok: true, rev: Number(r.rev ?? rev + 1), reapproval: r.reapproval === true, page: again ? await freshProject(db, project) : null }
 }
 
 /** An attendee signs the minutes, as themselves. */
@@ -423,6 +426,22 @@ export async function addMktClient(name: string, pic: string): Promise<Done<{ su
   if (!n) return { ok: false, reason: 'Name the company or client.' }
   const { data, error } = await (await client()).rpc('mkt_sub_add', { p_name: n.slice(0, 200), p_pic: String(pic ?? '').trim().slice(0, 200) || null })
   if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be added. Please try again.') }
+  freshen()
+  return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
+}
+
+const CLIENT_KEYS = ['name', 'pic', 'whatsapp', 'pic2', 'whatsapp2'] as const
+
+/** A client's details edited on its page (②b-2d-2a, mig 20261025034000): only the fields that changed — its name
+ * (Marketing's own clients; a group company keeps its own), its PIC and their WhatsApp, its second PIC and theirs. */
+export async function editMktClient(sub: string, patch: Partial<Record<(typeof CLIENT_KEYS)[number], string | null>>): Promise<Done<{ sub: MktSub }>> {
+  await requireActionOn('/marketing/subsidiaries/[code]', 'marketing', 'manage')
+  if (!isId(sub)) return { ok: false, reason: 'That client is not there.' }
+  const clean: Record<string, string | null> = {}
+  for (const k of CLIENT_KEYS) if (patch && k in patch) clean[k] = patch[k] == null ? null : String(patch[k]).slice(0, 200)
+  if (!Object.keys(clean).length) return { ok: false, reason: 'Nothing changed.' }
+  const { data, error } = await (await client()).rpc('mkt_sub_edit', { p_sub: sub, p_patch: clean })
+  if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be saved. Please try again.') }
   freshen()
   return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
 }

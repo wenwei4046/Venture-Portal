@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  dateWords, isPicCode, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
+  bothState, dateWords, isPicCode, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
+  stageReasonOk, workLastLine, workState, workWaiting,
 } from './pic'
 
 // 2026-10-23 — the PIC's link (⑤-1, `PIC Link.dc.html`): what mkt_pic_page answers the stranger holding a product
@@ -64,6 +65,9 @@ describe('where it stands, for the PIC', () => {
     expect(picBanner(page())?.title).toBe('Waiting for your approval')
     expect(picBanner(page({ updated: { fields: 'Posts, Objective', at: 'x' } }))).toEqual({ tone: 'waiting',
       title: 'Updated after your approval — please review again', text: 'The team changed Posts, Objective.' })
+    // The approval the edit took back was only the other PIC's (②b-2d-2b): never "after your approval".
+    expect(picBanner(page({ you: 2, updated: { fields: 'Objective', at: 'x', mine: false, by: 'Kelvin Tan' } }))).toEqual({ tone: 'waiting',
+      title: 'Updated — please review', text: 'The team changed Objective after Kelvin Tan approved.' })
     expect(picBanner(page({ asked: { reason: 'Add Penang', at: 'x' } }))?.text).toBe('You asked: “Add Penang”')
     expect(picBanner(page({ status: 'approved' }))?.title).toBe('Approved')
     expect(picBanner(page({ status: 'changes' }))).toBeNull()
@@ -80,6 +84,16 @@ describe('where it stands, for the PIC', () => {
       .toBe('The team is making your changes:cur')
     expect(states(page({ status: 'approved', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:00:00Z' } })).slice(2))
       .toEqual(['You approved the minutes:done:25 Oct', 'Work starts:cur'])
+  })
+
+  it('minutes that asked no sign-off never went to the PIC: the team completed them — never “sent to you”, never “you approved” (2026-10-24, the preview walk)', () => {
+    const states = (p: PicPage) => picTimeline(p).map(t => `${t.label}:${t.state}${t.date ? `:${t.date}` : ''}`)
+    const work = [{ id: 'd1', title: 'Banner', status: 'active', stages: 1, done: 0, stage: { idx: 0, name: 'Design', status: 'review', ver: 1, waiting: true, fields: [], links: [] } }]
+    expect(states(page({ status: 'active', sentAt: null, work })))
+      .toEqual(['Kick-off meeting:done:23 Oct', 'Minutes completed by the team:done', 'The work:cur'])
+    // Sent once and answered: as before.
+    expect(states(page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:00:00Z' }, work }))[2])
+      .toBe('You approved the minutes:done:25 Oct')
   })
 
   it('after an answer, the card with its receipt — never for a reply that no longer stands', () => {
@@ -104,5 +118,95 @@ describe('an answer', () => {
     expect(picRefusal({ code: '42501', message: 'permission denied for function mkt_pic_answer' }, 'fallback')).toBe('fallback')
     expect(picRefusal({ code: '23514', message: 'new row violates check constraint "mkt_minutes_check"' }, 'fallback')).toBe('fallback')
     expect(picRefusal(null, 'fallback')).toBe('fallback')
+  })
+})
+
+describe('the work on the PIC’s link (②b-2d)', () => {
+  const w = (over: Record<string, unknown>) => page({ status: 'active', work: [{ id: 'd1', title: 'Poster 1/2', status: 'active', stages: 2, done: 0,
+    stage: { idx: 0, name: 'Design', status: 'accepted', ver: 0, waiting: false, fields: [{ name: 'Due', type: 'Date', value: '2026-11-05' }, { name: 'OK', type: 'Checkbox', value: false }], links: [] }, last: null, ...over }] }).work[0]
+  it('says where each deliverable stands, in the PIC’s words', () => {
+    expect(workState(w({}), '2026-10-24')).toEqual({ label: 'In progress · Design', tone: 'draft' })
+    expect(workState(w({ startsOn: '2026-11-02' }), '2026-10-24')).toEqual({ label: 'Starts 2 Nov', tone: 'draft' })
+    expect(workState(w({ stage: { name: 'Design', status: 'review', ver: 1, waiting: true } }), '2026-10-24')).toEqual({ label: 'Waiting for your approval', tone: 'waiting' })
+    expect(workState(w({ status: 'done' }), '2026-10-24')).toEqual({ label: 'Done', tone: 'done' })
+    expect(workState(w({ stage: { name: 'Design', status: 'changes', ver: 1, waiting: false }, last: { action: 'pic changes', name: 'Kelvin (PIC)', reason: 'Bigger', stage: 'Design', version: 'v1', at: 'x' } }), '2026-10-24'))
+      .toEqual({ label: 'The team is making your changes', tone: 'draft' })
+    expect(w({}).stage?.fields.map(f => f.value)).toEqual(['5 Nov 2026', null]) // a date in words; a box not ticked is nothing yet
+  })
+  it('counts what waits for them, and the progress says so', () => {
+    const p = page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin', reason: '', at: '2026-10-24T03:00:00Z' }, work: [
+      { id: 'a', title: 'A', status: 'done', stages: 1, done: 1 }, { id: 'b', title: 'B', status: 'active', stages: 2, done: 1, stage: { name: 'X', status: 'review', ver: 1, waiting: true } },
+    ] })
+    expect(workWaiting(p.work)).toBe(1)
+    expect(picTimeline(p).at(-1)).toEqual({ label: 'The work', state: 'cur', date: '', sub: '1 of 2 done · 1 waiting for you' })
+    expect([stageReasonOk('meh'), stageReasonOk('Bigger logo'), stageReasonOk('x'.repeat(1001))]).toEqual([false, true, false])
+  })
+})
+
+describe('two PICs, each their own link — either one’s answer counts (②b-2d-2a, the user’s answer 29)', () => {
+  const kelvin = { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z', pic: 1 }
+  const asHana = (over: Record<string, unknown>) => page({ you: 2, pic: 'Hana Lee', other: 'Kelvin Tan', ...over })
+
+  it('reads whose link it is, and the other PIC; an answer from before two PICs is the first’s', () => {
+    const p = asHana({})
+    expect([p.you, p.pic, p.other]).toEqual([2, 'Hana Lee', 'Kelvin Tan'])
+    expect(page({ reply: { decision: 'approved', name: 'Kelvin', reason: '', at: null } }).reply?.pic).toBe(1)
+    expect([page().you, page().other]).toEqual([1, null])
+  })
+
+  it('the minutes approved by the other PIC: said in their name, never “You approved”', () => {
+    expect(picAnswered(asHana({ status: 'approved', reply: kelvin }))?.text).toBe('Kelvin Tan approved the meeting minutes. The team has been told.')
+    expect(picAnswered(page({ status: 'approved', reply: kelvin }))?.text).toBe('You approved the meeting minutes. The team has been told.')
+    expect(picTimeline(asHana({ status: 'approved', reply: kelvin }))[2].label).toBe('Kelvin Tan approved the minutes')
+  })
+
+  it('the other PIC’s changes: whose notes the team has; resent, whose words the banner quotes', () => {
+    const changes = { decision: 'changes', name: 'Kelvin', reason: 'Add Penang', at: '2026-10-25T02:12:00Z', pic: 1 }
+    expect(picAnswered(asHana({ status: 'changes', reply: changes }))?.text).toMatch(/^The team has Kelvin’s notes/)
+    expect(picTimeline(asHana({ status: 'changes', reply: changes }))[2].label).toBe('The team is making Kelvin’s changes')
+    expect(picBanner(asHana({ status: 'waiting_pic', reply: changes, asked: { reason: 'Add Penang', at: null } }))?.text).toBe('Kelvin asked: “Add Penang”')
+    expect(picBanner(page({ status: 'waiting_pic', reply: changes, asked: { reason: 'Add Penang', at: null } }))?.text).toBe('You asked: “Add Penang”')
+  })
+
+  it('a stage answered by the other PIC: the line and the state name them', () => {
+    const last = { action: 'pic changes', name: 'Kelvin Tan (PIC)', reason: 'Bigger', stage: 'Design', version: 'v1', at: '2026-10-25T02:12:00Z', pic: 1 }
+    const p = asHana({ status: 'active', work: [{ id: 'd1', title: 'Poster', status: 'active', stages: 1, done: 0, stage: { name: 'Design', status: 'changes', ver: 1, waiting: false }, last }] })
+    expect(workState(p.work[0], '2026-10-24', p.you)).toEqual({ label: 'The team is making Kelvin Tan’s changes', tone: 'draft' })
+    expect(workLastLine(p.work[0].last!, p.you)).toBe('Kelvin Tan asked for changes on Design: “Bigger” · 25 Oct 2026, 10:12')
+    expect(workLastLine({ ...p.work[0].last!, action: 'pic approved', name: 'Hana Lee (PIC)', pic: 2 }, p.you)).toBe('You approved Design v1 · signed by Hana Lee · 25 Oct 2026, 10:12')
+  })
+})
+
+describe('an approval that asks both PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const ok1 = { '1': { name: 'Kelvin Tan', at: '2026-10-25T02:00:00Z' } }
+  it('says whose approval is in for the link’s PIC — theirs (it waits for the other) or the other’s (it waits for them)', () => {
+    expect(bothState(true, ok1, 1, 'Hana Lee')).toEqual({ mine: true, other: 'Hana Lee' })
+    expect(bothState(true, ok1, 2, 'Kelvin')).toEqual({ mine: false, theirs: 'Kelvin Tan' })
+    expect([bothState(false, ok1, 1, 'Hana Lee'), bothState(true, null, 1, 'Hana Lee')]).toEqual([null, null])
+  })
+  it('the minutes: the banner, the progress and the chip-less wait for the PIC whose approval is in', () => {
+    const mine = page({ you: 1, pic: 'Kelvin', other: 'Hana Lee', both: true, ok: ok1 })
+    expect(picBanner(mine)).toEqual({ tone: 'waiting', title: 'Waiting for Hana Lee', text: 'You approved the minutes. They go ahead once Hana Lee approves too.' })
+    expect(picTimeline(mine)[2]).toEqual({ label: 'Waiting for Hana Lee', state: 'cur', date: '', sub: 'You approved the minutes' })
+    const theirs = page({ you: 2, pic: 'Hana Lee', other: 'Kelvin', both: true, ok: ok1 })
+    expect(picBanner(theirs)?.text).toBe('Kelvin Tan approved the minutes. They go ahead once you approve too.')
+    expect(picTimeline(theirs)[2].sub).toBe('Kelvin Tan approved — waiting for you')
+  })
+  it('the minutes both approved: each reads “You and <the other>”, never the last one alone (found on the preview walk)', () => {
+    const both = { both: true, ok: { ...ok1, '2': { name: 'Hana Lee', at: '2026-10-25T02:10:00Z' } }, status: 'approved',
+      reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z', pic: 1 } }
+    const hana = page({ you: 2, pic: 'Hana Lee', other: 'Kelvin', ...both })
+    expect(picAnswered(hana)).toMatchObject({ text: 'You and Kelvin Tan approved the meeting minutes. The team has been told.',
+      receipt: expect.stringMatching(/^Signed by Kelvin Tan and Hana Lee · /) })
+    expect(picTimeline(hana)[2].label).toBe('You and Kelvin Tan approved the minutes')
+    expect(picAnswered(page({ you: 1, pic: 'Kelvin', other: 'Hana Lee', ...both }))?.text).toBe('You and Hana Lee approved the meeting minutes. The team has been told.')
+    // Either PIC's counted (one approval kept): as before.
+    expect(picAnswered(page({ you: 2, other: 'Kelvin', ...both, both: false }))?.text).toBe('Kelvin Tan approved the meeting minutes. The team has been told.')
+  })
+  it('a stage: waiting no longer for the PIC whose approval is in — for the other', () => {
+    const p = page({ you: 1, other: 'Hana Lee', status: 'active', work: [{ id: 'd1', title: 'Poster', status: 'active', stages: 1, done: 0,
+      stage: { name: 'Design', status: 'review', ver: 2, waiting: false, both: true, ok: ok1 } }] })
+    expect([p.work[0].stage?.both, Object.keys(p.work[0].stage?.ok ?? {})]).toEqual([true, ['1']])
+    expect(workState(p.work[0], '2026-10-24', p.you, p.other)).toEqual({ label: 'Waiting for Hana Lee', tone: 'waiting' })
   })
 })

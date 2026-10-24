@@ -431,7 +431,7 @@ describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
     expect(screen.getByText('Daniel Lee')).toBeInTheDocument()
     expect(screen.queryByText('Nur Iman')).toBeNull()
     fireEvent.click(screen.getByText('Daniel Lee'))
-    fireEvent.click(screen.getByRole('button', { name: /^Not selected/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Not selected/ }))
     expect(stage).not.toHaveBeenCalled()
     expect(screen.getByText('Not selected · Daniel Lee')).toBeInTheDocument()
     const why = ['Failed interview', 'Not shortlisted', 'Not right now', 'Declined offer', 'Other']
@@ -452,7 +452,7 @@ describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
     window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
     render(<HrApp data={{ ...data, hires: [hire], hireReasons, parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
     fireEvent.click(screen.getByText('Daniel Lee'))
-    fireEvent.click(screen.getByRole('button', { name: /^Not selected/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Not selected/ }))
     const offered = ['Interview failed', 'Not shortlisted', 'Salary too high']
     const words = screen.getAllByRole('button').map(b => b.textContent ?? '')
     expect(words.filter(t => [...offered, 'Not right now', 'Failed interview'].includes(t))).toEqual(offered)
@@ -460,10 +460,43 @@ describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
     await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'r-salary'))
   })
 
-  it('everybody not selected: the list says they are in the Talent Bank', () => {
+  it('everybody not selected: the card is their fold alone', () => {
     window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
     render(<HrApp data={{ ...data, hires: [{ ...hire, candidates: hire.candidates.slice(1) }], parts: { ...data.parts, hiring: true } }} actions={actions} />)
-    expect(screen.getByText('Not selected · 1 · in Talent Bank')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' })).toBeInTheDocument()
+    expect(screen.queryByText('No candidates yet.')).toBeNull()
+  })
+
+  // The user, asked whether the phone should bring somebody back as the desktop's fold does: "can" (2026-10-24).
+  const kept = { ...hire, candidates: [hire.candidates[0], { ...hire.candidates[1], phone: '012-111 2222', note: 'Asked for RM 4,000', why: 'Not right now' }] }
+
+  it('the not selected fold at the card’s foot: each says why; a tap opens the status sheet that brings them back', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [kept], parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    const fold = screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    fireEvent.click(fold)
+    expect(fold).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Nur Iman')).toBeInTheDocument()
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    // Why in place of the note, as on the request's page.
+    expect(screen.queryByText(/Asked for RM 4,000/)).toBeNull()
+    fireEvent.click(screen.getByText('Nur Iman'))
+    const sheet = screen.getByRole('dialog', { name: 'Status · Nur Iman' })
+    expect(within(sheet).getByRole('button', { name: /^Not selected/ })).toHaveTextContent('✓')
+    fireEvent.click(within(sheet).getByRole('button', { name: /^Shortlisted/ }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c2', 'shortlisted'))
+  })
+
+  it('without Hiring · Edit the fold still says who and why, and a tap changes nothing', () => {
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [kept], parts: { ...data.parts, hiring: true } }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' }))
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Nur Iman'))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
 

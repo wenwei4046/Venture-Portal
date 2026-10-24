@@ -90,6 +90,27 @@
 .quote { margin-top: 6px; padding: 10px 14px; border-radius: 8px; background: rgb(var(--pk-page)); font-size: 13.5px; max-width: 360px; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
 .receipt { margin-top: 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(var(--pk-muted)); }
 
+/* The work (②b-2d): a deliverable a row; the one waiting for the PIC opened, with its fields, links and answer. */
+.workList { display: flex; flex-direction: column; }
+.workItem { padding: 12px 16px; border-top: 1px solid rgb(var(--pk-line-3)); display: flex; flex-direction: column; gap: 4px; }
+.workItem:first-child { border-top: 0; }
+.workOpen { background: rgb(var(--pk-white)); }
+.workHead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.workTitle { font-size: 14.5px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.workMeta { font-size: 12px; color: rgb(var(--pk-muted)); }
+.workStage { margin-top: 8px; font-size: 13px; font-weight: 600; }
+.workNote { font-size: 13px; color: rgb(var(--pk-text-2)); padding: 8px 10px; border-radius: 8px; background: rgb(var(--pk-page)); }
+/* The other PIC's approval in, on a level asking both (②b-2d-2b): green, as done. */
+/* Both PICs sign off (②b-2d-2b): theirs in, where the buttons were — on the done green, inside the card. */
+.bothMine { margin: 0 16px 16px; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: rgb(var(--pk-done)); background: rgb(var(--pk-done-bg)); }
+.workBoth { font-size: 13px; font-weight: 500; color: rgb(var(--pk-done)); padding: 8px 10px; border-radius: 8px; background: rgb(var(--pk-done-bg)); }
+.workItem .fields { padding: 0; }
+.workItem .choose, .workItem .step { padding-left: 0; padding-right: 0; }
+.workItem .step { margin: 4px -16px -12px; padding: 16px; }
+.workLinks { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.link { color: rgb(var(--pk-ink)); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; font-size: 13.5px; }
+.workLast { font-size: 12px; color: rgb(var(--pk-text-2)); overflow-wrap: anywhere; }
+
 .progress { padding: 14px 16px 6px; }
 .progressHead { margin-bottom: 12px; }
 .tl { display: flex; gap: 12px; }

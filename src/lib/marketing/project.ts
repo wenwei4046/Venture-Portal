@@ -5,7 +5,7 @@
 
 import { longDay, personFromRow, subFromRow, type MktPerson, type MktProjectStatus, type MktStageStatus, type MktSub } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { delivFromRow, trailTime, type TaskDeliv, type Tone } from './task'
+import { delivFromRow, picOkFromRow, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
 
 /** A product project's way to its work. */
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
@@ -36,6 +36,8 @@ export interface PicReply {
   name: string
   reason: string
   at: string | null
+  /** Which PIC answered (mig 20261025034000) — the first when the reply is older than two PICs. */
+  pic: 1 | 2
 }
 
 export interface ProductProjectPage {
@@ -52,8 +54,15 @@ export interface ProductProjectPage {
     ownerName: string | null
     pic: string
     whatsapp: string
-    /** The tracking link's code (made when the minutes are sent). */
+    /** The second PIC and theirs (the user's answer 29: one or two), '' for none. */
+    pic2: string
+    whatsapp2: string
+    /** The tracking link's code (made when the minutes are sent) — the first PIC's. */
     link: string | null
+    /** The second PIC's own link: made with the minutes sent, or once they are named after. */
+    link2: string | null
+    /** Whose approvals the minutes have while they wait for both PICs (mig 20261025035000). */
+    picOk: PicOk | null
     linkSentAt: string | null
     picReply: PicReply | null
     override: { by: string; at: string | null; reason: string } | null
@@ -150,9 +159,16 @@ export function productProjectFromRow(v: unknown): ProductProjectPage | null {
       ownerName: strOrNull(p.ownerName),
       pic: str(p.pic),
       whatsapp: str(p.whatsapp),
+      pic2: str(p.pic2),
+      whatsapp2: str(p.whatsapp2),
       link: strOrNull(p.link),
+      link2: strOrNull(p.link2),
+      picOk: picOkFromRow(p.picOk),
       linkSentAt: strOrNull(p.linkSentAt),
-      picReply: reply ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at) } : null,
+      picReply: reply
+        ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at),
+            pic: reply.pic === 2 ? 2 : 1 }
+        : null,
       override: override ? { by: str(override.by), at: strOrNull(override.at), reason: str(override.reason) } : null,
       createdAt: strOrNull(p.createdAt),
       product: product
@@ -289,11 +305,16 @@ export function unsignedOf(doc: Pick<MinutesDoc, 'template' | 'vals' | 'signed'>
 /** The PIC is reached on WhatsApp when they approve on the link (mkt_minutes_send asks the same 8 digits). */
 export const whatsappOk = (number: string) => number.replace(/\D/g, '').length >= 8
 
-/** What stops the intake minutes going to the PIC, in the order the side card says it. */
-export function sendProblems(doc: MinutesDoc, pic: { name: string; whatsapp: string }, team: readonly MktPerson[]): string[] {
+/** The PICs as the minutes name them: the first, and a second when named (the user's answer 29). */
+export type MinutesPics = { name: string; whatsapp: string; name2?: string; whatsapp2?: string }
+
+/** What stops the intake minutes going to the PIC, in the order the side card says it — a second PIC named is reached
+ * on WhatsApp too (mkt_minutes_send asks it). */
+export function sendProblems(doc: MinutesDoc, pic: MinutesPics, team: readonly MktPerson[]): string[] {
   const out = minutesMissing(doc.template.fields, doc.vals).map(n => `${n} is empty`)
   if (!pic.name.trim()) out.push('Name the PIC')
   if (doc.template.rules.pic && !whatsappOk(pic.whatsapp)) out.push('Add the PIC’s WhatsApp')
+  if (doc.template.rules.pic && pic.name2?.trim() && !whatsappOk(pic.whatsapp2 ?? '')) out.push('Add the second PIC’s WhatsApp')
   const nameOf = (id: string) => team.find(p => p.id === id)?.first ?? 'Somebody'
   const unsigned = unsignedOf(doc)
   if (unsigned.length) out.push(`Waiting for ${unsigned.map(nameOf).join(', ')} to sign`)
@@ -302,9 +323,10 @@ export function sendProblems(doc: MinutesDoc, pic: { name: string; whatsapp: str
 
 /** The side card's count: the required fields filled, of all of them — with the PIC's name, and their WhatsApp when
  * the link goes to them. */
-export function requiredTally(doc: Pick<MinutesDoc, 'template'>, vals: Readonly<Record<string, MinutesValue>>, pic: { name: string; whatsapp: string }): { done: number; total: number } {
+export function requiredTally(doc: Pick<MinutesDoc, 'template'>, vals: Readonly<Record<string, MinutesValue>>, pic: MinutesPics): { done: number; total: number } {
   const fields = doc.template.fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature')
-  const own = [!!pic.name.trim(), ...(doc.template.rules.pic ? [whatsappOk(pic.whatsapp)] : [])]
+  const own = [!!pic.name.trim(), ...(doc.template.rules.pic ? [whatsappOk(pic.whatsapp)] : []),
+    ...(doc.template.rules.pic && pic.name2?.trim() ? [whatsappOk(pic.whatsapp2 ?? '')] : [])]
   return { done: fields.length - minutesMissing(doc.template.fields, vals).length + own.filter(Boolean).length, total: fields.length + own.length }
 }
 
@@ -330,6 +352,8 @@ export interface MinutesEdit {
   notes: string
   pic: string
   whatsapp: string
+  pic2: string
+  whatsapp2: string
 }
 
 const same = (a: MinutesValue | undefined, b: MinutesValue | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
@@ -347,6 +371,8 @@ export function fillPatch(saved: MinutesEdit, now: MinutesEdit, intake: boolean)
   if (now.notes !== saved.notes) patch.notes = now.notes
   if (intake && now.pic !== saved.pic) patch.pic = now.pic
   if (intake && now.whatsapp !== saved.whatsapp) patch.whatsapp = now.whatsapp
+  if (intake && now.pic2 !== saved.pic2) patch.pic2 = now.pic2
+  if (intake && now.whatsapp2 !== saved.whatsapp2) patch.whatsapp2 = now.whatsapp2
   return Object.keys(patch).length ? patch : null
 }
 
@@ -385,7 +411,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'edited after approval' ? `${who} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
     : e.action === 'started before approval' ? `${who} started before PIC approval: "${e.reason ?? ''}"`
     : e.action === 'resent' ? `${who} resent to ${e.reason || 'the PIC'}`
-    : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link`
+    // The first of two when both PICs sign off (②b-2d-2b) names whom the minutes still wait for.
+    : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link${typeof e.data?.waiting === 'string' && e.data.waiting ? ` · waiting for ${e.data.waiting}` : ''}`
     : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason ?? ''}"`
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }
@@ -393,4 +420,16 @@ export function productEventText(e: { actor: string; action: string; reason: str
 /** The trail newest first, in the store's words. */
 export function productTrail(page: Pick<ProductProjectPage, 'project' | 'trail'>): { key: string; t: string; text: string }[] {
   return page.trail.map((e, i) => ({ key: `${e.at}:${i}`, t: trailTime(e.at), text: productEventText(e, page.project.product) }))
+}
+
+/** While the minutes wait for both PICs (the template's *Both PICs sign off*, two PICs on the project — ②b-2d-2b): whose
+ * approval is in and whom they wait for; null when nobody's is in yet, or either PIC's counts. */
+export function bothWaiting(page: Pick<ProductProjectPage, 'project' | 'minutes'>): string | null {
+  const pr = page.project
+  const doc = page.minutes.find(m => m.intake) ?? page.minutes[0]
+  if (pr.status !== 'waiting_pic' || !doc?.template.rules.picAll || !pr.pic2 || !pr.picOk) return null
+  const one = pr.picOk['1'], two = pr.picOk['2']
+  if (one && !two) return `${one.name || pr.pic} approved · waiting for ${pr.pic2}`
+  if (two && !one) return `${two.name || pr.pic2} approved · waiting for ${pr.pic || 'the PIC'}`
+  return null
 }

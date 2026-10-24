@@ -4,14 +4,17 @@ import { useEffect, useState, useTransition } from 'react'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
-  dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
+  bothState, dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
 } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
+import PicWork from './PicWork'
 import s from './pic.module.css'
 
 // The PIC's link (⑤-1, `PIC Link.dc.html`) — the subsidiary's PIC, who has no login, reads the meeting minutes as far
 // as the template lets them see and approves (their full name typed) or asks for changes (their words, 5–500). Where
-// it stands, why it waits for them again, the progress; after an answer, the receipt. The code is the only key.
+// it stands, why it waits for them again, the progress; after an answer, the receipt. Once the work is under way, the
+// work too (②b-2d, PicWork): each deliverable, the stage waiting for them answered on the same link. The code is the
+// only key.
 
 const TONE: Record<Tone, string> = { waiting: s.waiting, done: s.done, red: s.red, draft: s.draft }
 
@@ -66,12 +69,14 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
     )
   }
 
-  const status = picStatus(page.status)
-  const overdue = !!now && page.status === 'waiting_pic' && !!page.sentAt && workingHours(page.sentAt, now, new Set()) >= ACCEPT_HOURS
+  // Both PICs sign off (②b-2d-2b): theirs in, the minutes wait for the other — nothing more to answer here.
+  const both = page.status === 'waiting_pic' ? bothState(page.both, page.ok, page.you, page.other) : null
+  const status = both?.mine ? { label: `Waiting for ${both.other}`, tone: 'waiting' as Tone } : picStatus(page.status)
+  const overdue = !!now && page.status === 'waiting_pic' && !both?.mine && !!page.sentAt && workingHours(page.sentAt, now, new Set()) >= ACCEPT_HOURS
   const banner = picBanner(page, overdue)
   const answered = picAnswered(page)
   const steps = picTimeline(page)
-  const waiting = page.status === 'waiting_pic'
+  const waiting = page.status === 'waiting_pic' && !both?.mine
   const go = (to: typeof step) => {
     setError(null)
     setStep(to)
@@ -111,6 +116,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
 
         <div className={s.grid}>
           <div className={s.col}>
+            <PicWork code={code} page={page} onPage={p => setPage(p)} />
             {answered ? (
               <div className={s.answered}>
                 <span className={`${s.mark}${answered.approved ? ` ${s.markOk}` : ''}`} aria-hidden="true">{answered.approved ? '✓' : '↺'}</span>
@@ -137,6 +143,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
                 ))}
               </dl>
 
+              {both?.mine ? <div className={s.bothMine}>You approved · waiting for {both.other}</div> : null}
               {waiting && step === 'choose' ? (
                 <div className={s.choose}>
                   <button type="button" className={`${s.btn} ${s.approve}`} onClick={() => go('approve')}>Approve</button>

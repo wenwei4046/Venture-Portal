@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventText, seriesView, taskFromRow, taskView, trailLines } from './task'
+import { approvalText, eventText, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
 
 // A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
 // New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
@@ -124,5 +124,26 @@ describe('a task’s page', () => {
     expect(taskView(page, ALL)).toMatchObject({ isSeries: true, status: 'Active', actions: [], work: [] })
     expect(seriesView(page)).toMatchObject({ rule: 'Every week on Monday', period: 'from 26 Oct 2026 · 3 runs',
       runs: [{ label: 'Run 1', status: 'Done', tone: 'done' }, { label: 'Run 2', day: 'Mon 2 Nov', status: 'Scheduled', tone: 'draft' }] })
+  })
+})
+
+describe('a PIC level, with one or two PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const p1 = { pic: 'Kelvin', pic2: null }
+  const p2 = { pic: 'Kelvin', pic2: 'Hana' }
+  it('names whom it waits for by the project’s own PICs — either, both, or the one still to answer', () => {
+    expect(picApprover(p1, null, false, null)).toBe('Kelvin (PIC)')
+    expect(picApprover({ pic: null, pic2: null }, { pic: 'Mr Tan' }, false, null)).toBe('Mr Tan (PIC)')
+    expect(picApprover(p2, null, false, null)).toBe('Kelvin or Hana (PIC)')
+    expect(picApprover(p2, null, true, null)).toBe('Kelvin and Hana (PIC)')
+    expect(picApprover(p2, null, true, { '1': { name: 'Kelvin Tan', at: null } })).toBe('Hana (PIC) · Kelvin Tan approved')
+    expect(picApprover(p2, null, true, { '2': { name: 'Hana Lee', at: null } })).toBe('Kelvin (PIC) · Hana Lee approved')
+  })
+  it('reads both on a stage’s level and whose approval is in; the approvals line says “Both PICs”', () => {
+    const page = taskFromRow({ today: '2026-10-24', me: null, team: [],
+      project: { id: 'd1', trackId: 'MKT-CAR-2610-001-D01', kind: 'deliverable', sub: 'sub', title: 'Poster', status: 'active', cur: 0, pic: 'Kelvin', pic2: 'Hana' },
+      stages: [{ project: 'd1', idx: 0, name: 'Design', status: 'review', ver: 2, apprIdx: 0, appr: [{ kind: 'pic', all: true }], picOk: { '1': { name: 'Kelvin Tan', at: null } } }],
+      events: [], holidays: [] })
+    expect([page?.project.pic2, page?.stages[0].levels, page?.stages[0].picOk]).toEqual(['Hana', [{ kind: 'pic', all: true }], { '1': { name: 'Kelvin Tan', at: null } }])
+    expect(approvalText([], page!.stages[0])).toBe('🔗 Both PICs')
   })
 })

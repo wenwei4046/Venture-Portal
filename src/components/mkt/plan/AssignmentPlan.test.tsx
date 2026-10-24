@@ -100,6 +100,34 @@ describe('a deliverable’s Assignment Plan', () => {
     expect(screen.getByRole('button', { name: 'Plan saved ✓' })).toHaveProperty('disabled', true)
   })
 
+  it('two PICs: the PIC level is either one’s or both, and the plan saves which (②b-2d-2b — the user’s answer 29)', async () => {
+    render(<AssignmentPlan initial={page({ pic: 'Kelvin', pic2: 'Hana' })} people={people} approvers={approvers} />)
+    const design = card('Design')
+    expect(within(design).getByText('PIC · Kelvin and Hana')).toBeTruthy()
+    const toggle = within(design).getByRole('button', { name: 'Either PIC approves — make it both' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(toggle)
+    expect(within(design).getByText('Both PICs · Kelvin and Hana')).toBeTruthy()
+    expect(within(design).getByRole('button', { name: 'Both PICs approve — make it either' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(within(design).getByRole('button', { name: /Choose someone/ }))
+    fireEvent.click(within(design).getByRole('menuitem', { name: /Ali/ }))
+    fireEvent.click(within(card('Publish')).getByRole('button', { name: /Choose someone/ }))
+    fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /Mei/ }))
+    fireEvent.click(within(card('Publish')).getByRole('button', { name: '👤 Pick who approves' }))
+    fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /SIA/ }))
+    actions.planMktDeliverable.mockResolvedValue({ ok: true, reassigned: 0, page: null })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save plan' }))
+    })
+    await waitFor(() => expect(actions.planMktDeliverable).toHaveBeenCalledTimes(1))
+    expect(actions.planMktDeliverable.mock.calls[0][1].stages[0].appr).toEqual([{ kind: 'pic', all: true }])
+  })
+
+  it('one PIC: no either / both to pick', () => {
+    render(<AssignmentPlan initial={page()} people={people} approvers={approvers} />)
+    expect(within(card('Design')).queryByRole('button', { name: /make it both/ })).toBeNull()
+  })
+
   it('a refusal says why and keeps the plan', async () => {
     const planned = page({ status: 'active', startsOn: '2026-11-02' }, [
       stage(0, { name: 'Design', owner: ALI, status: 'todo' }), stage(1, { name: 'Caption', owner: MEI }),

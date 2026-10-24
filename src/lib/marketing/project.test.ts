@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attendeesOf, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
+  attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
   productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage,
 } from './project'
 
@@ -18,7 +18,7 @@ const FIELDS = [
   { name: 'Budget note', type: 'Short text', req: false, pic: false, lock: false },
   { name: 'Signatures', type: 'Signature', req: true, pic: true, lock: false },
 ]
-const RULES = { sign: true, pic: true, project: true, file: true, lock: true }
+const RULES = { sign: true, pic: true, picAll: false, project: true, file: true, lock: true }
 
 function page(project: Record<string, unknown> = {}, minutes: Record<string, unknown> = {}, trail: object[] = []): ProductProjectPage {
   return productProjectFromRow({
@@ -98,11 +98,22 @@ describe('what stops the intake minutes going to the PIC', () => {
     expect(sendProblems({ ...doc, vals: { ...doc.vals, Objective: 'Walk-ins' }, signed: { 's-rachel': 'x', 's-siti': 'y' } }, kelvin, team)).toEqual([])
   })
 
+  it('a second PIC named is reached on WhatsApp too, when the link goes to them (2026-10-24 — the user’s answer 29)', () => {
+    const team = page().team
+    const ready = { ...doc, vals: { ...doc.vals, Objective: 'Walk-ins' }, signed: { 's-rachel': 'x', 's-siti': 'y' } }
+    expect(sendProblems(ready, { ...kelvin, name2: 'Hana', whatsapp2: '12' }, team)).toEqual(['Add the second PIC’s WhatsApp'])
+    expect(sendProblems(ready, { ...kelvin, name2: 'Hana', whatsapp2: '+60 13-222 1111' }, team)).toEqual([])
+    expect(sendProblems(ready, { ...kelvin, name2: ' ', whatsapp2: '' }, team)).toEqual([])
+    const noPic = { ...ready, template: { ...ready.template, rules: { ...RULES, pic: false } } }
+    expect(sendProblems(noPic, { ...kelvin, name2: 'Hana', whatsapp2: '' }, team)).toEqual([])
+  })
+
   it('counts the required: the fields, the PIC’s name, and their WhatsApp when the link goes to them', () => {
     expect(requiredTally(doc, doc.vals, kelvin)).toEqual({ done: 4, total: 5 })
     expect(requiredTally(doc, { ...doc.vals, Objective: 'Walk-ins' }, { name: 'Kelvin', whatsapp: '' })).toEqual({ done: 4, total: 5 })
     const noPic = { ...doc, template: { ...doc.template, rules: { ...RULES, pic: false } } }
     expect(requiredTally(noPic, doc.vals, kelvin)).toEqual({ done: 3, total: 4 })
+    expect(requiredTally(doc, doc.vals, { ...kelvin, name2: 'Hana', whatsapp2: '' })).toEqual({ done: 4, total: 6 })
   })
 
   it('a WhatsApp number is 8 digits or more, written any way', () => {
@@ -141,6 +152,7 @@ describe('where it stands', () => {
 
   it('the trail in words, newest first, on the office’s clock', () => {
     const pp = page({}, {}, [
+      { at: '2026-10-25T11:00:00Z', actor: 'Hana Lee (PIC)', action: 'pic approved', reason: 'Kickoff', data: { pic: 2, waiting: 'Kelvin' } },
       { at: '2026-10-25T10:00:00Z', actor: 'Kelvin Tan (PIC)', action: 'pic approved', reason: 'Kickoff' },
       { at: '2026-10-25T09:00:00Z', actor: 'Kelvin (PIC)', action: 'pic changes', reason: 'Add Penang' },
       { at: '2026-10-25T08:00:00Z', actor: 'RACHEL', action: 'resent', reason: 'Kelvin' },
@@ -150,6 +162,7 @@ describe('where it stands', () => {
       { at: '2026-10-24T04:00:00Z', actor: 'SITI', action: 'signed', reason: 'Kickoff' },
     ])
     expect(productTrail(pp).map(l => `${l.t} ${l.text}`)).toEqual([
+      '25 Oct 19:00 Hana Lee (PIC) approved Kickoff on the link · waiting for Kelvin',
       '25 Oct 18:00 Kelvin Tan (PIC) approved Kickoff on the link',
       '25 Oct 17:00 Kelvin (PIC) asked for changes on the link: "Add Penang"',
       '25 Oct 16:00 RACHEL resent to Kelvin',
@@ -163,7 +176,7 @@ describe('where it stands', () => {
 })
 
 describe('the save and the link', () => {
-  const saved: MinutesEdit = { vals: { Objective: 'Walk-ins', Attendees: ['a'] }, notes: '', pic: 'Kelvin', whatsapp: '+60 12' }
+  const saved: MinutesEdit = { vals: { Objective: 'Walk-ins', Attendees: ['a'] }, notes: '', pic: 'Kelvin', whatsapp: '+60 12', pic2: '', whatsapp2: '' }
 
   it('sends only what changed; a field emptied is cleared; the PIC only on the intake minutes', () => {
     expect(fillPatch(saved, { ...saved }, true)).toBeNull()
@@ -173,9 +186,36 @@ describe('the save and the link', () => {
     expect(fillPatch(saved, { ...saved, pic: 'Kelvin Tan' }, false)).toBeNull()
   })
 
+  it('…and the second PIC, only theirs when only theirs changed', () => {
+    expect(fillPatch(saved, { ...saved, pic2: 'Hana' }, true)).toEqual({ pic2: 'Hana' })
+    expect(fillPatch({ ...saved, pic2: 'Hana', whatsapp2: '+60 13' }, { ...saved, pic2: '', whatsapp2: '' }, true)).toEqual({ pic2: '', whatsapp2: '' })
+    expect(fillPatch(saved, { ...saved, pic2: 'Hana' }, false)).toBeNull()
+  })
+
+  it('reads the second PIC, their link and whose the PIC’s answer was', () => {
+    const pp = page({ pic2: 'Hana', whatsapp2: '+60 13-222 1111', link: 'a1', link2: 'b2',
+      picReply: { decision: 'approved', name: 'Hana Lee', reason: '', at: '2026-10-25T08:00:00Z', pic: 2 } })
+    expect([pp.project.pic2, pp.project.whatsapp2, pp.project.link2, pp.project.picReply?.pic]).toEqual(['Hana', '+60 13-222 1111', 'b2', 2])
+    const before = page({ picReply: { decision: 'changes', name: 'Kelvin', reason: 'x', at: null } })
+    expect([before.project.pic2, before.project.link2, before.project.picReply?.pic]).toEqual(['', null, 1])
+  })
+
   it('the PIC’s link on this site, and WhatsApp with it in the message', () => {
     expect(linkUrl('https://venture.example/', 'abc')).toBe('https://venture.example/t/abc')
     expect(whatsappUrl('+60 12-345 6789', 'Hi Kelvin: https://x/t/abc')).toBe('https://wa.me/60123456789?text=Hi%20Kelvin%3A%20https%3A%2F%2Fx%2Ft%2Fabc')
     expect(whatsappUrl('12', 'x')).toBeNull()
+  })
+})
+
+describe('the minutes waiting for both PICs (②b-2d-2b, the user’s answer 29)', () => {
+  const both = { ...RULES, picAll: true }
+  it('says whose approval is in and whom they wait for — only while they wait, with two PICs, the template asking both', () => {
+    const pp = (project: Record<string, unknown>, rules = both) => page({ status: 'waiting_pic', pic2: 'Hana', ...project }, { template: { id: 't1', version: 1, name: 'Kickoff', fields: FIELDS, rules } })
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBe('Kelvin Tan approved · waiting for Hana')
+    expect(bothWaiting(pp({ picOk: { '2': { name: 'Hana Lee', at: null } } }))).toBe('Hana Lee approved · waiting for Kelvin')
+    expect(bothWaiting(pp({ picOk: null }))).toBeNull()
+    expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }, RULES))).toBeNull()
+    expect(bothWaiting(pp({ pic2: null, picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
+    expect(bothWaiting(pp({ status: 'approved', picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
   })
 })

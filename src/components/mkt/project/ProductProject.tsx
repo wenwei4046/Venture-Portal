@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { beginMktProduct, fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
 import {
-  canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
+  bothWaiting, canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
   stepsOf, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
+import { picNames } from '@/lib/marketing/clients'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
 import ProjectSheet from '../audit/ProjectSheet'
@@ -30,7 +31,8 @@ type SaveState = { state: 'saved' | 'saving' } | { state: 'error'; reason: strin
 const intakeOf = (page: ProductProjectPage): MinutesDoc | null => page.minutes.find(m => m.intake) ?? page.minutes[0] ?? null
 const editOf = (page: ProductProjectPage): MinutesEdit => {
   const doc = intakeOf(page)
-  return { vals: doc?.vals ?? {}, notes: doc?.notes ?? '', pic: page.project.pic, whatsapp: page.project.whatsapp }
+  return { vals: doc?.vals ?? {}, notes: doc?.notes ?? '', pic: page.project.pic, whatsapp: page.project.whatsapp,
+    pic2: page.project.pic2, whatsapp2: page.project.whatsapp2 }
 }
 
 export default function ProductProject({ initial, can }: { initial: ProductProjectPage; can: { edit: boolean; manage: boolean } }) {
@@ -45,7 +47,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   useEffect(() => setNow(new Date()), [page])
   const [logOpen, setLogOpen] = useState(false)
   const [reason, setReason] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+  // The second PIC's two fields: shown once named, or once the manager asks for them.
+  const [second, setSecond] = useState(() => !!initial.project.pic2)
   const [origin, setOrigin] = useState('')
 
   const pr = page.project
@@ -88,10 +92,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
       }
       revRef.current = r.rev
       savedRef.current = now
-      if (r.page) {
-        setPage(r.page)
-        say(`Changed after approval · back to ${now.pic.trim() || 'the PIC'}`)
-      }
+      // The page comes back when the PIC must approve again — or when the second PIC changed (their link made or gone).
+      if (r.page) setPage(r.page)
+      if (r.reapproval) say(`Changed after approval · back to ${picNames(now.pic, now.pic2) || 'the PIC'}`)
       if (editRef.current === now) setSave({ state: 'saved' })
       return true
     })
@@ -149,16 +152,26 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const writes = can.manage && !doc.locked && pr.status !== 'done' && pr.status !== 'cancelled'
   const stale = save.state === 'error' && save.stale
   const readOnly = !writes || pending || stale
-  const picName = edit.pic.trim() || 'the PIC'
+  const picName = picNames(edit.pic, edit.pic2) || 'the PIC'
+  // Both PICs sign off (②b-2d-2b): whose approval is in, whom the minutes wait for.
+  const halfway = bothWaiting(page)
   const live = { ...doc, vals: edit.vals }
-  const problems = sendProblems(live, { name: edit.pic, whatsapp: edit.whatsapp }, page.team)
-  const tally = requiredTally(doc, edit.vals, { name: edit.pic, whatsapp: edit.whatsapp })
+  const pics = { name: edit.pic, whatsapp: edit.whatsapp, name2: edit.pic2, whatsapp2: edit.whatsapp2 }
+  const problems = sendProblems(live, pics, page.team)
+  const tally = requiredTally(doc, edit.vals, pics)
   const complete = tally.done >= tally.total
   const status = productStatus(pr.status)
   const steps = stepsOf(pr.status, rules.pic)
   const edited = editedAfterApproval(page)
-  const url = pr.link ? linkUrl(origin, pr.link) : null
-  const wa = url ? whatsappUrl(edit.whatsapp, `Hi ${edit.pic.trim() || 'there'}, the minutes of our meeting for ${pr.title} — please review and approve: ${url}`) : null
+  // Each PIC their own link (2026-10-24 — the user's answer 29), shared with them on WhatsApp.
+  const links = [
+    { key: 'pic', who: edit.pic.trim(), code: pr.link, whatsapp: edit.whatsapp },
+    { key: 'pic2', who: edit.pic2.trim(), code: edit.pic2.trim() ? pr.link2 : null, whatsapp: edit.whatsapp2 },
+  ].flatMap(l => {
+    if (!l.code) return []
+    const url = linkUrl(origin, l.code)
+    return [{ ...l, url, wa: whatsappUrl(l.whatsapp, `Hi ${l.who || 'there'}, the minutes of our meeting for ${pr.title} — please review and approve: ${url}`) }]
+  })
   const waiting = pr.status === 'waiting_pic' || pr.status === 'changes'
   const lines = productTrail(page)
   const begin = canBeginWork(page)
@@ -176,9 +189,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      setCopied(true)
+      setCopied(text)
       if (copyTimer.current) clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setCopied(false), 2000)
+      copyTimer.current = setTimeout(() => setCopied(null), 2000)
     } catch {
       say('Copy it from the box')
     }
@@ -273,6 +286,22 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
                 <input className={`${p.input} ${p.mono}`} value={edit.whatsapp} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX" readOnly={readOnly}
                   onChange={e => change({ ...editRef.current, whatsapp: e.target.value })} />
               </label>
+              {/* A second PIC (the user's answer 29): their own link; either PIC's answer counts. */}
+              {second || edit.pic2 ? (
+                <>
+                  <label className={p.field}>
+                    <span className={p.fieldLabel}>Second PIC<span className={p.marks}><span title="The PICs see it on the link">👁</span></span></span>
+                    <input className={p.input} value={edit.pic2} maxLength={80} readOnly={readOnly} onChange={e => change({ ...editRef.current, pic2: e.target.value })} />
+                  </label>
+                  <label className={p.field}>
+                    <span className={p.fieldLabel}>Second PIC WhatsApp<span className={p.marks}>{rules.pic && edit.pic2.trim() ? <span title="Required">⭐</span> : null}<span title="Internal only — the PIC never sees it">🔒</span></span></span>
+                    <input className={`${p.input} ${p.mono}`} value={edit.whatsapp2} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX" readOnly={readOnly}
+                      onChange={e => change({ ...editRef.current, whatsapp2: e.target.value })} />
+                  </label>
+                </>
+              ) : !readOnly ? (
+                <button type="button" className={`${p.textBtn} ${p.addPic}`} onClick={() => setSecond(true)}>+ Second PIC</button>
+              ) : null}
             </div>
           </section>
 
@@ -343,20 +372,28 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </>
             ) : null}
 
-            {url && rules.pic && pr.status !== 'minutes' ? (
+            {/* The PIC's link: for the minutes they sign off — and, once the work is under way, for the stages they approve (②b-2d). */}
+            {links.length && (rules.pic || page.deliverables.length > 0) && pr.status !== 'minutes' ? (
               <div className={p.linkBox}>
-                <div className={p.linkUrl}><span>{url}</span></div>
-                <div className={p.linkBtns}>
-                  <button type="button" className={p.ghost} onClick={() => void copy(url)}>{copied ? 'Copied ✓' : 'Copy link'}</button>
-                  {wa ? <a className={`${p.ghost} ${p.ghostWide}`} href={wa} target="_blank" rel="noreferrer">Share via WhatsApp</a> : null}
-                </div>
+                {/* Each PIC their own link (2026-10-24 — the user's answer 29), named when there are two. */}
+                {links.map(l => (
+                  <div key={l.key} className={p.linkOne}>
+                    {links.length > 1 ? <div className={p.linkWho}>{l.who || 'The PIC'}</div> : null}
+                    <div className={p.linkUrl}><span>{l.url}</span></div>
+                    <div className={p.linkBtns}>
+                      <button type="button" className={p.ghost} onClick={() => void copy(l.url)}>{copied === l.url ? 'Copied ✓' : 'Copy link'}</button>
+                      {l.wa ? <a className={`${p.ghost} ${p.ghostWide}`} href={l.wa} target="_blank" rel="noreferrer">Share via WhatsApp</a> : null}
+                    </div>
+                  </div>
+                ))}
                 {pr.status === 'waiting_pic' && pr.linkSentAt ? (() => {
                   // No reply after 4 working hours: red (2026-10-24 — the user's answer 2, the PIC's wait as a stage's).
                   const hours = now ? workingHours(pr.linkSentAt, now, new Set()) : 0
                   return hours >= ACCEPT_HOURS
-                    ? <div className={`${p.wait} ${p.waitLate}`}>Sent {trailTime(pr.linkSentAt)} · no reply · {Math.floor(hours)} working hours</div>
+                    ? <div className={`${p.wait} ${p.waitLate}`}>Sent {trailTime(pr.linkSentAt)}{halfway ? '' : ' · no reply'} · {Math.floor(hours)} working hours</div>
                     : <div className={p.wait}>Sent {trailTime(pr.linkSentAt)}</div>
                 })() : null}
+                {halfway ? <div className={p.wait}>{halfway}</div> : null}
                 {pr.status === 'changes' && can.manage ? (
                   <button type="button" className={p.primary} disabled={pending} onClick={resend}>Resend to {picName}</button>
                 ) : null}

@@ -404,15 +404,17 @@ export default function MinutesBuilder({ initial, first, attendees }: {
 
                   <section className={m.card} aria-label="Completion rules">
                     <div className={m.cardHead}><span className={m.cardTitle}>Completion rules</span></div>
-                    {RULES.map(r => (
+                    {RULES.filter(r => !r.under || rules[r.under]).map(r => (
                       <button
                         key={r.key}
                         type="button"
                         role="switch"
                         aria-checked={rules[r.key]}
-                        className={m.rule}
+                        className={`${m.rule}${r.under ? ` ${m.ruleUnder}` : ''}`}
                         title={r.hint}
-                        onClick={() => change({ ...edit, rules: { ...rules, [r.key]: !rules[r.key] } })}
+                        // A rule turned off takes the ones beneath it with it (Both PICs sign off under PIC signs off).
+                        onClick={() => change({ ...edit, rules: { ...rules, [r.key]: !rules[r.key],
+                          ...(rules[r.key] ? Object.fromEntries(RULES.filter(x => x.under === r.key).map(x => [x.key, false])) : {}) } })}
                       >
                         <span className={`${m.sw}${rules[r.key] ? ` ${m.swOn}` : ''}`} aria-hidden="true" />
                         <span className={m.ruleName}>{r.name}</span>
