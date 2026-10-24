@@ -190,6 +190,8 @@ export const PAGE_TABS = {
 
   // ── Marketing view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup") ──
   '/marketing': ['mkt.overview'],
+  // A direct message opened on a complaint (⑦-3b): reached from My Space's chat tile; the database decides who.
+  '/marketing/chat-review': ['mkt.overview'],
   '/marketing/calendar': ['mkt.calendar'],
   '/marketing/new': ['mkt.projects'],
   '/marketing/projects': ['mkt.projects'],

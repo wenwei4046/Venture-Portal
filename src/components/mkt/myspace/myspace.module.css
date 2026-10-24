@@ -460,6 +460,15 @@ div.lobbyPet { cursor: default; }
 }
 .chatTab[aria-selected='true'] { background: rgb(var(--mk-white)); box-shadow: 0 1px 2px rgb(var(--mk-ink) / .14); font-weight: 600; }
 .chatTabDot { width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--mk-red-dot)); }
+/* A full-access title's own login: 🔍 Review beside the tabs (⑦-3b). */
+.chatTop { display: flex; align-items: center; gap: 6px; margin: 8px 10px 0; flex: none; }
+.chatTop .chatTabs { margin: 0; flex: 1; min-width: 0; }
+.chatReview {
+  flex: none; height: 32px; padding: 0 9px; box-sizing: border-box; border-radius: 8px; border: 1px solid rgb(var(--mk-line));
+  background: rgb(var(--mk-white)); display: flex; align-items: center; font-size: .8em; color: rgb(var(--mk-ink)); text-decoration: none;
+  white-space: nowrap;
+}
+.chatReview:hover { background: rgb(var(--mk-hover)); }
 .chatPeers { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .chatPeer {
   display: flex; align-items: center; gap: 9px; padding: 7px 6px; border-radius: 9px; cursor: pointer; min-width: 0; border: 0;

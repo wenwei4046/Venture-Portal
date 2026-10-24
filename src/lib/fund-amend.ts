@@ -42,6 +42,8 @@ export interface AmendDraft {
   noFixedTerm: boolean
   /** From a month: the interest is on the original principal, not on what is still owed then. */
   interestOnOriginal: boolean
+  /** From a month: the interest stays on the base the terms before used (one or the other, never both). */
+  interestKeepsBase: boolean
   months: string
   start: string
   compound: boolean
@@ -62,6 +64,7 @@ export const amendDraftOf = (t: AmendTerms): AmendDraft => ({
   remaining: '',
   noFixedTerm: false,
   interestOnOriginal: false,
+  interestKeepsBase: false,
   months: t.months,
   start: t.start,
   compound: t.compound,
@@ -92,6 +95,7 @@ export function amendFormData(side: DealSide, id: string, was: AmendTerms, d: Am
     if (d.noFixedTerm) fd.set('no_fixed_term', 'on')
     else if (d.remaining.trim()) fd.set('remaining_months', d.remaining.trim())
     if (d.interestOnOriginal) fd.set('interest_on_original', 'on')
+    else if (d.interestKeepsBase) fd.set('interest_keeps_base', 'on')
     if (d.reason.trim()) fd.set('reason', d.reason.trim())
     return fd
   }
@@ -118,6 +122,7 @@ export function draftOfForm(side: DealSide, fd: FormData, mode: AmendMode, was: 
     remaining: s('remaining_months'),
     noFixedTerm: fd.get('no_fixed_term') === 'on',
     interestOnOriginal: fd.get('interest_on_original') === 'on',
+    interestKeepsBase: fd.get('interest_keeps_base') === 'on',
     months: whole ? s(n.months) : was.months,
     start: whole ? s(n.start) : was.start,
     compound: fd.get('compound_interest') === 'on',

@@ -15,6 +15,7 @@ import { replaceDoneFromRow, type ReplaceDone } from './replace'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 import { petStatsFromRow, spaceFromRow, spacePatchOf, type PetStats, type Space, type SpacePatch } from './space'
 import { chatMessageFromRow, type ChatMessage } from './chat'
+import { reviewOpenFromRow, type ChatReviewOpen } from './chat-review'
 import {
   libraryFromRow, NO_PROFILE, profileFromRow, profileToRow, SHARE_EXPIRIES, taskFilesFromRow, type Library, type LibProfile, type ShareExpiry,
   type TaskFile,
@@ -635,6 +636,21 @@ export async function sendMktChat(to: string, body: string | null, project: stri
   const message = chatMessageFromRow(data)
   if (!message) return { ok: false, reason: 'Your message could not be sent. Please try again.' }
   return { ok: true, message }
+}
+
+/** A direct message opened on a complaint (⑦-3b, mig 20261025039500; the user's answer 35, amended): the two people and
+ * the reason first, then the record of it, then their messages. A full-access title's own login only — the database asks
+ * the login (never the shared Principal one) and keeps the record for good; nobody is told. */
+export async function openMktChatReview(a: string, b: string, reason: string): Promise<Done<{ open: ChatReviewOpen }>> {
+  await requireActionOn('/marketing/chat-review', 'accounts', 'manage')
+  if (!isId(a) || !isId(b)) return { ok: false, reason: 'Pick the two people whose chat it is.' }
+  const { data, error } = await (await client()).rpc('mkt_chat_review_open', { p_a: a.toLowerCase(), p_b: b.toLowerCase(), p_reason: reason })
+  if (error) return { ok: false, reason: words(error, 'The chat could not be opened. Please try again.') }
+  const open = reviewOpenFromRow(data)
+  if (!open) return { ok: false, reason: 'The chat could not be opened. Please try again.' }
+  // The page's records, fresh on the next visit too.
+  revalidatePath('/marketing/chat-review')
+  return { ok: true, open }
 }
 
 /** The caller has read a thread to there (⑦-3) — their own mark, forward only. */

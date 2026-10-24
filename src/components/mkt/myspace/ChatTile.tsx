@@ -156,17 +156,27 @@ export default function ChatTile({ list: initial, canSpeak, tasks, openWith = nu
     : [{ key: 'lobby', label: '🏛️ Lobby', unread: false }]
   const writes = canSpeak && !!showing && (showing === LOBBY || !!peer)
 
+  const tabBar = (
+    <div className={s.chatTabs} role="tablist" aria-label="Chats">
+      {tabs.map(t => (
+        <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={s.chatTab}
+          onClick={() => open(t.key, null)}>
+          {t.label}
+          {t.unread && tab !== t.key ? <span className={s.chatTabDot} aria-label="Unread" /> : null}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className={s.chat}>
-      <div className={s.chatTabs} role="tablist" aria-label="Chats">
-        {tabs.map(t => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={s.chatTab}
-            onClick={() => open(t.key, null)}>
-            {t.label}
-            {t.unread && tab !== t.key ? <span className={s.chatTabDot} aria-label="Unread" /> : null}
-          </button>
-        ))}
-      </div>
+      {/* A full-access title's own login opens a direct message on a complaint (⑦-3b): its page, beside the tabs. */}
+      {list.reviewer ? (
+        <div className={s.chatTop}>
+          {tabBar}
+          <Link href="/marketing/chat-review" className={s.chatReview}>🔍 Review</Link>
+        </div>
+      ) : tabBar}
 
       {tab === 'dm' && !dm ? (
         <div className={s.chatPeers}>

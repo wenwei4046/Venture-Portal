@@ -108,6 +108,8 @@ export interface PositionRow {
   termsBase?: number
   /** The current terms take their interest on the original principal (the change said so). */
   termsInterestOnOriginal?: boolean
+  /** …or keep it on the base the terms before used — this is that base. */
+  termsInterestKeptOn?: number | null
   /** A changed fixed-term deal's whole-plan interest, segment by segment (Total Interest). */
   planInterest?: number | null
   termsChanges?: TermsChangeComparison[]
@@ -144,6 +146,7 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
           termsFrom: seg.fromYM,
           termsBase: seg.base,
           termsInterestOnOriginal: seg.interestOnOriginal === true,
+          termsInterestKeptOn: seg.interestKeepsBase ? (seg.interestBase ?? null) : null,
           planInterest: whole?.interest ?? null,
           termsChanges: allTermsChanges(p.segments!, { currentYM, paidByMonth: p.paidByMonth }),
         }
