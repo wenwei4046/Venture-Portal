@@ -10,9 +10,11 @@ import {
 } from '@/lib/marketing/subsidiary'
 import { trailTime } from '@/lib/marketing/task'
 import { groupLabel, groupTone, rosterGroups, sameGroup, type MktTone } from '@/lib/marketing/groups'
+import ClientEdit from './ClientEdit'
 import s from './subsidiary.module.css'
 
-// A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PIC; where its work stands (five cards);
+// A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PICs — the manager edits them, and a client's
+// name (②b-2d-2a); where its work stands (five cards);
 // its dates by Month, Week or Timeline — coloured by group (a People title), red once passed undone, done faded — with
 // HR's holidays as ⚑ key dates and the handoff's filter (type, group, status); ⚡ Recent activity from its projects' trails; and its
 // projects with how far each has come. Every item opens its project.
@@ -30,7 +32,10 @@ const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encod
 const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM(e.team) : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
 const evEmoji = (e: CalEvent) => (e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
 
-export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; sub: MktSub; feed: SubFeedEvent[] }) {
+export default function SubsidiaryPage({ board, sub: initial, feed, manage = false }: { board: MktBoard; sub: MktSub; feed: SubFeedEvent[]; manage?: boolean }) {
+  // Its details as last saved here (the board answers again on the next visit).
+  const [sub, setSub] = useState(initial)
+  const [editing, setEditing] = useState(false)
   const [view, setView] = useState<View>('month')
   const [month, setMonth] = useState(() => monthOf(board.today))
   const [week, setWeek] = useState(board.today)
@@ -71,18 +76,22 @@ export default function SubsidiaryPage({ board, sub, feed }: { board: MktBoard; 
             <h1 className={s.name}>{sub.name}</h1>
             <span className={s.dot} style={{ background: sub.dot }} aria-hidden="true" />
             {sub.client ? <span className={s.clientChip}>Client</span> : null}
+            {manage ? <button type="button" className={s.editBtn} onClick={() => setEditing(true)}>Edit</button> : null}
           </div>
           <div className={s.picRow}>
-            <span>PIC</span>
+            <span>{sub.pic2 ? 'PICs' : 'PIC'}</span>
             {sub.pic ? (
               <>
-                <span className={s.pic}><span className={s.picAv} aria-hidden="true">{sub.pic.slice(0, 1).toUpperCase()}</span>{sub.pic}</span>
-                <span>· approves via 🔗 link</span>
+                {[sub.pic, sub.pic2].filter((x): x is string => !!x).map(name => (
+                  <span key={name} className={s.pic}><span className={s.picAv} aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>{name}</span>
+                ))}
+                <span>· {sub.pic2 ? 'either approves' : 'approves'} via 🔗 link</span>
               </>
             ) : <span className={s.none}>—</span>}
           </div>
         </div>
       </div>
+      {editing ? <ClientEdit sub={sub} onClose={() => setEditing(false)} onSaved={next => { setSub(next); setEditing(false) }} /> : null}
 
       <div className={s.stats}>
         {stats.map(st => (

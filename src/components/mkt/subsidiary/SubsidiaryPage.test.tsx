@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { boardFromRow, type MktSub } from '@/lib/marketing/board'
 import { subFeedFromRow } from '@/lib/marketing/subsidiary'
+const actions = vi.hoisted(() => ({ editMktClient: vi.fn() }))
+vi.mock('@/lib/marketing/actions', () => actions)
 import SubsidiaryPage from './SubsidiaryPage'
 
 // 2026-10-23 — ④-2: a subsidiary's page (`Subsidiary Page.dc.html`) — its PIC, its five cards, its dates by Month,
@@ -104,5 +106,45 @@ describe('a subsidiary’s page', () => {
     render(<SubsidiaryPage board={board} sub={{ ...sub, client: true, pic: null }} feed={[]} />)
     expect(screen.getByText('Client')).toBeTruthy()
     expect(screen.getByText('Nothing yet')).toBeTruthy()
+  })
+})
+
+describe('its details, the manager’s to edit (②b-2d-2a, the user’s answer 29)', () => {
+  it('no Edit for the staff; the manager’s dialog sends only what changed — never a group company’s name — and the page shows it', async () => {
+    const staff = render(<SubsidiaryPage board={board} sub={sub} feed={feed} />)
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+    staff.unmount()
+    render(<SubsidiaryPage board={board} sub={sub} feed={feed} manage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit Carres' })
+    expect(within(dialog).queryByRole('textbox', { name: 'Name' })).toBeNull()
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Second PIC' }), { target: { value: 'mr tan' } })
+    expect(within(dialog).getByRole('alert').textContent).toBe('The second PIC is somebody else')
+    expect(save).toHaveProperty('disabled', true)
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Second PIC' }), { target: { value: 'Hana Lee' } })
+    actions.editMktClient.mockResolvedValue({ ok: true, sub: { ...sub, whatsapp: null, pic2: 'Hana Lee', whatsapp2: null } })
+    await act(async () => {
+      fireEvent.click(save)
+    })
+    expect(actions.editMktClient).toHaveBeenCalledWith(CAR, { pic2: 'Hana Lee' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('PICs')).toBeTruthy()
+    expect(screen.getByText('Hana Lee')).toBeTruthy()
+    expect(screen.getByText('· either approves via 🔗 link')).toBeTruthy()
+  })
+
+  it('renames Marketing’s own client; a refusal says why and keeps the dialog', async () => {
+    render(<SubsidiaryPage board={board} sub={{ ...sub, client: true, name: 'Acme' }} feed={[]} manage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit Acme' })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Name' }), { target: { value: 'Carres' } })
+    actions.editMktClient.mockResolvedValue({ ok: false, reason: 'Carres is on the list already.' })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    })
+    expect(actions.editMktClient).toHaveBeenCalledWith(CAR, { name: 'Carres' })
+    expect(within(dialog).getByRole('alert').textContent).toBe('Carres is on the list already.')
   })
 })

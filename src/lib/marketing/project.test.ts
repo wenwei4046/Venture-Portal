@@ -98,11 +98,22 @@ describe('what stops the intake minutes going to the PIC', () => {
     expect(sendProblems({ ...doc, vals: { ...doc.vals, Objective: 'Walk-ins' }, signed: { 's-rachel': 'x', 's-siti': 'y' } }, kelvin, team)).toEqual([])
   })
 
+  it('a second PIC named is reached on WhatsApp too, when the link goes to them (2026-10-24 — the user’s answer 29)', () => {
+    const team = page().team
+    const ready = { ...doc, vals: { ...doc.vals, Objective: 'Walk-ins' }, signed: { 's-rachel': 'x', 's-siti': 'y' } }
+    expect(sendProblems(ready, { ...kelvin, name2: 'Hana', whatsapp2: '12' }, team)).toEqual(['Add the second PIC’s WhatsApp'])
+    expect(sendProblems(ready, { ...kelvin, name2: 'Hana', whatsapp2: '+60 13-222 1111' }, team)).toEqual([])
+    expect(sendProblems(ready, { ...kelvin, name2: ' ', whatsapp2: '' }, team)).toEqual([])
+    const noPic = { ...ready, template: { ...ready.template, rules: { ...RULES, pic: false } } }
+    expect(sendProblems(noPic, { ...kelvin, name2: 'Hana', whatsapp2: '' }, team)).toEqual([])
+  })
+
   it('counts the required: the fields, the PIC’s name, and their WhatsApp when the link goes to them', () => {
     expect(requiredTally(doc, doc.vals, kelvin)).toEqual({ done: 4, total: 5 })
     expect(requiredTally(doc, { ...doc.vals, Objective: 'Walk-ins' }, { name: 'Kelvin', whatsapp: '' })).toEqual({ done: 4, total: 5 })
     const noPic = { ...doc, template: { ...doc.template, rules: { ...RULES, pic: false } } }
     expect(requiredTally(noPic, doc.vals, kelvin)).toEqual({ done: 3, total: 4 })
+    expect(requiredTally(doc, doc.vals, { ...kelvin, name2: 'Hana', whatsapp2: '' })).toEqual({ done: 4, total: 6 })
   })
 
   it('a WhatsApp number is 8 digits or more, written any way', () => {
@@ -163,7 +174,7 @@ describe('where it stands', () => {
 })
 
 describe('the save and the link', () => {
-  const saved: MinutesEdit = { vals: { Objective: 'Walk-ins', Attendees: ['a'] }, notes: '', pic: 'Kelvin', whatsapp: '+60 12' }
+  const saved: MinutesEdit = { vals: { Objective: 'Walk-ins', Attendees: ['a'] }, notes: '', pic: 'Kelvin', whatsapp: '+60 12', pic2: '', whatsapp2: '' }
 
   it('sends only what changed; a field emptied is cleared; the PIC only on the intake minutes', () => {
     expect(fillPatch(saved, { ...saved }, true)).toBeNull()
@@ -171,6 +182,20 @@ describe('the save and the link', () => {
     expect(fillPatch(saved, { ...saved, vals: { Objective: 'Walk-ins' } }, true)).toEqual({ vals: { Attendees: null } })
     expect(fillPatch(saved, { ...saved, pic: 'Kelvin Tan', whatsapp: '+60 13' }, true)).toEqual({ pic: 'Kelvin Tan', whatsapp: '+60 13' })
     expect(fillPatch(saved, { ...saved, pic: 'Kelvin Tan' }, false)).toBeNull()
+  })
+
+  it('…and the second PIC, only theirs when only theirs changed', () => {
+    expect(fillPatch(saved, { ...saved, pic2: 'Hana' }, true)).toEqual({ pic2: 'Hana' })
+    expect(fillPatch({ ...saved, pic2: 'Hana', whatsapp2: '+60 13' }, { ...saved, pic2: '', whatsapp2: '' }, true)).toEqual({ pic2: '', whatsapp2: '' })
+    expect(fillPatch(saved, { ...saved, pic2: 'Hana' }, false)).toBeNull()
+  })
+
+  it('reads the second PIC, their link and whose the PIC’s answer was', () => {
+    const pp = page({ pic2: 'Hana', whatsapp2: '+60 13-222 1111', link: 'a1', link2: 'b2',
+      picReply: { decision: 'approved', name: 'Hana Lee', reason: '', at: '2026-10-25T08:00:00Z', pic: 2 } })
+    expect([pp.project.pic2, pp.project.whatsapp2, pp.project.link2, pp.project.picReply?.pic]).toEqual(['Hana', '+60 13-222 1111', 'b2', 2])
+    const before = page({ picReply: { decision: 'changes', name: 'Kelvin', reason: 'x', at: null } })
+    expect([before.project.pic2, before.project.link2, before.project.picReply?.pic]).toEqual(['', null, 1])
   })
 
   it('the PIC’s link on this site, and WhatsApp with it in the message', () => {
