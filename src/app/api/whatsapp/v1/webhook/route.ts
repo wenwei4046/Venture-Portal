@@ -82,6 +82,11 @@ export async function POST(request: Request) {
     console.error('crm_ingest_whatsapp failed:', error.message)
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
   }
+  // A customer's reactions onto the messages they react to (service role only, mig 20261025050000); a failure only warns.
+  if (delivery.reactions.length) {
+    const { error: rxError } = await client().rpc('crm_their_reactions', { p_reactions: delivery.reactions })
+    if (rxError) console.error('crm_their_reactions failed:', rxError.message)
+  }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).
