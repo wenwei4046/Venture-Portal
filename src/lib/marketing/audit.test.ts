@@ -87,6 +87,16 @@ describe('a project’s formal log', () => {
       ['Monthly run made', 'Nov 2026'], ['Run day changed', '—'], ['Plan carried', '—']])
   })
 
+  it('paused and resumed (②b-2g): the month it goes on from in the Version column, the months left out in Reason', () => {
+    const log = projectLogFromRow({ track: 'MKT-CAR-2610-007', title: 'Social media', kind: 'product', rows: [
+      { id: 50, at: '2026-11-02T01:00:00Z', actor: 'Josiah', action: 'runs paused', data: null },
+      { id: 51, at: '2026-12-08T01:00:00Z', actor: 'Josiah', action: 'runs resumed', data: { from: '2026-12', left: 1 } },
+      { id: 52, at: '2026-12-09T01:00:00Z', actor: 'Josiah', action: 'runs resumed', data: { from: '2027-01', left: 0 } },
+    ] })!
+    expect(auditRows(log).map(r => [r.action, r.reason, r.version])).toEqual([
+      ['Monthly runs paused', '—', '—'], ['Monthly runs resumed', '1 month left out', 'Dec 2026'], ['Monthly runs resumed', '—', 'Jan 2027']])
+  })
+
   it('a campaign’s period (④-2b): its days — or taken off — in the Reason column', () => {
     const log = projectLogFromRow({ track: 'MKT-CAR-2610-007', title: 'Truck event', kind: 'product', rows: [
       { id: 50, at: '2026-10-24T01:00:00Z', actor: 'Josiah', action: 'campaign period', data: { from: '2026-11-09', until: '2026-11-12' } },

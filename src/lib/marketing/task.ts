@@ -581,6 +581,18 @@ export function runMadeText(data: Record<string, unknown> | null | undefined): s
   return `${billMonthWords(data?.month)}'s work made · ${made} deliverable${made === 1 ? '' : 's'}${toPlan ? ` · ${toPlan} to plan` : ''}`
 }
 
+/** Resumed (②b-2g): the months whose run day came while it was paused — "1 month left out", or null for none. */
+export function leftOutWords(data: Record<string, unknown> | null | undefined): string | null {
+  const left = Number(data?.left) || 0
+  return left > 0 ? `${left} month${left === 1 ? '' : 's'} left out` : null
+}
+
+/** "Josiah resumed the monthly runs · from Nov 2026 · 1 month left out". */
+export function runsResumedText(actor: string, data: Record<string, unknown> | null | undefined): string {
+  const left = leftOutWords(data)
+  return `${actor} resumed the monthly runs · from ${billMonthWords(data?.from)}${left ? ` · ${left}` : ''}`
+}
+
 /** A trail line's month ('2026-10') in words ('Oct 2026'). */
 function billMonthWords(v: unknown): string {
   if (typeof v !== 'string' || !/^[0-9]{4}-[0-9]{2}$/.test(v)) return 'a month'
@@ -653,6 +665,9 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     // A recurring product's months (②b-2f): made each month on its run day, a deliverable's plan carried from the month before.
     case 'run made': return runMadeText(e.data)
     case 'run day': return `${e.actor} moved the monthly run to the ${ordinal(Number(e.data?.to) || 1)}`
+    // Paused and resumed (②b-2g): no month's work while paused; resumed from this month.
+    case 'runs paused': return `${e.actor} paused the monthly runs`
+    case 'runs resumed': return runsResumedText(e.actor, e.data)
     case 'carried': {
       const from = typeof e.data?.from === 'string' ? e.data.from.slice(e.data.from.lastIndexOf('-') + 1) : 'last month'
       const start = typeof e.data?.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.data.start) ? ` · starts ${shortDay(e.data.start)}` : ''

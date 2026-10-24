@@ -227,7 +227,8 @@ export function projectBillWords(kind: BillKind, b: ProjectBill, status: string)
   }
   if (!b.from) return 'Monthly · from the month its work starts'
   if (b.until) return `Stopped · ${monthLabel(b.from)} – ${monthLabel(b.until)}`
-  return `Monthly · from ${monthLabel(b.from)}${b.last ? ` · confirmed to ${monthLabel(b.last)}` : ''}`
+  // Paused (②b-2g): billed all the same (answer 51 — paused months too).
+  return `Monthly · from ${monthLabel(b.from)}${status === 'paused' ? ' · paused, still billed' : ''}${b.last ? ` · confirmed to ${monthLabel(b.last)}` : ''}`
 }
 
 /** A recurring project the manager may stop: its work started, not stopped yet, not closed. */

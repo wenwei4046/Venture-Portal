@@ -537,6 +537,18 @@ export async function setMktRunDay(project: string, day: number): Promise<Done<{
   return { ok: true, page: productProjectFromRow(data) }
 }
 
+/** A recurring project paused (②b-2g — no month's work made while it is paused; still billed, answer 51) or resumed
+ * (from this month: a month whose run day came while it was paused is left out). */
+export async function pauseMktProduct(project: string, pause: boolean): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  if (typeof pause !== 'boolean') return { ok: false, reason: 'Reload the page and try again.' }
+  const { data, error } = await (await client()).rpc('mkt_product_pause', { p_project: project, p_pause: pause })
+  if (error) return { ok: false, reason: words(error, `The project could not be ${pause ? 'paused' : 'resumed'}. Please try again.`) }
+  freshen()
+  return { ok: true, page: productProjectFromRow(data) }
+}
+
 /** A deliverable's Assignment Plan saved (②b-2a): its start day, each stage's person, approvals, days and subtasks —
  * and, once it has opened, why a stage changes hands. */
 export async function planMktDeliverable(project: string, plan: Record<string, unknown>): Promise<Done<{ page: MktTaskPage | null; reassigned: number }>> {

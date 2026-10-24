@@ -123,6 +123,9 @@ describe('a task’s page', () => {
     expect([months('run made', { run: 3, month: '2026-11', made: 1, toPlan: 0 }), months('run day', { from: 1, to: 22 }),
       months('carried', { from: 'MKT-CAR-2610-001-D03', start: '2026-11-05' })]).toEqual([
       "Nov 2026's work made · 1 deliverable", 'Josiah moved the monthly run to the 22nd', 'Plan carried from D03 · starts 5 Nov'])
+    // Paused and resumed (②b-2g): from which month, and the months left out.
+    expect([months('runs paused', {}), months('runs resumed', { from: '2026-12', left: 2 }), months('runs resumed', { from: '2026-12', left: 0 })]).toEqual([
+      'Josiah paused the monthly runs', 'Josiah resumed the monthly runs · from Dec 2026 · 2 months left out', 'Josiah resumed the monthly runs · from Dec 2026'])
     expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 28].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '28th'])
     // Billing (②b-2b), as a subsidiary's feed reads a product project's trail: its month, never its figure.
     const billing = (action: string, data: Record<string, unknown> | null) =>
