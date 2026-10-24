@@ -11,8 +11,8 @@
 
 import { tidyFileName } from './library'
 
-/** The tiles a board offers today (the chat and the lobby come later). */
-export type TileKind = 'room' | 'pet' | 'turn' | 'waiting' | 'delegated' | 'trophies' | 'week' | 'notes' | 'photo'
+/** The tiles a board offers today (the chat comes later). */
+export type TileKind = 'room' | 'pet' | 'turn' | 'waiting' | 'delegated' | 'lobby' | 'trophies' | 'week' | 'notes' | 'photo'
 export interface TilePlace { id: string; x: number; y: number; w: number; h: number }
 
 export const RW = 182
@@ -28,6 +28,7 @@ export const TILES: Record<TileKind, { emoji: string; label: string; size: [numb
   turn: { emoji: '👉', label: 'My turn', size: [1, 2] },
   waiting: { emoji: '⏳', label: 'Waiting', size: [1, 1] },
   delegated: { emoji: '📤', label: 'Delegated', size: [1, 1] },
+  lobby: { emoji: '🏛️', label: 'Lobby', size: [2, 1] },
   trophies: { emoji: '🏆', label: 'Trophies', size: [1, 1] },
   week: { emoji: '🗓️', label: 'This week', size: [1, 1] },
   notes: { emoji: '📝', label: 'Notes', size: [1, 1] },
@@ -38,18 +39,29 @@ export const KINDS = Object.keys(TILES) as TileKind[]
 /** Always on the board, "so nobody hides their work". */
 export const LOCKED: readonly string[] = ['turn', 'waiting']
 /** On a board until its owner takes them off — a kind shipped later joins a saved board once (tilesKnown). */
-const DEFAULT_ON: TileKind[] = ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week']
+const DEFAULT_ON: TileKind[] = ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week']
 
 export const isKind = (id: string): id is TileKind => (KINDS as string[]).includes(id)
 
 const place = (id: TileKind, c: number, r: number, w: number, h: number): TilePlace => ({ id, x: c * CW, y: r * RW, w: w * CW, h: h * RW })
-/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the chat, the lobby) — the room top
- * left, two by two; My turn beside it, two rows high; the pet and the trophies on the right; Waiting, Delegated and
- * This week under the room. */
+/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the chat) — the room top left, two
+ * by two; My turn beside it, two rows high; the pet and the trophies on the right; Waiting, Delegated and This week
+ * under the room; the lobby across the foot. */
 export const DEFAULT_LAYOUT: TilePlace[] = [
   place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('pet', 3, 0, 1, 1), place('trophies', 3, 1, 1, 1),
-  place('waiting', 0, 2, 1, 1), place('delegated', 1, 2, 1, 1), place('week', 2, 2, 2, 1),
+  place('waiting', 0, 2, 1, 1), place('delegated', 1, 2, 1, 1), place('week', 2, 2, 2, 1), place('lobby', 0, 3, 4, 1),
 ]
+
+/** A teammate's space as a visit draws it (the prototype's VISIT_POS — never their own board, whose task tiles are
+ * theirs): the room, the pet and the trophies, the Notes, the lobby across the foot — and, since the user's answer 38,
+ * the Photo beside the Notes when there is one. */
+export function visitLayout(photo: boolean): TilePlace[] {
+  return [
+    place('room', 0, 0, 2, 2), place('pet', 2, 0, 1, 1), place('trophies', 3, 0, 1, 1),
+    ...(photo ? [place('notes', 2, 1, 1, 1), place('photo', 3, 1, 1, 1)] : [place('notes', 2, 1, 2, 1)]),
+    place('lobby', 0, 2, 4, 1),
+  ]
+}
 
 // ── The look: keys, never colours (the colours are tokens in globals.css) ───────────
 export const BGS = ['linen', 'mint', 'lilac', 'sand', 'white'] as const
@@ -181,6 +193,61 @@ export function levelUpWords(name: string, species: SpeciesKey, from: number, to
 /** A workout done: its XP, or none — three a day earn it. */
 export const workoutWords = (name: string, earned: boolean) =>
   earned ? `+10 XP · ${name} worked out` : `${WORKOUTS_A_DAY}/${WORKOUTS_A_DAY} workouts today. No more XP until tomorrow`
+
+// ── ⑦-4: the lobby and a visit (mig 20261025038000) ────────────────────────────────
+/** A pet in the lobby (`mkt_lobby()`): somebody on Marketing's roster with a login and their pet set up. */
+export interface LobbyPet {
+  staff: string
+  first: string
+  title: string | null
+  species: SpeciesKey
+  name: string
+  color: PetColor
+  /** One's own animal, in place of the kind's emoji. */
+  petPath: string | null
+  xp: number
+  energy: number
+}
+
+export function lobbyFromRow(row: unknown): LobbyPet[] {
+  const out: LobbyPet[] = []
+  for (const x of Array.isArray(row) ? row : []) {
+    if (!isObject(x) || typeof x.staff !== 'string' || !x.staff) continue
+    out.push({
+      staff: x.staff, first: text(x.first) || 'Someone', title: typeof x.title === 'string' && x.title ? x.title : null,
+      species: oneOf(SPECIES_KEYS, x.species, NO_PET.species), name: text(x.name).slice(0, PET_NAME_MAX) || 'Pet',
+      color: oneOf(PET_COLORS, x.color, NO_PET.color), petPath: path(x.petPath),
+      xp: Math.max(0, Math.round(num(x.xp) ?? 0)), energy: Math.min(100, Math.max(0, Math.round(num(x.energy) ?? 0))),
+    })
+  }
+  return out
+}
+
+/** Where each pet stands when the lobby is drawn (% across, % up): spread over the floor, every other one a step back. */
+export function lobbySpots(n: number): { x: number; y: number }[] {
+  return Array.from({ length: n }, (_, i) => ({ x: n <= 1 ? 50 : Math.round(8 + (i * 84) / (n - 1)), y: i % 2 ? 18 : 8 }))
+}
+
+/** A teammate's space for a visit (`mkt_space_of(staff)`): whose, their space as they keep it (the design's when they
+ * never opened My Space), their pet in numbers. */
+export interface Visit {
+  staff: string
+  first: string
+  full: string
+  title: string | null
+  role: string | null
+  space: Space
+  stats: PetStats | null
+}
+
+export function visitFromRow(row: unknown): Visit | null {
+  if (!isObject(row) || typeof row.staff !== 'string' || !row.staff) return null
+  return {
+    staff: row.staff, first: text(row.first) || text(row.full) || 'Someone', full: text(row.full) || text(row.first),
+    title: typeof row.title === 'string' && row.title ? row.title : null, role: typeof row.role === 'string' && row.role ? row.role : null,
+    space: spaceFromRow(isObject(row.space) ? row.space : null), stats: petStatsFromRow(row.stats),
+  }
+}
 
 export type PetState = 'idle' | 'newTask' | 'busy' | 'overload' | 'sleeping' | 'eating' | 'exercising' | 'levelUp' | 'hungry'
 /** Each state's words and the bubble over the pet (the prototype's STATES). */
@@ -447,10 +514,10 @@ export function spacePatchOf(p: SpacePatch): Record<string, unknown> {
 /** A space's pictures. One goes up at a time: while it does, every button that picks one waits. */
 export type SpacePicture = 'cover' | 'avatar' | 'photo' | 'pet'
 
-/** The cover, the avatar and one's own animal — space/<uuid>/<name>, which Marketing sees; the photo —
- * mine/<uuid>/<name>, which only its owner does (the bucket's policies, mig 20261024007600). */
-export const spacePicturePath = (kind: SpacePicture, fileName: string, uuid: string) =>
-  `${kind === 'photo' ? 'mine' : 'space'}/${uuid}/${tidyFileName(fileName)}`
+/** Every picture of a space — the cover, the avatar, one's own animal and, since ⑦-4, the photo (the user's answer 38:
+ * a visitor sees it) — goes to space/<uuid>/<name>, which Marketing sees (mig 20261025038000; a photo kept under mine/
+ * stays its owner's alone). */
+export const spacePicturePath = (fileName: string, uuid: string) => `space/${uuid}/${tidyFileName(fileName)}`
 
 /** A space's picture: an image, and not a large one. */
 export const PICTURE_MAX = 10 * 1024 * 1024

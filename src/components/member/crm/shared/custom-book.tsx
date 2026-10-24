@@ -76,12 +76,12 @@ export function Phone4aBookMode({ m }: { m: CustomBook | null }) {
 }
 
 /** Online or Other: date, time, the link or the place, remarks, and Book. */
-export function Phone4aCustomBook({ m }: { m: CustomBook | null }) {
+export function Phone4aCustomBook({ m, bare }: { m: CustomBook | null; /** The desktop's sheet books from its own footer. */ bare?: boolean }) {
   if (!m || m.showroom) return null;
-  return <CustomForm m={m} />;
+  return <CustomForm m={m} bare={bare} />;
 }
 
-function CustomForm({ m }: { m: CustomBook }) {
+function CustomForm({ m, bare }: { m: CustomBook; bare?: boolean }) {
   // One picker open at a time, under the row at the sheet's full width (the owner, 2026-10-24, of the phone's own date
   // wheel and its field: "改一下" — the app's own month, as Book visit's showroom calendar; the two fields alike).
   const [open, setOpen] = useState<"date" | "time" | null>(null);
@@ -108,8 +108,8 @@ function CustomForm({ m }: { m: CustomBook }) {
       )}
       <label style={LBL}>Remarks
         <textarea value={m.remarks} onChange={e => m.set({ remarks: e.target.value })} rows={3} placeholder="Anything to remember for this appointment" style={{ ...FIELD, height: "auto", padding: "10px 12px", lineHeight: 1.5, resize: "none" }} /></label>
-      <button type="button" disabled={!m.confirm} onClick={m.confirm} style={{ ...BTN, minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px",
-        background: m.ready ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", fontSize: fs(16), fontWeight: 650, textAlign: "center", cursor: m.confirm ? "pointer" : "default" }}>{m.label}</button>
+      {!bare && <button type="button" disabled={!m.confirm} onClick={m.confirm} style={{ ...BTN, minHeight: "48px", borderRadius: "24px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px",
+        background: m.ready ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", fontSize: fs(16), fontWeight: 650, textAlign: "center", cursor: m.confirm ? "pointer" : "default" }}>{m.label}</button>}
     </div>
   );
 }

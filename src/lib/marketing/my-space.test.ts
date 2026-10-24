@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boardFromRow } from './board'
-import { cardMeta, plateColumns, plateLine, weekRows } from './my-space'
+import { cardMeta, plateColumns, plateLine, plateOf, weekRows } from './my-space'
 
 // My Space's three columns, from the board as mkt_board() answers it. Mei owns stages, Rachel approves, Aina and
 // Hafiz take subtasks — the handoff's own people (`My Space.dc.html`).
@@ -130,5 +130,18 @@ describe('My Space columns', () => {
     const late = holiday(board('2026-10-22', MEI, project([{ owner: MEI, status: 'todo', dueOn: '2026-10-30', enteredAt: '2026-10-22T09:00:00Z' }])))
     expect(at(late, '2026-10-26T03:59:00Z').tone).toBe('waiting')
     expect(at(late, '2026-10-26T04:00:00Z').tone).toBe('red')
+  })
+})
+
+// 2026-10-24 — ⑦-4: anybody's plate, for their pet's mood in the lobby and on a visit.
+describe('a plate, for the pet', () => {
+  it('My turn counted, what is late there and in Waiting, a stage just put on it — anybody’s, by their id', () => {
+    const b = board('2026-10-22', RACHEL,
+      project([{ owner: MEI, status: 'todo', dueOn: '2026-10-24' }]),
+      project([{ owner: MEI, status: 'accepted', dueOn: '2026-10-21' }]),
+      project([{ owner: AINA, status: 'accepted', dueOn: '2026-10-25' }]))
+    expect(plateOf(plateColumns(b, MEI))).toEqual({ count: 2, red: 1, fresh: true })
+    expect(plateOf(plateColumns(b, AINA))).toEqual({ count: 1, red: 0, fresh: false })
+    expect(plateOf(plateColumns(b))).toEqual({ count: 0, red: 0, fresh: false })
   })
 })

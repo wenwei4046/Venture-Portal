@@ -1,5 +1,29 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-24 i (SHIPPED, #720) — a no-fixed-term deal's earlier fixed months ask their principal; Balance counts principal paid before the first month
+
+Session 35e03c3c. User, on BI#7's schedule (Lim Wei Liang, 60,000, fund in): "帮我检查这个installment 是不是显示错了？ 指检查"
+→ shown the findings → "修这两个显示问题：2025 年固定期的 Installment 和 Balance 多 1,000，开 PR 做" → "全绿就合并上线".
+Squash-merged ac08b0e7; production deploy success 05:26 UTC.
+
+- What happened first (not by me): 2026-10-24 04:12 UTC the **Principal** account amended BI#7 (4cb7ee6d) from a month on —
+  2026-01, cost_rate 0.00833, **no fixed term** (history 2025-05..2025-12 at 0.5% × 60, reason "Recalculate Interest").
+  Memory `liang-cont-terms-change-pending` had this side as pending with a different sketch (fixed 1,000 principal on,
+  or no fixed term only from Oct-26) — **settled: the user, "现在的设定是对的：2026 年 1 月起就无固定期限"** — the record
+  stays as it is; don't re-ask. Also 0.833% × 51,000 = 424.83, not the 425 of 10% p.a. — said, not changed.
+- Display bugs it exposed, fixed in `lib/repayment-plan` `openPlan` (a deal whose CURRENT terms are open is drawn
+  wholly month by month): (1) a month an earlier fixed segment governs, within that segment's schedule, now asks its
+  principal and is set against oldest first as `fixedPlan` does (BI#7 May–Dec 2025: 1,300, had read 300); (2) Balance
+  starts from principal repaid before the first month (BI#7's 5 Apr 2025 payment — first due May; October 41,000,
+  had read 42,000).
+- Only BI#7 changes on production: the other open deals with principal paid before their first month (HC 45,156.32 /
+  140,000 fund sources, The Cont 80,000 / 2990 60,000 loans) were repaid inside that month and draw no rows either way.
+- The screenshot the user sent was taken between 04:12 and 04:15 UTC — before PV-202610-0478 (15 Oct, 1,300) was
+  approved — so it showed October without principal and August "Part paid 26.19".
+- Tests: `repayment-plan.test.ts` +3 (fail on the old code). Local full run: 2 failures, both CRLF false ones
+  (`erp-sync/catalogue.test.ts`; `crm/palette.test.ts` › `sales/wall.ts:7`, a `//` comment with a hex — its strip
+  regex misses the `\r`); CI green.
+
 ## CHECKPOINT 2026-10-23 h (SHIPPED, #677) — Fund OUT: a loan's funding source in a Source column of its own
 
 Session 35e03c3c, after g. User, on the Fund OUT list: "fund out 出去的 sc 可以单独一个column 吗？ 确定先" → shown a

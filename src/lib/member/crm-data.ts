@@ -244,7 +244,7 @@ export interface CrmData {
    * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
-  adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null; added?: boolean; startAt?: string | null; endAt?: string | null; pageId?: string | null; pageName?: string | null }>;
+  adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null; added?: boolean; startAt?: string | null; endAt?: string | null; pageId?: string | null; pageName?: string | null; /** Taken off Ads performance (crm_hide_ad, 2026-10-24); its leads stay. */ hidden?: boolean }>;
   /** Members locked out of the dealing for now (mig 20261022130000, crm_staff.locked): off Assignment's lists. */
   lockedStaff?: string[];
   ftRules: CrmFtRule[];
@@ -399,7 +399,7 @@ export interface CrmDataRows {
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
-  adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null }[];
+  adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null; hidden_at?: string | null }[];
   locked?: string[];
   /** crm_settings_read()'s answer; absent before the migration. */
   settings?: unknown;
@@ -522,7 +522,7 @@ export function personName(name: string): string {
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
-  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true, startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}) };
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true, startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {

@@ -4,8 +4,9 @@ import type { SpacePicture } from '@/lib/marketing/space'
 import { fileRoute } from '@/lib/storage/browser'
 import s from './myspace.module.css'
 
-/** My Space's Photo tile (`My Space Bento.dc.html`): a picture of the owner's — theirs alone to see (mine/, mig
- * 20261024007600) — or *Add a photo*; a click picks another, once no other picture is on its way up. */
+/** My Space's Photo tile (`My Space Bento.dc.html`): a picture of the owner's — a visitor sees it too since ⑦-4 (the
+ * user's answer 38; space/, mig 20261025038000) — or *Add a photo*; a click picks another, once no other picture is on
+ * its way up. */
 export default function PhotoTile({ path, canEdit, sending, onPick }: { path: string | null; canEdit: boolean; sending: SpacePicture | null; onPick: () => void }) {
   const style = path ? { backgroundImage: `url("${fileRoute('marketing', path)}")` } : undefined
   if (!canEdit) {

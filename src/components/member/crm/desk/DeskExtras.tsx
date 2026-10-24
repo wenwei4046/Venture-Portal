@@ -16,6 +16,7 @@ import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
 import { Ic, type Icon4a } from "../shared/icons4a";
+import { Phone4aBookMode, Phone4aCustomBook } from "../shared/custom-book";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -31,6 +32,8 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
     <button type="button" onClick={v.back} style={BACK}><Chev />{v.name} · chat</button>
     <div style={BODY}>
       {v.has && <div style={{ padding: "12px 14px", borderRadius: "14px", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)", fontSize: "13px", fontWeight: "600" }}>Booked · {v.current}</div>}
+      <Phone4aBookMode m={v.bkm} />
+      {v.bkm.showroom ? (<>
       <span style={LABEL}>Showroom</span>
       <div style={{ display: "inline-flex", alignSelf: "flex-start", background: "var(--crm-field)", borderRadius: "11px", padding: "3px", gap: "2px", flexWrap: "wrap" }}>
         {v.rooms.map((r, i) => <span key={i} onClick={r.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: r.bg, color: r.fg, fontSize: "13px", fontWeight: "650", boxShadow: r.sh, cursor: "pointer", whiteSpace: "nowrap" }}>{r.label}</span>)}
@@ -86,6 +89,7 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
           {v.slots.map((s, i) => <span key={i} onClick={s.pick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "10px 4px", borderRadius: "12px", border: `1px solid ${s.bd}`, background: s.bg, color: s.fg, cursor: s.cur, textDecoration: s.deco }}>
             <strong style={{ fontSize: "14px", fontWeight: "650" }}>{s.label}</strong><small style={{ fontSize: "11px", opacity: ".8" }}>{s.sub}</small></span>)}
         </div>)}
+      </>) : <Phone4aCustomBook m={v.bkm} bare />}
     </div>
     <div style={FOOT}>
       {v.has && <button type="button" onClick={v.cancel} style={{ ...GHOST, color: "var(--crm-oxblood)", borderColor: "var(--crm-tint-attention)" }}>Cancel visit</button>}

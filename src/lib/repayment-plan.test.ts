@@ -131,6 +131,84 @@ describe('a deal with no fixed term', () => {
     expect(plan).toMatchObject({ paidCount: 2, outstandingDue: 1200, principalOwed: 80000, months: null })
   })
 
+  // BI#7 (2026-10-24): 60,000 from 5 Apr 2025 at 0.5% × 60 (first due May), 1,000 + 300 paid every month from
+  // the day the money came; turned no-fixed-term at 0.833% from Jan 2026 (51,000 owed then → 424.83).
+  const BI7: PositionTerms = {
+    principal: 60000,
+    startYM: '2025-04',
+    firstDueYM: '2025-05',
+    current: { rate: 0.00833, months: null, compounding: false, effectiveFrom: '2026-01' },
+    history: [{ validFrom: '2025-05', validTo: '2025-12', rate: 0.005, months: 60, compounding: false }],
+  }
+  const BI7_PAID = ['2025-04-05', '2025-05-05', '2025-06-05', '2025-07-05', '2025-08-05', '2025-09-05', '2025-10-05', '2025-11-05', '2025-12-05', '2026-01-05', '2026-02-05', '2026-03-05', '2026-04-05', '2026-05-05', '2026-06-08', '2026-07-09', '2026-08-10', '2026-09-08', '2026-10-15']
+  const bi7 = () =>
+    buildRepaymentPlan({
+      terms: BI7,
+      payments: BI7_PAID.flatMap((d) => [pay(d, 'principal', 1000), pay(d, 'interest', 300)]),
+      isPrincipal,
+      today: '2026-10-24',
+      dueDay: 5,
+      status: 'active',
+    })
+
+  it('asks a fixed month’s principal still, once the deal turned no-fixed-term later — May–Dec 2025 read 1,300', () => {
+    const plan = bi7()
+    expect(plan.kind).toBe('open')
+    expect(plan.rows.slice(0, 8).map((r) => [r.due, r.installment, r.principal, r.interest, r.outstanding])).toEqual(
+      ['05', '06', '07', '08', '09', '10', '11', '12'].map((m) => [`2025-${m}-05`, 1300, 1000, 300, 0]),
+    )
+    expect(plan.rows[0].remark).toBe('Paid 5 Apr 2025')
+    expect(plan.rows[7].remark).toBe('Paid 5 Nov 2025')
+    // From January no principal falls due: the interest alone, the principal as it came in.
+    expect(plan.rows[8]).toMatchObject({ due: '2026-01-05', installment: 424.83, principal: 1000, interest: 424.83, outstanding: 0, remark: 'Paid 5 Jan 2026 · principal RM 1,000.00' })
+    expect(plan.rows[15]).toMatchObject({ due: '2026-08-05', installment: 424.83, outstanding: 98.64, remark: 'Part paid RM 326.19 · short RM 98.64 · principal RM 1,000.00', tone: 'alert' })
+    expect(plan.rows[17]).toMatchObject({ due: '2026-10-05', installment: 424.83, outstanding: 424.83, remark: 'Overdue 19 days · principal RM 1,000.00', tone: 'danger' })
+    expect(plan).toMatchObject({ firstInstallment: 1300, paidCount: 15, outstandingDue: 948.3 })
+  })
+
+  it('takes principal repaid before the first month off the balance — BI#7 owes 41,000, not 42,000', () => {
+    const plan = bi7()
+    expect(plan.rows[0].balance).toBe(58000) // 5 Apr and 5 May 2025 are in
+    expect(plan.rows[7].balance).toBe(51000) // the base January re-bases on
+    expect(plan.rows[17].balance).toBe(41000)
+    expect(plan.principalOwed).toBe(41000)
+
+    const open = buildRepaymentPlan({
+      terms: { principal: 100000, startYM: '2026-03', firstDueYM: '2026-04', current: { rate: 0.01, months: null, compounding: false, effectiveFrom: null }, history: [] },
+      payments: [pay('2026-03-20', 'principal', 10000), pay('2026-04-01', 'interest', 1000)],
+      isPrincipal,
+      today: '2026-04-10',
+      dueDay: 1,
+      status: 'active',
+    })
+    expect(open.rows.map((r) => [r.due, r.installment, r.principal, r.balance, r.remark])).toEqual([['2026-04-01', 1000, null, 90000, 'Paid 1 Apr 2026']])
+  })
+
+  it('asks no principal of a fixed month past that schedule’s end, and an unpaid fixed month owes both', () => {
+    const plan = buildRepaymentPlan({
+      terms: {
+        principal: 3000,
+        startYM: '2026-01',
+        firstDueYM: '2026-02',
+        current: { rate: 0.01, months: null, compounding: false, effectiveFrom: '2026-06' },
+        // 3 instalments Feb–Apr, the change filed from June: May sits in the old segment past its schedule.
+        history: [{ validFrom: '2026-02', validTo: '2026-05', rate: 0.01, months: 3, compounding: false }],
+      },
+      payments: [pay('2026-02-01', 'principal', 1000), pay('2026-02-01', 'interest', 30), pay('2026-03-01', 'principal', 1000), pay('2026-03-01', 'interest', 30)],
+      isPrincipal,
+      today: '2026-06-10',
+      dueDay: 1,
+      status: 'active',
+    })
+    expect(plan.rows.map((r) => [r.due, r.installment, r.principal, r.outstanding, r.tone])).toEqual([
+      ['2026-02-01', 1030, 1000, 0, 'ledger'],
+      ['2026-03-01', 1030, 1000, 0, 'ledger'],
+      ['2026-04-01', 1030, 1000, 1030, 'danger'], // nothing came in April: its principal and its interest are owed
+      ['2026-05-01', 30, null, 30, 'danger'],
+      ['2026-06-01', 10, null, 10, 'danger'], // 1,000 still owed at June × 1%
+    ])
+  })
+
   it('compounds an unpaid month into the balance', () => {
     const plan = buildRepaymentPlan({
       terms: { principal: 10000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.04, months: null, compounding: true, effectiveFrom: null }, history: [] },

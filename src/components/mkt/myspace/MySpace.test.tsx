@@ -11,7 +11,8 @@ import type { PlateColumn } from '@/lib/marketing/my-space'
 
 const actions = vi.hoisted(() => ({ saveMktSpace: vi.fn(), acceptMktStage: vi.fn(), careMktPet: vi.fn() }))
 vi.mock('@/lib/marketing/actions', () => actions)
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }))
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => router }))
 const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => bucket } }) }))
 vi.mock('@/lib/storage/browser', () => ({ fileRoute: (b: string, p: string) => `/files/${b}/${p}` }))
@@ -26,7 +27,7 @@ const props = (over: Partial<MySpaceProps> = {}): MySpaceProps => ({
   plateLine: 'your plate is clear',
   columns: [column('turn', 'My turn', '👉'), column('delegated', 'Delegated by me', '📤'), column('waiting', 'Waiting on others', '⏳')],
   week: [], plans: [], plate: { count: 0, red: 0, fresh: false }, hasPet: false, canEdit: true, space: spaceFromRow(null), petStats: null,
-  viewer: 'viewer-1', ...over,
+  viewer: 'viewer-1', lobby: [], me: null, ...over,
 })
 /** A pet in numbers, as `mkt_pet()` gives it. */
 const stats = (over: Partial<PetStats> = {}): PetStats => ({ xp: 0, energy: 64, snacks: 3, workouts: 0, trophies: [], trophyCount: 0, ...over })
@@ -96,10 +97,10 @@ describe('Edit layout', () => {
     expect(screen.getByRole('button', { name: /Edit layout/ }).getAttribute('aria-pressed')).toBe('true')
     expect(within(drawer).getAllByRole('button').slice(0, 2).map(b => b.textContent)).toEqual(['📝Notes', '🖼️Photo'])
     fireEvent.click(within(drawer).getByRole('button', { name: /Notes/ }))
-    expect(tile('notes')?.style.top).toBe('546px')
+    expect(tile('notes')?.style.top).toBe('728px')
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0]
-    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'notes'])
+    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'notes'])
     expect(sent.tilesKnown).toEqual([...KINDS].sort())
   })
 
@@ -111,7 +112,7 @@ describe('Edit layout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove This week' }))
     expect(tile('week')).toBeNull()
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
-    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated'])
+    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'lobby'])
   })
 
   it('dragged by its face: moved, drawn over the rest, saved when let go', async () => {
@@ -127,7 +128,7 @@ describe('Edit layout', () => {
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0].layout
     expect(sent.at(-1)).toEqual({ id: 'turn', x: 0.6, y: 40, w: 0.25, h: 364 })
-    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'turn'])
+    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'turn'])
   })
 
   it('the arrow keys move a tile; with Shift they size it', async () => {
@@ -185,7 +186,7 @@ describe('the cover and the pictures', () => {
     expect(document.querySelector('[data-cover="2"]')).toBeTruthy()
   })
 
-  it('the avatar sent under space/, the photo under mine/ — each saved, then drawn', async () => {
+  it('the avatar and the photo sent under space/ (a visitor sees the photo since ⑦-4) — each saved, then drawn', async () => {
     render(<MySpace {...props({ space: spaceFromRow({ layout: [...DEFAULT_LAYOUT, { id: 'photo', x: 0, y: 364, w: 0.25, h: 182 }] }) })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Change profile picture' }))
     pick(png('Me (1).PNG'))
@@ -199,7 +200,7 @@ describe('the cover and the pictures', () => {
     pick(png('beach.png'))
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalledTimes(2))
     const photo = bucket.upload.mock.calls[1][0] as string
-    expect(photo).toMatch(/^mine\/[0-9a-f-]{36}\/beach\.png$/)
+    expect(photo).toMatch(/^space\/[0-9a-f-]{36}\/beach\.png$/)
     expect(actions.saveMktSpace).toHaveBeenLastCalledWith({ photoPath: photo })
     await waitFor(() => expect(screen.getByRole('button', { name: 'Change the photo' }).style.backgroundImage).toContain(`/files/marketing/${photo}`))
   })
@@ -486,5 +487,35 @@ describe('the pet’s tile and the trophies', () => {
     expect(within(tile('pet') as HTMLElement).queryByRole('button')).toBeNull()
     const room = document.querySelector<HTMLElement>('[data-room]') as HTMLElement
     expect((room.querySelector('[data-state] span') as HTMLElement).style.fontSize).toBe('60px') // Lv 6: 52 px
+  })
+})
+
+// 2026-10-24 — ⑦-4: the lobby on one's own board (the user's answer 37): the roster's pets, one's own as it is here;
+// a teammate's opens their space.
+describe('the lobby', () => {
+  const MEI = '00000000-0000-4000-8000-000000000012', ALI = '00000000-0000-4000-8000-000000000013'
+  const settled = spaceFromRow({ layout: [], pet: { species: 'dog', name: 'Bao', color: 'mint', onboarded: true } })
+  const ali = { staff: ALI, first: 'Ali', title: 'GRAPHIC DESIGNER', species: 'cat' as const, name: 'Kopi', color: 'original' as const, petPath: null, xp: 260, energy: 80, state: 'busy' as const }
+  const lobby = () => within(tile('lobby') as HTMLElement)
+
+  it('the roster’s pets by name — one’s own as it is here, “(you)”, going nowhere; a teammate’s opens their space', () => {
+    render(<MySpace {...props({ hasPet: true, space: settled, petStats: stats({ xp: 40 }), me: MEI, first: 'Mei',
+      lobby: [ali, { ...ali, staff: MEI, first: 'Mei', name: 'Old name', xp: 0, state: 'sleeping' }] })} />)
+    expect(lobby().getByText('🏛️ Lobby · 2')).toBeTruthy()
+    expect(lobby().getAllByText(/^(Ali|Mei \(you\))$/).map(e => e.textContent)).toEqual(['Ali', 'Mei (you)'])
+    expect(lobby().getByTitle('Kopi · Lv 3 · Working')).toBeTruthy()
+    expect(lobby().getByTitle('Bao · Lv 1 · Sleeping')).toBeTruthy() // one's own: its name and level as here
+    expect(lobby().getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(["Visit Ali's space"])
+    fireEvent.click(lobby().getByRole('button', { name: "Visit Ali's space" }))
+    expect(router.push).toHaveBeenCalledWith(`/marketing?visit=${ALI}`)
+  })
+
+  it('somebody with no pet sees everybody else’s; an empty lobby says so', () => {
+    const { unmount } = render(<MySpace {...props({ lobby: [ali] })} />)
+    expect(lobby().getByText('🏛️ Lobby · 1')).toBeTruthy()
+    expect(lobby().getByRole('button', { name: "Visit Ali's space" })).toBeTruthy()
+    unmount()
+    render(<MySpace {...props()} />)
+    expect(lobby().getByText('No pets yet')).toBeTruthy()
   })
 })

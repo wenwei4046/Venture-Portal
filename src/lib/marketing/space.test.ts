@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   addable, addedTile, boardHeight, boardOf, clampPlace, DEFAULT_LAYOUT, DEFAULT_ROOM, DEFAULT_THEME, dragged, energyTone, exerciseTitle, formOf,
-  knownAfter, layoutToRow, levelOf, levelUpWords, newPiece, NO_PET, nudged, petFromRow, petSize, petState, petStatsFromRow, pictureProblem,
-  readingOrder, removedTile, roomFromRow, roomScale, sameLayout, spaceFromRow, spacePatchOf, spacePicturePath, toFront, trophyShelf, twoAbreast,
-  workoutWords, xpBar, type TilePlace,
+  knownAfter, layoutToRow, levelOf, levelUpWords, lobbyFromRow, lobbySpots, newPiece, NO_PET, nudged, petFromRow, petSize, petState,
+  petStatsFromRow, pictureProblem, readingOrder, removedTile, roomFromRow, roomScale, sameLayout, spaceFromRow, spacePatchOf, spacePicturePath,
+  toFront, trophyShelf, twoAbreast, visitFromRow, visitLayout, workoutWords, xpBar, type TilePlace,
 } from './space'
 
 // 2026-10-23 — ⑦-1: My Space's own side (`My Space Bento.dc.html`) — the board its owner lays out (the prototype's
@@ -13,13 +13,13 @@ import {
 const t = (id: string, x: number, y: number, w: number, h: number): TilePlace => ({ id, x, y, w, h })
 
 describe('the board as read', () => {
-  it('before the first save: the prototype’s board without what is not here yet — the room top left, My turn beside it, the pet and the trophies on the right', () => {
+  it('before the first save: the prototype’s board without what is not here yet — the room top left, My turn beside it, the pet and the trophies on the right, the lobby across the foot', () => {
     const s = spaceFromRow(null)
     expect(s.saved).toBe(false)
     expect(s.layout).toEqual(DEFAULT_LAYOUT)
     expect(s.layout.map(x => [x.id, x.x, x.y, x.w, x.h])).toEqual([
       ['room', 0, 0, 0.5, 364], ['turn', 0.5, 0, 0.25, 364], ['pet', 0.75, 0, 0.25, 182], ['trophies', 0.75, 182, 0.25, 182],
-      ['waiting', 0, 364, 0.25, 182], ['delegated', 0.25, 364, 0.25, 182], ['week', 0.5, 364, 0.5, 182],
+      ['waiting', 0, 364, 0.25, 182], ['delegated', 0.25, 364, 0.25, 182], ['week', 0.5, 364, 0.5, 182], ['lobby', 0, 546, 1, 182],
     ])
     expect([s.theme, s.cover, s.coverPath, s.avatarPath, s.photoPath, s.status, s.notes]).toEqual([DEFAULT_THEME, 0, null, null, null, '', ''])
     expect([s.room, s.pet, s.petPath]).toEqual([DEFAULT_ROOM, NO_PET, null])
@@ -27,7 +27,7 @@ describe('the board as read', () => {
 
   it('a saved board as its owner left it; a kind this page does not draw yet kept as it was', () => {
     const s = spaceFromRow({
-      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['delegated', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'],
+      layout: [t('waiting', 0, 0, 0.25, 182), t('turn', 0.25, 0, 0.75, 400), t('chat', 0, 400, 0.25, 546)], tilesKnown: ['delegated', 'lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'],
       theme: { bg: 'mint', accent: 'blue', corners: 'round' }, cover: 2, coverPath: null, avatarPath: 'space/a/me.png', status: 'Shooting', notes: 'Call PIC',
       photoPath: 'mine/b/beach.jpg', at: '2026-10-23T03:00:00Z', room: {}, pet: {},
     })
@@ -41,7 +41,7 @@ describe('the board as read', () => {
   })
 
   it('a tile taken off stays off; a kind shipped since the board was saved joins it once, under the rest', () => {
-    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['pet', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    const b = boardOf([t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182)], ['lobby', 'pet', 'room', 'trophies', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated'])
     expect(b[2]).toEqual(t('delegated', 0, 364, 0.25, 182))
   })
@@ -49,25 +49,32 @@ describe('the board as read', () => {
   it('a board saved before the room came (⑦-1) gets the room once, two by two, under the rest', () => {
     const saved = [t('turn', 0, 0, 0.5, 364), t('waiting', 0.5, 0, 0.25, 182), t('delegated', 0.75, 0, 0.25, 182), t('week', 0.5, 182, 0.5, 182)]
     const b = boardOf(saved, ['delegated', 'notes', 'photo', 'turn', 'waiting', 'week'])
-    expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week', 'room', 'pet', 'trophies'])
+    expect(b.map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week', 'room', 'pet', 'lobby', 'trophies'])
     expect(b[4]).toEqual(t('room', 0, 364, 0.5, 364))
     expect(boardOf(saved, knownAfter(['delegated', 'turn', 'waiting', 'week'])).map(x => x.id)).toEqual(['turn', 'waiting', 'delegated', 'week'])
   })
 
   it('a board saved before the pet’s tile and the trophies came (⑦-5) gets them once, one by one, under the rest', () => {
     const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182), t('week', 0, 364, 0.5, 182)]
-    const b = boardOf(saved, ['delegated', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
+    const b = boardOf(saved, ['delegated', 'lobby', 'notes', 'photo', 'room', 'turn', 'waiting', 'week'])
     expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'week', 'pet', 'trophies'])
     expect(b.slice(4)).toEqual([t('pet', 0, 546, 0.25, 182), t('trophies', 0, 728, 0.25, 182)])
   })
 
+  it('a board saved before the lobby came (⑦-4) gets it once, two by one, under the rest', () => {
+    const saved = [t('room', 0, 0, 0.5, 364), t('turn', 0.5, 0, 0.25, 364), t('waiting', 0.75, 0, 0.25, 182)]
+    const b = boardOf(saved, ['delegated', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    expect(b.map(x => x.id)).toEqual(['room', 'turn', 'waiting', 'lobby'])
+    expect(b[3]).toEqual(t('lobby', 0, 364, 0.5, 182))
+  })
+
   it('My turn and Waiting are always on it — whatever came back', () => {
-    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week'])
+    const b = boardOf([t('week', 0, 0, 0.5, 182)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week'])
     expect(b.map(x => x.id)).toEqual(['week', 'turn', 'waiting'])
   })
 
   it('each kind once; a tile out of bounds brought back in', () => {
-    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'trophies', 'week'])
+    const b = boardOf([t('turn', 0.9, -5, 0.5, 50), t('turn', 0, 0, 0.25, 182), t('waiting', 0, 0, 0.05, 9000)], ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week'])
     expect(b).toEqual([t('turn', 0.5, 0, 0.5, 110), t('waiting', 0, 0, 0.14, 2000)])
   })
 
@@ -110,23 +117,23 @@ describe('Edit layout', () => {
 
   it('the tile last moved goes on top (last); My turn and Waiting cannot be taken off', () => {
     const b = DEFAULT_LAYOUT
-    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'turn'])
+    expect(toFront(b, 'turn').map(x => x.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'turn'])
     expect(removedTile(b, 'turn')).toBe(b)
     expect(removedTile(b, 'waiting')).toBe(b)
-    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated'])
-    expect(removedTile(b, 'pet').map(x => x.id)).toEqual(['room', 'turn', 'trophies', 'waiting', 'delegated', 'week'])
+    expect(removedTile(b, 'week').map(x => x.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'lobby'])
+    expect(removedTile(b, 'pet').map(x => x.id)).toEqual(['room', 'turn', 'trophies', 'waiting', 'delegated', 'week', 'lobby'])
   })
 
   it('a tile added: its own size, under everything; the drawer offers only those not on the board', () => {
     expect(addable(DEFAULT_LAYOUT)).toEqual(['notes', 'photo'])
-    expect(addedTile(DEFAULT_LAYOUT, 'notes')).toEqual(t('notes', 0, 546, 0.25, 182))
+    expect(addedTile(DEFAULT_LAYOUT, 'notes')).toEqual(t('notes', 0, 728, 0.25, 182))
     expect(addedTile([], 'room')).toEqual(t('room', 0, 0, 0.5, 364))
     expect(addable([...DEFAULT_LAYOUT, addedTile(DEFAULT_LAYOUT, 'notes'), t('photo', 0.5, 400, 0.25, 182)])).toEqual([])
   })
 
   it('the board as high as its lowest tile, less the gap — and 140 px more to drag into while laying out', () => {
-    expect(boardHeight(DEFAULT_LAYOUT, false)).toBe(534)
-    expect(boardHeight(DEFAULT_LAYOUT, true)).toBe(674)
+    expect(boardHeight(DEFAULT_LAYOUT, false)).toBe(716)
+    expect(boardHeight(DEFAULT_LAYOUT, true)).toBe(856)
     expect(boardHeight([], false)).toBe(170)
   })
 
@@ -158,7 +165,7 @@ describe('a save', () => {
 
   it('a tile without its numbers is left out; the kinds the board has offered are remembered', () => {
     expect(spacePatchOf({ layout: [t('turn', 0, 0, 0.5, 364), { id: 'week', x: Number.NaN, y: 0, w: 0.5, h: 182 }] }).layout).toEqual([t('turn', 0, 0, 0.5, 364)])
-    expect(knownAfter(['room'])).toEqual(['delegated', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
+    expect(knownAfter(['room'])).toEqual(['delegated', 'lobby', 'notes', 'pet', 'photo', 'room', 'trophies', 'turn', 'waiting', 'week'])
   })
 
   it('the same board — to four places and whole pixels, in its order', () => {
@@ -169,11 +176,10 @@ describe('a save', () => {
 })
 
 describe('pictures', () => {
-  it('the cover and the avatar under space/ (Marketing sees them), the photo under mine/ (its owner alone)', () => {
+  it('every picture under space/ — Marketing sees them; the photo too since ⑦-4 (a visitor sees it)', () => {
     const uuid = '00000000-0000-4000-8000-000000000001'
-    expect(spacePicturePath('cover', 'Beach (1).JPG', uuid)).toBe(`space/${uuid}/Beach-1.jpg`)
-    expect(spacePicturePath('avatar', 'me.png', uuid)).toBe(`space/${uuid}/me.png`)
-    expect(spacePicturePath('photo', 'me.png', uuid)).toBe(`mine/${uuid}/me.png`)
+    expect(spacePicturePath('Beach (1).JPG', uuid)).toBe(`space/${uuid}/Beach-1.jpg`)
+    expect(spacePicturePath('me.png', uuid)).toBe(`space/${uuid}/me.png`)
   })
 
   it('an image, at most 10 MB', () => {
@@ -295,5 +301,46 @@ describe('the trophies', () => {
     expect(trophyShelf(stats(1))).toEqual({ got: [{ emoji: '🏆', name: 'TSK-CAR-2610-001 · Story 1' }], locked: ['🥇', '🎖️'], line: '1 project finished this quarter' })
     const nine = trophyShelf(stats(9))
     expect([nine.got.map(g => g.emoji).join(''), nine.locked, nine.line]).toEqual(['🏆🥇🎖️🏅🥈🎗️', [], '9 projects finished this quarter'])
+  })
+})
+
+// 2026-10-24 — ⑦-4: the lobby and a visit (the user's answers 37, 38 and 40; the database's side:
+// tests/member-sql/validate-marketing-lobby.mjs).
+describe('the lobby and a visit', () => {
+  it('a visit draws the prototype’s board — the room, the pet, the trophies, the Notes, the lobby — and the Photo when there is one', () => {
+    expect(visitLayout(false).map(x => [x.id, x.x, x.y, x.w, x.h])).toEqual([
+      ['room', 0, 0, 0.5, 364], ['pet', 0.5, 0, 0.25, 182], ['trophies', 0.75, 0, 0.25, 182], ['notes', 0.5, 182, 0.5, 182], ['lobby', 0, 364, 1, 182],
+    ])
+    expect(visitLayout(true).map(x => [x.id, x.x, x.w])).toEqual([
+      ['room', 0, 0.5], ['pet', 0.5, 0.25], ['trophies', 0.75, 0.25], ['notes', 0.5, 0.25], ['photo', 0.75, 0.25], ['lobby', 0, 1],
+    ])
+  })
+
+  it('the lobby’s pets, read by their keys; spread over the floor, every other one a step back', () => {
+    expect(lobbyFromRow([
+      { staff: 's1', first: 'Ali', title: 'GRAPHIC DESIGNER', species: 'dog', name: 'Bao', color: 'cocoa', petPath: null, xp: 120, energy: 140 },
+      { staff: 's2', first: '', species: 'tiger', name: 'x'.repeat(20), color: '#f00', petPath: 'space/a/rex.png', xp: '7', energy: -3 },
+      { first: 'Nobody' }, 'x',
+    ])).toEqual([
+      { staff: 's1', first: 'Ali', title: 'GRAPHIC DESIGNER', species: 'dog', name: 'Bao', color: 'cocoa', petPath: null, xp: 120, energy: 100 },
+      { staff: 's2', first: 'Someone', title: null, species: 'cat', name: 'x'.repeat(16), color: 'original', petPath: 'space/a/rex.png', xp: 7, energy: 0 },
+    ])
+    expect(lobbyFromRow(null)).toEqual([])
+    expect(lobbySpots(1)).toEqual([{ x: 50, y: 8 }])
+    expect(lobbySpots(3)).toEqual([{ x: 8, y: 8 }, { x: 50, y: 18 }, { x: 92, y: 8 }])
+    expect(lobbySpots(12).map(s => s.x).every(x => x >= 8 && x <= 92)).toBe(true)
+  })
+
+  it('a visit, read: whose, their space (the design’s when they never opened My Space), their pet in numbers', () => {
+    const v = visitFromRow({ staff: 's1', first: 'Mei', full: 'MEI LING TAN', title: 'VIDEOGRAPHER', role: null,
+      space: { theme: { bg: 'mint', accent: 'blue', corners: 'round' }, cover: 2, coverPath: null, avatarPath: 'space/a/me.png', status: 'Shooting',
+        notes: 'Call PIC', photoPath: 'space/b/beach.jpg', room: { wall: 'sage', floor: 'tile', items: [] }, pet: { species: 'cat', name: 'Kopi', color: 'original', onboarded: true }, petPath: null },
+      stats: { xp: 130, energy: 49, snacks: 3, workouts: 0, trophies: [], trophyCount: 0 } })
+    expect([v?.first, v?.title, v?.space.theme, v?.space.notes, v?.space.photoPath, v?.space.room.wall, v?.space.pet.name, v?.stats?.xp]).toEqual([
+      'Mei', 'VIDEOGRAPHER', { bg: 'mint', accent: 'blue', corners: 'round' }, 'Call PIC', 'space/b/beach.jpg', 'sage', 'Kopi', 130,
+    ])
+    const never = visitFromRow({ staff: 's2', first: 'SIA', full: 'SIA JOSIAH', space: null, stats: null })
+    expect([never?.space.saved, never?.space.pet.onboarded, never?.space.theme, never?.stats]).toEqual([false, false, DEFAULT_THEME, null])
+    expect([visitFromRow(null), visitFromRow({ first: 'x' })]).toEqual([null, null])
   })
 })
