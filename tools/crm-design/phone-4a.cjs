@@ -212,7 +212,8 @@ function bookModes(body, p) {
   const lbl = body.indexOf(">Showroom</span>", at), a = body.lastIndexOf("<div", lbl);
   const rm = body.indexOf(`<Phone4aRoomRemarks text={${p}.bookRemarks} />`, at), z = body.indexOf("</span>", rm) + "</span>".length;
   if (lbl < 0 || a < at || rm < 0 || z < rm) throw new Error("phone-4a: book sheet parts " + p);
-  return body.slice(0, a) + `<Phone4aBookMode m={${p}.bkm} />\n{!${p}.bkm || ${p}.bkm.showroom ? (<>` + body.slice(a, z) + `</>) : (<Phone4aCustomBook m={${p}.bkm} />)}` + body.slice(z);
+  // The sheet keeps its height across the switch (the owner, 2026-10-24: "從showroom 點online / other 不要好像跳的感覺").
+  return body.slice(0, a) + `<Phone4aBookMode m={${p}.bkm} />\n<Phone4aKeepHeight k={${p}.bkm?.mode ?? ""}>{!${p}.bkm || ${p}.bkm.showroom ? (<>` + body.slice(a, z) + `</>) : (<Phone4aCustomBook m={${p}.bkm} />)}</Phone4aKeepHeight>` + body.slice(z);
 }
 
 /** gen-sales.cjs: one salesperson screen. */
