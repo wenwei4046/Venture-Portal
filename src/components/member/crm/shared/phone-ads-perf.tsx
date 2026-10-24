@@ -106,8 +106,8 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           {p.chips.map(c => <button key={c.label} type="button" onClick={c.pick} style={chip(c.on)}>{c.label}</button>)}
           <span style={{ marginLeft: "auto" }} />
+          {/* One button: its sheet has Period and Compare to (the owner, 2026-10-24, of a second compare button: "刪掉右邊的"). */}
           <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={p.custom} onClick={p.openDates} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: p.custom ? "var(--crm-ink)" : "#fff", color: p.custom ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
-          <button type="button" aria-label="Compare with" title="Compare with" aria-pressed={!!p.cmp} onClick={p.openCompare} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: !!p.cmp ? "var(--crm-ink)" : "#fff", color: !!p.cmp ? "#fff" : "var(--crm-ink)" }}><Ic name="trending-up" size={14} /></button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>
