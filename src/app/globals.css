@@ -6042,6 +6042,194 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   .sheet-rpt td.sr-label { white-space: normal; font-size: 11.5px; }
   .sheet-rpt .sr-drill-box { padding: 8px 10px 12px; }
 }
+
+/* ═══ A department's charts (2026-10-25, the mockup's twelfth round —
+   dept-pool/statements/[seg]/_components). Money in green #3F7A64, money out
+   orange #E99A53 (in words the darker #A95C15) wherever the two are told
+   apart — the cards, the donuts, the bars, the statement's blocks; the
+   accounts in palette A (lib/dept-charts). ═══ */
+.stat-card[data-tone='in']::before { background: #3F7A64; }
+.stat-card[data-tone='in'] .stat-card-value { color: #3F7A64; }
+.stat-card[data-tone='in'] .stat-card-icon { background: rgb(233 242 237); color: #3F7A64; }
+.stat-card[data-tone='out']::before { background: #E99A53; }
+.stat-card[data-tone='out'] .stat-card-value { color: #A95C15; }
+.stat-card[data-tone='out'] .stat-card-icon { background: rgb(253 241 229); color: #A95C15; }
+
+/* The period row: P&L | Cash Flow, From → To, 6 / 12 months, the star. */
+.dept-period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -6px 0 18px; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(247 245 241); }
+.dept-period-rule { width: 1px; align-self: stretch; background: rgb(var(--hairline)); }
+.dept-period-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(117 100 86); }
+.dept-period-field select { height: 32px; padding: 0 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: #fff; color: rgb(var(--ink)); font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; }
+.dept-quick { display: inline-flex; gap: 4px; }
+.dept-quick button { height: 32px; padding: 0 10px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; font-weight: 500; }
+.dept-quick button[aria-pressed='true'] { background: #E99A53; border-color: #E99A53; }
+.dept-period-hint { font-size: 11.5px; color: rgb(138 119 101); }
+
+/* In vs Out: the Month and its donuts beside the months' bars (1 : 1.6, stacked below 1100px). */
+.dept-charts, .dept-pieces { margin-bottom: 14px; }
+.dept-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; }
+.dept-panel, .dept-card { min-width: 0; padding: 16px 18px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.dept-panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.dept-psub { margin: -6px 0 10px; font-size: 11px; color: rgb(117 100 86); }
+.dept-mpicker { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 12px; }
+.dept-chl { margin-right: 2px; font-size: 11px; color: rgb(117 100 86); }
+.dept-mpick { padding: 3px 9px; border: 1px solid rgb(229 228 223); border-radius: 99px; background: #fff; color: rgb(90 78 68); font-size: 11.5px; cursor: pointer; }
+.dept-mpick.is-total { font-weight: 600; }
+.dept-mpick[aria-pressed='true'] { border-color: rgb(43 31 23); background: rgb(43 31 23); color: #fff; }
+.dept-donuts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.dept-dcol { min-width: 0; text-align: center; }
+.dept-dcol h5 { margin: 4px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.dept-dcol h5.is-in { color: #3F7A64; }
+.dept-dcol h5.is-out { color: #A95C15; }
+.dept-donut { display: block; margin: 0 auto; }
+.dept-donut path { cursor: pointer; transition: opacity 150ms ease-out; }
+.dept-donut:hover path { opacity: 0.5; }
+.dept-donut path:hover { opacity: 1; }
+.dept-donut .dl { font-size: 10px; fill: rgb(117 100 86); text-anchor: middle; pointer-events: none; }
+.dept-donut .dv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.dept-donut .dv.is-in { fill: #3F7A64; }
+.dept-donut .dv.is-out { fill: #A95C15; }
+.dept-legend { margin: 6px 0 0; padding: 0; list-style: none; text-align: left; }
+.dept-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; font-size: 11px; color: rgb(90 78 68); }
+.dept-legend li:hover { background: rgb(247 247 245); }
+.dept-legend li span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-legend li b { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; font-weight: 500; color: #000; }
+.dept-sw { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.dept-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgb(239 235 229); }
+.dept-figs div { min-width: 0; }
+.dept-figs small { display: block; font-size: 10.5px; color: rgb(117 100 86); }
+.dept-figs b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 14px; font-weight: 500; }
+.dept-figs b.is-in { color: #3F7A64; }
+.dept-figs b.is-out { color: #A95C15; }
+.dept-figs b.is-pos { color: rgb(var(--ledger)); }
+.dept-figs b.is-neg { color: #B02822; }
+.dept-host { width: 100%; min-width: 0; }
+.dept-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.dept-chart .grid { stroke: rgb(239 235 229); }
+.dept-chart .zero { stroke: rgb(207 197 183); }
+.dept-chart .yt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; fill: rgb(117 100 86); text-anchor: end; }
+.dept-chart .xt { font-size: 11px; font-weight: 600; fill: rgb(31 29 27); text-anchor: middle; }
+.dept-chart .xt.sel { fill: #B8691F; }
+.dept-chart .selbar { fill: #E99A53; }
+/* The month pointed at lifts, the rest fade a little (round 8: not to white). */
+.dept-chart .mcol { cursor: pointer; transition: opacity 200ms ease-out, transform 200ms ease-out; }
+.dept-chart:hover .mcol { opacity: 0.62; }
+.dept-chart .mcol:hover { opacity: 1; transform: translateY(-4px); filter: drop-shadow(0 3px 4px rgb(43 31 23 / 18%)); }
+.dept-chart .hz { fill: #fff; fill-opacity: 0; }
+.dept-chart .nline { fill: none; stroke: rgb(29 43 74); stroke-width: 1.8; pointer-events: none; }
+.dept-chart .ndot { fill: #fff; stroke: rgb(29 43 74); stroke-width: 1.5; pointer-events: none; }
+.dept-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 6px; font-size: 11px; color: rgb(90 78 68); }
+.dept-keys span { display: inline-flex; align-items: center; gap: 5px; }
+.dept-ln { display: inline-block; width: 16px; height: 2px; border-radius: 2px; background: rgb(29 43 74); }
+
+/* Where it came from and went: the two ranked cards side by side, in left, out right. */
+.dept-pair-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.dept-card-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.dept-card-title h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.dept-card-title h4::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 2px; }
+.dept-card.is-in .dept-card-title h4::before { background: #3F7A64; }
+.dept-card.is-out .dept-card-title h4::before { background: #E99A53; }
+.dept-card-title span { font-size: 11px; color: rgb(117 100 86); }
+.dept-rank { margin-top: 10px; }
+.dept-rank-row { display: grid; grid-template-columns: minmax(84px, 1.5fr) minmax(48px, 1fr) 86px 44px 66px; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgb(241 237 231); font-size: 12px; }
+.dept-rank-row:not(.is-head):not(.is-foot):hover { background: rgb(247 247 245); }
+.dept-rank-row.is-head { padding-top: 4px; border-bottom: 1.5px solid rgb(207 197 183); color: rgb(117 100 86); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.dept-rank-row.is-head span:nth-child(3), .dept-rank-row.is-head span:nth-child(4) { text-align: right; }
+.dept-rank-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.dept-rank-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-rank-bar { height: 11px; overflow: hidden; border-radius: 3px; background: rgb(243 240 235); }
+.dept-rank-bar i { display: block; height: 100%; border-radius: 3px; }
+.dept-card.is-in .dept-rank-bar i { background: #3F7A64; }
+.dept-card.is-out .dept-rank-bar i { background: #E99A53; }
+.dept-rank-amt { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; }
+.dept-rank-amt.is-neg { color: #B02822; }
+.dept-rank-share { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
+.dept-rank-spark svg { display: block; width: 66px; height: 17px; }
+.dept-rank-row.is-foot { border-top: 1.5px solid rgb(216 210 200); border-bottom: 0; font-weight: 700; }
+.dept-card.is-in .dept-rank-row.is-foot { color: #3F7A64; }
+.dept-card.is-out .dept-rank-row.is-foot { color: #A95C15; }
+.dept-rank-row.is-foot span:nth-child(3), .dept-rank-row.is-foot span:nth-child(4) { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.dept-rank-empty { padding: 24px; text-align: center; color: rgb(148 139 128); }
+
+/* The hover box: beside a month's bars, or by the pointer. */
+.dept-tip { position: fixed; z-index: 60; min-width: 230px; max-width: 340px; padding: 10px 12px; border: 1px solid rgb(232 225 216); border-radius: 10px; background: #fff; box-shadow: 0 10px 28px rgb(43 31 23 / 16%); color: #000; font-size: 11.5px; pointer-events: none; }
+.dept-tip h6 { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 4px; font-size: 12px; font-weight: 700; }
+.dept-tip h6 span { color: rgb(117 100 86); font-size: 10.5px; font-weight: 400; white-space: nowrap; }
+.dept-tip table { width: 100%; border-collapse: collapse; }
+.dept-tip td { padding: 1.5px 0; white-space: nowrap; }
+.dept-tip td:first-child { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.dept-tip td.n { padding-left: 10px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; }
+.dept-tip td.p { padding-left: 8px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; color: rgb(117 100 86); }
+.dept-tip td.is-neg { color: #B02822; }
+.dept-tip td.dim { color: rgb(148 139 128); }
+.dept-tip tr.is-sec td { padding-top: 6px; font-weight: 700; }
+.dept-tip tr.is-sec.is-in td { color: #3F7A64; }
+.dept-tip tr.is-sec.is-out td { color: #A95C15; }
+.dept-tip tr.is-net td { padding-top: 5px; border-top: 1px solid rgb(239 235 229); color: rgb(29 43 74); font-weight: 700; }
+.dept-tip .dept-sw { margin-right: 5px; }
+
+/* The statement in the charts' dress (SheetReport variant="dept"): a warm
+   head, the Total tinted, a firmer rule between months, each block opening
+   on its side's total, a square in the account's chart colour. */
+.dept-st-note { margin: -6px 0 10px; font-size: 11px; color: rgb(117 100 86); }
+.sheet-rpt.is-dept thead th { background: rgb(235 231 224); border-left-color: rgb(211 202 189); color: rgb(43 31 23); }
+.sheet-rpt.is-dept thead th.sr-corner { border-right-color: rgb(207 197 183); border-bottom-color: rgb(207 197 183); }
+.sheet-rpt.is-dept thead th.sr-unit { border-bottom: 1.5px solid rgb(207 197 183); color: rgb(117 100 86); }
+.sheet-rpt.is-dept thead th.is-acc { background: rgb(227 221 211); }
+.sheet-rpt.is-dept thead th.is-now { background: rgb(251 233 216); }
+.sheet-rpt.is-dept thead tr:first-child th.is-now { box-shadow: inset 0 3px 0 #E99A53; }
+.sheet-rpt.is-dept thead th.sr-unit.is-now { box-shadow: none; }
+.sheet-rpt.is-dept td.sr-num { border-left-color: rgb(224 217 206); }
+.sheet-rpt.is-dept td.is-acc { background: rgb(246 243 238); }
+.sheet-rpt.is-dept tr.sr-item td.sr-label { color: rgb(90 78 68); }
+.sheet-rpt.is-dept tr.sr-title td { border-top: 1.5px solid rgb(216 210 200); font-weight: 700; }
+.sheet-rpt.is-dept tr.sr-title td.sr-label { font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.sheet-rpt.is-dept tr.sr-title.is-in td { background: rgb(233 242 237); color: #3F7A64; }
+.sheet-rpt.is-dept tr.sr-title.is-out td { background: rgb(253 241 229); color: #A95C15; }
+.sheet-rpt.is-dept tr.sr-title.is-in td.sr-label { box-shadow: inset 3px 0 0 #3F7A64; }
+.sheet-rpt.is-dept tr.sr-title.is-out td.sr-label { box-shadow: inset 3px 0 0 #E99A53; }
+.sheet-rpt .sr-sw { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 2px; vertical-align: 0; }
+
+/* By the room the charts get, not the window's (the sidebar takes its share). */
+.dept-charts { container: dept-charts / inline-size; }
+.dept-pieces { container: dept-pieces / inline-size; }
+.dept-panel { container: dept-panel / inline-size; }
+.dept-card { container: dept-card / inline-size; }
+/* Too narrow for the Month's two donuts side by side beside the bars: the Month over the months. */
+@container dept-charts (max-width: 980px) {
+  .dept-duo { grid-template-columns: minmax(0, 1fr); }
+}
+@container dept-pieces (max-width: 720px) {
+  .dept-pair-cards { grid-template-columns: minmax(0, 1fr); }
+}
+@container dept-panel (max-width: 330px) {
+  .dept-donuts { grid-template-columns: minmax(0, 1fr); }
+}
+/* A card of half a narrow page: the month bars go, the names get the room (the hover still lists each month). */
+@container dept-card (max-width: 540px) {
+  .dept-rank-row { grid-template-columns: minmax(118px, 1.6fr) minmax(48px, 1fr) 86px 44px; }
+  .dept-rank-row > span:nth-child(5) { display: none; }
+}
+/* A phone's card: the name wraps rather than losing its end, the bar gives up the room. */
+@container dept-card (max-width: 380px) {
+  .dept-rank-row { grid-template-columns: minmax(0, 1.6fr) minmax(36px, 1fr) 84px 42px; }
+  .dept-rank-text { overflow: visible; white-space: normal; line-height: 1.25; }
+}
+@media (max-width: 760px) {
+  .dept-period-rule { display: none; }
+}
+@media (max-width: 560px) {
+  .dept-panel, .dept-card { padding: 12px; }
+  /* A phone: a long section title and its count take a line each, never wider than the screen. */
+  .dept-page .sect-head { flex-wrap: wrap; gap: 2px 12px; }
+  .dept-page .sect-head .rule { display: none; }
+  .dept-page .sect-head .count { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dept-chart .mcol, .dept-donut path { transition: none; }
+  .dept-chart .mcol:hover { transform: none; }
+}
+
 /* Negatives red wherever Finance's sheet writes them (the handoff: "negative
    numbers are red, in brackets"). */
 .fin-view .neg { color: #B02822; }

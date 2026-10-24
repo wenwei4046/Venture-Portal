@@ -23,8 +23,9 @@ export async function GET(req: Request) {
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : officeMonth()
-  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them.
-  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth())
+  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them — a department's page may
+  // reach back across the year (2026-10-25), its months then built from From.
+  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth(), { crossYear: true })
   const segment = url.searchParams.get('segment') ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
     consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
   const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
-  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment: segmentFilterFor(segment), ...(range.buildFrom ? { from: range.buildFrom } : {}) })
   const saved = (savedRaw ?? null) as ReportLayout | null
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
       element: (
         <MatrixPdf
           title="Monthly P&L"
-          subtitle={`FY ${year} · all amounts RM`}
+          subtitle={`${range.buildFrom ? '' : `FY ${year} · `}all amounts RM`}
           periodLabel={range.wholeYear ? `Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}` : rangeLabel(range.from, range.to)}
           data={matrix}
         />

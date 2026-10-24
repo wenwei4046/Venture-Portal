@@ -141,10 +141,11 @@ export function buildMonthlyCashFlowSides(
   lines: GlLine[],
   accounts: CoaAccount[],
   bankCodes: ReadonlySet<string>,
-  args: { year: number; throughMonth: number; segment?: string | string[] },
+  /** `from`: a start before January (a department's page) — see monthColumns. */
+  args: { year: number; throughMonth: number; segment?: string | string[]; from?: string },
 ): MonthlyCashFlowSides {
   const { year, segment } = args
-  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth)
+  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth, args.from)
 
   const reportAcc = buildCashFlow(lines, accounts, { current: accPeriod, previous: EMPTY_PERIOD, segment }, bankCodes)
   const reports: CashFlowReport[] = [

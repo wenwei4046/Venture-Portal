@@ -19,10 +19,12 @@ export interface MonthlyStatementArgs {
   segment: string[] | undefined
   /** Every segment at once (a company-wide reader, nothing picked). */
   consolidated: boolean
+  /** A start before January (a department's page, 2026-10-25): the months run back across the year. */
+  from?: string
 }
 
 /** The P&L: inter-billing between segments eliminated when consolidated, rows laid out as saved. */
-export async function loadMonthlyPnl(supabase: SupabaseClient, { year, throughMonth, segment, consolidated }: MonthlyStatementArgs) {
+export async function loadMonthlyPnl(supabase: SupabaseClient, { year, throughMonth, segment, consolidated, from }: MonthlyStatementArgs) {
   const [rawLines, accounts, savedRaw, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
@@ -31,7 +33,7 @@ export async function loadMonthlyPnl(supabase: SupabaseClient, { year, throughMo
   ])
   const lines = elim ? eliminateInterBilling(rawLines, elim) : rawLines
 
-  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment })
+  const data = buildPnlAccounts(lines, accounts, { year, throughMonth, segment, ...(from ? { from } : {}) })
   const saved = (savedRaw ?? null) as ReportLayout | null
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved
@@ -41,7 +43,7 @@ export async function loadMonthlyPnl(supabase: SupabaseClient, { year, throughMo
 }
 
 /** The Cash Flow: one segment carries the internal-transfer bridge, so its closing cash ties to its pool. */
-export async function loadMonthlyCashFlow(supabase: SupabaseClient, { year, throughMonth, segment, consolidated }: MonthlyStatementArgs) {
+export async function loadMonthlyCashFlow(supabase: SupabaseClient, { year, throughMonth, segment, consolidated, from }: MonthlyStatementArgs) {
   // Internal-transfer bridge: per-segment only — it cancels across segments,
   // so the consolidated view must not carry it (same rule as the statement),
   // and there it is not read at all (2026-10-08).
@@ -68,6 +70,7 @@ export async function loadMonthlyCashFlow(supabase: SupabaseClient, { year, thro
     year,
     throughMonth,
     segment,
+    ...(from ? { from } : {}),
   })
 
   const nCols = data.columns.length

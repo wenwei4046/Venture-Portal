@@ -13,6 +13,8 @@ import type { ReportSegmentOption } from './report-segments'
  *
  * 2026-10-10: a single month's statement picks its month "vs" a month to
  * compare (`mode="single"`); a balance reads "As at" one month (`"asat"`).
+ * 2026-10-25: a department's page keeps its period in its own row over the
+ * charts, so its statement's row has Find and the level alone (`"none"`).
  */
 export default function ReportToolbar({
   mode = 'range',
@@ -26,7 +28,7 @@ export default function ReportToolbar({
   segment,
   segments,
 }: {
-  mode?: 'range' | 'single' | 'asat'
+  mode?: 'range' | 'single' | 'asat' | 'none'
   from?: string
   to?: string
   fromOptions?: string[]
@@ -104,7 +106,7 @@ export default function ReportToolbar({
             </select>
           </div>
         </div>
-      ) : (
+      ) : mode === 'none' ? null : (
         <div className="rpt-field">
           <span>{mode === 'asat' ? 'As at' : 'Period'}</span>
           <div className="rpt-range">
