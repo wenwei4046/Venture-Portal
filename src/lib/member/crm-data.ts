@@ -222,6 +222,9 @@ export interface CrmAdRule {
   adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string;
   /** By team, inside each team (rev 1011 §6.6): Evenly · By % (the default) · By max. Absent = By % with an even split. */
   tm?: Record<string, "even" | "pct" | "cnt">;
+  /** Counted together with the other together ads — saved by "Save and apply to all" (2026-10-24, mig 20261025121500): the
+   *  next lead of any of them goes by all of their leads this month. Absent = apart, the ad counts only its own. */
+  together?: boolean;
 }
 /** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
 /** rev 1011 §6.2: "turns" — vals[staff][day] = 1 where ticked; one ticked gets that day's leads, two or more take turns. */
@@ -454,7 +457,7 @@ export interface CrmDataRows {
   apptTypes?: unknown;
   /** crm_settings_read()'s answer; absent before the migration. */
   settings?: unknown;
-  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null }[];
+  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null; together?: boolean | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
@@ -610,7 +613,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     recentEmoji: rows.staffPrefs[0]?.recent_emoji ?? [],
     settings: settingsFrom(rows.settings),
     apptTypes: apptTypesFrom(rows.apptTypes),
-    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}) })),
+    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
     forms: [...(rows.forms ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),

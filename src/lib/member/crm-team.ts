@@ -345,7 +345,8 @@ export interface CrmDealRule {
 }
 /** One team's Full time lead allocation: the chosen weekdays (0 = Monday) and, per person, the ticked days (1). */
 export interface CrmDealFullTime { days: number[]; ticked: Record<string, Record<string, number>> }
-/** What the next pick balances against, for this ad (since its rule started; 30 days with no rule). */
+/** What the next pick balances against, for this ad (since its rule started; 30 days with no rule) — or, counted together,
+ *  every together ad's this month (dealCounts, 2026-10-24). */
 export interface CrmDealCounts {
   /** Person → this ad's enquiries given to them. */
   given: Record<string, number>;
@@ -432,6 +433,44 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
   const p = pickInside(teamId, rule.teamModes?.[teamId] ?? "pct", rule.people, at, fullTime[teamId], counts, members);
   if (p.hold) return { teamId, memberId: null, held: true, by: "over_the_limit" };
   return p.memberId ? { teamId, memberId: p.memberId, by: p.by } : organic;
+}
+
+/* ── Ads counted together (2026-10-24, mig 20261025121500) ─────────────── */
+
+/** An ad's rule as the dealer counts it: when its count started, and whether it is counted together ("Save and apply to all"). */
+export interface CrmDealAd { startedAt: Date; together?: boolean }
+/** A lead the counts are made of: its ad, when it came, its team, and who has it (nobody and held: waiting in that team). */
+export interface CrmDealLead { ad: string | null; at: Date; teamId: string | null; memberId: string | null; held?: boolean }
+
+/** The 1st of the month, 00:00 in Kuala Lumpur — the together ads count again from it, as the database does. */
+export function officeMonthStart(at: Date): Date {
+  const kl = new Date(at.getTime() + 8 * 3_600_000);
+  return new Date(Date.UTC(kl.getUTCFullYear(), kl.getUTCMonth(), 1) - 8 * 3_600_000);
+}
+
+/**
+ * The leads the next pick for this ad balances against (the database's crm_campaign_given): an ad apart, its own since
+ * `since` (its rule's start); an ad counted together, every together ad's leads this month (the office's), each from when
+ * its own rule started — so a new ad no longer begins at nothing and the small shares get their turn.
+ */
+export function countedLeads(ad: string, since: Date, ads: Record<string, CrmDealAd>, leads: CrmDealLead[], now: Date): CrmDealLead[] {
+  if (!ads[ad]?.together) return leads.filter(l => l.ad === ad && l.at >= since);
+  const month = officeMonthStart(now).getTime();
+  return leads.filter(l => { const a = l.ad ? ads[l.ad] : undefined; return !!a?.together && l.at.getTime() >= Math.max(a.startedAt.getTime(), month); });
+}
+
+/** What dealEnquiry balances against for this ad, from the leads: per person, per team (given or held), held, and Full time's
+ *  last given — that one from every lead, whatever its ad, as crm_fulltime_pick reads it. */
+export function dealCounts(ad: string, since: Date, ads: Record<string, CrmDealAd>, leads: CrmDealLead[], now: Date): CrmDealCounts {
+  const counts: CrmDealCounts = { given: {}, team: {}, held: {}, lastAt: {} };
+  const add = (r: Record<string, number>, k: string) => { r[k] = (r[k] ?? 0) + 1; };
+  for (const l of countedLeads(ad, since, ads, leads, now)) {
+    if (l.memberId) add(counts.given, l.memberId);
+    if (l.teamId && (l.memberId || l.held)) add(counts.team, l.teamId);
+    if (l.teamId && l.held && !l.memberId) add(counts.held, l.teamId);
+  }
+  for (const l of leads) if (l.memberId && l.at.getTime() > (counts.lastAt[l.memberId] ?? -Infinity)) counts.lastAt[l.memberId] = l.at.getTime();
+  return counts;
 }
 
 /** The counts after a deal — what the next one balances against. */

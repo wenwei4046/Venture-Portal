@@ -66,6 +66,9 @@ export interface DeskUi {
   awChat: string | null;
   awMenuOpen: boolean;
   ad: string | null;
+  /** Which ad's saved setting the editor's draft was loaded from (`id|rule` or `id|none`). The open ad is part of the place a
+   *  refresh or Back restores, its draft is not — so a restored ad loads its saved split again (2026-10-24). */
+  adDraftFor?: string | null;
   adMode: "evenly" | "team";
   /** Ads to teams' editor: the ad's name while it is typed (null = as saved). */
   adNameDraft?: string | null;

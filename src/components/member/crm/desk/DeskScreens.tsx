@@ -332,6 +332,13 @@ export default function DeskScreens(p: DeskScreensProps) {
     else if (v.ftSeed) { seeded.current = seedKey; v.ftSeed(); }
   }, [seedKey, v.adSeed, v.ftSeed, v.openAdById, patch]);
 
+  // An ad the place brought back (a refresh, Back) has no draft — load its saved split, or Save would write the default
+  // even one (2026-10-24); again once the read brings a rule it lacked.
+  const reloadAdDraft = v.reloadAdDraft;
+  useEffect(() => {
+    if (ui.ad && v.adDraftWant && ui.adDraftFor !== v.adDraftWant) reloadAdDraft(ui.ad);
+  }, [ui.ad, ui.adDraftFor, v.adDraftWant, reloadAdDraft]);
+
   // The prototype's keyboard: ↑ ↓ walk the number fields of the open editor; Esc closes the menu, then the pane.
   const closeRef = useRef(v.closePane);
   closeRef.current = v.closePane;

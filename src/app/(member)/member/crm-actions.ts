@@ -32,6 +32,8 @@ const CRM_WRITES = [
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
   // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
+  // Save and apply to all: one setting, the ads counted together (mig 20261025121500), CRM · Manage.
+  "crm_save_ads_together",
   // Cold lead templates (mig 20261011140000); submitting to Meta is submitCrmTemplate.
   "crm_save_template", "crm_template_on", "crm_delete_template",
   // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
@@ -61,7 +63,7 @@ export type CrmWrite = (typeof CRM_WRITES)[number];
  * is loaded only then — this module is imported by the CRM's screens.
  */
 const TELLS: ReadonlySet<string> = new Set([
-  "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign",
+  "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads_together",
   "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_visit_outcome",
   "crm_invite", "crm_answer_invite", "crm_remind",
 ]);
@@ -121,7 +123,7 @@ const requireCrm = async (need: "view" | "edit" | "manage") => {
 
 /** Which cell each of the CRM's writes needs (the database asks the same). */
 const MANAGE_WRITES: ReadonlySet<string> = new Set([
-  "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
+  "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads_together", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
@@ -176,7 +178,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
       read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").in("kind", LISTED_EVENTS).order("at", { ascending: false }).limit(500)),
       read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at, notif_read")),
-      read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes")),
+      read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes, together")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
       // Every template for the Control panel; Approved + On for everybody else (the row policy decides).
       read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason").order("created_at")),
