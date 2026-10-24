@@ -7,7 +7,7 @@
 
 import { monthLabel } from './billing'
 import { periodOf, type MktProjectKind } from './board'
-import { eventFromRow, trailTime, type TaskEvent } from './task'
+import { eventFromRow, leftOutWords, trailTime, type TaskEvent } from './task'
 
 /** A record of the log: a trail line — and, a correction's, the record it corrects (④-3b). */
 export interface LogEvent extends TaskEvent {
@@ -71,6 +71,7 @@ const ACTION: Record<string, string> = {
   'subtask removed': 'Subtask taken back',
   'amount set': 'Amount set', 'billing confirmed': 'Billing confirmed', 'billing withdrawn': 'Billing withdrawn', stopped: 'Stopped',
   'run made': 'Monthly run made', 'run day': 'Run day changed', carried: 'Plan carried',
+  'runs paused': 'Monthly runs paused', 'runs resumed': 'Monthly runs resumed',
   'campaign period': 'Campaign period',
   posted: 'Marked posted', unposted: 'Posted mark taken back',
   correction: 'Correction',
@@ -88,7 +89,8 @@ const OF_SUBTASK = new Set(['subtask', 'delivered', 'delivery returned', 'delive
 const TO_PIC = new Set(['link sent', 'resent'])
 const OF_MINUTES = new Set(['signed', 'minutes completed', 'pic approved'])
 /** Billing's lines (②b-2b): the month they are for, in the Version column — never a figure. */
-const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until', 'run made': 'month' }
+const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until', 'run made': 'month',
+  'runs resumed': 'from' }
 const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced', 'delivery returned', 'correction'])
 const NONE = '—'
 
@@ -127,6 +129,8 @@ export function auditRows(log: ProjectLog): AuditRow[] {
       reason: e.action === 'campaign period' ? periodOf(e.data) ?? 'Taken off'
         // A post's mark (④-2c): its field, and the link it was posted at.
         : e.action === 'posted' || e.action === 'unposted' ? [e.data?.field, e.action === 'posted' ? e.data?.link : null].filter(x => typeof x === 'string' && x).join(' · ') || NONE
+        // Resumed (②b-2g): the months whose run day came while it was paused.
+        : e.action === 'runs resumed' ? leftOutWords(e.data) ?? NONE
         : TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: OF_SUBTASK.has(e.action) && typeof e.data?.title === 'string' ? (e.version ? `${e.data.title} ${e.version}` : e.data.title)
         : OF_MONTH[e.action] ? monthOfLine(e.data?.[OF_MONTH[e.action]])

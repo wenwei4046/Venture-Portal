@@ -95,10 +95,14 @@ describe('a product project’s billing card', () => {
       projectBillWords('recurring', { ...none, from: '2026-08-01' }, 'active'),
       projectBillWords('recurring', { ...none, from: '2026-08-01', confirmed: 2, last: '2026-09-01' }, 'active'),
       projectBillWords('recurring', { ...none, from: '2026-08-01', until: '2026-10-01' }, 'done'),
+      // Paused (②b-2g): billed all the same (answer 51).
+      projectBillWords('recurring', { ...none, from: '2026-08-01', confirmed: 2, last: '2026-09-01' }, 'paused'),
+      projectBillWords('recurring', { ...none, from: '2026-08-01', until: '2026-10-01' }, 'paused'),
     ]).toEqual([
       'Billed once it is done', 'Done · to confirm on Billing', 'Billed once done · confirmed for Oct 2026',
       'Monthly · from the month its work starts', 'Monthly · from Aug 2026', 'Monthly · from Aug 2026 · confirmed to Sep 2026',
       'Stopped · Aug 2026 – Oct 2026',
+      'Monthly · from Aug 2026 · paused, still billed · confirmed to Sep 2026', 'Stopped · Aug 2026 – Oct 2026',
     ])
   })
 

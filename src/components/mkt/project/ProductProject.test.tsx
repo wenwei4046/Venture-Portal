@@ -18,6 +18,7 @@ const actions = vi.hoisted(() => ({
   setMktProjectAmount: vi.fn(),
   stopMktProduct: vi.fn(),
   setMktRunDay: vi.fn(),
+  pauseMktProduct: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }))
@@ -348,6 +349,72 @@ describe('a recurring product project’s months', () => {
     render(<ProductProject initial={page(SITI, { status: 'active', runs }, ready, [], made)} can={{ edit: true, manage: false }} />)
     expect(screen.getByText('Every month on the 5th · next 5 Nov 2026')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Change day' })).toBeNull()
+  })
+
+  // ②b-2g: paused — asked first, still billed (answer 51) — and resumed from this month.
+  it('the manager pauses it, asked first; resumes it — this month’s work made at once', async () => {
+    render(<ProductProject initial={page(RACHEL, { status: 'active', runs }, ready, [], made)} can={MANAGER} />)
+    const line = screen.getByLabelText('Monthly run')
+    fireEvent.click(within(line).getByRole('button', { name: 'Pause…' }))
+    const dialog = screen.getByRole('dialog', { name: /^Pause / })
+    expect(within(dialog).getByText('No month’s work is made while it is paused · work under way carries on · still billed every month')).toBeTruthy()
+    actions.pauseMktProduct.mockResolvedValue({ ok: true, page: page(RACHEL, { status: 'paused', runs }, ready, [], made) })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Pause' }))
+    })
+    expect(actions.pauseMktProduct).toHaveBeenCalledWith('p1', true)
+    await waitFor(() => expect(within(screen.getByLabelText('Monthly run')).getByText('Paused · every month on the 5th')).toBeTruthy())
+    expect(screen.getByRole('status').textContent).toBe('Paused · no month’s work until it is resumed')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // Paused: its day still moved; resumed in December, December's work made at once (November left out).
+    expect(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Change day' })).toBeTruthy()
+    const december = [...made, d('D03', 4, 'Image post 1/1 · Dec 2026')]
+    actions.pauseMktProduct.mockResolvedValue({ ok: true, page: page(RACHEL, { status: 'active', runs: { ...runs, made: 4, next: 5 } }, ready, [], december) })
+    await act(async () => {
+      fireEvent.click(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Resume' }))
+    })
+    expect(actions.pauseMktProduct).toHaveBeenLastCalledWith('p1', false)
+    await waitFor(() => expect(screen.getByText('Every month on the 5th · next 5 Jan 2027')).toBeTruthy())
+    expect(screen.getByRole('status').textContent).toBe("Resumed · Dec 2026's work made")
+    const list = screen.getByRole('region', { name: 'Deliverables' })
+    expect([...list.querySelectorAll('[class*="delMonthName"]')].map(n => n.textContent)).toEqual(['Dec 2026', 'Oct 2026', 'Sep 2026'])
+  })
+
+  it('says which is under way: Pausing… in the question, Resuming… on the line — never the other', async () => {
+    let answer!: (v: unknown) => void
+    actions.pauseMktProduct.mockReturnValue(new Promise(r => { answer = r }))
+    render(<ProductProject initial={page(RACHEL, { status: 'active', runs }, ready, [], made)} can={MANAGER} />)
+    fireEvent.click(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Pause…' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: /^Pause / })).getByRole('button', { name: 'Pause' }))
+    expect(within(screen.getByRole('dialog', { name: /^Pause / })).getByRole('button', { name: 'Pausing…' })).toBeTruthy()
+    await act(async () => answer({ ok: true, page: page(RACHEL, { status: 'paused', runs }, ready, [], made) }))
+    const line = screen.getByLabelText('Monthly run')
+    await waitFor(() => expect(within(line).getByRole('button', { name: 'Resume' })).toBeTruthy())
+    expect(within(line).queryByRole('button', { name: 'Resuming…' })).toBeNull()
+    actions.pauseMktProduct.mockReturnValue(new Promise(r => { answer = r }))
+    fireEvent.click(within(line).getByRole('button', { name: 'Resume' }))
+    expect(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Resuming…' })).toBeTruthy()
+    await act(async () => answer({ ok: true, page: page(RACHEL, { status: 'active', runs }, ready, [], made) }))
+    await waitFor(() => expect(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Pause…' })).toBeTruthy())
+  })
+
+  it('a refusal is said; no Pause once stopped, nor for the staff', async () => {
+    const first = render(<ProductProject initial={page(RACHEL, { status: 'paused', runs }, ready, [], made)} can={MANAGER} />)
+    actions.pauseMktProduct.mockResolvedValue({ ok: false, reason: 'It has stopped — no month is left to resume.' })
+    await act(async () => {
+      fireEvent.click(within(screen.getByLabelText('Monthly run')).getByRole('button', { name: 'Resume' }))
+    })
+    expect(screen.getByRole('status').textContent).toBe('It has stopped — no month is left to resume.')
+    expect(screen.getByText('Paused · every month on the 5th')).toBeTruthy()
+    first.unmount()
+    const { unmount } = render(<ProductProject initial={page(RACHEL, { status: 'paused', runs: { ...runs, until: '2026-10-01' } }, ready, [], made)} can={MANAGER} />)
+    expect(screen.getByText('Every month on the 5th · ended Oct 2026')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Pause…' })).toBeNull()
+    unmount()
+    render(<ProductProject initial={page(SITI, { status: 'paused', runs }, ready, [], made)} can={{ edit: true, manage: false }} />)
+    expect(screen.getByText('Paused · every month on the 5th')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
   })
 })
 

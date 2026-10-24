@@ -141,6 +141,8 @@ describe('a subsidiary’s page', () => {
       { id: 15, at: '2026-10-22T09:00:00Z', actor: 'Mei', action: 'campaign period', data: { from: '2026-11-09', until: '2026-11-12' }, project: p },
       { id: 14, at: '2026-10-22T08:00:00Z', actor: 'Mei', action: 'campaign period', data: { from: null, until: null }, project: p },
       { id: 13, at: '2026-10-22T07:00:00Z', actor: 'Mei', action: 'work started', data: { deliverables: 2, runDay: 5 }, project: p },
+      { id: 17, at: '2026-10-22T11:00:00Z', actor: 'Mei', action: 'runs resumed', data: { from: '2026-12', left: 1 }, project: p },
+      { id: 16, at: '2026-10-22T10:00:00Z', actor: 'Mei', action: 'runs paused', data: null, project: p },
       { id: 12, at: '2026-10-22T06:00:00Z', actor: 'Someone', action: 'run made', data: { month: '2026-11', made: 2, toPlan: 1 }, project: p },
       { id: 11, at: '2026-10-22T05:00:00Z', actor: 'Mei', action: 'billing confirmed', data: { month: '2026-10' }, project: p },
       // A deliverable's post marked (④-2c) — the task's words.
@@ -151,6 +153,8 @@ describe('a subsidiary’s page', () => {
       '📢 Mei set the campaign period · 9 – 12 Nov 2026',
       '📢 Mei took the campaign period off',
       '▶ Mei started the work · 2 deliverables · every month on the 5th',
+      '▶ Mei resumed the monthly runs · from Dec 2026 · 1 month left out',
+      '⏸ Mei paused the monthly runs',
       "🔁 Nov 2026's work made · 2 deliverables · 1 to plan",
       '💰 Mei confirmed the billing for Oct 2026',
       '📣 Ali marked Post day posted',

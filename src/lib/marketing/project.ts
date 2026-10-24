@@ -8,7 +8,7 @@ import {
   type MktStageStatus, type MktSub,
 } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
-import { delivFromRow, ordinal, picOkFromRow, runMadeText, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
+import { delivFromRow, ordinal, picOkFromRow, runMadeText, runsResumedText, trailTime, type PicOk, type TaskDeliv, type Tone } from './task'
 import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './billing'
 
 /** A product project's way to its work. */
@@ -101,6 +101,8 @@ export interface ProductRuns {
   first: string
   made: number
   until: string | null
+  /** The next run (②b-2g): the one after the last made — or, resumed, this month's (the months paused left out). */
+  next: number
 }
 
 /** A deliverable as its product's page lists it: where it stands, its stage now and whose. */
@@ -168,11 +170,12 @@ function minutesFromRow(m: Record<string, unknown>): MinutesDoc {
 
 function runsFromRow(v: unknown): ProductRuns | null {
   if (!isObj(v)) return null
-  const day = Number(v.day), made = Number(v.made)
+  const day = Number(v.day), made = Number(v.made), next = Number(v.next)
   const first = typeof v.first === 'string' && /^\d{4}-\d{2}-01/.test(v.first) ? v.first.slice(0, 10) : null
   if (!first || !Number.isInteger(day) || day < 1 || day > 28) return null
   const until = typeof v.until === 'string' && /^\d{4}-\d{2}-01/.test(v.until) ? v.until.slice(0, 10) : null
-  return { day, first, made: Number.isInteger(made) && made >= 1 ? made : 1, until }
+  const m = Number.isInteger(made) && made >= 1 ? made : 1
+  return { day, first, made: m, until, next: Number.isInteger(next) && next > m ? next : m + 1 }
 }
 
 /** Run k's month ('YYYY-MM-01'). */
@@ -180,12 +183,33 @@ export const runMonth = (r: ProductRuns, k: number) => shiftMonth(r.first, k - 1
 
 /** The next month's run day ('YYYY-MM-DD'), or null once the month it was stopped is made. */
 export function nextRun(r: ProductRuns): string | null {
-  const month = runMonth(r, r.made + 1)
+  const month = runMonth(r, r.next)
   if (r.until && month > r.until) return null
   return `${month.slice(0, 8)}${String(r.day).padStart(2, '0')}`
 }
 
-/** Its months in a line: "Every month on the 5th · next 5 Nov 2026" — "Every month on the 5th · ended Dec 2026". */
+/** '2026-11-05' → '5 Nov 2026'. */
+function runDayWords(day: string): string {
+  const [y, m, d] = day.split('-')
+  return `${+d} ${monthLabel(`${y}-${m}-01`).split(' ')[0]} ${y}`
+}
+
+/** Its months in a line: "Every month on the 5th · next 5 Nov 2026" — paused (②b-2g), "Paused · every month on the 5th"
+ * — "Every month on the 5th · ended Dec 2026". */
+export function runsLine(r: ProductRuns, paused = false): string {
+  if (paused && !r.until) return `Paused · every month on the ${ordinal(r.day)}`
+  const next = paused ? null : nextRun(r)
+  return `Every month on the ${ordinal(r.day)} · ${next ? `next ${runDayWords(next)}` : `ended ${monthLabel(r.until ?? r.first)}`}`
+}
+
+/** What Resume did (②b-2g), in its toast: this month's work made at once — or the day the next month's is. */
+export function resumedWords(before: ProductRuns, after: ProductRuns | null): string {
+  if (!after) return 'Resumed'
+  if (after.made > before.made) return `Resumed · ${monthLabel(runMonth(after, after.made))}'s work made`
+  const next = nextRun(after)
+  return next ? `Resumed · next ${runDayWords(next)}` : 'Resumed'
+}
+
 /** Where a campaign stands today (the user's answer 13): before its run — "Runs 9 – 12 Nov 2026 · in 16 days"; running —
  * "Live · 9 – 12 Nov 2026 · ends 12 Nov"; after — "Ran 9 – 12 Nov 2026". */
 export function campaignLine(c: MktCampaign, today: string): { text: string; live: boolean } {
@@ -205,12 +229,6 @@ export function typedCampaign(fields: readonly MinutesField[], vals: Readonly<Re
   if (!f) return undefined
   const v = vals[f.name]
   return isPeriod(v) && v.from && v.to && v.to >= v.from ? { from: v.from, until: v.to } : null
-}
-
-export function runsLine(r: ProductRuns): string {
-  const next = nextRun(r)
-  const [y, m, d] = (next ?? '').split('-')
-  return `Every month on the ${ordinal(r.day)} · ${next ? `next ${+d} ${monthLabel(`${y}-${m}-01`).split(' ')[0]} ${y}` : `ended ${monthLabel(r.until ?? r.first)}`}`
 }
 
 /** A recurring project's deliverables by month, the latest first — each month by category as deliverableGroups. */
@@ -426,8 +444,8 @@ export function requiredTally(doc: Pick<MinutesDoc, 'template'>, vals: Readonly<
  * minutes go to them; approved without them, every step is done. */
 export function stepsOf(status: ProductStatus, pic: boolean): { label: string; state: 'done' | 'current' | 'todo' }[] {
   const labels = ['Subsidiary & product', 'Meeting minutes', 'Tracking link', ...(pic ? ['PIC response'] : [])]
-  // Once the work has started, every step is behind it.
-  const cur = status === 'active' || status === 'done' ? labels.length + 1
+  // Once the work has started, every step is behind it — paused (②b-2g) too.
+  const cur = status === 'active' || status === 'paused' || status === 'done' ? labels.length + 1
     : status === 'minutes' ? 2 : status === 'waiting_pic' ? 3 : pic ? 4 : labels.length + 1
   return labels.map((label, i) => ({ label, state: i + 1 < cur ? 'done' : i + 1 === cur ? 'current' : 'todo' }))
 }
@@ -503,6 +521,9 @@ export function productEventText(e: { actor: string; action: string; reason: str
     // A recurring one's months (②b-2f).
     : e.action === 'run made' ? runMadeText(e.data)
     : e.action === 'run day' ? `${who} moved the monthly run to the ${ordinal(Number(e.data?.to) || 1)}`
+    // Paused and resumed (②b-2g).
+    : e.action === 'runs paused' ? `${who} paused the monthly runs`
+    : e.action === 'runs resumed' ? runsResumedText(who, e.data)
     : e.action === 'closed' ? 'Every deliverable done · project closed'
     : e.action === 'signed' ? `${who} signed ${e.reason || 'the minutes'}`
     : e.action === 'link sent' ? `${who} sent the tracking link to ${e.reason || 'the PIC'}`

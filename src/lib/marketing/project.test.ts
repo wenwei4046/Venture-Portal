@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
-  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine, campaignLine, typedCampaign
+  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine, campaignLine, typedCampaign, resumedWords
 } from './project'
 import { periodWords } from './board'
 
@@ -182,11 +182,11 @@ describe('where it stands', () => {
   it('a recurring product’s months: read, the next run day, its line, its deliverables by month, its trail', () => {
     const pp = productProjectFromRow({ project: { id: 'p', track: 'T', status: 'active', runs: { day: 5, first: '2026-09-01', made: 2, until: null } } })!
     const r = pp.project.runs!
-    expect(r).toEqual({ day: 5, first: '2026-09-01', made: 2, until: null })
+    expect(r).toEqual({ day: 5, first: '2026-09-01', made: 2, until: null, next: 3 })
     expect(productProjectFromRow({ project: { id: 'p', runs: { day: 31, first: '2026-09-01', made: 1 } } })!.project.runs).toBeNull()
     expect([runMonth(r, 1), runMonth(r, 3), nextRun(r), runsLine(r)]).toEqual(['2026-09-01', '2026-11-01', '2026-11-05', 'Every month on the 5th · next 5 Nov 2026'])
     expect([nextRun({ ...r, until: '2026-10-01' }), runsLine({ ...r, until: '2026-10-01' })]).toEqual([null, 'Every month on the 5th · ended Oct 2026'])
-    expect(runsLine({ ...r, day: 22, made: 4 })).toBe('Every month on the 22nd · next 22 Jan 2027')
+    expect(runsLine({ ...r, day: 22, made: 4, next: 5 })).toBe('Every month on the 22nd · next 22 Jan 2027')
     const del = (id: string, run?: number) => ({ id, trackId: id, title: id, status: 'planning' as const, cur: 0, deliv: { group: '', item: id, n: 1, of: 1, ...(run ? { run } : {}) },
       workflow: null, startsOn: null, dueOn: null, doneAt: null, stages: 1, done: 0, stage: null })
     expect(deliverableRuns([del('D01', 1), del('D02', 2), del('D03', 2), del('D00')], r).map(m => [m.run, m.month, m.list.map(x => x.id)]))
@@ -200,6 +200,30 @@ describe('where it stands', () => {
       "Oct 2026's work made · 4 deliverables · 1 to plan", 'Josiah moved the monthly run to the 5th',
       'Josiah started the work · 4 deliverables · every month on the 1st',
     ])
+  })
+
+  // ②b-2g: paused and resumed — the next run the page gives (a month whose run day came while paused left out).
+  it('paused and resumed: the next run read, its line, Resume’s toast, its trail, the stepper', () => {
+    const pp = productProjectFromRow({ project: { id: 'p', track: 'T', status: 'paused', runs: { day: 5, first: '2026-08-01', made: 2, until: null, next: 4 } } })!
+    const r = pp.project.runs!
+    expect(r.next).toBe(4)
+    const runsOf = (runs: object) => productProjectFromRow({ project: { id: 'p', runs } })!.project.runs!.next
+    expect([runsOf({ day: 5, first: '2026-08-01', made: 2 }), runsOf({ day: 5, first: '2026-08-01', made: 2, next: 2 })]).toEqual([3, 3])
+    expect([nextRun(r), runsLine(r)]).toEqual(['2026-11-05', 'Every month on the 5th · next 5 Nov 2026'])
+    expect(runsLine(r, true)).toBe('Paused · every month on the 5th')
+    expect(runsLine({ ...r, until: '2026-10-01' }, true)).toBe('Every month on the 5th · ended Oct 2026')
+    expect(resumedWords(r, { ...r, made: 4, next: 5 })).toBe("Resumed · Nov 2026's work made")
+    expect([resumedWords(r, r), resumedWords(r, null)]).toEqual(['Resumed · next 5 Nov 2026', 'Resumed'])
+    pp.trail = [
+      { at: '2026-11-05T01:00:00Z', actor: 'Josiah', action: 'runs resumed', reason: '', data: { from: '2026-11', left: 1 } },
+      { at: '2026-10-20T01:00:00Z', actor: 'Josiah', action: 'runs resumed', reason: '', data: { from: '2026-11', left: 0 } },
+      { at: '2026-10-03T01:00:00Z', actor: 'Josiah', action: 'runs paused', reason: '', data: null },
+    ]
+    expect(productTrail(pp).map(l => l.text)).toEqual([
+      'Josiah resumed the monthly runs · from Nov 2026 · 1 month left out', 'Josiah resumed the monthly runs · from Nov 2026',
+      'Josiah paused the monthly runs',
+    ])
+    expect(stepsOf('paused', true).map(x => x.state)).toEqual(['done', 'done', 'done', 'done'])
   })
 
   // ②b-2b: billing's lines — the month they are for, never the figure (amounts are the manager's, the trail everybody's).
