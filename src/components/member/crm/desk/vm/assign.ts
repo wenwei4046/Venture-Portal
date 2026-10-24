@@ -1,7 +1,7 @@
 /**
  * Assignment (CRM Desktop rev 1, D1–D6), CRM · Manage only: Organic Leads (Send to), Ads to teams (cards by delivery
  * status, the split editor — Evenly / By team, inside each team Evenly / By % / By max — saved through the phone's own
- * crm_save_ad_assign, or "Save and apply to all": every ad counted together, crm_save_ads_together), Awaiting reply
+ * crm_save_ad_assign, or "Save and apply to all": a window of the ads ticked, Standard or Count together, crm_save_ads), Awaiting reply
  * (Remind, Assign, the chat), Full time lead allocation (days per person, taking turns — crm_save_fulltime 'turns') and
  * Chat progress. Ported from the prototype; the dealer is the database's (crm_assign_contact).
  */
@@ -16,6 +16,7 @@ import { DAY_NAMES, DAYS, DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 import { lockedOf, sharedOut } from "../../shared/locked";
 import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
+import { applyOpening, applyToast, applyWindowVM } from "../../shared/apply-ads";
 
 const ago = (iso: string, now: Date) => { const m = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
   return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
@@ -99,7 +100,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     return { adDraftFor: draftKey(id), splitTyping: null, splitTouched: [], mvTyping: null, adMode: rule?.mode === "even" ? "evenly" : "team",
       tm: Object.fromEntries(TA.map(t => [t.id, fromDb(rule?.tm?.[t.id])])), mv: mv0,
       split: rule && rule.mode !== "even" ? { ...rule.split } : null }; };
-  const openAdById = (id: string) => set(u => ({ ...u, ad: id, stage: "op", adLog: false, ...savedDraft(id) }));
+  const openAdById = (id: string) => set(u => ({ ...u, ad: id, stage: "op", adLog: false, applyPick: null, ...savedDraft(id) }));
   // The open ad's saved setting, loaded again where the draft is not from it — the editor stays as it is, only its numbers.
   const adDraftWant = ui.ad ? draftKey(ui.ad) : null;
   const reloadAdDraft = (id: string) => set(u => (u.ad === id ? { ...u, ...savedDraft(id) } : u));
@@ -227,15 +228,18 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
     },
     evenTotal: TA.reduce((a2, t) => a2 + t.people.length, 0),
     evenTeams: TA.map(t => ({ name: t.name, color: t.color, avs: t.people.map(p => ({ ini: initials(p.name) })), names: t.people.map(p => shortName(p.name, t.people.map(x => x.name))).join(", ") })),
-    adTeams, closeAd: () => patch({ ad: null }), adDraftWant, reloadAdDraft,
-    // Save and apply to all means calculate together (the owner, 2026-10-24: "它的意思就是 calculate together … 而不是只是抄他的
-    // split 方案"): this setting on every ad in the list, whichever status is picked, and all of them counted together
-    // (crm_save_ads_together, which takes in every ad already together too) — the next lead of any of them goes by all of
-    // their leads this month. Save keeps an ad apart.
+    adTeams, closeAd: () => patch({ ad: null, applyPick: null }), adDraftWant, reloadAdDraft,
+    // Save and apply to all opens a window (the owner, 2026-10-24: "勾选广告，决定哪一个要、哪一个不要 … 再选择是 standard 的
+    // apply to all，还是全部总和起来算"): the ads ticked — every ad of the list at first, or the together ads when this one is
+    // counted together — then Standard or Count together (crm_save_ads; shared/apply-ads.ts). Save keeps an ad apart.
     applyLabel: "Save and apply to all",
-    applyAll: () => { if (!ad || !draftOk) return; const list = ads.some(a => a.id === ad.id) ? ads : [...ads, ad];
-      void ctx.act.saveAdsTogether(list.map(a => ({ id: a.id, label: a.label })), ruleFromDraft()).then(r => {
-        if (r) patch({ ad: null, toast: `Applied to all ${r.saved} ads · counted together${r.dealt ? ` · ${r.dealt} waiting lead${r.dealt === 1 ? "" : "s"} dealt` : ""}` }); }); },
+    applyAll: () => { if (ad && draftOk) patch({ applyPick: { ad: ad.id, ...applyOpening(ad.id, data.adRules, shownAds.map(a => a.id)) } }); },
+    applyWin: ad && ui.applyPick?.ad === ad.id ? applyWindowVM({ pick: ui.applyPick, openId: ad.id, rules: data.adRules,
+      ads: ads.map(a => { const st = statusOf(a.id);
+        return { id: a.id, label: a.label, leads: a.leads, status: st ? { label: ST_META[st][0], fg: ST_META[st][4], bg: ST_META[st][3] } : null }; }),
+      set: p => patch({ applyPick: p && { ...p, ad: ad.id } }),
+      run: (list, together) => draftOk ? ctx.act.saveAds(list.map(a => ({ id: a.id, label: a.label })), together, ruleFromDraft())
+        .then(r => { if (r) patch({ ad: null, applyPick: null, toast: applyToast(r, together) }); }) : undefined }) : null,
     // Saved on its own with anything changed, an ad leaves the ads counted together; the toast says so.
     saveAd: () => { if (!ad || !draftOk) return; const was = !!ruleOf(ad.id)?.together;
       void saveOne(ad.id, ad.label).then(r => { if (r) patch({ ad: null, toast: `Saved · ${ad.label}${was && !r.together ? " · counted on its own" : ""}${r.dealt ? ` · ${r.dealt} waiting lead${r.dealt === 1 ? "" : "s"} dealt` : ""}` }); }); },

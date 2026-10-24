@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
+import type { ApplyWindowVM } from "./apply-ads";
 export { Phone4aAdsPerf } from "./phone-ads-perf";
 export { Phone4aAutoReply } from "./auto-reply-pages";
 export { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight } from "./custom-book";
@@ -238,6 +239,52 @@ export function Phone4aAdjustSheet({ s }: { s: { name: string; c: string; sub: s
         <div style={{ flex: "none", display: "flex", gap: "10px", padding: "10px 20px calc(12px + var(--safe-bottom, 0px))" }}>
           <button type="button" onClick={s.cancel} style={{ ...BTN, flex: 1, height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
           <button type="button" onClick={s.apply} disabled={!s.apply} style={{ ...BTN, flex: 1.6, height: "44px", borderRadius: "22px", background: s.apply ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>Apply</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Save and apply to all's sheet (the owner, 2026-10-24): Standard or Count together, the ads ticked — the ad being edited
+ *  always — as the desktop's window (DeskApplyAds). Over the whole screen (PanelScreens draws it, beside the generated
+ *  markup). Behaviour: shared/apply-ads.ts. */
+export function Phone4aApplySheet({ s }: { s: ApplyWindowVM }) {
+  const [busy, setBusy] = useState(false), ok = s.go.ok && !busy;
+  const go = async () => { if (!ok || !s.go.run) return; setBusy(true); try { await s.go.run(); } finally { setBusy(false); } };
+  const tag = (label: string, bg: string, fg: string) => (
+    <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", background: bg, color: fg, fontSize: fs(11), fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>);
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(42,22,12,.38)" }} onClick={s.close}>
+      <div role="dialog" aria-label="Save and apply to all" onClick={e => e.stopPropagation()} style={{ maxHeight: "82%", display: "flex", flexDirection: "column", borderRadius: "24px 24px 0 0", background: "#fff" }}>
+        <span style={{ alignSelf: "center", width: "36px", height: "4px", margin: "8px 0 4px", borderRadius: "2px", background: "var(--crm-line)" }} />
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "4px 20px 10px" }}>
+          <span style={{ flex: 1, minWidth: 0, fontFamily: TIGHT, fontSize: fs(16), fontWeight: 500, color: "var(--crm-ink)" }}>Save and apply to all</span>
+          <button type="button" aria-label="Close" onClick={s.close} style={{ ...BTN, display: "flex", padding: "4px", color: "var(--crm-faint)" }}><Ic name="x" size={18} /></button>
+        </div>
+        <div role="radiogroup" aria-label="Apply" style={{ flex: "none", display: "flex", gap: "2px", margin: "0 20px 8px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{s.modes.map(m => (
+          <button key={m.label} type="button" role="radio" aria-checked={m.on} onClick={m.pick} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "16px", fontSize: fs(13), fontWeight: 500,
+            background: m.on ? "#fff" : "transparent", boxShadow: m.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: m.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{m.label}</button>))}</div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "4px 20px 6px" }}>
+          <span style={{ fontSize: fs(11), fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--crm-muted)" }}>Ads</span>
+          <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>{s.count}</span>
+          <button type="button" onClick={s.all.toggle} style={{ ...BTN, marginLeft: "auto", fontSize: fs(13), fontWeight: 500, color: "var(--crm-rust)" }}>{s.all.label}</button>
+        </div>
+        <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "0 12px" }}>
+          {s.rows.map(r => (
+            <label key={r.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 8px", borderTop: "1px solid var(--crm-rule-soft)", cursor: r.fixed ? "default" : "pointer" }}>
+              <input type="checkbox" checked={r.on} disabled={r.fixed} onChange={r.toggle} aria-label={r.name} style={{ flex: "none", width: "18px", height: "18px", margin: 0, accentColor: "var(--crm-rust)" }} />
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ fontSize: fs(11.5), color: "var(--crm-muted)" }}>{r.leads}</span>
+              </span>
+              {r.fixed && tag("This ad", "var(--crm-tint-attention)", "var(--crm-ink)")}
+              {r.together && tag("Together", "var(--crm-tint-cold)", "var(--crm-ink-soft)")}
+              {r.status && tag(r.status.label, r.status.bg, r.status.fg)}
+            </label>))}
+        </div>
+        <div style={{ flex: "none", display: "flex", gap: "10px", padding: "10px 20px calc(12px + var(--safe-bottom, 0px))", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={s.close} style={{ ...BTN, flex: 1, height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", fontSize: fs(15), fontWeight: 500, color: "var(--crm-ink)" }}>Cancel</button>
+          <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...BTN, flex: 1.6, height: "44px", borderRadius: "22px", background: ok ? "var(--crm-rust)" : "var(--crm-faint-2)", color: "#fff", fontSize: fs(15), fontWeight: 600 }}>{busy ? "Saving…" : s.go.label}</button>
         </div>
       </div>
     </div>

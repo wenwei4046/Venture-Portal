@@ -4,6 +4,7 @@
  * object (CrmFrame.dc.html's this.state) and so does this.
  */
 import type { CustomFields } from "../../shared/custom-book";
+import type { ApplyPick } from "../../shared/apply-ads";
 import type { Dispatch, SetStateAction } from "react";
 import type { MetaAdRow, MetaFig } from "@/lib/member/crm-ad-names-meta";
 import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
@@ -69,6 +70,8 @@ export interface DeskUi {
   /** Which ad's saved setting the editor's draft was loaded from (`id|rule` or `id|none`). The open ad is part of the place a
    *  refresh or Back restores, its draft is not — so a restored ad loads its saved split again (2026-10-24). */
   adDraftFor?: string | null;
+  /** Save and apply to all's window (2026-10-24): for which ad, the ads ticked, Standard or Count together; null = shut. */
+  applyPick?: (ApplyPick & { ad: string }) | null;
   adMode: "evenly" | "team";
   /** Ads to teams' editor: the ad's name while it is typed (null = as saved). */
   adNameDraft?: string | null;

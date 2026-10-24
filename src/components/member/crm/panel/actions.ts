@@ -30,9 +30,10 @@ export interface PanelActions extends SalesActions {
   saveSettings(s: CrmSettings): Promise<boolean>;
   /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
-  /** Save and apply to all (crm_save_ads_together, 2026-10-24): this setting on every ad listed and every ad already together,
-   *  all of them counted together; how many ads it saved and how many waiting leads it dealt, or false. */
-  saveAdsTogether(ads: { id: string; label: string }[], rule: { mode: "even" | "split"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { saved: number; dealt: number }>;
+  /** Save and apply to all's window (crm_save_ads, 2026-10-24): this setting on the ads ticked, each counting its own leads
+   *  (Standard) or all of them together — then they are the together ads, and one together before and not ticked counts on
+   *  its own. How many ads it saved, waiting leads it dealt and ads that left the together ads; or false. */
+  saveAds(ads: { id: string; label: string }[], together: boolean, rule: { mode: "even" | "split"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { saved: number; dealt: number; left: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
@@ -143,22 +144,24 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       // The leads it dealt arrive with the next read (every 5 s); the toast says how many.
       return { dealt: Number(row?.dealt ?? 0), together };
     },
-    async saveAdsTogether(ads, rule) {
+    async saveAds(ads, together, rule) {
       const tm = rule.mode === "split" ? rule.tm ?? {} : {};
-      const r = await write("crm_save_ads_together", { p_ads: Object.fromEntries(ads.map(a => [a.id, a.label])), p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
+      const r = await write("crm_save_ads", { p_ads: Object.fromEntries(ads.map(a => [a.id, a.label])), p_together: together, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
       if (!r) return false;
-      // Every ad listed and every ad already together now holds this setting, counted together; a new mode starts a new count.
-      const ids = [...new Set([...ads.map(a => a.id), ...data().adRules.filter(x => x.together).map(x => x.adId)])];
+      // The ads ticked hold this setting; counted together, they are the together ads and one together before counts alone.
+      // A new mode starts a new count, and so does joining the together ads or leaving them (the database does the same).
+      const ids = ads.map(a => a.id), at = new Date().toISOString(), before = data().adRules;
+      const left = together ? before.filter(x => x.together && !ids.includes(x.adId)).length : 0;
       setData(d => ({
         ...d,
-        adRules: [...d.adRules.filter(x => !ids.includes(x.adId)), ...ids.map(id => {
+        adRules: [...d.adRules.filter(x => !ids.includes(x.adId)).map(x => (together && x.together ? { ...x, together: false, startedAt: at } : x)), ...ids.map(id => {
           const old = d.adRules.find(x => x.adId === id);
           return { adId: id, label: ads.find(a => a.id === id)?.label ?? old?.label ?? "", mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm,
-            startedAt: old && old.mode === rule.mode ? old.startedAt : new Date().toISOString(), together: true };
+            startedAt: old && old.mode === rule.mode && !!old.together === together ? old.startedAt : at, ...(together ? { together: true } : {}) };
         })],
       }));
-      const got = r.data as { saved?: number; dealt?: number } | null;
-      return { saved: Number(got?.saved ?? ids.length), dealt: Number(got?.dealt ?? 0) };
+      const got = r.data as { saved?: number; dealt?: number; left?: number } | null;
+      return { saved: Number(got?.saved ?? ids.length), dealt: Number(got?.dealt ?? 0), left: Number(got?.left ?? left) };
     },
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
