@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   binRows, brandFace, brandLook, brandPath, extOf, fileKind, folderTiles, libHref, libraryFromRow, libraryPath, libSchedule, libView, linkHost,
-  listedName, moveTargets, NO_PROFILE, profileToRow, railCounts, sizeLabel, tidyFileName, typeChoices, viewFiles,
+  listedName, moveTargets, NO_PROFILE, profileToRow, railCounts, sizeLabel, tidyFileName, typeChoices, viewFiles, ZIP_MAX_BYTES, zipNames, zipPlan,
 } from './library'
 import type { CalEvent } from './calendar'
 
@@ -164,5 +164,26 @@ describe('a brand profile', () => {
     expect(libSchedule(events, CAR, '2026-10-23').map(e => `${e.label} · ${e.title}`))
       .toEqual(['Sat 24 Oct · Year-End Video · Shoot', 'Thu 5 Nov · Weekly reel · run 3', 'Mon 9 Nov · Year-End Video · Ads go live'])
     expect(libSchedule(events, 'nobody', '2026-10-23')).toEqual([])
+  })
+})
+
+// 2026-10-25 — gap 79: a folder's Download as ZIP, made in the browser (components/mkt/library/zip.ts).
+describe('a folder’s ZIP', () => {
+  it('is made for a folder with files, 1 GB at most — its size the hint', () => {
+    expect(zipPlan([])).toEqual({ n: 0, bytes: 0, ok: false, hint: 'Empty' })
+    expect(zipPlan([{ size: 20971520 }, { size: 1153434 }])).toEqual({ n: 2, bytes: 22124954, ok: true, hint: '21.1 MB' })
+    expect(zipPlan([{ size: ZIP_MAX_BYTES }])).toMatchObject({ ok: true, hint: '1.0 GB' })
+    expect(zipPlan([{ size: ZIP_MAX_BYTES }, { size: 1 }])).toMatchObject({ n: 2, ok: false, hint: '1.0 GB · over 1 GB' })
+  })
+
+  it('names each file as its Download does — the same name twice, in any letters, numbered; no character a file system refuses', () => {
+    expect(zipNames([
+      { name: 'Logo pack', path: 'library/u2/logo.ZIP' },
+      { name: 'KJ showroom', path: 'library/u3/kj.jpg' },
+      { name: 'kj Showroom', path: 'library/u4/kj2.jpg' },
+      { name: 'KJ showroom', path: 'library/u5/kj3.jpg' },
+      { name: 'Brief: v2 / final?', path: 'library/u6/brief.pdf' },
+      { name: '  ', path: 'library/u7/x.png' },
+    ])).toEqual(['Logo pack.zip', 'KJ showroom.jpg', 'kj Showroom (2).jpg', 'KJ showroom (3).jpg', 'Brief v2 final.pdf', 'file.png'])
   })
 })
