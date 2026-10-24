@@ -21,12 +21,49 @@ const plan: RepaymentPlan = {
   months: 3,
   paidCount: 1,
   outstandingDue: 11800,
+  overdue: 0,
+  overdueSince: null,
+  overdueDays: 0,
   firstDue: '2026-02-15',
   firstInstallment: 11200,
   totalInterest: 3600,
   principalPaid: 20000,
   interestPaid: 1800,
   principalOwed: 10000,
+  compound: null,
+}
+
+// 2026-10-24 — a 利滚利 deal, as the user's tidied LO#7 (cut down): a flat month, then two compounding ones.
+const compound: RepaymentPlan = {
+  kind: 'open',
+  rows: [
+    { no: 1, ym: '2025-12', due: '2025-12-05', installment: 1300, principal: 1000, interest: 300, balance: 51000, outstanding: 0, remark: 'Paid 5 Dec 2025', tone: 'ledger', paid: 1300, toBalance: 0 },
+    { no: 2, ym: '2026-01', due: '2026-01-05', installment: 2040, principal: 1000, interest: 2040, balance: 51740, outstanding: 0, remark: 'Part paid · 740.00 to balance', tone: 'alert', paid: 1300, toBalance: 740 },
+    { no: 3, ym: '2026-02', due: '2026-02-05', installment: 2069.6, principal: null, interest: 2069.6, balance: 53809.6, outstanding: 2069.6, remark: 'Overdue 19 days', tone: 'danger', paid: 0, toBalance: 0, late: true },
+  ],
+  months: null,
+  paidCount: 1,
+  outstandingDue: 2069.6,
+  overdue: 2069.6,
+  overdueSince: '2026-02-05',
+  overdueDays: 19,
+  firstDue: '2025-12-05',
+  firstInstallment: 1300,
+  totalInterest: 4409.6,
+  principalPaid: 2000,
+  interestPaid: 600,
+  principalOwed: 58000,
+  compound: {
+    breaks: [
+      { no: 1, head: 'Dec 2025 – Dec 2025', rest: '0.500% /mo flat · RM 1,000.00 + 300.00 a month' },
+      { no: 2, head: 'From Jan 2026', rest: '4.000% /mo compounding · no fixed term · rolls from RM 51,000.00 owed' },
+    ],
+    owedNow: 53809.6,
+    paidToDate: 2600,
+    addedToBalance: 740,
+    addedFrom: '2026-01',
+    addedTo: '2026-01',
+  },
 }
 const head = () => screen.getByRole('heading', { name: 'Repayment schedule' }).closest('.sect-head') as HTMLElement
 
@@ -67,6 +104,29 @@ describe('the Repayment schedule', () => {
     unmount()
     render(<RepaymentScheduleSection plan={{ ...plan, kind: 'none', rows: [] }} cancelled />)
     expect(screen.getByText('Cancelled — no schedule.')).toBeInTheDocument()
+  })
+
+  it('lays a 利滚利 deal out as the user tidied it: the figures over it, Due / Paid / To balance / Overdue, a line where its terms change', () => {
+    render(<RepaymentScheduleSection plan={compound} />)
+    expect(head().querySelector('.count')).toHaveTextContent('NO FIXED TERM · 3 MONTHS TO DATE · OVERDUE RM 2,069.60')
+    const facts = Array.from(document.querySelectorAll('.sched-fact')).map((f) => f.textContent)
+    expect(facts).toEqual([
+      'Overdue nowRM 2,069.60since 5 Feb 2026 · 19 days',
+      'Owed nowRM 53,809.60balance after Feb 2026',
+      'Paid to dateRM 2,600.00principal 2,000.00 + interest 600.00',
+      'Added to the balanceRM 740.00Jan 2026 · unpaid interest',
+    ])
+    const table = head().parentElement!.querySelector('table') as HTMLTableElement
+    expect(Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual([
+      'No.', 'Date', 'Due', 'Paid', 'To balance', 'Balance', 'Overdue', 'Remark',
+    ])
+    const lines = Array.from(table.querySelectorAll('tbody tr')).map((tr) => tr.textContent)
+    expect(lines[0]).toBe('Dec 2025 – Dec 2025 · 0.500% /mo flat · RM 1,000.00 + 300.00 a month')
+    expect(lines[2]).toBe('From Jan 2026 · 4.000% /mo compounding · no fixed term · rolls from RM 51,000.00 owed')
+    expect(lines[3]).toBe('25 Jan 20262,040.001,300.00740.0051,740.00—Part paid · 740.00 to balance')
+    expect(lines[4]).toBe('35 Feb 20262,069.60——53,809.602,069.60Overdue 19 days')
+    // 5,409.60 due = 2,600.00 paid + 740.00 rolled in + 2,069.60 overdue.
+    expect(table.querySelector('tfoot')!.textContent).toBe('Total5,409.602,600.00740.002,069.60Due = Paid + To balance + Overdue')
   })
 
   it('prints the schedule on a page of its own', () => {

@@ -5671,6 +5671,18 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sched-alert { color: rgb(150 100 12); }
 .sched-danger { color: rgb(176 40 34); }
 .sched-info { color: rgb(108 104 98); }
+/* A 利滚利 deal's (2026-10-24, the user's tidied LO#7): the four figures over the table, the line where its terms
+   change, its total's sum. Figures in the ledger's mono, as the table's (the user kept Chivo Mono). */
+.sched .sched-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 760px) { .sched .sched-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sched .sched-fact { min-width: 0; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--surface)); }
+.sched .sched-fact-k { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.sched .sched-fact-v { margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 500; color: rgb(var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched .sched-fact[data-bad='true'] .sched-fact-v { color: rgb(176 40 34); }
+.sched .sched-fact-s { font-size: 11.5px; color: rgb(var(--graphite)); overflow-wrap: anywhere; }
+.sched .sched-table tr.sched-break td { padding: 6px 12px; background: rgb(var(--surface-2)); color: rgb(var(--graphite)); font-size: 12px; white-space: normal; }
+.sched .sched-table tr.sched-break b { color: rgb(var(--ink)); font-weight: 600; }
+.sched .sched-table td.sched-total-note { font-weight: 400; color: rgb(var(--graphite)); }
 .sched .sched-recorded {
   margin-top: 14px;
   padding: 10px 14px;
