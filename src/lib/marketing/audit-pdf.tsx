@@ -38,7 +38,8 @@ const s = StyleSheet.create({
   metaKey: { width: 92, color: MUTED },
   metaVal: { flex: 1 },
   record: { paddingVertical: 7, borderBottom: `0.5pt solid ${LINE}` },
-  recordCorr: { backgroundColor: SOFT, paddingHorizontal: 6 },
+  // Shaded a little past the margin, so its words stay in line with every other record's.
+  recordCorr: { backgroundColor: SOFT, marginHorizontal: -6, paddingHorizontal: 6 },
   recordHead: { flexDirection: 'row', marginBottom: 2 },
   recordNo: { width: 30, fontFamily: 'Courier-Bold', fontSize: 9 },
   recordWhat: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 9.5 },
@@ -62,7 +63,7 @@ const s = StyleSheet.create({
 })
 
 /** The table's columns, in points of A4 landscape's 778 between the margins. */
-const WIDTHS = [26, 78, 84, 128, 112, 236, 114] as const
+const WIDTHS = [26, 88, 84, 128, 112, 226, 114] as const
 
 const t = (v: string) => pdfText(v)
 const filterWords = (f: readonly string[]) => (f.length ? f.join(' · ') : 'None — every record')
