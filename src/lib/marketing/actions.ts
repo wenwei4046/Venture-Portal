@@ -3,8 +3,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { requireActionOn } from '@/lib/auth'
+import { addressFromParts, addressRefusal, cleanAddress, isEmptyAddress } from '@/lib/address/address'
+import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 import { pushSoon } from '@/lib/push/outbox'
 import { createClient } from '@/lib/supabase/server'
+import { billingFromRow, clientBillFromRow, type BillingPage } from './billing'
 import { subFromRow, type MktSub } from './board'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
@@ -37,6 +40,10 @@ export type Done<T = object> = ({ ok: true } & T) | { ok: false; reason: string 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const isId = (v: unknown): v is string => typeof v === 'string' && UUID.test(v)
 const words = (error: { message?: string } | null, fallback: string) => (error?.message?.trim() ? error.message.trim() : fallback)
+/** A ringgit amount as sent: null for none, undefined for one that is not an amount (above zero, two decimals). */
+const amountOf = (v: unknown): number | null | undefined =>
+  v == null ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 1e13 && Math.round(v * 100) === v * 100 ? v : undefined
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])-01$/
 
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
@@ -394,12 +401,15 @@ async function freshProject(db: SupabaseClient, project: string): Promise<Produc
   return error ? null : productProjectFromRow(data)
 }
 
-/** New Project › 📦 Product project: made on the product's version in effect, its intake minutes ready to fill in. */
-export async function startMktProduct(sub: string, product: string): Promise<Done<{ id: string; track: string }>> {
+/** New Project › 📦 Product project: made on the product's version in effect, its intake minutes ready to fill in — with
+ * the manager's amount (②b-2b: a quote; the list price when none is typed). */
+export async function startMktProduct(sub: string, product: string, amount?: number | null): Promise<Done<{ id: string; track: string }>> {
   await requireActionOn('/marketing/new', 'marketing', 'manage')
   if (!isId(sub)) return { ok: false, reason: 'Pick who the project is for.' }
   if (!isId(product)) return { ok: false, reason: 'Pick a product.' }
-  const { data, error } = await (await client()).rpc('mkt_product_start', { p_sub: sub, p_product: product })
+  const a = amountOf(amount)
+  if (a === undefined) return { ok: false, reason: 'An amount in ringgit above zero, at most two decimals.' }
+  const { data, error } = await (await client()).rpc('mkt_product_start', { p_sub: sub, p_product: product, ...(a === null ? {} : { p_amount: a }) })
   if (error) return { ok: false, reason: words(error, 'The project could not be started. Please try again.') }
   freshen()
   const r = (data ?? {}) as { id?: string; track?: string }
@@ -493,31 +503,107 @@ export async function planMktDeliverable(project: string, plan: Record<string, u
   return { ok: true, page: await fresh(db, project), reassigned: moved }
 }
 
-/** Marketing's own client (+ Add subsidiary): its name and PIC; its code made by the database. */
-export async function addMktClient(name: string, pic: string): Promise<Done<{ sub: MktSub }>> {
+/** An address as a form sent it: the six parts checked against Malaysia's list (the page asked first), tidied — null for
+ * none; a refusal in words. */
+function billAddress(v: unknown): { ok: true; address: ReturnType<typeof cleanAddress> | null } | { ok: false; reason: string } {
+  if (v == null) return { ok: true, address: null }
+  const a = addressFromParts(v)
+  if (!a) return { ok: false, reason: 'An address in its parts.' }
+  if (isEmptyAddress(a)) return { ok: true, address: null }
+  const refused = addressRefusal(a, MALAYSIA_DATA)
+  return refused ? { ok: false, reason: refused } : { ok: true, address: cleanAddress(a) }
+}
+const words200 = (v: unknown) => (v == null ? null : String(v).slice(0, 200))
+
+/** Marketing's own client (+ Add subsidiary): its name and PIC, and its billing details when given (②b-2b — the user's
+ * answer 50); its code made by the database. */
+export async function addMktClient(name: string, pic: string, bill?: { name?: string | null; address?: unknown; phone?: string | null; email?: string | null } | null): Promise<Done<{ sub: MktSub }>> {
   await requireActionOn('/marketing/new', 'marketing', 'manage')
   const n = String(name ?? '').trim()
   if (!n) return { ok: false, reason: 'Name the company or client.' }
-  const { data, error } = await (await client()).rpc('mkt_sub_add', { p_name: n.slice(0, 200), p_pic: String(pic ?? '').trim().slice(0, 200) || null })
+  let p_bill: Record<string, unknown> | null = null
+  if (bill) {
+    const a = billAddress(bill.address)
+    if (!a.ok) return a
+    p_bill = { name: words200(bill.name), address: a.address, phone: words200(bill.phone), email: words200(bill.email) }
+  }
+  const { data, error } = await (await client()).rpc('mkt_sub_add', {
+    p_name: n.slice(0, 200), p_pic: String(pic ?? '').trim().slice(0, 200) || null, ...(p_bill ? { p_bill } : {}),
+  })
   if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be added. Please try again.') }
   freshen()
   return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
 }
 
-const CLIENT_KEYS = ['name', 'pic', 'whatsapp', 'pic2', 'whatsapp2'] as const
+const CLIENT_KEYS = ['name', 'pic', 'whatsapp', 'pic2', 'whatsapp2', 'billName', 'billPhone', 'billEmail'] as const
+export type ClientPatchKey = (typeof CLIENT_KEYS)[number] | 'billAddress'
 
 /** A client's details edited on its page (②b-2d-2a, mig 20261025034000): only the fields that changed — its name
- * (Marketing's own clients; a group company keeps its own), its PIC and their WhatsApp, its second PIC and theirs. */
-export async function editMktClient(sub: string, patch: Partial<Record<(typeof CLIENT_KEYS)[number], string | null>>): Promise<Done<{ sub: MktSub }>> {
+ * (Marketing's own clients; a group company keeps its own), its PIC and their WhatsApp, its second PIC and theirs; an
+ * outside client's billing details (②b-2b, mig 20261025121000 — its name, address, phone, email). */
+export async function editMktClient(sub: string, patch: Partial<Record<ClientPatchKey, unknown>>): Promise<Done<{ sub: MktSub; bill: ReturnType<typeof clientBillFromRow> }>> {
   await requireActionOn('/marketing/subsidiaries/[code]', 'marketing', 'manage')
   if (!isId(sub)) return { ok: false, reason: 'That client is not there.' }
-  const clean: Record<string, string | null> = {}
-  for (const k of CLIENT_KEYS) if (patch && k in patch) clean[k] = patch[k] == null ? null : String(patch[k]).slice(0, 200)
+  const clean: Record<string, unknown> = {}
+  for (const k of CLIENT_KEYS) if (patch && k in patch) clean[k] = words200(patch[k])
+  if (patch && 'billAddress' in patch) {
+    const a = billAddress(patch.billAddress)
+    if (!a.ok) return a
+    clean.billAddress = a.address
+  }
   if (!Object.keys(clean).length) return { ok: false, reason: 'Nothing changed.' }
   const { data, error } = await (await client()).rpc('mkt_sub_edit', { p_sub: sub, p_patch: clean })
   if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be saved. Please try again.') }
   freshen()
-  return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
+  return { ok: true, sub: subFromRow(data as Record<string, unknown>), bill: clientBillFromRow((data as Record<string, unknown>).bill) }
+}
+
+// ── Billing (②b-2b, mig 20261025121000 — the user's answers 43–48, 50, 51), the manager's ──────────────────────
+
+/** A product project's amount changed on its page: a one-time project's until its billing is confirmed; a recurring
+ * one's for the months not confirmed yet. */
+export async function setMktProjectAmount(project: string, amount: number): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const a = amountOf(amount)
+  if (a == null) return { ok: false, reason: 'An amount in ringgit above zero, at most two decimals.' }
+  const { data, error } = await (await client()).rpc('mkt_project_bill_set', { p_project: project, p_amount: a })
+  if (error) return { ok: false, reason: words(error, 'The amount could not be saved. Please try again.') }
+  freshen()
+  return { ok: true, page: productProjectFromRow(data) }
+}
+
+/** A recurring project stopped: this month its last billed; it closes once nothing of it is under way. */
+export async function stopMktProduct(project: string): Promise<Done<{ page: ProductProjectPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const { data, error } = await (await client()).rpc('mkt_product_stop', { p_project: project })
+  if (error) return { ok: false, reason: words(error, 'The project could not be stopped. Please try again.') }
+  freshen()
+  return { ok: true, page: productProjectFromRow(data) }
+}
+
+/** A month's lines confirmed — these projects' (a client's *Confirm all*, or one line). */
+export async function confirmMktBills(month: string, projects: readonly string[]): Promise<Done<{ page: BillingPage | null; confirmed: number }>> {
+  await requireActionOn('/marketing/billing', 'marketing', 'manage')
+  if (typeof month !== 'string' || !MONTH.test(month)) return { ok: false, reason: 'Pick the month.' }
+  const ids = Array.isArray(projects) ? projects.filter(isId) : []
+  if (!ids.length || ids.length !== projects.length || ids.length > 200) return { ok: false, reason: 'Pick what to confirm — at most 200 at once.' }
+  const { data, error } = await (await client()).rpc('mkt_bill_confirm', { p_month: month, p_projects: ids })
+  if (error) return { ok: false, reason: words(error, 'The billing could not be confirmed. Please try again.') }
+  revalidatePath('/marketing/billing')
+  const n = (data as Record<string, unknown> | null)?.confirmed
+  return { ok: true, page: billingFromRow(data), confirmed: typeof n === 'number' ? n : 0 }
+}
+
+/** A confirmation taken back: the line is the month's to confirm again. */
+export async function withdrawMktBill(bill: string): Promise<Done<{ page: BillingPage | null }>> {
+  await requireActionOn('/marketing/billing', 'marketing', 'manage')
+  if (!isId(bill)) return { ok: false, reason: 'That confirmation is not there.' }
+  const { data, error } = await (await client()).rpc('mkt_bill_withdraw', { p_bill: bill })
+  if (error) return { ok: false, reason: words(error, 'The confirmation could not be withdrawn. Please try again.') }
+  revalidatePath('/marketing/billing')
+  return { ok: true, page: billingFromRow(data) }
 }
 
 /** Replace Person (④-5, mig 20261025036000): one person for another in the places ticked, with the reason — the

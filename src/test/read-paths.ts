@@ -447,6 +447,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Chat review (mig 20261025039500): a direct message opened on a complaint, its older messages, the records — a
   // full-access title's own login only (the database asks the login, never the shared Principal one), behind Marketing · View.
   'mkt_chat_review_open', 'mkt_chat_review_more', 'mkt_chat_review_log',
+  // Billing (mig 20261025121000), all Marketing · Manage: the month's lines read, confirmed and withdrawn; a product
+  // project's amount changed, a recurring one stopped; an outside client's billing details read for its page.
+  'mkt_billing', 'mkt_bill_confirm', 'mkt_bill_withdraw', 'mkt_project_bill_set', 'mkt_product_stop', 'mkt_client_bill',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.

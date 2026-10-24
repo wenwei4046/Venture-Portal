@@ -118,3 +118,12 @@
 .addSave { height: 34px; padding: 0 14px; border-radius: 7px; display: flex; align-items: center; font: inherit; font-weight: 600; cursor: pointer; background: var(--mk-primary); color: rgb(var(--mk-ink-2)); border: 0; }
 .addSave:disabled { opacity: .45; cursor: not-allowed; }
 .addError { flex-basis: 100%; font-size: .88em; color: rgb(var(--mk-red)); }
+/* A new client's billing details (②b-2b), on ask: under the row, the width of the box. */
+.addBill { height: 34px; padding: 0 10px; border-radius: 7px; display: flex; align-items: center; font: inherit; font-size: .9em; font-weight: 500; cursor: pointer; color: rgb(var(--mk-ink)); background: transparent; border: 1px dashed rgb(var(--mk-line)); }
+.addBill:hover { border-color: rgb(var(--mk-hover-line)); }
+.addBillBox { flex-basis: 100%; max-width: 760px; box-sizing: border-box; padding: 12px; border-radius: 8px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line-2)); }
+/* The project's amount (②b-2b — a quote, the list price offered). */
+.amountRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.amountRm { font-family: var(--mk-mono); font-size: .9em; color: rgb(var(--mk-muted)); }
+.amountInput { width: 180px; font-family: var(--mk-mono); }
+.amountReset { font: inherit; font-size: .86em; color: rgb(var(--mk-muted)); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

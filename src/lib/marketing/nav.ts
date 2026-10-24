@@ -1,8 +1,8 @@
 // Marketing's sidebar (the handoff's `Marketing Shell.dc.html`): My Space, Calendar, Subsidiaries (each one under it),
 // Projects, Library, then MANAGER TOOLS — Tracking Dashboard, Workflow Builder, Product Builder, Minutes Builder,
-// Replace Person — and Settings at the foot. Each row is a page of Marketing's view and shows where its page opens for
-// the viewer (its tab, lib/page-tabs.ts). Two rows the handoff does not draw sit by Settings: one's own claims and the
-// meeting rooms, which every member of staff keeps (Staff · Basic's) — Marketing's people would lose them otherwise.
+// Replace Person, Billing — and Settings at the foot. Each row is a page of Marketing's view and shows where its page
+// opens for the viewer (its tab, lib/page-tabs.ts). Two rows the handoff does not draw sit by Settings: one's own claims
+// and the meeting rooms, which every member of staff keeps (Staff · Basic's) — Marketing's people would lose them otherwise.
 //
 // Pure: the shell draws it, the tests read it.
 
@@ -10,7 +10,7 @@ import { opensPath } from '@/lib/page-tabs'
 
 export type MktNavKey =
   | 'myspace' | 'calendar' | 'subs' | 'projects' | 'library'
-  | 'tracking' | 'workflow' | 'product' | 'minutes' | 'replace'
+  | 'tracking' | 'workflow' | 'product' | 'minutes' | 'replace' | 'billing'
   | 'claims' | 'rooms' | 'settings'
 
 /** The tile behind a row's emoji (the handoff's four tones). */
@@ -45,6 +45,8 @@ export const MKT_NAV: readonly MktNavRow[] = [
   { key: 'product', emoji: '📦', label: 'Product Builder', tone: 'peach', href: '/marketing/products', manager: true },
   { key: 'minutes', emoji: '📝', label: 'Minutes Builder', tone: 'cream', href: '/marketing/minutes', manager: true },
   { key: 'replace', emoji: '🔁', label: 'Replace Person', tone: 'mist', href: '/marketing/replace', manager: true },
+  // Not in the handoff (②b-2b — the user's answers 43–48): the month's billing the manager confirms for Finance.
+  { key: 'billing', emoji: '💰', label: 'Billing', tone: 'peach', href: '/marketing/billing', manager: true },
   { key: 'claims', emoji: '🧾', label: 'My claims', tone: 'cream', href: '/claims', foot: true },
   { key: 'rooms', emoji: '🚪', label: 'Meeting Rooms', tone: 'mist', href: '/admin/rooms', foot: true },
 ]

@@ -9,6 +9,7 @@ import {
   subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktProject, type MktProjectStatus, type MktStage,
   type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
+import { monthLabel } from './billing'
 import { isManagerTitle } from './groups'
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
@@ -561,6 +562,12 @@ export function delivFromRow(v: unknown): TaskDeliv | null {
   return { group: String(r.group ?? ''), item: String(r.item ?? ''), n: Number.isFinite(n) ? n : 1, of: Number.isFinite(of) ? of : 1 }
 }
 
+/** A trail line's month ('2026-10') in words ('Oct 2026'). */
+function billMonthWords(v: unknown): string {
+  if (typeof v !== 'string' || !/^[0-9]{4}-[0-9]{2}$/.test(v)) return 'a month'
+  return monthLabel(`${v}-01`)
+}
+
 export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'stages'>): string {
   const n = e.stage != null ? e.stage + 1 : null
   const stage = e.stageName ?? (e.stage != null ? page.stages[e.stage]?.name ?? '' : '')
@@ -619,6 +626,11 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
       const to = typeof e.data?.to === 'string' ? ` · back to ${e.data.to}` : ''
       return `${e.actor} requested changes on ${stage}${v} on the link: "${e.reason ?? ''}"${to}`
     }
+    // Billing (②b-2b): never its figure — amounts are the manager's, the trail everybody's.
+    case 'amount set': return `${e.actor} set the amount`
+    case 'billing confirmed': return `${e.actor} confirmed the billing for ${billMonthWords(e.data?.month)}`
+    case 'billing withdrawn': return `${e.actor} withdrew the billing for ${billMonthWords(e.data?.month)}`
+    case 'stopped': return `${e.actor} stopped the project · billed to ${billMonthWords(e.data?.until)}`
     default: return `${e.actor} · ${e.action}`
   }
 }

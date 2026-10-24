@@ -118,6 +118,8 @@ describe('its details, the manager’s to edit (②b-2d-2a, the user’s answer 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit Carres' })
     expect(within(dialog).queryByRole('textbox', { name: 'Name' })).toBeNull()
+    // A group company is billed as Finance keeps it (②b-2b): no billing details of Marketing's.
+    expect(within(dialog).queryByRole('textbox', { name: 'Billing name' })).toBeNull()
     const save = within(dialog).getByRole('button', { name: 'Save' })
     expect(save).toHaveProperty('disabled', true)
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Second PIC' }), { target: { value: 'mr tan' } })
@@ -146,5 +148,26 @@ describe('its details, the manager’s to edit (②b-2d-2a, the user’s answer 
     })
     expect(actions.editMktClient).toHaveBeenCalledWith(CAR, { name: 'Carres' })
     expect(within(dialog).getByRole('alert').textContent).toBe('Carres is on the list already.')
+  })
+
+  // ②b-2b — the user's answer 50: an outside client's billing details, Marketing's to keep.
+  it('an outside client’s billing details: on file, only what changed sent; opened at once from Billing', async () => {
+    const bill = { name: 'Acme Sdn Bhd', address: null, phone: '03-1234 5678', email: null }
+    render(<SubsidiaryPage board={board} sub={{ ...sub, client: true, name: 'Acme' }} feed={[]} manage bill={bill} openEdit />)
+    const dialog = screen.getByRole('dialog', { name: 'Edit Acme' })
+    expect((within(dialog).getByRole('textbox', { name: 'Billing name' }) as HTMLInputElement).value).toBe('Acme Sdn Bhd')
+    expect(within(dialog).getByRole('textbox', { name: 'Address line 1' })).toBeTruthy()
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Billing email' }), { target: { value: 'acc@acme' } })
+    expect(within(dialog).getByRole('alert').textContent).toBe('An email address, like name@company.com')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Billing email' }), { target: { value: 'acc@acme.my' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Billing phone' }), { target: { value: '' } })
+    actions.editMktClient.mockResolvedValue({ ok: true, sub: { ...sub, client: true, name: 'Acme' }, bill: { ...bill, phone: null, email: 'acc@acme.my' } })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    })
+    expect(actions.editMktClient).toHaveBeenCalledWith(CAR, { billPhone: null, billEmail: 'acc@acme.my' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect((within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Billing email' }) as HTMLInputElement).value).toBe('acc@acme.my')
   })
 })

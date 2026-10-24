@@ -65,10 +65,11 @@ describe('a product project as the page reads it', () => {
     expect(productProjectFromRow({ project: { track: 'MKT-X' } })).toBeNull()
   })
 
-  it('reads New Project’s products on sale', () => {
+  it('reads New Project’s products on sale — each with its list price, offered as the amount (②b-2b)', () => {
     expect(productPicksFromRow([{ id: 'pr', code: 'P-001', name: 'Social Media Package A', kind: 'recurring', version: 2, note: '4 posts', description: '',
-      actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 } }])).toEqual([{ id: 'pr', code: 'P-001', name: 'Social Media Package A',
-      kind: 'recurring', version: 2, note: '4 posts', description: '', actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 } }])
+      actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 }, price: 3000 }])).toEqual([{ id: 'pr', code: 'P-001', name: 'Social Media Package A',
+      kind: 'recurring', version: 2, note: '4 posts', description: '', actions: 3, intake: { id: 't1', name: 'Kickoff', version: 1, fields: 7 }, price: 3000 }])
+    expect(productPicksFromRow([{ id: 'pr', price: '450.50' }, { id: 'p2' }]).map(p => p.price)).toEqual([450.5, null])
   })
 })
 
@@ -173,6 +174,21 @@ describe('where it stands', () => {
       '24 Oct 13:00 RACHEL sent the tracking link to Kelvin',
       '24 Oct 12:00 SITI signed Kickoff',
       '24 Oct 09:00 RACHEL started the project · Social Media Package A v2',
+    ])
+  })
+
+  // ②b-2b: billing's lines — the month they are for, never the figure (amounts are the manager's, the trail everybody's).
+  it('billing’s lines: the amount set, a month confirmed or withdrawn, the project stopped', () => {
+    const pp = page()
+    pp.trail = [
+      { at: '2026-10-24T09:00:00Z', actor: 'Josiah', action: 'stopped', reason: '', data: { until: '2026-10' } },
+      { at: '2026-10-24T08:00:00Z', actor: 'Josiah', action: 'billing withdrawn', reason: '', data: { month: '2026-09' } },
+      { at: '2026-10-24T07:00:00Z', actor: 'Josiah', action: 'billing confirmed', reason: '', data: { month: '2026-09' } },
+      { at: '2026-10-24T06:00:00Z', actor: 'Josiah', action: 'amount set', reason: '', data: null },
+    ]
+    expect(productTrail(pp).map(l => l.text)).toEqual([
+      'Josiah stopped the project · billed to Oct 2026', 'Josiah withdrew the billing for Sep 2026',
+      'Josiah confirmed the billing for Sep 2026', 'Josiah set the amount',
     ])
   })
 })

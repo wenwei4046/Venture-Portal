@@ -5,19 +5,24 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { longDay, type MktSub } from '@/lib/marketing/board'
 import { addMktClient, createMktTask, startMktProduct } from '@/lib/marketing/actions'
+import { billEditOf, billOf, billProblems, type BillEdit } from '@/lib/marketing/billing'
 import type { ProductPick } from '@/lib/marketing/project'
 import {
   defaultRule, DAY_NAMES, ENDS, FREQS, INTERVALS, MONTH_DAYS, periodText, recurPreview, rulePayload, ruleText, type RecurRule,
 } from '@/lib/marketing/recur'
 import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES, type DraftStage, type TaskType } from '@/lib/marketing/tasks'
+import { formatMoney } from '@/lib/utils'
+import MoneyInput from '../products/MoneyInput'
+import BillFields from '../subsidiary/BillFields'
 import StageBuilder, { type BuilderPerson } from './StageBuilder'
 import s from './newproject.module.css'
 
 // New Project (`New Project.dc.html`): pick who it is for, then what is being started — a ⚡ Quick task or a 🔁
 // Recurring task (its Repeat: every day / week / month, from a start, until a day, for so many runs or for good), its
 // title, type and what needs to be done, and its stages (the quick Workflow Builder) — or a 📦 Product project (the
-// manager's): a product on sale, whose intake meeting minutes open next. Created, the task (or the project) opens.
-// The manager adds Marketing's own clients here too (the "+" beside Subsidiary — the handoff's Add & select).
+// manager's): a product on sale and its amount (②b-2b — a quote, its list price offered), whose intake meeting minutes
+// open next. Created, the task (or the project) opens. The manager adds Marketing's own clients here too (the "+"
+// beside Subsidiary — the handoff's Add & select), with their billing details when given (②b-2b).
 
 type Mode = 'product' | 'task' | 'recurring'
 
@@ -73,21 +78,31 @@ export default function NewProject({
   const [draftName, setDraftName] = useState('')
   const [draftPic, setDraftPic] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+  // The new client's billing details (②b-2b — the user's answer 50), shown on ask.
+  const [billOpen, setBillOpen] = useState(false)
+  const [draftBill, setDraftBill] = useState<BillEdit>(() => billEditOf(null))
+  const [billRefusal, setBillRefusal] = useState<string | null>(null)
+  // Each product's amount as typed (②b-2b — the user's answer 43: a quote, typed now); its list price until then.
+  const [amounts, setAmounts] = useState<Record<string, number | null>>({})
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
   const isProduct = mode === 'product'
   const picked = products?.find(p => p.id === product) ?? null
+  const amount = picked ? (picked.id in amounts ? amounts[picked.id] : picked.price) : null
   const subName = subList.find(x => x.id === sub)?.name ?? ''
   const base = isRec ? rule.start : today
   const dates = stageDates(base, stages.map(x => x.sla), hol)
   const problems = stageProblems(stages)
   const preview = recurPreview(rule)
   const titleOk = !!title.trim()
-  const ready = isProduct ? !!sub && !!picked : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok)
+  const ready = isProduct ? !!sub && !!picked && amount != null && amount > 0 : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok)
 
   let hint = ''
-  if (isProduct) hint = picked ? `${subName} · ${picked.name} · ${picked.intake.name} minutes` : 'Pick a product'
+  if (isProduct) {
+    hint = !picked ? 'Pick a product' : amount == null || amount <= 0 ? 'Give it its amount'
+      : `${subName} · ${picked.name} · ${formatMoney(amount)}${picked.kind === 'recurring' ? ' a month' : ''} · ${picked.intake.name} minutes`
+  }
   else if (!titleOk) hint = 'Add a task title'
   else if (problems.length) hint = problems[0] === 'A stage has no person' ? 'Every stage needs a name and a person' : problems[0]
   else if (isRec && !preview.ok) hint = 'Pick at least one day inside the period'
@@ -101,13 +116,18 @@ export default function NewProject({
     setDraftName('')
     setDraftPic('')
     setAddError(null)
+    setBillOpen(false)
+    setDraftBill(billEditOf(null))
+    setBillRefusal(null)
   }
   const saveSub = () => {
     const name = draftName.trim()
     if (!name || pending) return
+    const wrong = billOpen ? [...billProblems(draftBill), ...(billRefusal ? [billRefusal] : [])] : []
+    if (wrong.length) return setAddError(wrong[0])
     setAddError(null)
     start(async () => {
-      const r = await addMktClient(name, draftPic.trim())
+      const r = await addMktClient(name, draftPic.trim(), billOpen ? billOf(draftBill) : null)
       if (!r.ok) {
         setAddError(r.reason)
         return
@@ -123,7 +143,7 @@ export default function NewProject({
     setError(null)
     if (isProduct) {
       start(async () => {
-        const r = await startMktProduct(sub, product)
+        const r = await startMktProduct(sub, product, amount)
         if (!r.ok) {
           setError(r.reason)
           return
@@ -209,8 +229,14 @@ export default function NewProject({
             onChange={e => setDraftPic(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && saveSub()}
           />
+          {billOpen ? null : <button type="button" className={s.addBill} disabled={pending} onClick={() => setBillOpen(true)}>+ Billing details</button>}
           <button type="button" className={s.addCancel} disabled={pending} onClick={closeAdd}>Cancel</button>
           <button type="button" className={s.addSave} disabled={pending || !draftName.trim()} onClick={saveSub}>Add &amp; select</button>
+          {billOpen ? (
+            <div className={s.addBillBox} aria-label="Billing details">
+              <BillFields value={draftBill} idPrefix="new-client" onRefusal={setBillRefusal} onChange={v => { setAddError(null); setDraftBill(v) }} />
+            </div>
+          ) : null}
           {addError ? <span className={s.addError} role="alert">{addError}</span> : null}
         </div>
       ) : null}
@@ -264,6 +290,21 @@ export default function NewProject({
               <Link href="/marketing/products" className={s.crumbLink}>Product Builder →</Link>
             </div>
           )}
+          {picked ? (
+            <>
+              <div className={s.label}>Amount{picked.kind === 'recurring' ? ' · a month' : ''}</div>
+              <div className={s.amountRow}>
+                <span className={s.amountRm}>RM</span>
+                <MoneyInput key={picked.id} className={`${s.input} ${s.amountInput}`} value={amount} label="Amount" placeholder="0.00"
+                  onChange={v => setAmounts(m => ({ ...m, [picked.id]: v }))} />
+                {picked.price != null && amount !== picked.price ? (
+                  <button type="button" className={s.amountReset} onClick={() => setAmounts(m => { const n = { ...m }; delete n[picked.id]; return n })}>
+                    List price {formatMoney(picked.price)}
+                  </button>
+                ) : null}
+              </div>
+            </>
+          ) : null}
         </>
       ) : (
       <>

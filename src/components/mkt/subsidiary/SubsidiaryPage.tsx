@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import type { ClientBill } from '@/lib/marketing/billing'
 import { addDays, type MktBoard, type MktSub } from '@/lib/marketing/board'
 import { addMonths, calendarEvents, monthCells, monthLabel, monthOf, weekCells, weekLabel, type CalEvent, type CalTone } from '@/lib/marketing/calendar'
 import {
@@ -32,10 +33,20 @@ const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encod
 const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM(e.team) : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
 const evEmoji = (e: CalEvent) => (e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
 
-export default function SubsidiaryPage({ board, sub: initial, feed, manage = false }: { board: MktBoard; sub: MktSub; feed: SubFeedEvent[]; manage?: boolean }) {
+export default function SubsidiaryPage({ board, sub: initial, feed, manage = false, bill: billOnFile = null, openEdit = false }: {
+  board: MktBoard
+  sub: MktSub
+  feed: SubFeedEvent[]
+  manage?: boolean
+  /** Marketing's own client's billing details, for the manager's Edit (②b-2b). */
+  bill?: ClientBill | null
+  /** Open Edit at once (`?edit=1` — Billing's *Add it on its page*). */
+  openEdit?: boolean
+}) {
   // Its details as last saved here (the board answers again on the next visit).
   const [sub, setSub] = useState(initial)
-  const [editing, setEditing] = useState(false)
+  const [bill, setBill] = useState(billOnFile)
+  const [editing, setEditing] = useState(openEdit)
   const [view, setView] = useState<View>('month')
   const [month, setMonth] = useState(() => monthOf(board.today))
   const [week, setWeek] = useState(board.today)
@@ -91,7 +102,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
           </div>
         </div>
       </div>
-      {editing ? <ClientEdit sub={sub} onClose={() => setEditing(false)} onSaved={next => { setSub(next); setEditing(false) }} /> : null}
+      {editing ? <ClientEdit sub={sub} bill={bill} onClose={() => setEditing(false)} onSaved={(next, b) => { setSub(next); setBill(b); setEditing(false) }} /> : null}
 
       <div className={s.stats}>
         {stats.map(st => (
