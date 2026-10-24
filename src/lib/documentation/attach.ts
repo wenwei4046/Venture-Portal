@@ -54,6 +54,10 @@ export function startingLetters(types: readonly LetterChoice[]): PendingLetter[]
   return types.filter(t => t.compulsory).map(t => pendingLetter(t.id))
 }
 
+/** The types Confirm as permanent and Extend start their letter on, when exactly one name says so (2026-10-24). */
+export const CONFIRMATION_LETTER_TYPE = /confirm/i
+export const EXTENSION_LETTER_TYPE = /extend|extension/i
+
 /** The type a form starts a letter on: the one type whose name says it (a renewal's /contract/i) — or none. */
 export function suggestedLetterType(types: readonly LetterChoice[], says: RegExp): string {
   const hits = types.filter(t => says.test(t.name))

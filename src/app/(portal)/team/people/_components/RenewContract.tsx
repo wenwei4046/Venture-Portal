@@ -9,7 +9,7 @@ import { RENEWAL_LETTER_TYPE, renewalMonths, renewalRefusal, renewalStart } from
 import { lettersRefusal, pendingLetter, suggestedLetterType, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
 import { letterTypeOf } from '@/lib/documentation/file-letters'
 import { uploadDocumentationFile } from '@/lib/documentation/upload'
-import { renewContract } from '../contract-actions'
+import { renewContract } from '../renew-actions'
 import AttachLetters from './AttachLetters'
 import type { TermFacts } from './Employment'
 import w from '../../_components/person-well.module.css'

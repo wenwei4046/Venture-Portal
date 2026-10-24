@@ -12,12 +12,26 @@ import {
   termEndLine,
 } from '@/lib/employment-status'
 import { ackLine, acknowledged } from '@/lib/term-reviews'
-import type { LetterChoice } from '@/lib/documentation/attach'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
+import {
+  CONFIRMATION_LETTER_TYPE,
+  EXTENSION_LETTER_TYPE,
+  failedWords,
+  filedWords,
+  lettersRefusal,
+  lettersToFile,
+  pendingLetter,
+  suggestedLetterType,
+  type LetterChoice,
+  type PendingLetter,
+} from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
 import { deactivateStaff, reactivateStaff } from '../actions'
 import { acknowledgeProbation, confirmProbation, extendProbation } from '../probation-actions'
 import { acknowledgeContract } from '../contract-actions'
 import PersonWell from '../../_components/PersonWell'
 import w from '../../_components/person-well.module.css'
+import AttachLetters from './AttachLetters'
 import RenewContract from './RenewContract'
 
 /** A probation or a contract as the person's page acts on it (2026-10-23; a contract 2026-10-24). */
@@ -51,7 +65,9 @@ export interface TermFacts {
  * further action — Confirm as permanent or Extend; ending their employment is Deactivate, above it. On a contract
  * (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder") the same line with Acknowledge, and Renew (the
  * same day — "按一下 renew，就可以再选一次是几个月 … 同时要 attach 一个新的 contract") for whoever may file its new contract;
- * making them permanent is the card's Employment Status, above.
+ * making them permanent is the card's Employment Status, above. Confirm as permanent and Extend take a letter too (the
+ * same day — the user passed on a side note: the bell brings HR here, where a probation's status changes, and its
+ * letter went to the Data center apart and was easily missed), each filed to their record once the step is done.
  */
 export default function Employment({
   personId,
@@ -59,7 +75,7 @@ export default function Employment({
   active,
   probation = null,
   contract = null,
-  renew = null,
+  letterTypes = null,
   today,
   onDone,
 }: {
@@ -68,8 +84,11 @@ export default function Employment({
   active: boolean
   probation?: TermFacts | null
   contract?: TermFacts | null
-  /** Renew's letter types — null for a viewer who may not file the new contract (Documentation · Create). */
-  renew?: { types: readonly LetterChoice[] } | null
+  /**
+   * The Data center's letter types (2026-10-24): Renew's new contract, and a letter with Confirm as permanent or Extend
+   * — null for a viewer who may not file one (Documentation · Create): no Renew, and those two take none.
+   */
+  letterTypes?: readonly LetterChoice[] | null
   /** The office's today (YYYY-MM-DD). */
   today: string
   onDone: () => void
@@ -137,8 +156,12 @@ export default function Employment({
         )}
       </div>
 
-      {active && probation ? <ProbationLine personId={personId} personName={personName} probation={probation} today={today} onDone={onDone} /> : null}
-      {active && contract ? <ContractLine personId={personId} personName={personName} contract={contract} renew={renew} today={today} onDone={onDone} /> : null}
+      {active && probation ? (
+        <ProbationLine personId={personId} personName={personName} probation={probation} letterTypes={letterTypes} today={today} onDone={onDone} />
+      ) : null}
+      {active && contract ? (
+        <ContractLine personId={personId} personName={personName} contract={contract} letterTypes={letterTypes} today={today} onDone={onDone} />
+      ) : null}
     </PersonWell>
   )
 }
@@ -153,23 +176,28 @@ function termValue(t: TermFacts, today: string): string {
 
 /**
  * The probation's line: "3 months · ends 31 Oct 2026 · in 8 days", who acknowledged its reminder, and its steps —
- * Acknowledge (only while a reminder stands that nobody has), Confirm as permanent, Extend by 1–3 months.
+ * Acknowledge (only while a reminder stands that nobody has), Confirm as permanent, Extend by 1–3 months. Confirm and
+ * Extend each take a letter (2026-10-24) — their confirmation, their extension — one row to start, its type the one that
+ * says so where one does; optional, filed to their Data center record once the step is done.
  */
 function ProbationLine({
   personId,
   personName,
   probation,
+  letterTypes,
   today,
   onDone,
 }: {
   personId: string
   personName: string
   probation: TermFacts
+  letterTypes: readonly LetterChoice[] | null
   today: string
   onDone: () => void
 }) {
   const [step, setStep] = useState<'idle' | 'confirm' | 'extend'>('idle')
   const [by, setBy] = useState(String(EXTEND_MONTH_CHOICES[0]))
+  const [letters, setLetters] = useState<PendingLetter[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -178,12 +206,29 @@ function ProbationLine({
   const said = ackLine(probation, today, 'D MMM YYYY')
   const extendedEnd = probation.months ? probationEnd(probation.hireDate, probation.months + Number(by)) : null
 
-  function go(fn: () => Promise<{ ok: true } | { ok: false; reason: string }>) {
+  /** A step opened: its letter row starts again, on the type that says what the step is. */
+  function open(next: 'confirm' | 'extend') {
+    setError(null)
+    setLetters(letterTypes ? [pendingLetter(suggestedLetterType(letterTypes, next === 'confirm' ? CONFIRMATION_LETTER_TYPE : EXTENSION_LETTER_TYPE))] : [])
+    setStep(next)
+  }
+
+  function go(fn: () => Promise<{ ok: true } | { ok: false; reason: string }>, withLetters = false) {
+    const refused = withLetters && letterTypes ? lettersRefusal(letters) : null
+    if (refused) return setError(refused)
     setError(null)
     startTransition(async () => {
       try {
         const done = await fn()
         if (!done.ok) return setError(done.reason)
+        // Done: the letters go to their record — one that does not is said, and left for the Data center.
+        if (withLetters && letterTypes && lettersToFile(letters).length > 0) {
+          const filed = await fileLetters(personId, letters, letterTypes)
+          const failed = failedWords(filed.failed)
+          if (failed) flash(failed, FLASH_LONG)
+          else flash(filedWords(filed.filed, personName) ?? 'Saved')
+        }
+        setLetters([])
         setStep('idle')
         onDone()
       } catch {
@@ -191,6 +236,12 @@ function ProbationLine({
       }
     })
   }
+
+  const letterRow = letterTypes ? (
+    <div className={w.letters}>
+      <AttachLetters types={letterTypes} rows={letters} onChange={setLetters} idPrefix={`probation-${step}-letter`} disabled={pending} />
+    </div>
+  ) : null
 
   return (
     <div className={`${w.line} ${w.lineRule}`}>
@@ -208,6 +259,7 @@ function ProbationLine({
           )}
         </span>
         {said && step === 'idle' ? <span className={w.note}>{said}</span> : null}
+        {step !== 'idle' ? letterRow : null}
         {error ? <div className="sheet-danger mt-1 mb-0">{error}</div> : null}
       </div>
 
@@ -219,16 +271,16 @@ function ProbationLine({
                 {pending ? 'Acknowledging…' : 'Acknowledge'}
               </button>
             ) : null}
-            <button type="button" onClick={() => setStep('confirm')} disabled={pending} className={btn('outline')}>
+            <button type="button" onClick={() => open('confirm')} disabled={pending} className={btn('outline')}>
               Confirm as permanent
             </button>
-            <button type="button" onClick={() => setStep('extend')} disabled={pending || !probation.months} className={btn('outline')}>
+            <button type="button" onClick={() => open('extend')} disabled={pending || !probation.months} className={btn('outline')}>
               Extend
             </button>
           </>
         ) : step === 'confirm' ? (
           <>
-            <button type="button" onClick={() => go(() => confirmProbation(personId))} disabled={pending} className={btn('primary')}>
+            <button type="button" onClick={() => go(() => confirmProbation(personId), true)} disabled={pending} className={btn('primary')}>
               {pending ? 'Confirming…' : 'Confirm'}
             </button>
             <button type="button" onClick={() => setStep('idle')} disabled={pending} className={btn('outline')}>
@@ -244,7 +296,7 @@ function ProbationLine({
                 </option>
               ))}
             </Select>
-            <button type="button" onClick={() => go(() => extendProbation(personId, Number(by)))} disabled={pending} className={btn('primary')}>
+            <button type="button" onClick={() => go(() => extendProbation(personId, Number(by)), true)} disabled={pending} className={btn('primary')}>
               {pending ? 'Extending…' : 'Extend'}
             </button>
             <button type="button" onClick={() => setStep('idle')} disabled={pending} className={btn('outline')}>
@@ -265,14 +317,14 @@ function ContractLine({
   personId,
   personName,
   contract,
-  renew,
+  letterTypes,
   today,
   onDone,
 }: {
   personId: string
   personName: string
   contract: TermFacts
-  renew: { types: readonly LetterChoice[] } | null
+  letterTypes: readonly LetterChoice[] | null
   today: string
   onDone: () => void
 }) {
@@ -282,7 +334,7 @@ function ContractLine({
   const said = ackLine(contract, today, 'D MMM YYYY')
   const waiting = reminderDue(contract.endsOn, today) && !acknowledged(contract, today)
   // Renewed from its end: without one (no hire date) there is nothing to count the new contract from.
-  const mayRenew = renew !== null && !!contract.endsOn
+  const mayRenew = letterTypes !== null && !!contract.endsOn
 
   function acknowledge() {
     setError(null)
@@ -319,12 +371,12 @@ function ContractLine({
           ) : null}
         </span>
       ) : null}
-      {renewing && renew ? (
+      {renewing && letterTypes ? (
         <RenewContract
           personId={personId}
           personName={personName}
           contract={contract}
-          types={renew.types}
+          types={letterTypes}
           onCancel={() => setRenewing(false)}
           onDone={() => {
             setRenewing(false)

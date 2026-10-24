@@ -22,7 +22,7 @@ export default function PersonChanges({
   active,
   probation = null,
   contract = null,
-  renew = null,
+  letterTypes = null,
   today,
 }: {
   personId: string
@@ -35,8 +35,8 @@ export default function PersonChanges({
   probation?: TermFacts | null
   /** On a contract (2026-10-24): its end and its reminder. */
   contract?: TermFacts | null
-  /** Renew's letter types (2026-10-24) — null: this viewer may not file its new contract. */
-  renew?: { types: readonly LetterChoice[] } | null
+  /** The Data center's letter types (2026-10-24): Renew's new contract, a probation step's letter — null: none filed here. */
+  letterTypes?: readonly LetterChoice[] | null
   /** The office's today (YYYY-MM-DD). */
   today: string
 }) {
@@ -48,7 +48,7 @@ export default function PersonChanges({
       {active ? (
         <Promotion personId={personId} personName={personName} title={title} department={department} ladder={ladder} onDone={done} />
       ) : null}
-      <Employment personId={personId} personName={personName} active={active} probation={probation} contract={contract} renew={renew} today={today} onDone={done} />
+      <Employment personId={personId} personName={personName} active={active} probation={probation} contract={contract} letterTypes={letterTypes} today={today} onDone={done} />
     </div>
   )
 }

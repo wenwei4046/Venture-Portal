@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   extendProbation: vi.fn(),
   acknowledgeContract: vi.fn(),
   renewContract: vi.fn(),
+  fileLetters: vi.fn(),
   letterTypeOf: vi.fn(),
   upload: vi.fn(),
 }))
@@ -23,9 +24,10 @@ vi.mock('../probation-actions', () => ({
   confirmProbation: mocks.confirmProbation,
   extendProbation: mocks.extendProbation,
 }))
-vi.mock('../contract-actions', () => ({ acknowledgeContract: mocks.acknowledgeContract, renewContract: mocks.renewContract }))
+vi.mock('../contract-actions', () => ({ acknowledgeContract: mocks.acknowledgeContract }))
+vi.mock('../renew-actions', () => ({ renewContract: mocks.renewContract }))
 // Renew files the new contract (2026-10-24): its type, the file up, then renewContract.
-vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: vi.fn(), letterTypeOf: mocks.letterTypeOf }))
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: mocks.fileLetters, letterTypeOf: mocks.letterTypeOf }))
 vi.mock('@/lib/documentation/upload', () => ({ uploadDocumentationFile: mocks.upload }))
 
 import PersonChanges from './PersonChanges'
@@ -43,7 +45,7 @@ const TODAY = '2026-10-23'
 
 beforeEach(() => {
   for (const m of [mocks.refresh, mocks.acknowledgeProbation, mocks.confirmProbation, mocks.extendProbation, mocks.acknowledgeContract,
-    mocks.renewContract, mocks.letterTypeOf, mocks.upload]) m.mockReset()
+    mocks.renewContract, mocks.fileLetters, mocks.letterTypeOf, mocks.upload]) m.mockReset()
 })
 afterEach(cleanup)
 
@@ -154,6 +156,69 @@ describe('a probation in the Employment well', () => {
     expect(within(well('Employment')).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
     expect(within(well('Employment')).getByText('30-day reminder acknowledged by LI SEAN · 5 Oct 2026')).toBeInTheDocument()
   })
+
+  // A probation's step takes its letter (2026-10-24 — a side note the user passed on: the bell brings HR here, where a
+  // probation's status changes, and the confirmation letter went to the Data center apart and was easily missed).
+  describe('with a letter', () => {
+    const TYPES = [
+      { id: 'offer', name: 'Offer letter', compulsory: true },
+      { id: 'confirm', name: 'Confirmation letter', compulsory: false },
+    ]
+    const drawWith = (p: TermFacts) =>
+      render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active probation={p} letterTypes={TYPES} today={TODAY} />)
+    const letter = new File(['%PDF'], 'confirmation.pdf', { type: 'application/pdf' })
+
+    it('Confirm as permanent offers one, on the type that says confirm, and files it once confirmed', async () => {
+      mocks.confirmProbation.mockResolvedValue({ ok: true })
+      mocks.fileLetters.mockResolvedValue({ filed: ['Confirmation letter'], failed: [] })
+      drawWith(probation())
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Confirm as permanent' }))
+      expect(within(well('Employment')).getByLabelText('Letter type')).toHaveValue('confirm')
+      fireEvent.change(within(well('Employment')).getByLabelText('Letter file'), { target: { files: [letter] } })
+      await act(async () => {
+        fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Confirm' }))
+      })
+      expect(mocks.confirmProbation).toHaveBeenCalledWith('p1')
+      expect(mocks.fileLetters).toHaveBeenCalledWith('p1', [expect.objectContaining({ typeId: 'confirm', file: letter })], TYPES)
+      expect(mocks.confirmProbation.mock.invocationCallOrder[0]).toBeLessThan(mocks.fileLetters.mock.invocationCallOrder[0])
+      expect(mocks.refresh).toHaveBeenCalled()
+    })
+
+    it('is optional — a step without one files nothing — and a step refused files nothing', async () => {
+      mocks.confirmProbation.mockResolvedValue({ ok: true })
+      const first = drawWith(probation())
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Confirm as permanent' }))
+      await act(async () => {
+        fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Confirm' }))
+      })
+      expect(mocks.confirmProbation).toHaveBeenCalled()
+      expect(mocks.fileLetters).not.toHaveBeenCalled()
+      first.unmount()
+
+      mocks.extendProbation.mockResolvedValue({ ok: false, reason: 'Their probation changed since this page was opened — reload it.' })
+      drawWith(probation())
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Extend' }))
+      fireEvent.change(within(well('Employment')).getByLabelText('Letter type'), { target: { value: 'confirm' } })
+      fireEvent.change(within(well('Employment')).getByLabelText('Letter file'), { target: { files: [letter] } })
+      await act(async () => {
+        fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Extend' }))
+      })
+      expect(within(well('Employment')).getByText('Their probation changed since this page was opened — reload it.')).toBeInTheDocument()
+      expect(mocks.fileLetters).not.toHaveBeenCalled()
+    })
+
+    it('Extend starts on no type when none says extension, and asks one for a file before anything goes', async () => {
+      drawWith(probation())
+      fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Extend' }))
+      expect(within(well('Employment')).getByLabelText('Letter type')).toHaveValue('')
+      fireEvent.change(within(well('Employment')).getByLabelText('Letter file'), { target: { files: [letter] } })
+      await act(async () => {
+        fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Extend' }))
+      })
+      expect(within(well('Employment')).getByText('Choose the letter type for confirmation.pdf.')).toBeInTheDocument()
+      expect(mocks.extendProbation).not.toHaveBeenCalled()
+    })
+  })
 })
 
 // A contract (2026-10-24): its period and end, and Acknowledge at each reminder — renewing it is the card's own edit.
@@ -209,8 +274,8 @@ describe('Renew a contract', () => {
   const contract = (over: Partial<TermFacts> = {}): TermFacts => ({
     hireDate: '2025-10-01', months: 12, endsOn: '2026-09-30', startsOn: '2025-10-01', ackEnd: null, ackName: null, ackAt: null, ...over,
   })
-  const draw = (c: TermFacts, renew: { types: typeof TYPES } | null = { types: TYPES }) =>
-    render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active contract={c} renew={renew} today={TODAY} />)
+  const draw = (c: TermFacts, letterTypes: typeof TYPES | null = TYPES) =>
+    render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active contract={c} letterTypes={letterTypes} today={TODAY} />)
   const pdf = new File(['%PDF'], 'contract-2026.pdf', { type: 'application/pdf' })
   const open = () => {
     fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Renew' }))

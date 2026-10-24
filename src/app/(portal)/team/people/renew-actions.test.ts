@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('@/lib/push/outbox', () => ({ pushSoon: mocks.pushSoon }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => mocks.db }))
 
-import { renewContract } from './contract-actions'
+import { renewContract } from './renew-actions'
 
 type Call = { op: 'select' | 'update'; patch?: unknown; filters: Array<[string, unknown]>; columns?: string }
 type Builder = {

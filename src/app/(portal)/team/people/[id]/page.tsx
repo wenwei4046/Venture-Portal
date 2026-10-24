@@ -295,7 +295,7 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                   }
                 : null
             }
-            renew={letterTypes ? { types: letterTypes } : null}
+            letterTypes={letterTypes}
             today={today}
           />
         ) : null}

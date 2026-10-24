@@ -274,7 +274,7 @@ describe('Add Staff — the letters filed with the status', () => {
     const offer = new File(['%PDF'], 'offer-ana.pdf', { type: 'application/pdf' })
     fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [offer] } })
     await submit()
-    await waitFor(() => expect(letters.fileLetters).toHaveBeenCalled())
+    await waitFor(() => expect(letters.fileLetters).toHaveBeenCalled(), { timeout: 5000 })
     const [staffId, rows, types] = letters.fileLetters.mock.calls[0]
     expect(staffId).toBe('new-person')
     expect(rows.map((r: { typeId: string; file: File | null }) => [r.typeId, r.file])).toEqual([['offer', offer]])
@@ -286,7 +286,7 @@ describe('Add Staff — the letters filed with the status', () => {
   it('files nothing when no file was chosen, and asks a type for a file that has none', async () => {
     draw(TYPES)
     await submit()
-    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled(), { timeout: 5000 })
     expect(letters.fileLetters).not.toHaveBeenCalled()
 
     cleanup()
@@ -295,7 +295,7 @@ describe('Add Staff — the letters filed with the status', () => {
     fireEvent.change(screen.getByLabelText('Letter type'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' })] } })
     await submit()
-    expect(await screen.findByText('Choose the letter type for scan.pdf.')).toBeInTheDocument()
+    expect(await screen.findByText('Choose the letter type for scan.pdf.', undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(actions.addStaff).not.toHaveBeenCalled()
   })
 

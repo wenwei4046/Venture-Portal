@@ -713,7 +713,9 @@ hr_staff_costs (
     probation_ack_name text NULL
     probation_ack_at timestamptz NULL
     contract_months smallint NULL                    -- 合约几个月，1–36（表单给 6/12/18/24/30/36）；只在 contract 时有（CHECK，2026-10-24）
-    contract_end    date GENERATED ALWAYS             -- 合约最后一天 = hire_date + months − 1 天（1 Oct + 12 → 30 Sep）；
+    contract_start  date NULL                        -- 现在这一期合约的第一天；NULL = hire_date（Renew 才写，2026-10-24）；
+                                                     --   不是 contract 就清空（trigger hr_staff_costs_contract_start + CHECK）
+    contract_end    date GENERATED ALWAYS             -- 合约最后一天 = coalesce(contract_start, hire_date) + months − 1 天（1 Oct + 12 → 30 Sep）；
                                                      --   不是 contract 或没 hire_date 就 NULL；到期前 30 天、15 天各提醒一次（2026-10-24）
     contract_ack_end date NULL                       -- 合约提醒的 Acknowledge，跟 probation_ack_* 一样（2026-10-24）：那个 end；续约后 ≠ → 再提醒
     contract_ack_by uuid FK → users NULL             --   谁、几时、名字（contract_acknowledge() 写，trigger 拒绝直接写；不是 contract 就清空）
@@ -764,7 +766,22 @@ nothing new is stored for a probation. The hourly sweep is
 also counts the old `probation:<staff>:<end>`), titles *Probation ending · …* /
 *Contract ending · …*, the same holders and helper as below.
 `notify_probation_due` is left for the sweep deployed before; nothing calls it
-after.
+after (dropped by `20261025052000`, below).
+
+**Renew a contract; the letter types People's forms offer (2026-10-24, migration `20261025052000_people_contract_renew`).**
+`contract_start` (granted to `authenticated`) is the first day of the contract
+they are on now — NULL = the hire date, as every contract was counted before —
+written by Renew on the person's page (`renewContract`: an UPDATE under the
+session's row policies, over the period and end the page read) with the new
+`contract_months`; `contract_end` is now generated from
+`coalesce(contract_start, hire_date)` (`ALTER COLUMN … SET EXPRESSION`). Off a
+contract it is cleared (trigger `hr_staff_costs_contract_start`, CHECK
+`hr_staff_costs_contract_start_check`). A renewal moves the end, so its
+acknowledgement no longer matches and both reminders come again before the new
+end. `hr_letter_type_choices()` (DEFINER, STABLE; Documentation · Create) lists
+the live letter types — id, name, compulsory — for Add Staff, the waiting list's
+Transfer, a person's card and Renew, whose letters are filed by `hr_letter_file`
+as the Data center's Upload files one. `notify_probation_due` is dropped.
 
 **…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
 `notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly

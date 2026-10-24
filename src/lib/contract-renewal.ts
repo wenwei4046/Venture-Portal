@@ -3,7 +3,7 @@
  * renew，就可以再选一次是几个月，对不对？同时要 attach 一个新的 contract"). On the person's page the contract's line offers
  * Renew: the new contract's first day — the day after the old one ends, unless HR picks another (a late renewal may
  * start the day it is signed) — its period from the contract periods again, and the new contract itself, filed to their
- * Data center record as it is renewed (`renewContract`, team/people/contract-actions.ts). The database then counts the
+ * Data center record as it is renewed (`renewContract`, team/people/renew-actions.ts). The database then counts the
  * end from that day (`contract_start`, mig 20261025052000), so both reminders come again before the new end.
  *
  * Pure, so the form and the server ask one set of rules.
