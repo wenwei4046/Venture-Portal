@@ -73,6 +73,8 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     },
     async saveSettings(st) {
       if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
+      // Full time evenly has its own save (mig 20261025060000).
+      if (st.ftEven !== (data().settings?.ftEven ?? false) && !(await write("crm_set_ft_even", { p_on: st.ftEven }))) return false;
       setData(d => ({ ...d, settings: st }));
       return true;
     },
