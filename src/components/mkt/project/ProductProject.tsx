@@ -48,7 +48,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   // How long the PIC has been silent, only once in the browser (the server's clock and the browser's differ).
   const [now, setNow] = useState<Date | null>(null)
   useEffect(() => setNow(new Date()), [page])
-  const [logOpen, setLogOpen] = useState(false)
+  // Its Map and Audit trail (④-4d — answers 22, 23: the intake on the map).
+  const [sheet, setSheet] = useState<'map' | 'audit' | null>(null)
   const [reason, setReason] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
   // The second PIC's two fields: shown once named, or once the manager asks for them.
@@ -481,7 +482,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           <div className={p.trail} aria-label="Audit trail">
             <div className={t.trailHead}>
               <span>Audit trail</span>
-              <button type="button" className={a.open} onClick={() => setLogOpen(true)}>Formal log</button>
+              <button type="button" className={a.open} onClick={() => setSheet('map')}>Map</button>
+              <button type="button" className={a.open} onClick={() => setSheet('audit')}>Formal log</button>
             </div>
             {lines.map(l => (
               <div key={l.key} className={t.trailLine}>
@@ -492,7 +494,7 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
           </div>
         </aside>
       </div>
-      {logOpen ? <ProjectSheet project={pr.id} track={pr.track} title={pr.title} page={null} tab="audit" manage={can.manage} onClose={() => setLogOpen(false)} /> : null}
+      {sheet ? <ProjectSheet project={pr.id} track={pr.track} title={pr.title} page={null} product={page} tab={sheet} manage={can.manage} onClose={() => setSheet(null)} /> : null}
 
       {modal ? (
         <div className={t.scrim} onClick={() => !pending && setModal(false)}>

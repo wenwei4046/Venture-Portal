@@ -226,6 +226,10 @@ export const opensFrom = (p: { kind: MktProject['kind']; series: string | null }
 /** New Project, opened from this one. */
 export const newFromHref = (trackId: string) => `/marketing/new?from=${encodeURIComponent(trackId)}`
 
+/** New Project's own for each address — the page stays mounted when only its search changes (the top bar's + New
+ * Project from ?from=…), so what it was opened from, for whom and the client form start afresh with a new one. */
+export const newProjectKey = (from: string | null | undefined, sub?: string, add?: string) => `${from ?? ''}|${sub ?? ''}|${add ?? ''}`
+
 export interface RailStage {
   idx: number
   name: string

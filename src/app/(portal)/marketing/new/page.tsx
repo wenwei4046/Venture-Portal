@@ -1,6 +1,6 @@
 import { mayActOn, requireActionOn, requirePage } from '@/lib/auth'
 import { readBoard, readProductPicks, readTask } from '@/lib/marketing/server'
-import { opensFrom } from '@/lib/marketing/task'
+import { newProjectKey, opensFrom } from '@/lib/marketing/task'
 import { builderPeople } from '@/lib/marketing/tasks'
 import NewProject from '@/components/mkt/newproject/NewProject'
 
@@ -30,6 +30,7 @@ export default async function MarketingNewPage({ searchParams }: { searchParams:
     : from && board.subs.some(x => x.id === from.sub) ? from.sub : null
   return (
     <NewProject
+      key={newProjectKey(from?.id, sp.sub, sp.add)}
       today={board.today}
       me={board.me}
       subs={board.subs}
