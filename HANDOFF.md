@@ -9,8 +9,8 @@ Squash-merged ac08b0e7; production deploy success 05:26 UTC.
 - What happened first (not by me): 2026-10-24 04:12 UTC the **Principal** account amended BI#7 (4cb7ee6d) from a month on —
   2026-01, cost_rate 0.00833, **no fixed term** (history 2025-05..2025-12 at 0.5% × 60, reason "Recalculate Interest").
   Memory `liang-cont-terms-change-pending` had this side as pending with a different sketch (fixed 1,000 principal on,
-  or no fixed term only from Oct-26) — **still open with the user**: if 1,000 a month was meant to run to Sep-26, the
-  record itself needs another change. Also 0.833% × 51,000 = 424.83, not the 425 of 10% p.a. — said, not changed.
+  or no fixed term only from Oct-26) — **settled: the user, "现在的设定是对的：2026 年 1 月起就无固定期限"** — the record
+  stays as it is; don't re-ask. Also 0.833% × 51,000 = 424.83, not the 425 of 10% p.a. — said, not changed.
 - Display bugs it exposed, fixed in `lib/repayment-plan` `openPlan` (a deal whose CURRENT terms are open is drawn
   wholly month by month): (1) a month an earlier fixed segment governs, within that segment's schedule, now asks its
   principal and is set against oldest first as `fixedPlan` does (BI#7 May–Dec 2025: 1,300, had read 300); (2) Balance
