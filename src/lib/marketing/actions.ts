@@ -140,7 +140,7 @@ export async function correctMktLogRecord(project: string, record: number, text:
 }
 
 /** Your stage's work: only what changed — a field cleared is sent as null. */
-export async function saveMktWork(project: string, work: Partial<{ notes: string; links: StageWork['links']; vals: Record<string, string | boolean | null> }>): Promise<Done<{ missing: string[] }>> {
+export async function saveMktWork(project: string, work: Partial<{ notes: string; links: StageWork['links']; vals: Record<string, string | boolean | string[] | null> }>): Promise<Done<{ missing: string[] }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
   if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
   const { data, error } = await (await client()).rpc('mkt_stage_save', { p_project: project, p_work: work ?? {} })
@@ -535,6 +535,30 @@ export async function setMktRunDay(project: string, day: number): Promise<Done<{
   if (error) return { ok: false, reason: words(error, 'The run day could not be saved. Please try again.') }
   freshen()
   return { ok: true, page: productProjectFromRow(data) }
+}
+
+/** An option added to a shared list on the spot (③d-2 — the user's answer 9): whoever fills a choice in, or the manager
+ * on the canvas. Answers the list, and the option as the list keeps it (one there already in other letters keeps its own
+ * spelling). */
+export async function addMktOption(list: string, option: string): Promise<Done<{ list: string; opts: string[]; option: string }>> {
+  await requireActionOn(['/marketing/projects/[id]', '/marketing/workflows'], 'marketing', 'edit')
+  if (typeof list !== 'string' || !/^[A-Z][A-Za-z ]{1,39}$/.test(list)) return { ok: false, reason: 'That list is not there.' }
+  if (typeof option !== 'string' || !option.trim() || option.trim().length > 40) return { ok: false, reason: 'An option of 1 to 40 characters.' }
+  const { data, error } = await (await client()).rpc('mkt_option_add', { p_list: list, p_option: option })
+  if (error) return { ok: false, reason: words(error, 'The option could not be added. Please try again.') }
+  const r = (data ?? {}) as { list?: unknown; opts?: unknown; option?: unknown }
+  return { ok: true, list: String(r.list ?? list), opts: picksOf(r.opts), option: String(r.option ?? option.trim()) }
+}
+
+/** An option taken off a shared list — the manager's, on the canvas; an answer that picked it keeps it. */
+export async function removeMktOption(list: string, option: string): Promise<Done<{ list: string; opts: string[] }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (typeof list !== 'string' || !/^[A-Z][A-Za-z ]{1,39}$/.test(list)) return { ok: false, reason: 'That list is not there.' }
+  if (typeof option !== 'string' || !option) return { ok: false, reason: 'That option is not on the list.' }
+  const { data, error } = await (await client()).rpc('mkt_option_remove', { p_list: list, p_option: option })
+  if (error) return { ok: false, reason: words(error, 'The option could not be taken off. Please try again.') }
+  const r = (data ?? {}) as { list?: unknown; opts?: unknown }
+  return { ok: true, list: String(r.list ?? list), opts: picksOf(r.opts) }
 }
 
 /** A recurring project paused (②b-2g — no month's work made while it is paused; still billed, answer 51) or resumed
