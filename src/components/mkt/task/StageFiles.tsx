@@ -37,12 +37,18 @@ export default function StageFiles({ files, live, busy, label, onPick, onRemove 
       ))}
       {live ? (
         <>
-          <button type="button" className={`${u.drop}${over ? ` ${u.dropOver}` : ''}`} disabled={busy} onClick={() => picker.current?.click()}
+          {/* The zone while there is nothing yet (the handoff's); once a file is in, a small button for another. */}
+          <button type="button" className={files.length ? s.dashBtn : `${u.drop}${over ? ` ${u.dropOver}` : ''}`} disabled={busy}
+            style={files.length ? { alignSelf: 'flex-start' } : undefined} onClick={() => picker.current?.click()}
             onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
             onDrop={e => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) onPick(e.dataTransfer.files) }}>
-            <span className={u.dropIcon} aria-hidden="true">⬆</span>
-            <span className={u.dropText}>Drop the file here</span>
-            <span className={u.dropHint}>Any file · up to 2 GB</span>
+            {files.length ? '⬆ Upload another' : (
+              <>
+                <span className={u.dropIcon} aria-hidden="true">⬆</span>
+                <span className={u.dropText}>Drop the file here</span>
+                <span className={u.dropHint}>Any file · up to 2 GB</span>
+              </>
+            )}
           </button>
           <input ref={picker} type="file" multiple hidden aria-label={`Upload files for ${label}`}
             onChange={e => { if (e.target.files?.length) onPick(e.target.files); e.target.value = '' }} />
