@@ -208,7 +208,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     statuses: ([["all", "All"], ["running", "Running"], ["paused", "Paused"], ["ended", "Ended"]] as const).map(([k, label]) => ({ label, on: lbaSt === k, dot: k === "all" ? null : ST_PILL[label as LbaStatus].dot, pick: () => patch({ lbaSt: k }) })),
     sort: (["ad", "status", "members", "leads"] as const).reduce((o, k) => ({ ...o, [k]: { on: srt.k === k, dir: srt.dir,
       pick: () => patch({ lbaSort: srt.k === k ? { k, dir: srt.dir === "desc" ? "asc" : "desc" } : { k, dir: k === "leads" ? "desc" : "asc" } }) } }), {} as Record<"ad" | "status" | "members" | "leads", { on: boolean; dir: "asc" | "desc"; pick: () => void }>),
-    ads: sorted.map((a, i) => { const open = ui.lbaShut[a.id] === undefined ? i === 0 && !lbaQ ? true : !!lbaQ : !ui.lbaShut[a.id];
+    ads: sorted.map((a, i) => { // Every ad starts folded; a search opens what it finds (the owner, 2026-10-25: "默認收起來").
+      const open = ui.lbaShut[a.id] === undefined ? !!lbaQ : !ui.lbaShut[a.id]; void i;
       const max = Math.max(1, ...a.rows.map(r => r.n)), st = ST_PILL[a.status];
       return { id: a.id, name: a.name, wa: a.wa, total: a.total, open, toggle: () => set(u => ({ ...u, lbaShut: { ...u.lbaShut, [a.id]: open } })),
         teamDots: a.teams.slice(0, 3).map(teamColor), teamsLabel: `${a.teams.length} team${a.teams.length === 1 ? "" : "s"}`,
