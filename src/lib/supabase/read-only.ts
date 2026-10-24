@@ -91,6 +91,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_task_library',
   // My Space's own side (mig 20261024007500): the caller's own space — STABLE.
   'mkt_space',
+  // Replace Person (mig 20261025036000): who stands where, one person's places — STABLE.
+  'mkt_replace_people', 'mkt_replace_places',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

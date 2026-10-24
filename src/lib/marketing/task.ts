@@ -446,6 +446,9 @@ function parentFromRow(v: unknown): TaskProject['parentProject'] {
   return typeof r.id === 'string' && r.id ? { id: r.id, trackId: String(r.trackId ?? ''), title: String(r.title ?? ''), status } : null
 }
 
+/** How a replaced person stood in the place (④-5) — doing a stage says nothing more. */
+const REPLACED_AS: Record<string, string> = { cand: ' as a 🔓 candidate', appr: ' as approver', subtask: ' on a subtask', project: ' as the owner', series: ' in the plan' }
+
 /** " · starts Mon 2 Nov" — a plan's start day, as the trail says it. */
 const planStart = (e: TaskEvent) => (typeof e.data?.start === 'string' ? ` · starts ${longDay(e.data.start)}` : '')
 
@@ -490,6 +493,12 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'replanned': return `${e.actor} changed the plan${planStart(e)}`
     case 'plan changed': return `${e.actor} changed the plan`
     case 'reassigned': return `${e.actor} moved ${stage}: ${e.fromTo ?? '—'}${e.reason ? ` · "${e.reason}"` : ''}`
+    // Replace Person (④-5): one person for another, in a place of theirs.
+    case 'replaced': {
+      const role = typeof e.data?.role === 'string' ? REPLACED_AS[e.data.role] ?? '' : ''
+      const sub = e.data?.role === 'subtask' && typeof e.data.subtask === 'string' ? ` "${e.data.subtask}"` : ''
+      return `${e.actor} replaced ${e.fromTo ?? '—'}${role}${sub}${stage ? ` · ${stage}` : ''}${e.reason ? ` · "${e.reason}"` : ''}`
+    }
     // The PIC on their link (②b-2d).
     case 'pic approved': return `${e.actor} approved ${stage}${v} on the link${e.fromTo ? ` → ${e.fromTo}` : ''}`
     case 'pic changes': {

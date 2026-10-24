@@ -11,6 +11,7 @@ import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
+import { replaceDoneFromRow, type ReplaceDone } from './replace'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 import { spaceFromRow, spacePatchOf, type Space, type SpacePatch } from './space'
 import {
@@ -444,6 +445,21 @@ export async function editMktClient(sub: string, patch: Partial<Record<(typeof C
   if (error || !data || typeof data !== 'object') return { ok: false, reason: words(error, 'The client could not be saved. Please try again.') }
   freshen()
   return { ok: true, sub: subFromRow(data as Record<string, unknown>) }
+}
+
+/** Replace Person (④-5, mig 20261025036000): one person for another in the places ticked, with the reason — the
+ * database takes only those still theirs, and keeps the record. */
+export async function replaceMktPerson(from: string, to: string, keys: readonly string[], reason: string): Promise<Done<{ done: ReplaceDone }>> {
+  await requireActionOn('/marketing/replace', 'marketing', 'manage')
+  if (!isId(from) || !isId(to)) return { ok: false, reason: 'Pick who is replaced and who takes over.' }
+  const clean = [...new Set((Array.isArray(keys) ? keys : []).filter(k => typeof k === 'string' && k.length <= 120))].slice(0, 2000)
+  if (!clean.length) return { ok: false, reason: 'Tick at least one place.' }
+  const { data, error } = await (await client()).rpc('mkt_replace_person',
+    { p_from: from, p_to: to, p_keys: clean, p_reason: String(reason ?? '').slice(0, 200) })
+  const done = error ? null : replaceDoneFromRow(data)
+  if (!done) return { ok: false, reason: words(error, 'The replacement could not be made. Please try again.') }
+  freshen()
+  return { ok: true, done }
 }
 
 /** The Free space: a block put (added, or its text and tick changed) or removed. */

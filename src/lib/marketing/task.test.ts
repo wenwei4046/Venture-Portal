@@ -111,6 +111,12 @@ describe('a task’s page', () => {
     ])
     expect(eventText({ id: 9, at: '', actor: 'Rachel', action: 'changes', stage: 1, stageName: 'Redesign', fromTo: 'Rachel', reason: 'Bigger', version: 'v1',
       data: { back: 0, to: 'First draft' } }, page)).toBe('Rachel requested changes on Redesign v1: "Bigger" · back to First draft')
+    // Replace Person (④-5): how the person replaced stood there.
+    const replaced = (role: string, extra = {}) => eventText({ id: 10, at: '', actor: 'Josiah', action: 'replaced', stage: 1, stageName: 'Redesign',
+      fromTo: 'Siti → Hafiz', reason: 'Resigned', data: { role, rec: 3, ...extra } }, page)
+    expect([replaced('owner'), replaced('appr'), replaced('subtask', { subtask: 'Thumbnail' })]).toEqual([
+      'Josiah replaced Siti → Hafiz · Redesign · "Resigned"', 'Josiah replaced Siti → Hafiz as approver · Redesign · "Resigned"',
+      'Josiah replaced Siti → Hafiz on a subtask "Thumbnail" · Redesign · "Resigned"'])
   })
 
   it('a series: its rule, its runs', () => {
