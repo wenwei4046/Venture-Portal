@@ -72,8 +72,10 @@ export function customBookVM(o: { b: CustomFields; put: (p: Partial<CustomFields
 /** Showroom · Online · Other, above the booking sheet. */
 export function Phone4aBookMode({ m }: { m: CustomBook | null }) {
   if (!m) return null;
+  // flex: none — every sheet it sits in is a scrolling flex column, and this bar scrolls sideways: a scroller may shrink to
+  // nothing there, so a sheet taller than the screen left a 6px line under the title (the owner's Android, 2026-10-24).
   return (
-    <div style={{ display: "flex", gap: "2px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)", overflowX: "auto", scrollbarWidth: "none" }}>
+    <div style={{ flex: "none", display: "flex", gap: "2px", padding: "3px", borderRadius: "20px", background: "var(--crm-field)", overflowX: "auto", scrollbarWidth: "none" }}>
       {m.tabs.map(t => <button key={t.label} type="button" aria-pressed={t.on} onClick={t.pick} style={{ ...BTN, flex: "1 0 auto", padding: "0 12px", whiteSpace: "nowrap", height: "34px", borderRadius: "17px", fontSize: fs(13.5), fontWeight: 600,
         background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{t.label}</button>)}
     </div>
