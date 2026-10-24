@@ -39,7 +39,7 @@ const CRM_WRITES = [
   // The chat composer's Recents (mig 20261014251500): one's own recent emoji.
   "crm_save_recent_emoji",
   // An ad's name (mig 20261016120000), CRM · Manage.
-  "crm_name_ad", "crm_add_ad",
+  "crm_name_ad", "crm_add_ad", "crm_hide_ad",
   // CRM Desktop v2 · Channels: link / unlink a Page or number, its default (mig 20261015100000).
   "crm_set_channel",
   // Settings › General (mig 20261018100000), CRM · Manage.
@@ -122,7 +122,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
-  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad",
+  "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad",
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
@@ -223,7 +223,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // One's own recent emoji, the chat composer's Recents (mig 20261014251500).
     soft<{ recent_emoji: string[] | null }[]>(db.from("crm_staff_prefs").select("recent_emoji")),
     // Ads' names (mig 20261016120000).
-    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at, added_at, starts_at, ends_at, page_id, page_name")),
+    soft<NonNullable<CrmDataRows["adNames"]>>(db.from("crm_ad_names").select("ad_source_id, name, source, meta_status, status_at, added_at, starts_at, ends_at, page_id, page_name, hidden_at")),
     // Settings › General (mig 20261018100000): null before it, so the CRM keeps today's values.
     (async () => { try { const { data, error } = await db.rpc("crm_settings_read"); return error ? null : (data as unknown); } catch { return null; } })(),
     // Members locked out of the dealing for now (mig 20261022130000).

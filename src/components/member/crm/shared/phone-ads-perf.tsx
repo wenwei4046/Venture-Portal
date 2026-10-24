@@ -54,7 +54,7 @@ const KEPT = "crm-ads-meta-v1";
 function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, T>)[k]; } catch { return undefined; } }
 function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
 
-export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean;
+export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string; hidden?: boolean }>; now: Date; live: boolean; manage: boolean; hide?: (ad: string, on: boolean) => void;
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
   // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
@@ -62,9 +62,13 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
   const ads = useMemo(() => {
     const ids = new Set<string>(); p.customers.forEach(c => { if (c.adId) ids.add(c.adId); });
-    return [...ids].map(id => { const cs = p.customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs }; });
+    return [...ids].map(id => { const cs = p.customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs, hidden: !!p.adNames[id]?.hidden,
+      // The ad itself: the link Meta sent with its leads, else Ads Manager (the owner, 2026-10-24: "加個按鈕可以導入去看那隻廣告").
+      url: [...cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${id}` }; });
   }, [p.customers, p.adNames]);
-  const ids = ads.map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
+  // A hidden ad (crm_hide_ad) is left out of the list and the totals; "Hidden ads" brings them back to see or show again.
+  const [showHid, setShowHid] = useState(false), hidN = ads.filter(a => a.hidden).length, hidIds = new Set(ads.filter(a => a.hidden).map(a => a.id));
+  const ids = ads.filter(a => !a.hidden).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
   // Meta's figures, read on the server (CRM · Manage); none on the demo.
   // Drawn from the phone's last answer from the first frame — after the app was closed too — then read again (the owner, 2026-10-24).
   const idKey = [...ids].sort().join(","), kA = `f|${si}|${ui}`, kD = `d|${si}|${ui}`, kB = `f|${sb}|${ub}`; // by dates only: the answers are by ad, so a new ad keeps the rest on screen
@@ -83,10 +87,10 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
 
   const figsOf = (cs: CrmCustomer[], rr: Range, metaIds: string[], fig: Record<string, MetaFig | null>) => { const c = crmFigs(cs, p.visits, rr); return { ...c, ...metaFigures(metaIds.map(i => fig[i]), c) }; };
-  const all = p.customers.filter(c => c.adId);
+  const all = p.customers.filter(c => c.adId && !hidIds.has(c.adId));
   const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
-  const rows = ads.map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
+  const rows = ads.filter(a => showHid || !a.hidden).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => a.hidden || (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
   // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
   const change = (k: string, a: number | null | undefined, b: number | null | undefined) => {
     if (!cmp || a == null || b == null) return null;
@@ -138,7 +142,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         <span style={{ fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500 }}>By ad <span style={{ fontFamily: "Inter, sans-serif", fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)" }}>{rows.length}</span></span>
         {!rows.length && <span style={{ padding: "12px 0", fontSize: fs(13), color: "var(--crm-faint)" }}>No leads from an ad in this period.</span>}
         {rows.map(a => { const on = openAd === a.id; return (
-          <button key={a.id} type="button" onClick={() => setOpenAd(on ? null : a.id)} style={{ ...BTN, ...card, padding: "10px 12px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left" }}>
+          <div key={a.id} role="button" tabIndex={0} onClick={() => setOpenAd(on ? null : a.id)} style={{ ...BTN, ...card, padding: "10px 12px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left", opacity: a.hidden ? 0.6 : 1 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: on ? "normal" : "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
               <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: on ? "rotate(180deg)" : "none", transition: "transform 160ms" }}><Ic name="chevron-down" size={13} /></span>
@@ -153,7 +157,12 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
             {on && <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", paddingTop: "8px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: fs(12), color: "var(--crm-muted)" }}>
               {["leads", "appt", "showup", "won", "spend", "cpl"].filter(k => !keys.includes(k)).map(k => <span key={k} style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}><span>{label(k)}</span><b style={{ fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{show(k, a.f[k])}</b></span>)}
             </span>}
-          </button>); })}
+            {on && <span style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <a href={a.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 14px", borderRadius: "16px", background: "var(--crm-ink)", color: "#fff", fontSize: fs(12.5), fontWeight: 600, textDecoration: "none" }}><Ic name="arrow-up-right" size={13} />View ad</a>
+              {p.hide && <button type="button" onClick={e => { e.stopPropagation(); p.hide!(a.id, !a.hidden); setOpenAd(null); }} style={{ ...BTN, height: "32px", padding: "0 14px", borderRadius: "16px", border: "1px solid var(--crm-line)", fontSize: fs(12.5), fontWeight: 600, color: a.hidden ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>{a.hidden ? "Show in list again" : "Hide from list"}</button>}
+            </span>}
+          </div>); })}
+        {hidN > 0 && <button type="button" onClick={() => setShowHid(x => !x)} style={{ ...BTN, alignSelf: "flex-start", padding: "4px 0", fontSize: fs(12.5), fontWeight: 500, color: "var(--crm-muted)" }}>{showHid ? "Hide hidden ads" : `Hidden ads (${hidN}) · show`}</button>}
       </div>
       {!p.live && <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>Spend and costs come from Ads Manager on the live CRM.</span>}
 
