@@ -209,7 +209,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 152. **The first board** (⑦-3). With the chat every tile of the prototype is here, so a first board is its DEFAULT_POS exactly — the chat at the right three rows high, the trophies under the room, the lobby and This week at the foot; a saved board gets the chat once, under the rest.
 153. **Who opens a chat** (⑦-3b). Answer 35, amended: a login on its owner's active People record whose title's template is full-access — the Principal's kind, or one ticking Manage permissions, as Invite user and a login's email call it — and who manages permissions now (somebody lowered on it does not). On 2026-10-24: the CEO, the Director, the Executive and the Personal Assistant. The shared Principal login is on nobody's record: never — View as included (the database asks the login); the page is closed while viewing as a person.
 154. **The reason first** (⑦-3b). Ten characters at least (*Complaint* alone is not a reason), 500 at most, one line. The two are picked from the roster's with a login and anybody in a direct chat (somebody who has left since) — never oneself: one's own chats are on My Space.
-155. **The record** (⑦-3b). Who opened it (their People name then, their record and login), which two (their names then), why, when. It is itself the log: never changed or deleted, not copied into the audit log, read by the full-access logins alone — whether the two are told is question 41.
+155. **The record** (⑦-3b). Who opened it (their People name then, their record and login), which two (their names then), why, when. It is itself the log: never changed or deleted, not copied into the audit log, read by the full-access logins alone; the two are not told (question 41, answered).
 156. **An hour to read on** (⑦-3b). The newest fifty come with the record; older ones fifty at a time under that record, by the same login, for an hour — then it is opened again, with its reason. No read mark moves, nobody is told, and the chat itself stays closed to them: a record is the only way in.
 157. **Where it is reached** (⑦-3b). The chat tile's *🔍 Review*, shown only to those who may; not in the sidebar, as nobody else may. The page sits on My Space's tab.
 
@@ -305,6 +305,6 @@ Every question of §5 has its answer here; what is built from each says so in `.
 | 39 | No sound or push for a direct message yet — an unread dot. |
 | 40 | The avatar is My Space's own. |
 
-## 7. Questions after the answers (2026-10-24)
+## 7. Questions after the answers (2026-10-24 — asked and answered the same day)
 
-41. A chat opened on a complaint (⑦-3b): are the two people told — that it was opened, by whom, why — and does anybody besides the full-access logins read the records (HR, say)? Built: nobody is told; the records are the full-access logins' alone. No suggestion: it decides the company's own oversight.
+41. A chat opened on a complaint (⑦-3b): are the two people told — that it was opened, by whom, why — and does anybody besides the full-access logins read the records (HR, say)? No suggestion: it decides the company's own oversight. **Answered 2026-10-24: not told; the records are the full-access logins' alone** — as built.
