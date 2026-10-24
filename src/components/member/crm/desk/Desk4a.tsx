@@ -265,7 +265,6 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "baseline", paddingBottom: "12px" }}>
           <div style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>Team performance</div>
-          <div style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Click a team to see its people</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: T_COLS, padding: "8px 0", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)", borderBottom: "1px solid var(--crm-rule)" }}>
           <div>Team</div><div style={{ textAlign: "right" }}>Leads</div><div style={{ paddingLeft: "24px" }}>Appt rate</div><div style={{ textAlign: "right" }}>Show-up</div><div style={{ textAlign: "right" }}>Won</div><div style={{ textAlign: "right" }}>Lost</div>

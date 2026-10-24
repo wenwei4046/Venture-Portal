@@ -60,6 +60,8 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
 
   return {
     stop, stopTeam: stop,
+    // Auto-reply one page at a time, Save to keep it (shared/auto-reply-pages.tsx; the owner, 2026-10-24).
+    ar12: { ar: AR, readOnly: viewingOther, who: firstName(owner.name), upload: act.uploadAutoReplyImage, save: (s: CrmAutoReplySet) => { act.saveAutoReplies(s); act.toast("Auto-reply saved"); } },
     profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
     meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
     // v3 M12: the main page — the avatar centred, its line, MESSAGES (Notifications, Auto-reply, Quick replies).

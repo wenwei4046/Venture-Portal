@@ -32,14 +32,6 @@ const LOWER_IS_BETTER = /^(cpl|cpappt|cpwon|cpmsg|cpc|cpm|cpr|cpp|cpcall|spend)$
 
 type Range = { a: number; b: number };
 const day0 = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-function rangeOf(k: string, now: Date, custom?: Range | null): Range {
-  if (k === "custom" && custom) return custom;
-  const T = day0(now.getTime());
-  if (k === "today") return { a: T, b: T };
-  if (k === "week") return { a: T - ((now.getDay() + 6) % 7) * DAY, b: T };
-  if (k === "lastm") return { a: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), b: new Date(now.getFullYear(), now.getMonth(), 0).getTime() };
-  return { a: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), b: T };
-}
 const before = (r: Range): Range => { const n = Math.round((r.b - r.a) / DAY) + 1; return { a: r.a - n * DAY, b: r.a - DAY }; };
 const short = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" }).replace("Sept", "Sep");
 
@@ -57,11 +49,16 @@ const show = (k: string, v: number | null | undefined) => { const f = chartFmtOf
 const SHORT: Record<string, string> = { apptrate: "Appt rate", showrate: "Show-up rate", winrate: "Won rate", appt: "Appts", showup: "Showed up", spend: "Spend", cpl: "Per lead", cpappt: "Per appt", msgconv: "Chats started", cpmsg: "Per chat", impr: "Impressions", clicks: "Link clicks", ctr: "CTR", cpc: "CPC", cpm: "CPM" };
 const label = (k: string) => SHORT[k] ?? defOf(k)?.[1] ?? k;
 
-export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean }; head?: ReactNode }) {
-  const [per, setPer] = useState("month"), [cmp, setCmp] = useState(true), [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
-  const [custom, setCustom] = useState<Range | null>(null), [cal, setCal] = useState(false);
-  const r = rangeOf(per, p.now, custom), rb = before(r);
-  const tOf = (v: string) => { const [y, m, d] = v.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
+/** Meta's last answers on this phone, by ads and dates: shown at once, read again behind them. */
+const KEPT = "crm-ads-meta-v1";
+function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, T>)[k]; } catch { return undefined; } }
+function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
+
+export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string }>; now: Date; live: boolean; manage: boolean;
+  range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
+  const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
+  // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
+  const r = p.range, rb = p.cmp ?? before(r);
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
   const ads = useMemo(() => {
     const ids = new Set<string>(); p.customers.forEach(c => { if (c.adId) ids.add(c.adId); });
@@ -69,14 +66,18 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [p.customers, p.adNames]);
   const ids = ads.map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
   // Meta's figures, read on the server (CRM · Manage); none on the demo.
-  const [figA, setFigA] = useState<Record<string, MetaFig | null>>({}), [figB, setFigB] = useState<Record<string, MetaFig | null>>({}), [daily, setDaily] = useState<Record<string, Record<string, MetaFig> | null>>({});
-  const wantMeta = p.live && p.manage && keys.some(k => META.has(k)) && ids.length > 0, idKey = ids.join(",");
+  // Drawn from the phone's last answer from the first frame — after the app was closed too — then read again (the owner, 2026-10-24).
+  const idKey = [...ids].sort().join(","), kA = `f|${si}|${ui}`, kD = `d|${si}|${ui}`, kB = `f|${sb}|${ub}`; // by dates only: the answers are by ad, so a new ad keeps the rest on screen
+  const [figA, setFigA] = useState<Record<string, MetaFig | null>>(() => keptGet(kA) ?? {}), [figB, setFigB] = useState<Record<string, MetaFig | null>>(() => keptGet(kB) ?? {}), [daily, setDaily] = useState<Record<string, Record<string, MetaFig> | null>>(() => keptGet(kD) ?? {});
+  const wantMeta = p.live && p.manage && keys.some(k => META.has(k)) && ids.length > 0;
   useEffect(() => {
     if (!wantMeta) return;
     let on = true;
-    void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) setFigA(x.figs); });
-    void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) setDaily(x.days); });
-    if (cmp) void fetchAdInsights(ids, sb, ub).then(x => { if (on && x.ok) setFigB(x.figs); });
+    const a0 = keptGet<Record<string, MetaFig | null>>(kA), d0 = keptGet<Record<string, Record<string, MetaFig> | null>>(kD), b0 = keptGet<Record<string, MetaFig | null>>(kB);
+    if (a0) setFigA(a0); if (d0) setDaily(d0); if (b0) setFigB(b0);
+    void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) { setFigA(x.figs); keptSet(kA, x.figs); } });
+    void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) { setDaily(x.days); keptSet(kD, x.days); } });
+    if (cmp) void fetchAdInsights(ids, sb, ub).then(x => { if (on && x.ok) { setFigB(x.figs); keptSet(kB, x.figs); } });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
@@ -85,13 +86,15 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const all = p.customers.filter(c => c.adId);
   const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
-  const rows = ads.map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA) })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
-  const delta = (k: string) => {
-    const a = tot[k], b = totB[k]; if (!cmp || a == null || b == null) return null;
-    if (b === 0) return a === 0 ? { t: "±0", good: true } : null;
+  const rows = ads.map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
+  // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
+  const change = (k: string, a: number | null | undefined, b: number | null | undefined) => {
+    if (!cmp || a == null || b == null) return null;
+    if (b === 0) return a === 0 ? { t: "±0", good: true } : { t: "New", good: !LOWER_IS_BETTER.test(k) };
     const d = ((a - b) / Math.abs(b)) * 100, good = LOWER_IS_BETTER.test(k) ? d <= 0 : d >= 0;
     return { t: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(Math.round(d))}%`, good };
   };
+  const delta = (k: string) => change(k, tot[k], totB[k]);
   const chip = (on: boolean): CSSProperties => ({ ...BTN, flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", fontSize: fs(12.5), fontWeight: 500, background: on ? "var(--crm-rust)" : "var(--crm-field)", color: on ? "#fff" : "var(--crm-ink)" });
   const card: CSSProperties = { borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)" };
 
@@ -101,20 +104,15 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
       {/* The period, and "vs the period before" */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {([["today", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => { setPer(k); setCal(false); }} style={chip(per === k)}>{l}</button>)}
-          {/* Dates of one's own, and the comparison, as icons (the owner, 2026-10-24: "做comparison功能，用图标代替即可"). */}
+          {p.chips.map(c => <button key={c.label} type="button" onClick={c.pick} style={chip(c.on)}>{c.label}</button>)}
           <span style={{ marginLeft: "auto" }} />
-          <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={per === "custom"} onClick={() => { setCal(!cal); if (!custom) setCustom(rangeOf("month", p.now)); }} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: per === "custom" ? "var(--crm-ink)" : "#fff", color: per === "custom" ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
-          <button type="button" aria-label="Compare with the period before" title="Compare with the period before" aria-pressed={cmp} onClick={() => setCmp(!cmp)} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: cmp ? "var(--crm-ink)" : "#fff", color: cmp ? "#fff" : "var(--crm-ink)" }}><Ic name="trending-up" size={14} /></button>
+          {/* One button: its sheet has Period and Compare to (the owner, 2026-10-24, of a second compare button: "刪掉右邊的"). */}
+          <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={p.custom} onClick={p.openDates} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: p.custom ? "var(--crm-ink)" : "#fff", color: p.custom ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
         </div>
-        {cal && custom && <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <input type="date" aria-label="From" value={isoOf(custom.a)} max={isoOf(custom.b)} onChange={e => { if (e.target.value) { setCustom({ ...custom, a: tOf(e.target.value) }); setPer("custom"); } }} style={{ flex: 1, minWidth: 0, height: "34px", padding: "0 8px", border: "1px solid var(--crm-line)", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)" }} />
-          <span style={{ color: "var(--crm-faint)" }}>–</span>
-          <input type="date" aria-label="To" value={isoOf(custom.b)} min={isoOf(custom.a)} onChange={e => { if (e.target.value) { setCustom({ ...custom, b: tOf(e.target.value) }); setPer("custom"); } }} style={{ flex: 1, minWidth: 0, height: "34px", padding: "0 8px", border: "1px solid var(--crm-line)", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)" }} />
-        </div>}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>
-          {cmp && <span style={{ marginLeft: "auto" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}</span>}
+          {cmp && <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "6px" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
+            <button type="button" aria-label="Stop comparing" onClick={p.clearCompare} style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button></span>}
         </div>
       </div>
 
@@ -149,6 +147,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
               {keys.map((k, i) => <span key={k} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
                 <span style={{ fontSize: fs(10.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: COLORS[i], marginRight: "4px" }} />{label(k)}</span>
                 <span style={{ fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{show(k, a.f[k])}</span>
+                {cmp && (() => { const c = change(k, a.f[k], a.fb?.[k]); return <span style={{ fontSize: fs(10.5), fontWeight: 500, whiteSpace: "nowrap", color: c ? (c.good ? "var(--crm-today)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{c ? c.t : "—"}</span>; })()}
               </span>)}
             </span>
             {on && <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", paddingTop: "8px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: fs(12), color: "var(--crm-muted)" }}>

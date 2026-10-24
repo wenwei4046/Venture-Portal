@@ -30,14 +30,24 @@ export function afterHours(at: Date, from?: string, to?: string): boolean {
   return f < t ? now < f || now >= t : now < f && now >= t
 }
 
-/** The replies one customer message triggers, in the order they go: welcome, after hours, keywords. */
+/** Inside an away period: from and to are the office's (UTC+8) date and time, "2026-12-24T18:00". */
+export function inAway(at: Date, from?: string, to?: string): boolean {
+  const t = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? Date.parse(`${s}:00+08:00`) : NaN);
+  const a = t(from), b = t(to), x = at.getTime();
+  return !Number.isNaN(a) && !Number.isNaN(b) && x >= a && x < b;
+}
+
+/** The replies one customer message triggers, in the order they go: welcome, away (else after hours), keywords. */
 export function autoReplyTexts(settings: Partial<CrmAutoReplySet> | null | undefined, msg: { body: string; sentAt: string; first: boolean }): string[] {
   if (!settings) return []
   const out: string[] = []
   const add = (t: string | undefined) => { const s = (t ?? '').trim(); if (s && !out.includes(s)) out.push(s) }
   if (settings.welcome?.on && msg.first) add(settings.welcome.text)
   const at = new Date(msg.sentAt)
-  if (settings.after?.on && !Number.isNaN(at.getTime()) && afterHours(at, settings.after.from, settings.after.to)) add(settings.after.text)
+  // Away (holiday) takes the place of the after-hours reply while it lasts.
+  const away = !!settings.away?.on && !Number.isNaN(at.getTime()) && inAway(at, settings.away.from, settings.away.to)
+  if (away) add(settings.away!.text)
+  else if (settings.after?.on && !Number.isNaN(at.getTime()) && afterHours(at, settings.after.from, settings.after.to)) add(settings.after.text)
   const text = (msg.body ?? '').toLowerCase()
   if (text) for (const k of settings.kws ?? []) {
     if (!k?.on) continue

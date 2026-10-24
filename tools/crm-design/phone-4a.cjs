@@ -208,6 +208,9 @@ function sales(name, body) {
   if (name === "SalesChat") body = chat(body, "v.cl");
   if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
+  // Auto-reply: one page at a time with Save (the owner, 2026-10-24: "auto reply 做成分頁式 … 記得要有save").
+  if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profAuto) && (<>"), e = body.indexOf("\n      </>)}", a); if (a < 0 || e < 0) throw new Error("phone-4a: auto-reply page");
+    body = body.slice(0, a) + "{!!(v.profAuto) && (<Phone4aAutoReply a={v.ar12} />)}" + body.slice(e + "\n      </>)}".length); }
   // v3 M12 (the owner, 2026-10-23: "要" — Mine's Profile as the prototype too): the main page is Phone4aProfile.
   if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profMain) && (<>"), b = body.indexOf("{!!(v.teamOpen) && (<>", a); if (a < 0 || b < 0) throw new Error("phone-4a: mine profile main");
     body = body.slice(0, a) + "{!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}\n      " + body.slice(b); }
@@ -269,7 +272,8 @@ function teamInsight(body) {
   const [, ce] = el(body.slice(chev, chev + 600), '<svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16"', "svg", "team period chevron");
   body = body.slice(0, chev + ce) + `<span onClick={e => { e.stopPropagation(); v.ov.cmpPick(); }} style={{ flex: "none", height: "32px", padding: "0 12px", borderRadius: "16px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: "${F(13)}", fontWeight: "500", cursor: "pointer" }}>{v.ov.vsLabel}</span>` + body.slice(chev + ce);
   body = swap(body, '<div style={{ flex: "none", padding: "24px 22px", borderRadius: "26px", background: "linear-gradient(150deg, var(--crm-orange) 0%, var(--crm-orange) 45%, var(--crm-rust) 100%)"', "div", "<Phone4aHero items={v.ov.hero4} cols={2} compact />", "team hero");
-  body = once(body, "{!!(v.ov.cmpOn) && (<>", "{!!(v.ov.cmpOn && v.ov.cmpHas) && (<>", "team comparison");
+  // The owner, 2026-10-24, crossing the Comparison card out: the hero and "vs …" carry the comparison; no card under it.
+  body = once(body, "{!!(v.ov.cmpOn) && (<>", "{false && (<>", "team comparison");
   body = once(body, '<h2 style={{ flex: "none", margin: "4px 4px -10px", fontSize: "calc(20px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em" }}>Team performance</h2>',
     `<div style={{ flex: "none", display: "flex", alignItems: "baseline", gap: "10px", margin: "4px 0 -14px" }}><h2 style={{ flex: "1", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(19)}", fontWeight: "500", letterSpacing: "-0.01em" }}>Team performance</h2></div>`, "team perf title");
   body = once(body, '<section style={{ flex: "none", padding: "20px 18px 16px", borderRadius: "22px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", display: "flex", flexDirection: "column", gap: "6px" }}>',
