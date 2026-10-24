@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261025040000 (2026-10-24 — Marketing ⑦-3b: a direct message opened on a complaint;
+// Local PostgreSQL regression for 20261025039500 (2026-10-24 — Marketing ⑦-3b: a direct message opened on a complaint;
 // the user's answer 35, amended: only a personal account holding the full-access template opens one, a reason typed
 // first, the record naming that person — never the shared Principal login). Marketing's migrations up to the chat run;
 // then this one, twice. What is under test: who may call what (and that nothing changes or deletes a record); who may
@@ -173,7 +173,7 @@ const MIGS = ['20261023214100_marketing_core.sql', '20261023234000_marketing_tas
   '20261025037000_marketing_pet_levels.sql', '20261025038000_marketing_lobby_visit.sql', '20261025039000_marketing_chat.sql']
 for (const m of MIGS) await db.exec(await sql(m))
 
-const mig = await sql('20261025040000_marketing_chat_review.sql')
+const mig = await sql('20261025039500_marketing_chat_review.sql')
 await asSystem()
 await db.exec(mig)
 await db.exec(mig) // twice: nothing changes, nothing breaks

@@ -143,7 +143,7 @@ export async function readChatList(): Promise<ChatList> {
   return chatListFromRow(data)
 }
 
-/** Chat review (⑦-3b, mig 20261025040000): the people whose chat may be opened and every record — a full-access title's
+/** Chat review (⑦-3b, mig 20261025039500): the people whose chat may be opened and every record — a full-access title's
  * own login only. Null for anybody else (the page is not theirs). */
 export async function readChatReviewLog(): Promise<ChatReviewLog | null> {
   const db = await client()

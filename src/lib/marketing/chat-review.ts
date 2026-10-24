@@ -1,4 +1,4 @@
-// A direct message opened on a complaint (⑦-3b, mig 20261025040000; the user's answer 35, amended): only somebody's own
+// A direct message opened on a complaint (⑦-3b, mig 20261025039500; the user's answer 35, amended): only somebody's own
 // login whose title is full-access — never the shared Principal login — opens one, the two people and a reason first.
 // Every opening is a record: who, which two, why, when; kept for good, read by those who may open one. Pure: the page
 // draws what this returns.
