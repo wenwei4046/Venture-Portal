@@ -3,6 +3,7 @@
  * frame around it, and the screen's own state — what is open, drafted, filtered — which the prototype keeps in one
  * object (CrmFrame.dc.html's this.state) and so does this.
  */
+import type { CustomFields } from "../../shared/custom-book";
 import type { Dispatch, SetStateAction } from "react";
 import type { MetaAdRow, MetaFig } from "@/lib/member/crm-ad-names-meta";
 import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
@@ -151,7 +152,8 @@ export interface DeskUi {
   ntfTab: "all" | "unread" | "read"; ntfCat: string; ntfSel: boolean; ntfPick: Record<string, boolean>;
   // Screens the design does not draw (BUILD-NOTES.md)
   /** Appointment: showroom, day, time and the 7-day page; as RS's sheet also Week | Month and the month chooser (2026-10-13). */
-  book: { room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } | null;
+  /** Showroom (room, day, slot) or online / elsewhere (shared/custom-book.tsx, 2026-10-24). */
+  book: ({ room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } & CustomFields) | null;
   // ── v2 (CrmFrame v2.dc.html): every column, pane and editor is dragged to size, double-click gives it back.
   ibListW: number | null; ibInfoW: number | null; ibCpW: number | null; ibCp: boolean | null;
   paneW: number | null; sheetW: number | null; menuW: number | null; perfW: number | null; mwtLogW: number | null; auditW: number | null;
