@@ -4,7 +4,6 @@ import {
   allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, leadsPeople, periodRange, withoutTeam, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
   memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   dealEnquiry, afterDeal, officeWeekday, type CrmAssignConfig, type CrmDealCounts, type CrmDealFullTime, type CrmDealRule, type CrmMember,
-  countedLeads, dealCounts, officeMonthStart, type CrmDealAd, type CrmDealLead,
 } from "./crm-team";
 
 // Boss → HOD → (Senior TL vacant) → TL A / TL B → TA → RS
@@ -392,48 +391,5 @@ describe("the dealer, rev 1011 (twin of crm_assign_contact)", () => {
     expect(deal(4, "AD-FT2", { mode: "split", split: { tla: 50, tlb: 50 }, people: {} }, other).out.map(d => d.teamId).sort()).toEqual(["tla", "tla", "tlb", "tlb"]);
     // None of the ad's teams full time that day: as any other day (a lead never stalls).
     expect(deal(1, "AD-FT3", { mode: "split", split: { tlb: 100 }, people: {} }, ft).out[0].teamId).toBe("tlb");
-  });
-});
-
-// "Save and apply to all" means calculate together (2026-10-24, mig 20261025121500) — the same cases as
-// tests/member-sql/validate-crm-ads-together.mjs.
-describe("ads counted together (twin of crm_campaign_given)", () => {
-  const rule: CrmDealRule = { mode: "split", split: { tla: 50, tlb: 50 }, people: {}, teamModes: { tla: "even", tlb: "even" } };
-  const now = new Date(Date.UTC(2026, 9, 20, 3)); // Tue 20 Oct 2026, 11:00 in Kuala Lumpur
-  const start = new Date(Date.UTC(2026, 9, 19));
-  /** Leads one after another, each dealt on the leads before it. */
-  const dealAll = (ads: Record<string, CrmDealAd>, order: string[]) => {
-    const leads: CrmDealLead[] = [];
-    for (const [k, ad] of order.entries()) {
-      const at = new Date(now.getTime() + k * 60_000);
-      const d = dealEnquiry(ad, at, rule, {}, dealCounts(ad, ads[ad].startedAt, ads, leads, at), members);
-      leads.push({ ad, at, teamId: d.teamId, memberId: d.memberId, held: d.held });
-    }
-    return leads.map(l => [l.teamId, l.memberId]);
-  };
-
-  it("apart, each ad starts again: a fresh ad's first lead goes the same way every time", () => {
-    expect(dealAll({ X: { startedAt: start }, Y: { startedAt: start } }, ["X", "Y"])).toEqual([["tla", "a1"], ["tla", "a1"]]);
-  });
-
-  it("together, the next lead of any of them goes by all of their leads — Team B's turn on the other ad, a2 after a1", () => {
-    expect(dealAll({ X: { startedAt: start, together: true }, Y: { startedAt: start, together: true } }, ["X", "Y", "Y", "X"]))
-      .toEqual([["tla", "a1"], ["tlb", "b1"], ["tla", "a2"], ["tlb", "tab"]]);
-  });
-
-  it("counts a together ad's leads this month only, each from its own rule's start; an ad apart only its own", () => {
-    const ads = { X: { startedAt: new Date(Date.UTC(2026, 8, 1)), together: true }, Y: { startedAt: new Date(Date.UTC(2026, 9, 10)), together: true }, Z: { startedAt: start } };
-    const lead = (ad: string, at: Date): CrmDealLead => ({ ad, at, teamId: "tla", memberId: "a1" });
-    const leads = [lead("X", new Date(Date.UTC(2026, 8, 25))), lead("X", new Date(Date.UTC(2026, 9, 5))), lead("Y", new Date(Date.UTC(2026, 9, 5))),
-      lead("Y", new Date(Date.UTC(2026, 9, 12))), lead("Z", new Date(Date.UTC(2026, 9, 19, 1)))];
-    // September's lead is out (the count starts again on the 1st); Y's before its own start is out.
-    expect(countedLeads("X", start, ads, leads, now).map(l => l.at.getUTCDate())).toEqual([5, 12]);
-    expect(countedLeads("Z", start, ads, leads, now).map(l => l.ad)).toEqual(["Z"]);
-    expect(dealCounts("X", start, ads, leads, now).given).toEqual({ a1: 2 });
-  });
-
-  it("the office's month: 00:30 on 1 Nov in Kuala Lumpur is already November", () => {
-    expect(officeMonthStart(new Date(Date.UTC(2026, 9, 31, 16, 30))).toISOString()).toBe("2026-10-31T16:00:00.000Z");
-    expect(officeMonthStart(new Date(Date.UTC(2026, 9, 31, 15, 30))).toISOString()).toBe("2026-09-30T16:00:00.000Z");
   });
 });

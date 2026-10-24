@@ -229,19 +229,15 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const why = !is100(tot) ? "The teams add up to " + pctShow(tot) + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
     aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
-      // Saved on its own with anything changed, an ad leaves the ads counted together (2026-10-24); the toast says so.
-      const was = !!data.adRules.find(r => r.adId === E.id)?.together;
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
-        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (was && !ok.together ? " · counted on its own" : "") + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
+        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
       });
     } : undefined };
   }
 
-  // Round 2 (rev 1011 §8): "Save and apply to all" — this ad's whole setting (the split, every team's inside mode and
-  // values) on EVERY ad, each keeping its own name. Since 2026-10-24 it means calculate together (the owner: "它的意思就是
-  // calculate together … 而不是只是抄他的 split 方案"): one crm_save_ads_together, which also takes in every ad already
-  // together, and the next lead of any of them goes by all of their leads this month; Save keeps an ad apart. Off while the
-  // draft is not valid (the Save rule). An ad left on the default is saved to none.
+  // Round 2 (rev 1011 §8): "Save and apply to all N ads" — this ad's whole setting (the split, every team's inside mode
+  // and values) saved to EVERY ad, each keeping its own name and taken counts; one crm_save_ad_assign per ad, each dealing
+  // its own waiting leads. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
   const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined };
   if (E && asv?.ae) {
     const mp = new Map<string, string>();
@@ -251,12 +247,11 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const all = [...mp], okAll = isSp ? !!byTeamRule : !!asv.ae.save;
     const ruleFor = (): CrmRuleIn | null => isSp ? byTeamRule : E.mode === "unset" ? null : { mode: "even", split: { ...E.split }, pm: E.pm, pp: { ...E.pp } };
     Object.assign(aeApply, {
-      applyLabel: "Save and apply to all", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
+      applyLabel: "Save and apply to all " + all.length + " ads", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
       applyAll: okAll ? () => void (async () => {
         const r = ruleFor();
-        if (!r || !r.mode) { patch({ adEd: null, bp: null }); return; }
-        const done = await act.saveAdsTogether(all.map(([id, label]) => ({ id, label })), { ...r, mode: r.mode });
-        if (done) patch({ adEd: null, bp: null, toast: "Applied to all " + done.saved + " ads · counted together" + (done.dealt ? " · " + done.dealt + " waiting lead" + (done.dealt === 1 ? "" : "s") + " dealt" : "") });
+        if (r) for (const [id, label] of all) if (!(await act.saveAdRule(id, label, r))) return;
+        patch({ adEd: null, bp: null, toast: "Applied to all " + all.length + " ads · fine-tune any ad on its own" });
       })() : undefined,
     });
   }
