@@ -70,7 +70,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     const card = m.card, cd = card ? new Date(card.start) : null;
     const appt: ApptCard | null = card && cd && !hide ? {
       dow: cd.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase(), day: String(cd.getDate()), mon: cd.toLocaleDateString("en-GB", { month: "short" }).replace("Sept", "Sep").toUpperCase(),
-      time: time(card.start).toUpperCase(), place: card.room, addr: card.addr, sent: time(m.at), kind: card.kind.toUpperCase(), deco: card.kind === "Cancelled" ? "line-through" : "none",
+      time: time(card.start).toUpperCase(), place: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr, sent: time(m.at), kind: card.kind.toUpperCase(), deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
     } : null;
     const preview = m.text || mediaWord(m);

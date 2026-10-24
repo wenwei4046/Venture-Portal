@@ -9,6 +9,7 @@ import {
   crmWrite, fetchCrmTemplates, reactToMessage, forwardCrmMessage, sendCrmMedia, sendCrmMessage, sendCrmTemplate, type CrmWrite,
 } from "@/app/(member)/member/crm-actions";
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
+import { virtualRoom } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
@@ -37,6 +38,9 @@ export interface SalesActions {
   saveDetails(customerId: string, f: { name: string; phone: string; type: string; size: string; loc: string; req: string; budget: string; extra?: Record<string, string | null> }): Promise<boolean>;
   book(customerId: string, roomId: string, start: string): Promise<boolean>;
   moveVisit(visitId: string, roomId: string, start: string): Promise<boolean>;
+  /** An appointment online or elsewhere (the owner, 2026-10-24): booked, or a visit changed to one. */
+  bookCustom(customerId: string, f: CustomVisit): Promise<boolean>;
+  moveCustom(visitId: string, f: CustomVisit): Promise<boolean>;
   cancelVisit(visitId: string): Promise<boolean>;
   outcome(visitId: string, came: boolean, outcome: "follow_up" | "won" | "lost" | "rebooked", extra?: { amount?: number; reason?: string; note?: string }): Promise<boolean>;
   remind(visitId: string): Promise<boolean>;
@@ -73,16 +77,25 @@ interface Deps {
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 /** The words a visit card sends the customer (the chat draws them as the card), with the way there. */
+/** An appointment online or somewhere else: its kind, start (ISO), meeting link, place and the salesperson's remarks. */
+export interface CustomVisit { kind: "online" | "other"; start: string; link?: string; place?: string; remarks?: string }
+
+/** A visit's card: its room's name and address, and an online / elsewhere one's kind and link. */
+export function visitCard(kind: CrmCard["kind"], v: Pick<CrmVisit, "start" | "kind" | "link">, rm: { name: string; address: string } | undefined): CrmCard {
+  return { kind, start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "", ...(v.kind ? { mode: v.kind } : {}), ...(v.link ? { link: v.link } : {}) };
+}
+
 export function cardText(card: CrmCard): string {
   return withMapLinks(cardWords(card), card);
 }
 function cardWords(card: CrmCard): string {
   const d = new Date(card.start), when = `${dayLabel(d)}, ${timeLabel(d)}`;
-  const where = card.addr ? `${card.room}\n${card.addr}` : card.room;
-  return card.kind === "Cancelled" ? `Your showroom visit on ${when} at ${card.room} is cancelled. Reply here to book another time.`
-    : card.kind === "Reminder" ? `Reminder: your showroom visit is on ${when}.\n${where}`
-      : card.kind === "Updated" ? `Your showroom visit is changed to ${when}.\n${where}`
-        : `Your showroom visit is confirmed for ${when}.\n${where}`;
+  const what = card.mode === "online" ? "online meeting" : card.mode === "other" ? "appointment" : "showroom visit";
+  const where = card.mode === "online" ? (card.link ? `Online meeting\n${card.link}` : "Online meeting") : card.addr && card.addr !== card.room ? `${card.room}\n${card.addr}` : card.room;
+  return card.kind === "Cancelled" ? `Your ${what} on ${when}${card.mode === "online" ? "" : ` at ${card.room}`} is cancelled. Reply here to book another time.`
+    : card.kind === "Reminder" ? `Reminder: your ${what} is on ${when}.\n${where}`
+      : card.kind === "Updated" ? `Your ${what} is changed to ${when}.\n${where}`
+        : `Your ${what} is confirmed for ${when}.\n${where}`;
 }
 
 export function makeSalesActions({ live, me, data, setData, toast }: Deps): SalesActions {
@@ -221,10 +234,32 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       await sendCard(customerId, { kind: "Confirmed", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
       return true;
     },
+    async bookCustom(customerId, f) {
+      const r = await write("crm_book_custom", { p_contact: customerId, p_kind: f.kind, p_start: f.start, p_link: f.link ?? null, p_place: f.place ?? null, p_remarks: f.remarks ?? null, p_minutes: 60 });
+      if (!r.ok) return false;
+      const saved = r.data as { id: string } | null;
+      const v: CrmVisit = { id: saved?.id ?? uid(), customerId, showroomId: "", start: f.start, minutes: 60, state: "booked", outcome: null, remindedAt: null,
+        kind: f.kind, ...(f.link?.trim() ? { link: f.link.trim() } : {}), ...(f.place?.trim() ? { place: f.place.trim() } : {}), ...(f.remarks?.trim() ? { remarks: f.remarks.trim() } : {}) };
+      const vr = virtualRoom(v);
+      setData(d => ({ ...d, visits: [...d.visits, { ...v, showroomId: vr.id }], rooms: [...d.rooms, vr] }));
+      patchCustomer(customerId, c => ({ ...c, status: "appointment", lost: undefined, previous: undefined }));
+      await sendCard(customerId, visitCard("Confirmed", v, vr));
+      return true;
+    },
+    async moveCustom(visitId, f) {
+      if (!(await write("crm_move_custom", { p_appointment: visitId, p_kind: f.kind, p_start: f.start, p_link: f.link ?? null, p_place: f.place ?? null, p_remarks: f.remarks ?? null })).ok) return false;
+      const old = visit(visitId);
+      if (!old) return true;
+      const v: CrmVisit = { ...old, start: f.start, kind: f.kind, link: f.kind === "online" && f.link?.trim() ? f.link.trim() : undefined, place: f.kind === "other" ? f.place?.trim() : undefined, remarks: f.remarks?.trim() || undefined };
+      const vr = virtualRoom(v);
+      setData(d => ({ ...d, visits: d.visits.map(x => (x.id === visitId ? { ...v, showroomId: vr.id } : x)), rooms: [...d.rooms.filter(r => r.id !== vr.id), vr] }));
+      await sendCard(old.customerId, visitCard("Updated", v, vr));
+      return true;
+    },
     async moveVisit(visitId, roomId, start) {
       if (!(await write("crm_move_appointment", { p_appointment: visitId, p_start: start, p_showroom: roomId })).ok) return false;
       const v = visit(visitId);
-      setVisit(visitId, x => ({ ...x, start, showroomId: roomId }));
+      setVisit(visitId, x => ({ ...x, start, showroomId: roomId, kind: undefined, link: undefined, place: undefined }));
       const rm = room(roomId);
       if (v) await sendCard(v.customerId, { kind: "Updated", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
       return true;
@@ -237,7 +272,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         const stillBooked = data().visits.some(x => x.customerId === v.customerId && x.id !== visitId && x.state === "booked");
         if (!stillBooked) patchCustomer(v.customerId, c => (c.status === "appointment" ? { ...c, status: "follow_up" } : c));
         const rm = room(v.showroomId);
-        await sendCard(v.customerId, { kind: "Cancelled", start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+        await sendCard(v.customerId, visitCard("Cancelled", v, rm));
       }
       return true;
     },
@@ -261,7 +296,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const rm = room(v.showroomId), c = data().customers.find(x => x.id === v.customerId);
       if (!c) return false;
       if (windowShut(c, new Date())) { toast(c.channel === "messenger" ? "Messenger's 7-day window is closed — call the customer." : "WhatsApp's 24-hour window is closed — send a template instead."); return false; }
-      await sendCard(v.customerId, { kind: "Reminder", start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+      await sendCard(v.customerId, visitCard("Reminder", v, rm));
       if (live) await crmWrite("crm_mark_reminded", { p_appointment: visitId }).catch(() => null);
       setVisit(visitId, x => ({ ...x, remindedAt: new Date().toISOString() }));
       return true;

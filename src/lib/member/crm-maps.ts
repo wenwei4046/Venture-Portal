@@ -55,9 +55,13 @@ export function visitCardText(card: CrmCard, bold: boolean): string {
   const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: OFFICE_TZ, ...o }).format(d);
   const date = `${part({ day: "numeric", month: "short", year: "numeric" }).replace("Sept", "Sep")} (${part({ weekday: "short" })})`;
   const time = new Intl.DateTimeFormat("en-MY", { timeZone: OFFICE_TZ, hour: "numeric", minute: "2-digit", hour12: true }).format(d).toLowerCase();
-  const lines = [b(HEAD[card.kind]), "", `🗓️ ${b("Date:")} ${date}`, `⏰ ${b("Time:")} ${time}`, `📍 ${b("Location:")} ${card.room}`];
+  // An appointment online or somewhere else (2026-10-24): its own heading; online carries the meeting link, elsewhere the place
+  // is the location (no address line repeating it).
+  const head = card.mode ? HEAD[card.kind].replace("showroom visit", card.mode === "online" ? "online meeting" : "appointment") : HEAD[card.kind];
+  const lines = [b(head), "", `🗓️ ${b("Date:")} ${date}`, `⏰ ${b("Time:")} ${time}`, `📍 ${b("Location:")} ${card.room}`];
   if (card.kind === "Cancelled") lines.push("", "Reply here to book another time.");
-  else if (card.addr.trim()) lines.push("", `🔸 ${b("Address:")} ${card.addr.trim()}`);
+  else if (card.mode === "online") { if (card.link?.trim()) lines.push("", `🔗 ${b("Meeting link:")} ${card.link.trim()}`); }
+  else if (card.addr.trim() && card.addr.trim() !== card.room.trim()) lines.push("", `🔸 ${b("Address:")} ${card.addr.trim()}`);
   return lines.join("\n");
 }
 

@@ -201,12 +201,27 @@ function notifs(body) {
   return body;
 }
 
+/**
+ * Book visit › Showroom · Online · Other (the owner, 2026-10-24: "有些客戶想要Online，有些想約在其他地方"): the mode above the
+ * sheet's showroom part, which shows only on Showroom; Online / Other draw shared/custom-book.tsx's form in its place.
+ * `p` is the sheet's view model ("v" / "v.ld.lx").
+ */
+function bookModes(body, p) {
+  const at = body.indexOf(`{!!(${p}.bookOpen) && (<>`);
+  if (at < 0) throw new Error("phone-4a: book sheet " + p);
+  const lbl = body.indexOf(">Showroom</span>", at), a = body.lastIndexOf("<div", lbl);
+  const rm = body.indexOf(`<Phone4aRoomRemarks text={${p}.bookRemarks} />`, at), z = body.indexOf("</span>", rm) + "</span>".length;
+  if (lbl < 0 || a < at || rm < 0 || z < rm) throw new Error("phone-4a: book sheet parts " + p);
+  return body.slice(0, a) + `<Phone4aBookMode m={${p}.bkm} />\n{!${p}.bkm || ${p}.bkm.showroom ? (<>` + body.slice(a, z) + `</>) : (<Phone4aCustomBook m={${p}.bkm} />)}` + body.slice(z);
+}
+
 /** gen-sales.cjs: one salesperson screen. */
 function sales(name, body) {
   if (name === "SalesNav") body = swap(body, '<nav style={{ flex: "0 0 auto", display: "flex", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nav3b} />", "sales bottom bar");
   if (name === "SalesInbox") body = inbox(body);
   if (name === "SalesChat") body = chat(body, "v.cl");
   if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
+  if (name === "SalesChat") body = bookModes(body, "v");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
   // Auto-reply: one page at a time with Save (the owner, 2026-10-24: "auto reply 做成分頁式 … 記得要有save").
   if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profAuto) && (<>"), e = body.indexOf("\n      </>)}", a); if (a < 0 || e < 0) throw new Error("phone-4a: auto-reply page");
@@ -508,6 +523,7 @@ function panel(body) {
   body = swap(body, '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nv.nav} hidden={!v.navOn} />", "panel bottom bar");
   body = panelChat(body);
   body = once(body, "<span onClick={v.ld.lx.confirm}", "<Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm}", "panel book remarks");
+  body = bookModes(body, "v.ld.lx");
   body = teamInsight(body);
   body = teamInbox(body);
   body = teamAssign(body);

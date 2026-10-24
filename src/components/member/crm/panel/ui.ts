@@ -1,4 +1,5 @@
 import type { CustomerForm } from "../sales/ui";
+import type { CustomFields } from "../shared/custom-book";
 /** The Control panel's screen state (design 1a) — what is open and typed, not data. */
 export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads";
 export type Period = "day" | "week" | "month" | "custom";
@@ -59,7 +60,7 @@ export interface PanelUi {
   ftsDraft: Record<string, boolean> | null;
   tplOpen: boolean;
   tplEd: { id: string | null; name: string; ch: "whatsapp" | "messenger"; body: string } | null;
-  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
+  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } & CustomFields | null;
   reSheet: boolean;
   pick: string;
   /** What is typed in each chat, by customer — as Mine's (`SalesUi.draft`): words typed in one chat never go to another. */
