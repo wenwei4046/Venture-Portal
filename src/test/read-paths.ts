@@ -411,9 +411,13 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // …and a file of that work (mig 20261025113000): anon's by name, the code deciding — the stage now's own Files or a File
   // field the PIC sees; the bucket asks the code again (mkt_pic_may_read) before R2 signs a link.
   'mkt_pic_file',
+  // …and the PIC's own calendar (mig 20261025161000): anon's by name, the subsidiary's calendar code deciding — open only
+  // while its PIC is the one it was made for, reading only what was sent to that PIC.
+  'mkt_pic_calendar',
   // Marketing's own clients (mig 20261024004000): added by Marketing · Manage, its code made by the database; a client's
-  // name (its own clients only), PIC and second PIC edited by Manage (mig 20261025034000).
-  'mkt_sub_add', 'mkt_sub_edit',
+  // name (its own clients only), PIC and second PIC edited by Manage (mig 20261025034000); a PIC's calendar link made or
+  // made anew by Manage (mig 20261025161000).
+  'mkt_sub_add', 'mkt_sub_edit', 'mkt_sub_cal_link',
   // A subsidiary's page (mig 20261024005000): its projects' newest trail lines, by Marketing · View.
   'mkt_sub_feed',
   // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View.

@@ -12,6 +12,8 @@ import {
 } from '@/lib/marketing/subsidiary'
 import { trailTime } from '@/lib/marketing/task'
 import { groupLabel, groupTone, rosterGroups, sameGroup, type MktTone } from '@/lib/marketing/groups'
+import { whatsappOk } from '@/lib/marketing/project'
+import CalendarLink from './CalendarLink'
 import ClientEdit from './ClientEdit'
 import s from './subsidiary.module.css'
 
@@ -50,6 +52,8 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
   const [sub, setSub] = useState(initial)
   const [bill, setBill] = useState(billOnFile)
   const [editing, setEditing] = useState(openEdit)
+  // Which PIC's calendar link is open (⑤-2), the manager's.
+  const [calFor, setCalFor] = useState<1 | 2 | null>(null)
   const [view, setView] = useState<View>('month')
   const [month, setMonth] = useState(() => monthOf(board.today))
   const [week, setWeek] = useState(board.today)
@@ -102,9 +106,15 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
             <span>{sub.pic2 ? 'PICs' : 'PIC'}</span>
             {sub.pic ? (
               <>
-                {[sub.pic, sub.pic2].filter((x): x is string => !!x).map(name => (
-                  <span key={name} className={s.pic}><span className={s.picAv} aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>{name}</span>
-                ))}
+                {/* Each PIC their own calendar link (⑤-2), the manager's to share — a PIC with a WhatsApp number. */}
+                {([[1, sub.pic, sub.whatsapp], [2, sub.pic2, sub.whatsapp2]] as const).flatMap(([slot, name, wa]) => (name ? [(
+                  <span key={slot} className={s.pic}>
+                    <span className={s.picAv} aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>{name}
+                    {manage && wa && whatsappOk(wa) ? (
+                      <button type="button" className={s.calBtn} onClick={() => setCalFor(slot)} aria-label={`${name}’s calendar link`}>📅 Calendar</button>
+                    ) : null}
+                  </span>
+                )] : []))}
                 <span>· {sub.pic2 ? 'either approves' : 'approves'} via 🔗 link</span>
               </>
             ) : <span className={s.none}>—</span>}
@@ -112,6 +122,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
         </div>
       </div>
       {editing ? <ClientEdit sub={sub} bill={bill} onClose={() => setEditing(false)} onSaved={(next, b) => { setSub(next); setBill(b); setEditing(false) }} /> : null}
+      {calFor ? <CalendarLink sub={sub} slot={calFor} onClose={() => setCalFor(null)} /> : null}
 
       <div className={s.stats}>
         {stats.map(st => (

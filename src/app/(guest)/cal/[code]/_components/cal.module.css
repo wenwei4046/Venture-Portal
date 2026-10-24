@@ -1,0 +1,139 @@
+/* The PIC's calendar, /cal/<code> (⑤-2, `PIC Calendar.dc.html`), in the PIC link's tokens (globals.css › .mkt-pic). The
+   handoff's phone page below 900px (520 wide, the list first); from 900px its desktop (1080 wide, the month first). */
+
+.root { min-height: 100vh; font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif; color: rgb(var(--pk-ink)); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+.grow { flex: 1; }
+
+.top { background: rgb(var(--pk-white)); border-bottom: 1px solid rgb(var(--pk-line)); }
+.topIn { max-width: 520px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 10px; box-sizing: border-box; }
+.logo { width: 28px; height: 28px; border-radius: 7px; background: var(--pk-primary); color: rgb(var(--pk-primary-ink)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+.brand { font-size: 14px; font-weight: 600; }
+.topNote { font-size: 12px; color: rgb(var(--pk-muted)); }
+
+.main { max-width: 520px; margin: 0 auto; padding: 18px 16px 48px; box-sizing: border-box; }
+.nameRow { display: flex; align-items: center; gap: 10px; }
+.subDot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+/* The handoff's title is the page's own face (Inter 600), never the display serif the portal gives every h1. */
+.root .title { font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; color: inherit; margin: 0; overflow-wrap: anywhere; }
+.shared { font-size: 12.5px; color: rgb(var(--pk-muted)); margin-top: 2px; overflow-wrap: anywhere; }
+.closed { margin-top: 40px; text-align: center; padding: 40px 18px; background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 12px; }
+.closedTitle { font-size: 18px; font-weight: 600; }
+
+/* What waits for them */
+.bannerWrap { margin-top: 14px; }
+.banner { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: rgb(var(--pk-wait-bg)); border: 1px solid rgb(var(--pk-wait-line)); color: rgb(var(--pk-wait)); text-decoration: none; animation: mkIn .2s ease-out; }
+.bannerDot { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--pk-wait-dot)); flex: none; }
+.bannerRed { background: rgb(var(--pk-red-bg)); border-color: rgb(var(--pk-red-line)); color: rgb(var(--pk-red)); }
+.bannerRed .bannerDot { background: rgb(var(--pk-red-dot)); }
+.bannerText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bannerTitle { font-weight: 600; }
+.bannerLine { font-size: 13px; margin-top: 1px; overflow-wrap: anywhere; }
+.review { font-size: 13px; font-weight: 600; white-space: nowrap; }
+
+/* The toolbar: its title, the months, Key dates, List · Month */
+.toolbar { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.toolTitle { font-size: 16px; font-weight: 600; margin-right: 4px; }
+.navs { display: flex; gap: 8px; }
+.nav { width: 30px; height: 30px; padding: 0; border-radius: 8px; border: 1px solid rgb(var(--pk-btn-line)); background: rgb(var(--pk-white)); color: inherit; font: inherit; font-size: 15px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.nav:disabled { opacity: .4; cursor: default; }
+.keyBtn { height: 32px; padding: 0 10px 0 8px; border-radius: 8px; border: 1px solid rgb(var(--pk-btn-line)); background: rgb(var(--pk-white)); color: inherit; font: inherit; font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
+.track { width: 28px; height: 16px; border-radius: 8px; background: rgb(var(--pk-btn-line)); position: relative; transition: background .2s; }
+.knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgb(var(--pk-white)); box-shadow: 0 1px 2px rgb(var(--pk-shadow) / .2); transition: left .2s; }
+.keyBtn[aria-pressed='true'] .track { background: rgb(var(--pk-ink)); }
+.keyBtn[aria-pressed='true'] .knob { left: 14px; }
+.segs { display: flex; gap: 2px; padding: 3px; background: rgb(var(--pk-seg)); border-radius: 8px; }
+.seg { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.seg[aria-pressed='true'] { background: rgb(var(--pk-white)); box-shadow: 0 1px 2px rgb(var(--pk-shadow) / .12); font-weight: 600; }
+
+/* Which view: the one picked — before the page is in the browser, the phone's list or the desktop's month. */
+.root[data-view='list'] .monthOnly, .root[data-view='month'] .listOnly { display: none; }
+@media (max-width: 899.98px) {
+  .root[data-view='auto'] .monthOnly { display: none; }
+  .root[data-view='auto'] .segList { background: rgb(var(--pk-white)); box-shadow: 0 1px 2px rgb(var(--pk-shadow) / .12); font-weight: 600; }
+}
+@media (min-width: 900px) {
+  .root[data-view='auto'] .listOnly { display: none; }
+  .root[data-view='auto'] .segMonth { background: rgb(var(--pk-white)); box-shadow: 0 1px 2px rgb(var(--pk-shadow) / .12); font-weight: 600; }
+}
+
+/* The kinds' colours: an item's letter, a month's chip, the legend's swatch */
+.plain { background: rgb(var(--pk-draft-bg)); color: rgb(var(--pk-text-2)); border-color: rgb(var(--pk-draft-line)); }
+.live { background: rgb(var(--pk-live-bg)); color: rgb(var(--pk-live)); border-color: rgb(var(--pk-live-line)); }
+.approve { background: rgb(var(--pk-wait-bg)); color: rgb(var(--pk-wait)); border-color: rgb(var(--pk-wait-edge)); }
+.key { background: rgb(var(--pk-ink)); color: rgb(var(--pk-white)); border-color: rgb(var(--pk-ink)); }
+
+/* The list: the campaigns running, then each day coming up */
+.list { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.camps { background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.campsHead { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--pk-muted)); }
+.camp { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.campBar { width: 4px; align-self: stretch; border-radius: 2px; flex: none; }
+.campText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.campName { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.campRange { font-size: 12px; color: rgb(var(--pk-muted)); }
+.progress { width: 90px; height: 5px; border-radius: 3px; background: rgb(var(--pk-seg)); overflow: hidden; flex: none; }
+.progressFill { display: block; height: 100%; }
+.campBar.toneA, .progressFill.toneA { background: rgb(var(--pk-brown)); }
+.campBar.toneB, .progressFill.toneB { background: rgb(var(--pk-slate-bar)); }
+
+.day { display: flex; gap: 12px; }
+.dayHead { width: 44px; flex: none; text-align: center; padding-top: 4px; }
+.wd { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: rgb(var(--pk-muted)); }
+.dn { font-size: 20px; font-weight: 600; line-height: 1.2; }
+.mon { font-size: 10.5px; color: rgb(var(--pk-muted)); }
+.dayToday .wd, .dayToday .dn { color: rgb(var(--pk-brown)); }
+.dayItems { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.flag { align-self: flex-start; padding: 2px 10px 2px 7px; background: rgb(var(--pk-ink)); color: rgb(var(--pk-white)); font-size: 11px; font-weight: 600; clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%); }
+.card { display: flex; align-items: center; border-radius: 10px; background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); }
+.card:hover { border-color: rgb(var(--pk-faint)); }
+.cardApprove, .cardApprove:hover { border-color: rgb(var(--pk-wait-edge)); }
+.cardUrgent { box-shadow: 0 0 0 3px rgb(var(--pk-wait-bg)); }
+.cardMain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: inherit; text-decoration: none; }
+.icon { width: 30px; height: 30px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.cardText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kind { font-size: 11.5px; font-weight: 600; color: rgb(var(--pk-muted)); }
+.kindApprove { color: rgb(var(--pk-wait)); }
+.cardTitle { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { font-size: 12px; color: rgb(var(--pk-muted)); overflow-wrap: anywhere; }
+.chev { color: rgb(var(--pk-draft-dot)); font-size: 16px; flex: none; }
+.postLink { margin-right: 12px; font-size: 12px; font-weight: 500; color: rgb(var(--pk-brown)); white-space: nowrap; text-decoration: none; flex: none; }
+.empty { padding: 28px 16px; text-align: center; color: rgb(var(--pk-muted)); background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 12px; }
+
+/* The month: its weeks, each day's items as chips, the campaigns as bars across the days they run */
+.month { margin-top: 12px; background: rgb(var(--pk-white)); border: 1px solid rgb(var(--pk-line)); border-radius: 12px; overflow: hidden; }
+.wdRow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: rgb(var(--pk-soft-2)); border-bottom: 1px solid rgb(var(--pk-line-2)); }
+.wdCell { padding: 8px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgb(var(--pk-muted)); overflow: hidden; }
+.week { position: relative; border-bottom: 1px solid rgb(var(--pk-line-2)); }
+.week:last-child { border-bottom: 0; }
+.weekDays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cell { padding: 5px 6px 6px; box-sizing: border-box; border-right: 1px solid rgb(var(--pk-line-2)); background: rgb(var(--pk-white)); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cell:last-child { border-right: 0; }
+.cellOut { background: rgb(var(--pk-soft)); }
+.cellHead { display: flex; align-items: center; gap: 4px; height: 22px; min-width: 0; }
+.flagSm { padding: 1px 8px 1px 5px; background: rgb(var(--pk-ink)); color: rgb(var(--pk-white)); font-size: 9.5px; font-weight: 600; white-space: nowrap; overflow: hidden; max-width: 90px; min-width: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 50%, 100% 100%, 0 100%); }
+.dayNum { min-width: 22px; height: 22px; padding: 0 4px; box-sizing: border-box; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgb(var(--pk-text-2)); flex: none; }
+.cellOut .dayNum { color: rgb(var(--pk-faint)); }
+.dayNumToday, .cellOut .dayNumToday { background: rgb(var(--pk-brown)); color: rgb(var(--pk-white)); font-weight: 600; }
+.barSpace { flex: none; }
+/* Its border's width and style alone — the colour is its kind's (a `border` shorthand here would reset it). */
+.chip { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 5px; border-width: 1px; border-style: solid; font-size: 11.5px; min-width: 0; text-decoration: none; }
+.chipGlyph { font-size: 10px; font-weight: 700; flex: none; }
+.chipText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.bar { position: absolute; height: 20px; font-size: 11px; font-weight: 600; display: flex; align-items: center; padding: 0 8px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+.bar.toneA { background: rgb(var(--pk-camp-bg)); color: rgb(var(--pk-camp)); }
+.bar.toneB { background: rgb(var(--pk-slate-bg)); color: rgb(var(--pk-slate)); }
+.barStart { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+.barEnd { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; font-size: 12px; color: rgb(var(--pk-text-2)); }
+.legendItem { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.swatch { width: 18px; height: 18px; box-sizing: border-box; border-radius: 5px; border-width: 1px; border-style: solid; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
+
+@media (min-width: 900px) {
+  .topIn, .main { max-width: 1080px; padding-left: 32px; padding-right: 32px; }
+  .root .title { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner { animation: none; }
+  .track, .knob { transition: none; }
+}

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { boardFromRow, type MktSub } from '@/lib/marketing/board'
 import { subFeedFromRow } from '@/lib/marketing/subsidiary'
-const actions = vi.hoisted(() => ({ editMktClient: vi.fn() }))
+const actions = vi.hoisted(() => ({ editMktClient: vi.fn(), mktCalendarLink: vi.fn() }))
 vi.mock('@/lib/marketing/actions', () => actions)
 import SubsidiaryPage from './SubsidiaryPage'
 
@@ -174,6 +174,54 @@ describe('its details, the manager’s to edit (②b-2d-2a, the user’s answer 
 
 // 2026-10-24 — ④-2b: its campaigns (the user's answer 13 — a product project with a run period; the timeline shows which
 // runs when): the card, the days they run in Month and Week, the timeline's rows with their overlap, the filter.
+describe('a PIC’s calendar link (⑤-2), the manager’s to share', () => {
+  const two: MktSub = { ...sub, whatsapp: '012-345 6789', pic2: 'Hana Lee', whatsapp2: null }
+  const A = 'a'.repeat(32)
+  const B = 'b'.repeat(32)
+
+  it('by each PIC with a WhatsApp number, the manager’s alone: made, copied, shared on WhatsApp — and made anew, the old one stopped', async () => {
+    const staff = render(<SubsidiaryPage board={board} sub={two} feed={feed} />)
+    expect(screen.queryByRole('button', { name: /calendar link/ })).toBeNull()
+    staff.unmount()
+    render(<SubsidiaryPage board={board} sub={two} feed={feed} manage />)
+    expect(screen.getAllByRole('button', { name: /calendar link/ }).map(b => b.getAttribute('aria-label'))).toEqual(['Mr Tan’s calendar link'])
+    actions.mktCalendarLink.mockResolvedValueOnce({ ok: true, code: A })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Mr Tan’s calendar link' }))
+    })
+    expect(actions.mktCalendarLink).toHaveBeenCalledWith(CAR, 1)
+    const dialog = screen.getByRole('dialog', { name: 'Mr Tan’s calendar link' })
+    const url = `${window.location.origin}/cal/${A}`
+    expect(within(dialog).getByText(url)).toBeTruthy()
+    expect(within(dialog).getByRole('link', { name: 'Share via WhatsApp' }).getAttribute('href'))
+      .toBe(`https://wa.me/60123456789?text=${encodeURIComponent(`Hi Mr Tan, Carres’s marketing calendar — what is coming up, and what waits for your approval: ${url}`)}`)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'New link…' }))
+    expect(within(dialog).getByText('The old link stops working.')).toBeTruthy()
+    actions.mktCalendarLink.mockResolvedValueOnce({ ok: true, code: B })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'New link' }))
+    })
+    expect(actions.mktCalendarLink).toHaveBeenLastCalledWith(CAR, 1, true)
+    expect(within(dialog).getByText(`${window.location.origin}/cal/${B}`)).toBeTruthy()
+    expect(within(dialog).queryByText('The old link stops working.')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('a refusal says why, and there is no link to copy', async () => {
+    render(<SubsidiaryPage board={board} sub={{ ...two, whatsapp2: '+60 13-222 1111' }} feed={feed} manage />)
+    actions.mktCalendarLink.mockResolvedValueOnce({ ok: false, reason: 'Only Marketing’s managers share a PIC’s calendar.' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Hana Lee’s calendar link' }))
+    })
+    expect(actions.mktCalendarLink).toHaveBeenLastCalledWith(CAR, 2)
+    const dialog = screen.getByRole('dialog', { name: 'Hana Lee’s calendar link' })
+    expect(within(dialog).getByRole('alert').textContent).toBe('Only Marketing’s managers share a PIC’s calendar.')
+    expect(within(dialog).queryByRole('button', { name: 'Copy link' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'New link…' })).toBeNull()
+  })
+})
+
 describe('its campaigns', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })

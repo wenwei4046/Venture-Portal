@@ -97,6 +97,15 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
         ],
       },
+      // The PIC's calendar (2026-10-24, Marketing ⑤-2): the same — its address carries the subsidiary's calendar code.
+      {
+        source: '/cal/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
 

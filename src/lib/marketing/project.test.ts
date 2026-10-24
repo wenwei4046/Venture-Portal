@@ -246,6 +246,8 @@ describe('the save and the link', () => {
   it('the PIC’s link on this site, and WhatsApp with it in the message', () => {
     expect(linkUrl('https://venture.example/', 'abc')).toBe('https://venture.example/t/abc')
     expect(whatsappUrl('+60 12-345 6789', 'Hi Kelvin: https://x/t/abc')).toBe('https://wa.me/60123456789?text=Hi%20Kelvin%3A%20https%3A%2F%2Fx%2Ft%2Fabc')
+    // A number written the local way opens the same chat — wa.me takes only an international one (2026-10-24).
+    expect(whatsappUrl('012-345 6789', 'x')).toBe('https://wa.me/60123456789?text=x')
     expect(whatsappUrl('12', 'x')).toBeNull()
   })
 })

@@ -20,6 +20,12 @@
 .editBtn:hover { background: rgb(var(--mk-surface)); }
 .editGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
 .editError { font-size: 12.5px; color: rgb(var(--mk-red)); }
+/* A PIC's calendar link (⑤-2): the button by their name, and its dialog. */
+.calBtn { height: 22px; padding: 0 8px; margin-left: 2px; border-radius: 6px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); font: inherit; font-size: .78em; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.calBtn:hover { background: rgb(var(--mk-surface)); }
+.calBox { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.calWait { font-size: 12.5px; color: rgb(var(--mk-muted)); }
+.calAsk { margin-right: auto; align-self: center; font-size: 12.5px; color: rgb(var(--mk-muted)); }
 /* An outside client's billing details (②b-2b): under the PICs in Edit, under the row in + Add subsidiary. */
 .billHead { margin-top: 4px; padding-top: 12px; border-top: 1px solid rgb(var(--mk-line-2)); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
 .billFields { display: flex; flex-direction: column; gap: 12px; }

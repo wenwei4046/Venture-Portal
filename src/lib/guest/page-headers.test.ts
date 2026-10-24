@@ -26,9 +26,14 @@ describe('the guest page’s headers', () => {
     expect(rules.find(r => r.source === '/l/:path*')?.headers).toEqual(rules.find(r => r.source === '/g/:path*')?.headers)
   })
 
+  it('the PIC’s calendar (/cal/<code>, Marketing ⑤-2) the same', async () => {
+    const rules = await nextConfig.headers!()
+    expect(rules.find(r => r.source === '/cal/:path*')?.headers).toEqual(rules.find(r => r.source === '/g/:path*')?.headers)
+  })
+
   it('keeps the service worker’s and the manifest’s', async () => {
     const rules = await nextConfig.headers!()
-    expect(rules.map(r => r.source)).toEqual(['/sw.js', '/manifest.webmanifest', '/g/:path*', '/t/:path*', '/l/:path*'])
+    expect(rules.map(r => r.source)).toEqual(['/sw.js', '/manifest.webmanifest', '/g/:path*', '/t/:path*', '/l/:path*', '/cal/:path*'])
     expect(rules[0].headers).toContainEqual({ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' })
     expect(rules[1].headers).toEqual([{ key: 'Content-Type', value: 'application/manifest+json; charset=utf-8' }])
   })
