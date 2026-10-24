@@ -32,6 +32,10 @@ export interface GlLine {
   ref_id: string | null
   /** Counterparty for drill-down rows: invoice bill-to / voucher payee. */
   party?: string | null
+  /** The source document's number — the invoice, the voucher (PV / OR), the credit note (applyGlRefs). */
+  ref_no?: string | null
+  /** An invoice line's words without its number — applyGlRefs keeps "number · words" as its description. */
+  ref_text?: string | null
 }
 
 export interface CoaAccount {
@@ -112,9 +116,13 @@ export interface GlRefs {
   invoices: Map<string, InvoiceRef>
   /** payment voucher id → payee (PV: paid to / OR: received from). */
   voucherPayees: Map<string, string>
+  /** payment voucher id → its number, the drill-down's Ref. 2 (2026-10-24) — optional so hand-built refs stay valid. */
+  voucherNos?: Map<string, string>
   /** credit note id → the parent invoice's bill-to (CN v2, 2026-08-20) —
    *  optional so hand-built refs (tests) stay valid. */
   creditNoteParties?: Map<string, string>
+  /** credit note id → its number (Ref. 2). */
+  creditNoteNos?: Map<string, string>
   /** Set only for a reader who sees payroll by department (2026-10-13,
    *  fetchGlRefs `payrollByPerson: false`): salary voucher id → the batch and
    *  department its lines fold into (applyGlRefs). */
@@ -155,7 +163,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
         (from, to) =>
           supabase
             .from('payment_vouchers')
-            .select('id, payee_name, invoice_id')
+            .select('id, voucher_no, payee_name, invoice_id')
             .order('id', { ascending: true })
             .range(from, to),
         'fetchGlRefs vouchers',
@@ -164,8 +172,8 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
       // parent invoice's bill-to. Errors tolerated (a reader whose RLS blocks
       // credit_notes) — those lines just keep a null party.
       fetchAllRows((from, to) =>
-        supabase.from('credit_notes').select('id, invoice_id').order('id', { ascending: true }).range(from, to),
-      ).catch(() => [] as Array<{ id: string; invoice_id: string }>),
+        supabase.from('credit_notes').select('id, invoice_id, credit_note_no').order('id', { ascending: true }).range(from, to),
+      ).catch(() => [] as Array<{ id: string; invoice_id: string; credit_note_no?: string | null }>),
       // The salary vouchers — their batch and department — only for a reader
       // who sees payroll by department (2026-10-13).
       foldPayroll
@@ -231,11 +239,17 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
         return payee && payee !== '—' ? [[v.id as string, payee] as [string, string]] : []
       }),
     ),
+    voucherNos: new Map(
+      (vouchers ?? []).flatMap((v) => ((v.voucher_no as string | null) ? [[v.id as string, v.voucher_no as string] as [string, string]] : [])),
+    ),
     creditNoteParties: new Map(
       (creditNotes ?? []).flatMap((cn) => {
         const billTo = invoiceBillTo.get(cn.invoice_id as string) ?? null
         return billTo ? [[cn.id as string, billTo] as [string, string]] : []
       }),
+    ),
+    creditNoteNos: new Map(
+      (creditNotes ?? []).flatMap((cn) => (cn.credit_note_no ? [[cn.id as string, cn.credit_note_no as string] as [string, string]] : [])),
     ),
     ...(payrollByDepartment ? { payrollByDepartment } : {}),
   }
@@ -302,7 +316,9 @@ export function foldPayrollGlLines(lines: GlLine[], byVoucher: ReadonlyMap<strin
 
 /** Enrich drill-down lines: invoice JEs get "invoice_no · description" plus the
  *  bill-to company as the counterparty; voucher JEs (PV/OR) get the payee as
- *  the counterparty (pay-out to / received from). Pure — returns new objects.
+ *  the counterparty (pay-out to / received from). Each also carries its source
+ *  document's number (`ref_no` — the drill-down's Ref. 2, 2026-10-24) and an
+ *  invoice its words without the number (`ref_text`). Pure — returns new objects.
  *  With `refs.payrollByDepartment` (a reader who sees payroll by department)
  *  the salary vouchers' lines are folded first: no name is ever looked up. */
 export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
@@ -313,17 +329,19 @@ export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
       const ref = refs.invoices.get(l.ref_id)
       if (!ref?.invoice_no) return l
       const label = ref.description ? `${ref.invoice_no} · ${ref.description}` : ref.invoice_no
-      return { ...l, description: label, party: ref.billTo }
+      return { ...l, description: label, party: ref.billTo, ref_no: ref.invoice_no, ref_text: ref.description || l.description }
     }
     if (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void') {
       const payee = refs.voucherPayees.get(l.ref_id)
-      if (!payee) return l
-      return { ...l, party: payee }
+      const no = refs.voucherNos?.get(l.ref_id) ?? null
+      if (!payee && !no) return l
+      return { ...l, ...(payee ? { party: payee } : {}), ...(no ? { ref_no: no } : {}) }
     }
     if (l.ref_type === 'credit_note') {
       const party = refs.creditNoteParties?.get(l.ref_id)
-      if (!party) return l
-      return { ...l, party }
+      const no = refs.creditNoteNos?.get(l.ref_id) ?? null
+      if (!party && !no) return l
+      return { ...l, ...(party ? { party } : {}), ...(no ? { ref_no: no } : {}) }
     }
     return l
   })
@@ -355,6 +373,60 @@ export interface GlTxn {
   party: string | null
   /** Signed in the account's NATURAL direction (positive grows the account). */
   amount: number
+  /** The line's own debit and credit (2026-10-24 — the drill-down's columns). */
+  debit: number
+  credit: number
+  /** The entry's other side — "3000 · Cash & Bank - Hong Leong", with "+2" when it has more accounts. */
+  otherSide: string | null
+  /** The source document's number: the voucher (PV / OR), the invoice, the credit note. */
+  refNo: string | null
+}
+
+/**
+ * Each line's other side (2026-10-24, the drill-down's Other side): the entry's other accounts, the largest first —
+ * "3000 · Cash & Bank - Hong Leong", or "3033 · AR - Carres +1" when there are two. Indexed once per line set.
+ */
+const otherSideIndex = new WeakMap<GlLine[], Map<string, Map<string, number>>>()
+export function otherSideOf(lines: GlLine[], accounts: ReadonlyMap<string, { name: string }>): (l: GlLine) => string | null {
+  let index = otherSideIndex.get(lines)
+  if (!index) {
+    index = new Map()
+    for (const l of lines) {
+      let legs = index.get(l.entry_id)
+      if (!legs) {
+        legs = new Map()
+        index.set(l.entry_id, legs)
+      }
+      legs.set(l.account_code, r2((legs.get(l.account_code) ?? 0) + Math.abs(l.debit - l.credit)))
+    }
+    otherSideIndex.set(lines, index)
+  }
+  const built = index
+  return (l) => {
+    const legs = built.get(l.entry_id)
+    if (!legs) return null
+    const others = [...legs.entries()].filter(([code]) => code !== l.account_code).sort((a, b) => b[1] - a[1])
+    if (others.length === 0) return null
+    const [code] = others[0]
+    const name = accounts.get(code)?.name
+    return `${name ? `${code} · ${name}` : code}${others.length > 1 ? ` +${others.length - 1}` : ''}`
+  }
+}
+
+/** A journal line as a drill-down line: its words (an invoice's without its number), the party, its debit and credit, its other side, its document. */
+function txnOf(l: GlLine, amount: number, otherSide: (l: GlLine) => string | null): GlTxn {
+  return {
+    date: l.date,
+    entryNo: l.entry_no,
+    description: (l.ref_text ?? l.description) || l.entry_description || '',
+    segment: l.segment,
+    party: l.party ?? null,
+    amount,
+    debit: l.debit,
+    credit: l.credit,
+    otherSide: otherSide(l),
+    refNo: l.ref_no ?? null,
+  }
 }
 
 export interface AccountNode {
@@ -441,6 +513,7 @@ export function bucketAccounts(
   mode: 'movement' | 'balance',
 ): Map<string, Bucket> {
   const byCode = new Map(accounts.map((a) => [a.code, a]))
+  const otherSide = otherSideOf(lines, byCode)
   const buckets = new Map<string, Bucket>()
   for (const l of lines) {
     if (!segPass(l, filter.segment)) continue
@@ -457,16 +530,7 @@ export function bucketAccounts(
     }
     if (inCur) {
       b.current = r2(b.current + amt)
-      if (inPeriod(l, filter.current)) {
-        b.txns.push({
-          date: l.date,
-          entryNo: l.entry_no,
-          description: l.description || l.entry_description || '',
-          segment: l.segment,
-          party: l.party ?? null,
-          amount: amt,
-        })
-      }
+      if (inPeriod(l, filter.current)) b.txns.push(txnOf(l, amt, otherSide))
     }
     if (inPrev) b.previous = r2(b.previous + amt)
   }
@@ -692,6 +756,7 @@ export function buildCashFlow(
   bankCodes: ReadonlySet<string>,
 ): CashFlowReport {
   const byCode = new Map(accounts.map((a) => [a.code, a]))
+  const otherSide = otherSideOf(lines, byCode)
   const catOf = (code: string): CashFlowCategory => {
     const acc = byCode.get(code)
     if (acc?.cash_flow_category) return acc.cash_flow_category
@@ -755,14 +820,10 @@ export function buildCashFlow(
         dirFlows.set(dirKey, df)
       }
       if (inCur) {
-        const txn = {
-          date,
-          entryNo: c.entry_no,
-          description: c.description || c.entry_description || '',
-          segment: c.segment,
-          party: c.party ?? null,
-          amount: share,
-        }
+        // The counter line itself, with the cash it moved: its debit / credit as far as the cash went (the whole
+        // line when the entry is all cash), so the drill-down's totals are the row's; its other side the bank.
+        const k = Math.abs(share) / Math.abs(c.debit - c.credit)
+        const txn = { ...txnOf(c, share, otherSide), date, debit: r2(c.debit * k), credit: r2(c.credit * k) }
         f.current = r2(f.current + share)
         f.txns.push(txn)
         df.current = r2(df.current + share)

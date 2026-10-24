@@ -133,13 +133,19 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
         txns: [
           {
             date: i.invoiceDate ?? i.periodMonth,
-            entryNo: i.invoiceNo,
+            entryNo: null,
             description: `开单 ${dayjs(i.invoiceDate ?? i.periodMonth).format('DD MMM YYYY')} · 总额 ${i.totalAmount.toFixed(2)}${
               i.receipts > 0 ? ` · 已收 ${i.receipts.toFixed(2)}` : ''
             }${i.credits > 0 ? ` · CN −${i.credits.toFixed(2)}` : ''}`,
             segment,
             party: i.companyId ? companyMap.get(i.companyId) ?? null : i.partyFallback,
             amount: i.outstanding,
+            // The invoice still owed as the drill-down's one line (2026-10-24): its number the document (Ref. 2),
+            // what is owed a debit.
+            debit: i.outstanding,
+            credit: 0,
+            otherSide: null,
+            refNo: i.invoiceNo,
           },
         ],
         children: [],
