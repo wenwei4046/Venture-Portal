@@ -7351,6 +7351,12 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --pk-done-bg: 232 244 235; --pk-done-line: 190 222 199; --pk-done: 36 100 58; --pk-done-dot: 60 150 90;
   --pk-red-bg: 252 236 233; --pk-red-line: 236 190 184; --pk-red: 160 36 30; --pk-red-dot: 200 52 42;
   --pk-draft-bg: 243 242 239; --pk-draft-line: 226 223 217; --pk-draft: 90 84 78; --pk-draft-dot: 160 154 146;
+  /* The PIC's calendar (⑤-2, `PIC Calendar.dc.html`): a go-live's blue, a campaign's walnut and slate, a day out of the
+     month's number, the view switch, an approval's edge, a shadow. */
+  --pk-live-bg: 236 240 246; --pk-live-line: 212 222 236; --pk-live: 48 70 110;
+  --pk-camp-bg: 236 229 219; --pk-camp: 75 48 36;
+  --pk-slate-bg: 232 235 240; --pk-slate: 60 70 86; --pk-slate-bar: 110 120 136;
+  --pk-faint: 190 184 176; --pk-seg: 236 233 228; --pk-wait-edge: 224 190 120; --pk-shadow: 0 0 0;
   background: rgb(var(--pk-page));
 }
 @keyframes mkIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

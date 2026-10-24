@@ -4,11 +4,13 @@ import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { withFileStorage } from '@/lib/storage/server'
 import { isPicCode, picPageFromRow, type PicPage } from './pic'
+import { picCalendarFromRow, type PicCalendar } from './pic-calendar'
 
 /**
  * The PIC's link reads and writes as a stranger (⑤-1, mig 20261024003000): the publishable key and NO session — a
- * signed-in portal user is the same stranger there — so the database answers only the two mkt_pic_* functions granted
- * to anon by name, each checking the link's code. Never the service role (the guest link's way, lib/guest/client.ts).
+ * signed-in portal user is the same stranger there — so the database answers only the mkt_pic_* functions granted to
+ * anon by name, each checking the link's code (the PIC's calendar, ⑤-2, a subsidiary's calendar code). Never the
+ * service role (the guest link's way, lib/guest/client.ts).
  */
 export function picClient(): SupabaseClient {
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -33,4 +35,12 @@ export async function readPicPage(code: string): Promise<PicPage | null> {
   if (!isPicCode(code)) return null
   const { data, error } = await picClient().rpc('mkt_pic_page', { p_code: code })
   return error ? null : picPageFromRow(data)
+}
+
+/** What /cal/<code> draws (⑤-2) — null: the link is closed (a wrong code, its PIC no longer the subsidiary's on the
+ * number it was made for, a subsidiary no longer listed). */
+export async function readPicCalendar(code: string): Promise<PicCalendar | null> {
+  if (!isPicCode(code)) return null
+  const { data, error } = await picClient().rpc('mkt_pic_calendar', { p_code: code })
+  return error ? null : picCalendarFromRow(data)
 }

@@ -471,9 +471,10 @@ export function fillPatch(saved: MinutesEdit, now: MinutesEdit, intake: boolean)
 /** The PIC's link, as the page shows and copies it. */
 export const linkUrl = (origin: string, code: string) => `${origin.replace(/\/$/, '')}/t/${code}`
 
-/** WhatsApp, with the link in the message (the number's digits only). */
+/** WhatsApp, with the link in the message: the number's digits, a local 012-… as Malaysia's 6012-… — wa.me opens only an
+ * international number (the HR app's Message the same, components/hr-app). */
 export function whatsappUrl(number: string, text: string): string | null {
-  return whatsappOk(number) ? `https://wa.me/${number.replace(/\D/g, '')}?text=${encodeURIComponent(text)}` : null
+  return whatsappOk(number) ? `https://wa.me/${number.replace(/\D/g, '').replace(/^0/, '60')}?text=${encodeURIComponent(text)}` : null
 }
 
 /** Where a product project stands, in the side card's words and tone. */

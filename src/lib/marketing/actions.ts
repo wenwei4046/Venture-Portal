@@ -593,6 +593,20 @@ export async function editMktClient(sub: string, patch: Partial<Record<ClientPat
   return { ok: true, sub: subFromRow(data as Record<string, unknown>), bill: clientBillFromRow((data as Record<string, unknown>).bill) }
 }
 
+/** A PIC's calendar link (⑤-2, mig 20261025161000 — `PIC Calendar.dc.html`): the first PIC's or the second's — made when
+ * there is none (or its PIC changed since), the same one otherwise; `renew` makes a new one and the old one stops
+ * working. Nothing on any page changes with it. */
+export async function mktCalendarLink(sub: string, slot: 1 | 2, renew = false): Promise<Done<{ code: string }>> {
+  await requireActionOn('/marketing/subsidiaries/[code]', 'marketing', 'manage')
+  if (!isId(sub)) return { ok: false, reason: 'That subsidiary is not there.' }
+  if (slot !== 1 && slot !== 2) return { ok: false, reason: 'Pick its first PIC or its second.' }
+  const { data, error } = await (await client()).rpc('mkt_sub_cal_link', { p_sub: sub, p_slot: slot, p_renew: renew === true })
+  if (error || typeof data !== 'string' || !/^[0-9a-f]{32}$/.test(data)) {
+    return { ok: false, reason: words(error, 'The calendar link could not be made. Please try again.') }
+  }
+  return { ok: true, code: data }
+}
+
 // ── Billing (②b-2b, mig 20261025121000 — the user's answers 43–48, 50, 51), the manager's ──────────────────────
 
 /** A product project's amount changed on its page: a one-time project's until its billing is confirmed; a recurring
