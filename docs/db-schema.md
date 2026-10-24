@@ -714,7 +714,11 @@ hr_staff_costs (
     probation_ack_at timestamptz NULL
     contract_months smallint NULL                    -- 合约几个月，1–36（表单给 6/12/18/24/30/36）；只在 contract 时有（CHECK，2026-10-24）
     contract_end    date GENERATED ALWAYS             -- 合约最后一天 = hire_date + months − 1 天（1 Oct + 12 → 30 Sep）；
-                                                     --   不是 contract 或没 hire_date 就 NULL；没有提醒
+                                                     --   不是 contract 或没 hire_date 就 NULL；到期前 30 天、15 天各提醒一次（2026-10-24）
+    contract_ack_end date NULL                       -- 合约提醒的 Acknowledge，跟 probation_ack_* 一样（2026-10-24）：那个 end；续约后 ≠ → 再提醒
+    contract_ack_by uuid FK → users NULL             --   谁、几时、名字（contract_acknowledge() 写，trigger 拒绝直接写；不是 contract 就清空）
+    contract_ack_name text NULL
+    contract_ack_at timestamptz NULL                 --   这一刻的办公室日子决定它回应第几次提醒（≤ 15 天 = 第二次，否则第一次）
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()
     updated_at      timestamptz DEFAULT now()
@@ -737,11 +741,30 @@ INSERT); the 10-argument one calls it with neither.
 A fourth status with its period: `contract_months` (CHECK
 `hr_staff_costs_contract_months_check` — 1–36 while on a contract, NULL
 otherwise) and `contract_end` generated as `probation_end` is; both granted to
-`authenticated` column by column. Nobody is reminded of a contract's end.
+`authenticated` column by column. ~~Nobody is reminded of a contract's end.~~
+(Reminded since the same day's next migration, below.)
 `member_transfer_waiting` has a 13-argument overload (production's 12-argument
 body with `contract_months` in its INSERT); the 12-argument one now calls it with
 none. The same day `notify_probation_due` counts 15 days, not 14 (migration
 `20261025012000_probation_notice_15_days`).
+
+**Two reminders before a probation or a contract ends — 30 days, then 15 (2026-10-24, migration `20261025046500_people_term_end_reminders`).**
+A contract's acknowledgement as a probation's: `contract_ack_end / _by / _name /
+_at` (granted to `authenticated`), written only by `contract_acknowledge(staff)`
+(DEFINER; People · Edit with the HR scope and the person page's box via
+`tab_write_guard`) under `app.contract_ack` — trigger
+`hr_staff_costs_contract_ack` refuses a straight write and clears them off a
+contract. `contract_reviews()` (DEFINER, STABLE; the same gate) is
+`probation_reviews()`'s twin. Each term is reminded twice, and an
+acknowledgement answers the reminder that stood on the office's day it was given
+(`*_ack_at`: 15 days or fewer before the end the second, else the first) — so
+nothing new is stored for a probation. The hourly sweep is
+`notify_term_ends(p_now)` (DEFINER, the service role's): both terms,
+`data.due = '<probation|contract>:<staff>:<end>:<30|15>'` (a probation's second
+also counts the old `probation:<staff>:<end>`), titles *Probation ending · …* /
+*Contract ending · …*, the same holders and helper as below.
+`notify_probation_due` is left for the sweep deployed before; nothing calls it
+after.
 
 **…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
 `notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly
