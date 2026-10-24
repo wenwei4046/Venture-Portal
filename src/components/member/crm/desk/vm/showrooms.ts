@@ -9,6 +9,7 @@ import { blockHours, type CrmBlock, type CrmRoom } from "@/lib/member/crm-data";
 import { t12 } from "../../sales/vm/chat";
 import type { DeskCtx, SrBlk, SrBlock, SrDraft } from "./ctx";
 import { MON } from "./insight";
+import { apptTypesVM } from "./appt-types";
 
 const DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], DS = ["M", "T", "W", "T", "F", "S", "S"], DI = [0, 1, 2, 3, 4, 5, 6];
 /** Every half hour a visit may start (the prototype's ALLT) and the hours a blocked time may run (HOURS) — the whole day,
@@ -161,6 +162,8 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     del: () => { if (!curRoom) return; void ctx.deskAct.deleteRoom(curRoom.id).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: Math.max(0, at - 1), toast: `${curRoom.name} deleted` }); }); },
   };
   return {
+    // Showrooms › Appointment types (2026-10-24).
+    srPage: ui.srPage ?? "rooms", at: apptTypesVM(ctx),
     sr4, srOpen: false && srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
     srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => upd({ manual: v }) }; }),
     srTabSlots: ui.srTab === "slots", srTabBlk: ui.srTab === "blk", srTabInfo: ui.srTab === "info",

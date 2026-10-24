@@ -3,6 +3,7 @@
  * cancel a visit — the phone's own rules: the showroom's slots per weekday, its closures, its booking limit), Add note
  * (B6), Edit customer (the form the Principal / Director set, H3) and History (who changed which setting).
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { formV2 } from "./form";
 import { blockHours, type CrmCustomer, type CrmRoom } from "@/lib/member/crm-data";
@@ -84,7 +85,7 @@ export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
       pick: () => { if (!off) put({ slot: label }); } }; }) : [];
   const ok = !!room && !!b.slot && !!c;
   // Showroom · Online · Other, as the phone's (the owner, 2026-10-24: "電腦版也做"); Online / Other book from the footer.
-  const bkm = customBookVM({ b, put, changing: !!visit, now,
+  const bkm = customBookVM({ b, put, changing: !!visit, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
     save: f => (visit ? act.moveCustom(visit.id, f) : c ? act.bookCustom(c.id, f) : Promise.resolve(false)),
     done: () => patch({ kind: "chat", book: null, toast: `${b.mode === "online" ? "Online meeting" : "Appointment"} ${visit ? "changed" : "booked"} for ${c?.name ?? ""}` }) });
   const custom = !bkm.showroom;

@@ -6,6 +6,7 @@
  * Customer info, Appointment. The database lets the Principal and the
  * Director answer anyone (crm_can_reply).
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent } from "react";
 import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
@@ -340,7 +341,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
-    bkm: B && c ? customBookVM({ b: B, put: p => setB(p), changing: !!B.visitId, now,
+    bkm: B && c ? customBookVM({ b: B, put: p => setB(p), changing: !!B.visitId, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
       save: f => oneAtATime(`book:${c.id}`, () => (B.visitId ? act.moveCustom(B.visitId, f) : act.bookCustom(c.id, f))).then(ok => !!ok),
       done: () => { patch({ pBook: null }); act.toast(`${B.mode === "online" ? "Online meeting" : "Appointment"} ${B.visitId ? "changed" : "booked"} for ${c.name}`); } }) : null,
     bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm, bookRemarks: book?.remarks ?? "",

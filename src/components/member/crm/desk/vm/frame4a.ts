@@ -109,6 +109,7 @@ interface HeadBits {
   apDl: { v: string; tag: string; label: string; bg: string; fg: string; pick: () => void }[];
   apDlOpen: boolean; apToggleDl: () => void;
   sr4: { save: () => void; dirty: boolean };
+  srPage: "rooms" | "types"; at: { save: () => void; dirty: boolean };
   cfSave: () => void;
   cfSummary: string;
   ppCount: number;
@@ -139,7 +140,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     adsperf: { tabs: [], sub: "", cta: { label: "Export", icon: null, act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } } },
     // v2 (frames 06b / 06c): Assignment's five sections are the second row of tabs.
     assignment: { tabs: [], subTabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
-    showrooms: { tabs: [], sub: n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.sr4.save } },
+    // Showrooms and Appointment types (2026-10-24: "在電腦端有個控制面板，可以放在showroom 那邊"), each saved by the head's Save.
+    showrooms: { tabs: [], subTabs: ([["rooms", "Showrooms"], ["types", "Appointment types"]] as const).map(([k, label]) => ({ label, on: v.srPage === k, pick: () => ctx.patch({ srPage: k }) })),
+      sub: v.srPage === "types" ? "" : n(v.showroomCount, "showroom", "showrooms"), cta: { label: "Save", icon: "check", act: v.srPage === "types" ? v.at.save : v.sr4.save } },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },

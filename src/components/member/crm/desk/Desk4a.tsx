@@ -5,6 +5,8 @@
  * by hand from the frames' markup, placed into the generated DeskApp by tools/crm-design/desk-4a.cjs, and bound to
  * vm/frame4a.ts — the same links, counts, menus and permissions the frame had before.
  */
+import { DeskApptTypes } from "./DeskApptTypes";
+import type { apptTypesVM } from "./vm/appt-types";
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { usePanelOpenOn } from "./panel-state";
@@ -1511,6 +1513,7 @@ function DeleteRoom({ name, del }: { name: string; del: () => void }) {
 }
 
 interface RoomsBits {
+  srPage: "rooms" | "types"; at: ReturnType<typeof apptTypesVM>;
   sr4: {
     has: boolean; isNew: boolean; pager: { at: number; n: number; prev: () => void; next: () => void; prevOff: boolean; nextOff: boolean }; add: () => void;
     name: string; setName: (e: { target: { value: string } }) => void; addr: string; setAddr: (e: { target: { value: string } }) => void; links: { g: string; w: string };
@@ -1533,6 +1536,7 @@ const FIELD: CSSProperties = { height: "32px", padding: "0 8px", boxSizing: "bor
 
 /** Frame 07 · Showrooms: one at a time — its name and address typed in place, the map links, visits per slot, closures — and the weekly slots, 24 × 7. */
 export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
+  if (v.srPage === "types") return <DeskApptTypes v={v.at} />;
   const S = v.sr4;
   const [more, setMore] = useState(false);
   const round = (off: boolean): CSSProperties => ({ ...BTN, width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: off ? "var(--crm-faint-2)" : "var(--crm-ink)" });
