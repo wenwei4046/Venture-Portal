@@ -200,7 +200,7 @@ export function FieldPop<T extends FormField>({
           {names.length ? (
             <>
               <span className={c.popQ}>Where do the options come from?</span>
-              <div role="radiogroup" aria-label="Where do the options come from?">
+              <div className={c.srcList} role="radiogroup" aria-label="Where do the options come from?">
                 {names.map(name => (
                   <button key={name} type="button" role="radio" aria-checked={field.list === name} className={`${c.src}${field.list === name ? ` ${c.srcOn}` : ''}`}
                     onClick={() => onChange({ ...field, list: name })}>

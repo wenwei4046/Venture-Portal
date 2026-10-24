@@ -108,6 +108,7 @@
 .optBtn { height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .optBtn:disabled { opacity: .4; cursor: not-allowed; }
 /* Where a choice's options come from (③d-2): a shared list or its own — the handoff's radios. */
+.srcList { display: flex; flex-direction: column; gap: 6px; }
 .src { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; }
 .srcDot { width: 14px; height: 14px; flex: none; margin-top: 2px; border-radius: 50%; border: 1.5px solid rgb(var(--mk-radio)); }
 .srcOn .srcDot { border: 4.5px solid rgb(var(--mk-ink)); }
