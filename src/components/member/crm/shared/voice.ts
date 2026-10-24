@@ -24,7 +24,12 @@ export async function startVoice(): Promise<string | null> {
   if (!canRecord()) return "This browser cannot record voice notes.";
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch {
+  } catch (e) {
+    // Android (2026-10-24, the owner: "android allow 不到microphone" — the site's settings listed Camera and no Microphone):
+    // once the phone has refused the browser the microphone it never asks again, so the way is the phone's own settings.
+    const android = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+    if (android && (e as { name?: string })?.name === "NotAllowedError") return "Android has blocked the microphone: open Settings › Apps › Chrome (or Venture) › Permissions › Microphone › Allow, then try again.";
+    if ((e as { name?: string })?.name === "NotFoundError") return "No microphone was found on this device.";
     return "Allow the microphone for this site to record a voice note.";
   }
   const mime = voiceMime();
