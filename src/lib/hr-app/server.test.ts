@@ -76,6 +76,18 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     }
   })
 
+  // The step after the reminder (2026-10-24): Confirm as permanent and Extend by People · Edit; their letters and Renew's
+  // new contract by Documentation · Create on the person's page, as People's own forms ask.
+  it('Documentation · Create on a person’s page files a step’s letter — never without People open, nor while viewing as somebody', () => {
+    const withCells = (cells: Record<string, 'all'>) => hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all', ...cells }, permissions: [...HR_KEYS, 'team'] })
+    const filer = withCells({ 'documentation.create': 'all' })
+    expect(appAccess(filer).may).toMatchObject({ termEdit: true, letters: true })
+    expect(appAccess(withCells({})).may).toMatchObject({ termEdit: true, letters: false })
+    expect(appAccess({ ...filer, viewingAs: { id: 'x', name: 'Somebody' } }).may.letters).toBe(false)
+    // People's pages closed: no person page to file from.
+    expect(appAccess({ ...filer, tabs: ['hr.documentation.view', 'hr.documentation.create'], closed: ['hr.people.view', 'hr.people.edit'] }).may.letters).toBe(false)
+  })
+
   it('without the cell, the tab opens nothing', () => {
     const access = appAccess(hrUser({ actions: { 'rooms.view': 'all' }, permissions: ['meeting_rooms'] }))
     expect(access.parts).toEqual({ requests: false, hiring: false, insights: false, talent: false, docs: false, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
@@ -235,5 +247,33 @@ describe('viewing the app as somebody (the roles audit, 2026-10-11)', () => {
 
     const own = await loadHrAppData(hrUser({}))
     expect(own).toMatchObject({ greetName: 'Principal', viewingAs: null, meId: 'p1', personalLogin: true })
+  })
+})
+
+describe('the letter types a person’s step files its letter as (2026-10-24)', () => {
+  it('are read for whoever may file one — hr_letter_type_choices(), anything malformed left out — and not for anybody else', async () => {
+    const { readRoomsPeople, readRoomsRange } = await import('@/lib/rooms/read')
+    const { adminMemberAction } = await import('@/lib/member/server')
+    const { createClient } = await import('@/lib/supabase/server')
+    const { loadDocumentation } = await import('@/lib/documentation/server')
+    const { loadHiringBoard } = await import('@/lib/hiring/board')
+    vi.mocked(readRoomsRange).mockResolvedValue({ ok: false, reason: 'none' } as never)
+    vi.mocked(readRoomsPeople).mockResolvedValue({ ok: true, data: { me: { name: 'HR Manager', staffId: 'p1' }, account: 'HR', people: [], departments: [] } } as never)
+    vi.mocked(adminMemberAction).mockResolvedValue({ ok: false } as never)
+    vi.mocked(loadDocumentation).mockResolvedValue({ ok: false } as never)
+    vi.mocked(loadHiringBoard).mockResolvedValue({ ok: false } as never)
+    const rpc = vi.fn(async (name: string) => (name === 'hr_letter_type_choices'
+      ? { data: [{ id: 'cfs', name: 'Contract for Service', compulsory: false }, { id: 'x' }], error: null }
+      : { data: null, error: { message: 'none' } }))
+    const from = () => ({ select: () => ({ eq: async () => ({ data: [], error: null }) }) })
+    vi.mocked(createClient).mockResolvedValue({ rpc, from } as never)
+    const { loadHrAppData } = await import('./server')
+    const people = (cells: Record<string, 'all'>) => hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all', ...cells }, permissions: [...HR_KEYS, 'team'] })
+
+    expect((await loadHrAppData(people({ 'documentation.create': 'all' }))).letterTypes).toEqual([{ id: 'cfs', name: 'Contract for Service', compulsory: false }])
+    expect(rpc).toHaveBeenCalledWith('hr_letter_type_choices')
+    rpc.mockClear()
+    expect((await loadHrAppData(people({}))).letterTypes).toBeNull()
+    expect(rpc).not.toHaveBeenCalledWith('hr_letter_type_choices')
   })
 })
