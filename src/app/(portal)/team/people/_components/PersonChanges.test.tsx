@@ -197,3 +197,108 @@ describe('a contract in the Employment well', () => {
     expect(within(well('Employment')).getByText('They are not on a contract any more — reload the page.')).toBeInTheDocument()
   })
 })
+
+// Renew (2026-10-24 — the user: "当它已经 expired 之后，到时候按一下 renew，就可以再选一次是几个月，对不对？同时要 attach 一个新的
+// contract"): the new contract's first day, its period and its end, and the contract itself — filed as it is renewed.
+describe('Renew a contract', () => {
+  const TYPES = [
+    { id: 'offer', name: 'Offer letter', compulsory: true },
+    { id: 'cfs', name: 'Contract for Service', compulsory: false },
+  ]
+  // Ended 30 Sep 2026, still on it on 23 Oct.
+  const contract = (over: Partial<TermFacts> = {}): TermFacts => ({
+    hireDate: '2025-10-01', months: 12, endsOn: '2026-09-30', startsOn: '2025-10-01', ackEnd: null, ackName: null, ackAt: null, ...over,
+  })
+  const draw = (c: TermFacts, renew: { types: typeof TYPES } | null = { types: TYPES }) =>
+    render(<PersonChanges personId="p1" personName="TEST STAFF" title="Executive" department="Marketing" ladder={ladder()} active contract={c} renew={renew} today={TODAY} />)
+  const pdf = new File(['%PDF'], 'contract-2026.pdf', { type: 'application/pdf' })
+  const open = () => {
+    fireEvent.click(within(well('Employment')).getByRole('button', { name: 'Renew' }))
+    return screen.getByRole('group', { name: 'Renew the contract' })
+  }
+  const filed = () => {
+    mocks.letterTypeOf.mockResolvedValue({ ok: true, id: 'cfs', name: 'Contract for Service' })
+    mocks.upload.mockResolvedValue({ ok: true, path: 'letters/p1/u/contract-2026.pdf', fileName: 'contract-2026.pdf', contentType: 'application/pdf', size: 4 })
+  }
+
+  it('is offered to whoever may file its new contract, beside Acknowledge — and never without', () => {
+    const { unmount } = draw(contract())
+    expect(within(well('Employment')).getByRole('button', { name: 'Renew' })).toBeInTheDocument()
+    expect(within(well('Employment')).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    unmount()
+    draw(contract(), null)
+    expect(within(well('Employment')).queryByRole('button', { name: 'Renew' })).toBeNull()
+  })
+
+  it('opens on the day after the end, its period, the end it will have — and the type that says contract', () => {
+    draw(contract())
+    const form = open()
+    expect(within(form).getByLabelText('New contract starts')).toHaveValue('2026-10-01')
+    expect(within(form).getByLabelText('Period')).toHaveValue('12')
+    expect(within(form).getByText('30 Sep 2027')).toBeInTheDocument()
+    expect(within(form).getByLabelText('Letter type')).toHaveValue('cfs')
+    fireEvent.change(within(form).getByLabelText('Period'), { target: { value: '24' } })
+    expect(within(form).getByText('30 Sep 2028')).toBeInTheDocument()
+    expect(within(well('Employment')).queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Renew the contract' })).toBeNull()
+  })
+
+  it('asks for the new contract, and for a first day after this one’s, before anything goes', async () => {
+    draw(contract())
+    const form = open()
+    await act(async () => {
+      fireEvent.click(within(form).getByRole('button', { name: 'Renew' }))
+    })
+    expect(within(form).getByText('Attach the new contract.')).toBeInTheDocument()
+    fireEvent.change(within(form).getByLabelText('Letter file'), { target: { files: [pdf] } })
+    fireEvent.change(within(form).getByLabelText('New contract starts'), { target: { value: '2025-09-01' } })
+    await act(async () => {
+      fireEvent.click(within(form).getByRole('button', { name: 'Renew' }))
+    })
+    expect(within(form).getByText('The new contract starts after this one did (1 Oct 2025).')).toBeInTheDocument()
+    expect(mocks.upload).not.toHaveBeenCalled()
+    expect(mocks.renewContract).not.toHaveBeenCalled()
+  })
+
+  it('puts the contract up, then renews and files it together, and reads again', async () => {
+    filed()
+    mocks.renewContract.mockResolvedValue({ ok: true, endsOn: '2027-09-30' })
+    draw(contract())
+    const form = open()
+    fireEvent.change(within(form).getByLabelText('Letter file'), { target: { files: [pdf] } })
+    expect(within(form).getByText('contract-2026.pdf')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(within(form).getByRole('button', { name: 'Renew' }))
+    })
+    expect(mocks.letterTypeOf).toHaveBeenCalledWith(expect.objectContaining({ typeId: 'cfs' }), TYPES)
+    expect(mocks.upload).toHaveBeenCalledWith({ letterFor: 'p1' }, pdf)
+    expect(mocks.renewContract).toHaveBeenCalledWith({
+      staffId: 'p1',
+      start: '2026-10-01',
+      months: 12,
+      endsWas: '2026-09-30',
+      letter: { typeId: 'cfs', path: 'letters/p1/u/contract-2026.pdf', fileName: 'contract-2026.pdf', contentType: 'application/pdf', size: 4 },
+    })
+    expect(mocks.refresh).toHaveBeenCalled()
+    expect(screen.queryByRole('group', { name: 'Renew the contract' })).toBeNull()
+  })
+
+  it('a refusal is said in the form, which stays open', async () => {
+    filed()
+    mocks.renewContract.mockResolvedValue({ ok: false, reason: 'Their contract changed since this page was opened — reload it.' })
+    draw(contract())
+    const form = open()
+    fireEvent.change(within(form).getByLabelText('Letter file'), { target: { files: [pdf] } })
+    await act(async () => {
+      fireEvent.click(within(form).getByRole('button', { name: 'Renew' }))
+    })
+    expect(within(form).getByText('Their contract changed since this page was opened — reload it.')).toBeInTheDocument()
+    expect(mocks.refresh).not.toHaveBeenCalled()
+  })
+
+  it('a renewed contract reads from its own first day', () => {
+    draw(contract({ startsOn: '2026-10-01', endsOn: '2027-09-30' }))
+    expect(within(well('Employment')).getByText('12 months · from 1 Oct 2026 · ends 30 Sep 2027 · in 342 days')).toBeInTheDocument()
+  })
+})

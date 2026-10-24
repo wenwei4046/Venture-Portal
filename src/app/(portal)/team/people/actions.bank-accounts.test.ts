@@ -74,6 +74,11 @@ describe('staff bank account server actions', () => {
     }))
   })
 
+  // The letters Add Staff took beside the status go to the new person's Data center record after (2026-10-24).
+  it('answers who was filed', async () => {
+    await expect(addStaff(newStaffForm({ bank: 'CIMB', number: '00987654' }))).resolves.toEqual({ id: 'new-person' })
+  })
+
   it('updates or clears Account 2 explicitly while preserving the primary fields', async () => {
     await updateStaff('staff', staffForm({ bank: 'CIMB', number: '0098 7654' }))
     expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ bank_name: 'Maybank', bank_account_no: '0012345678', bank_name_2: 'CIMB', bank_account_no_2: '00987654' }))

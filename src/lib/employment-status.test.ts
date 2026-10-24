@@ -11,8 +11,10 @@ import {
   ackWords,
   answeredReminder,
   contractEnd,
+  dayAfter,
   daysFrom,
   employmentStatusOf,
+  isDay,
   monthsLabel,
   probationEnd,
   reminderAcknowledged,
@@ -70,6 +72,34 @@ describe('contractEnd — the database’s contract_end to the day', () => {
     expect(sql).toMatch(/\(hire_date \+ make_interval\(months => contract_months::integer\)\)::date - 1/)
     expect(sql).toContain('contract_months BETWEEN 1 AND 36')
     expect([...CONTRACT_MONTH_CHOICES]).toEqual([6, 12, 18, 24, 30, 36])
+  })
+
+  // Renew (2026-10-24 — "按一下 renew，就可以再选一次是几个月"): the contract they are on now counts from its own first day.
+  it('counts a renewed contract from its first day, as the column does since 20261025052000', () => {
+    expect(contractEnd('2027-10-01', 12)).toBe('2028-09-30')
+    expect(contractEnd('2027-01-31', 1)).toBe('2027-02-27')
+    expect(contractEnd('2028-02-29', 12)).toBe('2029-02-27')
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261025052000_people_contract_renew.sql'), 'utf8')
+    expect(sql).toMatch(/\(coalesce\(contract_start, hire_date\) \+ make_interval\(months => contract_months::integer\)\)::date - 1/)
+  })
+})
+
+describe('a day', () => {
+  it('isDay takes a real YYYY-MM-DD only', () => {
+    expect(isDay('2026-10-24')).toBe(true)
+    expect(isDay('2028-02-29')).toBe(true)
+    expect(isDay('2027-02-29')).toBe(false)
+    expect(isDay('2026-13-01')).toBe(false)
+    expect(isDay('24/10/2026')).toBe(false)
+    expect(isDay('')).toBe(false)
+    expect(isDay(null)).toBe(false)
+  })
+
+  it('dayAfter crosses a month’s, a year’s and a leap February’s end', () => {
+    expect(dayAfter('2027-09-30')).toBe('2027-10-01')
+    expect(dayAfter('2026-12-31')).toBe('2027-01-01')
+    expect(dayAfter('2028-02-28')).toBe('2028-02-29')
+    expect(dayAfter('2027-02-28')).toBe('2027-03-01')
   })
 })
 
