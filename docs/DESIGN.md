@@ -1022,7 +1022,7 @@ On the sheet (`payment-statement.css`, `payment-tables.css`).
 **Generating — two ways, nothing else**
 - **Generate by Department:** one PV per scheme.
 - **Manual generate:** a quiet button for an exception — one PV per person per scheme, which names that person's pay.
-- **A resubmit still open waits** (statutory): the person reads *Resubmit open* in the window, with no figure, and the institution's row says *N waiting for a resubmit* until Payroll sends it.
+- **A resubmit still open waits** (statutory): the person reads *Resubmit open* in the window, with no figure, and the institution's row says *N waiting for a resubmit* until Payroll sends it; if nothing else is left, the headline reads *Waiting for a resubmit* · *Open Payroll →*.
 
 **The `GenerationWindow`** (native `<dialog>`, `showModal()`)
 - **Scroll and focus:** only the employee table scrolls; `main` locks; focus returns on close.
