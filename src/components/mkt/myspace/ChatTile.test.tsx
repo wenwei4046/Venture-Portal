@@ -112,6 +112,19 @@ describe('the lobby', () => {
   })
 })
 
+describe('a direct message opened on a complaint (⑦-3b)', () => {
+  it('a full-access title’s own login: 🔍 Review beside the tabs, to its page — nobody else sees it', async () => {
+    reads.readChatThread.mockResolvedValue(thread('lobby', []))
+    let view!: ReturnType<typeof render>
+    await act(async () => { view = render(<ChatTile list={listFor(null, { reviewer: true })} canSpeak={false} tasks={[]} />) })
+    expect(screen.getByRole('link', { name: '🔍 Review' }).getAttribute('href')).toBe('/marketing/chat-review')
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['🏛️ Lobby'])
+    view.unmount()
+    await act(async () => { render(<ChatTile list={listFor(null)} canSpeak={false} tasks={[]} />) })
+    expect(screen.queryByRole('link', { name: '🔍 Review' })).toBeNull()
+  })
+})
+
 describe('a chat opened by a visit, and older messages', () => {
   it('a visit’s Message opens the chat with them — read, not marked until the person moves in it', async () => {
     reads.readChatThread.mockResolvedValueOnce(thread(MEI, [m(3, MEI, 'Mei', 'Can you check the banner?')]))

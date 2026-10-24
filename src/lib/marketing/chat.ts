@@ -36,6 +36,8 @@ export interface ChatPeer {
 export interface ChatList {
   /** The caller's staff id — null off the roster: the lobby only, read only. */
   me: string | null
+  /** A full-access title's own login: they may open a direct message on a complaint (⑦-3b — the tile's 🔍 Review). */
+  reviewer: boolean
   lobby: { last: ChatMessage | null; unread: boolean }
   dms: ChatPeer[]
 }
@@ -86,6 +88,7 @@ export function chatListFromRow(row: unknown): ChatList {
   }
   return {
     me: typeof r.me === 'string' && r.me ? r.me : null,
+    reviewer: r.reviewer === true,
     lobby: { last: chatMessageFromRow(lobby.last), unread: lobby.unread === true },
     dms,
   }
