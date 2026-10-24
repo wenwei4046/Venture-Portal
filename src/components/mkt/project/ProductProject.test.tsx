@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { productProjectFromRow, type ProductProjectPage } from '@/lib/marketing/project'
 
 // 2026-10-23 — a 📦 product project's page (②b-1, `New Project.dc.html` steps 2–4) for the people who work it: the
@@ -15,6 +15,8 @@ const actions = vi.hoisted(() => ({
   overrideMktProject: vi.fn(),
   resendMktProject: vi.fn(),
   beginMktProduct: vi.fn(),
+  setMktProjectAmount: vi.fn(),
+  stopMktProduct: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }))
@@ -241,5 +243,56 @@ describe('a product project, for an attendee', () => {
     await waitFor(() => expect(actions.signMktMinutes).toHaveBeenCalledWith('m1', 'p1'))
     expect(await screen.findAllByText('Signed')).toHaveLength(3)
     expect(actions.fillMktMinutes).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-24 — ②b-2b: the manager's Billing card (the user's answers 43, 44, 51) — the amount, when it is billed, the
+// amount changed, a recurring project stopped. The database's side is tests/member-sql/validate-marketing-billing.mjs.
+describe('a product project’s billing, the manager’s', () => {
+  const running = { status: 'active', link: 'abc123', linkSentAt: '2026-10-24T05:00:00Z' }
+  const billed = (p: ProductProjectPage, bill: Record<string, unknown>) => ({ ...p, bill: { amount: 3000, from: '2026-08-01', until: null, confirmed: 1, last: '2026-09-01', ...bill } } as ProductProjectPage)
+
+  it('shows the amount and when it is billed; the amount changed is saved', async () => {
+    render(<ProductProject initial={billed(page(RACHEL, running), {})} can={MANAGER} />)
+    const card = screen.getByLabelText('Billing')
+    expect(within(card).getByText('Monthly')).toBeTruthy()
+    expect(within(card).getByText('RM 3,000.00')).toBeTruthy()
+    expect(within(card).getByText('Monthly · from Aug 2026 · confirmed to Sep 2026')).toBeTruthy()
+    expect(within(card).getByRole('link', { name: 'Billing →' }).getAttribute('href')).toBe('/marketing/billing?m=2026-09')
+    fireEvent.click(within(card).getByRole('button', { name: 'Change amount' }))
+    fireEvent.change(within(card).getByRole('textbox', { name: 'Amount' }), { target: { value: '3200' } })
+    actions.setMktProjectAmount.mockResolvedValue({ ok: true, page: billed(page(RACHEL, running), { amount: 3200 }) })
+    await act(async () => {
+      fireEvent.click(within(card).getByRole('button', { name: 'Save' }))
+    })
+    expect(actions.setMktProjectAmount).toHaveBeenCalledWith('p1', 3200)
+    await waitFor(() => expect(within(screen.getByLabelText('Billing')).getByText('RM 3,200.00')).toBeTruthy())
+  })
+
+  it('a recurring project stopped: asked first; this month its last billed', async () => {
+    render(<ProductProject initial={billed(page(RACHEL, running), {})} can={MANAGER} />)
+    fireEvent.click(within(screen.getByLabelText('Billing')).getByRole('button', { name: 'Stop…' }))
+    const dialog = screen.getByRole('dialog', { name: /^Stop / })
+    expect(within(dialog).getByText('Oct 2026 is its last month billed · work under way carries on')).toBeTruthy()
+    actions.stopMktProduct.mockResolvedValue({ ok: true, page: billed(page(RACHEL, { ...running, status: 'done' }), { until: '2026-10-01' }) })
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Stop' }))
+    })
+    expect(actions.stopMktProduct).toHaveBeenCalledWith('p1')
+    const card = await screen.findByLabelText('Billing')
+    await waitFor(() => expect(within(card).getByText('Stopped · Aug 2026 – Oct 2026')).toBeTruthy())
+    expect(within(card).queryByRole('button', { name: 'Stop…' })).toBeNull()
+  })
+
+  it('a one-time project’s amount stays once its billing is confirmed; nobody but the manager sees the card', () => {
+    const one = page(RACHEL, { ...running, status: 'done', product: { id: 'pr', version: 1, name: 'Post pack', kind: 'one', note: '' } })
+    const { unmount } = render(<ProductProject initial={billed(one, { amount: 500, from: null, last: '2026-10-01' })} can={MANAGER} />)
+    const card = screen.getByLabelText('Billing')
+    expect(within(card).getByText('Billed once done · confirmed for Oct 2026')).toBeTruthy()
+    expect(within(card).queryByRole('button', { name: 'Change amount' })).toBeNull()
+    expect(within(card).queryByRole('button', { name: 'Stop…' })).toBeNull()
+    unmount()
+    render(<ProductProject initial={one} can={{ edit: true, manage: false }} />)
+    expect(screen.queryByLabelText('Billing')).toBeNull()
   })
 })

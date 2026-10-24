@@ -4,6 +4,7 @@
 // ever edited. Not yet: corrections (question 19), Export (question 18), the Attachment column (no record holds a file
 // until Marketing's R2 bucket). Pure.
 
+import { monthLabel } from './billing'
 import type { MktProjectKind } from './board'
 import { eventFromRow, trailTime, type TaskEvent } from './task'
 
@@ -67,8 +68,12 @@ const OF_SUBTASK = new Set(['subtask', 'delivered', 'delivery returned', 'delive
 /** A product project's actions whose reason is a name or a minutes' title — their own columns, not Reason. */
 const TO_PIC = new Set(['link sent', 'resent'])
 const OF_MINUTES = new Set(['signed', 'minutes completed', 'pic approved'])
+/** Billing's lines (②b-2b): the month they are for, in the Version column — never a figure. */
+const OF_MONTH: Record<string, string> = { 'billing confirmed': 'month', 'billing withdrawn': 'month', stopped: 'until' }
 const QUOTED = new Set(['changes', 'pic changes', 'started before approval', 'reassigned', 'replaced', 'delivery returned'])
 const NONE = '—'
+
+const monthOfLine = (v: unknown) => (typeof v === 'string' && /^[0-9]{4}-[0-9]{2}$/.test(v) ? monthLabel(`${v}-01`) : NONE)
 
 function actionWords(e: TaskEvent, kind: MktProjectKind): string {
   if (e.action === 'created') return kind === 'product' ? 'Project started' : e.data?.kind === 'recurring' ? 'Recurring task created' : 'Task created'
@@ -91,6 +96,7 @@ export function auditRows(log: ProjectLog): AuditRow[] {
         : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
       reason: TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: OF_SUBTASK.has(e.action) && typeof e.data?.title === 'string' ? (e.version ? `${e.data.title} ${e.version}` : e.data.title)
+        : OF_MONTH[e.action] ? monthOfLine(e.data?.[OF_MONTH[e.action]])
         : e.version ? (e.stageName ? `${e.stageName} ${e.version}` : e.version) : OF_MINUTES.has(e.action) ? reason || NONE : product || NONE,
     }
   })

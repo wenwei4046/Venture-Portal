@@ -117,6 +117,13 @@ describe('a task’s page', () => {
     expect([replaced('owner'), replaced('appr'), replaced('subtask', { subtask: 'Thumbnail' })]).toEqual([
       'Josiah replaced Siti → Hafiz · Redesign · "Resigned"', 'Josiah replaced Siti → Hafiz as approver · Redesign · "Resigned"',
       'Josiah replaced Siti → Hafiz on a subtask "Thumbnail" · Redesign · "Resigned"'])
+    // Billing (②b-2b), as a subsidiary's feed reads a product project's trail: its month, never its figure.
+    const billing = (action: string, data: Record<string, unknown> | null) =>
+      eventText({ id: 11, at: '', actor: 'Josiah', action, stage: null, stageName: null, fromTo: null, reason: null, version: null, data }, page)
+    expect([billing('amount set', null), billing('billing confirmed', { month: '2026-10' }), billing('billing withdrawn', { month: '2026-10' }),
+      billing('stopped', { until: '2026-12' }), billing('billing confirmed', { month: 'soon' })]).toEqual([
+      'Josiah set the amount', 'Josiah confirmed the billing for Oct 2026', 'Josiah withdrew the billing for Oct 2026',
+      'Josiah stopped the project · billed to Dec 2026', 'Josiah confirmed the billing for a month'])
   })
 
   it('a series: its rule, its runs', () => {

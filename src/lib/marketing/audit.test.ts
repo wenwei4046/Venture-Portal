@@ -61,6 +61,21 @@ describe('a project’s formal log', () => {
     expect(auditRows(log).map(line)).toEqual(['1 | 24 Oct 11:40 | Josiah | Replaced | amber | Draft | Siti → Hafiz | "Resigned" | —'])
   })
 
+  it('billing’s lines (②b-2b): its words, the month in the Version column — never a figure', () => {
+    const log = projectLogFromRow({ track: 'MKT-CAR-2610-007', title: 'Social media', kind: 'product', rows: [
+      { id: 30, at: '2026-10-24T02:00:00Z', actor: 'Josiah', action: 'amount set' },
+      { id: 31, at: '2026-10-24T03:00:00Z', actor: 'Josiah', action: 'billing confirmed', data: { month: '2026-10' } },
+      { id: 32, at: '2026-10-24T04:00:00Z', actor: 'Josiah', action: 'billing withdrawn', data: { month: '2026-10' } },
+      { id: 33, at: '2026-10-24T05:00:00Z', actor: 'Josiah', action: 'stopped', data: { until: '2026-10' } },
+    ] })!
+    expect(auditRows(log).map(line)).toEqual([
+      '1 | 24 Oct 10:00 | Josiah | Amount set | grey | — | — | — | —',
+      '2 | 24 Oct 11:00 | Josiah | Billing confirmed | green | — | — | — | Oct 2026',
+      '3 | 24 Oct 12:00 | Josiah | Billing withdrawn | amber | — | — | — | Oct 2026',
+      '4 | 24 Oct 13:00 | Josiah | Stopped | amber | — | — | — | Oct 2026',
+    ])
+  })
+
   it('filters by person, action and stage — each value as first named, counted over the whole log', () => {
     const rows = auditRows(task)
     const groups = auditGroups(rows, NO_AUDIT_FILTER)

@@ -176,6 +176,21 @@ describe('where it stands', () => {
       '24 Oct 09:00 RACHEL started the project · Social Media Package A v2',
     ])
   })
+
+  // ②b-2b: billing's lines — the month they are for, never the figure (amounts are the manager's, the trail everybody's).
+  it('billing’s lines: the amount set, a month confirmed or withdrawn, the project stopped', () => {
+    const pp = page()
+    pp.trail = [
+      { at: '2026-10-24T09:00:00Z', actor: 'Josiah', action: 'stopped', reason: '', data: { until: '2026-10' } },
+      { at: '2026-10-24T08:00:00Z', actor: 'Josiah', action: 'billing withdrawn', reason: '', data: { month: '2026-09' } },
+      { at: '2026-10-24T07:00:00Z', actor: 'Josiah', action: 'billing confirmed', reason: '', data: { month: '2026-09' } },
+      { at: '2026-10-24T06:00:00Z', actor: 'Josiah', action: 'amount set', reason: '', data: null },
+    ]
+    expect(productTrail(pp).map(l => l.text)).toEqual([
+      'Josiah stopped the project · billed to Oct 2026', 'Josiah withdrew the billing for Sep 2026',
+      'Josiah confirmed the billing for Sep 2026', 'Josiah set the amount',
+    ])
+  })
 })
 
 describe('the save and the link', () => {
