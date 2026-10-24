@@ -65,6 +65,17 @@ describe('what the calendar link reads', () => {
     expect(cal().approvals[1]).toEqual({ day: '2026-11-05', title: 'Reel', product: 'Nov content', stage: 'Approval', code: C2, waiting: true })
   })
 
+  it('a product project’s name without the subsidiary’s in front — the whole page is the subsidiary’s', () => {
+    const c = cal({
+      dates: [{ day: '2026-11-11', kind: 'post', field: 'Post day', title: 'Post 1/2', product: 'Carres · Social Media · Oct 2026', code: C1, done: false, posted: null }],
+      approvals: [{ day: '2026-11-11', title: 'Carres · Social Media · Oct 2026', product: 'Carres · Social Media · Oct 2026', stage: 'S', code: C1, waiting: true }],
+      minutes: [{ title: 'Carres · Social Media · Oct 2026', code: C1, sentAt: null }],
+      campaigns: [{ title: 'Carres · 11.11 Deal · Nov 2026', from: '2026-11-09', until: '2026-11-12', code: C1 }, { title: 'Carresville sale', from: '2026-11-09', until: '2026-11-12', code: C1 }],
+    })
+    expect([c.dates[0].product, c.approvals[0].title, c.approvals[0].product, c.minutes[0].title, c.campaigns.map(x => x.title)])
+      .toEqual(['Social Media · Oct 2026', 'Social Media · Oct 2026', 'Social Media · Oct 2026', 'Social Media · Oct 2026', ['11.11 Deal · Nov 2026', 'Carresville sale']])
+  })
+
   it('its address, and WhatsApp’s words with it', () => {
     expect(calendarUrl('https://erp.example/', C1)).toBe(`https://erp.example/cal/${C1}`)
     expect(calendarMessage('Kelvin', 'Carres', 'u')).toBe('Hi Kelvin, Carres’s marketing calendar — what is coming up, and what waits for your approval: u')

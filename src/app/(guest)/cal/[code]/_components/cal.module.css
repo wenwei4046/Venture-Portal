@@ -115,7 +115,8 @@
 .cellOut .dayNum { color: rgb(var(--pk-faint)); }
 .dayNumToday, .cellOut .dayNumToday { background: rgb(var(--pk-brown)); color: rgb(var(--pk-white)); font-weight: 600; }
 .barSpace { flex: none; }
-.chip { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 5px; border: 1px solid; font-size: 11.5px; min-width: 0; text-decoration: none; }
+/* Its border's width and style alone — the colour is its kind's (a `border` shorthand here would reset it). */
+.chip { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 5px; border-width: 1px; border-style: solid; font-size: 11.5px; min-width: 0; text-decoration: none; }
 .chipGlyph { font-size: 10px; font-weight: 700; flex: none; }
 .chipText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 .bar { position: absolute; height: 20px; font-size: 11px; font-weight: 600; display: flex; align-items: center; padding: 0 8px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
@@ -126,7 +127,7 @@
 
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; font-size: 12px; color: rgb(var(--pk-text-2)); }
 .legendItem { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.swatch { width: 18px; height: 18px; box-sizing: border-box; border-radius: 5px; border: 1px solid; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
+.swatch { width: 18px; height: 18px; box-sizing: border-box; border-radius: 5px; border-width: 1px; border-style: solid; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
 
 @media (min-width: 900px) {
   .topIn, .main { max-width: 1080px; padding-left: 32px; padding-right: 32px; }

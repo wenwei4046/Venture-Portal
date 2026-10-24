@@ -69,25 +69,29 @@ export function picCalendarFromRow(v: unknown): PicCalendar | null {
   const today = dayOrNull(v.today), from = dayOrNull(v.from), to = dayOrNull(v.to)
   if (!today || !from || !to) return null
   const sub = isObj(v.sub) ? v.sub : {}
+  const subName = str(sub.name)
+  // A product project is named "<subsidiary> · <product> · <month>" (mkt_product_start); the whole page is the
+  // subsidiary's, so its name goes from the front.
+  const own = (t: unknown) => (subName && str(t).startsWith(`${subName} · `) ? str(t).slice(subName.length + 3) : str(t))
   return {
     today, from, to,
-    sub: { name: str(sub.name), dot: /^(oklch|rgb)\([0-9. /]+\)$/.test(str(sub.dot)) ? str(sub.dot) : 'oklch(0.62 0.02 60)' },
+    sub: { name: subName, dot: /^(oklch|rgb)\([0-9. /]+\)$/.test(str(sub.dot)) ? str(sub.dot) : 'oklch(0.62 0.02 60)' },
     pic: str(v.pic),
     dates: rows(v.dates).flatMap(d => {
       const day = dayOrNull(d.day)
       const kind = DATE_KINDS.find(k => k === d.kind)
       if (!day || !kind) return []
       const posted = isObj(d.posted) && /^https?:\/\//i.test(str(d.posted.link)) ? { at: str(d.posted.at) || null, link: str(d.posted.link) } : null
-      return [{ day, kind, field: str(d.field), title: str(d.title), product: str(d.product), code: codeOrNull(d.code), done: d.done === true, posted }]
+      return [{ day, kind, field: str(d.field), title: own(d.title), product: own(d.product), code: codeOrNull(d.code), done: d.done === true, posted }]
     }),
     approvals: rows(v.approvals).flatMap(a => {
       const day = dayOrNull(a.day)
-      return day ? [{ day, title: str(a.title), product: str(a.product), stage: str(a.stage), code: codeOrNull(a.code), waiting: a.waiting === true }] : []
+      return day ? [{ day, title: own(a.title), product: own(a.product), stage: str(a.stage), code: codeOrNull(a.code), waiting: a.waiting === true }] : []
     }),
-    minutes: rows(v.minutes).map(m => ({ title: str(m.title), code: codeOrNull(m.code), sentAt: str(m.sentAt) || null })),
+    minutes: rows(v.minutes).map(m => ({ title: own(m.title), code: codeOrNull(m.code), sentAt: str(m.sentAt) || null })),
     campaigns: rows(v.campaigns).flatMap(c => {
       const a = dayOrNull(c.from), b = dayOrNull(c.until)
-      return a && b && a <= b ? [{ title: str(c.title), from: a, until: b, code: codeOrNull(c.code) }] : []
+      return a && b && a <= b ? [{ title: own(c.title), from: a, until: b, code: codeOrNull(c.code) }] : []
     }),
     holidays: rows(v.holidays).flatMap(h => (dayOrNull(h.day) ? [{ day: str(h.day), name: str(h.name) }] : [])),
   }
