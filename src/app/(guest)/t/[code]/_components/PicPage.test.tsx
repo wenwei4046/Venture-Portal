@@ -141,6 +141,20 @@ describe('the work on the PIC’s link (②b-2d)', () => {
     expect(screen.getByText('0 of 2 done · 1 waiting for you')).toBeTruthy()
   })
 
+  it('a stage’s files they see (②b-2e): under their field, or with its links — each opened on its own route of the link', () => {
+    const files = [
+      { key: '30000000-0000-4000-8000-000000000001', name: 'final.png', size: 2048, mime: 'image/png', field: 'Caption' },
+      { key: '30000000-0000-4000-8000-000000000003', name: 'Moodboard.pdf', size: 51200, mime: 'application/pdf', field: null },
+    ]
+    const base = work()
+    render(<PicPage code={CODE} initial={running([work({ stage: { ...base.stage, files } })])} />)
+    const final = screen.getByRole('link', { name: '📎 final.png' })
+    expect(final.getAttribute('href')).toBe(`/t/${CODE}/f/30000000-0000-4000-8000-000000000001`)
+    expect(final.closest('div')?.textContent).toContain('Caption')
+    expect(screen.getByText('2 KB')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '📎 Moodboard.pdf · 50 KB' }).getAttribute('href')).toBe(`/t/${CODE}/f/30000000-0000-4000-8000-000000000003`)
+  })
+
   it('approves a stage with their full name, on the version they read', async () => {
     render(<PicPage code={CODE} initial={running([work()])} />)
     const item = screen.getByLabelText('Image post 1/2')

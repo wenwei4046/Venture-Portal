@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { answerPicStage } from '@/lib/marketing/pic-actions'
-import { bothState, nameOk, stageReasonOk, workLastLine, workState, workWaiting, type PicNo, type PicPage, type PicWork as Work } from '@/lib/marketing/pic'
-import type { Tone } from '@/lib/marketing/task'
+import { bothState, nameOk, picFileHref, stageReasonOk, workLastLine, workState, workWaiting, type PicNo, type PicPage, type PicWork as Work } from '@/lib/marketing/pic'
+import { sizeText, type Tone } from '@/lib/marketing/task'
 import s from './pic.module.css'
 
 // The work on the PIC's link (②b-2d, `PIC Task Link.dc.html`): each deliverable of the project, where it stands in
@@ -64,15 +64,21 @@ function Item({ code, work, today, you, other, onPage }: { code: string; work: W
               {stage.fields.map(f => (
                 <div key={f.name} className={s.kv}>
                   <dt className={s.k}>{f.name}</dt>
-                  {f.value === null ? <dd className={`${s.v} ${s.empty}`}>—</dd>
-                    : /^https:\/\//i.test(f.value) ? <dd className={s.v}><a className={s.link} href={f.value} target="_blank" rel="noreferrer noopener">{f.value}</a></dd>
-                      : <dd className={s.v}>{f.value}</dd>}
+                  {f.value === null && !stage.files.some(x => x.field === f.name) ? <dd className={`${s.v} ${s.empty}`}>—</dd>
+                    : f.value !== null && /^https:\/\//i.test(f.value) ? <dd className={s.v}><a className={s.link} href={f.value} target="_blank" rel="noreferrer noopener">{f.value}</a></dd>
+                      : f.value !== null ? <dd className={s.v}>{f.value}</dd> : null}
+                  {stage.files.filter(x => x.field === f.name).map(x => (
+                    <dd key={x.key} className={s.v}><a className={s.link} href={picFileHref(code, x.key)} target="_blank" rel="noreferrer noopener">📎 {x.name}</a> <span className={s.empty}>{sizeText(x.size)}</span></dd>
+                  ))}
                 </div>
               ))}
             </dl>
           ) : null}
-          {stage.links.length ? (
+          {stage.links.length || stage.files.some(x => !x.field) ? (
             <div className={s.workLinks}>
+              {stage.files.filter(x => !x.field).map(x => (
+                <a key={x.key} className={s.link} href={picFileHref(code, x.key)} target="_blank" rel="noreferrer noopener">📎 {x.name} · {sizeText(x.size)}</a>
+              ))}
               {stage.links.map(l => (
                 <a key={l.url} className={s.link} href={l.url} target="_blank" rel="noreferrer noopener">{l.label || l.url}</a>
               ))}

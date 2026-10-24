@@ -14,8 +14,12 @@ const actions = vi.hoisted(() => ({
   decideMktStage: vi.fn(),
   setMktSeries: vi.fn(),
   putMktFree: vi.fn(),
+  saveMktStageFiles: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
+const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => bucket } }) }))
+vi.mock('@/lib/storage/browser', () => ({ fileRoute: (b: string, p: string) => `/files/${b}/${p}` }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 const readProjectLog = vi.hoisted(() => vi.fn())
 vi.mock('../audit/read', () => ({ readProjectLog }))
@@ -52,8 +56,52 @@ function page(me: string, redesign: Record<string, unknown>): MktTaskPage {
 const ALL = { edit: true, approve: true, manage: true }
 
 beforeEach(() => {
-  for (const f of Object.values(actions)) f.mockReset()
+  for (const f of [...Object.values(actions), bucket.upload, bucket.remove]) f.mockReset()
   actions.saveMktWork.mockResolvedValue({ ok: true, missing: [] })
+  bucket.upload.mockResolvedValue({ data: { path: 'x' }, error: null })
+  bucket.remove.mockResolvedValue({ data: [], error: null })
+})
+
+describe('a stage’s own files (②b-2e)', () => {
+  const ART = (path: string) => ({ path, name: 'art.png', size: 2048, mime: 'image/png', field: 'Final artwork', by: 'Siti', at: '2026-10-25T03:00:00Z' })
+  it('a File field takes a file: sent to the bucket under stage/ first, then saved with the work — and taken off', async () => {
+    const { container } = render(<TaskPage initial={page(SITI, {})} can={ALL} />)
+    const file = new File(['png'], 'art.png', { type: 'image/png' })
+    actions.saveMktStageFiles.mockImplementation(async (_p: string, files: { path: string }[]) =>
+      ({ ok: true, page: page(SITI, { work: { files: files.map(f => ART(f.path)) } }) }))
+    await act(async () => {
+      fireEvent.change(container.querySelector('input[aria-label="Upload files for Final artwork"]') as HTMLInputElement, { target: { files: [file] } })
+    })
+    await waitFor(() => expect(actions.saveMktStageFiles).toHaveBeenCalled())
+    const [path, sent] = bucket.upload.mock.calls[0]
+    expect([/^stage\/[0-9a-f-]{36}\/art\.png$/.test(path), sent]).toEqual([true, file])
+    expect(actions.saveMktStageFiles).toHaveBeenCalledWith('p1', [{ path, name: 'art.png', field: 'Final artwork' }])
+    expect(await screen.findByText('📎 art.png')).toBeTruthy()
+    expect(screen.getByText('2 KB · Uploaded by Siti · 25 Oct')).toBeTruthy()
+    expect(screen.getByText('Fill in Logo checked')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove art.png' }))
+    })
+    await waitFor(() => expect(actions.saveMktStageFiles).toHaveBeenLastCalledWith('p1', []))
+    expect(bucket.remove).not.toHaveBeenCalled()
+  })
+
+  it('refused: the file just sent is taken back, and the reason said', async () => {
+    const { container } = render(<TaskPage initial={page(SITI, {})} can={ALL} />)
+    actions.saveMktStageFiles.mockResolvedValue({ ok: false, reason: 'Accept the stage first — or it is with its approver now.' })
+    await act(async () => {
+      fireEvent.change(container.querySelector('input[aria-label="Upload files for Final artwork"]') as HTMLInputElement, { target: { files: [new File(['x'], 'a.png')] } })
+    })
+    expect(await screen.findByText('Accept the stage first — or it is with its approver now.')).toBeTruthy()
+    expect(bucket.remove).toHaveBeenCalledWith([bucket.upload.mock.calls[0][0]])
+  })
+
+  it('read only: the files as cards, no drop zone, no ×', () => {
+    render(<TaskPage initial={page(RACHEL, { status: 'review', ver: 1, work: { files: [ART('stage/k/art.png')] } })} can={ALL} />)
+    expect((screen.getByText('📎 art.png').closest('a') as HTMLAnchorElement).getAttribute('href')).toBe('/files/marketing/stage/k/art.png')
+    expect(screen.queryByText('Drop the file here')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove art.png' })).toBeNull()
+  })
 })
 
 describe('the task page, for the people who work it', () => {
@@ -63,7 +111,7 @@ describe('the task page, for the people who work it', () => {
     expect(submit).toHaveProperty('disabled', true)
     expect(screen.getByText('Fill in Final artwork, Logo checked')).toBeTruthy()
 
-    const link = screen.getByPlaceholderText('https://… (a link to the file)')
+    const link = screen.getByPlaceholderText('or a link — https://…')
     fireEvent.change(link, { target: { value: 'https://drive.google.com/a' } })
     fireEvent.blur(link)
     await waitFor(() => expect(actions.saveMktWork).toHaveBeenCalledWith('p1', { vals: { 'Final artwork': 'https://drive.google.com/a' } }))

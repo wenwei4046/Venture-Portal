@@ -106,6 +106,22 @@ export async function saveMktWork(project: string, work: Partial<{ notes: string
   return { ok: true, missing }
 }
 
+/** Your stage's files (②b-2e, mig 20261025113000): the whole list — those already the stage's, the ones just sent to
+ * the bucket under stage/ — each a File field's (field: its label) or the stage's own Files (null); one left out is
+ * taken off. Answered with the task as it now stands (each file's size, who sent it, when). */
+export async function saveMktStageFiles(project: string, files: { path: string; name: string; field: string | null }[]): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
+  const list = (Array.isArray(files) ? files : []).slice(0, 40).map(f => ({
+    path: String(f?.path ?? '').slice(0, 1100), name: String(f?.name ?? '').slice(0, 300), field: f?.field ? String(f.field).slice(0, 200) : null,
+  }))
+  const db = await client()
+  const { error } = await db.rpc('mkt_stage_save', { p_project: project, p_work: { files: list } })
+  if (error) return { ok: false, reason: words(error, 'The files could not be saved. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
 /** Hand your stage on: to its approver, or — none — completed. `pick`: who takes the next stage, when it is yours to pick. */
 export async function submitMktStage(project: string, pick?: string | null): Promise<Done<{ page: MktTaskPage | null }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')

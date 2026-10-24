@@ -453,5 +453,9 @@ export const libraryPath = (fileName: string, uuid: string) => `library/${uuid}/
 export const subtaskPath = (fileName: string, uuid: string) => `subtask/${uuid}/${tidyFileName(fileName)}`
 /** Files one delivery holds at most (the database's ten). */
 export const SUB_MAX_FILES = 10
+/** stage/<uuid>/<name> — a stage's own file (mig 20261025113000: its INSERT policy; mkt_stage_save asks for this shape). */
+export const stagePath = (fileName: string, uuid: string) => `stage/${uuid}/${tidyFileName(fileName)}`
+/** Files a stage holds at most (the database's twenty). */
+export const STAGE_MAX_FILES = 20
 /** The name a file is listed under: its own, without its ending. */
 export const listedName = (fileName: string) => fileName.replace(/\.[a-z0-9]{1,6}$/i, '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'File'

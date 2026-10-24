@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { withFileStorage } from '@/lib/storage/server'
 import { isPicCode, picPageFromRow, type PicPage } from './pic'
 
 /**
@@ -13,6 +14,18 @@ export function picClient(): SupabaseClient {
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: { getAll: () => [], setAll: () => {} },
   }) as unknown as SupabaseClient
+}
+
+/**
+ * A file of the work on the PIC's link (②b-2e, mig 20261025113000): the same stranger, carrying the link's code in
+ * `x-link-code` — the bucket's anon policy reads it (mkt_pic_may_read) before anything is signed, as a Library share
+ * link's (share-server.ts). The database answers it mkt_pic_file, granted to anon by name, checking the code.
+ */
+export function picFileClient(code: string): SupabaseClient {
+  return withFileStorage(createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: { getAll: () => [], setAll: () => {} },
+    global: { headers: { 'x-link-code': code } },
+  })) as unknown as SupabaseClient
 }
 
 /** What /t/<code> draws — null: the link is closed (a wrong code, a cancelled project, never sent). */

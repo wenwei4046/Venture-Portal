@@ -71,13 +71,22 @@ describe('what a stage still needs', () => {
     { label: 'Read me', type: 'Note' as const }, { label: 'Items', type: 'Table' as const, cols: [{ name: 'Item', type: 'Text' as const }] },
   ]
   it('each field not filled in — a note and a table not asked for', () => {
-    expect(missingWork(FORM, { notes: '', links: [], vals: {} })).toEqual(['Post link', 'Checked'])
-    expect(missingWork(FORM, { notes: '', links: [], vals: { 'Post link': '  ', Checked: false } })).toEqual(['Post link', 'Checked'])
-    expect(missingWork(FORM, { notes: '', links: [], vals: { 'Post link': 'https://x', Checked: true } })).toEqual([])
+    expect(missingWork(FORM, { notes: '', links: [], vals: {}, files: [] })).toEqual(['Post link', 'Checked'])
+    expect(missingWork(FORM, { notes: '', links: [], vals: { 'Post link': '  ', Checked: false }, files: [] })).toEqual(['Post link', 'Checked'])
+    expect(missingWork(FORM, { notes: '', links: [], vals: { 'Post link': 'https://x', Checked: true }, files: [] })).toEqual([])
   })
-  it('a stage with no field: a note or a link', () => {
-    expect(missingWork([], { notes: '', links: [], vals: {} })).toEqual(['a note or a link'])
-    expect(missingWork([], { notes: '', links: [{ url: 'https://x', label: '' }], vals: {} })).toEqual([])
+  const FILE = (field: string | null) => ({ path: 'stage/x/a.png', name: 'a.png', size: 1, mime: 'image/png', field, by: 'Ali', at: null })
+  it('a File field: a link or a file of its own (②b-2e)', () => {
+    const form = [{ label: 'Final image', type: 'File' as const }]
+    expect(missingWork(form, { notes: '', links: [], vals: {}, files: [] })).toEqual(['Final image'])
+    expect(missingWork(form, { notes: '', links: [], vals: {}, files: [FILE(null)] })).toEqual(['Final image'])
+    expect(missingWork(form, { notes: '', links: [], vals: {}, files: [FILE('Final image')] })).toEqual([])
+    expect(missingWork(form, { notes: '', links: [], vals: { 'Final image': 'https://drive.google.com/x' }, files: [] })).toEqual([])
+  })
+  it('a stage with no field: a note, a file or a link', () => {
+    expect(missingWork([], { notes: '', links: [], vals: {}, files: [] })).toEqual(['a note, a file or a link'])
+    expect(missingWork([], { notes: '', links: [{ url: 'https://x', label: '' }], vals: {}, files: [] })).toEqual([])
+    expect(missingWork([], { notes: '', links: [], vals: {}, files: [FILE(null)] })).toEqual([])
   })
 })
 

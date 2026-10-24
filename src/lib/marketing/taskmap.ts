@@ -79,9 +79,9 @@ const day = (at: string | null | undefined) => {
 }
 const flowKey = (a: string, b: string) => `${a}>${b}`
 const backKey = (a: string, b: string) => `${a}>${b}~back`
-/** A delivered file's link, signed at the click (lib/storage/browser.ts › fileRoute's shape — Marketing's code keeps
- * out of the storage modules). */
-const deliveryHref = (path: string) => `/files/marketing/${path.split('/').map(encodeURIComponent).join('/')}`
+/** A delivered or a stage's own file's link, signed at the click (lib/storage/browser.ts › fileRoute's shape —
+ * Marketing's code keeps out of the storage modules). */
+const fileHref = (path: string) => `/files/marketing/${path.split('/').map(encodeURIComponent).join('/')}`
 
 type RoadItem = { id: string; kind: 'card' | 'gate'; stage: number | null; level: number; sub?: MktSubtask; review?: true }
 
@@ -424,8 +424,8 @@ export function taskMap(page: MktTaskPage): TaskMap {
         ['Approval', n.id === 'start' ? '—' : approval],
       ],
       files: t
-        ? [...(t.delivery?.files ?? []).map(f => ({ name: f.name, href: deliveryHref(f.path) })), ...(t.delivery?.links ?? []).map(l => ({ name: l.label || l.url, href: l.url }))]
-        : n.kind === 'card' && s ? s.work.links.map(l => ({ name: l.label || l.url, href: l.url })) : [],
+        ? [...(t.delivery?.files ?? []).map(f => ({ name: f.name, href: fileHref(f.path) })), ...(t.delivery?.links ?? []).map(l => ({ name: l.label || l.url, href: l.url }))]
+        : n.kind === 'card' && s ? [...s.work.files.map(f => ({ name: f.name, href: fileHref(f.path) })), ...s.work.links.map(l => ({ name: l.label || l.url, href: l.url }))] : [],
       versions: [...(versions.get(n.id) ?? new Map<string, string>())].map(([v, t]) => ({ v, t })),
       audit: own.get(n.id) ?? [],
     }

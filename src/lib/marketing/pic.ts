@@ -81,10 +81,24 @@ export interface PicWork {
     note: string | null
     fields: PicWorkField[]
     links: { url: string; label: string }[]
+    /** Its files the PIC sees (②b-2e): a File field's (field: its name) or the stage's own (null) — each by its key. */
+    files: PicFile[]
   } | null
   /** The last answer on it — either PIC's. */
   last: { action: 'pic approved' | 'pic changes'; name: string; reason: string; stage: string; version: string; at: string | null; pic: PicNo } | null
 }
+
+/** A stage's file on the PIC's page — opened through /t/<code>/f/<key> (mkt_pic_file), never by its path. */
+export interface PicFile {
+  key: string
+  name: string
+  size: number
+  mime: string
+  field: string | null
+}
+
+/** /t/<code>/f/<key> — a file of the work, signed at the click as the stranger. */
+export const picFileHref = (code: string, key: string) => `/t/${encodeURIComponent(code)}/f/${encodeURIComponent(key)}`
 
 /** The first PIC or the second. An answer from before there were two is the first's. */
 export type PicNo = 1 | 2
@@ -162,6 +176,8 @@ function workFromRow(w: Record<string, unknown>): PicWork {
       note: strOrNull(s.note),
       fields: (Array.isArray(s.fields) ? s.fields : []).filter(isObj).map(f => ({ name: str(f.name), type: str(f.type), value: workValue(str(f.type), f.value) })),
       links: (Array.isArray(s.links) ? s.links : []).filter(isObj).filter(l => /^https:\/\//i.test(str(l.url))).map(l => ({ url: str(l.url), label: str(l.label) })),
+      files: (Array.isArray(s.files) ? s.files : []).filter(isObj).filter(f => /^[0-9a-f-]{36}$/i.test(str(f.key)))
+        .map(f => ({ key: str(f.key), name: str(f.name) || 'File', size: Math.max(0, n(f.size)), mime: str(f.mime), field: strOrNull(f.field) })),
     } : null,
     last: last && (last.action === 'pic approved' || last.action === 'pic changes')
       ? { action: last.action, name: str(last.name), reason: str(last.reason), stage: str(last.stage), version: str(last.version), at: strOrNull(last.at),
