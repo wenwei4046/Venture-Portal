@@ -39,6 +39,8 @@ export interface FormField {
   cal?: FieldCal | null
   /** …a choice's options. */
   opts?: string[]
+  /** …or a shared list's, by its name (③d-2 — the user's answer 9: *Locations*): the field's own options are then unused. */
+  list?: string
   /** A deliverable's field from one of its canvas's own sections (②b-2a): that section's title. */
   section?: string
 }
@@ -92,7 +94,8 @@ export interface StageFile {
 export interface StageWork {
   notes: string
   links: WorkLink[]
-  vals: Record<string, string | boolean>
+  /** Each field's answer: a text, a tick — a Multi-select's picks (③d-2). */
+  vals: Record<string, string | boolean | string[]>
   files: StageFile[]
 }
 
@@ -151,7 +154,7 @@ export function missingWork(form: readonly FormField[], work: StageWork): string
       if (f.req === false) return false
       if (f.type === 'File' && work.files.some(x => x.field === f.label)) return false
       const v = work.vals[f.label]
-      return v === undefined || v === false || (typeof v === 'string' && !v.trim())
+      return v === undefined || v === false || (typeof v === 'string' && !v.trim()) || (Array.isArray(v) && v.length === 0)
     })
     .map(f => f.label)
   if (inputs.length === 0 && !work.notes.trim() && work.links.length === 0 && work.files.length === 0) out.push('a note, a file or a link')
@@ -182,6 +185,7 @@ export function formFromRow(v: unknown): FormField[] {
       if (cal) extras.cal = cal
     }
     if ((type === 'Select' || type === 'Multi-select') && Array.isArray(f.opts)) extras.opts = f.opts.filter((o): o is string => typeof o === 'string')
+    if ((type === 'Select' || type === 'Multi-select') && typeof f.list === 'string' && f.list) extras.list = f.list
     if (typeof f.section === 'string' && f.section) extras.section = f.section
     return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}), ...extras }]
   })
@@ -193,8 +197,12 @@ export function workFromRow(v: unknown): StageWork {
   const links = Array.isArray(v.links)
     ? v.links.filter(isObj).filter(l => typeof l.url === 'string').map(l => ({ url: String(l.url), label: typeof l.label === 'string' ? l.label : '' }))
     : []
-  const vals: Record<string, string | boolean> = {}
-  if (isObj(v.vals)) for (const [k, x] of Object.entries(v.vals)) if (typeof x === 'string' || typeof x === 'boolean') vals[k] = x
+  const vals: StageWork['vals'] = {}
+  if (isObj(v.vals)) for (const [k, x] of Object.entries(v.vals)) {
+    if (typeof x === 'string' || typeof x === 'boolean') vals[k] = x
+    // A Multi-select's picks (③d-2).
+    else if (Array.isArray(x)) vals[k] = x.filter((o): o is string => typeof o === 'string')
+  }
   const files: StageFile[] = Array.isArray(v.files)
     ? v.files.filter(isObj).filter(f => typeof f.path === 'string' && f.path).map(f => ({
         path: String(f.path),

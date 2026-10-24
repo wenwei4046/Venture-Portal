@@ -132,6 +132,10 @@ describe('the work on the PIC’s link (②b-2d)', () => {
     expect(workState(w({ stage: { name: 'Design', status: 'changes', ver: 1, waiting: false }, last: { action: 'pic changes', name: 'Kelvin (PIC)', reason: 'Bigger', stage: 'Design', version: 'v1', at: 'x' } }), '2026-10-24'))
       .toEqual({ label: 'The team is making your changes', tone: 'draft' })
     expect(w({}).stage?.fields.map(f => f.value)).toEqual(['5 Nov 2026', null]) // a date in words; a box not ticked is nothing yet
+    // A Multi-select's picks (③d-2) in words; none picked is nothing yet.
+    const picks = w({ stage: { idx: 0, name: 'Shoot', status: 'accepted', ver: 0, waiting: false, links: [], fields: [
+      { name: 'Location', type: 'Multi-select', value: ['Showroom', 'LRT'] }, { name: 'Props', type: 'Multi-select', value: [] }] } })
+    expect(picks.stage?.fields.map(f => f.value)).toEqual(['Showroom, LRT', null])
   })
   it('counts what waits for them, and the progress says so', () => {
     const p = page({ status: 'active', reply: { decision: 'approved', name: 'Kelvin', reason: '', at: '2026-10-24T03:00:00Z' }, work: [

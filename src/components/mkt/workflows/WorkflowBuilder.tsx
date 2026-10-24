@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cloneMktWorkflow, deleteMktWorkflow, publishMktWorkflow, saveMktWorkflow } from '@/lib/marketing/actions'
 import { canvasProblems, canvasRemap, stageMap } from '@/lib/marketing/canvas'
 import { sameGroup } from '@/lib/marketing/groups'
+import type { OptionLists } from '@/lib/marketing/options'
 import { moveStage, removeStage } from '@/lib/marketing/tasks'
 import {
   asRun, firstWfStage, newWfStage, nextTemplateName, picTimes, totalDays, wfActions, wfApprText, wfPatch, wfProblems, wfStagesPayload,
@@ -38,6 +39,7 @@ export default function WorkflowBuilder({
   people,
   approvers,
   team,
+  lists: initialLists = {},
 }: {
   initial: WfTemplate[]
   /** The template to open (?w=); else the first. */
@@ -46,7 +48,10 @@ export default function WorkflowBuilder({
   approvers: BuilderPerson[]
   /** Marketing's roster now: whoever a version names must be on it. */
   team: string[]
+  /** The shared option lists (③d-2) a choice may take its options from. */
+  lists?: OptionLists
 }) {
+  const [lists, setLists] = useState<OptionLists>(initialLists)
   const router = useRouter()
   const start = (first ? initial.find(t => t.id === first) : undefined) ?? initial[0] ?? null
   const [wfs, setWfs] = useState<WfTemplate[]>(initial)
@@ -311,6 +316,9 @@ export default function WorkflowBuilder({
             setStageAt(i)
             setTab('stages')
           }}
+          lists={lists}
+          onList={(name, opts) => setLists(l => ({ ...l, [name]: opts }))}
+          say={flash}
         />
       ) : (
       <div className={w.grid}>

@@ -94,6 +94,7 @@ function canvasFieldFromRow(v: unknown): CanvasField | null {
     pic: v.pic === true,
     ...(type === 'Date' && isObj(v.cal) ? { cal: calFromRow(v.cal) } : {}),
     ...(isChoice(type) ? { opts: Array.isArray(v.opts) ? v.opts.filter((o): o is string => typeof o === 'string') : [] } : {}),
+    ...(isChoice(type) && typeof v.list === 'string' && v.list ? { list: v.list } : {}),
   }
 }
 
@@ -124,6 +125,8 @@ export function fieldExtras(f: FormField): Record<string, unknown> {
     pic: fieldPic(f),
     ...(f.type === 'Date' && f.cal ? { cal: { kind: f.cal.kind, pic: f.cal.pic } } : {}),
     ...(isChoice(f.type) ? { opts: f.opts ?? [] } : {}),
+    // A shared list by its name (③d-2); none sent — its own options.
+    ...(isChoice(f.type) && f.list ? { list: f.list } : {}),
   }
 }
 
@@ -176,8 +179,10 @@ export function newCanvasField(stage: number | null, label = 'New field'): Canva
 /** A field with a new kind of answer: options for a choice, a calendar mark only on a date. */
 export function withType<T extends FormField>(f: T, type: FieldType): T {
   const next: T = { ...f, type }
-  if (!isChoice(type)) delete next.opts
-  else if (!next.opts) next.opts = []
+  if (!isChoice(type)) {
+    delete next.opts
+    delete next.list
+  } else if (!next.opts) next.opts = []
   if (type !== 'Date') delete next.cal
   if (type === 'Note') next.req = false
   return next
@@ -211,7 +216,8 @@ export function canvasProblems(stages: readonly { form: FormField[] }[], c: WfCa
   if (!named) out.push('Each field in a section needs its own name')
   if (c.sections.some(s => s.fields.some(f => f.stage == null || f.stage >= stages.length))) out.push('A field has no stage to fill it in')
   const fields = everyField(stages, c).map(p => p.field)
-  if (fields.some(f => isChoice(f.type) && !(f.opts ?? []).some(o => o.trim()))) out.push('A choice has no options')
+  // A choice naming a shared list (③d-2) has the list's options.
+  if (fields.some(f => isChoice(f.type) && !f.list && !(f.opts ?? []).some(o => o.trim()))) out.push('A choice has no options')
   const twice = fields.some(f => {
     const o = (f.opts ?? []).map(x => x.trim().toLowerCase()).filter(Boolean)
     return new Set(o).size !== o.length

@@ -107,6 +107,13 @@
 .optAdd .popInput { flex: 1; height: 30px; }
 .optBtn { height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .optBtn:disabled { opacity: .4; cursor: not-allowed; }
+/* Where a choice's options come from (③d-2): a shared list or its own — the handoff's radios. */
+.srcList { display: flex; flex-direction: column; gap: 6px; }
+.src { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; }
+.srcDot { width: 14px; height: 14px; flex: none; margin-top: 2px; border-radius: 50%; border: 1.5px solid rgb(var(--mk-radio)); }
+.srcOn .srcDot { border: 4.5px solid rgb(var(--mk-ink)); }
+.srcName { display: block; font-weight: 500; }
+.srcHint { display: block; font-size: 11.5px; color: rgb(var(--mk-muted)); }
 .tones { display: flex; align-items: center; gap: 6px; }
 .tone { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 0; padding: 0; }
 .toneOn { box-shadow: 0 0 0 2px rgb(var(--mk-white)), 0 0 0 4px rgb(var(--mk-ink)); }

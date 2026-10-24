@@ -5,6 +5,7 @@
 
 import { officeTime } from '@/lib/office-time'
 import { periodWords, shortDay } from './board'
+import { answerWords } from './options'
 import { picOkFromRow, type PicOk, type Tone } from './task'
 
 export type PicStatus = 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done'
@@ -154,6 +155,8 @@ function valueFromRow(type: string, v: unknown): PicValue {
 function workValue(type: string, v: unknown): string | null {
   if (typeof v === 'boolean') return v ? 'Yes' : null
   if (typeof v === 'number') return String(v)
+  // A Multi-select's picks (③d-2): "Showroom, LRT".
+  if (Array.isArray(v)) return answerWords(v) || null
   if (typeof v === 'string' && v.trim()) return type === 'Date' ? dateWords(v.trim()) : v.trim()
   return null
 }

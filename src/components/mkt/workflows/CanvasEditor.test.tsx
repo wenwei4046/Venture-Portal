@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { canvasFromRow, type WfCanvas } from '@/lib/marketing/canvas'
+import type { OptionLists } from '@/lib/marketing/options'
 import { newWfStage, type WfStage } from '@/lib/marketing/workflows'
+
+const actions = vi.hoisted(() => ({ addMktOption: vi.fn(), removeMktOption: vi.fn() }))
+vi.mock('@/lib/marketing/actions', () => actions)
+
 import CanvasEditor from './CanvasEditor'
 
 // 2026-10-23 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, the Workflow Builder's Canvas template tab):
@@ -20,15 +25,17 @@ const CANVAS = canvasFromRow({
   sections: [{ emoji: '💬', title: 'Caption', stage: 0, locked: false, req: true, pic: true, fields: [{ label: 'Platform', type: 'Select', stage: 0, req: true, pic: true, opts: ['Instagram'] }] }],
 })
 
-function editor(stages = STAGES, canvas: WfCanvas = CANVAS) {
+function editor(stages = STAGES, canvas: WfCanvas = CANVAS, lists?: OptionLists) {
   const onStages = vi.fn()
   const onCanvas = vi.fn()
   const onEditStage = vi.fn()
+  const onList = vi.fn()
+  const say = vi.fn()
   render(
     <CanvasEditor title="Reels video · Full production" version={3} stages={stages} canvas={canvas} saveState={<span>Saved</span>}
-      nameAt={() => 'Ali'} onStages={onStages} onCanvas={onCanvas} onEditStage={onEditStage} />,
+      nameAt={() => 'Ali'} onStages={onStages} onCanvas={onCanvas} onEditStage={onEditStage} lists={lists} onList={onList} say={say} />,
   )
-  return { onStages, onCanvas, onEditStage }
+  return { onStages, onCanvas, onEditStage, onList, say }
 }
 
 describe('the Canvas Template Editor', () => {
@@ -107,6 +114,54 @@ describe('the Canvas Template Editor', () => {
     fireEvent.click(within(caption).getByRole('button', { name: '⚙ Section settings' }))
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Section Caption' })).getByRole('button', { name: 'Remove section' }))
     expect((onCanvas.mock.calls.at(-1)?.[0] as WfCanvas).sections).toEqual([])
+  })
+
+  // ③d-2 — the user's answer 9: a choice's options from a shared list (Locations), the group's — written at once.
+  it('a choice’s options from a shared list: picked; the list’s options added and taken off at once; back to its own', async () => {
+    const lists = { Locations: ['Showroom', 'LRT'] }
+    const first = editor(STAGES, CANVAS, lists)
+    fireEvent.click(within(screen.getByRole('region', { name: 'Caption' })).getByRole('button', { name: /Platform/ }))
+    let pop = screen.getByRole('dialog', { name: 'Field Platform' })
+    const from = within(pop).getByRole('radiogroup', { name: 'Where do the options come from?' })
+    expect(within(from).getAllByRole('radio').map(r => [r.textContent, r.getAttribute('aria-checked')])).toEqual([
+      ['Shared option list · Locations2 options · used across the group', 'false'], ['Own options for this field1 option · this template only', 'true']])
+    fireEvent.click(within(from).getByRole('radio', { name: /Shared option list · Locations/ }))
+    const picked = (first.onCanvas.mock.calls.at(-1)?.[0] as WfCanvas).sections[0].fields[0]
+    expect([picked.list, picked.opts]).toEqual(['Locations', ['Instagram']])
+    cleanup()
+
+    // Naming Locations: its options are the group's — added and taken off at once, told; back to its own.
+    const shared = canvasFromRow({ req: { pic: true }, sections: [{ emoji: '💬', title: 'Caption', stage: 0, fields: [
+      { label: 'Platform', type: 'Multi-select', stage: 0, opts: ['Instagram'], list: 'Locations' }] }] })
+    const second = editor(STAGES, shared, lists)
+    fireEvent.click(within(screen.getByRole('region', { name: 'Caption' })).getByRole('button', { name: /Platform/ }))
+    pop = screen.getByRole('dialog', { name: 'Field Platform' })
+    expect(within(pop).getAllByRole('button', { name: /^Remove / }).map(b => b.getAttribute('aria-label')).filter(Boolean)).toEqual(['Remove Showroom', 'Remove LRT'])
+    actions.addMktOption.mockResolvedValue({ ok: true, list: 'Locations', opts: ['Showroom', 'LRT', 'Studio A'], option: 'Studio A' })
+    fireEvent.change(within(pop).getByRole('textbox', { name: 'New option' }), { target: { value: 'Studio A' } })
+    await act(async () => {
+      fireEvent.click(within(pop).getByRole('button', { name: 'Add' }))
+    })
+    expect(actions.addMktOption).toHaveBeenCalledWith('Locations', 'Studio A')
+    expect(second.onList).toHaveBeenLastCalledWith('Locations', ['Showroom', 'LRT', 'Studio A'])
+    expect(second.say).toHaveBeenLastCalledWith('Studio A · on Locations')
+    actions.removeMktOption.mockResolvedValue({ ok: true, list: 'Locations', opts: ['Showroom', 'Studio A'] })
+    await act(async () => {
+      fireEvent.click(within(pop).getByRole('button', { name: 'Remove LRT' }))
+    })
+    expect(actions.removeMktOption).toHaveBeenCalledWith('Locations', 'LRT')
+    expect(second.onList).toHaveBeenLastCalledWith('Locations', ['Showroom', 'Studio A'])
+    expect(second.say).toHaveBeenLastCalledWith('LRT taken off Locations · answers that picked it keep it')
+    expect(second.onCanvas).not.toHaveBeenCalled() // the group's list, never the draft
+    fireEvent.click(within(pop).getByRole('radio', { name: /Own options for this field/ }))
+    const own = (second.onCanvas.mock.calls.at(-1)?.[0] as WfCanvas).sections[0].fields[0]
+    expect([own.list, own.opts]).toEqual([undefined, ['Instagram']])
+  })
+
+  it('no shared list: a choice has its own options only', () => {
+    editor(STAGES, CANVAS, {})
+    fireEvent.click(within(screen.getByRole('region', { name: 'Caption' })).getByRole('button', { name: /Platform/ }))
+    expect(within(screen.getByRole('dialog', { name: 'Field Platform' })).queryByRole('radiogroup', { name: 'Where do the options come from?' })).toBeNull()
   })
 
   it('Requirements: only whether the PIC sees it', () => {

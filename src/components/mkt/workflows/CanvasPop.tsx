@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { addMktOption, removeMktOption } from '@/lib/marketing/actions'
 import { CANVAS_TYPES, fieldPic, fieldReq, isChoice, MAX_OPTIONS, withType } from '@/lib/marketing/canvas'
+import { LIST_MAX, optionWords, type OptionLists } from '@/lib/marketing/options'
 import { CAL_KINDS, FIELD_GLYPH, type FormField } from '@/lib/marketing/tasks'
 import c from './canvas.module.css'
 
 // The canvas's two settings panels (`Canvas Template Editor.dc.html`): a section's (🔒 / ⭐ / 👁, which stage fills it in)
-// and a field's (its name and kind of answer, a choice's options, ⭐ / 👁, which stage fills it in, a date on the
-// calendar — which kind of date, one of six since 2026-10-24 (the user's answer 16: "要，固定种类"), the PIC's calendar).
-// Each answers the whole thing changed; the editor keeps it.
+// and a field's (its name and kind of answer, a choice's options — its own, or a shared list's (③d-2 — the user's
+// answer 9), ⭐ / 👁, which stage fills it in, a date on the calendar — which kind of date, one of six since 2026-10-24
+// (the user's answer 16: "要，固定种类"), the PIC's calendar). Each answers the whole thing changed; the editor keeps it —
+// but a shared list is the group's, so an option added to it or taken off is written at once.
 
 function Switch({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
   return (
@@ -115,6 +118,9 @@ export function FieldPop<T extends FormField>({
   onStage,
   onRemove,
   onClose,
+  lists = {},
+  onList,
+  say,
 }: {
   field: T
   stages: string[]
@@ -127,17 +133,44 @@ export function FieldPop<T extends FormField>({
   onStage?: (at: number) => void
   onRemove?: () => void
   onClose: () => void
+  /** The shared option lists (③d-2): a choice may take one's options. */
+  lists?: OptionLists
+  /** A shared list as it now stands, once an option was added to it or taken off. */
+  onList?: (name: string, opts: string[]) => void
+  say?: (words: string) => void
 }) {
   const [opt, setOpt] = useState('')
+  const [pending, start] = useTransition()
   const opts = field.opts ?? []
   // A stage's field of a kind the canvas does not offer (a number, a table, a note) keeps its kind.
   const typed = (CANVAS_TYPES as readonly string[]).includes(field.type)
+  const names = Object.keys(lists)
+  // The shared list it names — one not there any more offers nothing until another is picked.
+  const shared = field.list ? lists[field.list] ?? [] : null
   const addOpt = () => {
     const o = opt.trim().slice(0, 40)
     if (!o || opts.length >= MAX_OPTIONS || opts.some(x => x.trim().toLowerCase() === o.toLowerCase())) return
     onChange({ ...field, opts: [...opts, o] })
     setOpt('')
   }
+  const addShared = () =>
+    start(async () => {
+      const o = optionWords(opt)
+      if (!o || !field.list) return
+      const r = await addMktOption(field.list, o)
+      if (!r.ok) return say?.(r.reason)
+      onList?.(r.list, r.opts)
+      setOpt('')
+      say?.(`${r.option} · on ${r.list}`)
+    })
+  const removeShared = (o: string) =>
+    start(async () => {
+      if (!field.list) return
+      const r = await removeMktOption(field.list, o)
+      if (!r.ok) return say?.(r.reason)
+      onList?.(r.list, r.opts)
+      say?.(`${o} taken off ${r.list} · answers that picked it keep it`)
+    })
   const cal = field.cal ?? null
   return (
     <div className={c.pop} style={top != null ? { top } : undefined} role="dialog" aria-label={`Field ${field.label || 'settings'}`}>
@@ -164,32 +197,61 @@ export function FieldPop<T extends FormField>({
       </div>
       {isChoice(field.type) ? (
         <div className={c.popBox}>
+          {names.length ? (
+            <>
+              <span className={c.popQ}>Where do the options come from?</span>
+              <div className={c.srcList} role="radiogroup" aria-label="Where do the options come from?">
+                {names.map(name => (
+                  <button key={name} type="button" role="radio" aria-checked={field.list === name} className={`${c.src}${field.list === name ? ` ${c.srcOn}` : ''}`}
+                    onClick={() => onChange({ ...field, list: name })}>
+                    <span className={c.srcDot} />
+                    <span>
+                      <span className={c.srcName}>Shared option list · {name}</span>
+                      <span className={c.srcHint}>{lists[name].length} option{lists[name].length === 1 ? '' : 's'} · used across the group</span>
+                    </span>
+                  </button>
+                ))}
+                <button type="button" role="radio" aria-checked={!field.list} className={`${c.src}${field.list ? '' : ` ${c.srcOn}`}`}
+                  onClick={() => onChange({ ...field, list: undefined })}>
+                  <span className={c.srcDot} />
+                  <span>
+                    <span className={c.srcName}>Own options for this field</span>
+                    <span className={c.srcHint}>{opts.length} option{opts.length === 1 ? '' : 's'} · this template only</span>
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : null}
           <span className={c.popQ}>Options</span>
           <div className={c.opts}>
-            {opts.map((o, i) => (
+            {(shared ?? opts).map((o, i) => (
               <span key={`${o}-${i}`} className={c.opt}>
                 {o}
-                <button type="button" className={c.optX} aria-label={`Remove ${o}`} onClick={() => onChange({ ...field, opts: opts.filter((_, j) => j !== i) })}>×</button>
+                <button type="button" className={c.optX} aria-label={`Remove ${o}`} disabled={pending}
+                  onClick={() => (shared ? removeShared(o) : onChange({ ...field, opts: opts.filter((_, j) => j !== i) }))}>×</button>
               </span>
             ))}
-            {opts.length ? null : <span className={c.optNone}>No options yet</span>}
+            {(shared ?? opts).length ? null : <span className={c.optNone}>No options yet</span>}
           </div>
           <div className={c.optAdd}>
             <input
               className={c.popInput}
               value={opt}
               maxLength={40}
-              placeholder="New option"
+              placeholder={shared ? `New option for ${field.list}` : 'New option'}
               aria-label="New option"
               onChange={e => setOpt(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  addOpt()
+                  if (shared) addShared()
+                  else addOpt()
                 }
               }}
             />
-            <button type="button" className={c.optBtn} disabled={!opt.trim() || opts.length >= MAX_OPTIONS} onClick={addOpt}>Add</button>
+            <button type="button" className={c.optBtn}
+              disabled={!opt.trim() || pending || (shared ? shared.length >= LIST_MAX : opts.length >= MAX_OPTIONS)}
+              onClick={shared ? addShared : addOpt}>Add</button>
           </div>
         </div>
       ) : null}

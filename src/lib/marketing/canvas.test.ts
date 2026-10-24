@@ -75,6 +75,21 @@ describe('what the builder sends', () => {
     const d: FormField = { label: 'Day', type: 'Date', cal: { kind: 'ads_live', pic: false } }
     expect(withType(d, 'Select')).toEqual({ label: 'Day', type: 'Select', opts: [] })
     expect(withType({ label: 'P', type: 'Select', opts: ['a'] }, 'Text')).toEqual({ label: 'P', type: 'Text' })
+    // A shared list (③d-2) is a choice's only: kept between the two, gone with another kind.
+    expect(withType({ label: 'L', type: 'Select', opts: [], list: 'Locations' }, 'Multi-select')).toEqual({ label: 'L', type: 'Multi-select', opts: [], list: 'Locations' })
+    expect(withType({ label: 'L', type: 'Select', opts: [], list: 'Locations' }, 'Text')).toEqual({ label: 'L', type: 'Text' })
+  })
+
+  // ③d-2 — the user's answer 9: a choice naming a shared list.
+  it('a choice naming a shared list: read, sent, published with no options of its own', () => {
+    const c = canvasFromRow({ sections: [{ title: 'Shoot', stage: 0, fields: [
+      { label: 'Location', type: 'Multi-select', stage: 0, opts: [], list: 'Locations' }, { label: 'Note', type: 'Text', stage: 0, list: 'Locations' }] }] })
+    expect(c.sections[0].fields.map(f => [f.label, f.list ?? null])).toEqual([['Location', 'Locations'], ['Note', null]])
+    expect(fieldExtras({ label: 'L', type: 'Select', opts: ['Own'], list: 'Locations' })).toEqual({ req: true, pic: true, opts: ['Own'], list: 'Locations' })
+    expect(fieldExtras({ label: 'L', type: 'Select', list: undefined })).toEqual({ req: true, pic: true, opts: [] })
+    expect(canvasProblems([{ form: [] }], c)).toEqual([])
+    const none = canvasFromRow({ sections: [{ title: 'Shoot', stage: 0, fields: [{ label: 'Location', type: 'Select', stage: 0, opts: [] }] }] })
+    expect(canvasProblems([{ form: [] }], none)).toContain('A choice has no options')
   })
 
   it('a new section (the handoff’s): New section, 📝, a Notes field filled in at the last stage', () => {

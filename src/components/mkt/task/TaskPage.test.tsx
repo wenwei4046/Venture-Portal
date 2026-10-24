@@ -15,6 +15,7 @@ const actions = vi.hoisted(() => ({
   setMktSeries: vi.fn(),
   putMktFree: vi.fn(),
   saveMktStageFiles: vi.fn(),
+  addMktOption: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
@@ -101,6 +102,82 @@ describe('a stage’s own files (②b-2e)', () => {
     expect((screen.getByText('📎 art.png').closest('a') as HTMLAnchorElement).getAttribute('href')).toBe('/files/marketing/stage/k/art.png')
     expect(screen.queryByText('Drop the file here')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove art.png' })).toBeNull()
+  })
+})
+
+// 2026-10-25 — ③d-2: a choice (the user's answer 9) — a Select a dropdown of its own options, a Multi-select its shared
+// list's to tick, a missing one added on the spot. The database's side is tests/member-sql/validate-marketing-option-lists.mjs.
+describe('a choice on the stage’s work (③d-2)', () => {
+  const FORM = { spec: { form: [{ label: 'Location', type: 'Multi-select', list: 'Locations' }, { label: 'Mood', type: 'Select', opts: ['Bright', 'Calm'] }] }, work: {} }
+  const LISTS = { Locations: ['Showroom', 'LRT'] }
+  const chip = (name: string) => screen.getByRole('button', { name })
+
+  it('a Select picks from its own options; a Multi-select ticks its list’s — each saved on its own, in the list’s order', async () => {
+    render(<TaskPage initial={page(SITI, FORM)} can={ALL} lists={LISTS} />)
+    const mood = screen.getByRole('combobox', { name: 'Mood' }) as HTMLSelectElement
+    expect([...mood.options].map(o => o.text)).toEqual(['Pick one…', 'Bright', 'Calm'])
+    fireEvent.change(mood, { target: { value: 'Calm' } })
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenCalledWith('p1', { vals: { Mood: 'Calm' } }))
+    expect(screen.getByRole('group', { name: 'Location' }).textContent).toBe('ShowroomLRT+ Add an option…')
+    fireEvent.click(chip('LRT'))
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: ['LRT'] } }))
+    fireEvent.click(chip('Showroom'))
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: ['Showroom', 'LRT'] } }))
+    expect([chip('Showroom').getAttribute('aria-pressed'), chip('LRT').getAttribute('aria-pressed')]).toEqual(['true', 'true'])
+    fireEvent.click(chip('Showroom'))
+    fireEvent.click(chip('LRT'))
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: null } }))
+    expect(screen.getByText('Fill in Location')).toBeTruthy()
+  })
+
+  it('+ Add an option… puts a missing one on the list and picks it; one there in other letters is picked as spelt; a refusal is said', async () => {
+    render(<TaskPage initial={page(SITI, FORM)} can={ALL} lists={LISTS} />)
+    fireEvent.click(chip('+ Add an option…'))
+    fireEvent.change(screen.getByRole('textbox', { name: 'New option for Location' }), { target: { value: '  Studio   A ' } })
+    actions.addMktOption.mockResolvedValue({ ok: true, list: 'Locations', opts: ['Showroom', 'LRT', 'Studio A'], option: 'Studio A' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    expect(actions.addMktOption).toHaveBeenCalledWith('Locations', 'Studio A')
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: ['Studio A'] } }))
+    expect(chip('Studio A').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('status').textContent).toBe('Studio A · added to Locations')
+    // There already in other letters: picked, nothing added.
+    fireEvent.click(chip('+ Add an option…'))
+    fireEvent.change(screen.getByRole('textbox', { name: 'New option for Location' }), { target: { value: 'lrt' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    expect(actions.addMktOption).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: ['LRT', 'Studio A'] } }))
+    // Refused: said, nothing picked.
+    fireEvent.click(chip('+ Add an option…'))
+    fireEvent.change(screen.getByRole('textbox', { name: 'New option for Location' }), { target: { value: 'Rooftop' } })
+    actions.addMktOption.mockResolvedValue({ ok: false, reason: 'Adding an option is not open to your account.' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    expect(screen.getByRole('status').textContent).toBe('Adding an option is not open to your account.')
+    expect(actions.saveMktWork).toHaveBeenCalledTimes(2)
+  })
+
+  it('a Select naming a list offers + Add an option… in its dropdown; an answer typed before stays offered', async () => {
+    const form = { spec: { form: [{ label: 'Location', type: 'Select', list: 'Locations' }] }, work: { vals: { Location: 'Old studio' } } }
+    render(<TaskPage initial={page(SITI, form)} can={ALL} lists={LISTS} />)
+    const loc = screen.getByRole('combobox', { name: 'Location' }) as HTMLSelectElement
+    expect([[...loc.options].map(o => o.text), loc.value]).toEqual([['Pick one…', 'Showroom', 'LRT', 'Old studio', '+ Add an option…'], 'Old studio'])
+    fireEvent.change(loc, { target: { value: ' + add ' } })
+    expect(screen.getByRole('textbox', { name: 'New option for Location' })).toBeTruthy()
+    expect(actions.saveMktWork).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('textbox', { name: 'New option for Location' })).toBeNull()
+  })
+
+  it('read only: the answer in words', () => {
+    render(<TaskPage initial={page(RACHEL, { ...FORM, status: 'review', ver: 1, work: { vals: { Location: ['Showroom', 'LRT'], Mood: 'Calm' } } })} can={ALL} lists={LISTS} />)
+    expect([(screen.getByRole('textbox', { name: 'Location' }) as HTMLInputElement).value, (screen.getByRole('textbox', { name: 'Mood' }) as HTMLInputElement).value])
+      .toEqual(['Showroom, LRT', 'Calm'])
+    expect(screen.queryByRole('group', { name: 'Location' })).toBeNull()
   })
 })
 
