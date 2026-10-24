@@ -20,6 +20,8 @@ const ROUTE_ASKS_ITS_KEY: Record<string, string> = {
   'app/(fin-app)/fin-app/page/venture-pool/page.tsx': "/venture-pool/export asks Venture Pool's own key (finance-view.md › EXPORTS)",
   'app/(portal)/reconciliation/[sessionId]/report/page.tsx': "its export asks Reconciliation's own key",
   'components/layout/fin-nav.ts': "the sidebar's match — it names the route to leave it out, it links no file",
+  // ④-3b — the user's answer 18: "all of Marketing may export a trail"; the matrix's Marketing row has no Export cell.
+  'components/mkt/audit/AuditLog.tsx': "the formal log's files ask Marketing · View on the project's page (marketing-view.md › THE FORMAL LOG EXPORTED)",
 }
 
 const LINKS = /\/export(\?|`|'|")|<ExportLinks\b|[eE]xportHref\(/
