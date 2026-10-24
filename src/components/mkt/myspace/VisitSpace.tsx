@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { flash } from '@/components/hrv/toast'
+import { sendMktChat } from '@/lib/marketing/actions'
 import { formOf, PET_STATES, visitLayout, xpBar, type PetState, type Visit } from '@/lib/marketing/space'
 import LobbyTile, { type LobbyEntry } from './LobbyTile'
 import NotesTile from './NotesTile'
@@ -17,8 +20,8 @@ import s from './myspace.module.css'
 // A visit to a teammate's space (`My Space Bento.dc.html` › visiting, ⑦-4 — the user's answers 37, 38 and 40): *👀
 // You're visiting Mei's space* with *← Back to mine*, their cover, avatar (the one uploaded on My Space), name, role,
 // status and pet — in their own look — and the visit's board: their room with the pet in it, the pet's tile, the
-// trophies, their Notes and their Photo, the lobby. Nothing on it is the visitor's to change. *💬 Message* and *👋 Wave*
-// come with the chat (⑦-3).
+// trophies, their Notes and their Photo, the lobby. Nothing on it is the visitor's to change. Somebody who chats (⑦-3)
+// has *💬 Message <name>* — their chat with them, on their own space — and *👋 Wave*, a 👋 sent to them.
 
 export interface VisitSpaceProps {
   visit: Visit
@@ -29,12 +32,27 @@ export interface VisitSpaceProps {
   lobby: LobbyEntry[]
   /** The visitor's staff id, if they have one. */
   me: string | null
+  /** The visitor chats (on the roster, with a login, Marketing · Edit): *💬 Message* and *👋 Wave*. */
+  canChat: boolean
+  /** The lobby's last message, over its sender's pet. */
+  say?: { staff: string; text: string } | null
 }
 
 const nothing = () => {}
 
-export default function VisitSpace({ visit, state, letter, avatarBg, lobby, me }: VisitSpaceProps) {
+export default function VisitSpace({ visit, state, letter, avatarBg, lobby, me, canChat, say = null }: VisitSpaceProps) {
   const router = useRouter()
+  const [waving, setWaving] = useState(false)
+  const wave = async () => {
+    if (waving) return
+    setWaving(true)
+    try {
+      const r = await sendMktChat(visit.staff, '👋')
+      flash(r.ok ? `You waved at ${visit.first}` : r.reason)
+    } finally {
+      setWaving(false)
+    }
+  }
   const sp = visit.space
   const level = visit.stats ? xpBar(visit.stats.xp).level : 1
   const pet = sp.pet.onboarded ? { species: sp.pet.species, level, form: formOf(level), img: sp.petPath, state, color: sp.pet.color } : null
@@ -55,7 +73,7 @@ export default function VisitSpace({ visit, state, letter, avatarBg, lobby, me }
     photo: sp.photoPath ? { bare: true, body: <PhotoTile path={sp.photoPath} canEdit={false} sending={null} onPick={nothing} /> } : undefined,
     lobby: {
       bare: true,
-      body: <LobbyTile pets={lobby} me={me} home={false} onVisit={staff => router.push(staff === me ? '/marketing' : `/marketing?visit=${staff}`)} />,
+      body: <LobbyTile pets={lobby} me={me} home={false} say={say} onVisit={staff => router.push(staff === me ? '/marketing' : `/marketing?visit=${staff}`)} />,
     },
   }
   const role = visit.role || visit.title
@@ -81,6 +99,12 @@ export default function VisitSpace({ visit, state, letter, avatarBg, lobby, me }
                 {pet ? <span className={s.petLine}>· {petName} Lv {level} · {PET_STATES[state].bubble || '🙂'} {PET_STATES[state].label}</span> : null}
               </div>
             </div>
+            {canChat ? (
+              <>
+                <Link href={`/marketing?chat=${visit.staff}`} className={s.visitAct}>💬 Message {visit.first}</Link>
+                <button type="button" className={s.visitWave} disabled={waving} onClick={() => void wave()}>👋 Wave</button>
+              </>
+            ) : null}
           </div>
           <div className={s.boardPad}>
             <SpaceBoard layout={layout} tiles={tiles} editing={false} onMove={nothing} onPlace={nothing} onRemove={nothing} />

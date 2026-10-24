@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { boardFromRow, type MktBoard } from './board'
+import { chatListFromRow, type ChatList } from './chat'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
@@ -131,6 +132,14 @@ export async function readPet(): Promise<PetStats | null> {
   const { data, error } = await db.rpc('mkt_pet')
   if (error) throw new Error(error.message)
   return petStatsFromRow(data)
+}
+
+/** The viewer's chats (⑦-3, mig 20261025039000): the lobby's last message, each teammate's last with them, unread. */
+export async function readChatList(): Promise<ChatList> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_chat_list')
+  if (error) throw new Error(error.message)
+  return chatListFromRow(data)
 }
 
 /** The lobby (⑦-4, mig 20261025038000): the pets of Marketing's roster — those with a login and their pet set up. */

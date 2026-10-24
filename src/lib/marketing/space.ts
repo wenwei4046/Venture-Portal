@@ -11,8 +11,8 @@
 
 import { tidyFileName } from './library'
 
-/** The tiles a board offers today (the chat comes later). */
-export type TileKind = 'room' | 'pet' | 'turn' | 'waiting' | 'delegated' | 'lobby' | 'trophies' | 'week' | 'notes' | 'photo'
+/** The tiles a board offers — the prototype's, all of them. */
+export type TileKind = 'room' | 'pet' | 'turn' | 'waiting' | 'delegated' | 'chat' | 'lobby' | 'trophies' | 'week' | 'notes' | 'photo'
 export interface TilePlace { id: string; x: number; y: number; w: number; h: number }
 
 export const RW = 182
@@ -28,6 +28,7 @@ export const TILES: Record<TileKind, { emoji: string; label: string; size: [numb
   turn: { emoji: '👉', label: 'My turn', size: [1, 2] },
   waiting: { emoji: '⏳', label: 'Waiting', size: [1, 1] },
   delegated: { emoji: '📤', label: 'Delegated', size: [1, 1] },
+  chat: { emoji: '💬', label: 'Chat', size: [1, 2] },
   lobby: { emoji: '🏛️', label: 'Lobby', size: [2, 1] },
   trophies: { emoji: '🏆', label: 'Trophies', size: [1, 1] },
   week: { emoji: '🗓️', label: 'This week', size: [1, 1] },
@@ -39,17 +40,17 @@ export const KINDS = Object.keys(TILES) as TileKind[]
 /** Always on the board, "so nobody hides their work". */
 export const LOCKED: readonly string[] = ['turn', 'waiting']
 /** On a board until its owner takes them off — a kind shipped later joins a saved board once (tilesKnown). */
-const DEFAULT_ON: TileKind[] = ['room', 'pet', 'turn', 'waiting', 'delegated', 'lobby', 'trophies', 'week']
+const DEFAULT_ON: TileKind[] = ['room', 'pet', 'turn', 'waiting', 'delegated', 'chat', 'lobby', 'trophies', 'week']
 
 export const isKind = (id: string): id is TileKind => (KINDS as string[]).includes(id)
 
 const place = (id: TileKind, c: number, r: number, w: number, h: number): TilePlace => ({ id, x: c * CW, y: r * RW, w: w * CW, h: h * RW })
-/** Before the first save: the prototype's DEFAULT_POS without what is not here yet (the chat) — the room top left, two
- * by two; My turn beside it, two rows high; the pet and the trophies on the right; Waiting, Delegated and This week
- * under the room; the lobby across the foot. */
+/** Before the first save: the prototype's DEFAULT_POS — the room top left, two by two; My turn beside it, two rows
+ * high; the pet top right, the chat under it, three rows high; Waiting, Delegated and the trophies under the room; the
+ * lobby and This week at the foot. */
 export const DEFAULT_LAYOUT: TilePlace[] = [
-  place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('pet', 3, 0, 1, 1), place('trophies', 3, 1, 1, 1),
-  place('waiting', 0, 2, 1, 1), place('delegated', 1, 2, 1, 1), place('week', 2, 2, 2, 1), place('lobby', 0, 3, 4, 1),
+  place('room', 0, 0, 2, 2), place('turn', 2, 0, 1, 2), place('pet', 3, 0, 1, 1), place('chat', 3, 1, 1, 3),
+  place('waiting', 0, 2, 1, 1), place('delegated', 1, 2, 1, 1), place('trophies', 2, 2, 1, 1), place('lobby', 0, 3, 2, 1), place('week', 2, 3, 1, 1),
 ]
 
 /** A teammate's space as a visit draws it (the prototype's VISIT_POS — never their own board, whose task tiles are

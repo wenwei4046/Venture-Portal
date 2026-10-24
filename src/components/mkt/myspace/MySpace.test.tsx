@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { DEFAULT_LAYOUT, DEFAULT_THEME, KINDS, spaceFromRow, type PetStats, type Space } from '@/lib/marketing/space'
+import { chatListFromRow } from '@/lib/marketing/chat'
 import type { PlateColumn } from '@/lib/marketing/my-space'
 
 // 2026-10-23 — ⑦-1: My Space's own side (`My Space Bento.dc.html`): the board laid out by its owner (Edit layout — the
@@ -27,7 +28,7 @@ const props = (over: Partial<MySpaceProps> = {}): MySpaceProps => ({
   plateLine: 'your plate is clear',
   columns: [column('turn', 'My turn', '👉'), column('delegated', 'Delegated by me', '📤'), column('waiting', 'Waiting on others', '⏳')],
   week: [], plans: [], plate: { count: 0, red: 0, fresh: false }, hasPet: false, canEdit: true, space: spaceFromRow(null), petStats: null,
-  viewer: 'viewer-1', lobby: [], me: null, ...over,
+  viewer: 'viewer-1', lobby: [], me: null, chat: chatListFromRow(null), chatWith: null, chatTasks: [], ...over,
 })
 /** A pet in numbers, as `mkt_pet()` gives it. */
 const stats = (over: Partial<PetStats> = {}): PetStats => ({ xp: 0, energy: 64, snacks: 3, workouts: 0, trophies: [], trophyCount: 0, ...over })
@@ -53,7 +54,7 @@ describe('My Space as its owner left it', () => {
     expect(['room', 'turn', 'waiting', 'delegated', 'week'].map(id => !!tile(id))).toEqual([true, true, true, true, true])
     const turn = tile('turn') as HTMLElement
     expect([turn.style.left, turn.style.top, turn.style.width, turn.style.height]).toEqual(['50.000%', '0px', 'calc(25.000% - 12px)', '352px'])
-    expect(tile('week')?.style.top).toBe('364px')
+    expect(tile('week')?.style.top).toBe('546px')
     expect(screen.getByText(/Good morning, Mei/)).toBeTruthy()
     expect(screen.queryByRole('complementary', { name: 'Edit layout' })).toBeNull()
   })
@@ -100,7 +101,7 @@ describe('Edit layout', () => {
     expect(tile('notes')?.style.top).toBe('728px')
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0]
-    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'notes'])
+    expect(sent.layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'chat', 'waiting', 'delegated', 'trophies', 'lobby', 'week', 'notes'])
     expect(sent.tilesKnown).toEqual([...KINDS].sort())
   })
 
@@ -112,7 +113,7 @@ describe('Edit layout', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove This week' }))
     expect(tile('week')).toBeNull()
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
-    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'trophies', 'waiting', 'delegated', 'lobby'])
+    expect(actions.saveMktSpace.mock.calls[0][0].layout.map((t: { id: string }) => t.id)).toEqual(['room', 'turn', 'pet', 'chat', 'waiting', 'delegated', 'trophies', 'lobby'])
   })
 
   it('dragged by its face: moved, drawn over the rest, saved when let go', async () => {
@@ -128,7 +129,7 @@ describe('Edit layout', () => {
     await waitFor(() => expect(actions.saveMktSpace).toHaveBeenCalled(), { timeout: 2000 })
     const sent = actions.saveMktSpace.mock.calls[0][0].layout
     expect(sent.at(-1)).toEqual({ id: 'turn', x: 0.6, y: 40, w: 0.25, h: 364 })
-    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'pet', 'trophies', 'waiting', 'delegated', 'week', 'lobby', 'turn'])
+    expect(sent.map((t: { id: string }) => t.id)).toEqual(['room', 'pet', 'chat', 'waiting', 'delegated', 'trophies', 'lobby', 'week', 'turn'])
   })
 
   it('the arrow keys move a tile; with Shift they size it', async () => {
@@ -517,5 +518,21 @@ describe('the lobby', () => {
     unmount()
     render(<MySpace {...props()} />)
     expect(lobby().getByText('No pets yet')).toBeTruthy()
+  })
+})
+
+// 2026-10-24 — ⑦-3: the chat on one's own board, and the lobby's last message over its sender's pet.
+describe('the chat', () => {
+  const MEI = '00000000-0000-4000-8000-000000000012', ALI = '00000000-0000-4000-8000-000000000013'
+  const ali = { staff: ALI, first: 'Ali', title: null, species: 'cat' as const, name: 'Kopi', color: 'original' as const, petPath: null, xp: 0, energy: 64, state: 'busy' as const }
+  const chat = chatListFromRow({ me: MEI, lobby: { last: { id: 4, from: ALI, first: 'Ali', body: 'Who has the moodboard?', at: '2026-10-24T01:12:00Z' }, unread: true },
+    dms: [{ staff: ALI, first: 'Ali', title: 'GRAPHIC DESIGNER', last: null, unread: false }] })
+
+  it('the chat tile — its tabs, the teammates to message; the lobby’s last word over its sender’s pet', () => {
+    render(<MySpace {...props({ me: MEI, chat, lobby: [ali] })} />)
+    const tileChat = within(tile('chat') as HTMLElement)
+    expect(tileChat.getAllByRole('tab').map(t => t.textContent)).toEqual(['💬 My chats', '🏛️ Lobby'])
+    expect(tileChat.getByRole('button', { name: 'Ali' })).toBeTruthy()
+    expect(within(tile('lobby') as HTMLElement).getByText('Who has the moodboard?')).toBeTruthy()
   })
 })

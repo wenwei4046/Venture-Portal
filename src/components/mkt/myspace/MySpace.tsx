@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { flash } from '@/components/hrv/toast'
 import { careMktPet, saveMktSpace } from '@/lib/marketing/actions'
+import { messageLine, type ChatList, type ChatTask } from '@/lib/marketing/chat'
 import type { PlateColumn, WeekRow } from '@/lib/marketing/my-space'
 import type { MktNotice } from '@/lib/marketing/shell'
 import {
@@ -14,6 +15,7 @@ import {
   type PieceKind, type Room, type Space, type SpacePatch, type SpacePicture, type SpaceTheme, type TileKind, type TilePlace,
 } from '@/lib/marketing/space'
 import { createClient } from '@/lib/supabase/client'
+import ChatTile from './ChatTile'
 import LobbyTile, { type LobbyEntry } from './LobbyTile'
 import NotesTile from './NotesTile'
 import Onboarding from './Onboarding'
@@ -30,10 +32,11 @@ import TrophiesTile from './TrophiesTile'
 import WeekTile from './WeekTile'
 import s from './myspace.module.css'
 
-// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1, ⑦-2, ⑦-4 and ⑦-5): the viewer's cover, avatar (and
-// their pet beside it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their
-// board — the room, the pet (its level, XP and energy; fed and worked out), My turn, Waiting on others, Delegated by me,
-// the trophies, the lobby (a teammate's pet opens their space), This week, Notes and Photo, laid out as they left it.
+// My Space (`My Space.dc.html` → `My Space Bento.dc.html`, ⑦-1 to ⑦-5): the viewer's cover, avatar (and their pet
+// beside it), name, role and status, *✥ Edit layout*, the greeting with what is on their plate, and their board — the
+// room, the pet (its level, XP and energy; fed and worked out), My turn, the chat (the lobby's thread and direct
+// messages), Waiting on others, Delegated by me, the trophies, the lobby (a teammate's pet opens their space), This
+// week, Notes and Photo, laid out as they left it.
 // Above it, an
 // Assignment plan that put them on a project, while it is unread. The first visit of somebody on Marketing's roster
 // opens the pet's setup. What they change is saved as they change it (only that part); what is drawn is theirs from
@@ -70,6 +73,12 @@ export interface MySpaceProps {
   lobby: LobbyEntry[]
   /** The viewer's staff id: their own pet in the lobby is drawn as it is here. */
   me: string | null
+  /** The viewer's chats (⑦-3). */
+  chat: ChatList
+  /** The chat opened on a teammate (`?chat=<staff>` — a visit's *💬 Message*). */
+  chatWith: string | null
+  /** What a message may carry. */
+  chatTasks: ChatTask[]
 }
 
 export default function MySpace(p: MySpaceProps) {
@@ -337,6 +346,8 @@ export default function MySpace(p: MySpaceProps) {
     staff: p.me, first: p.first, title: p.role, species: space.pet.species, name: petName, color: space.pet.color, petPath: space.petPath,
     xp: stats?.xp ?? 0, energy: stats?.energy ?? 64, state,
   } : null
+  const lastWord = p.chat.lobby.last
+  const lobbySay = lastWord ? { staff: lastWord.from, text: messageLine(lastWord) } : null
   const lobby = [...p.lobby.filter(x => x.staff !== p.me), ...(mine ? [mine] : [])]
     .sort((a, b) => a.first.localeCompare(b.first) || a.staff.localeCompare(b.staff))
   const roomPlace = placeOf('room')
@@ -359,7 +370,11 @@ export default function MySpace(p: MySpaceProps) {
     waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} canAccept={p.canEdit} />, red: col('waiting').anyRed },
     delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
     trophies: { body: <TrophiesTile stats={stats} /> },
-    lobby: { bare: true, body: <LobbyTile pets={lobby} me={p.me} home onVisit={staff => router.push(`/marketing?visit=${staff}`)} /> },
+    lobby: {
+      bare: true,
+      body: <LobbyTile pets={lobby} me={p.me} home say={lobbySay} onVisit={staff => router.push(`/marketing?visit=${staff}`)} />,
+    },
+    chat: { body: <ChatTile list={p.chat} canSpeak={p.canEdit && !!p.chat.me} tasks={p.chatTasks} openWith={p.chatWith} /> },
     week: { body: <WeekTile week={p.week} /> },
     notes: { bare: true, body: <NotesTile text={space.notes} canEdit={p.canEdit} onChange={t => change('notes', t)} onDone={() => flushKey('notes')} /> },
     photo: { bare: true, body: <PhotoTile path={space.photoPath} canEdit={p.canEdit && !drawer} sending={sending} onPick={() => pick('photo')} /> },

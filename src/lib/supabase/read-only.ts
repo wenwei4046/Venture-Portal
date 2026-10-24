@@ -95,6 +95,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_pet',
   // The lobby and a visit (mig 20261025038000): the roster's pets, a teammate's space — STABLE.
   'mkt_lobby', 'mkt_space_of',
+  // The chat (mig 20261025039000): one's chats, a thread — STABLE.
+  'mkt_chat_list', 'mkt_chat_thread',
   // Replace Person (mig 20261025036000): who stands where, one person's places — STABLE.
   'mkt_replace_people', 'mkt_replace_places',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
