@@ -11,7 +11,9 @@ import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
 import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
 import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
-import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
+import { applyOpening, applyToast, applyWindowVM, type ApplyWindowVM } from "../../shared/apply-ads";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
+import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
@@ -238,11 +240,11 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   }
 
   // Round 2 (rev 1011 §8): "Save and apply to all" — this ad's whole setting (the split, every team's inside mode and
-  // values) on EVERY ad, each keeping its own name. Since 2026-10-24 it means calculate together (the owner: "它的意思就是
-  // calculate together … 而不是只是抄他的 split 方案"): one crm_save_ads_together, which also takes in every ad already
-  // together, and the next lead of any of them goes by all of their leads this month; Save keeps an ad apart. Off while the
-  // draft is not valid (the Save rule). An ad left on the default is saved to none.
-  const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined };
+  // values) on other ads, each keeping its own name. Since 2026-10-24 it opens a sheet (the owner: "勾选广告，决定哪一个要、
+  // 哪一个不要 … 再选择是 standard 的 apply to all，还是全部总和起来算"): the ads ticked — every ad at first, or the together
+  // ads when this one is counted together — then Standard or Count together (crm_save_ads; shared/apply-ads.ts). Save keeps
+  // an ad apart. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
+  const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined, applyWin: null as ApplyWindowVM | null };
   if (E && asv?.ae) {
     const mp = new Map<string, string>();
     data.customers.forEach(c => { if (c.adId) mp.set(c.adId, c.ad); });
@@ -250,14 +252,18 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     mp.set(E.id, E.label);
     const all = [...mp], okAll = isSp ? !!byTeamRule : !!asv.ae.save;
     const ruleFor = (): CrmRuleIn | null => isSp ? byTeamRule : E.mode === "unset" ? null : { mode: "even", split: { ...E.split }, pm: E.pm, pp: { ...E.pp } };
+    const r = ruleFor(), rm = r?.mode;
+    // Running · Paused · Pending, as the desktop's list says it (adStatusOf).
+    const statusOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id), st = adStatusOf(data.adNames?.[id], cs.map(c => c.createdAt).sort().at(-1) ?? null, now);
+      return { leads: cs.length, status: st ? { label: ST_META[st][0], fg: ST_META[st][4], bg: ST_META[st][3] } : null }; };
     Object.assign(aeApply, {
       applyLabel: "Save and apply to all", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
-      applyAll: okAll ? () => void (async () => {
-        const r = ruleFor();
-        if (!r || !r.mode) { patch({ adEd: null, bp: null }); return; }
-        const done = await act.saveAdsTogether(all.map(([id, label]) => ({ id, label })), { ...r, mode: r.mode });
-        if (done) patch({ adEd: null, bp: null, toast: "Applied to all " + done.saved + " ads · counted together" + (done.dealt ? " · " + done.dealt + " waiting lead" + (done.dealt === 1 ? "" : "s") + " dealt" : "") });
-      })() : undefined,
+      applyAll: okAll ? () => { if (r && rm) patch({ applyPick: { ad: E.id, ...applyOpening(E.id, data.adRules, all.map(([id]) => id)) } }); else patch({ adEd: null, bp: null }); } : undefined,
+      applyWin: okAll && r && rm && ui.applyPick?.ad === E.id ? applyWindowVM({ pick: ui.applyPick, openId: E.id, rules: data.adRules,
+        ads: all.map(([id, label]) => ({ id, label, ...statusOf(id) })),
+        set: p => patch({ applyPick: p && { ...p, ad: E.id } }),
+        run: (list, together) => act.saveAds(list.map(a => ({ id: a.id, label: a.label })), together, { ...r, mode: rm })
+          .then(done => { if (done) patch({ adEd: null, bp: null, applyPick: null, toast: applyToast(done, together) }); }) }) : null,
     });
   }
 

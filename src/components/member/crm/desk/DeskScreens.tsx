@@ -14,6 +14,7 @@ import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/membe
 import type { PanelActions } from "../panel/actions";
 import type { Team } from "../panel/vm/common";
 import DeskApp from "./DeskApp";
+import { DeskApplyAds } from "./DeskExtras";
 import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
 import { titleData, titleName, titleTeams } from "./vm/names";
@@ -365,6 +366,8 @@ export default function DeskScreens(p: DeskScreensProps) {
   return (
     <div ref={boxRef} className={R.root} data-revenue-app="" style={{ position: "fixed", inset: 0, zIndex: 10, overflow: "auto" }}>
       <DeskApp v={v} />
+      {/* Save and apply to all's window (2026-10-24): over the split editor, drawn as the Add customer window. */}
+      {v.applyWin && <DeskApplyAds v={v.applyWin} />}
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
       <MediaViewer />
       <MessageMenu />

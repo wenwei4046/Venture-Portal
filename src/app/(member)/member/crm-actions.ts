@@ -34,8 +34,8 @@ const CRM_WRITES = [
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
   // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
-  // Save and apply to all: one setting, the ads counted together (mig 20261025121500), CRM · Manage.
-  "crm_save_ads_together",
+  // Save and apply to all's window: the ads ticked, each on its own or counted together (mig 20261025134700), CRM · Manage.
+  "crm_save_ads",
   // Cold lead templates (mig 20261011140000); submitting to Meta is submitCrmTemplate.
   "crm_save_template", "crm_template_on", "crm_delete_template",
   // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
@@ -65,7 +65,7 @@ export type CrmWrite = (typeof CRM_WRITES)[number];
  * is loaded only then — this module is imported by the CRM's screens.
  */
 const TELLS: ReadonlySet<string> = new Set([
-  "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads_together",
+  "crm_send_to", "crm_send_to_team", "crm_assign_member", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads",
   "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_visit_outcome",
   "crm_invite", "crm_answer_invite", "crm_remind",
 ]);
@@ -125,7 +125,7 @@ const requireCrm = async (need: "view" | "edit" | "manage") => {
 
 /** Which cell each of the CRM's writes needs (the database asks the same). */
 const MANAGE_WRITES: ReadonlySet<string> = new Set([
-  "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads_together", "crm_save_ad_rule", "crm_save_fulltime",
+  "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types", "crm_set_ft_even",

@@ -1,5 +1,6 @@
 import type { CustomerForm } from "../sales/ui";
 import type { CustomFields } from "../shared/custom-book";
+import type { ApplyPick } from "../shared/apply-ads";
 /** The Control panel's screen state (design 1a) — what is open and typed, not data. */
 export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads";
 export type Period = "day" | "week" | "month" | "custom";
@@ -86,6 +87,8 @@ export interface PanelUi {
   /** The last reassignment made here, per customer — the chat keeps saying so after the Undo bar is gone. */
   movedRec: Record<string, { from: string | null; to: string }>;
   adEd: AdDraft | null;
+  /** Save and apply to all's sheet (2026-10-24): for which ad, the ads ticked, Standard or Count together; null = shut. */
+  applyPick?: (ApplyPick & { ad: string }) | null;
   ftEd: FtDraft | null;
   att: boolean;
   attF: "all" | "overdue" | "urgent" | "soon";

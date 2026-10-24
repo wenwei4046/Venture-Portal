@@ -15,6 +15,7 @@ import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
+import type { ApplyWindowVM } from "../shared/apply-ads";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { Phone4aBookMode, Phone4aCustomBook } from "../shared/custom-book";
 
@@ -1050,6 +1051,54 @@ export function DeskAddCustomer({ v }: { v: AddCustomerV }) {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>
           <button type="button" onClick={v.close} style={{ ...XBTN, height: "36px", padding: "0 14px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
           <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 13px Inter, sans-serif" }} className={ok ? "crm4a-primary" : undefined}>{busy ? "Adding…" : v.go}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Save and apply to all's window (the owner, 2026-10-24): Standard or Count together, the ads ticked — the ad being edited
+ * always — drawn as the Add customer window. Behaviour: shared/apply-ads.ts.
+ */
+export function DeskApplyAds({ v }: { v: ApplyWindowVM }) {
+  const [busy, setBusy] = useState(false), ok = v.go.ok && !busy;
+  const go = async () => { if (!ok || !v.go.run) return; setBusy(true); try { await v.go.run(); } finally { setBusy(false); } };
+  const tag = (label: string, bg: string, fg: string) => (
+    <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", background: bg, color: fg, font: "500 11px Inter, sans-serif", whiteSpace: "nowrap" }}>{label}</span>);
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Save and apply to all" style={{ width: "460px", maxHeight: "calc(100vh - 64px)", borderRadius: "12px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>Save and apply to all</span>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div role="radiogroup" aria-label="Apply" style={{ flex: "none", display: "flex", gap: "2px", margin: "16px 20px 6px", padding: "3px", borderRadius: "9px", background: "var(--crm-field)" }}>
+          {v.modes.map(m => (
+            <button key={m.label} type="button" role="radio" aria-checked={m.on} onClick={m.pick} style={{ ...XBTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif",
+              background: m.on ? "#fff" : "transparent", boxShadow: m.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: m.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{m.label}</button>))}
+        </div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px 6px" }}>
+          <span style={LABEL}>Ads</span>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{v.count}</span>
+          <button type="button" onClick={v.all.toggle} style={{ ...XBTN, marginLeft: "auto", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{v.all.label}</button>
+        </div>
+        <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent", padding: "0 12px 10px" }}>
+          {v.rows.map(r => (
+            <label key={r.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", background: r.on ? "var(--crm-sel)" : "transparent", cursor: r.fixed ? "default" : "pointer" }}>
+              <input type="checkbox" checked={r.on} disabled={r.fixed} onChange={r.toggle} aria-label={r.name} style={{ flex: "none", width: "15px", height: "15px", margin: 0, accentColor: "var(--crm-rust)" }} />
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ font: "400 11.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{r.leads}</span>
+              </span>
+              {r.fixed && tag("This ad", "var(--crm-tint-attention)", "var(--crm-ink)")}
+              {r.together && tag("Together", "var(--crm-tint-cold)", "var(--crm-ink-soft)")}
+              {r.status && tag(r.status.label, r.status.bg, r.status.fg)}
+            </label>))}
+        </div>
+        <div style={{ flex: "none", display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={v.close} style={{ ...XBTN, height: "36px", padding: "0 14px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 13px Inter, sans-serif" }} className={ok ? "crm4a-primary" : undefined}>{busy ? "Saving…" : v.go.label}</button>
         </div>
       </div>
     </div>

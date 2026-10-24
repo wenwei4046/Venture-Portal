@@ -169,7 +169,7 @@ export function assignVM(ctx: PanelCtx) {
     // 4a (T03): the channel, the ad's headline under its name, Set up while it has no rule.
     head: head4(a.id), wa: a.page === "WhatsApp", setUp: !ruleOf(a.id),
     ...mkRow(adTeams, a, p => void saveAd({ ...a, ...p })),
-    edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),
+    edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } }, applyPick: null }),
   }));
   const E = ui.adEd;
   const aeRow = E ? mkRow(adTeams, E, p => set(u => (u.adEd ? { ...u, adEd: { ...u.adEd, ...p } } : u))) : null;
@@ -188,7 +188,7 @@ export function assignVM(ctx: PanelCtx) {
     nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
   } : { canName: false, nameDraft: "", headline: "", onName: () => {}, saveName: () => {}, nameKey: () => {} };
   const ae = aeRow && E
-    ? { ...aeRow, ...naming, why: "", close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
+    ? { ...aeRow, ...naming, why: "", close: () => patch({ adEd: null, adNameDraft: null, applyPick: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
     : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, why: "", close: () => {}, saveBg: "var(--crm-faint-2)", save: undefined as (() => void) | undefined };
 
   // Awaiting reply, on Assignment: counts per level, then every waiting customer.
