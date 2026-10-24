@@ -38,6 +38,8 @@ export interface HrCandidate {
   note?: string
   source?: string
   stage: CandStage
+  /** Not selected: why the Talent Bank keeps them, in HR's words (2026-10-24). */
+  why?: string
 }
 
 export interface HrHire {

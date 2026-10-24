@@ -177,6 +177,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const [q, setQ] = useState('')
   const [mdTab, setMdTab] = useState<'company' | 'personal'>('company')
   const [talentNotes, setTalentNotes] = useState<{ id: string; text: string } | null>(null)
+  // The hire whose Not selected fold is open (2026-10-24): another hire opens with its own folded.
+  const [hireOut, setHireOut] = useState<string | null>(null)
   const [arm, setArm] = useState(false)
   const [busy, startBusy] = useTransition()
   const [toast, flash] = useToast()
@@ -593,6 +595,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         {top?.k === 'desk' ? <DeskScreen title={top.id} icon={top.icon} /> : null}
         {top?.k === 'hire' && hr ? (
           <HireScreen hr={hr} mayEdit={d.may.hireEdit && !d.viewingAs} mayCreate={d.may.hireCreate && !d.viewingAs}
+            outOpen={hireOut === hr.id} onOut={() => setHireOut(o => (o === hr.id ? null : hr.id))}
             onStage={(cid, name, cur) => openSheet({ k: 'stage', cid, name, cur })} onAdd={() => openSheet({ k: 'cand' })} />
         ) : null}
         {top?.k === 'talent' && tt ? (
