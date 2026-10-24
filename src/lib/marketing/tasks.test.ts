@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { missingWork, moveStage, removeStage, stageDates, stageProblems, stagesPayload, starterStages, type DraftStage } from './tasks'
+import { formFromRow, missingWork, moveStage, removeStage, stageDates, stageProblems, stagesPayload, starterStages, workFromRow, type DraftStage, type FormField } from './tasks'
 import { defaultRule, periodText, recurDays, recurPreview, ruleFromRow, rulePayload, ruleText, type RecurRule } from './recur'
 
 // The same days and the same needs the database reckons (tests/member-sql/validate-marketing-tasks.mjs holds
@@ -84,6 +84,15 @@ describe('what a stage still needs', () => {
     expect(missingWork(form, { notes: '', links: [], vals: { 'Final image': 'https://drive.google.com/x' }, files: [] })).toEqual([])
   })
   it('a stage with no field: a note, a file or a link', () => {
+    // A choice naming a shared list (③d-2): read with its list — a text field never; a Multi-select's picks kept.
+    expect(formFromRow([{ label: 'Location', type: 'Multi-select', list: 'Locations' }, { label: 'Topic', type: 'Text', list: 'Locations' }]))
+      .toEqual([{ label: 'Location', type: 'Multi-select', list: 'Locations' }, { label: 'Topic', type: 'Text' }])
+    expect(workFromRow({ vals: { Location: ['LRT', 3, 'Showroom'], Mood: 'Calm', Done: true, Junk: { x: 1 } } }).vals)
+      .toEqual({ Location: ['LRT', 'Showroom'], Mood: 'Calm', Done: true })
+    // A Multi-select with none picked (③d-2) is no answer.
+    const multi: FormField[] = [{ label: 'Location', type: 'Multi-select', list: 'Locations' }]
+    expect([missingWork(multi, { notes: '', links: [], vals: { Location: [] }, files: [] }), missingWork(multi, { notes: '', links: [], vals: { Location: ['LRT'] }, files: [] })])
+      .toEqual([['Location'], []])
     expect(missingWork([], { notes: '', links: [], vals: {}, files: [] })).toEqual(['a note, a file or a link'])
     expect(missingWork([], { notes: '', links: [{ url: 'https://x', label: '' }], vals: {}, files: [] })).toEqual([])
     expect(missingWork([], { notes: '', links: [], vals: {}, files: [FILE(null)] })).toEqual([])

@@ -1,5 +1,5 @@
 import { requireActionOn, requirePage } from '@/lib/auth'
-import { readBoard, readWorkflows } from '@/lib/marketing/server'
+import { readBoard, readOptionLists, readWorkflows } from '@/lib/marketing/server'
 import { builderPeople } from '@/lib/marketing/tasks'
 import WorkflowBuilder from '@/components/mkt/workflows/WorkflowBuilder'
 
@@ -10,7 +10,7 @@ export default async function MarketingWorkflowsPage({ searchParams }: { searchP
   await requirePage('/marketing/workflows')
   // The manager's: Marketing · Manage.
   await requireActionOn('/marketing/workflows', 'marketing', 'manage')
-  const [board, workflows, sp] = await Promise.all([readBoard(), readWorkflows(), searchParams])
+  const [board, workflows, lists, sp] = await Promise.all([readBoard(), readWorkflows(), readOptionLists(), searchParams])
   const { people, approvers } = builderPeople(board)
   return (
     <WorkflowBuilder
@@ -19,6 +19,7 @@ export default async function MarketingWorkflowsPage({ searchParams }: { searchP
       people={people}
       approvers={approvers}
       team={board.team.map(p => p.id)}
+      lists={lists}
     />
   )
 }

@@ -85,6 +85,18 @@ a.btn { text-decoration: none; } /* a deliverable's Assignment plan link */
 .fArea { padding: 8px 10px; resize: vertical; line-height: 1.5; max-width: none; }
 .fInput:focus, .fArea:focus { border-color: rgb(var(--mk-stat-hover)); }
 .fInput:disabled, .fArea:disabled { background: rgb(var(--mk-surface-4)); color: rgb(var(--mk-text-2)); }
+/* A choice (③d-2): a Multi-select's options to tick, + Add on a shared list's, the option typed in on the spot. */
+.choiceChips { display: flex; flex-wrap: wrap; gap: 6px; max-width: 560px; }
+.choiceChip {
+  height: 30px; padding: 0 11px; border-radius: 15px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white));
+  color: rgb(var(--mk-ink)); font: inherit; font-size: .88em; cursor: pointer;
+}
+.choiceChipOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
+.choiceChip:disabled { cursor: not-allowed; opacity: .6; }
+.choiceMore { height: 30px; padding: 0 11px; border-radius: 15px; border: 1px dashed rgb(var(--mk-line)); background: none; color: rgb(var(--mk-muted)); font: inherit; font-size: .88em; cursor: pointer; }
+.choiceAdd { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 560px; }
+.choiceAdd .fInput { flex: 1 1 200px; }
+.choiceNone { font-size: .88em; color: rgb(var(--mk-muted)); }
 .fileChip { height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: inline-flex; align-items: center; gap: 6px; font-size: .86em; max-width: 100%; color: inherit; text-decoration: none; }
 .fileChip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fileX { cursor: pointer; color: rgb(var(--mk-x)); background: none; border: 0; font: inherit; padding: 0 0 0 4px; }

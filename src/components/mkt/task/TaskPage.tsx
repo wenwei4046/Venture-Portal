@@ -8,9 +8,11 @@ import { acceptMktStage, decideMktStage, putMktFree, saveMktStageFiles, saveMktW
 import { nameOf, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone } from '@/lib/marketing/task'
 import { missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
 import { LIB_MAX_BYTES, STAGE_MAX_FILES, stagePath, type TaskFile } from '@/lib/marketing/library'
+import { sameAnswer, type OptionLists } from '@/lib/marketing/options'
 import { createClient } from '@/lib/supabase/client'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
+import ChoiceField from './ChoiceField'
 import StageFiles from './StageFiles'
 import TaskLibrary from './TaskLibrary'
 import TaskPosts from './TaskPosts'
@@ -24,19 +26,22 @@ import s from './task.module.css'
 // comes back with the task as it now stands.
 
 const TONE: Record<Tone, string> = { red: s.red, waiting: s.waiting, done: s.done, draft: s.draft }
-const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person', 'Select', 'Multi-select'])
+const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person'])
 const blockId = () => (Math.random().toString(36).slice(2) + '00000000').slice(0, 10)
 const isLink = (v: string) => /^https?:\/\/\S+$/i.test(v.trim())
 
-export default function TaskPage({ initial, can, files = [], splitPeople = [] }: {
+export default function TaskPage({ initial, can, files = [], splitPeople = [], lists: initialLists = {} }: {
   initial: MktTaskPage
   can: TaskViewer
   files?: TaskFile[]
   /** Whom ✂️ Split into subtasks offers — read only for the owner of a stage that splits. */
   splitPeople?: PickPerson[]
+  /** The shared option lists (③d-2) a choice may offer — an option added on the spot joins its list here too. */
+  lists?: OptionLists
 }) {
   const router = useRouter()
   const [page, setPage] = useState(initial)
+  const [lists, setLists] = useState<OptionLists>(initialLists)
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
@@ -136,17 +141,30 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
     if (!r.ok) return say(r.reason)
     if (saved.current) saved.current = after(saved.current)
   }
-  const saveVal = (f: FormField, value: string | boolean) => {
+  const saveVal = (f: FormField, value: string | boolean | string[]) => {
     if (!saved.current) return
     const before = saved.current.vals[f.label]
-    const empty = value === '' || value === false
-    if (before === value || (before === undefined && empty)) return
-    void save({ vals: { [f.label]: empty && typeof value === 'string' ? null : value } }, w => {
+    // None picked of a Multi-select (③d-2) is no answer, as an emptied text.
+    const empty = value === '' || value === false || (Array.isArray(value) && value.length === 0)
+    if (sameAnswer(before, value) || (before === undefined && empty)) return
+    void save({ vals: { [f.label]: empty && typeof value !== 'boolean' ? null : value } }, w => {
       const vals = { ...w.vals }
-      if (empty && typeof value === 'string') delete vals[f.label]
+      if (empty && typeof value !== 'boolean') delete vals[f.label]
       else vals[f.label] = value
       return { ...w, vals }
     })
+  }
+  /** A choice answered (③d-2): kept on the form, then saved. */
+  const answerChoice = (f: FormField, next: string | string[] | null) => {
+    const value = next ?? (f.type === 'Multi-select' ? [] : '')
+    setWork(cw => {
+      if (!cw) return cw
+      const vals = { ...cw.vals }
+      if (next === null) delete vals[f.label]
+      else vals[f.label] = next
+      return { ...cw, vals }
+    })
+    saveVal(f, value)
   }
   const saveNotes = () => {
     if (!work || !saved.current || work.notes === saved.current.notes) return
@@ -410,6 +428,10 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [] }:
                               onBlur={e => live && saveVal(f, e.target.value.trim())}
                             />
                           )
+                        ) : f.type === 'Select' || f.type === 'Multi-select' ? (
+                          <ChoiceField field={f} value={v} lists={lists} live={!!live} busy={pending} say={say}
+                            onAnswer={next => live && answerChoice(f, next)}
+                            onList={(name, opts) => setLists(l => ({ ...l, [name]: opts }))} />
                         ) : f.type === 'Checkbox' ? (
                           <button
                             type="button"

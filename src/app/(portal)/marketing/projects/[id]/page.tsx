@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { requireAuth, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { readBoard, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
+import { readBoard, readOptionLists, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
 import { builderPeople } from '@/lib/marketing/tasks'
 import TaskPage from '@/components/mkt/task/TaskPage'
 import ProductProject from '@/components/mkt/project/ProductProject'
@@ -36,14 +36,17 @@ export default async function MarketingProjectPage({ params, searchParams }: {
     // splits, working it, is offered the roster to split it to (②b-2c): somebody else with a login, with their plate.
     const cur = page.project.status === 'active' ? page.stages[page.project.cur] : undefined
     const splits = can.edit && !!cur?.split && !!page.me && cur.owner === page.me && (cur.status === 'accepted' || cur.status === 'changes')
-    const [files, board] = await Promise.all([
+    // A choice naming a shared list (③d-2) offers the list's options.
+    const shared = page.stages.some(st => st.form.some(f => !!f.list))
+    const [files, board, lists] = await Promise.all([
       page.project.kind === 'recurring' && !page.project.series ? [] : readTaskFiles(page.project.id),
       splits ? readBoard() : null,
+      shared ? readOptionLists() : {},
     ])
     const splitPeople = board
       ? builderPeople(board).people.filter(p => p.id !== page.me && board.team.some(t => t.id === p.id && !!t.user))
       : []
-    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} />
+    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} lists={lists} />
   }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()

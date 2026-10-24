@@ -77,6 +77,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_project',
   // Marketing's Workflow Builder (mig 20261023235500): the templates, their drafts and versions — STABLE.
   'mkt_workflows',
+  // Marketing's shared option lists (mig 20261025191000): every list by its name — STABLE.
+  'mkt_option_lists',
   // Marketing's Minutes Builder (mig 20261023235800): the minutes templates, their drafts and versions — STABLE.
   'mkt_minutes_templates',
   // Marketing's Product Builder (mig 20261023235900): the products, their prices and versions — STABLE.

@@ -5,6 +5,7 @@ import {
   CANVAS_MAX_FIELDS, CANVAS_MAX_SECTIONS, DEFAULT_STAGE_SEC, fieldFlags, newCanvasField, newCanvasSection, SECTION_ICONS,
   type CanvasField, type CanvasSection, type WfCanvas,
 } from '@/lib/marketing/canvas'
+import type { OptionLists } from '@/lib/marketing/options'
 import { FIELD_GLYPH, type FormField } from '@/lib/marketing/tasks'
 import type { WfStage } from '@/lib/marketing/workflows'
 import { FieldPop, SectionPop } from './CanvasPop'
@@ -48,6 +49,9 @@ export default function CanvasEditor({
   onStages,
   onCanvas,
   onEditStage,
+  lists = {},
+  onList,
+  say,
 }: {
   /** "Reels video · Full production" */
   title: string
@@ -61,6 +65,10 @@ export default function CanvasEditor({
   onCanvas: (next: WfCanvas) => void
   /** Open a stage on the Workflow stages tab. */
   onEditStage: (at: number) => void
+  /** The shared option lists (③d-2) a choice may take its options from; one written as an option is added or taken off. */
+  lists?: OptionLists
+  onList?: (name: string, opts: string[]) => void
+  say?: (words: string) => void
 }) {
   const [pop, setPop] = useState<Pop>(null)
   const [icons, setIcons] = useState<string | null>(null)
@@ -202,7 +210,8 @@ export default function CanvasEditor({
                   <div className={c.fields}>
                     {s.form.map((f, j) =>
                       fieldRow(id, j, f, names[i], (
-                        <FieldPop field={f} stages={names} stage={i} own showPic onChange={next => setStageField(i, j, next)} onClose={() => setPop(null)} />
+                        <FieldPop field={f} stages={names} stage={i} own showPic onChange={next => setStageField(i, j, next)} onClose={() => setPop(null)}
+                          lists={lists} onList={onList} say={say} />
                       )),
                     )}
                   </div>
@@ -246,6 +255,9 @@ export default function CanvasEditor({
                           setSection(s.key, x => ({ ...x, fields: x.fields.filter((_, k) => k !== j) }))
                         }}
                         onClose={() => setPop(null)}
+                        lists={lists}
+                        onList={onList}
+                        say={say}
                       />
                     )),
                   )}

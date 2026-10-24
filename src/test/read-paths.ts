@@ -458,6 +458,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A recurring product's months (mig 20261025131000): its run day moved by Marketing · Manage; the months due made by the
   // hourly sweep (the service role) as by every Marketing write; paused and resumed by Marketing · Manage (mig 20261025181000).
   'mkt_product_run_day', 'mkt_product_runs_due', 'mkt_product_pause',
+  // A choice's shared option lists (mig 20261025191000): read by Marketing · View, an option added by Marketing · Edit,
+  // taken off by Marketing · Manage.
+  'mkt_option_lists', 'mkt_option_add', 'mkt_option_remove',
   // A task's posts (mig 20261025151000): marked posted, or the mark taken back, by its owner or Marketing · Manage.
   'mkt_post_mark', 'mkt_post_unmark',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill

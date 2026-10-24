@@ -9,6 +9,7 @@ import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
+import { optionListsFromRow, type OptionLists } from './options'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
 import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
@@ -128,6 +129,14 @@ export async function readLibrary(): Promise<Library> {
 }
 
 /** A task's files from the Library (⑥-4), newest first. */
+/** The shared option lists by their names (③d-2, mig 20261025191000) — a choice that names one offers its options. */
+export async function readOptionLists(): Promise<OptionLists> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_option_lists')
+  if (error) throw new Error(error.message)
+  return optionListsFromRow(data)
+}
+
 export async function readTaskFiles(project: string): Promise<TaskFile[]> {
   const db = await client()
   const { data, error } = await db.rpc('mkt_task_library', { p_project: project })
