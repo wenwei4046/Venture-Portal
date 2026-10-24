@@ -378,7 +378,10 @@ describe('a campaign', () => {
     const to = screen.getByLabelText('Campaign period to') as HTMLInputElement
     expect([from.value, to.value, to.getAttribute('min')]).toEqual(['2026-11-09', '', '2026-11-09'])
     expect(screen.getByText(/Campaign period is empty/)).toBeTruthy()
+    expect(screen.queryByLabelText('Campaign')).toBeNull()
     fireEvent.change(to, { target: { value: '2026-11-12' } })
+    // The header follows it as typed.
+    expect(screen.getByLabelText('Campaign').textContent).toBe('📢 Runs 9 – 12 Nov 2026 · in 16 days')
     await waitFor(() => expect(actions.fillMktMinutes).toHaveBeenCalledTimes(1), { timeout: 3000 })
     expect(actions.fillMktMinutes.mock.calls[0]).toEqual(['m1', 'p1', 3, { vals: { 'Campaign period': { from: '2026-11-09', to: '2026-11-12' } } }])
     expect(screen.queryByText(/Campaign period is empty/)).toBeNull()

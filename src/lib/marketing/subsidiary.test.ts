@@ -135,6 +135,25 @@ describe('a subsidiary’s page', () => {
     ])
   })
 
+  // 2026-10-24: a product project's work, months, billing and campaign period in the page's own words — not the raw action.
+  it('words a product project’s own lines as its page does', () => {
+    const p = { id: id(3), track: 'MKT-CAR-2610-008', title: 'Sofa launch', kind: 'product' }
+    const feed = subFeedFromRow([
+      { id: 15, at: '2026-10-22T09:00:00Z', actor: 'Mei', action: 'campaign period', data: { from: '2026-11-09', until: '2026-11-12' }, project: p },
+      { id: 14, at: '2026-10-22T08:00:00Z', actor: 'Mei', action: 'campaign period', data: { from: null, until: null }, project: p },
+      { id: 13, at: '2026-10-22T07:00:00Z', actor: 'Mei', action: 'work started', data: { deliverables: 2, runDay: 5 }, project: p },
+      { id: 12, at: '2026-10-22T06:00:00Z', actor: 'Someone', action: 'run made', data: { month: '2026-11', made: 2, toPlan: 1 }, project: p },
+      { id: 11, at: '2026-10-22T05:00:00Z', actor: 'Mei', action: 'billing confirmed', data: { month: '2026-10' }, project: p },
+    ])
+    expect(feed.map(e => `${feedLine(e).emoji} ${feedLine(e).text}`)).toEqual([
+      '📢 Mei set the campaign period · 9 – 12 Nov 2026',
+      '📢 Mei took the campaign period off',
+      '▶ Mei started the work · 2 deliverables · every month on the 5th',
+      "🔁 Nov 2026's work made · 2 deliverables · 1 to plan",
+      '💰 Mei confirmed the billing for Oct 2026',
+    ])
+  })
+
   it('says how long ago, by the office’s day', () => {
     const now = Date.parse('2026-10-22T10:00:00Z') // 18:00 in the office
     expect(agoLabel('2026-10-22T09:59:40Z', now, '2026-10-22')).toBe('just now')

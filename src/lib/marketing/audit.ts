@@ -5,7 +5,7 @@
 // until Marketing's R2 bucket). Pure.
 
 import { monthLabel } from './billing'
-import type { MktProjectKind } from './board'
+import { periodOf, type MktProjectKind } from './board'
 import { eventFromRow, trailTime, type TaskEvent } from './task'
 
 export interface ProjectLog {
@@ -57,6 +57,7 @@ const ACTION: Record<string, string> = {
   'subtask removed': 'Subtask taken back',
   'amount set': 'Amount set', 'billing confirmed': 'Billing confirmed', 'billing withdrawn': 'Billing withdrawn', stopped: 'Stopped',
   'run made': 'Monthly run made', 'run day': 'Run day changed', carried: 'Plan carried',
+  'campaign period': 'Campaign period',
 }
 const TONE: Record<string, AuditTone> = {
   approved: 'green', completed: 'green', 'pic approved': 'green', 'delivery approved': 'green', 'billing confirmed': 'green',
@@ -95,7 +96,9 @@ export function auditRows(log: ProjectLog): AuditRow[] {
       stage: e.stageName || (e.stage != null ? `Stage ${e.stage + 1}` : NONE),
       fromTo: TO_PIC.has(e.action) ? (reason ? `→ ${reason} (PIC)` : NONE)
         : e.fromTo ? (e.action === 'submitted' ? `${e.actor || NONE} → ${e.fromTo}` : e.action === 'reassigned' || e.action === 'replaced' ? e.fromTo : `→ ${e.fromTo}`) : NONE,
-      reason: TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
+      // A campaign's run period (④-2b): its days, or that it was taken off.
+      reason: e.action === 'campaign period' ? periodOf(e.data) ?? 'Taken off'
+        : TO_PIC.has(e.action) || OF_MINUTES.has(e.action) || !reason ? NONE : QUOTED.has(e.action) ? `"${reason}"` : reason,
       version: OF_SUBTASK.has(e.action) && typeof e.data?.title === 'string' ? (e.version ? `${e.data.title} ${e.version}` : e.data.title)
         : OF_MONTH[e.action] ? monthOfLine(e.data?.[OF_MONTH[e.action]])
         : e.version ? (e.stageName ? `${e.stageName} ${e.version}` : e.version) : OF_MINUTES.has(e.action) ? reason || NONE : product || NONE,

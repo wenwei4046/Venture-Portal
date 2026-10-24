@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
-  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine, campaignLine
+  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine, campaignLine, typedCampaign
 } from './project'
 import { periodWords } from './board'
 
@@ -283,6 +283,15 @@ describe('a campaign’s run period', () => {
     expect(campaignLine(c, '2026-11-13')).toEqual({ text: 'Ran 9 – 12 Nov 2026', live: false })
     expect([periodWords('2026-11-09', '2026-11-09'), periodWords('2026-11-28', '2026-12-03'), periodWords('2026-12-28', '2027-01-03')])
       .toEqual(['9 Nov 2026', '28 Nov – 3 Dec 2026', '28 Dec 2026 – 3 Jan 2027'])
+  })
+
+  it('the run as typed — the header’s, before the save is back', () => {
+    const f = [{ key: 'k', name: 'Event days', type: 'Campaign period' as const, req: true, pic: true, lock: false }]
+    expect(typedCampaign([], {})).toBeUndefined()
+    expect(typedCampaign(f, {})).toBeNull()
+    expect(typedCampaign(f, { 'Event days': { from: '2026-11-09', to: '' } })).toBeNull()
+    expect(typedCampaign(f, { 'Event days': { from: '2026-11-12', to: '2026-11-09' } })).toBeNull()
+    expect(typedCampaign(f, { 'Event days': { from: '2026-11-09', to: '2026-11-12' } })).toEqual({ from: '2026-11-09', until: '2026-11-12' })
   })
 
   it('as written: required until both days are in; emptied, it is sent as nothing', () => {

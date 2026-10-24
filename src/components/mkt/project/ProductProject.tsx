@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { beginMktProduct, fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
 import {
   bothWaiting, campaignLine, canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
-  stepsOf, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
+  stepsOf, typedCampaign, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { picNames } from '@/lib/marketing/clients'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
@@ -59,9 +59,12 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const [runDay, setRunDay] = useState(() => Math.min(Number(initial.today.slice(8, 10)) || 1, 28))
 
   const pr = page.project
-  // A campaign's run (④-2b — the user's answer 13): before it, live, or ran.
-  const campaign = pr.campaign ? campaignLine(pr.campaign, page.today) : null
   const doc = intakeOf(page)
+  // A campaign's run (④-2b — the user's answer 13): before it, live, or ran — as the intake's Campaign period is typed,
+  // else as saved.
+  const typed = doc?.intake ? typedCampaign(doc.template.fields, edit.vals) : undefined
+  const run = typed === undefined ? pr.campaign : typed
+  const campaign = run ? campaignLine(run, page.today) : null
   const editRef = useRef(edit)
   const savedRef = useRef(edit)
   const revRef = useRef(doc?.rev ?? 1)
@@ -251,10 +254,10 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </>
             ) : null}
             <span>Owner {pr.ownerName ?? '—'}</span>
-            {pr.campaign ? (
+            {campaign ? (
               <>
                 <span>·</span>
-                <span className={campaign?.live ? p.live : undefined} aria-label="Campaign">📢 {campaign?.text}</span>
+                <span className={campaign.live ? p.live : undefined} aria-label="Campaign">📢 {campaign.text}</span>
               </>
             ) : null}
           </div>

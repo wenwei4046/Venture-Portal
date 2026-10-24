@@ -4,7 +4,7 @@
 // Meeting minutes · Tracking link · PIC response), and only what changed, for the save. Pure.
 
 import {
-  campaignFromRow, daysBetween, longDay, periodWords, personFromRow, shortDay, subFromRow, type MktCampaign, type MktPerson, type MktProjectStatus,
+  campaignFromRow, daysBetween, longDay, periodOf, periodWords, personFromRow, shortDay, subFromRow, type MktCampaign, type MktPerson, type MktProjectStatus,
   type MktStageStatus, type MktSub,
 } from './board'
 import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules } from './minutes'
@@ -196,6 +196,15 @@ export function campaignLine(c: MktCampaign, today: string): { text: string; liv
   }
   if (today && today <= c.until) return { text: `Live · ${words}${c.until === today ? ' · ends today' : ` · ends ${shortDay(c.until)}`}`, live: true }
   return { text: `${today ? 'Ran' : 'Runs'} ${words}`, live: false }
+}
+
+/** The intake's *Campaign period* as written (④-2b): its run once both days are in, the end on or after the start — null
+ * while not; undefined when its template has none (the project's run is then as saved). */
+export function typedCampaign(fields: readonly MinutesField[], vals: Readonly<Record<string, MinutesValue>>): MktCampaign | null | undefined {
+  const f = fields.find(x => x.type === 'Campaign period')
+  if (!f) return undefined
+  const v = vals[f.name]
+  return isPeriod(v) && v.from && v.to && v.to >= v.from ? { from: v.from, until: v.to } : null
 }
 
 export function runsLine(r: ProductRuns): string {
@@ -510,6 +519,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'billing withdrawn' ? `${who} withdrew the billing for ${billMonth(e.data?.month)}`
     : e.action === 'stopped' ? `${who} stopped the project · billed to ${billMonth(e.data?.until)}`
     : e.action === 'replaced' ? `${who} replaced ${typeof e.data?.swap === 'string' ? e.data.swap : 'a person'} as the owner${e.reason ? ` · "${e.reason}"` : ''}`
+    // A campaign's run period (④-2b — the user's answer 13), as the intake minutes set it.
+    : e.action === 'campaign period' ? (periodOf(e.data) ? `${who} set the campaign period · ${periodOf(e.data)}` : `${who} took the campaign period off`)
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }
 

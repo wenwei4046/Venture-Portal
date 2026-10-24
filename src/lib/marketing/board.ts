@@ -370,6 +370,12 @@ export function periodWords(from: string, until: string): string {
   if (from.slice(0, 7) !== until.slice(0, 7)) return `${shortDay(from)} – ${shortDay(until)} ${until.slice(0, 4)}`
   return `${+from.slice(8, 10)} – ${shortDay(until)} ${until.slice(0, 4)}`
 }
+/** A trail line's run period in words (its data's from and until), else null. */
+export function periodOf(data: Record<string, unknown> | null | undefined): string | null {
+  const from = data?.from, until = data?.until
+  return typeof from === 'string' && typeof until === 'string' && DAY_RE.test(from) && DAY_RE.test(until) ? periodWords(from, until) : null
+}
+
 /** "Tue 21 Oct" */
 export const longDay = (d: string) => `${WD[weekdayOf(d)]} ${shortDay(d)}`
 export const WEEKDAYS = WD
