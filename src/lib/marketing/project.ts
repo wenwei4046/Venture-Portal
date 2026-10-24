@@ -414,6 +414,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     // The first of two when both PICs sign off (②b-2d-2b) names whom the minutes still wait for.
     : e.action === 'pic approved' ? `${who} approved ${e.reason || 'the minutes'} on the link${typeof e.data?.waiting === 'string' && e.data.waiting ? ` · waiting for ${e.data.waiting}` : ''}`
     : e.action === 'pic changes' ? `${who} asked for changes on the link: "${e.reason ?? ''}"`
+    // Replace Person (④-5): the project's owner — the swap kept in the line's data.
+    : e.action === 'replaced' ? `${who} replaced ${typeof e.data?.swap === 'string' ? e.data.swap : 'a person'} as the owner${e.reason ? ` · "${e.reason}"` : ''}`
     : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }
 

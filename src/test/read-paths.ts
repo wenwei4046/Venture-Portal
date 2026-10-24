@@ -418,6 +418,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_lib_share', 'mkt_lib_share_stop', 'mkt_lib_shared', 'mkt_lib_shared_file',
   // A Library file on a task (mig 20261024007400): a task's files read by View; attached and taken off by Edit.
   'mkt_task_library', 'mkt_task_attach', 'mkt_task_detach',
+  // Replace Person (mig 20261025036000): who stands where, one person's places and the swap — all Marketing · Manage.
+  'mkt_replace_people', 'mkt_replace_places', 'mkt_replace_person',
   // My Space's own side (migs 20261024007500 and 20261024007600): the caller's own space read by View; saved — only the
   // parts sent — by Edit.
   'mkt_space', 'mkt_space_save',

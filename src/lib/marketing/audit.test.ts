@@ -54,6 +54,13 @@ describe('a project’s formal log', () => {
     ])
   })
 
+  it('a person replaced (④-5): amber, its from → to as it is, the reason quoted', () => {
+    const log = projectLogFromRow({ track: 'TSK-CAR-2610-002', title: 'Banner', kind: 'quick', rows: [
+      { id: 20, at: '2026-10-24T03:40:00Z', actor: 'Josiah', action: 'replaced', stage: 0, stageName: 'Draft', fromTo: 'Siti → Hafiz', reason: 'Resigned',
+        data: { role: 'owner', rec: 1 } }] })!
+    expect(auditRows(log).map(line)).toEqual(['1 | 24 Oct 11:40 | Josiah | Replaced | amber | Draft | Siti → Hafiz | "Resigned" | —'])
+  })
+
   it('filters by person, action and stage — each value as first named, counted over the whole log', () => {
     const rows = auditRows(task)
     const groups = auditGroups(rows, NO_AUDIT_FILTER)

@@ -51,8 +51,8 @@ describe("Marketing's shell", () => {
   it('lists the rows the viewer’s tabs open, the manager’s tools for a manager only', () => {
     const staff = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
     expect(mktNavRows(staff).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'claims', 'rooms'])
-    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'tracking', 'workflow', 'product', 'minutes', 'claims', 'rooms'])
-    expect(mktNavRows(undefined).length).toBe(11)
+    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'tracking', 'workflow', 'product', 'minutes', 'replace', 'claims', 'rooms'])
+    expect(mktNavRows(undefined).length).toBe(12)
   })
 
   it('lights the row a page is under, a subsidiary by its projects', () => {
@@ -64,6 +64,7 @@ describe("Marketing's shell", () => {
     expect(mktNavActive('/marketing/projects', new URLSearchParams('q=x'))).toBe('projects')
     expect(mktNavActive('/admin/rooms', null)).toBe('rooms')
     expect(mktCrumb('/marketing/tracking')).toEqual({ emoji: '📊', label: 'Tracking Dashboard' })
+    expect([mktNavActive('/marketing/replace', null), mktCrumb('/marketing/replace')]).toEqual(['replace', { emoji: '🔁', label: 'Replace Person' }])
     expect(mktCrumb('/it-support')).toEqual({ emoji: '🛟', label: 'IT support' })
     expect(mktNavActive('/marketing/new', null)).toBe('projects')
     expect(mktCrumb('/marketing/new')).toEqual({ emoji: '📁', label: 'Projects / New project' })
