@@ -17,8 +17,13 @@
 //
 // A deal with no fixed term runs month by month to date: interest on the base
 // (the flat convention, user 2026-09-22), principal as it came in, Balance =
-// principal still owed. A compounding deal (利滚利) rolls an unpaid month's
-// interest into the balance (lib/treasury-schedule compoundInterestState).
+// principal still owed — principal repaid before its first month too (BI#7,
+// 2026-10-24: the 5 Apr 2025 payment, made the day the money came, had been
+// left on the balance). A deal that turned no-fixed-term later still asks its
+// earlier fixed months' principal: those rows read as a fixed plan's do
+// (BI#7's May–Dec 2025, 1,000 + 300 = 1,300, had read 300). A compounding
+// deal (利滚利) rolls an unpaid month's interest into the balance
+// (lib/treasury-schedule compoundInterestState).
 // A repaid deal's month-by-month rows stop at the month it was repaid.
 
 import dayjs from 'dayjs'
@@ -263,43 +268,63 @@ function openPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, dueD
   const endYM = endMonth(input, [...principalPays, ...interestPays])
   const rows: PlanRow[] = []
   let cumI = 0
+  let cumP = 0
   let poolI = interestPaid
-  let principalSoFar = 0
+  let poolP = principalPaid
+  const firstYM = segments[0].fromYM
+  // Principal repaid before the first month — the day the money moved, say — is off the balance all the same.
+  let principalSoFar = r2(principalPays.filter((p) => p.date.slice(0, 7) < firstYM).reduce((s, p) => s + p.amount, 0))
   let paidCount = 0
-  let ym = segments[0].fromYM
+  let ym = firstYM
   while (ym <= endYM && rows.length < 600) {
-    const interest = segmentFor(segments, ym).interestPerMonth
+    const seg = segmentFor(segments, ym)
+    const interest = seg.interestPerMonth
+    // A month an earlier fixed segment governs, within its schedule, still asks that segment's principal.
+    const scheduled = seg.months && !seg.compounding && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? seg.principalPerMonth : 0
+    const installment = r2(scheduled + interest)
     cumI = r2(cumI + interest)
+    cumP = r2(cumP + scheduled)
     const monthPrincipal = r2(principalPays.filter((p) => p.date.slice(0, 7) === ym).reduce((s, p) => s + p.amount, 0))
     principalSoFar = r2(principalSoFar + monthPrincipal)
     const due = dueOn(ym, dueDay)
-    let outstanding = interest
+    let outstanding = installment
     let remark = ''
     let tone: PlanTone = ''
-    if (interest <= EPS) {
-      // No interest this month: nothing falls due, only principal as it came.
+    if (installment <= EPS) {
+      // Nothing falls due this month (no interest, no scheduled principal), only principal as it came.
       outstanding = 0
     } else if (!pending) {
-      const full = poolI >= interest - slack(interest)
-      const ic = full ? interest : Math.max(0, poolI)
+      // Oldest first, as a fixed plan sets it: interest against interest, a fixed month's principal against principal.
+      const fullI = interest <= EPS || poolI >= interest - slack(interest)
+      const fullP = scheduled <= EPS || poolP >= scheduled - slack(scheduled)
+      const ic = fullI ? interest : Math.max(0, poolI)
+      const pc = fullP ? scheduled : Math.max(0, poolP)
       poolI = Math.max(0, r2(poolI - interest))
-      outstanding = r2(Math.max(0, interest - ic))
-      if (full) {
+      poolP = Math.max(0, r2(poolP - scheduled))
+      const paid = r2(ic + pc)
+      outstanding = r2(Math.max(0, installment - paid))
+      if (fullI && fullP) {
         outstanding = 0
         tone = 'ledger'
         paidCount++
-        remark = paidRemark(reach(interestPays, Math.min(cumI, interestPaid)))
-      } else if (ic > slack(interest)) {
+        remark = paidRemark(
+          later(
+            scheduled > EPS ? reach(principalPays, Math.min(cumP, principalPaid)) : null,
+            interest > EPS ? reach(interestPays, Math.min(cumI, interestPaid)) : null,
+          ),
+        )
+      } else if (paid > slack(installment)) {
         tone = 'alert'
-        remark = `Part paid ${money(ic)} · short ${money(outstanding)}`
+        remark = `Part paid ${money(paid)} · short ${money(outstanding)}`
       } else if (due < today) {
         tone = 'danger'
         remark = overdue(today, due)
       }
     }
-    if (!pending && monthPrincipal > 0) remark = remark ? `${remark} · principal ${money(monthPrincipal)}` : `Principal ${money(monthPrincipal)} repaid`
+    // A no-fixed-term month says the principal that came in; a fixed month's Principal is what it asks.
+    if (!pending && monthPrincipal > 0 && scheduled <= EPS) remark = remark ? `${remark} · principal ${money(monthPrincipal)}` : `Principal ${money(monthPrincipal)} repaid`
     const balance = r2(Math.max(0, terms.principal - principalSoFar))
-    rows.push({ no: rows.length + 1, ym, due, installment: interest, principal: monthPrincipal > 0 ? monthPrincipal : null, interest, balance, outstanding, remark, tone })
+    rows.push({ no: rows.length + 1, ym, due, installment, principal: scheduled > EPS ? scheduled : monthPrincipal > 0 ? monthPrincipal : null, interest, balance, outstanding, remark, tone })
     if (balance <= PAID_UP) break
     ym = addMonthsYM(ym, 1)
   }
