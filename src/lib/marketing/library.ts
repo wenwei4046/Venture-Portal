@@ -286,7 +286,7 @@ export function sizeLabel(bytes: number): string {
 }
 
 /** A folder's *Download as ZIP* (`Library.dc.html`'s folder menu, "Preparing <folder>.zip"): made in the browser — a ZIP
- * made by a function stops at 4.5 MB — so for a folder of 1 GB at most, the browser holding it whole. */
+ * made by a function stops at 4.5 MB — so for a folder of 1 GB at most, the browser keeping every file until it is saved. */
 export const ZIP_MAX_BYTES = 1024 * 1024 * 1024
 
 /** What a folder's ZIP would hold — its files' count and bytes — whether it may be made (an empty folder, or one over
