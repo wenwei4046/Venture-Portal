@@ -13,7 +13,8 @@
 --                             no domain (approval_domain() leaves it NULL), so only the queue's own Approve — the
 --                             Principal — decides it, and never on their own filing unless the owner kind.
 --   file_terms_change         Treasury · Edit. Checks the change as the amend would (an active deal, a month after
---                             the current terms', the ranges, one interest base), refuses a second pending one.
+--                             the current terms', the ranges, one interest base, a loan's base rate), refuses a
+--                             second pending one.
 --   approve_terms_change      the approver: applies the change through the amend RPC and marks both rows approved
 --                             in one transaction — if the amend refuses, nothing is approved. The history row's
 --                             reason carries who filed it; its created_by is the approver.
@@ -88,6 +89,7 @@ declare
   v_seg_from  date;
   v_status    text;
   v_amount    numeric;
+  v_base      numeric;
   v_label     text;
   v_summary   text;
   v_request   uuid;
@@ -127,8 +129,9 @@ begin
     select l.status::text, l.principal, date_trunc('month', l.disbursement_date)::date, l.repayment_start_month, l.terms_effective_from,
            coalesce(c.name, 'Loan')
              || coalesce(' ' || (regexp_match(coalesce(l.repayment_terms, ''), '\[[^\]]{1,24}\]'))[1], '')
-             || ' · RM ' || to_char(l.principal, 'FM999,999,990.00')
-      into v_status, v_amount, v_start, v_first_due, v_seg_from, v_label
+             || ' · RM ' || to_char(l.principal, 'FM999,999,990.00'),
+           l.base_rate
+      into v_status, v_amount, v_start, v_first_due, v_seg_from, v_label, v_base
       from loans l
       left join companies c on c.id = l.company_id
      where l.id = p_record_id
@@ -137,6 +140,11 @@ begin
   if v_status is null then raise exception 'That deal was not found'; end if;
   if v_status <> 'active' then raise exception 'Only an active deal''s terms can change (this one is %)', v_status; end if;
   if v_start is null then raise exception 'The deal has no start date yet'; end if;
+  -- A loan's rate never goes under its base rate — amend_loan_from refuses it, so filing it does too.
+  if p_rate is not null and v_base is not null and p_rate < v_base then
+    raise exception 'Rate % is below the loan''s base rate % (risk premium cannot be negative)',
+      round(p_rate * 100, 3)::text || '%', round(v_base * 100, 3)::text || '%';
+  end if;
 
   v_from      := date_trunc('month', p_effective_from)::date;
   v_first_due := coalesce(date_trunc('month', v_first_due)::date, (v_start + interval '1 month')::date);

@@ -121,8 +121,8 @@ await db.exec(`
   insert into public.fund_sources (id, status, amount, cost_rate, lock_in_months, effective_date, from_director_id, notes) values
     ('${BI7}', 'active', 60000, 0.005, 60, '2025-04-05', '${LIANG}', '[BI#7]'),
     ('${DONE}', 'repaid', 10000, 0.01, 10, '2025-01-01', '${LIANG}', null);
-  insert into public.loans (id, status, principal, effective_rate, tenure_months, disbursement_date, repayment_terms, company_id) values
-    ('${LO7}', 'active', 60000, 0.005, 60, '2025-04-05', '[LO#7] EMI', '${CONT}');
+  insert into public.loans (id, status, principal, effective_rate, base_rate, tenure_months, disbursement_date, repayment_terms, company_id) values
+    ('${LO7}', 'active', 60000, 0.005, 0.003, 60, '2025-04-05', '[LO#7] EMI', '${CONT}');
 `)
 
 await db.exec(await text(new URL('20261024100000_terms_interest_on_original.sql', migrations)))
@@ -178,6 +178,8 @@ await refuses(`select public.file_terms_change('loan', $1, '2026-01-01')`, [LO7]
 await refuses(`select public.file_terms_change('fund_source', $1, '2026-11-01')`, [DONE], /Only an active deal/, 'a repaid deal is refused')
 await refuses(`select public.file_terms_change('loan', $1, '2026-11-01', null, null, null, false, true, true)`, [LO7], /one, not both/, 'both interest bases are refused')
 await refuses(`select public.file_terms_change('loan', $1, '2026-11-01', 1.2)`, [LO7], /Rate must be between/, 'a rate of 120% is refused')
+await refuses(`select public.file_terms_change('loan', $1, '2026-11-01', 0.002)`, [LO7], /Rate 0\.200% is below the loan's base rate 0\.300%/,
+  'a loan’s rate under its base rate is refused at filing, as the amend would refuse it at approval')
 await as(VIEWER)
 await refuses(`select public.file_terms_change('loan', $1, '2026-11-01', 0.004)`, [LO7], /needs Treasury · Edit/, 'without Treasury · Edit nobody files')
 // Finance cannot decide it — nor write the tables round the RPCs.
@@ -207,6 +209,12 @@ check(await q(`select a.status::text st, a.workflow_state::text ws, a.approved_b
 await as(PRINCIPAL)
 await refuses(`select public.approve_terms_change($1)`, [ap1], /already decided/, 'approved once only')
 await as(null)
+// A fund source has no base rate: a low rate is filed (then taken back).
+await as(FINANCE)
+const [{ id: low }] = await file({ kind: 'fund_source', id: BI7, from: '2026-11-01', rate: 0.002 })
+await q(`select public.withdraw_terms_change($1)`, [low])
+await as(null)
+check((await q(`select rate::text, status from treasury_terms_requests where id = $1`, [low]))[0], { rate: '0.002000', status: 'withdrawn' }, 'a fund source’s low rate is filed — no base rate to ask')
 
 // ── LO#7: filed, turned down — the loan untouched ──
 await as(FINANCE)
