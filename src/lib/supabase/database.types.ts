@@ -8541,6 +8541,7 @@ export type Database = {
         | "payroll_run"
         | "dept_payment_request"
         | "loan_cancel"
+        | "terms_change"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -8845,6 +8846,7 @@ export const Constants = {
         "payroll_run",
         "dept_payment_request",
         "loan_cancel",
+        "terms_change",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [

@@ -13,6 +13,7 @@ import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/R
 import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
+import TermsRequestNotice from '@/components/treasury/TermsRequestNotice'
 import { FullAudit, FullCard, FullFact, FullPanelRow, FullRow, FullTrail, fullDay, fullStyles as s } from '@/components/finv/FullParts'
 import ReturnLink from '@/components/layout/ReturnLink'
 import { dealReturn } from '@/lib/deal-return'
@@ -99,6 +100,16 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
           ) : null}
         </div>
       </div>
+
+      {source.termsRequest ? (
+        <TermsRequestNotice
+          kind="fund_source"
+          dealId={source.id}
+          note={source.termsRequest}
+          canRefile={can.fileTerms}
+          approvalsHref={source.termsRequest.decides ? `/approvals/${source.termsRequest.approvalId}` : null}
+        />
+      ) : null}
 
       <div className={s.body}>
         <div className={s.cards}>
@@ -226,7 +237,7 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
             party={source.fromLabel}
             amount={source.amount}
             status={status}
-            amendHref={can.amend ? `/fund-in/${source.id}/edit` : null}
+            amendHref={can.amend || can.fileTerms ? `/fund-in/${source.id}/edit` : null}
             editHref={can.financeEdit ? `/fund-in/${source.id}/edit` : null}
             withdraw={can.void ? withdrawFundSource : null}
             requestCancel={can.void ? requestFundSourceCancel : null}

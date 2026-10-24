@@ -39,6 +39,29 @@ interface HistoryClient {
 const ym = (d: string) => d.slice(0, 7)
 const r2 = (n: number) => Math.round(n * 100) / 100
 
+/** A history row as the terms read it. */
+export function historyRowOf(h: {
+  valid_from: string
+  valid_to: string
+  rate: number | string
+  months: number | null
+  compound_interest: boolean
+  reason: string | null
+  next_interest_on_original?: boolean | null
+  next_interest_keeps_base?: boolean | null
+}): TermsHistoryRow {
+  return {
+    validFrom: ym(h.valid_from),
+    validTo: ym(h.valid_to),
+    rate: Number(h.rate),
+    months: h.months == null ? null : Number(h.months),
+    compounding: h.compound_interest === true,
+    reason: h.reason,
+    nextInterestOnOriginal: h.next_interest_on_original === true,
+    nextInterestKeepsBase: h.next_interest_keeps_base === true,
+  }
+}
+
 /** record id → its earlier segments (oldest first). Records with no change
  *  simply aren't in the map. */
 export async function fetchTermsHistory(
@@ -58,16 +81,7 @@ export async function fetchTermsHistory(
   if (error) throw new Error(`fetchTermsHistory: ${error.message}`)
   for (const h of data ?? []) {
     const rows = out.get(h.record_id) ?? []
-    rows.push({
-      validFrom: ym(h.valid_from),
-      validTo: ym(h.valid_to),
-      rate: Number(h.rate),
-      months: h.months == null ? null : Number(h.months),
-      compounding: h.compound_interest === true,
-      reason: h.reason,
-      nextInterestOnOriginal: h.next_interest_on_original === true,
-      nextInterestKeepsBase: h.next_interest_keeps_base === true,
-    })
+    rows.push(historyRowOf(h))
     out.set(h.record_id, rows)
   }
   return out

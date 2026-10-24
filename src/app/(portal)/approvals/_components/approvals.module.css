@@ -62,3 +62,12 @@
 .inline:hover { color: var(--ds-ink); text-decoration-color: currentColor; }
 .notes { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ds-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .panelNote { margin: 14px 0 0; font-size: 12.5px; line-height: 1.45; color: rgb(var(--fv-dark-note)); }
+
+/* A terms change (2026-10-24): each line now and as asked — the lines the change moves picked out, the words wrap. */
+.terms { display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) minmax(0, 1fr); border: 1px solid var(--ds-border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.terms > span { padding: 9px 12px; border-top: 1px solid var(--ds-border); color: var(--ds-ink); overflow-wrap: anywhere; }
+.terms > .termsHead { border-top: 0; background: rgb(var(--fv-strip-head)); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(var(--hvs-graphite)); }
+.terms > .termsLabel { color: rgb(var(--hvs-graphite)); font-size: 12.5px; }
+.terms > .termsNow { color: rgb(var(--hvs-graphite)); }
+.terms > .termsAsked[data-changed='true'] { background: rgb(var(--fv-chip-accent)); font-weight: 600; }
+.termsWhy { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: rgb(var(--hvs-graphite)); }

@@ -122,6 +122,7 @@ const RECORD: ApprovalRecordModel = {
     files: [{ id: 'f1', name: 'invoice.pdf', size: 204800 }],
     upstream: null,
   },
+  terms: null,
   open: null,
 }
 

@@ -14,6 +14,7 @@ import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/R
 import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
+import TermsRequestNotice from '@/components/treasury/TermsRequestNotice'
 import { FullAudit, FullCard, FullFact, FullPanelRow, FullRow, FullTrail, fullDay, fullStyles as s } from '@/components/finv/FullParts'
 import ReturnLink from '@/components/layout/ReturnLink'
 import { dealReturn } from '@/lib/deal-return'
@@ -103,6 +104,16 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           ) : null}
         </div>
       </div>
+
+      {loan.termsRequest ? (
+        <TermsRequestNotice
+          kind="loan"
+          dealId={loan.id}
+          note={loan.termsRequest}
+          canRefile={can.fileTerms}
+          approvalsHref={loan.termsRequest.decides ? `/approvals/${loan.termsRequest.approvalId}` : null}
+        />
+      ) : null}
 
       <div className={s.body}>
         <div className={s.cards}>
@@ -218,7 +229,7 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
             party={loan.borrower}
             amount={loan.principal}
             status={isRepaid ? 'repaid' : loan.status}
-            amendHref={can.amend ? `/fund-out/${loan.id}/edit` : null}
+            amendHref={can.amend || can.fileTerms ? `/fund-out/${loan.id}/edit` : null}
             withdraw={can.void ? cancelPendingLoan : null}
             requestCancel={can.void ? requestLoanCancel : null}
             cancelShut={isActive && !noRepayments ? `${plural(loan.repayments.length, 'repayment', 'repayments')} recorded — reverse those first (Repayments recorded, under the schedule)` : null}

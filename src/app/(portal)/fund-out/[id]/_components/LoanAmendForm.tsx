@@ -16,6 +16,8 @@ interface Props {
   nextMonth: string
   /** 'YYYY-MM' the current terms took effect, when they were changed before. */
   termsFrom?: string | null
+  /** Treasury · Approve: the change applies now. Without it (Treasury · Edit) a from-month change is filed for the Principal. */
+  direct?: boolean
 }
 
 // Two ways to change an active loan (user 2026-09-21):
@@ -33,6 +35,7 @@ export default function LoanAmendForm({
   compound,
   nextMonth,
   termsFrom,
+  direct = true,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +69,7 @@ export default function LoanAmendForm({
       <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
         <div className="font-serif italic text-accent text-sm">修改贷款条款 · Amend loan terms</div>
         <p className="font-serif text-sm text-graphite mt-1">
-          你是最高审批人,改动会立即生效(系统记录修改时间)。
+          {direct ? '你是最高审批人,改动会立即生效(系统记录修改时间)。' : '提交后等 Principal 在 Approvals 核准,核准后才生效;之前条件不变。'}
           {termsFrom ? <> 现行条件自 <span className="font-mono text-ink">{termsFrom}</span> 起生效。</> : null}
         </p>
       </div>
@@ -81,13 +84,16 @@ export default function LoanAmendForm({
             </span>
             <span className="block font-serif italic text-muted text-xs mt-1 ml-5">之前的月份照旧条件,生效月起用新的;利息按生效月初剩余本金算（也可以勾选按原本金算）。</span>
           </label>
-          <label className={`border rounded-md p-3 cursor-pointer ${!fromMode ? 'border-accent bg-accent-bg/40' : 'border-hairline'}`}>
-            <span className="flex items-center gap-2 text-sm font-sans text-ink">
-              <input type="radio" name="mode" checked={!fromMode} onChange={() => setMode('whole')} className="accent-[var(--accent)]" />
-              整条重算
-            </span>
-            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">改错用 —— 从放款日起整条照新条件重算。</span>
-          </label>
+          {/* The whole deal again is the Principal's own (a keying-error fix); a filed change is a from-month one. */}
+          {direct ? (
+            <label className={`border rounded-md p-3 cursor-pointer ${!fromMode ? 'border-accent bg-accent-bg/40' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-sans text-ink">
+                <input type="radio" name="mode" checked={!fromMode} onChange={() => setMode('whole')} className="accent-[var(--accent)]" />
+                整条重算
+              </span>
+              <span className="block font-serif italic text-muted text-xs mt-1 ml-5">改错用 —— 从放款日起整条照新条件重算。</span>
+            </label>
+          ) : null}
         </div>
       </fieldset>
 
@@ -190,7 +196,7 @@ export default function LoanAmendForm({
           type="submit" disabled={isPending}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
         >
-          {isPending ? '保存中…' : fromMode ? '从生效月起套用 · Apply' : '保存修改 · Save'}
+          {isPending ? (direct ? '保存中…' : '提交中…') : !direct ? '提交给 Principal 核准 · Submit' : fromMode ? '从生效月起套用 · Apply' : '保存修改 · Save'}
         </button>
         <Link href={`/fund-out/${loanId}`} className="text-sm text-graphite hover:text-ink font-sans transition-colors">Cancel</Link>
       </div>

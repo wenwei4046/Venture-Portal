@@ -109,6 +109,8 @@ export const DYNAMIC_TABLES: Readonly<Record<string, readonly string[]>> = {
 export const WHOEVER_MAY: Readonly<Record<string, string>> = {
   'src/app/(portal)/audit-log/_lib/ref-labels.ts#loadRefLabels':
     'The names behind the ids in the audit log: a name the reader may not read stays a short id.',
+  'src/lib/terms-change-request.ts#readTermsChange':
+    'A terms change request’s figures (the deal, its terms history, its repayments): a reader the deal is not open to gets the ask in words, the figures left out — only the Principal decides it.',
 }
 
 /** Functions nothing calls (dead code): no session reaches their reads. */
@@ -470,6 +472,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields',
   'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
+  // A deal's terms change filed for the Principal (mig 20261025110000): filed and withdrawn on the deal's page
+  // (Treasury · Edit; withdrawn by whoever filed it or the queue's Approve), decided in Approvals (Approve).
+  'approve_terms_change', 'file_terms_change', 'reject_terms_change', 'withdraw_terms_change',
 ])
 
 /**

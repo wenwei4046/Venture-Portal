@@ -51,6 +51,17 @@ function assertMayDecide(user: User, rows: ReadonlyArray<{ request_type: string;
 // against the same shape the original `.single()` select returned.
 type ApprovalRecord = Database['public']['Tables']['approval_requests']['Row']
 
+/** A terms change decided: its deal's page says so; approved, every schedule that reads the deal's terms moves too. */
+function revalidateTermsDeal(approval: Pick<ApprovalRecord, 'reference_table' | 'reference_id'>, applied: boolean) {
+  const hub = approval.reference_table === 'loans' ? '/fund-out' : '/fund-in'
+  if (approval.reference_id) revalidatePath(`${hub}/${approval.reference_id}`)
+  revalidatePath(hub)
+  if (!applied) return
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
+  revalidatePath('/reports/loan-aging')
+}
+
 async function performApproval(
   supabase: Awaited<ReturnType<typeof createClient>>,
   user: User,
@@ -84,6 +95,16 @@ async function performApproval(
       approval.description ?? '',
       user.name
     ).catch(() => {})
+    return
+  }
+
+  // A deal's terms change filed by Finance (mig 20261025110000): one RPC applies the change through the amend and
+  // marks the request approved in the same transaction — an amend that refuses leaves it pending, nothing changed.
+  if (approval.request_type === 'terms_change') {
+    const { error: rpcErr } = await supabase.rpc('approve_terms_change' as never, { p_approval_id: id, p_notes: notes } as never)
+    if (rpcErr) throw new Error(`The terms were not changed: ${rpcErr.message}`)
+    revalidateTermsDeal(approval, true)
+    notifyApprovalDecision(approval.request_type, 'approved', approval.description ?? '', user.name).catch(() => {})
     return
   }
 
@@ -570,6 +591,14 @@ async function performRejection(
   assertMayDecide(user, [approval])
   const id = approval.id
   const now = new Date().toISOString()
+
+  // A terms change (mig 20261025110000): its own RPC closes the approval and the filed request together.
+  if (approval.request_type === 'terms_change') {
+    const { error: rpcErr } = await supabase.rpc('reject_terms_change' as never, { p_approval_id: id, p_notes: notes } as never)
+    if (rpcErr) throw new Error(`Failed to reject: ${rpcErr.message}`)
+    revalidateTermsDeal(approval, false)
+    return
+  }
 
   const { error: approvalError } = await supabase
     .from('approval_requests')
