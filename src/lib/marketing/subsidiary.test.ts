@@ -143,6 +143,9 @@ describe('a subsidiary’s page', () => {
       { id: 13, at: '2026-10-22T07:00:00Z', actor: 'Mei', action: 'work started', data: { deliverables: 2, runDay: 5 }, project: p },
       { id: 12, at: '2026-10-22T06:00:00Z', actor: 'Someone', action: 'run made', data: { month: '2026-11', made: 2, toPlan: 1 }, project: p },
       { id: 11, at: '2026-10-22T05:00:00Z', actor: 'Mei', action: 'billing confirmed', data: { month: '2026-10' }, project: p },
+      // A deliverable's post marked (④-2c) — the task's words.
+      { id: 10, at: '2026-10-22T04:00:00Z', actor: 'Ali', action: 'posted', stage: 0, data: { field: 'Post day', link: 'https://x.my/1' },
+        project: { id: id(4), track: 'MKT-CAR-2610-008-D01', title: 'Image post 1/1', kind: 'deliverable' } },
     ])
     expect(feed.map(e => `${feedLine(e).emoji} ${feedLine(e).text}`)).toEqual([
       '📢 Mei set the campaign period · 9 – 12 Nov 2026',
@@ -150,6 +153,7 @@ describe('a subsidiary’s page', () => {
       '▶ Mei started the work · 2 deliverables · every month on the 5th',
       "🔁 Nov 2026's work made · 2 deliverables · 1 to plan",
       '💰 Mei confirmed the billing for Oct 2026',
+      '📣 Ali marked Post day posted',
     ])
   })
 

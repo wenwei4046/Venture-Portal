@@ -301,7 +301,7 @@ const FEED_EMOJI: Record<string, string> = {
   'pic changes': '🔗', signed: '✍️', 'minutes completed': '📝', 'edited after approval': '✏️', 'started before approval': '⚡',
   attached: '📚', detached: '📚', replaced: '🔁',
   'work started': '▶', 'run made': '🔁', 'run day': '📅', 'amount set': '💰', 'billing confirmed': '💰', 'billing withdrawn': '💰', stopped: '⏹',
-  'campaign period': '📢',
+  'campaign period': '📢', posted: '📣', unposted: '📣',
 }
 
 /** "just now", "12 min ago", "3h ago", "yesterday", else the day — `now` an instant (ms). */
