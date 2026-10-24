@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteMktMinutes, publishMktMinutes, saveMktMinutes } from '@/lib/marketing/actions'
 import {
-  ADDABLE_TYPES, COL_GLYPH, MAX_MINUTES_FIELDS, MINUTES_COL_TYPES, RULES, addMinutesField, colTypeOf, minutesFieldsPayload, minutesPatch,
+  ADDABLE_TYPES, COL_GLYPH, MAX_MINUTES_FIELDS, MINUTES_COL_TYPES, ONCE_TYPES, RULES, addMinutesField, colTypeOf, minutesFieldsPayload, minutesPatch,
   minutesProblems, minutesSummary, minutesWarnings, newMinutesFields, newMinutesName, NEW_RULES, type MinutesEdit, type MinutesField,
   type MinutesTemplate, type MinutesType,
 } from '@/lib/marketing/minutes'
@@ -163,6 +163,8 @@ export default function MinutesBuilder({ initial, first, attendees }: {
     if (!draft.trim() || fields.length >= MAX_MINUTES_FIELDS) return
     setFields(addMinutesField(fields, draft, kind))
     setDraft('')
+    // A kind kept once (the project link, a campaign period) is not offered again.
+    if (ONCE_TYPES.includes(kind)) setKind('Short text')
   }
   const move = (from: number, to: number) => {
     if (from === to) return
@@ -393,7 +395,7 @@ export default function MinutesBuilder({ initial, first, attendees }: {
                           onKeyDown={e => e.key === 'Enter' && add()}
                         />
                         <div className={m.chips}>
-                          {ADDABLE_TYPES.filter(t => t !== 'Project link' || !fields.some(f => f.type === 'Project link')).map(t => (
+                          {ADDABLE_TYPES.filter(t => !ONCE_TYPES.includes(t) || !fields.some(f => f.type === t)).map(t => (
                             <button key={t} type="button" className={`${m.chip}${kind === t ? ` ${m.chipOn}` : ''}`} aria-pressed={kind === t} onClick={() => setKind(t)}>{t}</button>
                           ))}
                         </div>

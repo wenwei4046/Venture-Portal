@@ -210,3 +210,13 @@ describe('an approval that asks both PICs (②b-2d-2b, the user’s answer 29)',
     expect(workState(p.work[0], '2026-10-24', p.you, p.other)).toEqual({ label: 'Waiting for Hana Lee', tone: 'waiting' })
   })
 })
+
+// 2026-10-24 — ④-2b: a campaign's run period on the PIC's link, in words.
+describe('a campaign period on the link', () => {
+  it('reads as its days, once both are picked', () => {
+    const field = (value: unknown) => page({ minutes: { title: 'Kickoff', fields: [{ name: 'Campaign period', type: 'Campaign period', value }] } }).minutes.fields[0].value
+    expect(field({ from: '2026-11-09', to: '2026-11-12' })).toBe('9 – 12 Nov 2026')
+    expect(field({ from: '2026-11-09', to: null })).toBeNull()
+    expect(field(null)).toBeNull()
+  })
+})

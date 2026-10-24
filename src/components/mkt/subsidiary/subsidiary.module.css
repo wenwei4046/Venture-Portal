@@ -28,7 +28,7 @@
 .editWide { width: 560px; }
 .editBody { display: flex; flex-direction: column; gap: 14px; max-height: min(64vh, 640px); overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
 
-.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
 .stat { padding: 14px 16px; border-radius: 12px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line-2)); }
 .statRed { background: rgb(var(--mk-red-bg)); border-color: rgb(var(--mk-red-line)); }
 .statLabel { display: flex; align-items: center; gap: 6px; font-size: .85em; color: rgb(var(--mk-muted)); }
@@ -141,6 +141,12 @@
 .tlLabel { padding: 0 12px; height: 44px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgb(var(--mk-line-4)); border-right: 1px solid rgb(var(--mk-line-2)); font-size: .9em; min-width: 0; }
 .tlLabelText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tlTrack { position: relative; height: 44px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
+/* A campaign's sections (④-2b): 📢 Campaigns, ⚠️ Overlaps, 📁 Projects — the handoff's heads. */
+.tlSect { background: rgb(var(--mk-surface)); font-weight: 600; color: rgb(var(--mk-muted)); }
+.tlSectTrack { background: rgb(var(--mk-surface-2)); }
+.tlOverlap { position: absolute; top: 6px; bottom: 6px; border-radius: 6px; background: repeating-linear-gradient(135deg, rgb(var(--mk-ink) / .75) 0 4px, rgb(var(--mk-ink) / .15) 4px 8px); }
+.ovNote { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid rgb(var(--mk-line-2)); font-size: .85em; color: rgb(var(--mk-text-3)); }
+.ovSwatch { width: 22px; height: 12px; border-radius: 3px; flex: none; background: repeating-linear-gradient(135deg, rgb(var(--mk-ink) / .75) 0 4px, rgb(var(--mk-ink) / .15) 4px 8px); }
 .tlEmpty { display: flex; align-items: center; padding: 0 12px; color: rgb(var(--mk-muted)); font-size: .9em; }
 .tlBar {
   position: absolute; top: 10px; height: 24px; border-radius: 6px; border: 1px solid transparent; font-size: .78em; font-weight: 600; display: flex;

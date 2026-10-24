@@ -144,6 +144,9 @@
 .pvPic { font-size: .78em; color: rgb(var(--mk-muted)); }
 .pvInput { width: 100%; box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: .92em; outline: none; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); resize: vertical; }
 .pvInput:focus:not([readonly]) { border-color: rgb(var(--mk-wait-line)); }
+.pvPeriod { display: flex; align-items: center; gap: 8px; }
+.pvPeriod .pvInput { flex: 1 1 0; min-width: 0; }
+.pvTo { color: rgb(var(--mk-muted)); font-size: .9em; }
 .pvInput[readonly], .pvRo { background: rgb(var(--mk-surface)); color: rgb(var(--mk-text-2)); }
 .pvGridWrap { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
 .pvGrid { border-collapse: collapse; min-width: 100%; }

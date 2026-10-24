@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { boardFromRow } from './board'
 import { calendarEvents } from './calendar'
 import {
-  agoLabel, feedLine, filterCount, keyDates, NO_FILTER, passesSub, subFeedFromRow, subProjects, subStats, timelineBars,
-  timelineHeads, timelineLeft, timelineTitle, timelineWindow,
+  agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates, NO_FILTER, overlapNote, passesCampaign, passesSub, spanWords,
+  subCampaigns, subFeedFromRow, subProjects, subStats, timelineBars, timelineCampaigns, timelineHeads, timelineLeft, timelineOverlaps,
+  timelineTitle, timelineWindow,
 } from './subsidiary'
 
 // 2026-10-23 — ④-2: a subsidiary's page (`Subsidiary Page.dc.html`), reckoned from the board and its feed.
@@ -58,6 +59,7 @@ describe('a subsidiary’s page', () => {
   it('opens on where its work stands — this week to Sunday, the office’s month, red only when overdue', () => {
     // Due this week: the run's stage on Friday the 23rd — not the 28th (next week), nor a run to come.
     expect(subStats(board, CAR, events).map(s => `${s.label} ${s.value}${s.sub ? ` ${s.sub}` : ''}${s.red ? ' red' : ''}`)).toEqual([
+      'Campaigns running 0',
       'Projects running 3',
       'Waiting for PIC 1',
       'Due this week 1',
@@ -143,5 +145,75 @@ describe('a subsidiary’s page', () => {
     expect(agoLabel('2026-10-21T15:00:00Z', now, '2026-10-22')).toBe('yesterday')
     expect(agoLabel('2026-10-19T03:00:00Z', now, '2026-10-22')).toBe('19 Oct')
     expect(agoLabel('x', now, '2026-10-22')).toBe('')
+  })
+})
+
+// 2026-10-24 — ④-2b: its campaigns (the user's answer 13 — a product project with a run period; the timeline shows which
+// runs when): the card, the days they run, the timeline's rows and overlaps, the filter.
+describe('its campaigns', () => {
+  const camp = (n: number, title: string, status: string, from: string, until: string, sub = CAR, extra: Record<string, unknown> = {}) => ({
+    id: id(n), trackId: `MKT-CAR-2611-0${n}`, kind: 'product', sub, title, status, cur: 0, campaign: { from, until },
+    createdAt: '2026-10-01T01:00:00Z', updatedAt: '2026-10-20T01:00:00Z', ...extra,
+  })
+  const cboard = (today: string) => boardFromRow({
+    today,
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }, { id: HK, code: 'HK', name: 'Hookka' }],
+    projects: [
+      camp(21, 'Carres · 11.11 Rental Deal · Nov 2026', 'active', '2026-11-09', '2026-11-12'),
+      camp(22, 'Carres · Showroom Weekends · Nov 2026', 'done', '2026-11-07', '2026-11-29'),
+      camp(23, 'Carres · Year-End Sale · Dec 2026', 'approved', '2026-12-01', '2026-12-31'),
+      camp(24, 'Carres · Cancelled deal · Nov 2026', 'cancelled', '2026-11-09', '2026-11-12'),
+      camp(25, 'Hookka · Rug week · Nov 2026', 'active', '2026-11-09', '2026-11-12', HK),
+      camp(26, 'Carres · Oct promo · Oct 2026', 'done', '2026-10-01', '2026-10-05'),
+      // A half period never reaches the board as one.
+      { ...camp(27, 'Carres · Half · Nov 2026', 'active', '2026-11-09', '2026-11-12'), campaign: { from: '2026-11-09', until: null } },
+    ],
+  })
+
+  it('lists them by their first day — not a cancelled one, nor another company’s — and counts those running', () => {
+    const b = cboard('2026-11-10')
+    const list = subCampaigns(b, CAR)
+    expect(list.map(c => `${c.short} ${c.from}–${c.until}${c.live ? ' live' : ''}${c.ran ? ' ran' : ''}`)).toEqual([
+      'Oct promo · Oct 2026 2026-10-01–2026-10-05 ran',
+      'Showroom Weekends · Nov 2026 2026-11-07–2026-11-29 live',
+      '11.11 Rental Deal · Nov 2026 2026-11-09–2026-11-12 live',
+      'Year-End Sale · Dec 2026 2026-12-01–2026-12-31',
+    ])
+    expect(subStats(b, CAR, [])[0]).toMatchObject({ key: 'campaigns', label: 'Campaigns running', value: 2, sub: '' })
+    // None running: the next one's day.
+    expect(subStats(cboard('2026-11-30'), CAR, [])[0]).toMatchObject({ value: 0, sub: 'next 1 Dec' })
+    expect(subStats(cboard('2027-02-01'), CAR, [])[0]).toMatchObject({ value: 0, sub: '' })
+    expect(campaignsOn(list, '2026-11-10').map(c => c.trackId)).toEqual(['MKT-CAR-2611-022', 'MKT-CAR-2611-021'])
+    expect(campaignsOn(list, '2026-11-30')).toEqual([])
+  })
+
+  it('names the days two share, and draws them on the timeline’s weeks', () => {
+    const list = subCampaigns(cboard('2026-11-10'), CAR)
+    const ov = campaignOverlaps(list)
+    expect(ov.map(o => `${o.a.trackId} ${o.b.trackId} ${o.from} ${o.until}`)).toEqual(['MKT-CAR-2611-022 MKT-CAR-2611-021 2026-11-09 2026-11-12'])
+    expect(overlapNote([])).toBe('No campaign overlaps')
+    expect(overlapNote(ov)).toBe('1 overlap: Showroom Weekends · Nov 2026 overlaps 11.11 Rental Deal · Nov 2026 (9 – 12 Nov)')
+    expect(overlapNote([...ov, ...ov]).startsWith('2 overlaps: ')).toBe(true)
+    const w = timelineWindow('2026-11-10')
+    expect(w).toEqual({ start: '2026-10-26', days: 70 })
+    const bars = timelineCampaigns(list, w)
+    expect(bars.map(b => [b.trackId, +b.left.toFixed(2), +b.width.toFixed(2), b.range, b.label])).toEqual([
+      ['MKT-CAR-2611-022', 17.14, 32.86, '7 – 29 Nov 2026', 'Showroom Weekends · Nov 2026 · 7 – 29 Nov'],
+      ['MKT-CAR-2611-021', 20, 5.71, '9 – 12 Nov 2026', '11.11 Rental Deal · Nov 2026 · 9 – 12 Nov'],
+      ['MKT-CAR-2611-023', 51.43, 44.29, '1 – 31 Dec 2026', 'Year-End Sale · Dec 2026 · 1 – 31 Dec'],
+    ])
+    expect(timelineOverlaps(ov, w).map(o => [+o.left.toFixed(2), +o.width.toFixed(2), o.title])).toEqual([[20, 5.71, 'Showroom Weekends · Nov 2026 overlaps 11.11 Rental Deal · Nov 2026 · 9 – 12 Nov']])
+    // One past the window's end is clipped to it.
+    expect(timelineCampaigns([{ ...list[3], until: '2027-02-01' }], w)[0].width).toBeCloseTo((34 / 70) * 100, 5)
+    expect([spanWords('2026-11-28', '2026-12-03'), spanWords('2026-11-09', '2026-11-09')]).toEqual(['28 Nov – 3 Dec', '9 Nov'])
+  })
+
+  it('goes through the filter by type and status; a group asked hides it', () => {
+    const [ran, live] = subCampaigns(cboard('2026-11-10'), CAR)
+    expect(passesCampaign(live, NO_FILTER)).toBe(true)
+    expect(passesCampaign(live, { ...NO_FILTER, types: ['due'] })).toBe(false)
+    expect(passesCampaign(live, { ...NO_FILTER, types: ['campaign'] })).toBe(true)
+    expect(passesCampaign(live, { ...NO_FILTER, teams: ['GRAPHIC DESIGNER'] })).toBe(false)
+    expect([passesCampaign(ran, { ...NO_FILTER, statuses: ['done'] }), passesCampaign(live, { ...NO_FILTER, statuses: ['done'] })]).toEqual([true, false])
   })
 })

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   attendeesOf, bothWaiting, editedAfterApproval, fillPatch, linkUrl, minutesMissing, productPicksFromRow, productProjectFromRow, productStatus,
-  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine
+  productTrail, requiredTally, sendProblems, stepsOf, unsignedOf, whatsappOk, whatsappUrl, type MinutesEdit, type ProductProjectPage, deliverableRuns, nextRun, runMonth, runsLine, campaignLine
 } from './project'
+import { periodWords } from './board'
 
 // 2026-10-23 — a 📦 product project before its work starts (②b-1, `New Project.dc.html` steps 2–4): the page as
 // mkt_product_project answers it, what stops the intake minutes going to the PIC, the stepper, the side card's count,
@@ -259,5 +260,41 @@ describe('the minutes waiting for both PICs (②b-2d-2b, the user’s answer 29)
     expect(bothWaiting(pp({ picOk: { '1': { name: 'Kelvin Tan', at: null } } }, RULES))).toBeNull()
     expect(bothWaiting(pp({ pic2: null, picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
     expect(bothWaiting(pp({ status: 'approved', picOk: { '1': { name: 'Kelvin Tan', at: null } } }))).toBeNull()
+  })
+})
+
+// 2026-10-24 — ④-2b: a campaign's run period (the user's answer 13) — the intake's *Campaign period* as written and read,
+// required until both its days are in, and the product page's line.
+describe('a campaign’s run period', () => {
+  it('reads the project’s run — both days or none', () => {
+    const pp = productProjectFromRow({ project: { id: 'p', track: 'T', status: 'active', campaign: { from: '2026-11-09', until: '2026-11-12' } } })!
+    expect(pp.project.campaign).toEqual({ from: '2026-11-09', until: '2026-11-12' })
+    expect(productProjectFromRow({ project: { id: 'p', track: 'T', campaign: { from: '2026-11-09', until: null } } })!.project.campaign).toBeNull()
+    expect(productProjectFromRow({ project: { id: 'p', track: 'T', campaign: { from: '2026-11-12', until: '2026-11-09' } } })!.project.campaign).toBeNull()
+    expect(productProjectFromRow({ project: { id: 'p', track: 'T' } })!.project.campaign).toBeNull()
+  })
+
+  it('says it in words: before, live, ran', () => {
+    const c = { from: '2026-11-09', until: '2026-11-12' }
+    expect(campaignLine(c, '2026-10-24')).toEqual({ text: 'Runs 9 – 12 Nov 2026 · in 16 days', live: false })
+    expect(campaignLine(c, '2026-11-08').text).toBe('Runs 9 – 12 Nov 2026 · tomorrow')
+    expect(campaignLine(c, '2026-11-10')).toEqual({ text: 'Live · 9 – 12 Nov 2026 · ends 12 Nov', live: true })
+    expect(campaignLine(c, '2026-11-12').text).toBe('Live · 9 – 12 Nov 2026 · ends today')
+    expect(campaignLine(c, '2026-11-13')).toEqual({ text: 'Ran 9 – 12 Nov 2026', live: false })
+    expect([periodWords('2026-11-09', '2026-11-09'), periodWords('2026-11-28', '2026-12-03'), periodWords('2026-12-28', '2027-01-03')])
+      .toEqual(['9 Nov 2026', '28 Nov – 3 Dec 2026', '28 Dec 2026 – 3 Jan 2027'])
+  })
+
+  it('as written: required until both days are in; emptied, it is sent as nothing', () => {
+    const f = [{ key: 'k', name: 'Campaign period', type: 'Campaign period' as const, req: true, pic: true, lock: false }]
+    expect(minutesMissing(f, {})).toEqual(['Campaign period'])
+    expect(minutesMissing(f, { 'Campaign period': { from: '2026-11-09', to: '' } })).toEqual(['Campaign period'])
+    expect(minutesMissing(f, { 'Campaign period': { from: '2026-11-09', to: '2026-11-12' } })).toEqual([])
+    const base: MinutesEdit = { vals: { 'Campaign period': { from: '2026-11-09', to: '2026-11-12' } }, notes: '', pic: '', whatsapp: '', pic2: '', whatsapp2: '' }
+    expect(fillPatch(base, { ...base, vals: { 'Campaign period': { from: '2026-11-09', to: '' } } }, true)).toEqual({ vals: { 'Campaign period': { from: '2026-11-09', to: '' } } })
+    expect(fillPatch(base, { ...base, vals: { 'Campaign period': { from: '', to: '' } } }, true)).toEqual({ vals: { 'Campaign period': null } })
+    // Read back as the database keeps a half one (to: null): '' — the same as typed, so nothing is sent again.
+    const read = productProjectFromRow({ project: { id: 'p', track: 'T' }, minutes: [{ id: 'm', intake: true, vals: { 'Campaign period': { from: '2026-11-09', to: null } } }] })!
+    expect(read.minutes[0].vals['Campaign period']).toEqual({ from: '2026-11-09', to: '' })
   })
 })

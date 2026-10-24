@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { beginMktProduct, fillMktMinutes, overrideMktProject, resendMktProject, sendMktMinutes, signMktMinutes, type Done } from '@/lib/marketing/actions'
 import {
-  bothWaiting, canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
+  bothWaiting, campaignLine, canBeginWork, deliverableProgress, editedAfterApproval, fillPatch, linkUrl, productStatus, productTrail, requiredTally, sendProblems,
   stepsOf, whatsappUrl, type MinutesDoc, type MinutesEdit, type MinutesValue, type ProductProjectPage,
 } from '@/lib/marketing/project'
 import { picNames } from '@/lib/marketing/clients'
@@ -59,6 +59,8 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
   const [runDay, setRunDay] = useState(() => Math.min(Number(initial.today.slice(8, 10)) || 1, 28))
 
   const pr = page.project
+  // A campaign's run (④-2b — the user's answer 13): before it, live, or ran.
+  const campaign = pr.campaign ? campaignLine(pr.campaign, page.today) : null
   const doc = intakeOf(page)
   const editRef = useRef(edit)
   const savedRef = useRef(edit)
@@ -249,6 +251,12 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </>
             ) : null}
             <span>Owner {pr.ownerName ?? '—'}</span>
+            {pr.campaign ? (
+              <>
+                <span>·</span>
+                <span className={campaign?.live ? p.live : undefined} aria-label="Campaign">📢 {campaign?.text}</span>
+              </>
+            ) : null}
           </div>
         </div>
         {writes || stale ? (

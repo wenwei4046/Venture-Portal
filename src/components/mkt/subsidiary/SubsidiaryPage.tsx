@@ -6,8 +6,9 @@ import type { ClientBill } from '@/lib/marketing/billing'
 import { addDays, type MktBoard, type MktSub } from '@/lib/marketing/board'
 import { addMonths, calendarEvents, monthCells, monthLabel, monthOf, weekCells, weekLabel, type CalEvent, type CalTone } from '@/lib/marketing/calendar'
 import {
-  agoLabel, feedLine, filterCount, keyDates, NO_FILTER, passesSub, SUB_STATUSES, SUB_TYPES, subProjects, subStats, timelineBars,
-  timelineHeads, timelineLeft, timelineTitle, timelineWindow, type SubFeedEvent, type SubFilter, type SubType,
+  agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates, NO_FILTER, overlapNote, passesCampaign, passesSub, spanWords,
+  SUB_STATUSES, SUB_TYPES, subCampaigns, subProjects, subStats, timelineBars, timelineCampaigns, timelineHeads, timelineLeft, timelineOverlaps,
+  timelineTitle, timelineWindow, type SubCampaign, type SubFeedEvent, type SubFilter, type SubType,
 } from '@/lib/marketing/subsidiary'
 import { trailTime } from '@/lib/marketing/task'
 import { groupLabel, groupTone, rosterGroups, sameGroup, type MktTone } from '@/lib/marketing/groups'
@@ -15,8 +16,9 @@ import ClientEdit from './ClientEdit'
 import s from './subsidiary.module.css'
 
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PICs — the manager edits them, and a client's
-// name (②b-2d-2a); where its work stands (five cards);
-// its dates by Month, Week or Timeline — coloured by group (a People title), red once passed undone, done faded — with
+// name (②b-2d-2a); where its work stands (six cards — its campaigns running first);
+// its dates by Month, Week or Timeline — its campaigns (④-2b) on the days they run, the timeline's own rows with their
+// overlaps — — coloured by group (a People title), red once passed undone, done faded — with
 // HR's holidays as ⚑ key dates and the handoff's filter (type, group, status); ⚡ Recent activity from its projects' trails; and its
 // projects with how far each has come. Every item opens its project.
 
@@ -32,6 +34,7 @@ type View = 'month' | 'week' | 'timeline'
 const href = (trackId: string | null) => (trackId ? `/marketing/projects/${encodeURIComponent(trackId)}` : '/marketing/projects')
 const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team ? TEAM(e.team) : s.draft}${e.tone === 'done' ? ` ${s.faded}` : ''}`
 const evEmoji = (e: CalEvent) => (e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
+const campClass = (c: SubCampaign) => `${s.item} ${s.team_brand}${c.ran ? ` ${s.faded}` : ''}`
 
 export default function SubsidiaryPage({ board, sub: initial, feed, manage = false, bill: billOnFile = null, openEdit = false }: {
   board: MktBoard
@@ -66,6 +69,12 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
   const tw = timelineWindow(board.today)
   const heads = timelineHeads(tw)
   const bars = timelineBars(board, rows.filter(r => !filter.teams.length || filter.teams.some(g => sameGroup(g, r.team))), tw)
+  // Its campaigns (④-2b): through the filter, on the timeline, where two share days.
+  const camps = useMemo(() => subCampaigns(board, sub.id), [board, sub.id])
+  const campsShown = camps.filter(c => passesCampaign(c, filter))
+  const tlCamps = timelineCampaigns(campsShown, tw)
+  const overlaps = campaignOverlaps(campsShown)
+  const tlOverlaps = timelineOverlaps(overlaps, tw)
   // The groups to filter by: the roster's titles (2026-10-24 — the user: each title is a group).
   const groups = rosterGroups(board.team)
   const n = filterCount(filter)
@@ -184,6 +193,12 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                       <span className={s.grow} />
                       <span className={`${s.dayN}${c.today ? ` ${s.dayToday}` : ''}`}>{c.n === 1 ? `${c.n} ${monthLabel(c.day).slice(0, 3)}` : c.n}</span>
                     </div>
+                    {campaignsOn(campsShown, c.day).map(cp => (
+                      <Link key={`c${cp.id}`} href={href(cp.trackId)} className={campClass(cp)} title={`${cp.title} · runs ${spanWords(cp.from, cp.until)}`}>
+                        <span className={s.itemEmoji} aria-hidden="true">📢</span>
+                        <span className={s.itemTitle}>{cp.short}</span>
+                      </Link>
+                    ))}
                     {[...c.events].sort((a, b) => Number(b.tone === 'red') - Number(a.tone === 'red')).map(e => (
                       <Link key={e.id} href={href(e.trackId)} className={evClass(e)} title={`${e.title} · ${e.line2} · ${e.label}`}>
                         <span className={s.itemEmoji} aria-hidden="true">{evEmoji(e)}</span>
@@ -206,6 +221,13 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                     {flagsOn(c.day).map(f => <span key={f.name} className={s.flag} title={f.name}>⚑ {f.name}</span>)}
                   </div>
                   <div className={s.wcolBody}>
+                    {campaignsOn(campsShown, c.day).map(cp => (
+                      <Link key={`c${cp.id}`} href={href(cp.trackId)} className={`${campClass(cp)} ${s.witem}`}>
+                        <span className={s.witemKind}><span aria-hidden="true">📢</span>Campaign</span>
+                        <span className={s.witemTitle}>{cp.short}</span>
+                        <span className={s.witemLine}>{spanWords(cp.from, cp.until)}</span>
+                      </Link>
+                    ))}
                     {[...c.events].sort((a, b) => Number(b.tone === 'red') - Number(a.tone === 'red')).map(e => (
                       <Link key={e.id} href={href(e.trackId)} className={`${evClass(e)} ${s.witem}`}>
                         <span className={s.witemKind}><span aria-hidden="true">{evEmoji(e)}</span>{e.recur ? 'Run opens' : 'Stage due'}</span>
@@ -222,7 +244,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
           {view === 'timeline' ? (
             <div className={s.tl}>
               <div className={s.tlGrid}>
-                <div className={s.tlCorner}>Project</div>
+                <div className={s.tlCorner}>{tlCamps.length ? 'Campaign / project' : 'Project'}</div>
                 <div className={`${s.tlHead}${keyOn ? ` ${s.tlHeadTall}` : ''}`}>
                   {heads.months.map(m => <div key={`${m.name}${m.left}`} className={s.tlMonth} style={{ left: `${m.left}%` }}>{m.name}</div>)}
                   {heads.weeks.map(w => <div key={w.left} className={`${s.tlWeek}${w.left === 0 ? ` ${s.tlWeekFirst}` : ''}`} style={{ left: `${w.left}%` }}>{w.n}</div>)}
@@ -230,6 +252,30 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                     <div key={f.day + f.name} className={`${s.flag} ${s.tlFlag}`} style={{ left: `${timelineLeft(tw, f.day)}%` }} title={f.name}>⚑ {f.short}</div>
                   ))}
                 </div>
+                {tlCamps.length ? (
+                  <>
+                    <div className={`${s.tlLabel} ${s.tlSect}`}><span aria-hidden="true">📢</span>Campaigns</div>
+                    <div className={`${s.tlTrack} ${s.tlSectTrack}`} />
+                    {tlCamps.map(c => (
+                      <div key={`c${c.id}`} className={s.tlRow}>
+                        <div className={s.tlLabel}><span className={s.tlLabelText}>{c.short}</span></div>
+                        <div className={s.tlTrack}>
+                          <Link href={href(c.trackId)} className={`${s.tlBar} ${s.team_brand}${c.ran ? ` ${s.faded}` : ''}`}
+                            style={{ left: `${c.left}%`, width: `${c.width}%` }} title={`${c.title} · ${c.range}`}>
+                            {c.label}
+                          </Link>
+                          <span className={s.today} style={{ left: `${timelineLeft(tw, board.today)}%` }} aria-hidden="true" />
+                        </div>
+                      </div>
+                    ))}
+                    <div className={`${s.tlLabel} ${s.tlSect}`}><span aria-hidden="true">⚠️</span>Overlaps</div>
+                    <div className={`${s.tlTrack} ${s.tlSectTrack}`} aria-label="Overlaps">
+                      {tlOverlaps.map(o => <span key={o.key} className={s.tlOverlap} style={{ left: `${o.left}%`, width: `${o.width}%` }} title={o.title} />)}
+                    </div>
+                    <div className={`${s.tlLabel} ${s.tlSect}`}><span aria-hidden="true">📁</span>Projects</div>
+                    <div className={`${s.tlTrack} ${s.tlSectTrack}`} />
+                  </>
+                ) : null}
                 {bars.length ? bars.map(b => (
                   <div key={b.id} className={s.tlRow}>
                     <div className={s.tlLabel}><span className={s.tlLabelText}>{b.title}</span></div>
@@ -248,10 +294,14 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                   </>
                 )}
               </div>
+              {tlCamps.length ? (
+                <div className={s.ovNote}><span className={s.ovSwatch} aria-hidden="true" />{overlapNote(overlaps)}</div>
+              ) : null}
             </div>
           ) : null}
 
           <div className={s.legend}>
+            <span><span aria-hidden="true">📢</span> Campaign</span>
             <span><span aria-hidden="true">⏱</span> Stage due date</span>
             <span><span aria-hidden="true">⚡</span> Quick task</span>
             <span><span aria-hidden="true">🔁</span> Recurring run</span>

@@ -8,7 +8,7 @@ import m from './minutes.module.css'
 // PIC reads them on the link — each field as it will ask, the checks Complete makes, the buttons each side has. Typed
 // into here and nothing is kept: it is the template being tried, not minutes being written.
 
-type Val = string | string[] | { cols: string[]; rows: string[][] }
+type Val = string | string[] | { cols: string[]; rows: string[][] } | { from: string; to: string }
 interface Try {
   vals: Record<string, Val>
   signed: Record<string, boolean>
@@ -18,7 +18,7 @@ interface Try {
 const FRESH: Try = { vals: {}, signed: {}, approved: false, done: false }
 
 const blank = (v: Val | undefined) =>
-  v === undefined ? true : Array.isArray(v) ? v.length === 0 : typeof v === 'string' ? !v.trim() : !v.rows.some(r => r.some(x => x.trim()))
+  v === undefined ? true : Array.isArray(v) ? v.length === 0 : typeof v === 'string' ? !v.trim() : 'from' in v ? !v.from || !v.to : !v.rows.some(r => r.some(x => x.trim()))
 
 export default function MinutesPreview({ name, version, fields, rules, attendees }: {
   name: string
@@ -149,6 +149,16 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
                     aria-label={f.name}
                     onChange={e => set(f.name, e.target.value)}
                   />
+                ) : f.type === 'Campaign period' ? (
+                  <div className={m.pvPeriod}>
+                    <input className={m.pvInput} type="date" readOnly={ro} aria-label={`${f.name} from`}
+                      value={v && typeof v === 'object' && 'from' in v ? v.from : ''}
+                      onChange={e => set(f.name, { from: e.target.value, to: v && typeof v === 'object' && 'from' in v ? v.to : '' })} />
+                    <span className={m.pvTo}>to</span>
+                    <input className={m.pvInput} type="date" readOnly={ro} aria-label={`${f.name} to`}
+                      value={v && typeof v === 'object' && 'from' in v ? v.to : ''}
+                      onChange={e => set(f.name, { from: v && typeof v === 'object' && 'from' in v ? v.from : '', to: e.target.value })} />
+                  </div>
                 ) : f.type === 'Long text' ? (
                   <textarea className={m.pvInput} rows={3} value={typeof v === 'string' ? v : ''} readOnly={ro} placeholder="Type here…" aria-label={f.name} onChange={e => set(f.name, e.target.value)} />
                 ) : f.type === 'Project link' ? (
@@ -183,7 +193,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
                       )
                     })}
                   </div>
-                ) : v && !Array.isArray(v) && typeof v !== 'string' ? (
+                ) : v && !Array.isArray(v) && typeof v !== 'string' && 'rows' in v ? (
                   grid(f, v)
                 ) : null}
               </div>

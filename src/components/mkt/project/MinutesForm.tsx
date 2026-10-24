@@ -2,11 +2,12 @@
 
 import type { MktPerson } from '@/lib/marketing/board'
 import { COL_GLYPH, type MinutesField } from '@/lib/marketing/minutes'
-import { attendeesOf, type MinutesDoc, type MinutesValue } from '@/lib/marketing/project'
+import { attendeesOf, isPeriod, type MinutesDoc, type MinutesValue } from '@/lib/marketing/project'
 import p from './project.module.css'
 
 // Meeting minutes as they are written (`New Project.dc.html` step 2, on the product's intake template): each field as its
-// kind asks — text, a date, a number, people from the team, a typed table, the Free space, the project it is for — with
+// kind asks — text, a date, a campaign's run period, a number, people from the team, a typed table, the Free space, the
+// project it is for — with
 // ⭐ (required) and 👁 / 🔒 (the PIC sees it, or it stays internal); the signatures of those who attended, each signing
 // for themselves. Read-only when the viewer does not write minutes or they are locked.
 
@@ -48,7 +49,7 @@ export default function MinutesForm({
 
   const table = (f: MinutesField, v: MinutesValue | undefined) => {
     const free = f.type === 'Free space'
-    const cur = typeof v === 'object' && !Array.isArray(v) ? v : null
+    const cur = typeof v === 'object' && !Array.isArray(v) && !isPeriod(v) ? v : null
     const cols = free ? cur?.cols ?? FREE_COLS : (f.cols ?? []).map(c => c.name)
     const types = free ? cols.map(() => 'Text' as const) : (f.cols ?? []).map(c => c.type)
     const rows = cur?.rows?.length ? cur.rows : [cols.map(() => '')]
@@ -121,6 +122,20 @@ export default function MinutesForm({
     )
   }
 
+  // A campaign's run period (the user's answer 13): its first day, then its last — not before the first.
+  const period = (f: MinutesField, v: MinutesValue | undefined) => {
+    const cur = isPeriod(v) ? v : { from: '', to: '' }
+    return (
+      <div className={p.period}>
+        <input className={p.input} type="date" value={cur.from} readOnly={readOnly} aria-label={`${f.name} from`}
+          onChange={e => onVal(f.name, { from: e.target.value, to: cur.to })} />
+        <span className={p.muted}>to</span>
+        <input className={p.input} type="date" value={cur.to} min={cur.from || undefined} readOnly={readOnly} aria-label={`${f.name} to`}
+          onChange={e => onVal(f.name, { from: cur.from, to: e.target.value })} />
+      </div>
+    )
+  }
+
   const field = (f: MinutesField) => {
     const v = vals[f.name]
     const text = typeof v === 'string' ? v : ''
@@ -145,6 +160,7 @@ export default function MinutesForm({
       )
     } else if (f.type === 'People') input = people(f, v)
     else if (f.type === 'Table' || f.type === 'Free space') input = table(f, v)
+    else if (f.type === 'Campaign period') input = period(f, v)
     else if (f.type === 'Long text') input = <textarea className={p.textarea} rows={3} value={text} maxLength={4000} readOnly={readOnly} aria-label={f.name} onChange={e => onVal(f.name, e.target.value)} />
     else {
       input = (
