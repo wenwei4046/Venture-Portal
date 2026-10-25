@@ -96,7 +96,7 @@ import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edi
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
-import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
+import { claimClosedMonth, claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
 import { foodOpenTo, transportOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
@@ -446,6 +446,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The month being worked, and this month while another is: what brand weeks, claims and the team read.
   const arena = working && working !== period ? arenaWork.snapshot : arenaCur.snapshot;
   const arenaNow = working && working !== period ? arenaCur.snapshot : null;
+  // Last month once it is closed, for the claim form alone (2026-10-25 — the user: "关月后还能 claim"): its weekends stay
+  // claimable, paid in the payroll still open.
+  const arenaClosed = useMonthArena({ source, membershipId, context, readable,
+    month: route.screen === "account" && route.pf === "requests" ? claimClosedMonth(period, working) : null, mark: markViewed, gen, track });
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
   const income = useMemo(() => (!todayKey ? incomes[0]
@@ -1229,7 +1233,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (fxp) return fxp.form;
     return {
       subName: membership?.name ?? "",
-      weeks: claimWeeks([arena, arenaNow], today),
+      weeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today),
       rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, groupMaxPax: 3, groupCapPerNight: null, regions: [], fairs: {} },
       members: team,
       departments: data.departments ?? [],
@@ -1241,7 +1245,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       today,
       foodClaims: myRequests,
     };
-  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
+  }, [fxp, membership, arena, arenaNow, arenaClosed.snapshot, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
   // Requests' ways to start one: a food claim only in Fair, for a title HR picked (2026-10-13) — sent under the
   // same Create as a claim. In View as, the viewed person's title decides.
   // The design preview's form carries the refresh handoff's food sample (2026-10-14), so its Requests offer it too.

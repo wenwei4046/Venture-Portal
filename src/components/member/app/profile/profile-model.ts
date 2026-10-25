@@ -6,6 +6,7 @@ import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
 import { isAnyTime, joiningLabel } from "@/lib/member/waiting-start";
 import { memoFileExt } from "@/lib/memos/model";
 import { MONTHS_SHORT, dayList, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
+import { addMonths } from "../insight/period";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
   TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, TrackVM, VaGroupVM,
@@ -561,6 +562,16 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
     });
   }
   return [...out.values()].sort((a, b) => b.key.localeCompare(a.key));
+}
+
+/**
+ * Last month, for the claim form once it is closed (2026-10-25 — the user: "关月后还能 claim"): while last month is still
+ * being worked the month being worked brings its weekends; closed, they would drop off the form, so its Arena is read
+ * for the form alone. Paid in the payroll still open (`member_claim_payroll_month` — the month the claim is sent).
+ * Null while the month being worked is not known yet, or is last month.
+ */
+export function claimClosedMonth(period: string, working: string | null): string | null {
+  return working === period ? addMonths(period, -1) : null;
 }
 
 /** Who the member may propose for a replacement: their own team in this sub-department. */
