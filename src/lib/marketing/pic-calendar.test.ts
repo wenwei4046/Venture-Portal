@@ -147,6 +147,25 @@ describe('the list: what is coming up', () => {
   })
 })
 
+describe('its own key dates (2026-10-25)', () => {
+  it('read beside HR’s holidays — flagged first, every year’s on its day — in the list and the month', () => {
+    const c = cal({ keyDates: [
+      { day: '2025-12-12', name: '12.12 sale day', short: '12.12', yearly: true },
+      { day: '2026-11-21', name: 'New Carres showroom opens (Puchong)', short: 'Showroom', yearly: false },
+      { day: '2026-11-08', name: 'Payday', short: null, yearly: false },
+      { day: 'soon', name: 'Not a day' },
+    ] })
+    expect(c.keyDates.map(k => k.name)).toEqual(['12.12 sale day', 'New Carres showroom opens (Puchong)', 'Payday'])
+    expect(listDays(c, calendarItems(c), true).filter(d => d.flags.length).map(d => [d.day, d.flags.map(f => f.short)])).toEqual([
+      ['2026-11-11', ['Singles']], ['2026-11-21', ['Showroom']], ['2026-11-30', ['Payday']], ['2026-12-12', ['12.12']],
+    ])
+    expect(monthWeeks(c, calendarItems(c), '2026-11-01', true)[1].days[6].flags.map(f => [f.name, f.own])).toEqual([['Payday', true], ['Deepavali', false]])
+    expect(listDays(c, calendarItems(c), false).some(d => d.day === '2026-11-21')).toBe(false)
+    // Before the database sent them: none.
+    expect(cal().keyDates).toEqual([])
+  })
+})
+
 describe('the month', () => {
   it('the months it holds: last month to three ahead', () => {
     expect(calendarMonths(cal())).toEqual(['2026-10-01', '2026-11-01', '2026-12-01', '2027-01-01', '2027-02-01'])

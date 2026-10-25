@@ -6,6 +6,7 @@ import { billingFromRow, clientBillFromRow, type BillingPage, type ClientBill } 
 import { boardFromRow, type MktBoard } from './board'
 import { chatListFromRow, type ChatList } from './chat'
 import { draftsFromRow, openDraftFromRow, type DraftRow, type OpenDraft } from './drafts'
+import { keyDatesFromRow, type MktKeyDate } from './key-dates'
 import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
@@ -146,6 +147,14 @@ export async function readSubFeed(sub: string, limit = 20): Promise<SubFeedEvent
   const { data, error } = await db.rpc('mkt_sub_feed', { p_sub: sub, p_limit: limit })
   if (error) throw new Error(error.message)
   return subFeedFromRow(data)
+}
+
+/** A subsidiary's own key dates, by day (mig 20261025235500) — Marketing · View. */
+export async function readSubKeyDates(sub: string): Promise<MktKeyDate[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_key_dates', { p_sub: sub })
+  if (error) throw new Error(error.message)
+  return keyDatesFromRow(data)
 }
 
 /** The Library — its folder types, folders, files and the Dustbin's last 30 days (mig 20261024007000). */

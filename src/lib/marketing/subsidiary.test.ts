@@ -77,10 +77,20 @@ describe('a subsidiary’s page', () => {
     expect(filterCount({ types: ['due'], teams: ['design', 'social'], statuses: [] })).toBe(3)
   })
 
-  it('flags HR’s holidays as key dates, in day order', () => {
+  it('flags HR’s holidays as key dates, in day order — and its own (2026-10-25), once or every year, over the Calendar’s window', () => {
     expect(keyDates(board)).toEqual([
-      { day: '2026-10-20', name: 'Deepavali', short: 'Deepavali' },
-      { day: '2026-12-25', name: 'Christmas Day', short: 'Christmas' },
+      { day: '2026-10-20', name: 'Deepavali', short: 'Deepavali', id: null, own: false },
+      { day: '2026-12-25', name: 'Christmas Day', short: 'Christmas', id: null, own: false },
+    ])
+    const own = [
+      { id: 'k1', day: '2025-11-11', name: '11.11 sale day', short: '11.11', yearly: true },
+      { id: 'k2', day: '2026-12-25', name: 'Christmas Day', short: null, yearly: false },
+      { id: 'k3', day: '2028-01-01', name: 'Far away', short: null, yearly: false },
+    ]
+    expect(keyDates(board, own).map(f => `${f.day} ${f.short} ${f.id ?? 'HR'}`)).toEqual([
+      // Four months back to eight ahead (Jun 2026 – Jun 2027): the 11.11s of 2025 and 2027 fall outside it, as does 2028;
+      // its own Christmas Day shows once, as its own.
+      '2026-10-20 Deepavali HR', '2026-11-11 11.11 k1', '2026-12-25 Christmas Day k2',
     ])
   })
 

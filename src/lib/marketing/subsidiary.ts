@@ -1,6 +1,6 @@
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): where its work stands (the stat cards), its dates by Month,
-// Week or Timeline — stage due dates and the runs to come, coloured by group (a People title), red once passed undone, HR's holidays as
-// key dates — its projects with how far each has come, and the newest lines of their trails. All from the board
+// Week or Timeline — stage due dates and the runs to come, coloured by group (a People title), red once passed undone, its own key
+// dates and HR's holidays as ⚑ — its projects with how far each has come, and the newest lines of their trails. All from the board
 // (mkt_board) and its feed (mkt_sub_feed). Its campaigns (④-2b — the user's answer 13: a product project with a run
 // period): the card of those running, the timeline's own rows with their overlaps, the days they run. Pure.
 
@@ -10,7 +10,8 @@ import {
   type MktTaskDate,
 } from './board'
 import { sameGroup } from './groups'
-import type { CalEvent, CalTone } from './calendar'
+import { readWindow, type CalEvent, type CalTone } from './calendar'
+import { keyFlags, type KeyFlag, type MktKeyDate } from './key-dates'
 import { productEventText } from './project'
 import { projectRows, type ProjectRow } from './projects'
 import { eventFromRow, eventText, type MktTaskPage, type TaskEvent } from './task'
@@ -151,13 +152,14 @@ export function overlapNote(ov: readonly CampaignOverlap[]): string {
   return `${ov.length} overlap${ov.length === 1 ? '' : 's'}: ${ov.map(o => `${o.a.short} overlaps ${o.b.short} (${spanWords(o.from, o.until)})`).join(', ')}`
 }
 
-// ── Key dates: HR's holidays, flagged ────────────────────────────────────────────
-export interface KeyDate { day: string; name: string; short: string }
+// ── Key dates: its own (2026-10-25 — key-dates.ts) and HR's holidays, flagged ──────────
+export type KeyDate = KeyFlag
 
-export function keyDates(board: MktBoard): KeyDate[] {
-  return board.holidays
-    .map(h => ({ day: h.day, name: h.name, short: h.name.split(/\s+/)[0].slice(0, 12) || h.name }))
-    .sort((a, b) => a.day.localeCompare(b.day))
+/** Its key dates and HR's holidays as ⚑, by day, over the Calendar's window (four months back, eight ahead). */
+export function keyDates(board: MktBoard, own: readonly MktKeyDate[] = []): KeyDate[] {
+  if (!board.today) return []
+  const w = readWindow(board.today)
+  return keyFlags(own, board.holidays, w.from, w.to)
 }
 
 // ── The projects table ───────────────────────────────────────────────────────────
