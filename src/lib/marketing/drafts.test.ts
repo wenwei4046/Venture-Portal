@@ -11,7 +11,7 @@ const STAGES = [
 ]
 const BLANK: NewForm = {
   sub: 'sub-car', mode: 'task', product: 'pr-a', amounts: {}, title: '', type: 'social', req: 'write', brief: '',
-  minutes: { template: '', vals: {}, notes: '', sign: false }, rule: defaultRule('2026-10-25'),
+  minutes: { template: '', vals: {}, notes: '', sign: false, pic: { on: false, name: '', whatsapp: '', name2: '', whatsapp2: '' } }, rule: defaultRule('2026-10-25'),
   stages: STAGES, source: null,
 }
 

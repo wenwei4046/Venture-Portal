@@ -15,7 +15,8 @@ import {
 } from '@/lib/marketing/recur'
 import { trailTime } from '@/lib/marketing/task'
 import {
-  minutesPayload, minutesProblems, minutesTyped, newMinutesDoc, NO_MINUTES, pickMinutes, type MinutesPick, type NewMinutes,
+  minutesPayload, minutesProblems, minutesTyped, newMinutesDoc, NO_MINUTES, picFor, pickMinutes, picOnSubChange, picWho, type MinutesPick, type NewMinutes,
+  type NewPic,
 } from '@/lib/marketing/task-minutes'
 import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES } from '@/lib/marketing/tasks'
 import { formatMoney } from '@/lib/utils'
@@ -256,15 +257,31 @@ export default function NewProject({
   else if (minutesWrong.length) hint = minutesWrong[0]
   else if (problems.length) hint = problems[0] === 'A stage has no person' ? 'Every stage needs a name and a person' : problems[0]
   else if (isRec && !preview.ok) hint = 'Pick at least one day inside the period'
-  else if (isRec) hint = `${subName} · Recurring · ${ruleText(rule)} · ${preview.count.toLowerCase()}`
-  else hint = `${subName} · Quick task · ${stages.length} stage${stages.length === 1 ? '' : 's'} · finishes ${dates.length ? longDay(dates[dates.length - 1].dueOn) : '—'}`
+  else {
+    // The PIC approving the minutes (②a-4): the work waits for them — its days are counted from their approval.
+    const waitsFor = req === 'minutes' && minutes.pic.on ? picWho({ pic: minutes.pic.name, pic2: minutes.pic.name2 }) : null
+    hint = isRec ? `${subName} · Recurring · ${ruleText(rule)} · ${preview.count.toLowerCase()}${waitsFor ? ` · starts once ${waitsFor} approves` : ''}`
+      : `${subName} · Quick task · ${stages.length} stage${stages.length === 1 ? '' : 's'} · ${waitsFor ? `starts once ${waitsFor} approves`
+        : `finishes ${dates.length ? longDay(dates[dates.length - 1].dueOn) : '—'}`}`
+  }
 
   const setR = (patch: Partial<RecurRule>) => update(f => ({ ...f, rule: { ...f.rule, ...patch } }))
 
   // Meeting minutes (②a-3): a template picked — the attendees starting as whoever starts the task, when on the team — and
-  // filled in here; the first published one picked when none is yet.
+  // filled in here; the first published one picked when none is yet. The PIC approves them as the template's rule says,
+  // turned on or off here (②a-4), named as the subsidiary names its PICs.
   const meOnTeam = me && team.some(t => t.id === me) ? me : null
-  const pickTemplate = (m: MinutesPick) => update(f => ({ ...f, req: 'minutes', minutes: pickMinutes(f.minutes, m, meOnTeam) }))
+  const subOf = (id: string) => subList.find(x => x.id === id) ?? null
+  const pickTemplate = (m: MinutesPick) => update(f => ({ ...f, req: 'minutes', minutes: pickMinutes(f.minutes, m, meOnTeam, subOf(f.sub)) }))
+  // Another subsidiary picked: its PICs instead, unless the PICs were typed by hand.
+  const pickSub = (id: string, to: MktSub | null = subOf(id)) => update(f => ({
+    ...f, sub: id, minutes: f.minutes.pic.on ? { ...f.minutes, pic: picOnSubChange(f.minutes.pic, subOf(f.sub), to) } : f.minutes,
+  }))
+  const togglePic = () => update(f => ({
+    ...f, minutes: { ...f.minutes, pic: f.minutes.pic.on ? { ...f.minutes.pic, on: false } : picFor(f.minutes.pic, subOf(f.sub)) },
+  }))
+  const setPic = (patch: Partial<NewPic>) => update(f => ({ ...f, minutes: { ...f.minutes, pic: { ...f.minutes.pic, ...patch } } }))
+  const [secondPic, setSecondPic] = useState(false)
   const chooseMinutes = () => {
     const first = pickOf(formRef.current.minutes.template) ?? minutesPicks[0]
     if (first) pickTemplate(first)
@@ -300,7 +317,7 @@ export default function NewProject({
         return
       }
       setSubList(l => [...l, r.sub])
-      set({ sub: r.sub.id })
+      pickSub(r.sub.id, r.sub)
       closeAdd()
     })
   }
@@ -497,7 +514,7 @@ export default function NewProject({
       </div>
       <div className={s.subs} role="radiogroup" aria-label="Subsidiary">
         {subList.map(x => (
-          <button key={x.id} type="button" role="radio" aria-checked={sub === x.id} className={`${s.subCard}${sub === x.id ? ` ${s.cardOn}` : ''}`} onClick={() => set({ sub: x.id })}>
+          <button key={x.id} type="button" role="radio" aria-checked={sub === x.id} className={`${s.subCard}${sub === x.id ? ` ${s.cardOn}` : ''}`} onClick={() => pickSub(x.id)}>
             <span className={s.subDot} style={{ background: x.dot }} />
             <span className={s.cardText}>
               <span className={s.cardName} style={{ display: 'block' }}>{x.name}</span>
@@ -655,6 +672,39 @@ export default function NewProject({
                       <textarea className={s.textarea} rows={3} value={minutes.notes} maxLength={4000} aria-label="Meeting notes"
                         onChange={e => setMinutes({ notes: e.target.value })} />
                     </label>
+                    {/* The PIC approving them (②a-4 — answers 52, 53): chosen here; the work waits for their approval. */}
+                    <button type="button" role="switch" aria-checked={minutes.pic.on} className={s.picRule} onClick={togglePic}>
+                      <span className={`${s.sw}${minutes.pic.on ? ` ${s.swOn}` : ''}`} aria-hidden="true" />
+                      <span className={s.picRuleName}>PIC approves these minutes</span>
+                    </button>
+                    {minutes.pic.on ? (
+                      <div className={s.picFields}>
+                        <label className={s.field}>
+                          <span className={s.fieldLabel}>PIC name<span className={s.marks}><span title="Required">⭐</span><span title="The PIC sees it on the link">👁</span></span></span>
+                          <input className={s.input} value={minutes.pic.name} maxLength={80} onChange={e => setPic({ name: e.target.value })} />
+                        </label>
+                        <label className={s.field}>
+                          <span className={s.fieldLabel}>PIC WhatsApp<span className={s.marks}><span title="Required">⭐</span><span title="Internal only — the PIC never sees it">🔒</span></span></span>
+                          <input className={`${s.input} ${s.mono}`} value={minutes.pic.whatsapp} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX"
+                            onChange={e => setPic({ whatsapp: e.target.value })} />
+                        </label>
+                        {secondPic || minutes.pic.name2 ? (
+                          <>
+                            <label className={s.field}>
+                              <span className={s.fieldLabel}>Second PIC<span className={s.marks}><span title="The PICs see it on the link">👁</span></span></span>
+                              <input className={s.input} value={minutes.pic.name2} maxLength={80} onChange={e => setPic({ name2: e.target.value })} />
+                            </label>
+                            <label className={s.field}>
+                              <span className={s.fieldLabel}>Second PIC WhatsApp<span className={s.marks}>{minutes.pic.name2.trim() ? <span title="Required">⭐</span> : null}<span title="Internal only — the PIC never sees it">🔒</span></span></span>
+                              <input className={`${s.input} ${s.mono}`} value={minutes.pic.whatsapp2} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX"
+                                onChange={e => setPic({ whatsapp2: e.target.value })} />
+                            </label>
+                          </>
+                        ) : (
+                          <button type="button" className={`${s.textBtn} ${s.addPic}`} onClick={() => setSecondPic(true)}>+ Second PIC</button>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 )
               })() : null}

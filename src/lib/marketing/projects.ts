@@ -85,7 +85,8 @@ export function projectRows(board: MktBoard): ProjectRow[] {
     const stage = p.status === 'active' && s && !isSeries(p)
       ? `Stage ${s.idx + 1}/${stages.length} · ${s.name}`
       : p.status === 'minutes' || p.status === 'waiting_pic' || p.status === 'changes' || p.status === 'approved'
-        ? 'Before the plan'
+        // A task whose minutes the PIC approves waits before its first stage (②a-4).
+        ? p.kind === 'product' ? 'Before the plan' : 'Before stage 1'
         : stages.length ? `${stages.length} stages` : '—'
     return {
       id: p.id,

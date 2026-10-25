@@ -37,6 +37,15 @@ describe('Projects', () => {
     ])
   })
 
+  it('a task whose minutes the PIC approves waits before its first stage (②a-4)', () => {
+    const b = boardFromRow({
+      today: '2026-10-22', team: [{ id: MEI, full: 'Mei Ling', first: 'Mei' }], subs: [{ id: CAR, code: 'CAR', name: 'Carres' }],
+      projects: [{ id: id(9), trackId: 'TSK-CAR-2610-009', kind: 'quick', sub: CAR, title: 'Raya push', status: 'waiting_pic', pic: 'Kelvin', owner: MEI, cur: 0, updatedAt: '2026-10-22T01:00:00Z' }],
+      stages: [{ project: id(9), idx: 0, name: 'Design', owner: MEI, status: 'planned' }],
+    })
+    expect(projectRows(b).map(r => `${r.stage} | ${r.who} | ${r.dueLabel} | ${r.label}`)).toEqual(['Before stage 1 | Kelvin (PIC) | — | Waiting for PIC'])
+  })
+
   it('filters by scope, subsidiary and words — a Track ID reaches the done ones too', () => {
     expect(filterProjects(rows, { scope: 'open', sub: null, q: '' }).length).toBe(3)
     expect(filterProjects(rows, { scope: 'open', sub: 'HK', q: '' }).map(r => r.trackId)).toEqual(['MKT-HK-2610-002'])

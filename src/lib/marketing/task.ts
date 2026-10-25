@@ -13,7 +13,8 @@ import { monthLabel } from './billing'
 import { isManagerTitle } from './groups'
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
-import { minutesFromRow, type MinutesDoc } from './project'
+import { minutesFromRow, type MinutesDoc, type PicReply } from './project'
+import { minutesState, picWho } from './task-minutes'
 
 /** An approval level as a deliverable's template has it (②b-2a): a person, the PIC on the link, or one the manager picks
  * at assignment. */
@@ -104,6 +105,50 @@ export interface TaskProject extends MktProject {
   posted: Record<string, MktPosted>
   /** The project it was opened from (④-4c — answer 23); a run's, its series'. */
   source: MktSource | null
+  /** Its minutes go to the PIC (②a-4): where that stands; a run's, its series'. */
+  picMinutes: TaskPicMinutes | null
+}
+
+/** Where the PIC's approval of a task's minutes stands (②a-4, mig 20261025231000 — the user's answers 52, 53): the task's
+ * way to its work ('minutes' not sent yet, 'waiting_pic', 'changes' — then under way), its PICs and their links, the last
+ * answer, the manager's start before approval, the edit that sent it back to them. */
+export interface TaskPicMinutes {
+  status: MktProjectStatus
+  pic: string
+  whatsapp: string
+  pic2: string
+  whatsapp2: string
+  link: string | null
+  link2: string | null
+  sentAt: string | null
+  reply: PicReply | null
+  override: { by: string; at: string | null; reason: string } | null
+  /** Whose approvals this sending has while it waits for both PICs. */
+  ok: PicOk | null
+  /** Sent back to the PIC by an edit after an approval: what changed. */
+  edited: string | null
+}
+
+/** A task waits for the PIC before its work starts (②a-4): its minutes not sent yet, sent, or sent back with changes. */
+export const picWaits = (pm: Pick<TaskPicMinutes, 'status'> | null | undefined) =>
+  !!pm && (pm.status === 'minutes' || pm.status === 'waiting_pic' || pm.status === 'changes')
+
+export function picMinutesFromRow(v: unknown): TaskPicMinutes | null {
+  if (!isObj(v)) return null
+  const reply = isObj(v.reply) ? v.reply : null
+  const override = isObj(v.override) ? v.override : null
+  return {
+    status: projectFromRow({ status: v.status }).status,
+    pic: str(v.pic), whatsapp: str(v.whatsapp), pic2: str(v.pic2), whatsapp2: str(v.whatsapp2),
+    link: strOrNull(v.link), link2: strOrNull(v.link2), sentAt: strOrNull(v.sentAt),
+    reply: reply
+      ? { decision: reply.decision === 'approved' ? 'approved' : 'changes', name: str(reply.name), reason: str(reply.reason), at: strOrNull(reply.at),
+          pic: reply.pic === 2 ? 2 : 1 }
+      : null,
+    override: override ? { by: str(override.by), at: strOrNull(override.at), reason: str(override.reason) } : null,
+    ok: picOkFromRow(v.ok),
+    edited: strOrNull(v.edited),
+  }
 }
 
 export interface MktTaskPage {
@@ -201,6 +246,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       parentProject: parentFromRow(p.parent), deliv: delivFromRow(p.deliv), locked: p.locked === true, pic2: strOrNull(p.pic2),
       posted: Object.fromEntries(Object.entries(isObj(p.posted) ? p.posted : {}).flatMap(([k, x]) => { const m = postedFromRow(x); return m ? [[k, m]] : [] })),
       source: sourceFromRow(p.source),
+      picMinutes: picMinutesFromRow(p.picMinutes),
     },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
@@ -319,6 +365,10 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const amApprover = open && cur.status === 'review' && appr?.kind === 'person' && !!me && appr.staff === me
   const missing = working ? missingWork(cur.form, cur.work) : []
   const subsOut = working ? page.subtasks.filter(t => t.stage === cur.idx && t.status !== 'approved').length : 0
+  // Waiting for the PIC to approve its minutes (②a-4): nobody's turn yet — the work starts with the approval.
+  const pm = p.picMinutes
+  const waits = picWaits(pm) ? pm : null
+  const pmState = waits && page.minutes ? minutesState(page.minutes, id => nameOf(team, id), waits) : null
 
   const actions: TaskView['actions'] = []
   let note = ''
@@ -337,13 +387,18 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     actions.push({ key: 'changes', label: 'Request changes', disabled: false }, { key: 'approve', label: 'Approve', disabled: false })
   }
   if (!actions.length) {
-    note = isSeries ? '' : done ? 'All stages done' : p.status === 'planning' ? 'Not planned yet — its people and start day come with the Assignment Plan'
+    note = waits ? `Starts once ${picWho(waits, !!page.minutes?.template.rules.picAll)} approves the minutes`
+      : isSeries ? '' : done ? 'All stages done' : p.status === 'planning' ? 'Not planned yet — its people and start day come with the Assignment Plan'
       : notYet ? `Opens ${longDay(p.startsOn as string)}` : !open ? '' : cur.status === 'review' ? `Waiting for ${approver}` : `Now with ${owner}`
   }
 
   let tone: Tone = 'waiting'
   let status = cur ? `Stage ${cur.idx + 1} · ${cur.name}` : '—'
-  if (isSeries) {
+  if (waits) {
+    // The minutes' way to the PIC, in the requirements' words.
+    tone = waits.status === 'changes' ? 'red' : waits.status === 'minutes' ? 'draft' : 'waiting'
+    status = pmState?.label ?? (waits.status === 'minutes' ? 'Not sent to the PIC yet' : `Waiting for ${picWho(waits)}`)
+  } else if (isSeries) {
     tone = p.status === 'active' ? 'waiting' : p.status === 'paused' ? 'draft' : 'done'
     status = p.status === 'active' ? 'Active' : p.status === 'paused' ? 'Paused' : 'Ended'
   } else if (done) {
@@ -373,7 +428,12 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   }
 
   let banner: TaskView['banner'] = null
-  if (open && cur.status === 'changes' && cur.changes) {
+  if (waits?.status === 'changes' && waits.reply?.decision === 'changes') {
+    // The PIC sent the minutes back (②a-4), as a product project's banner says it.
+    banner = { tone: 'red', text: `Changes requested by ${waits.reply.name || waits.pic || 'the PIC'} (PIC): "${waits.reply.reason}"` }
+  } else if (waits?.status === 'waiting_pic' && waits.edited) {
+    banner = { tone: 'waiting', text: `Edited after approval — needs PIC re-approval · ${waits.edited} changed` }
+  } else if (open && cur.status === 'changes' && cur.changes) {
     banner = { tone: 'red', text: `Changes requested by ${cur.changes.by}${cur.changes.from ? ` on ${cur.changes.from}` : ''}: "${cur.changes.reason}"` }
   } else if (amOwner && cur.status === 'todo') {
     banner = { tone: 'waiting', text: `You're up: ${cur.name}${cur.dueOn ? ` · due ${longDay(cur.dueOn)}` : ''}` }
@@ -391,14 +451,16 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const meta = [
     { k: 'Subsidiary', v: page.sub?.name ?? '—' },
     { k: 'Owner', v: p.owner ? nameOf(team, p.owner) : p.createdBy ?? '—' },
-    { k: 'Now with', v: !open ? '—' : cur.status === 'review' ? approver : owner },
+    { k: 'Now with', v: waits ? (waits.status === 'waiting_pic' ? picWho(waits, !!page.minutes?.template.rules.picAll) : p.owner ? nameOf(team, p.owner) : '—')
+      : !open ? '—' : cur.status === 'review' ? approver : owner },
     { k: 'Type', v: kindText },
     { k: 'Deadline', v: p.dueOn ? `Due ${longDay(p.dueOn)}` : '—' },
   ]
 
   const rail: RailStage[] = stages.map(s => {
     const isDone = !isSeries && (done || s.status === 'done')
-    const isCur = !isSeries && !done && s.idx === cur?.idx
+    // Waiting for the PIC (②a-4): no stage is on yet.
+    const isCur = !isSeries && !waits && !done && s.idx === cur?.idx
     const who = s.owner ? nameOf(team, s.owner) : s.mode === 'prev' ? '🔓 picked by the stage before' : 'Picked at assignment'
     return {
       idx: s.idx,
@@ -411,7 +473,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     }
   })
 
-  const work: WorkSection[] = isSeries
+  const work: WorkSection[] = isSeries || waits
     ? []
     : stages
         .filter(s => done || s.idx <= (cur?.idx ?? 0) || s.status === 'done')
@@ -616,9 +678,11 @@ export function runsResumedText(actor: string, data: Record<string, unknown> | n
   return `${actor} resumed the monthly runs · from ${billMonthWords(data?.from)}${left ? ` · ${left}` : ''}`
 }
 
-/** Written with meeting minutes (②a-3): a 'created' record's " · Kickoff minutes", '' for none. */
+/** Written with meeting minutes (②a-3): a 'created' record's " · Kickoff minutes", '' for none — " · Kickoff minutes for
+ * Kelvin Tan (PIC) to approve" when the PIC approves them (②a-4). */
 export function minutesWords(data: Record<string, unknown> | null | undefined): string {
-  return typeof data?.minutes === 'string' && data.minutes ? ` · ${data.minutes} minutes` : ''
+  if (typeof data?.minutes !== 'string' || !data.minutes) return ''
+  return ` · ${data.minutes} minutes${typeof data.pic === 'string' && data.pic ? ` for ${data.pic} (PIC) to approve` : ''}`
 }
 
 /** Opened from another (④-4c — answer 23): a 'created' record's " · from TSK-CAR-2610-004", '' for none. */
@@ -696,11 +760,28 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'delivery returned': return `${e.actor} returned "${subTitle(e)}"${v} to ${e.fromTo ?? '—'}: "${e.reason ?? ''}"`
     case 'delivery approved': return `${e.actor} approved "${subTitle(e)}"${v}`
     case 'subtask removed': return `${e.actor} took back subtask "${subTitle(e)}" from ${e.fromTo ?? '—'}`
-    // The PIC on their link (②b-2d).
-    case 'pic approved': return `${e.actor} approved ${stage}${v} on the link${e.fromTo ? ` → ${e.fromTo}` : ''}`
+    // The PIC on their link (②b-2d) — a task's minutes too (②a-4: no stage, the minutes' name), as a product project's.
+    case 'pic approved':
+      if (e.stage == null) {
+        return `${e.actor} approved the ${e.reason || 'meeting'} minutes on the link${typeof e.data?.waiting === 'string' && e.data.waiting ? ` · waiting for ${e.data.waiting}` : ''}`
+      }
+      return `${e.actor} approved ${stage}${v} on the link${e.fromTo ? ` → ${e.fromTo}` : ''}`
     case 'pic changes': {
+      if (e.stage == null) return `${e.actor} asked for changes to the minutes on the link: "${e.reason ?? ''}"`
       const to = typeof e.data?.to === 'string' ? ` · back to ${e.data.to}` : ''
       return `${e.actor} requested changes on ${stage}${v} on the link: "${e.reason ?? ''}"${to}`
+    }
+    // A task's minutes on their way to the PIC (②a-4).
+    case 'link sent': return `${e.actor} sent the minutes to ${e.reason || 'the PIC'} · tracking link`
+    case 'resent': return `${e.actor} resent the minutes to ${e.reason || 'the PIC'}`
+    case 'edited after approval': return `${e.actor} changed ${e.reason || 'the minutes'} after approval · back to the PIC`
+    case 'started before approval': return `${e.actor} started before PIC approval: "${e.reason ?? ''}"`
+    case 'work started': {
+      if (typeof e.data?.deliverables === 'number') return `${e.actor} started the work · ${e.data.deliverables} deliverable${e.data.deliverables === 1 ? '' : 's'}`
+      const runs = Number(e.data?.runs)
+      return Number.isFinite(runs) && e.data?.runs !== undefined
+        ? `The work started · ${runs} run${runs === 1 ? '' : 's'} made from today`
+        : 'The work started · its stages dated from today'
     }
     // Billing (②b-2b): never its figure — amounts are the manager's, the trail everybody's.
     case 'amount set': return `${e.actor} set the amount`

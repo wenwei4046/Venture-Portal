@@ -76,7 +76,8 @@ export interface NewTaskInput {
   from?: string | null
   /** The draft it was typed in (mig 20261025211000), dropped once the task is made. */
   draft?: string | null
-  /** Its meeting minutes instead of what is written (②a-3 — mkt_task_create's p_minutes): { template, vals, notes, sign }. */
+  /** Its meeting minutes instead of what is written (②a-3 — mkt_task_create's p_minutes): { template, vals, notes, sign,
+   * pic } — pic { name, whatsapp, name2?, whatsapp2? } when the PIC approves them (②a-4), else null. */
   minutes?: Record<string, unknown> | null
 }
 
@@ -130,6 +131,7 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
   if (minutes !== null && (typeof minutes !== 'object' || Array.isArray(minutes) || !isId(minutes.template))) {
     return { ok: false, reason: 'Pick the meeting minutes.' }
   }
+  if (minutes?.pic != null && (typeof minutes.pic !== 'object' || Array.isArray(minutes.pic))) return { ok: false, reason: 'Name the PIC, or leave the PIC out.' }
   const db = await client()
   const { data, error } = await db.rpc('mkt_task_create', {
     p_subsidiary: input.sub,
@@ -555,18 +557,57 @@ export async function signMktTaskMinutes(minutes: string, project: string): Prom
 }
 
 /** A task's meeting minutes written after (②a-3) — its owner's or a manager's (the database decides): only what changed,
- * on the minutes the page last saw. */
-export async function fillMktTaskMinutes(minutes: string, project: string, rev: number, patch: Record<string, unknown>): Promise<Done<{ rev: number }>> {
+ * on the minutes the page last saw. Its PICs too, when the PIC approves them (②a-4 — the database refuses them on a task
+ * that does not ask the PIC); an edit the PIC sees after an approval sends them back — the task then comes back as it
+ * now stands, as it does when the second PIC changed (their own link made, or gone). */
+export async function fillMktTaskMinutes(minutes: string, project: string, rev: number, patch: Record<string, unknown>): Promise<Done<{ rev: number; reapproval: boolean; page: MktTaskPage | null }>> {
   await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
   if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
   if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
-  if (!patch || typeof patch !== 'object' || Array.isArray(patch) || 'pic' in patch || 'whatsapp' in patch || 'pic2' in patch || 'whatsapp2' in patch) {
-    return { ok: false, reason: 'Nothing to save.' }
-  }
-  const { data, error } = await (await client()).rpc('mkt_minutes_fill', { p_minutes: minutes, p_rev: rev, p_patch: patch })
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { ok: false, reason: 'Nothing to save.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_fill', { p_minutes: minutes, p_rev: rev, p_patch: patch })
   if (error) return { ok: false, reason: words(error, 'The minutes could not be saved. Please try again.') }
-  const r = (data ?? {}) as { rev?: number }
-  return { ok: true, rev: Number(r.rev ?? rev + 1) }
+  const r = (data ?? {}) as { rev?: number; reapproval?: boolean }
+  const again = r.reapproval === true || 'pic2' in patch
+  if (again) freshen()
+  return { ok: true, rev: Number(r.rev ?? rev + 1), reapproval: r.reapproval === true, page: again ? await fresh(db, project) : null }
+}
+
+/** A task's minutes sent to the PIC (②a-4) — its owner's or a manager's (the database decides): the tracking link made,
+ * the task waiting for their approval. Answered with the task as it now stands. */
+export async function sendMktTaskMinutes(minutes: string, project: string, rev: number): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(minutes) || !isId(project)) return { ok: false, reason: 'Those minutes are not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_minutes_send', { p_minutes: minutes, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The minutes could not be sent. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** A task's minutes sent to the PIC again after the changes they asked for (②a-4) — its owner's or a manager's. */
+export async function resendMktTask(project: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_project_resend', { p_project: project })
+  if (error) return { ok: false, reason: words(error, 'It could not be resent. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
+}
+
+/** A task started before the PIC approves its minutes (②a-4 — answer 53): the manager's, the reason kept in the trail — its
+ * work starts that day. */
+export async function overrideMktTask(project: string, reason: string): Promise<Done<{ page: MktTaskPage | null }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'manage')
+  if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_project_override', { p_project: project, p_reason: String(reason ?? '') })
+  if (error) return { ok: false, reason: words(error, 'It could not be started. Please try again.') }
+  freshen()
+  return { ok: true, page: await fresh(db, project) }
 }
 
 /** The intake minutes sent: the tracking link made, the project waits for the PIC (or, with no PIC sign-off, is approved). */
