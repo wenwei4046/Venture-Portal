@@ -10,6 +10,8 @@ import {
 import { picNames } from '@/lib/marketing/clients'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { newFromHref, ordinal, trailTime } from '@/lib/marketing/task'
+import type { AdsPage } from '@/lib/marketing/ads'
+import AdsReport from '../ads/AdsReport'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import BillCard from './BillCard'
@@ -38,7 +40,12 @@ const editOf = (page: ProductProjectPage): MinutesEdit => {
     pic2: page.project.pic2, whatsapp2: page.project.whatsapp2 }
 }
 
-export default function ProductProject({ initial, can }: { initial: ProductProjectPage; can: { edit: boolean; manage: boolean; create?: boolean } }) {
+export default function ProductProject({ initial, can, ads = null }: {
+  initial: ProductProjectPage
+  can: { edit: boolean; manage: boolean; create?: boolean }
+  /** Its Ads report (2026-10-25). */
+  ads?: AdsPage | null
+}) {
   const [page, setPage] = useState(initial)
   const [edit, setEdit] = useState<MinutesEdit>(() => editOf(initial))
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
@@ -476,6 +483,9 @@ export default function ProductProject({ initial, can }: { initial: ProductProje
               </div>
             ) : null}
           </div>
+
+          {/* 📈 Its Ads report (2026-10-25 — the user's answer 57): the CRM's ads it reads, published to the PIC's link. */}
+          {ads ? <AdsReport project={pr.id} title={pr.title} initial={ads} edit={can.edit} say={say} /> : null}
 
           {can.manage && page.bill ? <BillCard key={`${page.bill.amount}:${page.bill.until}`} page={page} bill={page.bill} onPage={setPage} say={say} /> : null}
 

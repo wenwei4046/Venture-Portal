@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { mayActOn, requireAuth, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
-import { readBoard, readOptionLists, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
+import { readAdsPage, readBoard, readOptionLists, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
 import { builderPeople } from '@/lib/marketing/tasks'
 import TaskPage from '@/components/mkt/task/TaskPage'
 import ProductProject from '@/components/mkt/project/ProductProject'
@@ -39,17 +39,21 @@ export default async function MarketingProjectPage({ params, searchParams }: {
     const splits = can.edit && !!cur?.split && !!page.me && cur.owner === page.me && (cur.status === 'accepted' || cur.status === 'changes')
     // A choice naming a shared list (③d-2) offers the list's options.
     const shared = page.stages.some(st => st.form.some(f => !!f.list))
-    const [files, board, lists] = await Promise.all([
+    // Its Ads report (2026-10-25): an Ads task's or series' — never a deliverable's or a run's.
+    const adsOn = page.project.qType === 'ads' && (page.project.kind === 'quick' || (page.project.kind === 'recurring' && !page.project.series))
+    const [files, board, lists, ads] = await Promise.all([
       page.project.kind === 'recurring' && !page.project.series ? [] : readTaskFiles(page.project.id),
       splits ? readBoard() : null,
       shared ? readOptionLists() : {},
+      adsOn ? readAdsPage(page.project.id) : null,
     ])
     const splitPeople = board
       ? builderPeople(board).people.filter(p => p.id !== page.me && board.team.some(t => t.id === p.id && !!t.user))
       : []
-    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} lists={lists} />
+    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} lists={lists} ads={ads} />
   }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()
-  return <ProductProject key={product.project.id} initial={product} can={{ edit: can.edit, manage: can.manage, create: can.create }} />
+  const ads = await readAdsPage(product.project.id)
+  return <ProductProject key={product.project.id} initial={product} can={{ edit: can.edit, manage: can.manage, create: can.create }} ads={ads} />
 }

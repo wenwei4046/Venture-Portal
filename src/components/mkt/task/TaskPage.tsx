@@ -11,7 +11,9 @@ import {
 import { missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
 import { LIB_MAX_BYTES, STAGE_MAX_FILES, stagePath, type TaskFile } from '@/lib/marketing/library'
 import { sameAnswer, type OptionLists } from '@/lib/marketing/options'
+import type { AdsPage } from '@/lib/marketing/ads'
 import { createClient } from '@/lib/supabase/client'
+import AdsReport from '../ads/AdsReport'
 import ProjectSheet from '../audit/ProjectSheet'
 import a from '../audit/audit.module.css'
 import ChoiceField from './ChoiceField'
@@ -34,7 +36,7 @@ const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person'])
 const blockId = () => (Math.random().toString(36).slice(2) + '00000000').slice(0, 10)
 const isLink = (v: string) => /^https?:\/\/\S+$/i.test(v.trim())
 
-export default function TaskPage({ initial, can, files = [], splitPeople = [], lists: initialLists = {} }: {
+export default function TaskPage({ initial, can, files = [], splitPeople = [], lists: initialLists = {}, ads = null }: {
   initial: MktTaskPage
   can: TaskViewer
   files?: TaskFile[]
@@ -42,6 +44,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
   splitPeople?: PickPerson[]
   /** The shared option lists (③d-2) a choice may offer — an option added on the spot joins its list here too. */
   lists?: OptionLists
+  /** Its Ads report (2026-10-25) — a quick task's or a series' (never a run's). */
+  ads?: AdsPage | null
 }) {
   const router = useRouter()
   const [page, setPage] = useState(initial)
@@ -371,6 +375,9 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
           )}
 
           <TaskPosts page={page} can={can} onPage={fresh} say={say} />
+
+          {/* 📈 Its Ads report (2026-10-25 — the user's answer 57): the CRM's ads it reads, published to the PIC's link. */}
+          {ads ? <AdsReport project={page.project.id} title={page.project.title} initial={ads} edit={can.edit} say={say} /> : null}
 
           <TaskSubtasks part="deliver" page={page} can={can} onPage={fresh} say={say} />
 

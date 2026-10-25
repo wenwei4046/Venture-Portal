@@ -429,6 +429,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A subsidiary's own key dates (mig 20261025235500): read by Marketing · View, added, changed and deleted by Marketing ·
   // Edit — everybody in Marketing (the user, 2026-10-25).
   'mkt_key_dates', 'mkt_key_date_save', 'mkt_key_date_delete',
+  // A project's Ads report (mig 20261025235800): read by Marketing · View; the CRM's ads to pick and what the CRM counts
+  // for them (counts only) by Marketing · Edit; set up, changed and published by Marketing · Edit.
+  'mkt_ads_page', 'mkt_ads_choices', 'mkt_ads_crm', 'mkt_ads_save', 'mkt_ads_publish',
   // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View; a record of it corrected
   // by a record of its own, Marketing · Manage (mig 20261025171000).
   'mkt_project_log', 'mkt_log_correct',
