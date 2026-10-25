@@ -15,10 +15,18 @@ export interface InsightMainActions {
   toKpi: () => void;
   toWaiting: () => void;
   openBrand: (code: string) => void;
+  /** The Principal's whole sub-department (2026-10-25): a member's row views them — their own bills, read-only. */
+  openPerson?: (staffId: string) => void;
 }
 
-/** Insight — sales, margin and KPI in one place (RevenueApp.dc.html 585–665). */
-export default function InsightMain({ vm, tab, dateLabel, actions }: { vm: InsightMainVM | null; tab: InsightTab; dateLabel: string; actions: InsightMainActions }) {
+/**
+ * Insight — sales, margin and KPI in one place (RevenueApp.dc.html 585–665). `whole` (2026-10-25 — the Principal
+ * viewing nobody, "直接 show 全部人的单 … 或者点按过去看全部人的"): the sub-department named — everybody's bills on the
+ * first tab, everybody on the second, a tap on one viewing them.
+ */
+export default function InsightMain({ vm, tab, dateLabel, actions, whole }: {
+  vm: InsightMainVM | null; tab: InsightTab; dateLabel: string; actions: InsightMainActions; whole?: string;
+}) {
   return (
     <div className={s.page}>
       <div className={s.head}>
@@ -31,21 +39,23 @@ export default function InsightMain({ vm, tab, dateLabel, actions }: { vm: Insig
       <div className={s.seg}>
         {(["personal", "team"] as const).map(id => (
           <button key={id} className={`${s.segBtn} ${tab === id ? s.segOn : ""}`} onClick={() => actions.setTab(id)} aria-pressed={tab === id}>
-            {id === "personal" ? "Personal" : "My team"}
+            {id === "personal" ? (whole ? `All of ${whole}` : "Personal") : whole ? "Members" : "My team"}
           </button>
         ))}
       </div>
-      {!vm ? <p className={s.empty}>Loading your sales…</p> : tab === "personal" ? <Personal vm={vm.personal} actions={actions} /> : <Team vm={vm.team} />}
+      {!vm ? <p className={s.empty}>{whole ? `Loading ${whole}’s sales…` : "Loading your sales…"}</p>
+        : tab === "personal" ? <Personal vm={vm.personal} actions={actions} whole={whole} />
+        : <Team vm={vm.team} whole={whole} onPerson={actions.openPerson} />}
     </div>
   );
 }
 
-function Personal({ vm, actions }: { vm: InsightMainVM["personal"]; actions: InsightMainActions }) {
+function Personal({ vm, actions, whole }: { vm: InsightMainVM["personal"]; actions: InsightMainActions; whole?: string }) {
   return (
     <div className={s.col20}>
       <button className={s.salesCard} onClick={actions.toBills}>
         <div className={s.cardTop}>
-          <span className={s.cardLabel}>My sales</span>
+          <span className={s.cardLabel}>{whole ? `${whole} sales` : "My sales"}</span>
           <span className={`${s.cardRight} ${vm.sales.rightAccent ? s.cardRightAccent : ""}`}>{vm.sales.right}</span>
         </div>
         <div className={s.cardAmount}>{vm.sales.amount}</div>
@@ -93,12 +103,12 @@ function Personal({ vm, actions }: { vm: InsightMainVM["personal"]; actions: Ins
   );
 }
 
-function Team({ vm }: { vm: InsightMainVM["team"] }) {
+function Team({ vm, whole, onPerson }: { vm: InsightMainVM["team"]; whole?: string; onPerson?: (staffId: string) => void }) {
   return (
     <div className={s.col20}>
       <section className={s.teamCard}>
         <div className={s.cardTop}>
-          <span className={s.cardLabel}>Team sales</span>
+          <span className={s.cardLabel}>{whole ? `${whole} sales` : "Team sales"}</span>
           <span className={`${s.cardRight} ${vm.sales.rightAccent ? s.cardRightAccent : ""}`}>{vm.sales.right}</span>
         </div>
         <div className={s.cardAmount}>{vm.sales.amount}</div>
@@ -110,14 +120,20 @@ function Team({ vm }: { vm: InsightMainVM["team"] }) {
         <div className={s.miniStatic}><span className={s.miniLabel}>KPI hit</span><div className={s.miniValueTeam}>{vm.kpiHit.value}</div><p className={s.miniNote}>{vm.kpiHit.sub}</p></div>
       </div>
       <section>
-        <div className={s.sectHead}><h2 className={s.sectTitle}>Team members</h2><span className={s.sectNote}>By sales</span></div>
-        {vm.rows.map(t => (
-          <div key={t.id} className={s.teamRow}>
-            <span className={`${s.av} ${t.mine ? s.avMine : ""}`}>{t.ini}</span>
-            <span className={s.teamText}><span className={s.teamName}>{t.name}</span><span className={s.teamTitle}>{t.title}</span></span>
-            <span className={s.teamRight}><span className={s.teamSales}>{t.sales}</span><span className={s.teamMeta}>{t.meta}</span></span>
-          </div>
-        ))}
+        <div className={s.sectHead}><h2 className={s.sectTitle}>{whole ? "Members" : "Team members"}</h2><span className={s.sectNote}>By sales</span></div>
+        {vm.rows.map(t => {
+          const body = (
+            <>
+              <span className={`${s.av} ${t.mine ? s.avMine : ""}`}>{t.ini}</span>
+              <span className={s.teamText}><span className={s.teamName}>{t.name}</span><span className={s.teamTitle}>{t.title}</span></span>
+              <span className={s.teamRight}><span className={s.teamSales}>{t.sales}</span><span className={s.teamMeta}>{t.meta}</span></span>
+            </>
+          );
+          // A tap views them — their own bills, read-only (2026-10-25: "点按过去看全部人的").
+          return t.open && onPerson
+            ? <button key={t.id} className={`${s.teamRow} ${s.teamRowTap}`} onClick={() => onPerson(t.id)} aria-label={`View ${t.name}`}>{body}</button>
+            : <div key={t.id} className={s.teamRow}>{body}</div>;
+        })}
       </section>
     </div>
   );

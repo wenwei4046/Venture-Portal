@@ -463,8 +463,14 @@ export interface MemberInsightBlock {
   /** The reader directs this sub-department (2026-10-14): everybody in it is their downline, and no rung is next. */
   director?: boolean;
   /**
-   * A director's block only: the month's every bill of the sub-department — the directors' own too — summed. What
-   * Today's Sales / Margin / KPI show them ("All of Fair"), the same for every director of it.
+   * The Principal viewing nobody (2026-10-25): the WHOLE sub-department — `team` every bill, `downline` everybody,
+   * and no reader of their own (`me` is nobody's).
+   */
+  whole?: boolean;
+  /**
+   * A director's block, and the whole sub-department's (`whole`): the month's every bill of the sub-department — the
+   * directors' own too — summed. What Today's Sales / Margin / KPI show them ("All of Fair"), the same for every
+   * director of it and for the Principal.
    */
   team?: Omit<MemberScore, "staffId" | "lastOrder">;
   me: MemberScore & { name: string };

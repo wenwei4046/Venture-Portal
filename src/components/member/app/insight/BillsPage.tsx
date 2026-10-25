@@ -8,7 +8,7 @@ import s from "./insight.module.css";
 export type BillsStatus = "counted" | "waiting";
 
 /** My sales orders — Counted / Waiting tiles over the month's weeks (`soLayout="a"`, 519–584). */
-export default function BillsPage({ vm, dateLabel, status, week, onStatus, onWeek, onBill, onBack, onDate }: {
+export default function BillsPage({ vm, dateLabel, status, week, onStatus, onWeek, onBill, onBack, onDate, whole }: {
   vm: BillsVM | null;
   dateLabel: string;
   status: BillsStatus;
@@ -18,14 +18,16 @@ export default function BillsPage({ vm, dateLabel, status, week, onStatus, onWee
   onBill: (id: string) => void;
   onBack: () => void;
   onDate: () => void;
+  /** The Principal's whole sub-department (2026-10-25): everybody's bills, the sub-department named. */
+  whole?: string;
 }) {
   // The prototype opens on the first week; carried-in bills wait behind their own tab.
   const selected = vm ? (week && vm.weeks[week] ? week : (vm.tabs.find(t => t.key !== "earlier") ?? vm.tabs[0])?.key ?? null) : null;
   const card = selected && vm ? vm.weeks[selected] : null;
   return (
     <div className={s.billsPage}>
-      <SubHead title="My sales orders" dateLabel={dateLabel} onBack={onBack} onDate={onDate} />
-      {!vm ? <p className={s.empty}>Loading your bills…</p> : (
+      <SubHead title={whole ? `${whole} sales orders` : "My sales orders"} dateLabel={dateLabel} onBack={onBack} onDate={onDate} />
+      {!vm ? <p className={s.empty}>{whole ? "Loading the bills…" : "Loading your bills…"}</p> : (
         <>
           <section className={s.tiles}>
             <button className={`${s.tile} ${s.tileCounted} ${status === "counted" ? s.tileCountedOn : ""}`} onClick={() => onStatus("counted")} aria-pressed={status === "counted"}>

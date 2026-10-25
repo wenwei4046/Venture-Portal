@@ -60,7 +60,26 @@ describe("Arena identity boundary",()=>{
   });
   // Brand weeks come from the ERP's Sales Attending (2026-10-12): nobody — the
   // member, the Principal viewing them — has a way to save one any more.
+  // The Principal viewing nobody (2026-10-25 — "Arena 那边 … 显示 Top 3 是谁"): the whole sub-department's boards and every
+  // booth, for a Principal account alone.
+  it("reads the whole sub-department's boards for a Principal, and for nobody else",async()=>{
+    mocks.getUser.mockResolvedValue({role:"revenue_member",actualRole:"principal",is_active:true,permissions:[]});
+    mocks.rpc.mockImplementation(async(name:string)=>/booth_history$/.test(name)?{data:{events:[],weeks:[]},error:null}:{data:{people:[]},error:null});
+    const read=await arenaActions.fetchDepartmentArena(membershipId,"2026-10","monthly");
+    expect(read.ok).toBe(true);
+    expect(mocks.rpc).toHaveBeenCalledWith("member_principal_department_arena",{p_sub_department:membershipId,p_period:"2026-10",p_window:"monthly"});
+    expect(mocks.rpc).toHaveBeenCalledWith("member_principal_department_booth_history",{p_sub_department:membershipId});
+    mocks.rpc.mockClear();
+    await arenaActions.fetchDepartmentArena(membershipId,"2026-10","annual",{history:false});
+    expect(mocks.rpc.mock.calls.map(c=>c[0])).toEqual(["member_principal_department_arena"]);
+    mocks.rpc.mockClear();
+    mocks.getUser.mockResolvedValue({role:"revenue_member",is_active:true,permissions:["member_insight"]});
+    expect((await arenaActions.fetchDepartmentArena(membershipId,"2026-10","monthly")).ok).toBe(false);
+    expect((await arenaActions.fetchDepartmentArena("fair","2026-10","monthly")).ok).toBe(false);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  // …and since 2026-10-25 the Principal viewing nobody reads the whole sub-department's boards, still nothing to save.
   it("offers no brand-week save",()=>{
-    expect(Object.keys(arenaActions).sort()).toEqual(["fetchMemberArena"]);
+    expect(Object.keys(arenaActions).sort()).toEqual(["fetchDepartmentArena", "fetchMemberArena"]);
   });
 });

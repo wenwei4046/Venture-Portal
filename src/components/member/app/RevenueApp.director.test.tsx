@@ -9,7 +9,7 @@ import RevenueApp from "./RevenueApp";
 
 // A Revenue Director in the app (2026-10-14 — the user, on PETER's login: "why as revenue director log in, peter,
 // cant switch to fair view"): the switcher lists the sub-departments they direct; Today's figures are the whole
-// sub-department's, the Arena's cards name who leads.
+// sub-department's, the Arena's cards name who leads (the first three since 2026-10-25).
 const nav = vi.hoisted(() => ({ router: { push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {}, forward: () => {} } }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/member",
@@ -75,6 +75,10 @@ function source() {
   } satisfies RevenueSource;
 }
 
+// Today's Sales and Margin cards as they read (2026-10-25, the user: "就放第一名是谁就好了" — who is first, the name alone).
+const firsts = () => within(screen.getByRole("heading", { name: "Your Arena" }).closest("section")!)
+  .getAllByRole("button").map(b => b.textContent).filter(t => t !== "All boards").slice(0, 2);
+
 beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -101,9 +105,8 @@ describe("a Revenue Director's app", () => {
     // Sales, Margin and KPI.
     expect(screen.getAllByText("All of Fair")).toHaveLength(3);
     expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
-    // Sales (ANNA's RM 120k) and Margin (BEN's 44.4%); a director is on no board.
-    expect(screen.getAllByText("ANNA leads").length).toBeGreaterThan(0);
-    expect(screen.getByText("BEN leads")).toBeInTheDocument();
+    // Sales (ANNA RM 120k, BEN RM 90k) and Margin (BEN 44.4%, ANNA 40.0%): who is first; a director is on no board.
+    expect(firsts()).toEqual(["SalesANNA", "MarginBEN"]);
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
   });
@@ -165,8 +168,7 @@ describe("the Principal's View as of a Revenue Director", () => {
     expect(live.insight).toHaveBeenCalledWith("2026-10", { staffId: "peter", subDepartmentId: "fair" });
     expect(screen.getAllByText("All of Fair")).toHaveLength(3);
     expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
-    expect(screen.getAllByText("ANNA leads").length).toBeGreaterThan(0);
-    expect(screen.getByText("BEN leads")).toBeInTheDocument();
+    expect(firsts()).toEqual(["SalesANNA", "MarginBEN"]);
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
   });

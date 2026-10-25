@@ -134,3 +134,16 @@
 .boardSkel { width: 46px; height: calc(30px * var(--rv-type)); }
 /* A board with no place yet says so in words — a big dash looked like a bar still loading. */
 .boardNone { font-size: calc(13px * var(--rv-type)); font-weight: 650; opacity: .82; line-height: 1.2; }
+/* Who is first, for a reader on no board (2026-10-25 — the user: "就放第一名是谁就好了"): the name where a place would
+   stand, in the place's face. A long name ends in an ellipsis, never a second line. */
+.boardLeaderName {
+  min-width: 0;
+  font-family: var(--font-display-rv);
+  font-size: calc(21px * var(--rv-type));
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

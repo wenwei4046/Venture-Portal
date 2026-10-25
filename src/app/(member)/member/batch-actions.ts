@@ -4,6 +4,8 @@ import type { ArenaWindow } from "@/lib/member/arena";
 import type { MemberReadContext } from "@/lib/member/types";
 import {
   fetchDepartmentIncome,
+  fetchDepartmentInsight,
+  fetchDepartmentOrderBook,
   fetchMemberCatalogue,
   fetchMemberClaimRates,
   fetchMemberWaitingForm,
@@ -19,7 +21,7 @@ import {
   fetchPrincipalMemoReceipts,
   refreshMemberData,
 } from "./actions";
-import { fetchMemberArena } from "./arena-actions";
+import { fetchDepartmentArena, fetchMemberArena } from "./arena-actions";
 import { fetchMemberKpiSummary } from "./kpi-summary-actions";
 import { fetchMemberRooms } from "./rooms-actions";
 import { fetchMemberDocuments, fetchMemberPersonal } from "./docs-actions";
@@ -40,6 +42,10 @@ export type MemberRead =
   | { kind: "insightRange"; subDepartmentId: string; from: string; until: string; context?: MemberReadContext }
   | { kind: "income"; subDepartmentId: string; period: string; context?: MemberReadContext }
   | { kind: "departmentIncome"; subDepartmentId: string; period: string }
+  // The Principal viewing nobody (2026-10-25): the whole sub-department's Insight, bills and boards.
+  | { kind: "departmentInsight"; subDepartmentId: string; from: string; until: string }
+  | { kind: "departmentBook"; subDepartmentId: string; from: string; until: string }
+  | { kind: "departmentArena"; subDepartmentId: string; period: string; window: ArenaWindow; options?: { history?: boolean } }
   | { kind: "honours"; subDepartmentId: string; from: string; until: string; context?: MemberReadContext }
   | { kind: "memoReceipts"; staffId: string }
   | { kind: "claimRates" }
@@ -92,6 +98,9 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "insightRange": return fetchMemberInsightRange(read.subDepartmentId, read.from, read.until, read.context);
     case "income": return fetchMemberIncome(read.subDepartmentId, read.period, read.context);
     case "departmentIncome": return fetchDepartmentIncome(read.subDepartmentId, read.period);
+    case "departmentInsight": return fetchDepartmentInsight(read.subDepartmentId, read.from, read.until);
+    case "departmentBook": return fetchDepartmentOrderBook(read.subDepartmentId, read.from, read.until);
+    case "departmentArena": return fetchDepartmentArena(read.subDepartmentId, read.period, read.window, read.options);
     case "honours": return fetchMemberHonours(read.subDepartmentId, read.from, read.until, read.context);
     case "memoReceipts": return fetchPrincipalMemoReceipts(read.staffId);
     case "claimRates": return fetchMemberClaimRates();

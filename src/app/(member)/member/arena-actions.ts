@@ -60,3 +60,26 @@ export async function fetchMemberArena(membershipId: string, period: string, win
     return { ok: true as const, data: snapshot };
   } catch (error) { return failure(error); }
 }
+
+/**
+ * The Principal's own app, viewing nobody (2026-10-25 — a salesperson's note the user passed on: "Arena 那边 … 显示
+ * Top 3 是谁"): the whole sub-department's boards, everybody on them and nobody the reader, and every fair's booths —
+ * nobody's brand weeks (mig 20261026014700). The Principal's own session; the database asks again.
+ */
+export async function fetchDepartmentArena(membershipId: string, period: string, window: ArenaWindow, options: { history?: boolean } = {}) {
+  try {
+    if (!uuid.test(membershipId) || !validPeriod(period) || !["monthly", "quarterly", "annual"].includes(window)) throw new Error("Choose a valid department and period.");
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's boards.");
+    const db = (await createClient()) as unknown as SupabaseClient;
+    const { data, error } = await db.rpc("member_principal_department_arena", { p_sub_department: membershipId, p_period: period, p_window: window });
+    if (error) throw new Error(error.message);
+    if (!data || !Array.isArray(data.people)) throw new Error("Arena information is temporarily unavailable.");
+    const snapshot = data as MemberArenaSnapshot;
+    if (options.history === false) return { ok: true as const, data: snapshot };
+    const history = await db.rpc("member_principal_department_booth_history", { p_sub_department: membershipId });
+    if (!history.error && history.data && Array.isArray(history.data.events)) snapshot.history = history.data as ArenaHistorySnapshot;
+    else snapshot.historyError = "Fair results are not available yet. Your sales, margin and KPI rankings are up to date.";
+    return { ok: true as const, data: snapshot };
+  } catch (error) { return failure(error); }
+}

@@ -222,16 +222,19 @@ function FairBody({ fair, onFairs }: { fair: FairView; onFairs: () => void }) {
           </div>
         ) : <p className={s.empty} style={{ padding: "0 6px 16px" }}>No completed fairs in this period yet.</p>}
       </section>
-      <button className={s.fairsCard} onClick={onFairs}>
-        <span className={s.fairsText}>
-          <span className={s.fairsTitle}>Your fairs</span>
-          <span className={s.fairsSub}>{fair.entrySub}</span>
-          <span className={s.fairsChips}>
-            {fair.chips.map((c, i) => <span key={i} className={`${s.fairsChip} ${medal(c.medal)}`}>{c.place}</span>)}
+      {/* Your fairs: a reader on no board worked none (2026-10-25). */}
+      {!fair.lead && (
+        <button className={s.fairsCard} onClick={onFairs}>
+          <span className={s.fairsText}>
+            <span className={s.fairsTitle}>Your fairs</span>
+            <span className={s.fairsSub}>{fair.entrySub}</span>
+            <span className={s.fairsChips}>
+              {fair.chips.map((c, i) => <span key={i} className={`${s.fairsChip} ${medal(c.medal)}`}>{c.place}</span>)}
+            </span>
           </span>
-        </span>
-        <span className={s.view}>View<Svg d={ICON.chevronRight} size={16} sw={1.8} /></span>
-      </button>
+          <span className={s.view}>View<Svg d={ICON.chevronRight} size={16} sw={1.8} /></span>
+        </button>
+      )}
       <section>
         <div className={`${s.listHead} ${s.listHeadFair}`}><h2 className={s.listTitle}>{fair.tableTitle}</h2><span className={s.listCount}>{fair.rows.length} people</span></div>
         <div className={s.ftHead}>

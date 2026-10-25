@@ -39,14 +39,17 @@ export default function ArenaHub({ vm, kind, onKind, onBoard, onRecord }: {
               <span className={s.cardHead}>
                 <span className={s.cardLabel}>{c.label}</span>
                 {c.state === "loading" ? <span className={`${s.skel} ${s.cardValueSkel}`} />
-                  : <CrossFade k={c.value} block><span className={s.cardValue}>{c.value}</span></CrossFade>}
+                  : c.value ? <CrossFade k={c.value} block><span className={s.cardValue}>{c.value}</span></CrossFade> : null}
               </span>
               <span className={s.cardIcon}><Svg d={BOARD_ICON[c.board]} size={17} sw={1.8} /></span>
             </span>
             <span className={s.cardRank}>
               {c.state === "loading" ? <span className={`${s.skel} ${s.cardNumSkel}`} />
                 : c.state === "unranked" ? <span className={s.cardNone}>Not ranked yet</span>
-                : c.state === "lead" ? <span className={s.cardNone}>{c.leader ? `${c.leader} leads` : "Nobody placed yet"}</span>
+                : c.state === "lead" ? (c.leader
+                  // Who is first (2026-10-25), where a place would stand — their figure is the card's head.
+                  ? <span className={s.cardLeaderName}>{c.leader}</span>
+                  : <span className={s.cardNone}>Nobody placed yet</span>)
                 : (
                   <CrossFade k={`${c.rankNum}${c.rankSuf}`}>
                     <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>

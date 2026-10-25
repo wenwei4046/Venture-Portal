@@ -34,7 +34,7 @@ export function blockOf(insight: MemberInsight | null | undefined, membershipId:
  * quarter or a year reads its own book and its team range. What the phone kept
  * from an earlier open shows until the answers land.
  */
-export function useInsightData({ source, membershipId, schemeId, context, readable, period, recent, recentFrom, recentUntil, recentFailed = false, gen = 0, track = untracked }: {
+export function useInsightData({ source, membershipId, schemeId, context, readable, period, recent, recentFrom, recentUntil, recentFailed = false, withBook = true, gen = 0, track = untracked }: {
   source: RevenueSource;
   membershipId: string;
   schemeId: string;
@@ -49,6 +49,11 @@ export function useInsightData({ source, membershipId, schemeId, context, readab
   recentUntil: string;
   /** It could not be read: a month inside it reads its own bills. */
   recentFailed?: boolean;
+  /**
+   * Read the period's own bills (the default). A whole sub-department's (the Principal viewing nobody, 2026-10-25) are
+   * every bill, so they are read only once a page shows them — not for Today's figures, which the block carries.
+   */
+  withBook?: boolean;
   /** Pull to refresh: a new number reads the period again, keeping what is on screen until it lands. */
   gen?: number;
   track?: TrackRead;
@@ -70,13 +75,13 @@ export function useInsightData({ source, membershipId, schemeId, context, readab
   // The period's own bills — only for one the two-month book does not hold.
   const bookShown = useRef("");
   useEffect(() => {
-    if (!membershipId || !readable || !kind || !from || !through || fromRecent) return;
+    if (!membershipId || !readable || !kind || !from || !through || fromRecent || !withBook) return;
     let stale = false;
     if (bookShown.current !== key) setBook(source.peek?.<MemberOrderBook>(ask.orderBook(membershipId, from, through, context)) ?? null);
     bookShown.current = key;
     void track(gen, source.orderBook(membershipId, from, through, context)).then(r => { if (!stale && r.ok) setBook(r.data); });
     return () => { stale = true; };
-  }, [source, membershipId, context, readable, kind, from, through, fromRecent, key, gen, track]);
+  }, [source, membershipId, context, readable, kind, from, through, fromRecent, withBook, key, gen, track]);
 
   useEffect(() => {
     if (!membershipId || !readable || !kind || !from || !through) return;

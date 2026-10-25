@@ -78,6 +78,21 @@
 .cardNum { font-family: var(--font-display-rv); font-size: calc(40px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
 .cardSuf { font-family: var(--font-display-rv); font-size: calc(16px * var(--rv-type)); font-weight: 700; margin: 4px 0 0 2px; }
 .cardOf { font-size: calc(13px * var(--rv-type)); color: var(--rv-white-88); padding-bottom: 4px; }
+/* Who is first, for a reader on no board (2026-10-25 — the user: "can same", as Today's cards): the name where a place
+   would stand, in the place's face; a long name ends in an ellipsis, never a second line. */
+.cardLeaderName {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-display-rv);
+  font-size: calc(24px * var(--rv-type));
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-bottom: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   .segBtn, .heroSegBtn, .card { transition: none; }
   .card:active { transform: none; }

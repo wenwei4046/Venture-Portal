@@ -46,7 +46,8 @@ export interface TodayInput {
    * lead. The income stays their own; Sales / Margin / KPI are the whole
    * sub-department's — every bill of the month, the Insight block's `team` —
    * the Arena's cards name who leads (a director is on no board), and there is
-   * no week of their own.
+   * no week of their own. The Principal viewing nobody reads Today the same way
+   * (2026-10-25), their hero the sub-department's commission (`department`).
    */
   team?: string;
   hidden: boolean;
@@ -85,12 +86,17 @@ export interface TodayTodo {
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
  * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
- * `off` is KPI not counted this period — nobody will ever have a place there; `lead` (a director, on no board) names
- * who leads it (`leader`, absent while nobody is placed).
+ * `off` is KPI not counted this period — nobody will ever have a place there; `lead` (a director, or the Principal
+ * viewing nobody — on no board) names who leads it.
  */
 export interface TodayBoard {
   id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string;
-  state: "ranked" | "unranked" | "loading" | "off" | "lead"; leader?: string;
+  state: "ranked" | "unranked" | "loading" | "off" | "lead";
+  /**
+   * `lead`: who is first (absent while nobody is placed), drawn as the first name alone (2026-10-25, the user: "就放第一名是谁
+   * 就好了不需要放第一、第二、第三"); on Championship the most points ("championship i want is show 1st in championship point").
+   */
+  leader?: string;
 }
 export interface TodayWeek { title: string; dates: string; venue: string | null; org: string | null }
 export interface TodayModel {

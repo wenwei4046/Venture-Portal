@@ -13,7 +13,7 @@ import { quoteCostRules, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
-import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
+import { readDepartmentInsight, readInsightRange, readOrderBook, type DepartmentInsight, type MemberInsightRange, type MemberOrderBook } from "./order-book";
 import { closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
 import { memberPay, salaryFromRow, salaryFromSchedule, taxModeOf, type PayrollRowFacts, type PaySalary } from "./income-pay";
 import { parseCloseSummary } from "@/lib/commission/closes";
@@ -681,6 +681,45 @@ export async function loadDepartmentIncome(subDepartmentId: string, period: stri
       commission: round2(board.people.reduce((a, p) => a + p.totalCommission, 0)),
       countedSales: round2(board.people.reduce((a, p) => a + (p.statement?.productRevenue ?? 0), 0)),
     };
+  });
+}
+
+/**
+ * The Principal's own app, viewing nobody (2026-10-25 — a salesperson's note the user passed on: "要看销售额的话，就是把
+ * 全部的加起来 … 直接 show 全部人的单"): the WHOLE sub-department's Insight over a month, a quarter or a year — every bill
+ * summed, everybody who sits there or wrote a bill with their own figures, whether KPI counts (mig 20261026014700).
+ * Sales and margin only: nobody's commission, rate or salary. The Principal's own session; the database asks again
+ * (`member_principal_department`).
+ */
+export async function loadDepartmentInsight(subDepartmentId: string, from: string, until: string): Promise<MemberOutcome<DepartmentInsight>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's sales.");
+    insightWindow(subDepartmentId, from, until);
+    const client = await session("member_insight", true);
+    const read = readDepartmentInsight(await rpc<unknown>(client, "member_principal_department_insight", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+    }));
+    if (!read) throw new Error("Performance information is temporarily unavailable.");
+    return { ...read, people: read.people.map((row) => ({ ...row, title: legacyLabel(row.title) })) };
+  });
+}
+
+/**
+ * …and every bill of the window, once each, with its salesperson — Insight's bills, KPI and brand pages for the whole
+ * sub-department. No cost: a bill carries its layer-2 margin percentage only, as a member's own.
+ */
+export async function loadDepartmentOrderBook(subDepartmentId: string, from: string, until: string): Promise<MemberOutcome<MemberOrderBook>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's bills.");
+    insightWindow(subDepartmentId, from, until);
+    const client = await session("member_insight", true);
+    const book = readOrderBook(await rpc<unknown>(client, "member_principal_department_order_book", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+    }));
+    if (!book) throw new Error("The bills are temporarily unavailable.");
+    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
   });
 }
 
