@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   adsCard, adsEventText, adsPageFromRow, adsPatch, adsPatchOf, adsPeriod, adsPeriods, adsRows, adsValues, adsValuesOf, choicesFromRow,
-  draftOf, draftProblems, figureText, metaSum, NO_TARGETS, reportRange, targetOf, typedValues, valueText, type AdsSetup,
+  draftOf, draftProblems, figureText, metaSum, NO_TARGETS, reportCards, reportRange, targetOf, typedValues, valueText, type AdsSetup,
 } from './ads'
 
 // 2026-10-25 — a project's Ads report (the user's answer 57: from the CRM's Ads Performance; each Ads project picks its
@@ -81,6 +81,11 @@ describe('its figures', () => {
     ])
     expect(adsCard('cpl', { cpl: 18.4 }, NO_TARGETS)).toEqual({ key: 'cpl', label: 'Cost per lead', value: 'RM 18.40', sub: '', tone: 'muted' })
     expect(adsCard('cpl', {}, SETUP.targets).sub).toBe('Target RM 20')
+  })
+
+  it('lays a published report’s cards out in its setup’s order — a figure since taken off last', () => {
+    const r = { values: { roas: 3.2, leads: 40, spendToDate: 3240, cpl: 18.4 }, targets: SETUP.targets }
+    expect(reportCards(r, SETUP.figures).map(c => c.label)).toEqual(['Spend so far', 'Cost per lead', 'ROAS', 'Leads'])
   })
 })
 

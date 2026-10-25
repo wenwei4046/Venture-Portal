@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { adsRows, EVERY_WORDS, figureOf, reportRange, type AdsPage } from '@/lib/marketing/ads'
+import { adsRows, EVERY_WORDS, figureOf, reportCards, reportRange, type AdsPage } from '@/lib/marketing/ads'
 import { shortDay } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
-import AdsFigures, { reportCards, targetWords } from './AdsFigures'
+import AdsFigures, { targetWords } from './AdsFigures'
 import AdsPublish from './AdsPublish'
 import AdsSetup from './AdsSetup'
 import s from './ads.module.css'

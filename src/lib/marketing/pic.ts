@@ -4,6 +4,7 @@
 // the progress, the card after an answer, and what an answer asks. Pure.
 
 import { officeTime } from '@/lib/office-time'
+import { isAdsKey, reportsFromRow, type AdsEvery, type AdsKey, type AdsReport } from './ads'
 import { periodWords, shortDay } from './board'
 import { answerWords } from './options'
 import { picOkFromRow, type PicOk, type Tone } from './task'
@@ -53,6 +54,27 @@ export interface PicPage {
   minutes: { title: string; fields: PicField[] } | null
   /** The work (②b-2d): each deliverable planned, and its stage now. */
   work: PicWork[]
+  /** Its Ads report (⑤-3b, mig 20261025235900): how often, its figures' order, the reports published — null without one. */
+  ads: PicAds | null
+}
+
+/** The reports the Ads person published to the link (the user's answer 57) — each as it was published. */
+export interface PicAds {
+  every: AdsEvery
+  figures: AdsKey[]
+  reports: Pick<AdsReport, 'no' | 'from' | 'until' | 'values' | 'targets' | 'note' | 'at'>[]
+}
+
+const EVERY = ['1w', '2w', '4w', '1m'] as const
+function adsFromRow(v: unknown): PicAds | null {
+  if (!isObj(v)) return null
+  const every = EVERY.find(e => e === v.every)
+  if (!every) return null
+  return {
+    every,
+    figures: (Array.isArray(v.figures) ? v.figures : []).filter(isAdsKey),
+    reports: reportsFromRow(v.reports).map(({ no, from, until, values, targets, note, at }) => ({ no, from, until, values, targets, note, at })),
+  }
 }
 
 /** A stage's field as the PIC reads it: words (a date as written, Yes for a box ticked), a link, or nothing yet. */
@@ -236,6 +258,7 @@ export function picPageFromRow(v: unknown): PicPage | null {
         .map(f => ({ name: str(f.name), type: str(f.type), value: valueFromRow(str(f.type), f.value) })),
     } : null,
     work: (Array.isArray(v.work) ? v.work : []).filter(isObj).map(workFromRow),
+    ads: adsFromRow(v.ads),
   }
 }
 

@@ -1,4 +1,4 @@
-import { adsCard, figureText, type AdsCard, type AdsReport, type AdsTargets } from '@/lib/marketing/ads'
+import { figureText, type AdsCard, type AdsTargets } from '@/lib/marketing/ads'
 import s from './ads.module.css'
 
 // A report's figures, two a row — the handoff's PIC Link report cards: each figure's words, its value and, under it, how it
@@ -18,12 +18,6 @@ export default function AdsFigures({ cards }: { cards: AdsCard[] }) {
       ))}
     </div>
   )
-}
-
-/** A published report's cards, in its setup's order (a figure since taken off the setup last). */
-export const reportCards = (r: Pick<AdsReport, 'values' | 'targets'>, figures: readonly string[]): AdsCard[] => {
-  const at = (k: string) => (figures.indexOf(k) < 0 ? 99 : figures.indexOf(k))
-  return (Object.keys(r.values) as (keyof AdsReport['values'])[]).sort((a, b) => at(a) - at(b)).map(k => adsCard(k, r.values, r.targets))
 }
 
 /** Its targets in words: "Budget RM 6,000 · Cost per lead RM 20.00 · ROAS 3.0 · Appointment rate 25%". */

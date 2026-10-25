@@ -93,7 +93,7 @@ export default function AdsPublish({ project, title, setup, period, report, onDo
             </>
           ) : null}
           <label className={p.dialogField}>
-            <span className={p.dialogLabel}>Note</span>
+            <span className={p.dialogLabel}>Note for the PIC</span>
             <textarea className={p.textarea} rows={3} maxLength={500} value={note} onChange={e => setNote(e.target.value)} />
           </label>
         </div>

@@ -87,7 +87,7 @@ describe('a project’s Ads report', () => {
     fireEvent.change(input('Spend so far'), { target: { value: '3,300' } })
     expect(within(dialog).getByText('RM 3,300')).toBeTruthy()
     expect(within(dialog).getByText('Target RM 20 · on target')).toBeTruthy()
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Note' }), { target: { value: 'Google ads added by hand' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Note for the PIC' }), { target: { value: 'Google ads added by hand' } })
     actions.publishMktAds.mockResolvedValue({ ok: true, ads: page({ reports: [{ ...R1, no: 2, from: '2026-10-20', until: '2026-11-02' }, R1] }) })
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' })) })
     expect(actions.publishMktAds).toHaveBeenCalledWith(PID, 2, { spendToDate: 3300, cpl: 10.4, appt: 46, roas: 5.7 }, 'Google ads added by hand')

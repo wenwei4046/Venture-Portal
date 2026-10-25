@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import { EVERY_WORDS, reportCards, reportRange } from '@/lib/marketing/ads'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
@@ -191,6 +192,34 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
           </div>
 
           <div className={s.col}>
+            {/* Its Ads reports (⑤-3b — the user's answer 57): each as the Ads person published it, the newest first. */}
+            {page.ads?.reports.length ? (
+              <section className={s.card} aria-label="Reports">
+                <div className={s.cardHead}>
+                  <span className={s.cardTitle}>Reports</span>
+                  <span className={s.grow} />
+                  <span className={s.repEvery}>{EVERY_WORDS[page.ads.every]}</span>
+                </div>
+                {page.ads.reports.map(r => (
+                  <div key={r.no} className={s.rep}>
+                    <div className={s.repHead}>
+                      <span className={s.repTitle}>Report #{r.no}</span>
+                      <span className={s.repRange}>{reportRange(r)}</span>
+                    </div>
+                    <div className={s.repFigs}>
+                      {reportCards(r, page.ads?.figures ?? []).map(c => (
+                        <div key={c.key} className={s.repFig}>
+                          <div className={s.repLabel}>{c.label}</div>
+                          <div className={s.repValue}>{c.value}</div>
+                          {c.sub ? <div className={`${s.repSub}${c.tone === 'good' ? ` ${s.repGood}` : c.tone === 'bad' ? ` ${s.repBad}` : ''}`}>{c.sub}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                    {r.note ? <div className={s.repNote}>{r.note}</div> : null}
+                  </div>
+                ))}
+              </section>
+            ) : null}
             <section className={`${s.card} ${s.progress}`} aria-label="Progress">
               <div className={`${s.cardTitle} ${s.progressHead}`}>Progress</div>
               {steps.map((t, i) => (
