@@ -11,6 +11,7 @@ import { minutesFieldFromRow, rulesFromRow, type MinutesField, type MinutesRules
 import {
   delivFromRow, fromWords, openedProjectText, ordinal, picOkFromRow, runMadeText, runsResumedText, trailTime, type PicOk, type TaskDeliv, type Tone,
 } from './task'
+import { adsEventText } from './ads'
 import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './billing'
 
 /** A product project's way to its work. */
@@ -551,7 +552,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     : e.action === 'replaced' ? `${who} replaced ${typeof e.data?.swap === 'string' ? e.data.swap : 'a person'} as the owner${e.reason ? ` · "${e.reason}"` : ''}`
     // A campaign's run period (④-2b — the user's answer 13), as the intake minutes set it.
     : e.action === 'campaign period' ? (periodOf(e.data) ? `${who} set the campaign period · ${periodOf(e.data)}` : `${who} took the campaign period off`)
-    : `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
+    // Its Ads report (2026-10-25 — the user's answer 57).
+    : adsEventText(who, e.action, e.data) ?? `${who} · ${e.action}${e.reason ? `: ${e.reason}` : ''}`
 }
 
 /** The trail newest first, in the store's words. */

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { billingFromRow, clientBillFromRow, type BillingPage, type ClientBill } from './billing'
 import { boardFromRow, type MktBoard } from './board'
 import { chatListFromRow, type ChatList } from './chat'
+import { adsPageFromRow, type AdsPage } from './ads'
 import { draftsFromRow, openDraftFromRow, type DraftRow, type OpenDraft } from './drafts'
 import { keyDatesFromRow, type MktKeyDate } from './key-dates'
 import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
@@ -147,6 +148,14 @@ export async function readSubFeed(sub: string, limit = 20): Promise<SubFeedEvent
   const { data, error } = await db.rpc('mkt_sub_feed', { p_sub: sub, p_limit: limit })
   if (error) throw new Error(error.message)
   return subFeedFromRow(data)
+}
+
+/** A project's Ads report — its setup, its reports, whether the PIC has a link (mig 20261025235800) — Marketing · View. */
+export async function readAdsPage(project: string): Promise<AdsPage> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_ads_page', { p_project: project })
+  if (error) throw new Error(error.message)
+  return adsPageFromRow(data)
 }
 
 /** A subsidiary's own key dates, by day (mig 20261025235500) — Marketing · View. */

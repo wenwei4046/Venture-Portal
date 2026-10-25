@@ -93,6 +93,9 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_sub_feed',
   // …and its own key dates (mig 20261025235500) — STABLE.
   'mkt_key_dates',
+  // A Marketing project's Ads report (mig 20261025235800): its setup and reports, the CRM's ads to pick, what the CRM
+  // counts for them — STABLE.
+  'mkt_ads_page', 'mkt_ads_choices', 'mkt_ads_crm',
   // A Marketing project's formal log (mig 20261024006000): every line of its trail — STABLE.
   'mkt_project_log',
   // Marketing's Library (mig 20261024007000): its folder types, folders, files and Dustbin — STABLE.

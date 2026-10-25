@@ -10,6 +10,11 @@ import { createClient } from '@/lib/supabase/server'
 import { correctionOk, projectLogFromRow, type ProjectLog } from './audit'
 import { billingFromRow, clientBillFromRow, type BillingPage } from './billing'
 import { subFromRow, type MktSub } from './board'
+import { metaAdInsights, type MetaFig } from '@/lib/member/crm-ad-names-meta'
+import {
+  adsPageFromRow, adsPatchOf, adsPeriod, adsValuesOf, choicesFromRow, crmFromRow, metaSum, type AdsChoice, type AdsCrm, type AdsMeta,
+  type AdsPage, type AdsPatch, type AdsPeriod, type AdsValues,
+} from './ads'
 import { openDraftFromRow } from './drafts'
 import { keyDatesFromRow, keyPatchOf, type KeyPatch, type MktKeyDate } from './key-dates'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
@@ -792,6 +797,77 @@ export async function mktCalendarLink(sub: string, slot: 1 | 2, renew = false): 
     return { ok: false, reason: words(error, 'The calendar link could not be made. Please try again.') }
   }
   return { ok: true, code: data }
+}
+
+// ── A project's Ads report (mig 20261025235800 — the user's answer 57: from the CRM, set by the Ads person) ─────────
+
+const AD_ID = /^\d{5,32}$/
+
+/** The CRM's ads to pick from (name, Page, Meta's status, leads so far) — Marketing · Edit. */
+export async function readMktAdsChoices(): Promise<Done<{ choices: AdsChoice[] }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  const { data, error } = await (await client()).rpc('mkt_ads_choices')
+  if (error) return { ok: false, reason: words(error, 'The CRM’s ads could not be read. Please try again.') }
+  return { ok: true, choices: choicesFromRow(data) }
+}
+
+/** Its Ads report set up, or changed — only what changed is sent. The page's part comes back. */
+export async function saveMktAds(project: string, patch: AdsPatch): Promise<Done<{ ads: AdsPage }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project)) return { ok: false, reason: 'That project is not there.' }
+  const clean = adsPatchOf(patch)
+  if (!clean) return { ok: false, reason: 'Nothing changed.' }
+  const { data, error } = await (await client()).rpc('mkt_ads_save', { p_project: project, p_patch: clean })
+  if (error) return { ok: false, reason: words(error, 'The Ads report could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, ads: adsPageFromRow(data) }
+}
+
+/**
+ * A period's figures to publish: what the CRM counts for its ads over its days (the database's, counts only) and what
+ * Meta's Ads Manager says — spend, impressions, reach, clicks, conversations — for the same days, read by the server
+ * with the system user's token, as the CRM's Ads Performance reads them; *Spend so far* from its first day. Marketing ·
+ * Edit; only the ads its setup picked; six asked of Meta at a time.
+ */
+export async function readMktAdsFigures(project: string, no: number): Promise<Done<{
+  period: AdsPeriod; crm: AdsCrm | null; meta: AdsMeta | null; toDate: number | null; metaRead: number; metaOf: number; metaOff: boolean
+}>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !Number.isInteger(no) || no < 1 || no > 1000) return { ok: false, reason: 'That report is not one of its periods.' }
+  const db = await client()
+  const page = await db.rpc('mkt_ads_page', { p_project: project })
+  if (page.error) return { ok: false, reason: words(page.error, 'The Ads report could not be read. Please try again.') }
+  const setup = adsPageFromRow(page.data).setup
+  if (!setup) return { ok: false, reason: 'Set up its Ads report first.' }
+  const period = adsPeriod(setup.every, setup.startsOn, no)
+  const crm = await db.rpc('mkt_ads_crm', { p_project: project, p_from: period.from, p_until: period.until })
+  if (crm.error) return { ok: false, reason: words(crm.error, 'The CRM’s figures could not be read. Please try again.') }
+  const token = process.env.META_SYSTEM_USER_TOKEN?.trim()
+  const ads = setup.ads.filter(id => AD_ID.test(id)).slice(0, 40)
+  if (!token || !ads.length) return { ok: true, period, crm: crmFromRow(crm.data), meta: null, toDate: null, metaRead: 0, metaOf: ads.length, metaOff: !token }
+  const read = async (since: string, until: string) => {
+    const figs: (MetaFig | null)[] = []
+    for (let i = 0; i < ads.length; i += 6) figs.push(...(await Promise.all(ads.slice(i, i + 6).map(id => metaAdInsights(id, token, since, until)))))
+    return figs
+  }
+  const figs = await read(period.from, period.until)
+  const toDate = setup.figures.includes('spendToDate') ? metaSum(await read(setup.startsOn, period.until))?.spend ?? null : null
+  return { ok: true, period, crm: crmFromRow(crm.data), meta: metaSum(figs), toDate, metaRead: figs.filter(Boolean).length, metaOf: ads.length, metaOff: false }
+}
+
+/** A period published to the PIC's link — each figure's value as the Ads person publishes it (worked out or typed),
+ * a note; published again, it is replaced. The page's part comes back. */
+export async function publishMktAds(project: string, no: number, values: AdsValues, note: string): Promise<Done<{ ads: AdsPage }>> {
+  await requireActionOn('/marketing/projects/[id]', 'marketing', 'edit')
+  if (!isId(project) || !Number.isInteger(no) || no < 1 || no > 1000) return { ok: false, reason: 'That report is not one of its periods.' }
+  const clean = adsValuesOf(values)
+  if (!clean) return { ok: false, reason: 'Nothing to publish.' }
+  const { data, error } = await (await client()).rpc('mkt_ads_publish', {
+    p_project: project, p_no: no, p_values: clean, p_note: typeof note === 'string' ? note.slice(0, 600) : '',
+  })
+  if (error) return { ok: false, reason: words(error, 'The report could not be published. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, ads: adsPageFromRow(data) }
 }
 
 // ── A subsidiary's key dates (mig 20261025235500 — the user: "Marketing 全员，可每年重复") ──────────────────────────

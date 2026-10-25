@@ -9,6 +9,7 @@ import {
   postedFromRow, subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktPosted, type MktProject, type MktProjectStatus, type MktSource,
   type MktStage, type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
+import { adsEventText } from './ads'
 import { monthLabel } from './billing'
 import { isManagerTitle } from './groups'
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
@@ -848,7 +849,8 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'unposted': return `${e.actor} took back ${typeof e.data?.field === 'string' ? e.data.field : 'the post'}’s posted mark`
     // A record of the formal log corrected (④-3b — answer 19): the correction is a record of its own.
     case 'correction': return `${e.actor} added a correction to the log: “${e.reason ?? ''}”`
-    default: return `${e.actor} · ${e.action}`
+    // Its Ads report (2026-10-25 — the user's answer 57).
+    default: return adsEventText(e.actor, e.action, e.data) ?? `${e.actor} · ${e.action}`
   }
 }
 
