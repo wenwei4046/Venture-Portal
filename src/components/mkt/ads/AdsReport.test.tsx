@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { adsPageFromRow } from '@/lib/marketing/ads'
 const actions = vi.hoisted(() => ({ readMktAdsChoices: vi.fn(), saveMktAds: vi.fn(), readMktAdsFigures: vi.fn(), publishMktAds: vi.fn() }))
@@ -92,6 +93,29 @@ describe('a project’s Ads report', () => {
     expect(actions.publishMktAds).toHaveBeenCalledWith(PID, 2, { spendToDate: 3300, cpl: 10.4, appt: 46, roas: 5.7 }, 'Google ads added by hand')
     expect(say).toHaveBeenCalledWith('Report #2 published')
     expect(screen.queryByRole('dialog', { name: 'Report #2' })).toBeNull()
+  })
+
+  // Found on the walk (2026-10-25): a development build runs the opening read twice; the first answered, the figures were
+  // typed, then the second's answer wrote over them and the report went out without them.
+  it('only the newest read fills the figures — what is typed after it is never written over', async () => {
+    const answers: ((v: unknown) => void)[] = []
+    actions.readMktAdsFigures.mockImplementation(() => new Promise(res => answers.push(res)))
+    const figs = (spend: number) => ({ ok: true, period: { no: 2, from: '2026-10-20', until: '2026-11-02' },
+      crm: { leads: 10, appt: 2, showup: 1, won: 0, wonAmount: 0 }, meta: null, toDate: spend, metaRead: 0, metaOf: 1, metaOff: true })
+    render(<StrictMode><AdsReport project={PID} title="Raya ads" initial={page()} edit say={say} /></StrictMode>)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Publish…' })) })
+    const dialog = screen.getByRole('dialog', { name: 'Report #2' })
+    const spend = () => within(dialog).getByRole('textbox', { name: 'Spend so far' }) as HTMLInputElement
+    expect(answers.length).toBe(2)
+    await act(async () => { answers[0](figs(111)) })
+    // The first read overtaken: still reading, nothing filled from it.
+    expect([spend().disabled, spend().value]).toEqual([true, ''])
+    await act(async () => { answers[1](figs(222)) })
+    expect([spend().disabled, spend().value]).toEqual([false, '222'])
+    fireEvent.change(spend(), { target: { value: '1,250' } })
+    actions.publishMktAds.mockResolvedValue({ ok: true, ads: page() })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' })) })
+    expect(actions.publishMktAds.mock.calls[0][2]).toMatchObject({ spendToDate: 1250 })
   })
 
   it('a value that is not a number stops it; Meta not connected says so', async () => {

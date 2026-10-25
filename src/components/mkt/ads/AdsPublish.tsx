@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { publishMktAds, readMktAdsFigures } from '@/lib/marketing/actions'
 import {
   adsCard, adsValues, figureOf, reportRange, typedValues, valueText, type AdsKey, type AdsPage, type AdsPeriod, type AdsReport,
@@ -36,10 +36,15 @@ export default function AdsPublish({ project, title, setup, period, report, onDo
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
+  // Only the newest read fills the figures: one overtaken — or still on its way when the window closed — never writes
+  // over what was typed since (a development build runs the opening read twice).
+  const seq = useRef(0)
   const read = useCallback(async () => {
+    const mine = ++seq.current
     setReading(true)
     setError(null)
     const r = await readMktAdsFigures(project, period.no)
+    if (mine !== seq.current) return
     setReading(false)
     if (!r.ok) return setError(r.reason)
     const values = adsValues(r.crm, r.meta, r.toDate)
@@ -48,6 +53,7 @@ export default function AdsPublish({ project, title, setup, period, report, onDo
   }, [project, period.no, setup.figures])
   useEffect(() => {
     if (!report) void read()
+    return () => { seq.current++ }
   }, [report, read])
 
   const values = typedValues(setup.figures, typed)
