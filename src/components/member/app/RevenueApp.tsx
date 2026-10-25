@@ -778,12 +778,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The KPI rule is the scheme's (Rules), not a month's: this month's summary says it.
   const kpiRule = useMemo(() => ({ enabled: !!now.kpi?.enabled, threshold: now.kpi?.threshold ?? null }), [now.kpi?.enabled, now.kpi?.threshold]);
   const selfId = arenaToday?.selfId || context?.staffId || "";
-  // The reader's place — and who has the most points, for a reader on no board (a director, the Principal viewing nobody).
+  // The reader's place — and, for a reader on no board (a director, the Principal viewing nobody), the standings whose
+  // leader and points the Championship card names, as the Arena's does.
   const champ = useMemo(() => {
     if (!arenaToday) return null;
     const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
     const standings = championshipStandings([month]);
-    return { rank: standings.find(s => s.id === selfId)?.position ?? null, leader: standings.find(s => s.position === 1)?.name ?? null };
+    return { rank: standings.find(s => s.id === selfId)?.position ?? null, standings };
   }, [arenaToday, kpiRule, selfId]);
   // On no board: a director (2026-10-14), or the Principal viewing nobody (2026-10-25).
   const onNoBoard = director || !!deptSource;
@@ -795,7 +796,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     team: onNoBoard ? membership?.name : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
     metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo, shares: shares.waiting,
-  }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
+  }, champ?.rank ?? null, champ?.standings ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
     now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, onNoBoard, shares.waiting]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──

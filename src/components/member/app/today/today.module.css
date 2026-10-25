@@ -96,7 +96,10 @@
   flex-direction: column;
   justify-content: space-between;
 }
+.boardHead { display: flex; flex-direction: column; min-width: 0; }
 .boardLabel { font-size: calc(12.5px * var(--rv-type)); font-weight: 650; }
+/* The leader's figure under the board's name, for a reader on no board (2026-10-26 — "跟 Arena 的 Hero Card 是一样的"). */
+.boardValue { font-size: calc(12px * var(--rv-type)); font-weight: 500; opacity: .85; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .boardRank { display: flex; align-items: flex-start; line-height: 1; }
 .boardNum { font-family: var(--font-display-rv); font-size: calc(32px * var(--rv-type)); font-weight: 800; letter-spacing: -.05em; }
 .boardSuf { font-size: calc(13px * var(--rv-type)); font-weight: 700; margin: 3px 0 0 1px; }

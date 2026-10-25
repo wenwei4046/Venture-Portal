@@ -134,6 +134,16 @@ function leadHero(board: Board, ordered: readonly BoardRow[], count: number): Ra
   return { num: "", suf: "", count, value: boardValue(board, first.value, first.pending), chase, state: "lead", leader: firstName(first.name) };
 }
 
+/**
+ * Who leads a board this month and their figure, exactly as the hub's card names them for a reader on no board — so
+ * Today's cards read the same (2026-10-26, the user: "跟 Arena 的 Hero Card 是一样的"). Championship's are its standings.
+ */
+export function arenaLead(board: Board, people: readonly ArenaPerson[], standings: readonly ChampStanding[] | null): { name: string; value: string } | null {
+  const rows = board === "champ" ? (standings ? fromStandings(standings, "") : []) : fromRankings(arenaRankings(people, METRIC[board]), board);
+  const hero = leadHero(board, displayOrder(rows), rows.length);
+  return hero.leader ? { name: hero.leader, value: hero.value } : null;
+}
+
 function rankView(board: Board, rows: BoardRow[], count: number, director = false): RankView {
   const ordered = displayOrder(rows);
   const me = ordered.find(r => r.self);
