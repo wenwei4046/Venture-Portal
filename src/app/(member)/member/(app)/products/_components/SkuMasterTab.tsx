@@ -88,19 +88,19 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '', colum
   }, [live, category, query, model])
 
   // Keep visible sizes in ERP order, followed by historical priced sizes.
-  // DEFAULT stays in saved grids but is not an editable size column here.
+  // DEFAULT is one of them (2026-10-25): a seat the ERP sells — 8211 MODENA's
+  // only one — that a bill costs at exactly, as it does any other.
   const heights = useMemo(() => {
     if (!sofaView) return []
-    const cols = sofaSizes.filter(h => heightKey(h) !== 'default')
-    const have = new Set(cols.map(h => heightKey(h)))
+    const have = new Set(sofaSizes.map(h => heightKey(h)))
     const extra = new Map<string, string>()
     for (const s of shown) {
       for (const cell of s.grid ?? []) {
         const k = heightKey(cell.height)
-        if (k !== null && k !== 'default' && !have.has(k) && !extra.has(k)) extra.set(k, cell.height)
+        if (k !== null && !have.has(k) && !extra.has(k)) extra.set(k, cell.height)
       }
     }
-    return [...cols, ...[...extra.values()].sort(compareHeights)]
+    return [...sofaSizes, ...[...extra.values()].sort(compareHeights)]
   }, [sofaView, sofaSizes, shown])
 
   function changeCategory(next: string | null) {

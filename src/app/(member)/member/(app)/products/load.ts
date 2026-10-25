@@ -506,8 +506,8 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
 
 /**
  * The sofa seat heights, in the ERP's order (Maintenance's `sofa_sizes`): the
- * SKU Master's sofa columns and a new combo's price grid. DEFAULT is a saved
- * grid's fallback, never a size anybody prices.
+ * SKU Master's sofa columns, DEFAULT among them (2026-10-25 — a seat the ERP
+ * sells, 8211's only one), and a new combo's price grid, which leaves DEFAULT out.
  */
 export async function loadSofaSizes(): Promise<string[]> {
   const sb = await untyped()
