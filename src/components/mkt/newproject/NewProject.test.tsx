@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ProductPick } from '@/lib/marketing/project'
 
 // 2026-10-23 — New Project's 📦 branch (②b-1, `New Project.dc.html` step 1): a product project is the manager's; they
@@ -372,5 +372,139 @@ describe('New Project kept as a draft', () => {
     expect(actions.dropMktDraft).toHaveBeenCalledWith('d9')
     expect(window.location.search).toBe('')
     expect(screen.queryByText(/Draft saved/)).toBeNull()
+  })
+})
+
+// 2026-10-25 — ②a-3: a task written with meeting minutes, there and then (the user's answers 52–55). The database's side is
+// tests/member-sql/validate-marketing-task-minutes.mjs.
+describe('New Project’s meeting minutes', () => {
+  const MEI = { id: 's1', first: 'Mei', hint: '', group: 'SOCIAL MEDIA SPECIALIST' }
+  const TEAM = [
+    { id: 's1', user: 'u1', full: 'MEI LING', first: 'Mei', title: 'SOCIAL MEDIA SPECIALIST', team: null, role: null, color: null, capacity: 5 },
+    { id: 's2', user: 'u2', full: 'ALI HASSAN', first: 'Ali', title: 'GRAPHIC DESIGNER', team: null, role: null, color: null, capacity: 5 },
+  ]
+  const PICKS = [
+    { id: 't1', name: 'Kickoff', version: 2, rules: { sign: true, pic: false, picAll: false, project: true, file: true, lock: true }, fields: [
+      { key: 'a', name: 'Project', type: 'Project link' as const, req: false, pic: false, lock: true },
+      { key: 'b', name: 'Attendees', type: 'People' as const, req: false, pic: false, lock: true },
+      { key: 'c', name: 'Agenda', type: 'Long text' as const, req: true, pic: true, lock: false },
+      { key: 'd', name: 'Signatures', type: 'Signature' as const, req: false, pic: false, lock: false },
+    ] },
+    { id: 't2', name: 'Quick brief', version: 1, rules: { sign: false, pic: false, picAll: false, project: true, file: false, lock: false }, fields: [
+      { key: 'e', name: 'Project', type: 'Project link' as const, req: false, pic: false, lock: true },
+      { key: 'f', name: 'Attendees', type: 'People' as const, req: false, pic: false, lock: true },
+      { key: 'g', name: 'Points', type: 'Long text' as const, req: true, pic: false, lock: false },
+    ] },
+  ]
+  const openNew = (minutesPicks = PICKS, p: ProductPick[] | null = null) =>
+    render(<NewProject today="2026-10-24" me="s1" subs={subs} people={[MEI]} approvers={[]} holidays={[]} firstSub="sub-car" products={p}
+      minutesPicks={minutesPicks} team={TEAM} />)
+  const oneStage = () => {
+    for (const name of [/Publish/, /Redesign/]) {
+      fireEvent.click(screen.getAllByRole('button', { name }).find(b => b.getAttribute('tabindex') === '0')!)
+      fireEvent.click(screen.getByRole('button', { name: 'Remove stage' }))
+    }
+  }
+  const create = () => screen.getByRole('button', { name: 'Create task & open →' })
+
+  it('Use meeting minutes: the first template picked, its fields to fill in, the attendees starting as whoever starts it', () => {
+    openNew()
+    expect(screen.queryByRole('radiogroup', { name: 'Meeting minutes' })).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    expect(screen.getByRole('radio', { name: /Kickoff/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText('v2 · 4 fields')).toBeTruthy()
+    const box = screen.getByLabelText('Kickoff minutes')
+    expect(box.textContent).toContain('Agenda')
+    expect(box.textContent).toContain('TSK-CAR-… · This task')
+    expect(screen.getByRole('button', { name: 'Remove Mei' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText(/What to change, where/)).toBeNull()
+  })
+
+  it('made only once its required fields are filled in — the minutes sent, nothing written beside them', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Raya push' } })
+    fireEvent.change(screen.getByPlaceholderText(/What to change, where/), { target: { value: 'Written first' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    expect(screen.getByText('Agenda is empty')).toBeTruthy()
+    expect(create()).toHaveProperty('disabled', true)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Agenda' }), { target: { value: 'Raya visuals' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Meeting notes' }), { target: { value: 'Ali sends drafts' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign' }))
+    expect(create()).toHaveProperty('disabled', false)
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/t9'))
+    expect(actions.createMktTask.mock.calls[0][0]).toMatchObject({
+      title: 'Raya push', brief: '',
+      minutes: { template: 't1', vals: { Attendees: ['s1'], Agenda: 'Raya visuals' }, notes: 'Ali sends drafts', sign: true },
+    })
+  })
+
+  it('another template picked: its own fields — what the first held never sent; back to Write it here, no minutes', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Agenda' }), { target: { value: 'Old' } })
+    fireEvent.click(screen.getByRole('radio', { name: /Quick brief/ }))
+    expect(screen.getByText('Points is empty')).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Points' }), { target: { value: 'New price' } })
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
+    expect(actions.createMktTask.mock.calls[0][0].minutes).toEqual({ template: 't2', vals: { Attendees: ['s1'], Points: 'New price' }, notes: '', sign: false })
+  })
+
+  it('back to Write it here: what is written is sent, no minutes', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Write it here' }))
+    fireEvent.change(screen.getByPlaceholderText(/What to change, where/), { target: { value: 'New price' } })
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
+    expect(actions.createMktTask.mock.calls[0][0]).toMatchObject({ brief: 'New price', minutes: null })
+  })
+
+  it('none published: said — the manager pointed to the Minutes Builder — and nothing is made', () => {
+    openNew([])
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    expect(screen.getByText('No meeting minutes published')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Minutes Builder →' })).toBeNull()
+    expect(screen.getByText('Add a task title')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    expect(screen.getByText('Pick the meeting minutes')).toBeTruthy()
+    cleanup()
+    openNew([], [])
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    expect(screen.getByRole('link', { name: 'Minutes Builder →' }).getAttribute('href')).toBe('/marketing/minutes')
+  })
+
+  it('kept in the draft as typed — picking a template alone keeps nothing', async () => {
+    openNew()
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    await new Promise(r => setTimeout(r, 900))
+    expect(actions.saveMktDraft).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Agenda' }), { target: { value: 'Raya visuals' } })
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.saveMktDraft.mock.calls[0][2]).toMatchObject({ req: 'minutes', minutes: { template: 't1', vals: { Attendees: ['s1'], Agenda: 'Raya visuals' } } })
+  })
+
+  it('a draft written with minutes opens with them', () => {
+    render(<NewProject today="2026-10-24" me="s1" subs={subs} people={[MEI]} approvers={[]} holidays={[]} firstSub="sub-car" products={null}
+      minutesPicks={PICKS} team={TEAM}
+      draft={{ id: 'd9', rev: 1, at: '', data: { v: 1, title: 'Raya', req: 'minutes', minutes: { template: 't2', vals: { Attendees: ['s2'], Points: 'Kept' }, notes: '', sign: false } } }} />)
+    expect(screen.getByRole('radio', { name: /Quick brief/ }).getAttribute('aria-checked')).toBe('true')
+    expect((screen.getByRole('textbox', { name: 'Points' }) as HTMLTextAreaElement).value).toBe('Kept')
+    expect(screen.getByRole('button', { name: 'Remove Ali' })).toBeTruthy()
   })
 })

@@ -1,5 +1,5 @@
 import { mayActOn, requireActionOn, requirePage } from '@/lib/auth'
-import { readBoard, readNewDraft, readNewDrafts, readProductPicks, readTask } from '@/lib/marketing/server'
+import { readBoard, readMinutesPicks, readNewDraft, readNewDrafts, readProductPicks, readTask } from '@/lib/marketing/server'
 import { newProjectKey, opensFrom } from '@/lib/marketing/task'
 import { builderPeople } from '@/lib/marketing/tasks'
 import NewProject from '@/components/mkt/newproject/NewProject'
@@ -10,17 +10,19 @@ export const dynamic = 'force-dynamic'
  * manager adds Marketing's own clients here too (?add=1 opens the form — the sidebar's + Add subsidiary). Opened from
  * another project (?from=<Track ID> — ④-4c, the user's answer 23): it keeps that one as where it came from, for its
  * subsidiary unless another is picked. Kept as a draft while it is typed (mig 20261025211000): the viewer's drafts listed,
- * one opened by ?draft=<id>. */
+ * one opened by ?draft=<id>. A task may be written with meeting minutes (②a-3): the templates published offered. */
 export default async function MarketingNewPage({ searchParams }: { searchParams: Promise<{ sub?: string; add?: string; from?: string; draft?: string }> }) {
   await requirePage('/marketing/new')
   await requireActionOn('/marketing/new', 'marketing', 'create')
   const sp = await searchParams
-  const [board, manages, source, drafts, draft] = await Promise.all([
+  const [board, manages, source, drafts, draft, minutesPicks] = await Promise.all([
     readBoard(),
     mayActOn('/marketing/new', 'marketing', 'manage'),
     sp.from ? readTask(sp.from) : null,
     readNewDrafts(),
     sp.draft ? readNewDraft(sp.draft) : null,
+    // The meeting minutes a task may be written with (②a-3).
+    readMinutesPicks(),
   ])
   // The products on sale, for whoever may start a product project.
   const products = manages ? await readProductPicks() : null
@@ -47,6 +49,8 @@ export default async function MarketingNewPage({ searchParams }: { searchParams:
       from={from ? { id: from.id, trackId: from.trackId, title: from.title } : null}
       drafts={drafts}
       draft={draft}
+      minutesPicks={minutesPicks}
+      team={board.team}
     />
   )
 }

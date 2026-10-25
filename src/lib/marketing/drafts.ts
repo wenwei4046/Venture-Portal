@@ -1,5 +1,6 @@
 import { trailTime } from './task'
 import { ruleFromRow, type RecurRule } from './recur'
+import { newMinutesFromDraft, type NewMinutes } from './task-minutes'
 import { formFromRow, stageKey, stagesPayload, TASK_TYPES, type DraftStage, type TaskType } from './tasks'
 
 // New Project kept as a draft while it is typed (mig 20261025211000 — 2026-10-25, the user: "New Project 一有输入就会自动进
@@ -19,7 +20,11 @@ export interface NewForm {
   amounts: Record<string, number | null>
   title: string
   type: TaskType
+  /** What needs to be done: written here, or meeting minutes (②a-3). */
+  req: 'write' | 'minutes'
   brief: string
+  /** The meeting minutes as typed (②a-3), when it uses them. */
+  minutes: NewMinutes
   rule: RecurRule
   stages: DraftStage[]
   /** The project it is opened from (④-4c), none for none. */
@@ -116,7 +121,9 @@ export function formFromDraft(data: unknown, blank: NewForm): NewForm {
     amounts,
     title: str(data.title).slice(0, 140),
     type: TASK_TYPES.find(t => t.key === data.type)?.key ?? blank.type,
+    req: data.req === 'minutes' || data.req === 'write' ? data.req : blank.req,
     brief: str(data.brief).slice(0, 4000),
+    minutes: isObj(data.minutes) ? newMinutesFromDraft(data.minutes) : blank.minutes,
     rule: ruleFromRow(data.rule) ?? blank.rule,
     stages: stagesOf(data.stages) ?? blank.stages,
     source: src,

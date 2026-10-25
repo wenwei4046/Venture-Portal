@@ -140,7 +140,8 @@ function valueFromRow(v: unknown): MinutesValue | null {
   return null
 }
 
-function minutesFromRow(m: Record<string, unknown>): MinutesDoc {
+/** One minutes as the readers give them (mkt_product_project, mkt_project — ②a-3). */
+export function minutesFromRow(m: Record<string, unknown>): MinutesDoc {
   const t = isObj(m.template) ? m.template : {}
   const vals: Record<string, MinutesValue> = {}
   if (isObj(m.vals)) for (const [k, x] of Object.entries(m.vals)) {

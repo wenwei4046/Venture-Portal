@@ -10,7 +10,8 @@ const STAGES = [
   { key: 'b', name: 'Publish', dept: '', who: null, sla: 2, appr: ['s9'], back: 0, form: [] },
 ]
 const BLANK: NewForm = {
-  sub: 'sub-car', mode: 'task', product: 'pr-a', amounts: {}, title: '', type: 'social', brief: '', rule: defaultRule('2026-10-25'),
+  sub: 'sub-car', mode: 'task', product: 'pr-a', amounts: {}, title: '', type: 'social', req: 'write', brief: '',
+  minutes: { template: '', vals: {}, notes: '', sign: false }, rule: defaultRule('2026-10-25'),
   stages: STAGES, source: null,
 }
 

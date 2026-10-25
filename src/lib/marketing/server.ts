@@ -16,6 +16,7 @@ import { productPicksFromRow, productProjectFromRow, type ProductPick, type Prod
 import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
 import { lobbyFromRow, petStatsFromRow, spaceFromRow, visitFromRow, type LobbyPet, type PetStats, type Space, type Visit } from './space'
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
+import { minutesPicksFromRow, type MinutesPick } from './task-minutes'
 import { taskFromRow, type MktTaskPage } from './task'
 import { workflowsFromRow, type WfTemplate } from './workflows'
 
@@ -87,6 +88,15 @@ export async function readProductPicks(): Promise<ProductPick[]> {
   const { data, error } = await db.rpc('mkt_product_picker')
   if (error) throw new Error(error.message)
   return productPicksFromRow(data)
+}
+
+/** New Project's meeting minutes (②a-3, mig 20261025221000): the templates published, each at its last version —
+ * Marketing · Create. */
+export async function readMinutesPicks(): Promise<MinutesPick[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_picker')
+  if (error) throw new Error(error.message)
+  return minutesPicksFromRow(data)
 }
 
 /** The viewer's New Project drafts, newest first, without their forms (mig 20261025211000) — Marketing · Create. */
