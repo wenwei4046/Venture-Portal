@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ArenaPerson, ArenaScore, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
-import { boardModel, chaseLine, fairTallies, hubModel, recordModel, type ArenaInput, type BoardRow } from "./arena-model";
+import { arenaLead, boardModel, chaseLine, fairTallies, hubModel, recordModel, type ArenaInput, type BoardRow } from "./arena-model";
 
 const score = (s: Partial<ArenaScore> = {}): ArenaScore => ({ sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, ...s });
 const person = (id: string, name: string, total: Partial<ArenaScore>, self = false, brands: Record<string, Partial<ArenaScore>> = {}): ArenaPerson => ({
@@ -152,6 +152,18 @@ describe("a Revenue Director reads the boards (2026-10-14: on none of them)", ()
     const empty = snapshot(theirs.map(p => ({ ...p, sales: 0, marginRevenue: 0, marginCost: 0 })), { selfId: "peter" });
     const card = hubModel(director({ snapshot: empty })).cards.find(c => c.board === "sales")!;
     expect([card.state, card.value, card.leader]).toEqual(["lead", "—", undefined]);
+  });
+  // 2026-10-26 — the user, of Today's cards: "跟 Arena 的 Hero Card 是一样的": Today reads who leads through arenaLead.
+  it("arenaLead names who leads and their figure exactly as the hub's cards", () => {
+    const standings = [{ id: "y", name: "YAP", total: 72, position: 1, months: 1, parts: {} as never }];
+    const hub = hubModel(director({ standings }));
+    for (const board of ["sales", "margin", "kpi", "champ"] as const) {
+      const card = hub.cards.find(c => c.board === board)!;
+      const lead = arenaLead(board, theirs, standings);
+      expect([lead?.name, lead?.value ?? "—"]).toEqual([card.leader, card.value]);
+    }
+    expect(arenaLead("sales", theirs, null)).toEqual({ name: "XAVIER LIM", value: "RM 800" });
+    expect(arenaLead("champ", theirs, null)).toBeNull();
   });
   it("Championship's board adds up nobody's own points", () => {
     const standings = [{ id: "x", name: "XAVIER LIM", total: 60, position: 1, months: 1, parts: {} as never }];

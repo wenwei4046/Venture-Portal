@@ -75,7 +75,8 @@ function source() {
   } satisfies RevenueSource;
 }
 
-// Today's Sales and Margin cards as they read (2026-10-25, the user: "就放第一名是谁就好了" — who is first, the name alone).
+// Today's Sales and Margin cards as they read (2026-10-25/26, the user: "就放第一名是谁就好了"; "跟 Arena 的 Hero Card 是一样的")
+// — who is first, their figure over the name.
 const firsts = () => within(screen.getByRole("heading", { name: "Your Arena" }).closest("section")!)
   .getAllByRole("button").map(b => b.textContent).filter(t => t !== "All boards").slice(0, 2);
 
@@ -106,7 +107,7 @@ describe("a Revenue Director's app", () => {
     expect(screen.getAllByText("All of Fair")).toHaveLength(3);
     expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
     // Sales (ANNA RM 120k, BEN RM 90k) and Margin (BEN 44.4%, ANNA 40.0%): who is first; a director is on no board.
-    expect(firsts()).toEqual(["SalesANNA", "MarginBEN"]);
+    expect(firsts()).toEqual(["SalesRM 120,000ANNA", "Margin44.4%BEN"]);
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
   });
@@ -168,7 +169,7 @@ describe("the Principal's View as of a Revenue Director", () => {
     expect(live.insight).toHaveBeenCalledWith("2026-10", { staffId: "peter", subDepartmentId: "fair" });
     expect(screen.getAllByText("All of Fair")).toHaveLength(3);
     expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
-    expect(firsts()).toEqual(["SalesANNA", "MarginBEN"]);
+    expect(firsts()).toEqual(["SalesRM 120,000ANNA", "Margin44.4%BEN"]);
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
   });

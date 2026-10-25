@@ -121,11 +121,12 @@ describe("the Principal's own app, viewing nobody", () => {
     expect(screen.getByText("39.9%")).toBeInTheDocument();
     // KPI has not started: it says so.
     expect(screen.getAllByText("Not counted").length).toBeGreaterThan(0);
-    // The cards (2026-10-25, the user: "就放第一名是谁就好了不需要放第一、第二、第三"): who is first, the name alone —
-    // Championship the most points ("championship i want is show 1st in championship point"): LUCAS, 93.92 pts.
+    // The cards (2026-10-25, the user: "就放第一名是谁就好了不需要放第一、第二、第三"): who is first — Championship the most
+    // points ("championship i want is show 1st in championship point"): LUCAS, 93.92 pts — with their figure over the name,
+    // as the Arena's cards (2026-10-26: "跟 Arena 的 Hero Card 是一样的").
     const arenaCards = screen.getByRole("heading", { name: "Your Arena" }).closest("section")!;
     const cards = within(arenaCards).getAllByRole("button").map(b => b.textContent).filter(t => t !== "All boards");
-    expect(cards).toEqual(["SalesLUCAS", expect.stringMatching(/^Margin/), "KPINot counted", "ChampionshipLUCAS"]);
+    expect(cards).toEqual(["SalesRM 144,064LUCAS", expect.stringMatching(/^Margin40\.0%/), "KPINot counted", "Championship93.92 ptsLUCAS"]);
     expect(arenaCards.querySelector("ol")).toBeNull();
     expect(document.querySelector("[aria-busy='true']")).toBeNull();
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
