@@ -52,7 +52,9 @@ export default function AdsReport({ project, title, initial, edit, say }: {
       <div className={s.head}>
         <span aria-hidden="true">📈</span>
         <span className={s.title}>Ads report</span>
-        <span className={s.every}>{EVERY_WORDS[setup.every]}</span>
+        <span className={s.every}>
+          {EVERY_WORDS[setup.every]}{setup.lastNo ? ` · ${setup.lastNo} report${setup.lastNo === 1 ? '' : 's'}` : ''}
+        </span>
         <span className={s.grow} />
         {edit ? <button type="button" className={s.edit} onClick={() => setSetting(true)} aria-label="Change the Ads report">Edit</button> : null}
       </div>

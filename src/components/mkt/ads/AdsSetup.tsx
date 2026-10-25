@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { readMktAdsChoices, saveMktAds } from '@/lib/marketing/actions'
 import {
-  ADS_EVERY, ADS_FIGURES, adsPatch, draftOf, draftProblems, EVERY_WORDS, type AdsChoice, type AdsDraft, type AdsEvery, type AdsKey, type AdsPage,
+  ADS_EVERY, ADS_FIGURES, adsPatch, draftOf, draftProblems, EVERY_WORDS, lastChoices, type AdsChoice, type AdsDraft, type AdsEvery, type AdsKey, type AdsPage,
 } from '@/lib/marketing/ads'
 import p from '../project/project.module.css'
 import t from '../task/task.module.css'
@@ -12,7 +12,8 @@ import s from './ads.module.css'
 // An Ads report set up or changed (2026-10-25 — the user: each Ads project picks its own CRM ads; how often "可以自己set";
 // which figures "可以自己set 要加哪一个"): the CRM's ads to tick (its name, Page, Meta's status, leads so far; a search),
 // how often from which day (both stay once a report is out), the figures in the order ticked, the targets the figures
-// are read against. Save sends only what changed.
+// are read against; its last report (⑤-3c — none: it reports on; never one before a report already out). Save sends only
+// what changed.
 
 const TARGETS: { key: keyof AdsDraft['targets']; label: string; hint: string }[] = [
   { key: 'budget', label: 'Budget (RM)', hint: '6000' },
@@ -33,8 +34,10 @@ export default function AdsSetup({ project, page, onSaved, onClose }: {
   const [find, setFind] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
-  // A report is out: how often and from when stay as they are.
+  // A report is out: how often and from when stay as they are, and its last report is that one or later.
   const out = page.reports.length > 0
+  const newest = Math.max(0, ...page.reports.map(r => r.no))
+  const lasts = useMemo(() => lastChoices(now.every, now.startsOn, Math.max(newest, now.lastNo ?? 0)), [now.every, now.startsOn, now.lastNo, newest])
 
   useEffect(() => {
     let live = true
@@ -90,7 +93,7 @@ export default function AdsSetup({ project, page, onSaved, onClose }: {
             )) : <div className={s.none}>No ads</div>}
           </div>
 
-          <div className={s.grid2}>
+          <div className={s.grid3}>
             <label className={p.dialogField}>
               <span className={p.dialogLabel}>How often</span>
               <select className={p.input} value={now.every} disabled={out} onChange={e => { setError(null); setNow(d => ({ ...d, every: e.target.value as AdsEvery })) }}>
@@ -101,6 +104,14 @@ export default function AdsSetup({ project, page, onSaved, onClose }: {
               <span className={p.dialogLabel}>First report from</span>
               <input className={p.input} type="date" value={now.startsOn} disabled={out} min="2020-01-01" max="2100-12-31"
                 onChange={e => { setError(null); setNow(d => ({ ...d, startsOn: e.target.value })) }} />
+            </label>
+            <label className={p.dialogField}>
+              <span className={p.dialogLabel}>Last report</span>
+              <select className={p.input} value={now.lastNo ?? ''}
+                onChange={e => { setError(null); setNow(d => ({ ...d, lastNo: e.target.value ? Number(e.target.value) : null })) }}>
+                <option value="">No end</option>
+                {lasts.map(c => <option key={c.no} value={c.no} disabled={c.no < newest}>{c.label}</option>)}
+              </select>
             </label>
           </div>
 

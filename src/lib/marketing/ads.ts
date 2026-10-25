@@ -5,8 +5,7 @@
 // conversations), over a report's days; the figures built from them; a report's periods by its cadence; each figure as
 // the PIC reads it, against its target. Pure.
 
-import { addDays, shortDay } from './board'
-import { addMonths } from './calendar'
+import { addDays, addMonths, shortDay } from './board'
 
 // ── The cadence and the periods ───────────────────────────────────────────────────────────────────────────────
 
@@ -37,15 +36,44 @@ export function adsPeriod(every: AdsEvery, startsOn: string, no: number): AdsPer
   return { no, from: periodStart(every, startsOn, no), until: addDays(periodStart(every, startsOn, no + 1), -1) }
 }
 
-/** Its periods from the first to the one today is in (none before its first day) — the newest first, at most `max`. */
-export function adsPeriods(every: AdsEvery, startsOn: string, today: string, max = 60): AdsPeriod[] {
+/** Its periods from the first to the one today is in (none before its first day, none after its last report) — the
+ * newest first, at most `max`. */
+export function adsPeriods(every: AdsEvery, startsOn: string, today: string, max = 60, lastNo: number | null = null): AdsPeriod[] {
   const out: AdsPeriod[] = []
-  for (let no = 1; no <= 500; no++) {
+  for (let no = 1; no <= Math.min(lastNo ?? 500, 1000); no++) {
     const p = adsPeriod(every, startsOn, no)
     if (p.from > today) break
     out.push(p)
   }
   return out.reverse().slice(0, max)
+}
+
+/** A period's Report day: the day after its last (the handoff's PIC Link — *20 Oct – 2 Nov*, *Next report 3 Nov*). */
+export const reportDay = (p: Pick<AdsPeriod, 'until'>) => addDays(p.until, 1)
+
+/** Its Report days, the first first — to its last report, else to a year after today. */
+export function reportDays(every: AdsEvery, startsOn: string, lastNo: number | null, today: string): (AdsPeriod & { day: string })[] {
+  const horizon = addDays(today, 366)
+  const out: (AdsPeriod & { day: string })[] = []
+  for (let no = 1; no <= Math.min(lastNo ?? 1000, 1000); no++) {
+    const p = adsPeriod(every, startsOn, no)
+    const day = reportDay(p)
+    if (day > horizon) break
+    out.push({ ...p, day })
+  }
+  return out
+}
+
+/** A year of its periods to pick the last report from — "#3 · 17 – 30 Nov", the year where it is not the first's — and
+ * as far as `atLeast`. */
+export function lastChoices(every: AdsEvery, startsOn: string, atLeast = 0): { no: number; label: string }[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startsOn)) return []
+  const n = Math.min(Math.max({ '1w': 52, '2w': 26, '4w': 13, '1m': 12 }[every], atLeast), 1000)
+  return Array.from({ length: n }, (_, i) => {
+    const p = adsPeriod(every, startsOn, i + 1)
+    const year = p.until.slice(0, 4) !== startsOn.slice(0, 4) && p.from.slice(0, 4) === p.until.slice(0, 4) ? ` ${p.until.slice(0, 4)}` : ''
+    return { no: p.no, label: `#${p.no} · ${reportRange(p)}${year}` }
+  })
 }
 
 /** "6 – 19 Oct", "27 Oct – 9 Nov", "29 Dec 2026 – 11 Jan 2027". */
@@ -230,6 +258,8 @@ export interface AdsSetup {
   startsOn: string
   figures: AdsKey[]
   targets: AdsTargets
+  /** Its last report's number (⑤-3c) — null: it reports on. */
+  lastNo: number | null
 }
 
 export interface AdsReport {
@@ -268,7 +298,14 @@ export function setupFromRow(v: unknown): AdsSetup | null {
   return {
     ads: (Array.isArray(v.ads) ? v.ads : []).filter((a): a is string => typeof a === 'string' && /^\d{5,32}$/.test(a)),
     every: v.every, startsOn: v.startsOn, figures: figures.length ? figures : [...ADS_DEFAULT], targets: targetsFromRow(v.targets),
+    lastNo: lastNoOf(v.lastNo) ?? null,
   }
+}
+
+/** A last report's number: 1 to 1000 — null for none, undefined for one that is not. */
+function lastNoOf(v: unknown): number | null | undefined {
+  if (v === null || v === undefined) return null
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 1000 ? v : undefined
 }
 
 export function reportsFromRow(v: unknown): AdsReport[] {
@@ -309,10 +346,10 @@ export interface AdsRow extends AdsPeriod {
   due: boolean
 }
 
-/** Its periods to today, the newest first — each with its report, or due once over. */
+/** Its periods to today (to its last report), the newest first — each with its report, or due once over. */
 export function adsRows(setup: AdsSetup, reports: readonly AdsReport[], today: string): AdsRow[] {
   const byNo = new Map(reports.map(r => [r.no, r]))
-  return adsPeriods(setup.every, setup.startsOn, today).map(p => {
+  return adsPeriods(setup.every, setup.startsOn, today, 60, setup.lastNo).map(p => {
     const report = byNo.get(p.no) ?? null
     return { ...p, report, due: !report && p.until < today }
   })
@@ -348,7 +385,7 @@ export function crmFromRow(v: unknown): AdsCrm | null {
 
 // ── Changing the setup; publishing ─────────────────────────────────────────────────────────────────────────────────
 
-export type AdsPatch = Partial<{ ads: string[]; every: AdsEvery; startsOn: string; figures: AdsKey[]; targets: Partial<AdsTargets> }>
+export type AdsPatch = Partial<{ ads: string[]; every: AdsEvery; startsOn: string; figures: AdsKey[]; targets: Partial<AdsTargets>; lastNo: number | null }>
 
 export interface AdsDraft {
   ads: string[]
@@ -357,6 +394,7 @@ export interface AdsDraft {
   figures: AdsKey[]
   /** As typed: '' for none. */
   targets: Record<keyof AdsTargets, string>
+  lastNo: number | null
 }
 
 const targetText = (n: number | null) => (n == null ? '' : String(n))
@@ -369,6 +407,7 @@ export const draftOf = (s: AdsSetup | null, today: string): AdsDraft => ({
     budget: targetText(s?.targets.budget ?? null), cpl: targetText(s?.targets.cpl ?? null),
     roas: targetText(s?.targets.roas ?? null), apptRate: targetText(s?.targets.apptRate ?? null),
   },
+  lastNo: s?.lastNo ?? null,
 })
 
 /** A typed target: a number from 0 (an appointment rate at most 100) — '' for none, undefined for one that is not. */
@@ -404,13 +443,14 @@ export function adsPatch(was: AdsSetup | null, d: AdsDraft): AdsPatch | null {
     if (!was || t !== was.targets[k]) targets[k] = t
   }
   const ads = [...new Set(d.ads)].sort()
-  if (!was) return { ads, every: d.every, startsOn: d.startsOn, figures: [...d.figures], targets }
+  if (!was) return { ads, every: d.every, startsOn: d.startsOn, figures: [...d.figures], targets, ...(d.lastNo != null ? { lastNo: d.lastNo } : {}) }
   const out: AdsPatch = {}
   if (!sameList(ads, [...was.ads].sort())) out.ads = ads
   if (d.every !== was.every) out.every = d.every
   if (d.startsOn !== was.startsOn) out.startsOn = d.startsOn
   if (!sameList(d.figures, was.figures)) out.figures = [...d.figures]
   if (Object.keys(targets).length) out.targets = targets
+  if (d.lastNo !== was.lastNo) out.lastNo = d.lastNo
   return Object.keys(out).length ? out : null
 }
 
@@ -429,6 +469,10 @@ export function adsPatchOf(v: unknown): AdsPatch | null {
       if (x === null || (typeof x === 'number' && Number.isFinite(x))) t[k] = x
     }
     out.targets = t
+  }
+  if ('lastNo' in v) {
+    const last = lastNoOf(v.lastNo)
+    if (last !== undefined) out.lastNo = last
   }
   return Object.keys(out).length ? out : null
 }
@@ -470,7 +514,7 @@ export function adsValuesOf(v: unknown): AdsValues | null {
 // ── Its lines on the project's trail ───────────────────────────────────────────────────────────────────────────────
 
 const CHANGED_WORDS: Readonly<Record<string, string>> = {
-  ads: 'its ads', every: 'how often', startsOn: 'its first day', figures: 'its figures', targets: 'its targets',
+  ads: 'its ads', every: 'how often', startsOn: 'its first day', figures: 'its figures', targets: 'its targets', lastNo: 'its last report',
 }
 
 /** An Ads report's line on the project's trail (mkt_ads_save, mkt_ads_publish) — null for any other line. */
