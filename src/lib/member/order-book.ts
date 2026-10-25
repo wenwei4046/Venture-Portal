@@ -66,6 +66,11 @@ export interface MemberBookOrder {
    * Null when nobody shares it. `revenue` and the lines' `kpiQty` are already the reader's part; `total` is the bill's.
    */
   share: MemberBookShare | null;
+  /**
+   * Whose bill it is — the salesperson the ERP put on it — on a whole sub-department's book only (the Principal viewing
+   * nobody, 2026-10-25), where every bill is whole (`revenue` the bill's, never a part). Null: the ERP named nobody.
+   */
+  seller?: { id: string; name: string } | null;
 }
 
 export interface MemberBookShare {
@@ -168,7 +173,14 @@ function readOrder(value: unknown): MemberBookOrder | null {
     lines,
     own: value.own !== false,
     share: readShare(value.share),
+    ...("seller" in value ? { seller: readSeller(value.seller) } : {}),
   };
+}
+
+function readSeller(value: unknown): { id: string; name: string } | null {
+  if (!isObject(value)) return null;
+  const id = text(value.id);
+  return id ? { id, name: text(value.name) ?? "" } : null;
 }
 
 /** Validate and project `member_order_book`; null when its shape is not the one this app reads. */
@@ -240,4 +252,52 @@ export function readInsightRange(value: unknown): MemberInsightRange | null {
     downline.push({ ...score, name: text(row.name) ?? "", title: text(row.title) ?? "", uplineId: text(row.uplineId), depth });
   }
   return { from, through, asOf, me: { ...meScore, name: text(value.me.name) ?? "" }, downline };
+}
+
+/**
+ * The Principal viewing nobody (2026-10-25, mig 20261026014700 — `member_principal_department_insight`): a window's
+ * every bill summed (`team` — the directors' own and a bill the ERP named nobody for included, as a Revenue
+ * Director's "All of Fair"), everybody who sits there or wrote a bill with their own figures, and whether KPI counts.
+ * Sales and margin only, as Insight's.
+ */
+export interface DepartmentInsight {
+  membershipId: string;
+  schemeId: string;
+  department: string;
+  from: string;
+  through: string;
+  asOf: string;
+  /** The window holds the current month: the figures are still moving. */
+  live: boolean;
+  team: Omit<MemberScore, "staffId" | "lastOrder">;
+  /** Everybody, by sales. */
+  people: MemberDownlineRow[];
+  /** `threshold`: a PERSON's first rung, never the sub-department's. */
+  kpi: { enabled: boolean; threshold: number | null };
+}
+
+/** Validate and project `member_principal_department_insight`; null when its shape is not the one this app reads. */
+export function readDepartmentInsight(value: unknown): DepartmentInsight | null {
+  if (!isObject(value) || !Array.isArray(value.people) || !isObject(value.team) || !isObject(value.kpi)) return null;
+  const membershipId = text(value.membershipId);
+  const schemeId = text(value.schemeId);
+  const from = text(value.from);
+  const through = text(value.through);
+  const asOf = text(value.asOf);
+  if (!membershipId || !schemeId || !from || !MONTH.test(from) || !through || !MONTH.test(through) || !asOf) return null;
+  const team = readScore({ ...value.team, staffId: membershipId });
+  if (!team || typeof value.kpi.enabled !== "boolean") return null;
+  const people: MemberDownlineRow[] = [];
+  for (const row of value.people) {
+    const score = readScore(row);
+    if (!score || !isObject(row)) return null;
+    people.push({ ...score, name: text(row.name) ?? "", title: text(row.title) ?? "", uplineId: text(row.uplineId), depth: num(row.depth) ?? 1 });
+  }
+  return {
+    membershipId, schemeId, department: text(value.department) ?? "", from, through, asOf, live: value.live === true,
+    team: { sales: team.sales, held: team.held, orders: team.orders, kpiQty: team.kpiQty, marginRevenue: team.marginRevenue,
+      marginCost: team.marginCost, blindOrders: team.blindOrders },
+    people,
+    kpi: { enabled: value.kpi.enabled, threshold: value.kpi.enabled ? num(value.kpi.threshold) : null },
+  };
 }

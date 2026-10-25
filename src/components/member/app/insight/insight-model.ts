@@ -3,7 +3,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { holdersLine, pctLabel } from "@/lib/member/share-requests";
-import { dayRange, initials, monthName, rm, shortDay } from "../format";
+import { dayRange, firstName, initials, monthName, rm, shortDay } from "../format";
 import { barPos, brandLadder, pctText, rowFor, TONES, type Ladder, type LadderRow, type Tone } from "./ladder";
 import type { InsightPeriod } from "./period";
 
@@ -47,6 +47,14 @@ export interface InsightInput {
   bands: MemberBand[];
   name: string;
   title: string;
+  /**
+   * The Principal viewing nobody (2026-10-25 — "直接 show 全部人的单"): the WHOLE sub-department, by its name. The bills
+   * are everybody's, each naming its salesperson; the team is everybody, with no "you"; nothing is measured against a
+   * person's threshold or tier.
+   */
+  whole?: string;
+  /** …and whom a tap on the team opens (View as, read-only): everybody the Principal may view there. */
+  canView?: ReadonlySet<string>;
 }
 
 // ── shared derivations ─────────────────────────────────────────────────────
@@ -115,7 +123,8 @@ const stillDue = (o: MemberBookOrder) => Math.max(0, (o.depositNeeded ?? 0) - o.
 // ── Insight › main ─────────────────────────────────────────────────────────
 export interface InsightCardVM { right: string; rightAccent: boolean; amount: string; bar: number | null; sub: string }
 export interface BrandRowVM { code: string; name: string; sub: string; pct: string; pill: string; tone: Tone }
-export interface TeamRowVM { id: string; ini: string; name: string; title: string; sales: string; meta: string; mine: boolean }
+/** `open`: a tap views them (the Principal's whole sub-department, 2026-10-25). */
+export interface TeamRowVM { id: string; ini: string; name: string; title: string; sales: string; meta: string; mine: boolean; open?: boolean }
 export interface InsightMainVM {
   personal: {
     sales: InsightCardVM;
@@ -230,19 +239,22 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const overall = blend(done);
 
   // KPI card
+  const whole = input.whole;
   const kpiEnabled = kpiOn(input);
   const kpiTotal = monthly && input.kpi ? input.kpi.total : done.reduce((s, o) => s + o.kpiQty, 0);
   const threshold = monthly ? input.kpi?.threshold ?? null : null;
   let kpiCard: InsightMainVM["personal"]["kpi"];
   if (!kpiEnabled) kpiCard = { value: "—", pill: "Not counted", pillTone: "none", sub: "KPI is off this month" };
+  // Everybody's KPI items (2026-10-25 — "显示大家的 KPI 都卖了几个"): a threshold is a person's, never the whole's.
+  else if (whole) kpiCard = { value: String(kpiTotal), pill: `All of ${whole}`, pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
   else if (threshold !== null) {
     kpiCard = kpiTotal >= threshold
       ? { value: String(kpiTotal), pill: `Hit · ${threshold} needed`, pillTone: "good", sub: kpiTopItems(book, input.kpi) }
       : { value: String(kpiTotal), pill: `${threshold - kpiTotal} to go · ${threshold} needed`, pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
   } else kpiCard = { value: String(kpiTotal), pill: monthly ? "No threshold" : "Sum of months", pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
 
-  // Team
-  const team = [input.me ? { ...input.me, name: input.name, title: input.title, mine: true } : null, ...input.downline.map(d => ({ ...d, mine: false }))]
+  // Team — the whole sub-department's is everybody, and nobody is "you".
+  const team = [input.me && !whole ? { ...input.me, name: input.name, title: input.title, mine: true } : null, ...input.downline.map(d => ({ ...d, mine: false }))]
     .filter((r): r is NonNullable<typeof r> => r !== null);
   const teamSales = team.reduce((s, r) => s + r.sales, 0);
   const teamOrders = team.reduce((s, r) => s + r.orders, 0);
@@ -255,6 +267,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
     return {
       id: r.staffId || (r.mine ? "me" : r.name), ini: initials(r.name), name: r.mine ? `${r.name} (you)` : r.name, title: r.title,
       sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${r.kpiQty >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
+      ...(input.canView?.has(r.staffId) ? { open: true } : {}),
     };
   });
 
@@ -272,11 +285,13 @@ export function insightMain(input: InsightInput): InsightMainVM {
         const { pill, tone } = brandPill(b);
         return { code: b.code, name: brandName(b.code), sub: `${rm(b.goods)} goods · ${plural(b.orders, "order")}`, pct: b.margin === null ? "—" : `${b.margin.toFixed(1)}%`, pill, tone };
       }),
-      notice: heldNotice(stats),
+      // The margin incentive is a person's: nothing is held for a whole sub-department.
+      notice: whole ? null : heldNotice(stats),
     },
     team: {
       sales: salesCard(teamSales, monthly ? input.target?.group ?? null : null, `${plural(members, "person", "people")} · ${plural(teamOrders, "order")}`, "the", "team "),
-      members: { value: String(members), sub: members <= 1 ? "Just you" : `You + ${plural(members - 1, "downline")}` },
+      members: whole ? { value: String(members), sub: `Everybody in ${whole}` }
+        : { value: String(members), sub: members <= 1 ? "Just you" : `You + ${plural(members - 1, "downline")}` },
       kpiHit: !kpiEnabled ? { value: "—", sub: "KPI not counted" }
         : threshold === null ? { value: "—", sub: monthly ? "No threshold set" : "Month view only" }
         : { value: `${hits} of ${members}`, sub: members - hits ? `${members - hits} still pending` : "Everyone hit" },
@@ -368,14 +383,26 @@ function weekDates(group: Group, fair: MemberBookOrder | null): string {
   return plural(group.orders.length, "bill");
 }
 
+/** Whose bill it is, on a whole sub-department's book (2026-10-25). */
+const sellerOf = (o: MemberBookOrder) => (o.seller?.name ? firstName(o.seller.name) : "No salesperson");
+
+/** A week's booths — each brand at each fair — and its venues, for a whole sub-department's week (2026-10-25). */
+function boothsOf(orders: readonly MemberBookOrder[]): { booths: number; venues: string } {
+  const booths = new Set(orders.map(o => `${o.venue}|${o.booth ?? o.brand}`));
+  const venues = [...new Set(orders.map(o => o.venue).filter(Boolean))];
+  return { booths: booths.size, venues: venues.length > 2 ? `${venues.slice(0, 2).join(" · ")} +${venues.length - 2}` : venues.join(" · ") };
+}
+
 export function billsView(input: InsightInput): BillsVM {
-  const { book } = input;
+  const { book, whole } = input;
   const kpiEnabled = kpiOn(input);
   const ladders = new Map<string, Ladder>();
   const picks = book?.brandWeeks ?? {};
   const groups = billGroups(input);
   const weekOf = new Map<string, string>();
   for (const g of groups) for (const o of g.orders) weekOf.set(o.id, g.title);
+  // Everybody's bills: each names its salesperson first.
+  const who = (o: MemberBookOrder) => (whole ? `${sellerOf(o)} · ` : "");
 
   const row = (o: MemberBookOrder, sub: string): BillRowVM => {
     const band = billRow(o, ladders, input.bands);
@@ -388,7 +415,8 @@ export function billsView(input: InsightInput): BillsVM {
   const tabs: WeekTabVM[] = [];
   const weeks: Record<string, WeekCardVM> = {};
   for (const g of groups) {
-    const brand = g.key === EARLIER ? null : weekBrand(g, picks);
+    // A whole sub-department works every booth of a week: no one brand week is its.
+    const brand = g.key === EARLIER || whole ? null : weekBrand(g, picks);
     const colors = brand ? brandColors(brand) : NEUTRAL_BRAND;
     const fair = g.key === EARLIER ? null : weekFair(g, brand);
     const dates = weekDates(g, fair);
@@ -396,16 +424,21 @@ export function billsView(input: InsightInput): BillsVM {
     const wait = g.orders.length - done.length;
     const kpi = done.reduce((s, o) => s + o.kpiQty, 0);
     const monthly = input.period.kind === "monthly";
-    tabs.push({ key: g.key, title: g.title, brand: g.key === EARLIER ? "Carried in" : brand ? brandName(brand) : "No booth", dates: g.key === EARLIER ? plural(g.orders.length, "bill") : monthly ? dates : plural(g.orders.length, "bill"), ...colors });
+    const all = whole && g.key !== EARLIER ? boothsOf(g.orders) : null;
+    tabs.push({ key: g.key, title: g.title,
+      brand: g.key === EARLIER ? "Carried in" : all ? plural(all.booths, "booth") : brand ? brandName(brand) : "No booth",
+      dates: g.key === EARLIER ? plural(g.orders.length, "bill") : monthly ? dates : plural(g.orders.length, "bill"), ...colors });
     weeks[g.key] = {
-      brandWeek: g.key === EARLIER ? "From earlier months" : !monthly ? monthName(g.key) : brand ? `${brandName(brand)} week` : "No brand week",
+      brandWeek: g.key === EARLIER ? "From earlier months" : !monthly ? monthName(g.key) : all ? `All of ${whole}` : brand ? `${brandName(brand)} week` : "No brand week",
       total: rm(done.reduce((s, o) => s + o.revenue, 0)),
-      place: g.key === EARLIER ? "Bills written before this month, paying in it" : [fair?.venue || null, fair?.organiser ?? null].filter(Boolean).join(" · ") || "No fair",
+      place: g.key === EARLIER ? "Bills written before this month, paying in it"
+        : all ? [plural(all.booths, "booth"), all.venues || null].filter(Boolean).join(" · ")
+        : [fair?.venue || null, fair?.organiser ?? null].filter(Boolean).join(" · ") || "No fair",
       dates: g.key === EARLIER || !monthly ? `${plural(g.orders.length, "bill")}` : dates,
       stats: `${plural(done.length, "order")}${kpiEnabled ? ` · KPI ${kpi}` : ""}${wait ? ` · ${wait} waiting` : ""}`,
       tint: colors.tint,
       bills: [...g.orders].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number))
-        .map(o => row(o, `${o.customer || "Walk-in"} · ${plural(o.lines.length, "line")}`)),
+        .map(o => row(o, `${who(o)}${o.customer || "Walk-in"} · ${plural(o.lines.length, "line")}`)),
     };
   }
 
@@ -417,7 +450,7 @@ export function billsView(input: InsightInput): BillsVM {
     counted: { amount: rm(done.reduce((s, o) => s + o.revenue, 0)), sub: `${plural(done.length, "order")}${kpiEnabled ? ` · ${kpiSum} KPI items` : ""}` },
     waiting: { amount: rm(heldSum), sub: held.length ? `${plural(held.length, "order")} · not counted yet` : "Nothing waiting" },
     tabs, weeks,
-    waitBills: [...held].sort((a, b) => a.date.localeCompare(b.date)).map(o => row(o, `${o.customer || "Walk-in"} · ${weekOf.get(o.id) ?? "—"}${o.venue ? ` · ${o.venue}` : ""}`)),
+    waitBills: [...held].sort((a, b) => a.date.localeCompare(b.date)).map(o => row(o, `${who(o)}${o.customer || "Walk-in"} · ${weekOf.get(o.id) ?? "—"}${o.venue ? ` · ${o.venue}` : ""}`)),
     footnote: "Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.",
   };
 }
@@ -455,7 +488,8 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
   return {
     no: o.number,
     ref: o.ref,
-    cust: o.customer || "Walk-in",
+    // Everybody's bills (2026-10-25): whose it is, first.
+    cust: input.whole ? `${sellerOf(o)} · ${o.customer || "Walk-in"}` : o.customer || "Walk-in",
     where: [group?.title, o.venue || null].filter(Boolean).join(" · "),
     status: o.cleared ? "Deposit cleared" : due > 0 ? `Deposit due ${rm(due)}` : "Deposit due",
     statusTone: o.cleared ? "good" : "warn",
@@ -468,7 +502,9 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     own: o.own,
     share: o.share ? {
       line: holdersLine(o.share.holders),
-      sub: `${o.own ? "Your" : `${o.share.holders.find(h => h.owner)?.name ?? "Another salesperson"}’s bill · your`} part ${pctLabel(o.share.part)} · ${rm(o.revenue)} in your sales`,
+      // A whole sub-department's bill is whole: nobody's part is the reader's.
+      sub: input.whole ? `${rm(o.revenue)} in ${input.whole}’s sales`
+        : `${o.own ? "Your" : `${o.share.holders.find(h => h.owner)?.name ?? "Another salesperson"}’s bill · your`} part ${pctLabel(o.share.part)} · ${rm(o.revenue)} in your sales`,
     } : null,
   };
 }
@@ -494,7 +530,8 @@ export function kpiView(input: InsightInput, subName: string): KpiVM {
   const done = counted(input.book);
   const monthly = input.period.kind === "monthly";
   const total = monthly && input.kpi ? input.kpi.total : done.reduce((s, o) => s + o.kpiQty, 0);
-  const threshold = monthly ? input.kpi?.threshold ?? null : null;
+  // A threshold is a person's: a whole sub-department's items are only counted (2026-10-25).
+  const threshold = monthly && !input.whole ? input.kpi?.threshold ?? null : null;
   const byName = new Map<string, number>();
   for (const o of done) for (const l of o.lines) if (l.kpiQty > 0) byName.set(l.name, (byName.get(l.name) ?? 0) + l.kpiQty);
   const items = [...byName.entries()].sort((a, b) => b[1] - a[1]).map(([name, n], k) => ({ name, n, color: KPI_SHADES[k % KPI_SHADES.length] }));
@@ -504,23 +541,26 @@ export function kpiView(input: InsightInput, subName: string): KpiVM {
   return {
     enabled,
     total: enabled ? String(total) : "—",
-    pill: !enabled ? "Not counted" : threshold === null ? (monthly ? "No threshold" : "Sum of months") : total >= threshold ? "Threshold hit" : `${threshold - total} to go`,
+    pill: !enabled ? "Not counted" : input.whole ? `All of ${input.whole}` : threshold === null ? (monthly ? "No threshold" : "Sum of months") : total >= threshold ? "Threshold hit" : `${threshold - total} to go`,
     hit: enabled && threshold !== null && total >= threshold,
     fill: enabled ? Math.round((total / max) * 100) : 0,
     marker: enabled && threshold !== null ? Math.round((threshold / max) * 1000) / 10 : null,
-    need: !enabled ? `KPI pay is off for ${subName} this month` : threshold === null ? "No threshold this month" : `${threshold} needed for the threshold`,
+    need: !enabled ? `KPI pay is off for ${subName} this month` : input.whole ? `Every KPI item sold in ${input.whole}`
+      : threshold === null ? "No threshold this month" : `${threshold} needed for the threshold`,
     above: !enabled || threshold === null ? "" : total >= threshold ? `${total - threshold} above` : `${threshold - total} to go`,
     how: enabled && items.length ? {
-      title: `How you reached ${total}`,
+      title: `How ${input.whole ?? "you"} reached ${total}`,
       threshold: threshold === null ? "" : `Threshold ${threshold}`,
       thLeft: threshold === null || total <= 0 ? null : `${Math.min(100, (threshold / Math.max(total, threshold)) * 100).toFixed(1)}%`,
       items,
       total: `${total} items`,
     } : null,
     weeks: enabled ? groups.map((g, i) => {
-      const brand = monthly ? weekBrand(g, picks) : null;
+      // A whole sub-department's week is every booth's.
+      const brand = monthly && !input.whole ? weekBrand(g, picks) : null;
       const colors = brand ? brandColors(brand) : NEUTRAL_BRAND;
-      return { key: g.key, week: monthly ? (g.title.startsWith("Week ") ? `W${g.title.slice(5)}` : g.title) : g.title, n: g.orders.filter(o => o.cleared).reduce((s, o) => s + o.kpiQty, 0), brand: brand ? brandName(brand) : monthly ? "No booth" : `Month ${i + 1}`, ...colors };
+      const label = brand ? brandName(brand) : !monthly ? `Month ${i + 1}` : input.whole ? plural(boothsOf(g.orders).booths, "booth") : "No booth";
+      return { key: g.key, week: monthly ? (g.title.startsWith("Week ") ? `W${g.title.slice(5)}` : g.title) : g.title, n: g.orders.filter(o => o.cleared).reduce((s, o) => s + o.kpiQty, 0), brand: label, ...colors };
     }) : [],
     orders: enabled ? done.filter(o => o.kpiQty > 0).map(o => ({ id: o.id, no: o.number, kpi: o.kpiQty, items: o.lines.filter(l => l.kpiQty > 0).map(l => `${l.name} × ${l.kpiQty}`).join(" · ") })) : [],
     orderCount: plural(enabled ? done.filter(o => o.kpiQty > 0).length : 0, "order"),
@@ -571,7 +611,7 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
     nextSub = `${brandName(b.code)} has no incentive tier in this sub-department's rules.`;
   } else if (b.margin + 1e-9 >= top.threshold) {
     nextTitle = "Top tier reached";
-    nextSub = `You are ${(b.margin - top.threshold).toFixed(1)}% above ${top.label}. Keep new orders at ${pctText(top.threshold)}% or more to hold it.`;
+    nextSub = `${input.whole ? `${input.whole} is` : "You are"} ${(b.margin - top.threshold).toFixed(1)}% above ${top.label}. Keep new orders at ${pctText(top.threshold)}% or more to hold it.`;
   } else {
     const next = b.ladder.incentives.find(i => i.threshold > b.margin! + 1e-9)!;
     const gap = next.threshold - b.margin;
@@ -612,7 +652,7 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
       const r = billRow(o, ladders, input.bands);
       return {
         id: o.id, no: o.number,
-        meta: [o.customer || "Walk-in", titleOf(o), rm(o.revenue)].filter(Boolean).join(" · "),
+        meta: [input.whole ? sellerOf(o) : null, o.customer || "Walk-in", titleOf(o), rm(o.revenue)].filter(Boolean).join(" · "),
         pct: o.margin === null ? "No cost" : `${o.margin.toFixed(1)}%`,
         tier: o.margin === null ? "Cost pending" : r?.label ?? "No ladder",
         ink: o.margin === null ? TONES.warn.ink : TONES[r?.tone ?? "neutral"].ink,

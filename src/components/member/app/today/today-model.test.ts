@@ -304,14 +304,31 @@ describe("todayModel — a Revenue Director (2026-10-14: the top of the sub-depa
     expect(m.metrics.map(x => [x.value, x.tag])).toEqual([["RM 906.9k", "All of Fair"], ["—", "Cost pending"], ["—", "Not counted"]]);
     expect(todayModel({ ...peter, insight: { ...directed, team: team() } }).metrics[1]).toMatchObject({ value: "—", tag: "No sales yet" });
   });
-  it("the Arena's cards name who leads — a director is on no board", () => {
-    const people = [score({ id: "anna", name: "ANNA TAN", sales: 600_000, marginRevenue: 500_000, marginCost: 300_000, kpiQty: 10 }),
-      score({ id: "ben", name: "BEN", sales: 400_000, marginRevenue: 400_000, marginCost: 200_000, kpiQty: 12 })];
-    const m = todayModel({ ...peter, arena: arena(people, { selfId: "peter" }) }, null, "BEN LIM");
-    expect(m.boards.map(b => [b.id, b.state, b.leader])).toEqual([
-      ["sales", "lead", "ANNA TAN"], ["margin", "lead", "BEN"], ["kpi", "lead", "BEN"], ["champ", "lead", "BEN LIM"],
-    ]);
+  // 2026-10-25 — the user, over the first three the cards listed: "就放第一名是谁就好了不需要放第一、第二、第三"; and of
+  // Championship: "championship i want is show 1st in championship point".
+  it("the Arena's cards name who is first — Championship the most points; a director is on no board", () => {
+    const people = [
+      score({ id: "anna", name: "ANNA TAN LI", sales: 600_000, marginRevenue: 500_000, marginCost: 300_000, kpiQty: 10 }),
+      score({ id: "ben", name: "BEN", sales: 400_000, marginRevenue: 400_000, marginCost: 200_000, kpiQty: 12 }),
+      score({ id: "cara", name: "CARA", sales: 300_000, marginRevenue: 300_000, marginCost: 200_000, kpiQty: 3 }),
+      score({ id: "dan", name: "DAN", sales: 100_000, marginRevenue: 100_000, marginCost: 90_000, kpiQty: 1 }),
+    ];
+    // The month's points leader, as RevenueApp reads it from the Championship's standings.
+    const m = todayModel({ ...peter, arena: arena(people, { selfId: "peter" }) }, null, "CARA LIM WEI");
+    const first = (id: string) => m.boards.find(x => x.id === id)!.leader;
+    expect(m.boards.map(b => b.state)).toEqual(["lead", "lead", "lead", "lead"]);
+    expect(first("sales")).toBe("ANNA TAN");
+    // BEN 50.0%, ANNA 40.0%, CARA 33.3%, DAN 10%.
+    expect(first("margin")).toBe("BEN");
+    expect(first("kpi")).toBe("BEN");
+    expect(first("champ")).toBe("CARA LIM");
+    // Nobody placed yet, no points yet: no name.
     expect(todayModel({ ...peter, arena: arena([], { selfId: "peter" }) }).boards.map(b => b.leader)).toEqual([undefined, undefined, undefined, undefined]);
+  });
+  it("a tie for first names one of them, never a list", () => {
+    const people = ["A", "B", "C"].map((n, i) => score({ id: n, name: n, sales: i < 2 ? 500 : 300 }));
+    const m = todayModel({ ...peter, arena: arena(people, { selfId: "peter" }) });
+    expect(m.boards[0].leader).toBe("A");
   });
   it("no week card: a director works no booth of their own; the income stays their own", () => {
     const m = todayModel({ ...peter, arena: arena([], { selfId: "peter" }), salary: 3_000, income: { period: "2026-10", status: "computed", total: 35_000 } });
@@ -333,6 +350,38 @@ describe("todayModel — a Principal viewing nobody", () => {
     expect(m.heroAmount).toBe("RM 89,460.99");
     expect(m.heroSplit).toBe("Everybody in Fair, before salaries · View as a member for their own");
     expect(todayModel({ ...base, income }).heroLabel).toBe("October · Estimated income");
+  });
+
+  // 2026-10-25 — a salesperson's note the user passed on, over the Principal's Today standing as placeholders: "要看销售额
+  // 的话，就是把全部的加起来 … 要不然一直这样漏单的话，其实很容易让人以为是出 bug".
+  it("Sales / Margin / KPI are everybody's, added up; the boards name who leads; no week of their own", () => {
+    const whole: MemberInsightBlock = {
+      ...block({ staffId: "", name: "" }, null), whole: true, target: null, title: "", rank: "",
+      team: { sales: 1_489_210, held: 43_987.01, orders: 267, kpiQty: 0, marginRevenue: 537_656, marginCost: 323_280.36, blindOrders: 144 },
+    };
+    const off = { schemeId: "s", period: "2026-10", asOf: "", enabled: false, items: [], total: 0, threshold: null, hit: null };
+    const people = [score({ id: "lucas", name: "LUCAS", sales: 144_064 }), score({ id: "shawn", name: "SHAWN", sales: 128_308 })];
+    const m = todayModel({ ...base, first: "WEN WEI", title: "Principal", rank: "All access", salary: null, department: "Fair", team: "Fair",
+      income: { period: "2026-10", status: "computed", total: 206_283.82 }, insight: whole, kpi: off, arena: arena(people, { selfId: "" }) });
+    expect(m.metrics.map(x => [x.label, x.value, x.tag])).toEqual([
+      ["Sales", "RM 1.49M", "All of Fair"],
+      // (537,656 − 323,280.36) ÷ 537,656
+      ["Margin", "39.9%", "All of Fair"],
+      // KPI has not started: it says so, and counts everybody's once it does.
+      ["KPI", "—", "Not counted"],
+    ]);
+    expect(m.heroLabel).toBe("October · Fair commission");
+    expect(m.boards.map(b => [b.id, b.state, b.leader])).toEqual([
+      ["sales", "lead", "LUCAS"], ["margin", "lead", undefined], ["kpi", "off", undefined], ["champ", "lead", undefined],
+    ]);
+    expect(m.week).toBeNull();
+    expect(todayModel({ ...base, team: "Fair", department: "Fair", insight: { ...whole, team: { ...whole.team!, kpiQty: 41 } },
+      kpi: { ...off, enabled: true, total: 41, threshold: 30 } }).metrics[2]).toMatchObject({ value: "41", tag: "All of Fair" });
+  });
+  it("still loading: placeholders, never a zero", () => {
+    const m = todayModel({ ...base, team: "Fair", department: "Fair", metricsLoading: true, arenaLoading: true });
+    expect(m.metrics.every(x => x.loading)).toBe(true);
+    expect(m.boards.map(b => b.state)).toEqual(["loading", "loading", "loading", "loading"]);
   });
 });
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, adminMemberAction, calculateMemberQuote, cancelMemberRequest, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, adminMemberAction, calculateMemberQuote, cancelMemberRequest, loadDepartmentInsight, loadDepartmentOrderBook, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -67,6 +67,38 @@ describe('Principal Revenue View server boundary', () => {
     expect((await loadMemberOrgMap({ subDepartmentId: schemeId })).ok).toBe(true)
     expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_org_map', { p_sub_department: schemeId })
     expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  // The Principal viewing nobody (2026-10-25 — "要看销售额的话，就是把全部的加起来 … 直接 show 全部人的单"): the whole
+  // sub-department's Insight and bills, under the Principal's own session — never the service role, never a member.
+  it('reads the whole sub-department for a Principal account, and for nobody else', async () => {
+    const whole = {
+      membershipId: schemeId, schemeId, department: 'Fair', from: '2026-10', through: '2026-10', asOf: 'x', live: true,
+      team: { sales: 1489210, held: 0, orders: 267, kpiQty: 0, marginRevenue: 10, marginCost: 6, blindOrders: 0 },
+      people: [{ staffId: productId, name: 'LUCAS', title: 'Title 待配置', uplineId: null, depth: 1, sales: 144064, held: 0, orders: 9, kpiQty: 0, marginRevenue: 1, marginCost: 1, blindOrders: 0, lastOrder: null }],
+      kpi: { enabled: false, threshold: null },
+    }
+    mocks.rpc.mockResolvedValueOnce({ data: whole, error: null })
+    const insight = await loadDepartmentInsight(schemeId, '2026-10', '2026-10')
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_department_insight', { p_sub_department: schemeId, p_from: '2026-10', p_until: '2026-10' })
+    expect(insight.ok && insight.data).toMatchObject({ team: whole.team, kpi: { enabled: false, threshold: null } })
+    expect(insight.ok && insight.data.people[0].title).toBe('Title not configured')
+    const bill = { id: 'o1', number: 'HC-SO-2610-001', date: '2026-10-02', week: '2026-10-02', revenue: 5388, kpiQty: 0, total: 5388, paid: 5388,
+      sourceMonth: '2026-10', recognitionMonth: '2026-10', cleared: true, carried: false, margin: 57.06, lines: [], own: false, seller: { id: productId, name: 'LUCAS' } }
+    mocks.rpc.mockResolvedValueOnce({ data: { from: '2026-10', through: '2026-10', asOf: 'x', orders: [bill] }, error: null })
+    const book = await loadDepartmentOrderBook(schemeId, '2026-10', '2026-10')
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_department_order_book', { p_sub_department: schemeId, p_from: '2026-10', p_until: '2026-10' })
+    expect(book.ok && book.data.orders[0]).toMatchObject({ own: false, seller: { id: productId, name: 'LUCAS' } })
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+
+    mocks.rpc.mockClear()
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_insight'] }))
+    expect((await loadDepartmentInsight(schemeId, '2026-10', '2026-10')).ok).toBe(false)
+    expect((await loadDepartmentOrderBook(schemeId, '2026-10', '2026-10')).ok).toBe(false)
+    mocks.getUser.mockResolvedValue(user())
+    expect((await loadDepartmentInsight('fair', '2026-10', '2026-10')).ok).toBe(false)
+    expect((await loadDepartmentOrderBook(schemeId, '2026-10', '2026-09')).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it('rejects forged cross-member context and missing or invalid Principal selections before RPC', async () => {

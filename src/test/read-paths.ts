@@ -305,6 +305,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'notify_crm_due',
   // The Revenue app's Waiting list & replacements (mig 20261010190000): member_requests, or member_is_manager for View as.
   'member_waiting_queue',
+  // The Principal's own Revenue app, viewing nobody (mig 20261026014700): the whole sub-department's boards, booths,
+  // Insight and bills — each asks member_principal_department (an active Principal account) first.
+  'member_principal_department_arena', 'member_principal_department_booth_history', 'member_principal_department_insight',
+  'member_principal_department_order_book',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
   // "+ New template"'s window (mig 20261011233200): has_any_action(accounts.manage), then the two above ask permissions_manage.

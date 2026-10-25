@@ -35,10 +35,13 @@ export default function ArenaRecord({ vm, onBack }: { vm: RecordVM; onBack: () =
           })}
         </div>
       </section>
-      <div className={s.myBest}>
-        <span className={s.myBestLabel}>Your best · {vm.myPos}</span>
-        <span className={s.myBestAmt}>{vm.myAmt}</span>
-      </div>
+      {/* A reader on no board has no best of their own (2026-10-25). */}
+      {!vm.lead && (
+        <div className={s.myBest}>
+          <span className={s.myBestLabel}>Your best · {vm.myPos}</span>
+          <span className={s.myBestAmt}>{vm.myAmt}</span>
+        </div>
+      )}
       <section>
         {vm.rest.map(r => (
           <div key={r.id} className={`${s.recRow} ${r.mine ? s.recRowMine : ""}`}>

@@ -125,12 +125,45 @@ describe("a Revenue Director reads the boards (2026-10-14: on none of them)", ()
     expect([empty.state, empty.leader, empty.chase]).toEqual(["lead", undefined, "No counted sales yet"]);
     const off = boardModel(director({ board: "kpi", kpiEnabled: false })).rank!.hero;
     expect([off.state, off.leader, off.num]).toEqual(["off", undefined, "—"]);
+    // The hub's KPI card counts no place of theirs (2026-10-25: it read "— of 23"); a member's still does.
+    expect(hubModel(director({ kpiEnabled: false })).cards.find(c => c.board === "kpi")).toMatchObject({ state: "off", value: "Not counted", of: "" });
+    expect(hubModel(input({ kpiEnabled: false })).cards.find(c => c.board === "kpi")!.of).toBe(`of ${people.length}`);
   });
-  it("the hub's cards name the leaders; its head says so", () => {
-    const hub = hubModel(director());
+  // 2026-10-25 — the first version listed the first three; the user, of Today's cards: "就放第一名是谁就好了不需要放第一、
+  // 第二、第三", of these: "can same", and of Championship: "championship i want is show 1st in championship point".
+  it("the hub's cards name who is first, their figure as the head — Championship the most points; its head says who leads", () => {
+    const standings = [
+      { id: "y", name: "YAP", total: 72, position: 1, months: 1, parts: {} as never },
+      { id: "x", name: "XAVIER LIM", total: 60, position: 2, months: 1, parts: {} as never },
+    ];
+    const hub = hubModel(director({ standings }));
     expect(hub.director).toBe(true);
-    expect(hub.cards.find(c => c.board === "sales")).toMatchObject({ state: "lead", leader: "XAVIER LIM", value: "RM 800", of: "" });
+    const card = (board: string) => hub.cards.find(c => c.board === board)!;
+    expect(card("sales")).toMatchObject({ state: "lead", leader: "XAVIER LIM", value: "RM 800", of: "" });
+    // XAVIER's margin waits for a cost: ME alone is placed.
+    expect(card("margin")).toMatchObject({ state: "lead", leader: "ME", value: "40.0%" });
+    expect(card("champ")).toMatchObject({ state: "lead", leader: "YAP", value: "72 pts" });
+    // The points still on their way: a placeholder, never somebody else's name.
+    expect(hubModel(director()).cards.find(c => c.board === "champ")).toMatchObject({ state: "loading", value: "" });
     expect(hubModel(input()).director).toBeUndefined();
+    expect(hubModel(input()).cards.every(c => c.leader === undefined)).toBe(true);
+  });
+  it("a hub card with nobody placed says so, its head a dash", () => {
+    const empty = snapshot(theirs.map(p => ({ ...p, sales: 0, marginRevenue: 0, marginCost: 0 })), { selfId: "peter" });
+    const card = hubModel(director({ snapshot: empty })).cards.find(c => c.board === "sales")!;
+    expect([card.state, card.value, card.leader]).toEqual(["lead", "—", undefined]);
+  });
+  it("Championship's board adds up nobody's own points", () => {
+    const standings = [{ id: "x", name: "XAVIER LIM", total: 60, position: 1, months: 1, parts: {} as never }];
+    expect(boardModel(director({ board: "champ", standings })).rank!.champ).toBeNull();
+    expect(boardModel(input({ board: "champ", standings })).rank!.champ).not.toBeNull();
+  });
+  it("nothing is the reader's own: no margin incentive, no fairs of theirs, no best record", () => {
+    expect(boardModel(director({ board: "margin" })).foot).toBeNull();
+    expect(boardModel(director({ sub: "fair" })).fair!.lead).toBe(true);
+    const record = recordModel(history, "peter", true);
+    expect([record.lead, record.cardLine, record.podium.map(p => p.name)]).toEqual([true, "YAP holds it · RM 3,000", ["ME", "YAP", "XAVIER LIM"]]);
+    expect(recordModel(null, "", true).cardLine).toBe("");
   });
   it("Fair results: the leader's medals, none of the director's own", () => {
     const fair = boardModel(director({ sub: "fair" })).fair!;
@@ -140,6 +173,8 @@ describe("a Revenue Director reads the boards (2026-10-14: on none of them)", ()
   it("a member's boards are unchanged", () => {
     const hero = boardModel(input()).rank!.hero;
     expect([hero.state, hero.leader]).toEqual(["ranked", undefined]);
+    expect(boardModel(input({ board: "margin" })).foot).not.toBeNull();
+    expect(boardModel(input({ sub: "fair" })).fair!.lead).toBeUndefined();
   });
 });
 

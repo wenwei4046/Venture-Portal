@@ -242,6 +242,8 @@ export interface FairPodiumVM { id: string; medal: 1 | 2 | 3; place: string; joi
 export interface FairRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; sub: string; joint: boolean; g: number; s: number; b: number; mine: boolean }
 export interface FairListItem { venue: string; dates: string; sales: string; finish: string; place: string; medal: Medal }
 export interface FairView {
+  /** The reader is on no board (2026-10-25): no fairs of their own to list. */
+  lead?: boolean;
   hero: { num: string; suf: string; count: number; medals: FairMedalVM[]; chase: string; state: HeroState; leader?: string };
   podium: FairPodiumVM[];
   entrySub: string;
@@ -278,6 +280,7 @@ function fairView(tallies: FairTally[], count: number, director = false): FairVi
   const mine = director ? [] : me?.fairs ?? [];
   const n = mine.length;
   return {
+    ...(director ? { lead: true } : {}),
     hero: {
       num: !director && me?.position ? String(me.position) : director ? "" : "—", suf: !director && me?.position ? ordinalSuffix(me.position) : "", count,
       medals: [["1st", me?.g ?? 0], ["2nd", me?.s ?? 0], ["3rd", me?.b ?? 0]].map(([label, c], i) => ({ n: (i + 1) as 1 | 2 | 3, label: String(label), count: Number(c) })),
@@ -341,7 +344,10 @@ export interface ArenaInput {
   current: string;
   /** The window's read failed: nothing is on its way, so nothing shows as loading. */
   failed?: boolean;
-  /** A Revenue Director reads the boards (2026-10-14): on none of them, so each hero names who leads. */
+  /**
+   * The reader is on no board — a Revenue Director (2026-10-14), or the Principal viewing nobody (2026-10-25) — so each
+   * hero and each hub card names who leads, and nothing is "yours".
+   */
   director?: boolean;
 }
 
@@ -419,7 +425,8 @@ export function boardModel(input: ArenaInput): BoardVM {
   } else if (board === "champ") {
     const rows = input.standings ? fromStandings(input.standings, input.selfId) : [];
     rank = rankView("champ", rows, count, director);
-    if (input.standings) rank.champ = champBreakdown(input.standings, input.selfId, period, input.kpiEnabled);
+    // How YOUR points add up: nothing to add for a reader on no board.
+    if (input.standings && !director) rank.champ = champBreakdown(input.standings, input.selfId, period, input.kpiEnabled);
   } else {
     const metric = METRIC[board];
     const enabled = board !== "kpi" || input.kpiEnabled;
@@ -449,15 +456,21 @@ export function boardModel(input: ArenaInput): BoardVM {
     brands: sub === "brand" ? brands : [],
     brand,
     rank, fair,
-    foot: board === "margin" ? { title: "My margin incentive", sub: footSub(people.find(p => p.self), snapshot?.tiers ?? [], period, names) } : null,
+    // My margin incentive: the reader's own — none for a reader on no board.
+    foot: board === "margin" && !director ? { title: "My margin incentive", sub: footSub(people.find(p => p.self), snapshot?.tiers ?? [], period, names) } : null,
     basis: basisText(input, isFair),
   };
 }
 
 // ── the hub ──────────────────────────────────────────────────────────────
 
+/**
+ * `lead`: the reader is on no board — the card names who is first (`leader`, absent while nobody is placed) where a place
+ * would stand, their figure as its head (`value`): as Today's cards (2026-10-25, the user: "就放第一名是谁就好了", then
+ * "can same"); Championship's first is the most points ("championship i want is show 1st in championship point").
+ */
 export interface HubCardVM { board: Board; label: string; rankNum: string; rankSuf: string; of: string; value: string; state: HeroState; leader?: string }
-/** `director`: the reader is on no board (a Revenue Director) — the hub's head says the cards name who leads. */
+/** `director`: the reader is on no board (a Revenue Director, the Principal viewing nobody) — the head says the cards name who leads. */
 export interface HubVM { updated: string; cards: HubCardVM[]; recordLine: string; director?: boolean }
 
 /** `2:40 pm` in Kuala Lumpur. */
@@ -475,14 +488,15 @@ export function hubModel(input: Omit<ArenaInput, "board" | "sub" | "brand">): Hu
     return {
       board, label: BOARD_LABEL[board],
       rankNum: hero?.num ?? "—", rankSuf: hero?.suf ?? "",
-      of: hero?.state === "ranked" || hero?.state === "off" ? `of ${hero?.count ?? 0}` : "",
+      // "of 23" counts the reader's own place: a reader on no board has none, KPI off or on.
+      of: !input.director && (hero?.state === "ranked" || hero?.state === "off") ? `of ${hero?.count ?? 0}` : "",
       value: loading ? "" : hero?.value ?? "—",
       state: hero?.state ?? "unranked",
       ...(hero?.leader ? { leader: hero.leader } : {}),
     };
   });
   return {
-    updated: input.snapshot ? klTime(input.snapshot.asOf) : "", cards, recordLine: recordModel(input.history, input.selfId).cardLine,
+    updated: input.snapshot ? klTime(input.snapshot.asOf) : "", cards, recordLine: recordModel(input.history, input.selfId, !!input.director).cardLine,
     ...(input.director ? { director: true } : {}),
   };
 }
@@ -491,13 +505,19 @@ export function hubModel(input: Omit<ArenaInput, "board" | "sub" | "brand">): Hu
 
 export interface RecordPodiumVM { id: string; place: 1 | 2 | 3; suf: string; ini: string; name: string; amt: string; venue: string; dates: string }
 export interface RecordRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; where: string; amt: string; mine: boolean }
-export interface RecordVM { podium: RecordPodiumVM[]; myPos: string; myAmt: string; rest: RecordRowVM[]; cardLine: string; count: number }
+/** `lead`: the reader is on no board (2026-10-25) — no best of their own; the hub's line names who holds the record. */
+export interface RecordVM { podium: RecordPodiumVM[]; myPos: string; myAmt: string; rest: RecordRowVM[]; cardLine: string; count: number; lead?: boolean }
 
 const withYear = (start: string, end: string) => `${dayRange(start, end)} ${end.slice(0, 4)}`;
 
-export function recordModel(history: ArenaHistorySnapshot | null, selfId: string): RecordVM {
+export function recordModel(history: ArenaHistorySnapshot | null, selfId: string, lead = false): RecordVM {
   const records = history ? arenaFairRecords(history) : [];
   const ranked = records.filter(r => r.position !== null && r.value !== null);
+  if (lead) {
+    const top = ranked[0];
+    const vm = recordModel(history, "");
+    return { ...vm, lead: true, cardLine: top ? `${firstName(top.name)} holds it · ${rm(top.value!)}` : history ? "No fair record yet" : "" };
+  }
   const mine = ranked.find(r => r.id === selfId);
   const podium = [ranked[1], ranked[0], ranked[2]].filter((r): r is typeof ranked[number] => !!r).map(r => ({
     id: r.id, place: Math.min(3, r.position!) as 1 | 2 | 3, suf: ordinalSuffix(r.position!), ini: initials(r.name),
