@@ -57,6 +57,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ⑤ | The PIC's public links — PIC Link, PIC Task Link, PIC Calendar (no login; approve = type your name; changes ≥ 5 characters; ads reports) | |
 | ⑤-3a | **Built 2026-10-25** (mig `20261025235800`): a project's Ads report from the CRM (answer 57) — a product project's, or an Ads task's or series': the CRM ads it reads (picked), how often from when, its figures and targets, set up by Marketing · Edit; each period over published by the Ads person — the CRM's counts (leads, appointments, show-ups, won and its amount) and Meta's (spend, impressions, reach, clicks, conversations) for its days, typed over where needed; replaced when published again | answered |
 | ⑤-3b | **Built 2026-10-25** (mig `20261025235900`): the PIC reads the published reports on their link — the handoff's *Reports · Every 2 weeks*, each its period and figures against the targets it was published with, its note; never who published it | answered |
+| ⑤-3c | **Built 2026-10-25** (mig `20261026001000`): an Ads report's Report days — the day after each period's last — on the Calendar's *Ads & reports* and a subsidiary's page, published / due / overdue; its last report picked in its setup (none: it reports on) (gaps 250–253) | answered (62) |
 | ⑥-1 | The Library on R2 (bucket `marketing`): the group's folder types (the manager's), each subsidiary's folders and link folders, files uploaded ≤ 2 GB, the categories, search, Move, the Dustbin (30 days; Restore; the manager's Delete now) (migs `20261024007000`, `007100`); a folder's *Download as ZIP* made in the browser (2026-10-25, gaps 79, 221) | #660, live 2026-10-23; ZIP #759 |
 | ⑥-2 | A subsidiary's brand profile — its picture (a colour, or a logo), its background (a colour, or a cover), its font, display name and caption, the manager's ✎ — on its card and banner; its Schedule: the Calendar's next three dates (mig `20261024007200`) | #663, live 2026-10-23 |
 | ⑥-3 | The guest share link — a file's or a folder's, made, changed (24 hours / 7 days / 30 days / Never, Allow download) and stopped by Edit; its page `/l/<code>` for a stranger (the brand, the files, previews, Download when allowed) (mig `20261024007300`) | #664, live 2026-10-23 |
@@ -139,6 +140,10 @@ Asked 2026-10-25 (~17:10 MYT), once ②a-5 was live — the questions parked whi
 59. A recurring product's monthly minutes? **Answered: none** ("不用每月开") — the intake's only.
 60. Gap 206 — resumed after its run day, the month resumed in gets its work at once? **Answered: as built** ("对，照现在").
 61. The two Finance date bugs found on the way? **Answered: left to Chew** (Finance's).
+
+Asked 2026-10-25 (~20:30 MYT), once ⑤-3b was live:
+62. An Ads report's Report day on the calendars, a notice when a period is due, its PDF? **Answered: "can do"** — the Report days built (⑤-3c), with a last report the Ads person picks (gap 251); the notice and the PDF next.
+63. A key date every month (the handoff's *Payday*, each month's last day)? Asked again (the user: "is what ?") — explained 2026-10-25; waiting.
 52. **Who is told** (⑤-1). The handoff does not say: the project's owner; with none (the Principal started it), Marketing's managers.
 53. **Changes ask no name** (⑤-1). The handoff's changes step has no name field: the reply goes under the PIC's name on the project (Kelvin), approving asks the full name typed.
 54. **A client's code** (④-1). The handoff's (the name's first four letters and digits, else OTH) can collide or fall under two characters, and a Track ID keeps it for good: the database makes it, numbered when taken.
@@ -337,6 +342,10 @@ Asked 2026-10-25 (~17:10 MYT), once ②a-5 was live — the questions parked whi
 247. **A recurring task** (②a-5). Its series names the PICs and holds the link; every run's stage asks them (a run copies its series' stages); the link follows the runs to two weeks ahead, the latest twenty — and any run waiting for them, however far back.
 248. **The PIC's calendar** (②a-5). A task with a link is theirs as a product project is: its stages' approvals ahead and waiting, a series' runs', its minutes waiting for them.
 249. **The map** (②a-5). A stage's 🔗 gate names the task's own PIC — a run's, its series' — the subsidiary's only when the task names none.
+250. **A Report day** (⑤-3c — answer 62). The day after its period's last — the handoff's PIC Link: *20 Oct – 2 Nov*, *Next report 3 Nov* — the day its report is due: published once its last day is over (⑤-3a).
+251. **Its last report** (⑤-3c). Nothing said when a report stops; a task's work may be done while its ads run on (the handoff's PIC Link: *Ads are live* after *Campaign approved*), so neither the task's end nor its stages end it: the Ads person picks its **last report** from its periods (*#3 · 17 – 30 Nov*), none — it reports on (how often it reports is theirs to set, answer 57). Any time, never before a report already out; none published after it. A period runs whole: the last is not cut to the ads' last day.
+252. **Where they show** (⑤-3c). The Calendar's 📈 *Ads & reports* (gap 188), a subsidiary's page and its Library schedule — *Report #2 · 20 Oct – 2 Nov*, *Published*, *Due · Mei*, then *Overdue · Mei* once its day has passed; *Only mine* by the project's owner. Not the PIC's calendar: the handoff's has none.
+253. **A task done stays on the board** (⑤-3c). The board lists done work for 60 days; one whose Ads report reports on — or whose last Report day was within 60 days — stays with it, so its Report days keep showing; never a cancelled one's.
 
 ## 5. Open questions (for the user) — all answered 2026-10-24, §6
 

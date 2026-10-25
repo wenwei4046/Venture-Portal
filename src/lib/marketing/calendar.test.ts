@@ -130,7 +130,9 @@ describe('a task’s dates on the Calendar', () => {
     const posted = evs.find(e => e.postLink)!
     expect([posted.postLink, posted.who, posted.people, posted.team]).toEqual(['https://instagram.com/p/abc', 'Ali', [ALI], null])
     expect(eventRows(posted, () => '')).toContainEqual({ k: 'Posted', v: 'https://instagram.com/p/abc' })
-    expect(eventRows(evs[0], () => '')).toContainEqual({ k: 'Date', v: 'Report day · Schedule' })
+    // Its field — never a second *Date* (⑤-3c: the detail panel keyed two rows the same).
+    expect(eventRows(evs[0], () => '').map(r => r.k)).toEqual(['Subsidiary', 'Date', 'Field', 'Owner'])
+    expect(eventRows(evs[0], () => '')).toContainEqual({ k: 'Field', v: 'Report day · Schedule' })
     expect(LAYERS.map(l => l.key)).toEqual(['post', 'due', 'meet', 'ads'])
     expect(evs.filter(e => passes(e, { layers: { ...ALL_LAYERS, ads: false }, subs: [], who: null })).map(e => e.kind)).toEqual(['meet', 'post', 'post'])
   })
@@ -139,5 +141,78 @@ describe('a task’s dates on the Calendar', () => {
     const at = (status: string, day: string, posted = false) => postState({ status } as never, { day, posted: posted ? { at: '', name: 'Ali', link: 'https://x.my' } : null }, '2026-11-08').label
     expect([at('done', '2026-11-01', true), at('done', '2026-11-01'), at('planning', '2026-11-01'), at('active', '2026-11-01'), at('active', '2026-11-08'), at('active', '2026-11-09')])
       .toEqual(['Posted', 'Scheduled', 'Draft', 'Overdue', 'In production', 'In production'])
+  })
+})
+
+// ⑤-3c — the user, asked whether an Ads report should put its Report day on the calendars: "can do".
+describe('an Ads report’s Report days', () => {
+  const A = '40000000-0000-0000-0000-000000000001'
+  const B = '40000000-0000-0000-0000-000000000002'
+  const C = '40000000-0000-0000-0000-000000000003'
+  const D = '40000000-0000-0000-0000-000000000004'
+  const aboard = boardFromRow({
+    today: '2026-11-04',
+    me: MEI,
+    team: [{ id: MEI, full: 'Mei Ling', first: 'Mei' }, { id: ALI, full: 'Ali Hassan', first: 'Ali' }],
+    subs: [{ id: CAR, code: 'CAR', name: 'Carres' }, { id: HK, code: 'HK', name: 'Hookka' }],
+    projects: [
+      // Its work done, its ads run on.
+      { id: A, trackId: 'TSK-CAR-2610-010', kind: 'quick', sub: CAR, title: 'Raya ads', status: 'done', cur: 2, owner: MEI },
+      { id: B, trackId: 'MKT-HK-2610-011', kind: 'product', sub: HK, title: 'Hookka · Media buying', status: 'active', cur: 0, owner: ALI },
+      { id: C, trackId: 'TSK-CAR-2610-012', kind: 'quick', sub: CAR, title: 'Cancelled ads', status: 'cancelled', cur: 0, owner: MEI },
+      // Made by the Principal: no owner on the roster.
+      { id: D, trackId: 'TSK-HK-2610-013', kind: 'quick', sub: HK, title: 'Hookka ads', status: 'active', cur: 1 },
+    ],
+    stages: [
+      { project: D, idx: 0, name: 'Brief', owner: MEI, status: 'done' },
+      { project: D, idx: 1, name: 'Run ads', owner: ALI, status: 'accepted' },
+    ],
+    ads: [
+      { project: D, every: '1w', startsOn: '2026-11-02', lastNo: 1, published: [] },
+      { project: A, every: '2w', startsOn: '2026-10-06', lastNo: 3, published: [1] },
+      { project: B, every: '1m', startsOn: '2026-10-01', lastNo: null, published: [] },
+      { project: C, every: '1w', startsOn: '2026-10-01', published: [] },
+      // Not a cadence, no first day, no project: dropped.
+      { project: A, every: 'daily', startsOn: '2026-10-01' }, { project: A, every: '1w' }, { every: '1w', startsOn: '2026-10-01' },
+    ],
+  })
+  const evs = calendarEvents(aboard)
+
+  it('reads each schedule — a cadence, a first day, its project', () => {
+    expect(aboard.ads).toEqual([
+      { project: D, every: '1w', startsOn: '2026-11-02', lastNo: 1, published: [] },
+      { project: A, every: '2w', startsOn: '2026-10-06', lastNo: 3, published: [1] },
+      { project: B, every: '1m', startsOn: '2026-10-01', lastNo: null, published: [] },
+      { project: C, every: '1w', startsOn: '2026-10-01', lastNo: null, published: [] },
+    ])
+  })
+
+  it('dates each the day after its period’s last — published, overdue once its day has passed, else due; to its last report', () => {
+    expect(evs.filter(e => e.trackId === 'TSK-CAR-2610-010').map(e => `${e.day} ${e.kind} ${e.icon} ${e.title} · ${e.line2} · ${e.label} · ${e.tone}`)).toEqual([
+      '2026-10-20 ads 📊 Raya ads · Report #1 · 6 – 19 Oct · Published · done',
+      '2026-11-03 ads 📊 Raya ads · Report #2 · 20 Oct – 2 Nov · Overdue · Mei · red',
+      '2026-11-17 ads 📊 Raya ads · Report #3 · 3 – 16 Nov · Due · Mei · waiting',
+    ])
+    const r1 = evs.find(e => e.id === `a:${A}:1`)!
+    expect([r1.kindLabel, r1.people, r1.sub?.code, r1.quick, r1.team]).toEqual(['Report day', [MEI], 'CAR', true, null])
+    expect(eventRows(r1, () => '')).toEqual([
+      { k: 'Subsidiary', v: 'Carres' }, { k: 'Date', v: 'Tue 20 Oct' }, { k: 'Report', v: 'Report #1 · 6 – 19 Oct' }, { k: 'Owner', v: 'Mei' }])
+  })
+
+  it('no owner on the roster (the Principal made it): whoever’s stage it is at', () => {
+    const d = evs.filter(e => e.trackId === 'TSK-HK-2610-013')
+    expect(d.map(e => `${e.day} · ${e.line2} · ${e.label}`)).toEqual(['2026-11-09 · Report #1 · 2 – 8 Nov · Due · Ali'])
+    expect(d[0].people).toEqual([ALI])
+  })
+
+  it('reports on without a last — a year ahead; never a cancelled project’s', () => {
+    const b = evs.filter(e => e.trackId === 'MKT-HK-2610-011')
+    expect([b.length, b[0].day, b[0].line2, b[0].label, b[0].tone, b.at(-1)?.day]).toEqual([13, '2026-11-01', 'Report #1 · 1 – 31 Oct', 'Overdue · Ali', 'red', '2027-11-01'])
+    expect(evs.some(e => e.trackId === 'TSK-CAR-2610-012')).toBe(false)
+  })
+
+  it('goes with the Ads & reports layer, its subsidiary, its owner', () => {
+    const n = (f: Partial<Parameters<typeof passes>[1]>) => evs.filter(e => passes(e, { layers: ALL_LAYERS, subs: [], who: null, ...f })).length
+    expect([n({}), n({ layers: { ...ALL_LAYERS, ads: false } }), n({ subs: [CAR] }), n({ who: ALI })]).toEqual([17, 0, 3, 14])
   })
 })

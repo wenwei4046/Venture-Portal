@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   adsCard, adsEventText, adsPageFromRow, adsPatch, adsPatchOf, adsPeriod, adsPeriods, adsRows, adsValues, adsValuesOf, choicesFromRow,
-  draftOf, draftProblems, figureText, metaSum, NO_TARGETS, reportCards, reportRange, targetOf, typedValues, valueText, type AdsSetup,
+  draftOf, draftProblems, figureText, lastChoices, metaSum, NO_TARGETS, reportCards, reportDay, reportDays, reportRange, setupFromRow, targetOf,
+  typedValues, valueText, type AdsSetup,
 } from './ads'
 
 // 2026-10-25 — a project's Ads report (the user's answer 57: from the CRM's Ads Performance; each Ads project picks its
@@ -10,7 +11,7 @@ import {
 
 const SETUP: AdsSetup = {
   ads: ['120210000000000001', '120210000000000002'], every: '2w', startsOn: '2026-10-06',
-  figures: ['spendToDate', 'cpl', 'appt', 'roas'], targets: { budget: 6000, cpl: 20, roas: 3, apptRate: 25 },
+  figures: ['spendToDate', 'cpl', 'appt', 'roas'], targets: { budget: 6000, cpl: 20, roas: 3, apptRate: 25 }, lastNo: null,
 }
 
 describe('its periods', () => {
@@ -44,6 +45,30 @@ describe('its periods', () => {
     expect(page.setup?.every).toBe('2w')
     expect(adsRows(page.setup as AdsSetup, page.reports, '2026-10-25').map(r => [r.no, !!r.report, r.due])).toEqual([[2, false, false], [1, true, false]])
     expect(adsRows(SETUP, [], '2026-11-03').map(r => [r.no, r.due])).toEqual([[3, false], [2, true], [1, true]])
+  })
+
+  it('stops at its last report (⑤-3c) — none after it, however long after', () => {
+    expect(adsPeriods('2w', '2026-10-06', '2027-03-01', 60, 3).map(p => p.no)).toEqual([3, 2, 1])
+    expect(adsRows({ ...SETUP, lastNo: 2 }, [], '2026-12-01').map(r => [r.no, r.due])).toEqual([[2, true], [1, true]])
+    expect(adsPeriods('2w', '2026-10-06', '2026-10-25', 60, 3).map(p => p.no)).toEqual([2, 1])
+  })
+
+  it('puts each Report day the day after its period’s last — to its last report, else a year on', () => {
+    expect(reportDay({ until: '2026-11-02' })).toBe('2026-11-03')
+    expect(reportDays('2w', '2026-10-06', 3, '2026-10-25').map(r => `#${r.no} ${r.day}`)).toEqual(['#1 2026-10-20', '#2 2026-11-03', '#3 2026-11-17'])
+    const monthly = reportDays('1m', '2026-10-01', null, '2026-10-25')
+    expect([monthly.length, monthly[0].day, monthly.at(-1)?.day]).toEqual([12, '2026-11-01', '2027-10-01'])
+    // Begun long ago: its days from the first.
+    expect(reportDays('4w', '2026-01-05', null, '2026-10-25')[0]).toEqual({ no: 1, from: '2026-01-05', until: '2026-02-01', day: '2026-02-02' })
+  })
+
+  it('offers a year of its periods to pick the last from — as far as one already out', () => {
+    const two = lastChoices('2w', '2026-10-06')
+    expect([two.length, two[0].label, two[1].label, two[6].label, two[7].label]).toEqual(
+      [26, '#1 · 6 – 19 Oct', '#2 · 20 Oct – 2 Nov', '#7 · 29 Dec 2026 – 11 Jan 2027', '#8 · 12 – 25 Jan 2027'])
+    expect([lastChoices('1w', '2026-10-06').length, lastChoices('4w', '2026-10-06').length, lastChoices('1m', '2026-10-06').length]).toEqual([52, 13, 12])
+    expect(lastChoices('1m', '2026-10-06', 30).length).toBe(30)
+    expect(lastChoices('2w', '')).toEqual([])
   })
 })
 
@@ -92,7 +117,7 @@ describe('its figures', () => {
 describe('setting it up', () => {
   it('starts every two weeks from today on the handoff’s four, no ads', () => {
     expect(draftOf(null, '2026-10-25')).toEqual({ ads: [], every: '2w', startsOn: '2026-10-25', figures: ['spendToDate', 'cpl', 'appt', 'roas'],
-      targets: { budget: '', cpl: '', roas: '', apptRate: '' } })
+      targets: { budget: '', cpl: '', roas: '', apptRate: '' }, lastNo: null })
   })
 
   it('takes targets as numbers from 0 — an appointment rate at most 100', () => {
@@ -116,6 +141,22 @@ describe('setting it up', () => {
     expect(adsPatchOf({ ads: ['1', 2], every: 'daily', startsOn: '2026-10-25T00:00', figures: ['cpl', 'nope'], targets: { cpl: '18', roas: 3, budget: null }, x: 1 }))
       .toEqual({ ads: ['1'], startsOn: '2026-10-25', figures: ['cpl'], targets: { roas: 3, budget: null } })
     expect(adsPatchOf('x')).toBeNull()
+  })
+
+  it('its last report (⑤-3c): sent with a new one only when picked; changed, or taken off as null', () => {
+    const fresh = draftOf(null, '2026-10-25')
+    expect(adsPatch(null, fresh)).not.toHaveProperty('lastNo')
+    expect(adsPatch(null, { ...fresh, lastNo: 3 })).toMatchObject({ lastNo: 3 })
+    const d = draftOf({ ...SETUP, lastNo: 3 }, '2026-10-25')
+    expect(d.lastNo).toBe(3)
+    expect(adsPatch({ ...SETUP, lastNo: 3 }, d)).toBeNull()
+    expect(adsPatch({ ...SETUP, lastNo: 3 }, { ...d, lastNo: 5 })).toEqual({ lastNo: 5 })
+    expect(adsPatch({ ...SETUP, lastNo: 3 }, { ...d, lastNo: null })).toEqual({ lastNo: null })
+    expect([adsPatchOf({ lastNo: 4 }), adsPatchOf({ lastNo: null })]).toEqual([{ lastNo: 4 }, { lastNo: null }])
+    expect([adsPatchOf({ lastNo: 0 }), adsPatchOf({ lastNo: 2.5 }), adsPatchOf({ lastNo: '3' }), adsPatchOf({ lastNo: 1001 })]).toEqual([null, null, null, null])
+    expect([setupFromRow({ ...SETUP, lastNo: 4 })?.lastNo, setupFromRow({ ...SETUP, lastNo: 'x' })?.lastNo, setupFromRow({ ...SETUP, lastNo: undefined })?.lastNo])
+      .toEqual([4, null, null])
+    expect(adsEventText('Mei', 'ads changed', { what: ['lastNo', 'targets'] })).toBe('Mei changed the Ads report · its last report, its targets')
   })
 })
 

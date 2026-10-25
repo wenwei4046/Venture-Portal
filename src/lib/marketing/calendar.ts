@@ -4,9 +4,12 @@
 // opened yet is a draft. Posts and meetings come from the posting plans and the minutes (later modules): the layers
 // are drawn, empty, until then. Pure.
 
+import { reportDays, reportRange } from './ads'
 import {
-  addDays, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktGroup, type MktDateKind, type MktProject, type MktSub, type MktTaskDate,
+  addDays, addMonths, daysBetween, indexBoard, isSeries, longDay, mondayOf, MONTH_NAMES, MONTH_SHORT, weekdayOf, type MktBoard, type MktGroup, type MktDateKind, type MktProject, type MktSub, type MktTaskDate,
 } from './board'
+
+export { addMonths }
 
 export type CalKind = 'post' | 'due' | 'meet' | 'ads'
 export type CalTone = 'draft' | 'waiting' | 'done' | 'red' | 'meet'
@@ -151,6 +154,39 @@ export function calendarEvents(board: MktBoard): CalEvent[] {
       ...(d.posted ? { postLink: d.posted.link } : {}),
     })
   }
+  // Each Ads report's Report days (⑤-3c — the day after each period's last, to its last report): published, due, overdue.
+  for (const a of board.ads) {
+    const p = byId.get(a.project)
+    if (!p || p.status === 'cancelled' || !board.today) continue
+    const sent = new Set(a.published)
+    // Its owner — else (the Principal made it) whoever's stage it is at, as a subsidiary's projects table says.
+    const stages = ix.stagesOf(p.id)
+    const owner = p.owner ?? (stages.find(s => s.idx === p.cur) ?? stages[0])?.owner ?? null
+    const who = first(owner)
+    for (const r of reportDays(a.every, a.startsOn, a.lastNo, board.today)) {
+      const published = sent.has(r.no)
+      const tone: CalTone = published ? 'done' : r.day < board.today ? 'red' : 'waiting'
+      out.push({
+        id: `a:${p.id}:${r.no}`,
+        kind: 'ads',
+        day: r.day,
+        title: p.title,
+        sub: ix.sub(p.sub) ?? null,
+        trackId: p.trackId,
+        line2: `Report #${r.no} · ${reportRange(r)}`,
+        people: owner ? [owner] : [],
+        who,
+        tone,
+        label: published ? 'Published' : tone === 'red' ? `Overdue · ${who}` : `Due · ${who}`,
+        icon: DATE_KIND.report.icon,
+        kindLabel: DATE_KIND.report.label,
+        time: null,
+        quick: p.kind === 'quick',
+        recur: false,
+        team: null,
+      })
+    }
+  }
   return out.sort((a, b) => a.day.localeCompare(b.day) || (a.time ?? '').localeCompare(b.time ?? '') || a.id.localeCompare(b.id))
 }
 
@@ -191,13 +227,6 @@ export function passes(e: CalEvent, f: CalFilter): boolean {
 /** The month a day is in: its first day. */
 export const monthOf = (d: string) => `${d.slice(0, 7)}-01`
 export const monthLabel = (d: string) => `${MONTH_NAMES[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`
-export function addMonths(d: string, n: number): string {
-  const y = +d.slice(0, 4)
-  const m = +d.slice(5, 7) - 1 + n
-  const yy = y + Math.floor(m / 12)
-  const mm = ((m % 12) + 12) % 12
-  return `${yy}-${String(mm + 1).padStart(2, '0')}-01`
-}
 const daysIn = (month: string) => daysBetween(month, addMonths(month, 1))
 
 export interface MonthCell {
@@ -266,7 +295,9 @@ export function eventRows(e: CalEvent, nameOf: (id: string) => string): { k: str
   ]
   if (e.kind === 'due') rows.push({ k: 'Stage', v: e.line2 }, { k: 'Assignee', v: e.who })
   if (e.kind === 'post') rows.push({ k: 'Type', v: e.line2 }, { k: 'Now with', v: e.who }, ...(e.postLink ? [{ k: 'Posted', v: e.postLink }] : []))
-  if (e.kind === 'ads') rows.push({ k: 'Date', v: e.line2 }, { k: 'Owner', v: e.who })
+  // An Ads report's Report day (its id a:…) says its report; a task's date its field — never a second *Date* (⑤-3c: the
+  // panel keyed two rows the same).
+  if (e.kind === 'ads') rows.push({ k: e.id.startsWith('a:') ? 'Report' : 'Field', v: e.line2 }, { k: 'Owner', v: e.who })
   if (e.kind === 'meet') rows.push({ k: 'Attendees', v: e.people.map(nameOf).join(', ') || '—' })
   return rows
 }

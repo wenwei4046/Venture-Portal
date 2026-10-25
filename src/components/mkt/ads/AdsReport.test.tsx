@@ -73,6 +73,22 @@ describe('a project’s Ads report', () => {
     expect(screen.getByText('Due')).toBeTruthy()
   })
 
+  it('picks its last report from its periods — never one before a report already out (⑤-3c)', async () => {
+    actions.readMktAdsChoices.mockResolvedValue({ ok: true, choices: [] })
+    render(<AdsReport project={PID} title="Raya ads" initial={page({ reports: [R1, { ...R1, no: 2, from: '2026-10-20', until: '2026-11-02' }] })} edit say={say} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Change the Ads report' })) })
+    const dialog = screen.getByRole('dialog', { name: 'Ads report' })
+    const last = within(dialog).getByRole('combobox', { name: /^Last report/ }) as HTMLSelectElement
+    expect([...last.options].slice(0, 4).map(o => [o.textContent, o.disabled])).toEqual([
+      ['No end', false], ['#1 · 6 – 19 Oct', true], ['#2 · 20 Oct – 2 Nov', false], ['#3 · 3 – 16 Nov', false]])
+    expect(last.options.length).toBe(27)
+    fireEvent.change(last, { target: { value: '3' } })
+    actions.saveMktAds.mockResolvedValue({ ok: true, ads: page({ setup: { ...SETUP, lastNo: 3 } }) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Save' })) })
+    expect(actions.saveMktAds).toHaveBeenCalledWith(PID, { lastNo: 3 })
+    expect(screen.getByText('Every 2 weeks · 3 reports')).toBeTruthy()
+  })
+
   it('publishes a period: its figures read from the CRM and Meta, typed over, read as the PIC will — then published', async () => {
     actions.readMktAdsFigures.mockResolvedValue({ ok: true, period: { no: 2, from: '2026-10-20', until: '2026-11-02' },
       crm: { leads: 176, appt: 46, showup: 30, won: 9, wonAmount: 10368 }, meta: { spend: 1830, impr: 1, reach: 1, clicks: 1, msgconv: 1 },

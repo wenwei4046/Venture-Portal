@@ -3,6 +3,7 @@
 // a field the database leaves out draws as nothing, and the pages work on plain types. Dates stay 'YYYY-MM-DD'
 // strings, the office's (the database answers today in Asia/Kuala_Lumpur).
 
+import type { AdsEvery } from './ads'
 import { groupOf } from './groups'
 import type { MktTeam } from './shell'
 
@@ -155,7 +156,19 @@ export interface MktBoard {
   holidays: MktHoliday[]
   /** A task's dates marked for the calendar (④-2c — answers 15, 16), once filled, by day. */
   dates: MktTaskDate[]
+  /** Each Ads report on it (⑤-3c) — the calendars reckon its Report days from these. */
+  ads: MktAdsPlan[]
 }
+
+/** An Ads report's schedule (⑤-3c): how often from which day, its last report (none: it reports on), the reports out. */
+export interface MktAdsPlan {
+  project: string
+  every: AdsEvery
+  startsOn: string
+  lastNo: number | null
+  published: number[]
+}
+const EVERY: readonly AdsEvery[] = ['1w', '2w', '4w', '1m']
 
 /** The kinds of date a task's field puts on the calendar (answer 16 — tasks.ts' CAL_KINDS). */
 export type MktDateKind = 'post' | 'shoot' | 'meeting' | 'ads_live' | 'ads_end' | 'report'
@@ -210,7 +223,7 @@ function recur(v: unknown): MktRecur | null {
   return { runs, status: oneOf(v.status, ['active', 'paused', 'ended'] as const, 'active'), rule: isObj(v.rule) ? v.rule : null }
 }
 
-export const EMPTY_BOARD: MktBoard = { today: '', me: null, team: [], subs: [], projects: [], stages: [], subtasks: [], holidays: [], dates: [] }
+export const EMPTY_BOARD: MktBoard = { today: '', me: null, team: [], subs: [], projects: [], stages: [], subtasks: [], holidays: [], dates: [], ads: [] }
 
 /** One person of the roster as the database answers them. */
 export function personFromRow(p: Record<string, unknown>): MktPerson {
@@ -380,6 +393,17 @@ export function boardFromRow(v: unknown): MktBoard {
         ? [{ project: str(d.project), stage: Math.max(0, int(d.stage)), field: str(d.field), kind, day: when, pic: d.pic === true, posted: postedFromRow(d.posted) }]
         : []
     }),
+    ads: list(v.ads).flatMap(a => {
+      const every = EVERY.find(e => e === a.every)
+      const startsOn = day(a.startsOn)
+      const last = a.lastNo == null ? 0 : int(a.lastNo)
+      return every && startsOn && str(a.project)
+        ? [{
+            project: str(a.project), every, startsOn, lastNo: last >= 1 ? last : null,
+            published: (Array.isArray(a.published) ? a.published : []).map(n => int(n)).filter(n => n >= 1),
+          }]
+        : []
+    }),
   }
 }
 
@@ -392,6 +416,14 @@ const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const dayValue = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10), 12)
 export const dayOf = (t: number) => new Date(t).toISOString().slice(0, 10)
 export const addDays = (d: string, n: number) => dayOf(dayValue(d) + n * 864e5)
+/** The first day of the month n months from a day's. */
+export function addMonths(d: string, n: number): string {
+  const y = +d.slice(0, 4)
+  const m = +d.slice(5, 7) - 1 + n
+  const yy = y + Math.floor(m / 12)
+  const mm = ((m % 12) + 12) % 12
+  return `${yy}-${String(mm + 1).padStart(2, '0')}-01`
+}
 /** Whole days from a to b (b later: positive). */
 export const daysBetween = (a: string, b: string) => Math.round((dayValue(b) - dayValue(a)) / 864e5)
 /** 0 = Monday … 6 = Sunday. */
