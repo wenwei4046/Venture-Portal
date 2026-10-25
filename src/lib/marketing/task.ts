@@ -13,6 +13,7 @@ import { monthLabel } from './billing'
 import { isManagerTitle } from './groups'
 import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
+import { minutesFromRow, type MinutesDoc } from './project'
 
 /** An approval level as a deliverable's template has it (②b-2a): a person, the PIC on the link, or one the manager picks
  * at assignment. */
@@ -116,6 +117,9 @@ export interface MktTaskPage {
   events: TaskEvent[]
   series: TaskSeries | null
   holidays: MktHoliday[]
+  /** Its meeting minutes (②a-3 — the user's answers 52–55): a task's own, a run's its series' — its requirements; none when
+   * what needs to be done is written. */
+  minutes: MinutesDoc | null
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -203,6 +207,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
     events: rowsOf(v.events).map(eventFromRow),
     series,
     holidays: holidaysFromRow(v.holidays),
+    minutes: isObj(v.minutes) ? minutesFromRow(v.minutes) : null,
   }
 }
 
@@ -438,7 +443,10 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     banner,
     meta,
     rail,
-    requirements: { source: `WHAT NEEDS TO BE DONE · FROM ${from.toUpperCase()}`, text: p.brief || 'No extra details.' },
+    // Written with meeting minutes (②a-3): the minutes are its requirements — the handoff's FROM MEETING MINUTES · KICKOFF · RACHEL.
+    requirements: page.minutes
+      ? { source: `FROM MEETING MINUTES · ${page.minutes.template.name.toUpperCase()} · ${from.toUpperCase()}`, text: '' }
+      : { source: `WHAT NEEDS TO BE DONE · FROM ${from.toUpperCase()}`, text: p.brief || 'No extra details.' },
     work,
     missing,
     mine: working ? cur : null,
@@ -608,6 +616,11 @@ export function runsResumedText(actor: string, data: Record<string, unknown> | n
   return `${actor} resumed the monthly runs · from ${billMonthWords(data?.from)}${left ? ` · ${left}` : ''}`
 }
 
+/** Written with meeting minutes (②a-3): a 'created' record's " · Kickoff minutes", '' for none. */
+export function minutesWords(data: Record<string, unknown> | null | undefined): string {
+  return typeof data?.minutes === 'string' && data.minutes ? ` · ${data.minutes} minutes` : ''
+}
+
 /** Opened from another (④-4c — answer 23): a 'created' record's " · from TSK-CAR-2610-004", '' for none. */
 export function fromWords(data: Record<string, unknown> | null | undefined): string {
   return typeof data?.from === 'string' && data.from ? ` · from ${data.from}` : ''
@@ -634,12 +647,15 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'created': {
       const kind = e.data?.kind
       const rule = ruleFromRow(e.data?.rule)
-      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}${fromWords(e.data)}`
+      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}${minutesWords(e.data)}${fromWords(e.data)}`
       const count = Number(e.data?.stages) || page.stages.length
-      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}${fromWords(e.data)}`
+      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}${minutesWords(e.data)}${fromWords(e.data)}`
     }
     // A project opened from this one (④-4c — answer 23).
     case 'opened project': return openedProjectText(e.actor, e.data)
+    // Its meeting minutes (②a-3): each attendee's signature, complete with the last one (or at once).
+    case 'signed': return `${e.actor} signed the ${e.reason || 'meeting'} minutes`
+    case 'minutes completed': return `The ${e.reason || 'meeting'} minutes are complete`
     case 'opened': return `Stage ${n} · ${stage} opened for ${e.fromTo ?? '—'}`
     case 'accepted': return `${e.actor} accepted Stage ${n} · ${stage}`
     case 'picked': return `${e.actor} picked ${e.fromTo ?? '—'} for ${stage}`

@@ -183,3 +183,14 @@ a.btn { text-decoration: none; } /* a deliverable's Assignment plan link */
   .trail { position: static; }
   .headRight { align-items: flex-start; }
 }
+
+/* A task's meeting minutes as its requirements (②a-3): the template's fields as written, the signatures, the notes. */
+.reqMinutes { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; color: rgb(var(--mk-ink)); }
+.reqMinutes .reqSource { margin-bottom: 0; }
+.minutesSaved { font-size: .78em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.minutesNotSaved { font-size: .78em; color: rgb(var(--mk-red)); display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; max-width: 420px; }
+.minutesReload { font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; cursor: pointer; padding: 0; }
+.minutesNotes { display: flex; flex-direction: column; gap: 6px; }
+.minutesNotesLabel { font-size: .88em; font-weight: 500; color: rgb(var(--mk-ink)); }
+.minutesNotesBox { box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; padding: 8px 10px; font: inherit; line-height: 1.5; outline: none; background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); resize: vertical; min-width: 0; }
+.minutesNotesBox:focus { border-color: rgb(var(--mk-stat-hover)); }

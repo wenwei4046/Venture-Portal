@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { longDay, type MktSub } from '@/lib/marketing/board'
+import { longDay, type MktPerson, type MktSub } from '@/lib/marketing/board'
 import { addMktClient, createMktTask, dropMktDraft, openMktDraft, saveMktDraft, startMktProduct } from '@/lib/marketing/actions'
 import { billEditOf, billOf, billProblems, type BillEdit } from '@/lib/marketing/billing'
 import {
@@ -14,9 +14,13 @@ import {
   defaultRule, DAY_NAMES, ENDS, FREQS, INTERVALS, MONTH_DAYS, periodText, recurPreview, rulePayload, ruleText, type RecurRule,
 } from '@/lib/marketing/recur'
 import { trailTime } from '@/lib/marketing/task'
+import {
+  minutesPayload, minutesProblems, minutesTyped, newMinutesDoc, NO_MINUTES, pickMinutes, type MinutesPick, type NewMinutes,
+} from '@/lib/marketing/task-minutes'
 import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES } from '@/lib/marketing/tasks'
 import { formatMoney } from '@/lib/utils'
 import MoneyInput from '../products/MoneyInput'
+import MinutesForm from '../project/MinutesForm'
 import BillFields from '../subsidiary/BillFields'
 import StageBuilder, { type BuilderPerson } from './StageBuilder'
 import s from './newproject.module.css'
@@ -43,6 +47,10 @@ const MODES: readonly { key: Mode; icon: string; name: string }[] = [
   { key: 'recurring', icon: '🔁', name: 'Recurring task' },
 ]
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+// Props not given: the same empty lists every render, so what is worked out from them stays put.
+const NO_DRAFTS: DraftRow[] = []
+const NO_PICKS: MinutesPick[] = []
+const NO_TEAM: MktPerson[] = []
 
 export default function NewProject({
   today,
@@ -56,8 +64,10 @@ export default function NewProject({
   canAddSub = false,
   addFirst = false,
   from = null,
-  drafts = [],
+  drafts = NO_DRAFTS,
   draft = null,
+  minutesPicks = NO_PICKS,
+  team = NO_TEAM,
 }: {
   today: string
   me: string | null
@@ -79,6 +89,10 @@ export default function NewProject({
   drafts?: DraftRow[]
   /** The draft opened (?draft=) — its form as kept. */
   draft?: OpenDraft | null
+  /** The meeting minutes a task may use (②a-3): the templates published. */
+  minutesPicks?: MinutesPick[]
+  /** Marketing's team — the minutes' attendees and people. */
+  team?: MktPerson[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -88,7 +102,7 @@ export default function NewProject({
   const [first] = useState(() => {
     const blank: NewForm = {
       sub: firstSub ?? subs[0]?.id ?? '', mode: 'task', product: products?.[0]?.id ?? '', amounts: {}, title: '', type: 'social',
-      brief: '', rule: defaultRule(today), stages: starterStages(mine, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null),
+      req: 'write', brief: '', minutes: NO_MINUTES, rule: defaultRule(today), stages: starterStages(mine, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null),
       source: from,
     }
     const kept = draft ? formFromDraft(draft.data, blank) : blank
@@ -102,7 +116,13 @@ export default function NewProject({
   })
   const blank = first.blank
   const [form, setForm] = useState<NewForm>(first.form)
-  const { sub, mode, product, title, type, brief, rule, stages, amounts, source } = form
+  const { sub, mode, product, title, type, req, brief, minutes, rule, stages, amounts, source } = form
+  // Meeting minutes instead of what is written (②a-3): the template picked.
+  const pickOf = useCallback((id: string) => minutesPicks.find(m => m.id === id) ?? null, [minutesPicks])
+  const mpick = pickOf(minutes.template)
+  /** Anything typed to keep — the minutes' too. */
+  const typed = useCallback((f: NewForm) => worthKeeping(f, blank) || (f.req === 'minutes' && minutesTyped(f.minutes, pickOf(f.minutes.template), me)),
+    [blank, me, pickOf])
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   // Marketing's own clients: added here, picked at once.
@@ -159,7 +179,7 @@ export default function NewProject({
       const now = formRef.current
       const d = draftRef.current
       const snap = JSON.stringify(draftOf(now))
-      if (doneRef.current || staleRef.current || snap === keptRef.current || (!d.id && !worthKeeping(now, blank))) {
+      if (doneRef.current || staleRef.current || snap === keptRef.current || (!d.id && !typed(now))) {
         setKeep(k => (k.state === 'saving' ? (atRef.current ? { state: 'saved', at: atRef.current } : { state: 'none' }) : k))
         return !staleRef.current
       }
@@ -184,7 +204,7 @@ export default function NewProject({
     })
     chain.current = run.catch(() => false)
     return run
-  }, [blank])
+  }, [typed])
 
   const update = (next: NewForm | ((f: NewForm) => NewForm)) => {
     const f = typeof next === 'function' ? next(formRef.current) : next
@@ -200,8 +220,8 @@ export default function NewProject({
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
       const now = formRef.current
-      const typed = draftRef.current.id ? JSON.stringify(draftOf(now)) !== keptRef.current : worthKeeping(now, blank)
-      if (!doneRef.current && (timer.current || typed)) e.preventDefault()
+      const unkept = draftRef.current.id ? JSON.stringify(draftOf(now)) !== keptRef.current : typed(now)
+      if (!doneRef.current && (timer.current || unkept)) e.preventDefault()
     }
     window.addEventListener('beforeunload', warn)
     return () => {
@@ -209,7 +229,7 @@ export default function NewProject({
       if (timer.current) void flush()
       if (toastTimer.current) clearTimeout(toastTimer.current)
     }
-  }, [blank, flush])
+  }, [flush, typed])
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
@@ -222,7 +242,10 @@ export default function NewProject({
   const problems = stageProblems(stages)
   const preview = recurPreview(rule)
   const titleOk = !!title.trim()
-  const ready = isProduct ? !!sub && !!picked && amount != null && amount > 0 : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok)
+  // Written with meeting minutes (②a-3): one picked, every required field filled in.
+  const minutesWrong = req === 'minutes' ? minutesProblems(mpick, minutes) : []
+  const ready = isProduct ? !!sub && !!picked && amount != null && amount > 0
+    : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok) && minutesWrong.length === 0
 
   let hint = ''
   if (isProduct) {
@@ -230,12 +253,30 @@ export default function NewProject({
       : `${subName} · ${picked.name} · ${formatMoney(amount)}${picked.kind === 'recurring' ? ' a month' : ''} · ${picked.intake.name} minutes`
   }
   else if (!titleOk) hint = 'Add a task title'
+  else if (minutesWrong.length) hint = minutesWrong[0]
   else if (problems.length) hint = problems[0] === 'A stage has no person' ? 'Every stage needs a name and a person' : problems[0]
   else if (isRec && !preview.ok) hint = 'Pick at least one day inside the period'
   else if (isRec) hint = `${subName} · Recurring · ${ruleText(rule)} · ${preview.count.toLowerCase()}`
   else hint = `${subName} · Quick task · ${stages.length} stage${stages.length === 1 ? '' : 's'} · finishes ${dates.length ? longDay(dates[dates.length - 1].dueOn) : '—'}`
 
   const setR = (patch: Partial<RecurRule>) => update(f => ({ ...f, rule: { ...f.rule, ...patch } }))
+
+  // Meeting minutes (②a-3): a template picked — the attendees starting as whoever starts the task, when on the team — and
+  // filled in here; the first published one picked when none is yet.
+  const meOnTeam = me && team.some(t => t.id === me) ? me : null
+  const pickTemplate = (m: MinutesPick) => update(f => ({ ...f, req: 'minutes', minutes: pickMinutes(f.minutes, m, meOnTeam) }))
+  const chooseMinutes = () => {
+    const first = pickOf(formRef.current.minutes.template) ?? minutesPicks[0]
+    if (first) pickTemplate(first)
+    else set({ req: 'minutes' })
+  }
+  const setMinutes = (patch: Partial<NewMinutes>) => update(f => ({ ...f, minutes: { ...f.minutes, ...patch } }))
+  const setMinutesVal = (name: string, v: NewMinutes['vals'][string] | undefined) => update(f => {
+    const vals = { ...f.minutes.vals }
+    if (v === undefined) delete vals[name]
+    else vals[name] = v
+    return { ...f, minutes: { ...f.minutes, vals } }
+  })
 
   const closeAdd = () => {
     setAdding(false)
@@ -353,11 +394,12 @@ export default function NewProject({
           kind: isRec ? 'recurring' : 'quick',
           title: title.trim(),
           type,
-          brief: brief.trim(),
+          brief: req === 'write' ? brief.trim() : '',
           stages: stagesPayload(stages),
           recur: isRec ? rulePayload(rule) : null,
           from: source?.id ?? null,
           draft: draftRef.current.id,
+          minutes: req === 'minutes' && mpick ? minutesPayload(mpick, minutes) : null,
         })
         if (!r.ok) return r.reason
         doneRef.current = true
@@ -581,12 +623,48 @@ export default function NewProject({
         <div className={s.field} style={{ gap: 8 }}>
           <div className={s.reqHead}>
             <span className={s.fieldLabel}>What needs to be done</span>
-            <div className={s.seg}>
-              <button type="button" className={`${s.segBtn} ${s.segOn}`}>Write it here</button>
-              <button type="button" className={`${s.segBtn} ${s.segOff}`} disabled title="Comes with the Minutes Builder">Use meeting minutes</button>
+            <div className={s.seg} role="radiogroup" aria-label="What needs to be done">
+              <button type="button" role="radio" aria-checked={req === 'write'} className={`${s.segBtn}${req === 'write' ? ` ${s.segOn}` : ''}`}
+                onClick={() => set({ req: 'write' })}>Write it here</button>
+              <button type="button" role="radio" aria-checked={req === 'minutes'} className={`${s.segBtn}${req === 'minutes' ? ` ${s.segOn}` : ''}`}
+                onClick={chooseMinutes}>Use meeting minutes</button>
             </div>
           </div>
-          <textarea className={s.textarea} rows={3} value={brief} maxLength={4000} onChange={e => set({ brief: e.target.value })} placeholder="What to change, where, and anything they should know" />
+          {req === 'write' ? (
+            <textarea className={s.textarea} rows={3} value={brief} maxLength={4000} onChange={e => set({ brief: e.target.value })} placeholder="What to change, where, and anything they should know" />
+          ) : minutesPicks.length ? (
+            <>
+              <div className={s.minutesPicks} role="radiogroup" aria-label="Meeting minutes">
+                {minutesPicks.map(m => (
+                  <button key={m.id} type="button" role="radio" aria-checked={minutes.template === m.id}
+                    className={`${s.minutesPick}${minutes.template === m.id ? ` ${s.cardOn}` : ''}`} onClick={() => pickTemplate(m)}>
+                    <span className={s.cardName}>{m.name}</span>
+                    <span className={s.productMeta}>v{m.version} · {m.fields.length} field{m.fields.length === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+              </div>
+              {mpick ? (() => {
+                const doc = newMinutesDoc(mpick, minutes, me)
+                return (
+                  <div className={s.minutesBox} aria-label={`${mpick.name} minutes`}>
+                    <MinutesForm doc={doc} vals={doc.vals} track={`${isRec ? 'RCR' : 'TSK'}-${subList.find(x => x.id === sub)?.code ?? '…'}-…`}
+                      title={title.trim() || 'This task'} team={team} me={me} readOnly={false} onVal={setMinutesVal}
+                      onSign={() => setMinutes({ sign: true })} signing={false} />
+                    <label className={s.field}>
+                      <span className={s.fieldLabel}>Meeting notes <span title="Internal only — the PIC never sees it">🔒</span></span>
+                      <textarea className={s.textarea} rows={3} value={minutes.notes} maxLength={4000} aria-label="Meeting notes"
+                        onChange={e => setMinutes({ notes: e.target.value })} />
+                    </label>
+                  </div>
+                )
+              })() : null}
+            </>
+          ) : (
+            <div className={s.noProducts}>
+              <span>No meeting minutes published</span>
+              {products ? <Link href="/marketing/minutes" className={s.crumbLink}>Minutes Builder →</Link> : null}
+            </div>
+          )}
         </div>
       </div>
 

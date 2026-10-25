@@ -385,6 +385,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // New Project kept as a draft while it is typed (mig 20261025211000): the login's own drafts listed, opened, saved on
   // their count and dropped — all Marketing · Create, each the caller's own rows alone.
   'mkt_new_drafts', 'mkt_new_draft', 'mkt_new_draft_save', 'mkt_new_draft_drop',
+  // A task written with meeting minutes (mig 20261025221000): the templates published, read by Marketing · Create;
+  // mkt_task_create made again with them; a task's minutes written by its owner too, completed by the last signature.
+  'mkt_minutes_picker',
   // Subtasks (mig 20261025101000): split off the stage now and taken back by its owner, delivered by their assignee
   // (files sent under subtask/ first), reviewed by the stage's owner — all Marketing · Edit, the database deciding whose.
   'mkt_subtask_add', 'mkt_subtask_deliver', 'mkt_subtask_review', 'mkt_subtask_remove',
