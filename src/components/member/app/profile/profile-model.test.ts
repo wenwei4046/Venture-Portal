@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import type { ArenaPerson, MemberArenaSnapshot } from "@/lib/member/arena";
 import {
-  claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
+  claimClosedMonth, claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
   type RequestEvent,
 } from "./profile-model";
 
@@ -266,6 +266,20 @@ describe("the request forms' choices", () => {
 
   it("leaves out a weekend that has not begun", () => {
     expect(claimWeeks([sep], "2026-09-12").map(w => w.key)).toEqual(["2026-09-11", "2026-09-04"]);
+  });
+
+  // 2026-10-25 — the user: "关月后还能 claim". On 16 Oct September is closed and October is the month being worked: its
+  // weekends used to drop off the form; now the form reads September's Arena for itself, and they stay.
+  it("keeps a closed month's weekends claimable — last month read for the form once it is closed", () => {
+    expect([claimClosedMonth("2026-10", "2026-10"), claimClosedMonth("2026-10", "2026-09"), claimClosedMonth("2026-10", null), claimClosedMonth("2026-01", "2026-01")])
+      .toEqual(["2026-09", null, null, "2025-12"]);
+    // The app's three: the month being worked (October), no other this month, and the closed September.
+    expect(claimWeeks([oct, null, sep], "2026-10-16").map(w => [w.key, w.month, w.claimable])).toEqual([
+      ["2026-10-16", "OCT", false], ["2026-10-09", "OCT", false], ["2026-10-02", "OCT", true],
+      ["2026-09-25", "SEP", false], ["2026-09-18", "SEP", false], ["2026-09-11", "SEP", true], ["2026-09-04", "SEP", true],
+    ]);
+    // What the form held before: October alone.
+    expect(claimWeeks([oct, null], "2026-10-16").map(w => w.month)).toEqual(["OCT", "OCT", "OCT"]);
   });
 
   it("lets a member replace only somebody in their own team below them", () => {
