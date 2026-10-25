@@ -445,11 +445,13 @@ export function typedValues(figures: readonly AdsKey[], typed: Readonly<Partial<
   return out
 }
 
-/** A value as the publish form starts it: the worked-out figure, rounded as it would be written. */
+/** A value as the publish form starts it — what the report keeps: money to the sen, even a figure its cards write whole
+ * (Meta's RM 516.74 kept so, written *RM 517*: the cost per lead worked out from it agrees with it), a rate or ROAS to a
+ * tenth, a count whole. */
 export function valueText(key: AdsKey, v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return ''
   const f = figureOf(key).fmt
-  const r = f === 'rm' || f === 'n' ? Math.round(v) : f === 'x' || f === 'pct' ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100
+  const r = f === 'n' ? Math.round(v) : f === 'x' || f === 'pct' ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100
   return String(r)
 }
 

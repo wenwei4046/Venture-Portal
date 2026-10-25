@@ -120,14 +120,28 @@ describe('setting it up', () => {
 })
 
 describe('publishing a period', () => {
-  it('starts each value from the worked-out figure, rounded as written; typed numbers from 0, an empty one none', () => {
+  it('starts each value from the worked-out figure — money to the sen, a rate a tenth, a count whole; typed numbers from 0, an empty one none', () => {
     expect([valueText('spend', 3240.4), valueText('cpl', 18.4091), valueText('apptRate', 26.136), valueText('roas', 3.2), valueText('leads', null)])
-      .toEqual(['3240', '18.41', '26.1', '3.2', ''])
+      .toEqual(['3240.4', '18.41', '26.1', '3.2', ''])
+    expect([valueText('spendToDate', 1234.567), valueText('wonAmount', 8800), valueText('impr', 15078.4)]).toEqual(['1234.57', '8800', '15078'])
     expect(typedValues(['spend', 'cpl', 'apptRate', 'roas'], { spend: 'RM 3,240', cpl: '18.41', apptRate: '26%', roas: '' }))
       .toEqual({ spend: 3240, cpl: 18.41, apptRate: 26, roas: null })
     expect(typedValues(['cpl'], { cpl: '-3' })).toBeUndefined()
     expect(adsValuesOf({ cpl: 18.4, roas: null, leads: -1, nope: 3, spend: 'x' })).toEqual({ cpl: 18.4, roas: null })
     expect(adsValuesOf({ nope: 1 })).toBeNull()
+  })
+
+  // Production, 11 – 24 Oct, two Carres ads: Meta's spend started the window whole (`517`) and was kept so, while the
+  // cost per lead beside it was worked out from Meta's own figure — 517 ÷ 12 leads is not the 43.06 the report kept.
+  it('keeps Meta’s spend to the sen, so the cost per lead kept beside it is worked out from what is kept', () => {
+    const values = adsValues({ leads: 12, appt: 0, showup: 0, won: 0, wonAmount: 0 }, { spend: 516.74, impr: 15078, reach: 9100, clicks: 56, msgconv: 10 }, 516.74)
+    const figures = ['spendToDate', 'spend', 'cpl', 'cpmsg'] as const
+    const typed = Object.fromEntries(figures.map(k => [k, valueText(k, values[k])]))
+    expect(typed).toEqual({ spendToDate: '516.74', spend: '516.74', cpl: '43.06', cpmsg: '51.67' })
+    const kept = typedValues(figures, typed)!
+    expect(kept.cpl).toBe(Math.round((kept.spend! / 12) * 100) / 100)
+    expect(kept.cpmsg).toBe(Math.round((kept.spend! / 10) * 100) / 100)
+    expect(figures.map(k => figureText(k, kept[k]))).toEqual(['RM 517', 'RM 517', 'RM 43.06', 'RM 51.67'])
   })
 })
 
