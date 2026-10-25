@@ -127,13 +127,23 @@ function hub(over: Partial<InvoiceHubData> = {}): InvoiceHubData {
     ],
     otherOpen: [toHubInvoice(row({ id: 'old1', invoice_no: 'HV-INV-202609-0040', period_month: '2026-09-01', total_amount: 300 }), ctx, true)],
     creditNotes: [CN],
-    contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', companyId: 'co-hc', invoice: { id: 'hc2', no: 'HV-INV-202610-0009' } }],
+    marketing: {
+      month: '2026-10-01',
+      locked: false,
+      lines: [
+        { bill: 'b1', project: 'p1', track: 'PRJ-HC-2610-001', title: 'Retainer', words: "Social Media - Oct'26", amount: 2000, sub: { id: 's-hc', code: 'HC', name: 'HOUZS Century' },
+          party: { kind: 'subsidiary', id: 'co-hc', name: 'HOUZS Century', code: 'HC' }, account: { code: '5017', name: 'Social Media' }, invoice: { id: 'hc2', no: 'HV-INV-202610-0009', status: 'issued' } },
+        { bill: 'b2', project: 'p2', track: 'PRJ-REDT-2610-001', title: 'Post pack', words: "Post pack - Oct'26", amount: 500, sub: { id: 's-rt', code: 'REDT', name: 'Red Truck' },
+          party: { kind: 'client', id: 's-rt', name: 'Red Truck Sdn Bhd', code: 'REDT' }, account: null, invoice: null },
+      ],
+      typed: [],
+    },
     nonBillable: [
       { id: 'vp1', at: '2026-10-06T02:00:00Z', type: 'expense_out', amount: 2899.75, description: 'AI tools Sep26 claim', source: 'Payment voucher', out: true },
       { id: 'vp2', at: '2026-10-05T02:00:00Z', type: 'profit_in', amount: 21.5, description: 'Settle HV-INV-202609-0017', source: 'Payment voucher', out: false },
     ],
     banks: [{ id: 'b1', label: 'Hong Leong Bank — 123-456-7890' }],
-    basis: { status: 'Pending', note: 'HR pending · Director salary pending · 1 marketing contract', summary: 'Nothing from payroll yet', lines: [], director: null, allocation: [] },
+    basis: { status: 'Pending', note: 'HR pending · Director salary pending · 2 Marketing lines', summary: 'Nothing from payroll yet', lines: [], director: null, allocation: [] },
     department: null,
     companies: [{ id: 'co-hc', name: 'HOUZS Century', short_code: 'HC' }],
     departments: [{ id: 'd-mkt', name: 'Marketing' }],
@@ -178,14 +188,14 @@ describe('the head and the cards', () => {
     expect(screen.getByText('October 2026')).toBeInTheDocument()
   })
 
-  it('cards each list with its count and figure — credit notes taken off, the projects, what left the pool', () => {
+  it('cards each list with its count and figure — credit notes taken off, Marketing’s billing, what left the pool', () => {
     draw()
     const card = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}`) })
     expect(card('All invoices')).toHaveTextContent('6 invoicesRM 8,387.25')
     expect(card('Issued')).toHaveTextContent('4 invoicesRM 6,637.25')
     expect(card('Draft')).toHaveTextContent('1 invoiceRM 500.00')
     expect(card('Credit notes')).toHaveTextContent('1 credit note−RM 220.40')
-    expect(card('Marketing projects')).toHaveTextContent('1 project · 1 activeRM 6,000.00')
+    expect(card('Marketing billing')).toHaveTextContent('2 lines · 1 to importRM 2,500.00')
     expect(card('Non-billable')).toHaveTextContent('2 transactionsRM 2,899.75')
   })
 
@@ -194,13 +204,13 @@ describe('the head and the cards', () => {
     expect(screen.queryByRole('button', { name: 'Create invoice ▾' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Export ▾' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Payroll ▾' }))
-    expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Payroll basisPending · HR pending · Director salary pending · 1 marketing contract'])
+    expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Payroll basisPending · HR pending · Director salary pending · 2 Marketing lines'])
   })
 
   it('Create invoice ▾ opens the invoice dialogs on the page’s month', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
-    expect(within(dialog()).getByText('From 1 active marketing project')).toBeInTheDocument()
+    expect(within(dialog()).getByText('1 line to import · RM 500.00')).toBeInTheDocument()
     fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Single invoice/ }))
     expect(screen.getByTestId('dialog-single')).toBeInTheDocument()
     expect(mocks.dialog).toHaveBeenLastCalledWith('single', expect.objectContaining({ period: '2026-10-01', open: true, today: '2026-10-14' }))
@@ -216,7 +226,7 @@ describe('the head and the cards', () => {
       fireEvent.click(screen.getByRole('button', { name: menu }))
       fireEvent.click(within(dialog()).getByRole('menuitem', { name: item }))
     }
-    pick('Create invoice ▾', /Generate Marketing invoices/)
+    pick('Create invoice ▾', /Import Marketing billing/)
     expect(mocks.dialog).toHaveBeenLastCalledWith('marketing', expect.objectContaining({ period: '2026-10-01', open: true }))
     pick('Payroll ▾', /Generate payroll invoices/)
     expect(mocks.dialog).toHaveBeenLastCalledWith('consolidated', expect.objectContaining({ period: '2026-10-01', open: true }))
@@ -508,12 +518,26 @@ describe('the lists that are not the table’s', () => {
     expect(drawer()).toHaveTextContent('HV-INV-202610-0013')
   })
 
-  it('marketing projects: Invoice opens the month’s invoice; + New contract', () => {
+  it('Marketing billing: each confirmed line — Invoice opens the one it is on; Import while some are on none', () => {
     draw({ card: 'mkt' })
-    expect(screen.getByText('HOUZS Century (HC) · 01 Oct – 31 Dec 2026 · active')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '+ New contract' })).toHaveAttribute('href', '/billing/contracts/new')
-    fireEvent.click(screen.getByRole('button', { name: 'Invoice' }))
+    expect(screen.getByText('HOUZS Century · PRJ-HC-2610-001 · 5017 · On HV-INV-202610-0009 · issued')).toBeInTheDocument()
+    expect(screen.getByText('Red Truck Sdn Bhd · PRJ-REDT-2610-001 · no account · To import')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '+ New contract' })).toBeNull()
+    const [onIt, notYet] = screen.getAllByRole('button', { name: 'Invoice' })
+    expect(notYet).toBeDisabled()
+    fireEvent.click(onIt)
     expect(drawer()).toHaveTextContent('HV-INV-202610-0009')
+    fireEvent.click(screen.getByRole('button', { name: 'Import · 1' }))
+    expect(mocks.dialog).toHaveBeenLastCalledWith('marketing', expect.objectContaining({ period: '2026-10-01', open: true }))
+  })
+
+  it('Marketing billing: nothing to import, or no Billing · Create — no Import', () => {
+    const all = hub()
+    draw({ card: 'mkt', data: { ...all, marketing: { ...all.marketing, lines: all.marketing.lines.slice(0, 1) } } })
+    expect(screen.queryByRole('button', { name: /^Import/ })).toBeNull()
+    document.body.innerHTML = ''
+    draw({ card: 'mkt', can: { ...ALL, create: false } })
+    expect(screen.queryByRole('button', { name: /^Import/ })).toBeNull()
   })
 
   it('non-billable: what left the pool plain, what came in green with a +', () => {

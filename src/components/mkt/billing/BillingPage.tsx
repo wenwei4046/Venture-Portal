@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { confirmMktBills, withdrawMktBill } from '@/lib/marketing/actions'
 import {
-  billingTotals, billMissing, billPartyLines, clientLines, confirmable, lineWhen, monthKey, monthLabel, shiftMonth,
+  billingTotals, billMissing, billPartyLines, clientLines, confirmable, invoiceWords, lineWhen, monthKey, monthLabel, shiftMonth,
   type BillingPage as Page, type BillLine,
 } from '@/lib/marketing/billing'
 import { officeTime } from '@/lib/office-time'
@@ -13,8 +13,9 @@ import s from './billing.module.css'
 
 // Billing (②b-2b — the user's answers 43–48, 50, 51), the manager's: the month's lines by client — a one-time project
 // the month it was done, a recurring one every month from its first run until stopped — each with the project's amount
-// now; *Confirm* keeps it as it is for Finance's import (not built yet), *Withdraw* takes it back. ‹ › walk the months
-// (never past this one); the months still to confirm are named at the top.
+// now; *Confirm* keeps it as it is for Finance's import, *Withdraw* takes it back — until Finance imports it: then the
+// line says the invoice it is on, and comes back to withdraw once Finance deletes that draft or voids it (②b-2h). ‹ ›
+// walk the months (never past this one); the months still to confirm are named at the top.
 
 const monthHref = (m: string, now: string) => (m === now ? '/marketing/billing' : `/marketing/billing?m=${monthKey(m)}`)
 
@@ -156,9 +157,13 @@ export default function BillingPage({ initial }: { initial: Page }) {
                               <span className={`${s.statDot} ${s.dotDone}`} aria-hidden="true" />
                               Confirmed{l.bill.by ? ` · ${l.bill.by}` : ''}{l.bill.at ? ` · ${officeTime(l.bill.at).format('D MMM')}` : ''}
                             </span>
-                            <button type="button" className={s.ghost} disabled={pending} onClick={() => withdraw(l)}>
-                              {busy === l.project ? 'Withdrawing…' : 'Withdraw'}
-                            </button>
+                            {l.bill.invoice ? (
+                              <span className={`${s.pill} ${s.pillInv}`}>{invoiceWords(l.bill.invoice)}</span>
+                            ) : (
+                              <button type="button" className={s.ghost} disabled={pending} onClick={() => withdraw(l)}>
+                                {busy === l.project ? 'Withdrawing…' : 'Withdraw'}
+                              </button>
+                            )}
                           </>
                         ) : l.amount == null ? (
                           <>

@@ -9,6 +9,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   marketing: vi.fn(),
+  marketingPreview: vi.fn(),
   payrollPreview: vi.fn(),
   payroll: vi.fn(),
   delta: vi.fn(),
@@ -17,7 +18,8 @@ const mocks = vi.hoisted(() => ({
   own: vi.fn(),
 }))
 vi.mock('../invoice-actions', () => ({
-  hubGenerateMarketing: mocks.marketing,
+  hubImportMarketing: mocks.marketing,
+  hubMarketingPreview: mocks.marketingPreview,
   hubPayrollPreview: mocks.payrollPreview,
   hubGeneratePayrollInvoices: mocks.payroll,
   hubPayrollDelta: mocks.delta,
@@ -39,23 +41,90 @@ const comp = (salary: number, allowance: number, epf: number, socso: number, eis
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('Generate Marketing invoices', () => {
-  it('asks first, on the hub’s month; generates the drafts and says how many', async () => {
-    mocks.marketing.mockResolvedValue({ ok: true, value: { generated: 2, kept: 1 } })
+describe('Import Marketing billing (2026-10-26)', () => {
+  const line = (over: Record<string, unknown>) => ({
+    bill: 'b', project: 'p', track: 'PRJ-CAR-2609-001', title: 'x', words: "Post pack - Sep'26", amount: 500,
+    sub: { id: 's-car', code: 'CAR', name: 'Carres' }, party: { kind: 'subsidiary', id: 'co-car', name: 'Carres', code: 'CAR' },
+    account: { code: '5019', name: 'Design Income' }, invoice: null, ...over,
+  })
+  const PREVIEW = {
+    month: '2026-09-01',
+    locked: false,
+    lines: [
+      line({ bill: 'b1' }),
+      line({ bill: 'b2', track: 'PRJ-CAR-2609-002', words: "Lead Gen - Sep'26", amount: 2500, account: { code: '5012', name: 'Revenue - Lead Gen' },
+        invoice: { id: 'i1', no: 'HV-INV-202609-0050', status: 'draft' } }),
+      line({ bill: 'b3', track: 'PRJ-REDT-2609-001', words: "Social Media - Sep'26", amount: 3000, account: null,
+        sub: { id: 's-rt', code: 'REDT', name: 'Red Truck' }, party: { kind: 'client', id: 's-rt', name: 'Red Truck Sdn Bhd', code: 'REDT' } }),
+    ],
+    typed: [{ id: 't1', no: 'HV-INV-202609-0013', status: 'paid', total: 2000, party: 'Rygis Private Gym', code: null, words: 'Marketing Service' }],
+  }
+
+  it('reads the month’s confirmed lines, a party a card — its lines, accounts and invoices — and the invoices typed by hand', async () => {
+    mocks.marketingPreview.mockResolvedValue({ ok: true, value: PREVIEW })
+    render(<MarketingDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-09-01" />)
+    await flush()
+    expect(mocks.marketingPreview).toHaveBeenCalledWith('2026-09')
+    const car = within(dialog()).getByRole('group', { name: 'Carres (CAR)' })
+    expect(car).toHaveTextContent("Carres (CAR)3,000.00Post pack - Sep'26500.00PRJ-CAR-2609-001 · 5019 · Design Income · To import")
+    expect(car).toHaveTextContent('PRJ-CAR-2609-002 · 5012 · Revenue - Lead Gen · On HV-INV-202609-0050 · draft')
+    expect(within(dialog()).getByRole('group', { name: 'Red Truck Sdn Bhd' })).toHaveTextContent('Red Truck Sdn Bhd · client3,000.00')
+    expect(within(dialog()).getByRole('group', { name: 'Red Truck Sdn Bhd' })).toHaveTextContent('No account · To import')
+    expect(within(dialog()).getByRole('group', { name: 'Typed this month' })).toHaveTextContent('HV-INV-202609-0013 · Rygis Private Gym · paid2,000.00')
+    expect(hint()).toContain('Marketing invoices were typed by hand this month too — check none bills the same work.')
+    expect(within(dialog()).getByRole('button', { name: 'Import · 2 lines · RM 3,500.00' })).not.toHaveAttribute('data-off', 'true')
+  })
+
+  it('imports the lines on no invoice and says what it did', async () => {
+    mocks.marketingPreview.mockResolvedValue({ ok: true, value: PREVIEW })
+    mocks.marketing.mockResolvedValue({ ok: true, value: { made: 1, added: 1, lines: 2, invoices: ['HV-INV-202609-0050', 'HV-INV-202609-0051'] } })
     const onDone = vi.fn()
     const onClose = vi.fn()
     render(<MarketingDialog open onClose={onClose} onDone={onDone} period="2026-09-01" />)
-    expect(dialog()).toHaveTextContent('Draft invoices for September 2026 from the active marketing projects. Issued ones are kept as they are.')
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Generate' }))
+    await flush()
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Import · 2 lines · RM 3,500.00' }))
     await flush()
     expect(mocks.marketing).toHaveBeenCalledWith('2026-09')
-    expect(onDone).toHaveBeenCalledWith('2 Marketing invoices generated as drafts · 1 kept as they were')
+    expect(onDone).toHaveBeenCalledWith('Marketing billing imported · 1 draft made · 1 draft added to · 2 lines')
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('Cancel generates nothing', () => {
+  it('a refusal stays in the window', async () => {
+    mocks.marketingPreview.mockResolvedValue({ ok: true, value: PREVIEW })
+    mocks.marketing.mockResolvedValue({ ok: false, reason: 'Period Sep 2026 is closed. Contact Principal to reopen.' })
     const onClose = vi.fn()
     render(<MarketingDialog open onClose={onClose} onDone={vi.fn()} period="2026-09-01" />)
+    await flush()
+    fireEvent.click(within(dialog()).getByRole('button', { name: /^Import/ }))
+    await flush()
+    expect(hint()).toContain('Period Sep 2026 is closed. Contact Principal to reopen.')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('every line on an invoice, a closed month, another month with nothing: nothing to import', async () => {
+    const imported = { ...PREVIEW, typed: [], lines: PREVIEW.lines.map((l) => ({ ...l, invoice: { id: 'i1', no: 'HV-INV-202609-0050', status: 'issued' } })) }
+    mocks.marketingPreview
+      .mockResolvedValueOnce({ ok: true, value: imported })
+      .mockResolvedValueOnce({ ok: true, value: { ...PREVIEW, month: '2026-08-01', locked: true } })
+      .mockResolvedValueOnce({ ok: true, value: { month: '2026-07-01', locked: false, lines: [], typed: [] } })
+    render(<MarketingDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-09-01" />)
+    await flush()
+    expect(within(dialog()).getByRole('button', { name: 'Nothing to import' })).toHaveAttribute('data-off', 'true')
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2026-08' } })
+    await flush()
+    expect(mocks.marketingPreview).toHaveBeenLastCalledWith('2026-08')
+    expect(hint()).toContain('August 2026 is closed — the Principal reopens it.')
+    expect(within(dialog()).getByRole('button', { name: /^Import/ })).toHaveAttribute('data-off', 'true')
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2026-07' } })
+    await flush()
+    expect(hint()).toContain('Nothing confirmed by Marketing for July 2026.')
+  })
+
+  it('Cancel imports nothing', async () => {
+    mocks.marketingPreview.mockResolvedValue({ ok: true, value: PREVIEW })
+    const onClose = vi.fn()
+    render(<MarketingDialog open onClose={onClose} onDone={vi.fn()} period="2026-09-01" />)
+    await flush()
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalled()
     expect(mocks.marketing).not.toHaveBeenCalled()

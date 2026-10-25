@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem } from '@/components/finv/Dialog'
+import { money } from '@/components/finv/form-words'
 import { invoiceSteps, type InvoiceCan, type InvoiceStepKey } from './InvoiceDrawer'
 import SettleDialog from './SettleDialog'
 import CreateInvoiceDialog from './CreateInvoiceDialog'
@@ -23,6 +24,7 @@ import {
   type HubResult,
 } from '../invoice-actions'
 import { creditNoteFigures, postedAccounts, settleSelection, type HubCreditNote, type HubInvoice, type InvoiceHubData } from '../_lib/invoice-model'
+import { mktSummary } from '../_lib/marketing-lines'
 
 // What can be done to Invoice's invoices (2026-10-15 — moved out of the hub's
 // client word for word, so the Finance phone app's Invoice screens do the same
@@ -240,7 +242,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
   }
 
   // ── The head's menus ──
-  const activeContracts = hub.contracts.filter((c) => c.status === 'active').length
+  const mkt = mktSummary(hub.marketing)
   const drafts = hub.invoices.filter((i) => i.status === 'draft').length
   const menuItem = (key: string, label: string, onClick: () => void, sub?: string): DialogMenuItem => ({
     key,
@@ -255,7 +257,12 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
   const createItems: DialogMenuItem[] = [
     menuItem('single', 'Single invoice', openDialog('single')),
     menuItem('multi', 'Multi-line invoice', openDialog('multi'), 'Several lines on one invoice'),
-    menuItem('marketing', 'Generate Marketing invoices', openDialog('marketing'), `From ${plural(activeContracts, 'active marketing project', 'active marketing projects')}`),
+    menuItem(
+      'marketing',
+      'Import Marketing billing',
+      openDialog('marketing'),
+      mkt.lines === 0 ? `Nothing confirmed for ${monthLong} yet` : mkt.toImport === 0 ? `${plural(mkt.lines, 'line', 'lines')} · all imported` : `${plural(mkt.toImport, 'line', 'lines')} to import · RM ${money(mkt.toImportAmount)}`,
+    ),
   ]
   const payrollItems: DialogMenuItem[] = [
     ...(can.create
@@ -546,7 +553,6 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
     settle: (ids: string[]) => setSettleIds(ids),
     exportItems,
     drafts,
-    activeContracts,
     dialogs,
   }
 }

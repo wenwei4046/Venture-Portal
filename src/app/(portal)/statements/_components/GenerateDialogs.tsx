@@ -1,30 +1,33 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { DialogButton, DialogConfirm, DialogForm, Field, FinDialog, Hint } from '@/components/finv/Dialog'
+import { DialogButton, DialogForm, Field, FinDialog, Hint } from '@/components/finv/Dialog'
 import { money } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
 import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
 import type { DeptComponentGroup } from '@/lib/staff-allocation'
 import type { InvoiceCategory } from '../_lib/invoice-form'
 import {
-  hubGenerateMarketing,
   hubGenerateOwnShare,
   hubGeneratePayrollInvoices,
+  hubImportMarketing,
+  hubMarketingPreview,
   hubOwnSharePreview,
   hubPayrollDelta,
   hubPayrollPreview,
   hubTopUpPayroll,
   type HubResult,
 } from '../invoice-actions'
+import { importWords, mktLineState, mktParties, mktSummary } from '../_lib/marketing-lines'
 import { CategorySelect, PeriodSelect } from './InvoiceFormParts'
 
 // The hub's generators (2026-10-14, the Finance revamp v2 — D10's *Create
-// invoice ▾ › Generate Marketing invoices* and *Payroll ▾*): the system's
-// own, in the kit's sheet. Each reads what it would write before it writes
-// it — HR's staff billing allocation per company, payroll against the issued
-// payroll invoices, HV's own share per department — on the hub's month (or
-// another, by its Period), and writes drafts only.
+// invoice ▾ › Generate Marketing invoices* — Import Marketing billing since
+// 2026-10-26 — and *Payroll ▾*): the system's own, in the kit's sheet. Each
+// reads what it would write before it writes it — Marketing's confirmed
+// lines, HR's staff billing allocation per company, payroll against the
+// issued payroll invoices, HV's own share per department — on the hub's month
+// (or another, by its Period), and writes drafts only.
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const monthWords = (month: string) => `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`
@@ -70,20 +73,30 @@ interface GeneratorProps {
   period: string
 }
 
-// ── Generate Marketing invoices ──
+// ── Import Marketing billing (2026-10-26, ②b-2h — the user's "A") ──
+// The lines Marketing's manager confirmed for the month, by party — each with its account and the invoice it is on —
+// and the month's Marketing invoices typed by hand, so the same work is not billed twice; Import puts the lines on no
+// invoice yet onto drafts, a party each, deleting nothing.
 
 export function MarketingDialog({ open, onClose, onDone, period }: GeneratorProps) {
-  const month = period.slice(0, 7)
+  const hubMonth = period.slice(0, 7)
+  const [month, setMonth] = useState(hubMonth)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const preview = usePreview(open, month, hubMarketingPreview)
+  const m = preview.value
+  const parties = m ? mktParties(m) : []
+  const sum = m ? mktSummary(m) : null
+  const ok = !preview.loading && !!m && !m.locked && (sum?.toImport ?? 0) > 0
+
   const go = async () => {
+    if (!ok || busy) return
     setBusy(true)
     setError(null)
     try {
-      const res = await hubGenerateMarketing(month)
+      const res = await hubImportMarketing(month)
       if (!res.ok) return setError(res.reason)
-      const { generated, kept } = res.value
-      onDone(`${plural(generated, 'Marketing invoice', 'Marketing invoices')} generated as drafts${kept > 0 ? ` · ${kept} kept as they were` : ''}`)
+      onDone(importWords(res.value))
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'It did not go through. Try again.')
@@ -91,19 +104,78 @@ export function MarketingDialog({ open, onClose, onDone, period }: GeneratorProp
       setBusy(false)
     }
   }
+
   return (
-    <FinDialog open={open} onClose={() => !busy && onClose()} title="Generate Marketing invoices" locked={busy}>
-      <DialogConfirm
-        text={`Draft invoices for ${monthWords(month)} from the active marketing projects. Issued ones are kept as they are.`}
-        confirmLabel={busy ? 'Generating…' : 'Generate'}
-        busy={busy}
-        error={error}
-        onCancel={onClose}
-        onConfirm={go}
-      />
+    <FinDialog open={open} onClose={() => !busy && onClose()} title="Import Marketing billing" sub="One draft a party · the lines Marketing confirmed" locked={busy}>
+      <DialogForm
+        buttons={
+          <>
+            <DialogButton disabled={busy} onClick={onClose}>
+              Cancel
+            </DialogButton>
+            <DialogButton kind="primary" off={!ok} disabled={busy} onClick={go}>
+              {busy ? 'Importing…' : sum && sum.toImport > 0 ? `Import · ${plural(sum.toImport, 'line', 'lines')} · RM ${money(sum.toImportAmount)}` : 'Nothing to import'}
+            </DialogButton>
+          </>
+        }
+      >
+        <Field label="Period" htmlFor="mk-period">
+          <PeriodSelect id="mk-period" value={month} onChange={setMonth} around={hubMonth} />
+        </Field>
+        {preview.loading ? (
+          <Hint>Reading Marketing’s billing…</Hint>
+        ) : preview.error ? (
+          <Hint danger>{preview.error}</Hint>
+        ) : !m || m.lines.length === 0 ? (
+          <Hint>Nothing confirmed by Marketing for {monthWords(month)}.</Hint>
+        ) : (
+          <Field label={`${plural(parties.length, 'party', 'parties')} · RM ${money(sum?.amount ?? 0)}`}>
+            {parties.map((p) => (
+              <div key={p.key} className={fm.summary} role="group" aria-label={p.name}>
+                <div className={fm.summaryRow} data-head="true">
+                  <span className={fm.summaryLabel}>{p.kind === 'client' ? `${p.name} · client` : p.name}</span>
+                  <span className={fm.summaryValue}>{money(p.total)}</span>
+                </div>
+                {p.lines.map((l) => (
+                  <div key={l.bill}>
+                    <div className={fm.summaryRow}>
+                      <span className={fm.summaryLabel}>{l.words}</span>
+                      <span className={fm.summaryValue}>{money(l.amount)}</span>
+                    </div>
+                    <div className={fm.summaryParts}>{[l.track, l.account ? `${l.account.code} · ${l.account.name}` : 'No account', mktLineState(l)].join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Field>
+        )}
+        {m && m.typed.length > 0 ? (
+          <Field label="Typed this month">
+            <div className={fm.summary} role="group" aria-label="Typed this month">
+              {m.typed.map((t) => (
+                <div key={t.id} className={fm.summaryRow}>
+                  <span className={fm.summaryLabel}>{[t.no ?? 'Draft', t.code ?? t.party, statusWords(t.status)].join(' · ')}</span>
+                  <span className={fm.summaryValue}>{money(t.total)}</span>
+                </div>
+              ))}
+            </div>
+          </Field>
+        ) : null}
+        {error ? (
+          <Hint danger>{error}</Hint>
+        ) : m?.locked ? (
+          <Hint danger>{monthWords(month)} is closed — the Principal reopens it.</Hint>
+        ) : m && m.typed.length > 0 ? (
+          <Hint>Marketing invoices were typed by hand this month too — check none bills the same work.</Hint>
+        ) : (
+          <Hint>Drafts with no invoice date — each line on its product’s account.</Hint>
+        )}
+      </DialogForm>
     </FinDialog>
   )
 }
+
+const statusWords = (s: string) => (s === 'paid_via_netting' ? 'paid via netting' : s)
 
 // ── Generate payroll invoices ──
 

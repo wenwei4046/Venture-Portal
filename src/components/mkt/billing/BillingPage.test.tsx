@@ -113,4 +113,12 @@ describe('Billing', () => {
     expect(actions.withdrawMktBill).toHaveBeenCalledWith('b4')
     await waitFor(() => expect(within(card('Red Truck')).getByRole('button', { name: 'Confirm' })).toBeTruthy())
   })
+
+  // ②b-2h (2026-10-26): once Finance imports a line, it says the invoice it is on and is not withdrawn from here.
+  it('a line Finance put on an invoice says which — no Withdraw', () => {
+    const imported = page({ lines: ROW.lines.map(l => (l.project === 'p4' ? { ...l, bill: { ...(l.bill as object), invoice: { no: 'HV-INV-202610-0040', status: 'issued' } } } : l)) })
+    render(<BillingPage initial={imported} />)
+    expect(within(card('Red Truck')).getByText('On HV-INV-202610-0040 · Issued')).toBeTruthy()
+    expect(within(card('Red Truck')).queryByRole('button', { name: 'Withdraw' })).toBeNull()
+  })
 })

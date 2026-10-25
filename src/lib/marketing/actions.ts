@@ -501,6 +501,19 @@ export async function setMktProductStatus(id: string, to: 'retire' | 'reactivate
   return { ok: true, status: r.status === 'retired' ? 'retired' : 'active', retiredOn: r.retiredOn ? String(r.retiredOn) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
 }
 
+/** A product's revenue account (②b-2h): Finance's, picked from its list — set at once, no new version; null for none. */
+export async function setMktProductAccount(id: string, code: string | null): Promise<Done<{ account: string | null }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That product is not there any more.' }
+  const c = typeof code === 'string' ? code.trim() : ''
+  if (c.length > 20) return { ok: false, reason: 'Pick its revenue account from the list.' }
+  const { data, error } = await (await client()).rpc('mkt_product_account', { p_product: id, p_code: c || null })
+  if (error) return { ok: false, reason: words(error, 'The account could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { account?: string | null }
+  return { ok: true, account: typeof r.account === 'string' && r.account ? r.account : null }
+}
+
 /** A product project's page as it now stands, for the page that wrote it. */
 async function freshProject(db: SupabaseClient, project: string): Promise<ProductProjectPage | null> {
   const { data, error } = await db.rpc('mkt_product_project', { p_key: project })

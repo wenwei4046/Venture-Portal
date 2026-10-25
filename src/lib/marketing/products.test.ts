@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  editOfProduct, groupsPayload, includedText, itemsSum, margin, newGroup, productBookFromRow, productPatch, productProblems, productSections, ringgitOf,
+  accountLabel, editOfProduct, groupsPayload, includedText, itemsSum, margin, newGroup, productBookFromRow, productPatch, productProblems, productSections, ringgitOf,
   type Product,
 } from './products'
 
@@ -31,7 +31,17 @@ describe('what the builder reads', () => {
   })
 
   it('reads nothing as no products', () => {
-    expect(productBookFromRow(null)).toEqual({ products: [], workflows: [], minutes: [] })
+    expect(productBookFromRow(null)).toEqual({ products: [], workflows: [], minutes: [], accounts: [] })
+  })
+
+  // ②b-2h (2026-10-26): the revenue account Finance's import posts a product's billing to, and Finance's list of them.
+  it('its revenue account — none until picked — and the accounts Finance offers', () => {
+    expect(p.account).toBeNull()
+    const withAcct = productBookFromRow({ ...row, products: [{ ...row.products[0], account: '5019' }],
+      accounts: [{ code: '5019', name: 'Design Income' }, { code: '', name: 'nothing' }, 'x'] })
+    expect([withAcct.products[0].account, withAcct.accounts]).toEqual(['5019', [{ code: '5019', name: 'Design Income' }]])
+    expect(accountLabel('5019', withAcct.accounts)).toBe('5019 · Design Income')
+    expect(accountLabel('5016', withAcct.accounts)).toBe("5016 · no longer on Finance's list")
   })
 })
 

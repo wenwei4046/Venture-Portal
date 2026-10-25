@@ -13,6 +13,7 @@ const actions = vi.hoisted(() => ({
   setMktProductStatus: vi.fn(),
   saveMktWorkflow: vi.fn(),
   deleteMktProduct: vi.fn(),
+  setMktProductAccount: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
@@ -23,7 +24,7 @@ import ProductBuilder from './ProductBuilder'
 const SMA = {
   id: 'p1', code: 'PRD-26001', name: 'Social Media Package A', description: '', kind: 'recurring', status: 'active',
   groups: [{ name: 'Graphic design', items: [{ name: 'Image posts', qty: 4, price: 450, workflow: 'w1' }] }],
-  intake: 'm1', price: 4800, cost: 3100, effectiveFrom: '2026-11-01', rev: 4, version: 3, changed: false, live: 6,
+  intake: 'm1', price: 4800, cost: 3100, account: '5013', effectiveFrom: '2026-11-01', rev: 4, version: 3, changed: false, live: 6,
   history: [{ version: 3, at: '2026-10-01T01:00:00Z', note: '4 image posts / month', by: 'Sia Josiah' }],
 }
 const DRAFT = { id: 'p2', code: 'PRD-26002', name: 'Brand Book', description: '', kind: 'one', status: 'draft', groups: [], intake: null, price: null, cost: null,
@@ -33,6 +34,7 @@ const BOOK = {
   products: [SMA, DRAFT, RETIRED],
   workflows: [{ id: 'w1', action: 'Design photo', tname: 'Simple', version: 1, stages: 2, days: 3, pic: 1 }],
   minutes: [{ id: 'm1', name: 'Kickoff', version: 2, fields: 9 }],
+  accounts: [{ code: '5012', name: 'Revenue - Lead Gen' }, { code: '5013', name: 'Video Shooting' }, { code: '5019', name: 'Design Income' }],
 }
 
 beforeEach(() => {
@@ -154,5 +156,42 @@ describe('the Product Builder', () => {
     expect(actions.setMktProductStatus).toHaveBeenCalledWith('p3', 'reactivate')
     expect(await screen.findByText('Social Media Package B is active again')).toBeTruthy()
     expect(within(document.body).queryByText('Not saved')).toBeNull()
+  })
+
+  // ②b-2h (2026-10-26): the revenue account Finance's import posts a product's billing to — Finance's list, set once.
+  it('its revenue account: Finance’s list, saved the moment it is picked — no draft, no new version', async () => {
+    builder('p1')
+    const select = screen.getByRole('combobox', { name: 'Revenue account' }) as HTMLSelectElement
+    expect(select.value).toBe('5013')
+    expect([...select.options].map(o => o.textContent)).toEqual(['Pick an account…', '5012 · Revenue - Lead Gen', '5013 · Video Shooting', '5019 · Design Income'])
+    actions.setMktProductAccount.mockResolvedValue({ ok: true, account: '5019' })
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '5019' } })
+    })
+    expect(actions.setMktProductAccount).toHaveBeenCalledWith('p1', '5019')
+    expect(actions.saveMktProduct).not.toHaveBeenCalled()
+    expect(await screen.findByText('Revenue account saved · 5019 · Design Income')).toBeTruthy()
+    expect(select.value).toBe('5019')
+    actions.setMktProductAccount.mockResolvedValue({ ok: true, account: null })
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '' } })
+    })
+    expect(actions.setMktProductAccount).toHaveBeenLastCalledWith('p1', null)
+    expect(await screen.findByText('Revenue account cleared')).toBeTruthy()
+  })
+
+  it('an account Finance closed still shows as the product’s; a refusal is said; a retired product’s account is still set', async () => {
+    const { unmount } = render(<ProductBuilder initial={productBookFromRow({ ...BOOK, products: [{ ...SMA, account: '5016' }, DRAFT, RETIRED] })} first="p1" />)
+    const select = screen.getByRole('combobox', { name: 'Revenue account' }) as HTMLSelectElement
+    expect(select.value).toBe('5016')
+    expect(select.options[1].textContent).toBe("5016 · no longer on Finance's list")
+    actions.setMktProductAccount.mockResolvedValue({ ok: false, reason: 'Pick its revenue account from the list.' })
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '5012' } })
+    })
+    expect(await screen.findByText('Pick its revenue account from the list.')).toBeTruthy()
+    unmount()
+    builder('p3')
+    expect(screen.getByRole('combobox', { name: 'Revenue account' })).toHaveProperty('disabled', false)
   })
 })

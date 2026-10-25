@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductStatus } from '@/lib/marketing/actions'
+import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductAccount, setMktProductStatus } from '@/lib/marketing/actions'
 import {
-  editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
+  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
 } from '@/lib/marketing/products'
 import { firstWfStage, wfStagesPayload } from '@/lib/marketing/workflows'
@@ -17,8 +17,10 @@ import pb from './products.module.css'
 // The Product Builder (`Product Builder.dc.html`; the manager's — Marketing · Manage, and so are its prices): the list
 // of products (All · Active · Draft · Retired, + New product) and a product's editor — Basics, What's included (actions
 // in categories: a quantity, a unit price, a workflow each), its intake minutes template, Pricing (list price, internal
-// cost, the margin), Publish (the version, the day it takes effect, the history, Retire). A draft is saved as it is
-// typed — only what changed, never over somebody else's save (as the other builders'); a retired product is read-only.
+// cost, the margin, the revenue account Finance's import posts its billing to), Publish (the version, the day it takes
+// effect, the history, Retire). A draft is saved as it is typed — only what changed, never over somebody else's save (as
+// the other builders'); a retired product is read-only but for its revenue account, saved the moment it is picked (its
+// running projects are still billed; no new version).
 
 type SaveState = { state: 'saved' } | { state: 'saving' } | { state: 'error'; reason: string; stale: boolean }
 type Filter = 'all' | ProductStatus
@@ -39,6 +41,7 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
   const [edit, setEdit] = useState<ProductEdit | null>(start ? editOfProduct(start) : null)
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
   const [busy, setBusy] = useState(false)
+  const [acctBusy, setAcctBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [catDraft, setCatDraft] = useState('')
 
@@ -207,6 +210,19 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
   }
   const saveDraft = async () => {
     if (await flush()) flash('Draft saved')
+  }
+  /** Its revenue account, saved the moment it is picked — apart from the draft, no new version. */
+  const setAccount = async (code: string) => {
+    if (!sel || acctBusy) return
+    setAcctBusy(true)
+    try {
+      const r = await setMktProductAccount(sel.id, code || null)
+      if (!r.ok) return flash(r.reason)
+      setBook(b => ({ ...b, products: b.products.map(p => (p.id === sel.id ? { ...p, account: r.account } : p)) }))
+      flash(r.account ? `Revenue account saved · ${accountLabel(r.account, book.accounts)}` : 'Revenue account cleared')
+    } finally {
+      setAcctBusy(false)
+    }
   }
   /** A product still a draft, deleted (the user's answer 8) — back to the list. */
   const remove = async () => {
@@ -496,6 +512,16 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
                   ) : null}
                 </span>
               </div>
+              <label className={pb.field}>
+                <span className={pb.label}>Revenue account</span>
+                <select className={pb.select} value={sel.account ?? ''} disabled={acctBusy} onChange={e => void setAccount(e.target.value)}>
+                  <option value="">Pick an account…</option>
+                  {sel.account && !book.accounts.some(a => a.code === sel.account) ? (
+                    <option value={sel.account}>{accountLabel(sel.account, book.accounts)}</option>
+                  ) : null}
+                  {book.accounts.map(a => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
+                </select>
+              </label>
             </div>
           </section>
 

@@ -13,12 +13,13 @@ import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, t
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import { useInvoiceWork } from './invoice-work'
 import { INVOICE_CARD, invoiceCards, isStatusCard } from '../_lib/invoice-cards'
-import { invoicedTotal, onCard, returnedNote, settleSelection, type HubContract, type HubInvoice, type InvoiceCardKey, type InvoiceHubData } from '../_lib/invoice-model'
+import { invoicedTotal, onCard, returnedNote, settleSelection, type HubInvoice, type InvoiceCardKey, type InvoiceHubData } from '../_lib/invoice-model'
+import { mktLineState, mktSummary } from '../_lib/marketing-lines'
 
 // Invoice's hub (2026-10-14, the Finance revamp v2 — D10 of `.design/fin-r2/handoff`):
 // the head (Create invoice ▾, Payroll ▾, Export ▾), the month's total with its
 // month pill, a card a list — All invoices, Issued, Paid, Draft, Voided, then
-// Credit notes, Marketing projects, Non-billable — the table with its column
+// Credit notes, Marketing billing, Non-billable — the table with its column
 // tools and *Select* (a dark bar at the foot settles one payer's invoices on
 // one receipt), and the drawer an invoice opens. Every step is the system's
 // own (Service Billing's actions, their rules and gates — `useInvoiceWork`,
@@ -254,21 +255,17 @@ export default function InvoicesHubClient({
           : null,
     onOpen: () => work.openCreditNote(cn),
   }))
-  const datesOf = (c: HubContract) => {
-    const s = c.start ? fd(c.start) : null
-    const e = c.end ? fd(c.end) : null
-    if (s && e) return s.slice(-4) === e.slice(-4) ? `${s.slice(0, -5)} – ${e}` : `${s} – ${e}`
-    return s ? `from ${s}` : e ? `to ${e}` : ''
-  }
-  const mktItems: ItemRow[] = hub.contracts.map((c) => ({
-    key: c.id,
-    label: c.description,
-    sub: [c.company, datesOf(c), c.status].filter(Boolean).join(' · '),
-    value: c.amount == null ? '—' : f2(c.amount),
-    action: c.invoice
-      ? { label: 'Invoice', onClick: () => setDrawerId(c.invoice!.id), title: c.invoice.no ?? undefined }
-      : { label: 'Invoice', disabled: true, title: `No invoice for this project in ${monthLong} yet — Create invoice ▾ › Generate Marketing invoices raises them.` },
-    onOpen: can.edit ? () => router.push(`/billing/contracts/${c.id}/edit`) : undefined,
+  // Marketing billing (2026-10-26, ②b-2h): each line Marketing's manager confirmed — its party, Track ID, account and
+  // state; Invoice opens the draft it was imported onto.
+  const mkt = mktSummary(hub.marketing)
+  const mktItems: ItemRow[] = hub.marketing.lines.map((l) => ({
+    key: l.bill,
+    label: l.words,
+    sub: [l.party.name, l.track, l.account ? l.account.code : 'no account', mktLineState(l)].join(' · '),
+    value: f2(l.amount),
+    action: l.invoice
+      ? { label: 'Invoice', onClick: () => setDrawerId(l.invoice!.id), title: l.invoice.no ?? undefined }
+      : { label: 'Invoice', disabled: true, title: 'Not on an invoice yet — Create invoice ▾ › Import Marketing billing puts it on its draft.' },
   }))
   const nbItems: ItemRow[] = hub.nonBillable.map((t) => ({
     key: t.id,
@@ -376,12 +373,12 @@ export default function InvoicesHubClient({
             amountOf={(r) => r.total}
             onRowClick={() => {}}
             emptyText=""
-            countText={card === 'cn' ? plural(hub.creditNotes.length, 'credit note', 'credit notes') : card === 'mkt' ? plural(hub.contracts.length, 'project', 'projects') : plural(hub.nonBillable.length, 'transaction', 'transactions')}
+            countText={card === 'cn' ? plural(hub.creditNotes.length, 'credit note', 'credit notes') : card === 'mkt' ? plural(mkt.lines, 'line', 'lines') : plural(hub.nonBillable.length, 'transaction', 'transactions')}
             tools={
-              card === 'mkt' && can.create ? (
-                <Link href="/billing/contracts/new" className={hs.toolBtn}>
-                  + New contract
-                </Link>
+              card === 'mkt' && can.create && mkt.toImport > 0 ? (
+                <button type="button" className={hs.toolBtn} onClick={() => work.openDialog('marketing')}>
+                  Import <span className={hs.toolN}>· {mkt.toImport}</span>
+                </button>
               ) : card === 'nonbill' && can.voucher ? (
                 <Link href="/payments/new?preset=non_billable" className={hs.toolBtn}>
                   + Add non-billable expense
@@ -392,7 +389,7 @@ export default function InvoicesHubClient({
             {card === 'cn' ? (
               <ItemList title="Credit notes" count={plural(hub.creditNotes.length, 'credit note', 'credit notes')} items={cnItems} empty={`No credit notes in ${monthLong}.`} />
             ) : card === 'mkt' ? (
-              <ItemList title="Marketing projects" count={plural(hub.contracts.length, 'project', 'projects')} items={mktItems} empty="No marketing projects yet." />
+              <ItemList title="Marketing billing" count={plural(mkt.lines, 'line', 'lines')} items={mktItems} empty={`Nothing confirmed by Marketing for ${monthLong} yet.`} />
             ) : (
               <ItemList title="Non-billable" count={plural(hub.nonBillable.length, 'transaction', 'transactions')} items={nbItems} empty={`Nothing in ${monthLong} yet.`} />
             )}

@@ -114,6 +114,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_replace_people', 'mkt_replace_places',
   // Billing (mig 20261025121000): the month's lines, an outside client's billing details — STABLE.
   'mkt_billing', 'mkt_client_bill',
+  // What Finance's import would bring in (mig 20261026023000) — STABLE; the Invoice hub reads it.
+  'mkt_bill_import_preview',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
