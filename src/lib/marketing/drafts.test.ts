@@ -6,8 +6,8 @@ import { defaultRule } from './recur'
 // 那边，这样的话内容就不会丢了"). The database's side is tests/member-sql/validate-marketing-new-drafts.mjs.
 
 const STAGES = [
-  { key: 'a', name: 'First draft', dept: 'GRAPHIC DESIGNER', who: 's1', sla: 1, appr: [], back: null, form: [{ label: 'Canva link', type: 'Text' as const }] },
-  { key: 'b', name: 'Publish', dept: '', who: null, sla: 2, appr: ['s9'], back: 0, form: [] },
+  { key: 'a', name: 'First draft', dept: 'GRAPHIC DESIGNER', who: 's1', sla: 1, appr: [], back: null, picText: '', form: [{ label: 'Canva link', type: 'Text' as const }] },
+  { key: 'b', name: 'Publish', dept: '', who: null, sla: 2, appr: ['s9'], back: 0, picText: '', form: [] },
 ]
 const BLANK: NewForm = {
   sub: 'sub-car', mode: 'task', product: 'pr-a', amounts: {}, title: '', type: 'social', req: 'write', brief: '',
@@ -62,13 +62,16 @@ describe('the form a draft keeps', () => {
       { name: 'Design', who: 's1', sla: 99, appr: ['a', 'b', 'c', 'd'], back: 0, form: [{ label: 'Link', type: 'Text' }, { label: 'x', type: 'Nonsense' }] },
       { name: 'Post', who: '', sla: 0, back: 1 },
       { name: 'Check', sla: 2, back: 0 },
+      // 🔗 The PIC's level kept as it was picked, what they read cut to 120 (②a-5).
+      { name: 'Approve', who: 's2', sla: 1, appr: ['pic:all', 's9'], picText: 'y'.repeat(130) },
     ] }, BLANK)
     expect(back.stages.map(({ key: _k, ...x }) => x)).toEqual([
-      { name: 'Design', dept: '', who: 's1', sla: 30, appr: ['a', 'b', 'c'], back: null, form: [{ label: 'Link', type: 'Text' }] },
-      { name: 'Post', dept: '', who: null, sla: 1, appr: [], back: null, form: [] },
-      { name: 'Check', dept: '', who: null, sla: 2, appr: [], back: 0, form: [] },
+      { name: 'Design', dept: '', who: 's1', sla: 30, appr: ['a', 'b', 'c'], back: null, form: [{ label: 'Link', type: 'Text' }], picText: '' },
+      { name: 'Post', dept: '', who: null, sla: 1, appr: [], back: null, form: [], picText: '' },
+      { name: 'Check', dept: '', who: null, sla: 2, appr: [], back: 0, form: [], picText: '' },
+      { name: 'Approve', dept: '', who: 's2', sla: 1, appr: ['pic:all', 's9'], back: null, form: [], picText: 'y'.repeat(120) },
     ])
-    expect(new Set(back.stages.map(x => x.key)).size).toBe(3)
+    expect(new Set(back.stages.map(x => x.key)).size).toBe(4)
   })
 
   it('where it was opened from: kept, taken off (× — null), or the page’s own when the draft says nothing', () => {

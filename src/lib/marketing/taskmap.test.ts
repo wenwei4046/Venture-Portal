@@ -289,3 +289,12 @@ describe('a task written with meeting minutes', () => {
     expect(edge(m, 'pic>s0')).toMatchObject({ kind: 'dashed', label: 'started before approval' })
   })
 })
+
+// 2026-10-25 — ②a-5: a quick task's own PIC on its stage's 🔗 gate (the user's answer 52).
+describe('a stage the PIC approves on the task’s own link', () => {
+  it('names the task’s PIC — the subsidiary’s only when the task names none', () => {
+    const own = taskMap(taskFromRow({ ...raw, project: { ...raw.project, pic: 'Mr Lim' } }) as MktTaskPage)
+    expect(mapRows(own).find(r => r.icon === '🔗')?.title).toBe('Mr Lim approves Redesign')
+    expect(mapRows(map).find(r => r.icon === '🔗')?.title).toBe('Kelvin approves Redesign')
+  })
+})

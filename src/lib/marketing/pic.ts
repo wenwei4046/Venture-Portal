@@ -49,7 +49,8 @@ export interface PicPage {
    * approvals this sending has. */
   both: boolean
   ok: PicOk | null
-  minutes: { title: string; fields: PicField[] }
+  /** The minutes they read — none on a task whose minutes they do not approve (②a-5: its stages are theirs alone). */
+  minutes: { title: string; fields: PicField[] } | null
   /** The work (②b-2d): each deliverable planned, and its stage now. */
   work: PicWork[]
 }
@@ -206,7 +207,7 @@ export function picPageFromRow(v: unknown): PicPage | null {
   const reply = isObj(v.reply) ? v.reply : null
   const updated = isObj(v.updated) ? v.updated : null
   const asked = isObj(v.asked) ? v.asked : null
-  const minutes = isObj(v.minutes) ? v.minutes : {}
+  const minutes = isObj(v.minutes) ? v.minutes : null
   return {
     today: str(v.today),
     sub: str(v.sub),
@@ -229,11 +230,11 @@ export function picPageFromRow(v: unknown): PicPage | null {
     asked: asked ? { reason: str(asked.reason), at: strOrNull(asked.at) } : null,
     both: v.both === true,
     ok: picOkFromRow(v.ok),
-    minutes: {
+    minutes: minutes ? {
       title: str(minutes.title),
       fields: (Array.isArray(minutes.fields) ? minutes.fields : []).filter(isObj)
         .map(f => ({ name: str(f.name), type: str(f.type), value: valueFromRow(str(f.type), f.value) })),
-    },
+    } : null,
     work: (Array.isArray(v.work) ? v.work : []).filter(isObj).map(workFromRow),
   }
 }
@@ -315,7 +316,9 @@ export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: str
 
 /** The progress: the meeting, the minutes sent, their approval, the work. Minutes that asked no sign-off never went to
  * the PIC (no sending, no answer) — the team completed them; the link is theirs for the work (②b-2d). */
-export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other' | 'kind'>> & { work?: readonly PicWork[] }): PicStep[] {
+export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other' | 'kind' | 'minutes'>> & { work?: readonly PicWork[] }): PicStep[] {
+  // A task whose minutes are not theirs (②a-5): it started, then its work — the stages they approve in it.
+  if (p.minutes === null) return [{ label: 'Started', state: 'done', date: day(p.startedAt), sub: '' }, workStep(p.work ?? [], true, p.kind)]
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
   if (approved && !p.sentAt && !p.reply) {
     return [

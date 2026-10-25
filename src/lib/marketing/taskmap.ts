@@ -123,7 +123,9 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const stages = [...page.stages].sort((a, b) => a.idx - b.idx)
   const events = page.events.filter(e => e.action !== 'free')
   const who = (id: string | null | undefined) => nameOf(page.team, id)
-  const picName = page.sub?.pic || 'PIC'
+  // The PIC its 🔗 levels ask: the project's own — a task's named on New Project (②a-5), a run's its series' — else the
+  // subsidiary's.
+  const picName = p.pic || page.sub?.pic || 'PIC'
   const active = p.status === 'active'
   const created = events.find(e => e.action === 'created')
   const src = originOf(p)

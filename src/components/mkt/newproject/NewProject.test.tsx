@@ -519,6 +519,68 @@ describe('New Project’s meeting minutes', () => {
     expect(screen.getByText('Add the second PIC’s WhatsApp')).toBeTruthy()
   })
 
+  // ②a-5 — a stage the PIC approves (the user's answer 52): 🔗 PIC via link in the builder, the PIC named once.
+  const levelOne = () => screen.getAllByRole('button', { name: /No approval|PIC via link/ }).find(b => b.getAttribute('aria-expanded') !== null)!
+  const picLevel = () => {
+    fireEvent.click(levelOne())
+    fireEvent.click(screen.getByRole('button', { name: /PIC via link/ }))
+  }
+  it('🔗 PIC via link on a stage: the subsidiary’s PIC named under the stages — their WhatsApp asked — sent as the task’s PIC', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.change(screen.getByPlaceholderText(/What to change, where/), { target: { value: 'New price' } })
+    expect(screen.queryByLabelText('PIC')).toBeNull()
+    expect(screen.getByText('0×')).toBeTruthy()
+    picLevel()
+    expect(levelOne().textContent).toContain('Kelvin (PIC)')
+    expect(screen.getByText('1×')).toBeTruthy()
+    expect((screen.getByRole('textbox', { name: /PIC name/ }) as HTMLInputElement).value).toBe('Kelvin')
+    expect(screen.getByLabelText('PIC').textContent).toContain('PIC WhatsApp')
+    expect(screen.getByText('Add the PIC’s WhatsApp')).toBeTruthy()
+    expect(create()).toHaveProperty('disabled', true)
+    fireEvent.change(screen.getByPlaceholderText('Department words only — no names, no prices'), { target: { value: 'Check the new price' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /PIC WhatsApp/ }), { target: { value: '012-345 6789' } })
+    expect(create()).toHaveProperty('disabled', false)
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
+    const sent = actions.createMktTask.mock.calls[0][0]
+    expect([sent.pic, sent.minutes, sent.stages[0].appr, sent.stages[0].picText]).toEqual([{ name: 'Kelvin', whatsapp: '012-345 6789' }, null, ['pic'], 'Check the new price'])
+  })
+
+  it('two PICs: either one’s approval or both — and the minutes theirs too, the PICs under them, named once', async () => {
+    openNew([...PICKS, INTAKE])
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.change(screen.getByPlaceholderText(/What to change, where/), { target: { value: 'New price' } })
+    picLevel()
+    expect(screen.queryByRole('button', { name: /make it both/ })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: /PIC WhatsApp/ }), { target: { value: '012-345 6789' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Second PIC' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /^Second PIC(?! WhatsApp)/ }), { target: { value: 'Hana' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /^Second PIC WhatsApp/ }), { target: { value: '013-999 8888' } })
+    expect(levelOne().textContent).toContain('Kelvin or Hana (PIC)')
+    fireEvent.click(screen.getByRole('button', { name: 'Either PIC approves — make it both' }))
+    expect(screen.getByRole('button', { name: 'Both PICs approve — make it either' }).getAttribute('aria-pressed')).toBe('true')
+    expect(levelOne().textContent).toContain('Kelvin and Hana (PIC)')
+    // Their minutes too: the PICs move under them, as typed — the stages' box goes.
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Client intake/ }))
+    expect(screen.queryByLabelText('PIC')).toBeNull()
+    expect((screen.getByRole('textbox', { name: /^Second PIC(?! WhatsApp)/ }) as HTMLInputElement).value).toBe('Hana')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Points' }), { target: { value: 'New price' } })
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
+    const sent = actions.createMktTask.mock.calls[0][0]
+    expect([sent.pic, sent.minutes.pic, sent.stages[0].appr]).toEqual([null, { name: 'Kelvin', whatsapp: '012-345 6789', name2: 'Hana', whatsapp2: '013-999 8888' }, ['pic:all']])
+  })
+
   it('back to Write it here: what is written is sent, no minutes', async () => {
     openNew()
     oneStage()

@@ -15,14 +15,15 @@ import {
 } from '@/lib/marketing/recur'
 import { trailTime } from '@/lib/marketing/task'
 import {
-  minutesPayload, minutesProblems, minutesTyped, newMinutesDoc, NO_MINUTES, picFor, pickMinutes, picOnSubChange, picWho, type MinutesPick, type NewMinutes,
-  type NewPic,
+  minutesPayload, minutesProblems, minutesTyped, newMinutesDoc, NO_MINUTES, picFor, pickMinutes, picNamed, picOnSubChange, picPayload, picProblems, picWho,
+  type MinutesPick, type NewMinutes, type NewPic,
 } from '@/lib/marketing/task-minutes'
-import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES } from '@/lib/marketing/tasks'
+import { picStages, stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES, type DraftStage } from '@/lib/marketing/tasks'
 import { formatMoney } from '@/lib/utils'
 import MoneyInput from '../products/MoneyInput'
 import MinutesForm from '../project/MinutesForm'
 import BillFields from '../subsidiary/BillFields'
+import PicFields from './PicFields'
 import StageBuilder, { type BuilderPerson } from './StageBuilder'
 import s from './newproject.module.css'
 
@@ -245,8 +246,12 @@ export default function NewProject({
   const titleOk = !!title.trim()
   // Written with meeting minutes (②a-3): one picked, every required field filled in.
   const minutesWrong = req === 'minutes' ? minutesProblems(mpick, minutes) : []
+  // A stage the PIC approves on the link (②a-5): the PIC named — under the minutes when they approve those too, else under
+  // the stages.
+  const picUnderStages = picStages(stages) > 0 && !(req === 'minutes' && minutes.pic.on)
+  const picWrong = picUnderStages ? picProblems(minutes.pic) : []
   const ready = isProduct ? !!sub && !!picked && amount != null && amount > 0
-    : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok) && minutesWrong.length === 0
+    : titleOk && problems.length === 0 && !!sub && (!isRec || preview.ok) && minutesWrong.length === 0 && picWrong.length === 0
 
   let hint = ''
   if (isProduct) {
@@ -256,6 +261,7 @@ export default function NewProject({
   else if (!titleOk) hint = 'Add a task title'
   else if (minutesWrong.length) hint = minutesWrong[0]
   else if (problems.length) hint = problems[0] === 'A stage has no person' ? 'Every stage needs a name and a person' : problems[0]
+  else if (picWrong.length) hint = picWrong[0]
   else if (isRec && !preview.ok) hint = 'Pick at least one day inside the period'
   else {
     // The PIC approving the minutes (②a-4): the work waits for them — its days are counted from their approval.
@@ -275,13 +281,18 @@ export default function NewProject({
   const pickTemplate = (m: MinutesPick) => update(f => ({ ...f, req: 'minutes', minutes: pickMinutes(f.minutes, m, meOnTeam, subOf(f.sub)) }))
   // Another subsidiary picked: its PICs instead, unless the PICs were typed by hand.
   const pickSub = (id: string, to: MktSub | null = subOf(id)) => update(f => ({
-    ...f, sub: id, minutes: f.minutes.pic.on ? { ...f.minutes, pic: picOnSubChange(f.minutes.pic, subOf(f.sub), to) } : f.minutes,
+    ...f, sub: id,
+    minutes: f.minutes.pic.on || picStages(f.stages) > 0 ? { ...f.minutes, pic: picOnSubChange(f.minutes.pic, subOf(f.sub), to) } : f.minutes,
+  }))
+  // The first stage the PIC approves names them as the subsidiary does — unless somebody is typed already (②a-5).
+  const setStages = (next: DraftStage[]) => update(f => ({
+    ...f, stages: next,
+    minutes: !picStages(f.stages) && picStages(next) > 0 ? { ...f.minutes, pic: picNamed(f.minutes.pic, subOf(f.sub)) } : f.minutes,
   }))
   const togglePic = () => update(f => ({
     ...f, minutes: { ...f.minutes, pic: f.minutes.pic.on ? { ...f.minutes.pic, on: false } : picFor(f.minutes.pic, subOf(f.sub)) },
   }))
   const setPic = (patch: Partial<NewPic>) => update(f => ({ ...f, minutes: { ...f.minutes, pic: { ...f.minutes.pic, ...patch } } }))
-  const [secondPic, setSecondPic] = useState(false)
   const chooseMinutes = () => {
     const first = pickOf(formRef.current.minutes.template) ?? minutesPicks[0]
     if (first) pickTemplate(first)
@@ -417,6 +428,7 @@ export default function NewProject({
           from: source?.id ?? null,
           draft: draftRef.current.id,
           minutes: req === 'minutes' && mpick ? minutesPayload(mpick, minutes) : null,
+          pic: picUnderStages ? picPayload(minutes.pic) : null,
         })
         if (!r.ok) return r.reason
         doneRef.current = true
@@ -677,34 +689,7 @@ export default function NewProject({
                       <span className={`${s.sw}${minutes.pic.on ? ` ${s.swOn}` : ''}`} aria-hidden="true" />
                       <span className={s.picRuleName}>PIC approves these minutes</span>
                     </button>
-                    {minutes.pic.on ? (
-                      <div className={s.picFields}>
-                        <label className={s.field}>
-                          <span className={s.fieldLabel}>PIC name<span className={s.marks}><span title="Required">⭐</span><span title="The PIC sees it on the link">👁</span></span></span>
-                          <input className={s.input} value={minutes.pic.name} maxLength={80} onChange={e => setPic({ name: e.target.value })} />
-                        </label>
-                        <label className={s.field}>
-                          <span className={s.fieldLabel}>PIC WhatsApp<span className={s.marks}><span title="Required">⭐</span><span title="Internal only — the PIC never sees it">🔒</span></span></span>
-                          <input className={`${s.input} ${s.mono}`} value={minutes.pic.whatsapp} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX"
-                            onChange={e => setPic({ whatsapp: e.target.value })} />
-                        </label>
-                        {secondPic || minutes.pic.name2 ? (
-                          <>
-                            <label className={s.field}>
-                              <span className={s.fieldLabel}>Second PIC<span className={s.marks}><span title="The PICs see it on the link">👁</span></span></span>
-                              <input className={s.input} value={minutes.pic.name2} maxLength={80} onChange={e => setPic({ name2: e.target.value })} />
-                            </label>
-                            <label className={s.field}>
-                              <span className={s.fieldLabel}>Second PIC WhatsApp<span className={s.marks}>{minutes.pic.name2.trim() ? <span title="Required">⭐</span> : null}<span title="Internal only — the PIC never sees it">🔒</span></span></span>
-                              <input className={`${s.input} ${s.mono}`} value={minutes.pic.whatsapp2} maxLength={40} inputMode="tel" placeholder="+60 1X-XXX XXXX"
-                                onChange={e => setPic({ whatsapp2: e.target.value })} />
-                            </label>
-                          </>
-                        ) : (
-                          <button type="button" className={`${s.textBtn} ${s.addPic}`} onClick={() => setSecondPic(true)}>+ Second PIC</button>
-                        )}
-                      </div>
-                    ) : null}
+                    {minutes.pic.on ? <PicFields pic={minutes.pic} onChange={setPic} /> : null}
                   </div>
                 )
               })() : null}
@@ -812,7 +797,15 @@ export default function NewProject({
         </div>
       ) : null}
 
-      <StageBuilder stages={stages} onChange={next => set({ stages: next })} people={people} approvers={approvers} me={me} start={base} holidays={hol} />
+      <StageBuilder stages={stages} onChange={setStages} people={people} approvers={approvers} me={me} start={base} holidays={hol}
+        pics={{ name: minutes.pic.name, name2: minutes.pic.name2 }} />
+      {/* 🔗 A stage the PIC approves, the minutes not theirs (②a-5): whom the link goes to. */}
+      {picUnderStages ? (
+        <div className={`${s.box} ${s.boxNext}`} aria-label="PIC">
+          <div className={s.repeatHead}><span aria-hidden="true">🔗</span><span>PIC</span></div>
+          <PicFields pic={minutes.pic} onChange={setPic} />
+        </div>
+      ) : null}
       </>
       )}
 

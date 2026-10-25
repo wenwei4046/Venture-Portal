@@ -1,7 +1,7 @@
 import { trailTime } from './task'
 import { ruleFromRow, type RecurRule } from './recur'
 import { newMinutesFromDraft, type NewMinutes } from './task-minutes'
-import { formFromRow, stageKey, stagesPayload, TASK_TYPES, type DraftStage, type TaskType } from './tasks'
+import { formFromRow, MAX_PIC_TEXT, stageKey, stagesPayload, TASK_TYPES, type DraftStage, type TaskType } from './tasks'
 
 // New Project kept as a draft while it is typed (mig 20261025211000 — 2026-10-25, the user: "New Project 一有输入就会自动进
 // draft（草稿）那边，这样的话内容就不会丢了"): the form as a login typed it, one draft for each form it started (a login
@@ -98,6 +98,7 @@ function stagesOf(v: unknown): DraftStage[] | null {
     appr: Array.isArray(s.appr) ? s.appr.filter((x): x is string => typeof x === 'string').slice(0, 3) : [],
     form: formFromRow(s.form),
     back: Number.isInteger(s.back) && (s.back as number) >= 0 ? (s.back as number) : null,
+    picText: str(s.picText).slice(0, MAX_PIC_TEXT),
   }))
   // Where changes go back to is always an earlier stage.
   return out.map((s, i) => (s.back != null && s.back >= i ? { ...s, back: null } : s))

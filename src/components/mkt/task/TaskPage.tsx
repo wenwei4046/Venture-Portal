@@ -18,6 +18,7 @@ import ChoiceField from './ChoiceField'
 import StageFiles from './StageFiles'
 import TaskLibrary from './TaskLibrary'
 import TaskMinutes from './TaskMinutes'
+import TaskPicLink from './TaskPicLink'
 import TaskPosts from './TaskPosts'
 import TaskSubtasks from './TaskSubtasks'
 import s from './task.module.css'
@@ -350,6 +351,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
 
       <div className={s.body}>
         <div className={s.main}>
+          {/* 🔗 Its stages the PIC approves on their link, its minutes not theirs (②a-5): the link to send them. */}
+          {p.picLink ? <TaskPicLink page={page} pl={p.picLink} say={say} /> : null}
           {/* Written with meeting minutes (②a-3): the minutes are its requirements — signed, and written on by its owner. */}
           {page.minutes ? (
             <TaskMinutes page={page} doc={page.minutes} can={can} source={view.requirements.source} onPage={fresh} say={say} />
