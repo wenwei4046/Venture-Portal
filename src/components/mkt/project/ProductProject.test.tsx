@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { adsPageFromRow } from '@/lib/marketing/ads'
 import { productProjectFromRow, type ProductProjectPage } from '@/lib/marketing/project'
 
 // 2026-10-23 — a 📦 product project's page (②b-1, `New Project.dc.html` steps 2–4) for the people who work it: the
@@ -485,5 +486,22 @@ describe('its map', () => {
     expect(within(sheet).getByRole('button', { name: 'Kelvin approves the minutes · Planned' })).toBeTruthy()
     fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Task map' })).toBeNull()
+  })
+
+  // 2026-10-25 — ⑤-3a: its Ads report on the side, above Billing; set up by Marketing · Edit, read by everybody else.
+  it('carries its Ads report on the side — Set up for Marketing · Edit, nothing for a viewer until there is one', () => {
+    const none = adsPageFromRow({ today: '2026-10-25', link: true, setup: null, reports: [] })
+    const { unmount } = render(<ProductProject initial={page(RACHEL)} can={MANAGER} ads={none} />)
+    expect(within(screen.getByLabelText('Ads report')).getByRole('button', { name: 'Set up' })).toBeTruthy()
+    unmount()
+    const { unmount: gone } = render(<ProductProject initial={page(RACHEL)} can={{ edit: false, manage: false }} ads={none} />)
+    expect(screen.queryByLabelText('Ads report')).toBeNull()
+    gone()
+    const set = adsPageFromRow({ today: '2026-10-25', link: true, reports: [],
+      setup: { ads: ['120210000000000001'], every: '1m', startsOn: '2026-09-01', figures: ['spend', 'leads'], targets: {} } })
+    render(<ProductProject initial={page(RACHEL)} can={{ edit: false, manage: false }} ads={set} />)
+    const card = screen.getByLabelText('Ads report')
+    expect(within(card).getByText('Every month')).toBeTruthy()
+    expect(within(card).queryByRole('button', { name: /Publish/ })).toBeNull()
   })
 })
