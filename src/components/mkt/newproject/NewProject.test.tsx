@@ -457,7 +457,66 @@ describe('New Project’s meeting minutes', () => {
       fireEvent.click(create())
     })
     await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
-    expect(actions.createMktTask.mock.calls[0][0].minutes).toEqual({ template: 't2', vals: { Attendees: ['s1'], Points: 'New price' }, notes: '', sign: false })
+    expect(actions.createMktTask.mock.calls[0][0].minutes).toEqual({ template: 't2', vals: { Attendees: ['s1'], Points: 'New price' }, notes: '', sign: false, pic: null })
+  })
+
+  // ②a-4 — the PIC approving the minutes (the user's answers 52, 53): chosen on New Project, the work waiting for them.
+  const INTAKE = { ...PICKS[1], id: 't3', name: 'Client intake', rules: { ...PICKS[1].rules, pic: true } }
+  it('a template whose rule asks the PIC: on, the subsidiary’s PIC named — their WhatsApp asked, then sent with the minutes', async () => {
+    openNew([...PICKS, INTAKE])
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    expect(screen.getByRole('switch', { name: 'PIC approves these minutes' }).getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByRole('radio', { name: /Client intake/ }))
+    expect(screen.getByRole('switch', { name: 'PIC approves these minutes' }).getAttribute('aria-checked')).toBe('true')
+    expect((screen.getByRole('textbox', { name: /PIC name/ }) as HTMLInputElement).value).toBe('Kelvin')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Points' }), { target: { value: 'New price' } })
+    expect(screen.getByText('Add the PIC’s WhatsApp')).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: /PIC WhatsApp/ }), { target: { value: '012-345 6789' } })
+    expect(screen.getByText('Carres · Quick task · 1 stage · starts once Kelvin (PIC) approves')).toBeTruthy()
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(create())
+    })
+    await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(1))
+    expect(actions.createMktTask.mock.calls[0][0].minutes.pic).toEqual({ name: 'Kelvin', whatsapp: '012-345 6789' })
+  })
+
+  it('turned off: nobody approves them — the work starts at once; turned on by hand for any template', () => {
+    openNew([...PICKS, INTAKE])
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Client intake/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Points' }), { target: { value: 'New price' } })
+    fireEvent.click(screen.getByRole('switch', { name: 'PIC approves these minutes' }))
+    expect(screen.queryByRole('textbox', { name: /PIC name/ })).toBeNull()
+    expect(screen.getByText(/^Carres · Quick task · 1 stage · finishes/)).toBeTruthy()
+    // Kickoff's rule does not ask it: off, until turned on.
+    fireEvent.click(screen.getByRole('radio', { name: /Kickoff/ }))
+    expect(screen.getByRole('switch', { name: 'PIC approves these minutes' }).getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByRole('switch', { name: 'PIC approves these minutes' }))
+    expect((screen.getByRole('textbox', { name: /PIC name/ }) as HTMLInputElement).value).toBe('Kelvin')
+  })
+
+  it('another subsidiary: its PIC instead — unless typed by hand; a second PIC named asks their WhatsApp too', () => {
+    openNew([...PICKS, INTAKE])
+    oneStage()
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/), { target: { value: 'Banner' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Use meeting minutes' }))
+    fireEvent.click(screen.getByRole('radio', { name: /Client intake/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Points' }), { target: { value: 'New price' } })
+    fireEvent.click(screen.getByRole('radio', { name: /Mattress Villa/ }))
+    expect((screen.getByRole('textbox', { name: /PIC name/ }) as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('Name the PIC')).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: /PIC name/ }), { target: { value: 'Mr Lim' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /PIC WhatsApp/ }), { target: { value: '012-345 6789' } })
+    fireEvent.click(screen.getByRole('radio', { name: /Carres/ }))
+    expect((screen.getByRole('textbox', { name: /PIC name/ }) as HTMLInputElement).value).toBe('Mr Lim')
+    fireEvent.click(screen.getByRole('button', { name: '+ Second PIC' }))
+    fireEvent.change(screen.getByRole('textbox', { name: /^Second PIC(?! WhatsApp)/ }), { target: { value: 'Hana' } })
+    expect(screen.getByText('Add the second PIC’s WhatsApp')).toBeTruthy()
   })
 
   it('back to Write it here: what is written is sent, no minutes', async () => {

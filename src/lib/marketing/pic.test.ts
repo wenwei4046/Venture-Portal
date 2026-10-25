@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  bothState, dateWords, isPicCode, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
+  bothState, dateWords, isPicCode, kindWords, nameOk, picAnswered, picBanner, picPageFromRow, picRefusal, picStatus, picTimeline, reasonOk, type PicPage,
   stageReasonOk, workLastLine, workState, workWaiting,
 } from './pic'
 
@@ -44,6 +44,16 @@ describe('the PIC’s page as it is read', () => {
       ['Ideas', null],
       ['Signatures', null],
     ])
+  })
+
+  it('a task’s link (②a-4): the kind of task under the subsidiary — a product project’s, its product', () => {
+    expect([page().kind, kindWords(page())]).toEqual(['product', 'Social Media Package A'])
+    expect(kindWords(page({ kind: 'quick', product: null }))).toBe('Quick task')
+    expect(kindWords(page({ kind: 'recurring', product: null }))).toBe('Recurring task')
+    expect(page({ kind: 'nonsense' }).kind).toBe('product')
+    // Approved, its work not on the link yet: a task's is scheduled, never planned.
+    expect(picTimeline(page({ kind: 'recurring', product: null, status: 'active', reply: { decision: 'approved', name: 'Kelvin', reason: '', at: null } })).at(-1))
+      .toEqual({ label: 'Work starts', state: 'cur', date: '', sub: 'The work is scheduled' })
   })
 
   it('a link’s code is 32 hex, however it is typed', () => {

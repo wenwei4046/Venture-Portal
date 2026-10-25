@@ -24,6 +24,8 @@ export interface PicPage {
   today: string
   sub: string
   product: string
+  /** A product project's link — or a task's whose minutes the PIC approves (②a-4, mig 20261025231000). */
+  kind: 'product' | 'quick' | 'recurring'
   title: string
   track: string
   status: PicStatus
@@ -130,6 +132,9 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const strOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
 const strs = (v: unknown) => (Array.isArray(v) ? v.map(x => (typeof x === 'string' ? x : '')) : [])
 
+/** What the link is for, under the subsidiary's name: the product — or, a task's (②a-4), the kind of task. */
+export const kindWords = (p: Pick<PicPage, 'kind' | 'product'>) => p.product || (p.kind === 'quick' ? 'Quick task' : p.kind === 'recurring' ? 'Recurring task' : '')
+
 /** A link's code: 32 hex (mkt_minutes_send makes it), however it is typed. */
 export const isPicCode = (code: string) => /^[0-9a-f]{32}$/i.test(code)
 
@@ -206,6 +211,7 @@ export function picPageFromRow(v: unknown): PicPage | null {
     today: str(v.today),
     sub: str(v.sub),
     product: str(v.product),
+    kind: v.kind === 'quick' || v.kind === 'recurring' ? v.kind : 'product',
     title: str(v.title),
     track: str(v.track),
     status: STATUSES.find(s => s === v.status) ?? 'waiting_pic',
@@ -309,13 +315,13 @@ export type PicStep = { label: string; state: 'done' | 'cur' | 'next'; date: str
 
 /** The progress: the meeting, the minutes sent, their approval, the work. Minutes that asked no sign-off never went to
  * the PIC (no sending, no answer) — the team completed them; the link is theirs for the work (②b-2d). */
-export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other'>> & { work?: readonly PicWork[] }): PicStep[] {
+export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' | 'reply'> & Partial<Pick<PicPage, 'you' | 'both' | 'ok' | 'other' | 'kind'>> & { work?: readonly PicWork[] }): PicStep[] {
   const approved = p.status !== 'waiting_pic' && p.status !== 'changes'
   if (approved && !p.sentAt && !p.reply) {
     return [
       { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
       { label: 'Minutes completed by the team', state: 'done', date: '', sub: '' },
-      workStep(p.work ?? [], approved),
+      workStep(p.work ?? [], approved, p.kind),
     ]
   }
   // The answer was theirs, or the other PIC's (either one's counts — the user's answer 29).
@@ -332,13 +338,16 @@ export function picTimeline(p: Pick<PicPage, 'status' | 'startedAt' | 'sentAt' |
     { label: 'Kick-off meeting', state: 'done', date: day(p.startedAt), sub: '' },
     { label: 'Minutes sent to you', state: 'done', date: day(p.sentAt), sub: '' },
     yours,
-    workStep(p.work ?? [], approved),
+    workStep(p.work ?? [], approved, p.kind),
   ]
 }
 
-/** The last step: the work to come — or, once under way, how far it has come (②b-2d). */
-function workStep(work: readonly PicWork[], approved: boolean): PicStep {
-  if (!work.length) return { label: 'Work starts', state: approved ? 'cur' : 'next', date: '', sub: approved ? 'The team is planning the work' : '' }
+/** The last step: the work to come — or, once under way, how far it has come (②b-2d). A task's starts with the approval
+ * (②a-4): a series' first run may be weeks off. */
+function workStep(work: readonly PicWork[], approved: boolean, kind: PicPage['kind'] = 'product'): PicStep {
+  if (!work.length) {
+    return { label: 'Work starts', state: approved ? 'cur' : 'next', date: '', sub: !approved ? '' : kind === 'product' ? 'The team is planning the work' : 'The work is scheduled' }
+  }
   const done = work.filter(w => w.status === 'done').length
   const waiting = workWaiting(work)
   return { label: 'The work', state: done >= work.length ? 'done' : 'cur', date: '', sub: `${done} of ${work.length} done${waiting ? ` · ${waiting} waiting for you` : ''}` }

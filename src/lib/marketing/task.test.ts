@@ -214,6 +214,39 @@ describe('opened from another project', () => {
   })
 })
 
+// 2026-10-25 — ②a-4: the PIC approving a task's minutes (the user's answers 52, 53) — read, and said on its trail.
+describe('the PIC approving a task’s minutes', () => {
+  const pm = { status: 'waiting_pic', pic: 'Kelvin Tan', whatsapp: '012-345 6789', pic2: '', whatsapp2: '', link: 'a'.repeat(32), link2: null,
+    sentAt: '2026-10-26T01:00:00Z', reply: { decision: 'changes', name: 'Kelvin Tan', reason: 'Green', at: '2026-10-26T02:00:00Z', pic: 2 },
+    override: { by: 'SIA', at: null, reason: 'Phone' }, ok: { 1: { name: 'Kelvin Tan', at: null } }, edited: 'Agenda' }
+  it('reads where it stands — none for a task the PIC does not approve', () => {
+    const p = taskFromRow(row([stage(0, {})], { picMinutes: pm }))!.project.picMinutes
+    expect(p).toEqual({ ...pm, reply: { ...pm.reply, decision: 'changes', pic: 2 }, ok: { 1: { name: 'Kelvin Tan', at: null } } })
+    expect(taskFromRow(row([stage(0, {})]))!.project.picMinutes).toBeNull()
+    expect(taskFromRow(row([stage(0, {})], { picMinutes: { status: 'nonsense' } }))!.project.picMinutes)
+      .toMatchObject({ status: 'active', pic: '', link: null, reply: null, override: null, edited: null })
+  })
+
+  it('words the minutes’ way to the PIC and back — a stage’s own approval on the link as before', () => {
+    const page = taskFromRow(row([stage(0, {})]))!
+    const ev = (action: string, more: Partial<Parameters<typeof eventText>[0]> = {}) =>
+      eventText({ id: 1, at: '', actor: 'Mei', action, stage: null, stageName: null, fromTo: null, reason: null, version: null, data: null, ...more }, page)
+    expect(ev('created', { data: { kind: 'quick', stages: 2, minutes: 'Kickoff', pic: 'Kelvin Tan' } }))
+      .toBe('Mei created quick task "Price update" · 2 stages · Kickoff minutes for Kelvin Tan (PIC) to approve')
+    expect(ev('link sent', { reason: 'Kelvin Tan' })).toBe('Mei sent the minutes to Kelvin Tan · tracking link')
+    expect(ev('resent', { reason: 'Kelvin Tan and Hana Lee' })).toBe('Mei resent the minutes to Kelvin Tan and Hana Lee')
+    expect(ev('pic approved', { actor: 'Kelvin Tan (PIC)', reason: 'Kickoff' })).toBe('Kelvin Tan (PIC) approved the Kickoff minutes on the link')
+    expect(ev('pic approved', { actor: 'Kelvin Tan (PIC)', reason: 'Kickoff', data: { waiting: 'Hana Lee' } }))
+      .toBe('Kelvin Tan (PIC) approved the Kickoff minutes on the link · waiting for Hana Lee')
+    expect(ev('pic changes', { actor: 'Kelvin Tan (PIC)', reason: 'Green banner' })).toBe('Kelvin Tan (PIC) asked for changes to the minutes on the link: "Green banner"')
+    expect(ev('pic approved', { actor: 'Kelvin Tan (PIC)', stage: 0, stageName: 'Design', version: 'v2' })).toBe('Kelvin Tan (PIC) approved Design v2 on the link')
+    expect(ev('edited after approval', { reason: 'Agenda' })).toBe('Mei changed Agenda after approval · back to the PIC')
+    expect(ev('started before approval', { actor: 'SIA', reason: 'Phone' })).toBe('SIA started before PIC approval: "Phone"')
+    expect(ev('work started', { actor: 'Kelvin Tan (PIC)', data: { stages: 2 } })).toBe('The work started · its stages dated from today')
+    expect(ev('work started', { actor: 'Kelvin Tan (PIC)', data: { runs: 3 } })).toBe('The work started · 3 runs made from today')
+  })
+})
+
 // 2026-10-25 — a review's find: New Project stayed mounted from ?from=A to the top bar's + New Project, its source kept.
 describe('New Project’s own for each address', () => {
   it('a different source, subsidiary or client form is a new one; the same address the same', () => {

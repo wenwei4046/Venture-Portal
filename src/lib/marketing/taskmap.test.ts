@@ -212,3 +212,80 @@ describe('a deliverable’s map', () => {
     expect(m.nodes[0]).toMatchObject({ id: 'src', title: 'TSK-CAR-2610-004', person: 'Mei', handoff: 'Quick task' })
   })
 })
+
+// 2026-10-25 — a task written with meeting minutes (②a-3) has their station after Created; the PIC approving them (②a-4 —
+// the user's answers 52, 53) adds 🔗 their gate before the first stage: sent back red, gone round dashed when the manager
+// started before approval.
+describe('a task written with meeting minutes', () => {
+  const MIN = { id: 'm1', project: 'p9', title: 'Kickoff', intake: true, status: 'completed', locked: true, rev: 3, vals: {}, signed: {}, notes: '',
+    completedAt: '2026-10-26T03:00:00Z', template: { id: 't1', version: 1, name: 'Kickoff', fields: [], rules: { sign: false } } }
+  const PM = { pic: 'Kelvin Tan', whatsapp: '012-345 6789', pic2: '', whatsapp2: '', link: 'a'.repeat(32), link2: null, sentAt: '2026-10-26T01:00:00Z',
+    reply: null, override: null, ok: null, edited: null }
+  const of = (status: string, events: ReturnType<typeof ev>[], pm: Record<string, unknown> | null, minutes: Record<string, unknown> = {}) => taskMap(taskFromRow({
+    ...raw,
+    project: { id: 'p9', trackId: 'TSK-CAR-2610-009', kind: 'quick', sub: 'sub', title: 'Raya push', status, owner: RACHEL, cur: 0, createdAt: '2026-10-26T00:00:00Z', free: [],
+      picMinutes: pm ? { status, ...PM, ...pm } : null },
+    stages: [{ project: 'p9', idx: 0, name: 'Design', dept: 'GRAPHIC DESIGNER', owner: SITI, appr: [], mode: 'person', status: status === 'active' ? 'todo' : 'planned',
+      dueOn: status === 'active' ? '2026-10-27' : null, work: { notes: '', links: [] } }],
+    events, minutes: { ...MIN, ...minutes },
+  }) as MktTaskPage)
+  const created = ev(1, '2026-10-26T00:00:00Z', 'Rachel', 'created', { data: { kind: 'quick', stages: 1, minutes: 'Kickoff' } })
+  const sent = ev(2, '2026-10-26T01:00:00Z', 'Rachel', 'link sent', { reason: 'Kelvin Tan' })
+  const edge = (m: ReturnType<typeof taskMap>, key: string) => m.edges.find(e => e.key === key)
+
+  it('no PIC asked: the minutes’ station after Created — the first stage opened from it', () => {
+    const m = of('active', [created, ev(2, '2026-10-26T00:00:00Z', 'Rachel', 'opened', { stage: 0, stageName: 'Design', fromTo: 'Siti' })], null)
+    expect(m.nodes.map(n => n.id)).toEqual(['start', 'min', 's0'])
+    expect(m.nodes[1]).toMatchObject({ title: 'Meeting minutes', full: 'Meeting minutes · Kickoff', tone: 'done', status: 'Done', handoff: 'Written on New Project' })
+    expect(m.lanes.some(l => l.id === 'appr')).toBe(false)
+    expect([edge(m, 'start>min')?.kind, edge(m, 'min>s0')?.kind]).toEqual(['solid', 'solid'])
+    expect(m.stations.min.facts.find(f => f[0] === 'Approval')?.[1]).toBe('— No PIC sign-off')
+    expect(replayAt(m, 2).lit.has('min>s0')).toBe(true)
+  })
+
+  it('sent to the PIC: 🔗 their gate waiting before the first stage — the stage still ahead', () => {
+    const m = of('waiting_pic', [created, sent], {}, { status: 'sent', completedAt: null, locked: false })
+    expect(m.nodes.map(n => n.id)).toEqual(['start', 'min', 'pic', 's0'])
+    expect(m.lanes[0].id).toBe('appr')
+    expect(m.nodes[2]).toMatchObject({ kind: 'gate', lane: 'appr', icon: '🔗', title: 'approves the minutes', person: 'Kelvin Tan (PIC)', current: true,
+      status: 'Waiting for Kelvin Tan (PIC)', date: 'Since 26 Oct' })
+    expect(m.nodes[1]).toMatchObject({ tone: 'done', status: 'Done' })
+    expect(m.nodes[3]).toMatchObject({ future: true, current: false })
+    expect([edge(m, 'min>pic')?.kind, edge(m, 'pic>s0')?.kind]).toEqual(['solid', 'future'])
+    expect(replayAt(m, 2)).toMatchObject({ at: 'pic' })
+    expect(m.stations.min.facts.find(f => f[0] === 'Approval')?.[1]).toBe('🔗 Kelvin Tan (PIC)')
+  })
+
+  it('sent back: a red line round to the minutes, written again there', () => {
+    const back = ev(3, '2026-10-26T02:00:00Z', 'Kelvin Tan (PIC)', 'pic changes', { reason: 'Green banner please' })
+    const m = of('changes', [created, sent, back], { reply: { decision: 'changes', name: 'Kelvin Tan', reason: 'Green banner please', at: '2026-10-26T02:00:00Z', pic: 1 } },
+      { status: 'sent', completedAt: null, locked: false })
+    expect(edge(m, 'pic>min~back')).toMatchObject({ kind: 'return', label: 'returned ×1' })
+    expect(m.nodes[1]).toMatchObject({ tone: 'red', current: true, status: 'Changes requested', tag: 'returned ×1' })
+    expect(m.nodes[2]).toMatchObject({ tone: 'red', current: false, status: 'Changes requested' })
+    expect(replayAt(m, 3).at).toBe('min')
+  })
+
+  it('approved: the gate done, the first stage opened from it', () => {
+    const ok = ev(3, '2026-10-26T03:00:00Z', 'Kelvin Tan (PIC)', 'pic approved', { reason: 'Kickoff' })
+    const begun = ev(4, '2026-10-26T03:00:00Z', 'Kelvin Tan (PIC)', 'work started', { data: { stages: 1 } })
+    const opened = ev(5, '2026-10-26T03:00:00Z', 'Kelvin Tan (PIC)', 'opened', { stage: 0, stageName: 'Design', fromTo: 'Siti' })
+    const m = of('active', [created, sent, ok, begun, opened], { reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-26T03:00:00Z', pic: 1 } })
+    expect(m.nodes[2]).toMatchObject({ tone: 'done', current: false, status: 'Approved', date: '26 Oct' })
+    expect(m.nodes[3]).toMatchObject({ current: true })
+    expect(edge(m, 'pic>s0')).toMatchObject({ kind: 'solid', label: null })
+    expect(replayAt(m, 5).lit.has('pic>s0')).toBe(true)
+    expect(m.stations.pic.audit.map(a => a.e)).toEqual([
+      'Rachel sent the minutes to Kelvin Tan · tracking link', 'Kelvin Tan (PIC) approved the Kickoff minutes on the link', 'The work started · its stages dated from today',
+    ])
+  })
+
+  it('started before approval: round the gate, dashed and said so', () => {
+    const over = ev(3, '2026-10-26T03:00:00Z', 'Rachel', 'started before approval', { reason: 'Kelvin confirmed by phone' })
+    const opened = ev(4, '2026-10-26T03:00:00Z', 'Rachel', 'opened', { stage: 0, stageName: 'Design', fromTo: 'Siti' })
+    const m = of('active', [created, sent, over, opened], { override: { by: 'Rachel', at: '2026-10-26T03:00:00Z', reason: 'Kelvin confirmed by phone' } },
+      { status: 'sent', completedAt: null, locked: false })
+    expect(m.nodes[2]).toMatchObject({ status: 'Started before approval', current: false })
+    expect(edge(m, 'pic>s0')).toMatchObject({ kind: 'dashed', label: 'started before approval' })
+  })
+})

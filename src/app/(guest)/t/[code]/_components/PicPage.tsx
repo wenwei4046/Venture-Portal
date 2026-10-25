@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
-  bothState, dateWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
+  bothState, dateWords, kindWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
 } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
 import PicWork from './PicWork'
@@ -97,7 +97,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
     <div className={`mkt-pic ${s.root}`}>
       {top}
       <main className={s.main}>
-        <div className={s.sub}>{[page.sub, page.product].filter(Boolean).join(' · ')}</div>
+        <div className={s.sub}>{[page.sub, kindWords(page)].filter(Boolean).join(' · ')}</div>
         <h1 className={s.title}>{page.title}</h1>
         <div className={s.idRow}>
           <span className={s.track}>{page.track}</span>

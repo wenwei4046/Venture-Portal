@@ -6,13 +6,16 @@
 // 🔓 picked by the stage's owner, a dashed line to it), then the stage's mini gate Review delivery — a delivery's line up
 // to it, a return's red line back. A project opened from another (④-4c — answer 23) starts at that one: its station
 // before Created (tagged *Opened from*), a line to it, its panel opening it — a deliverable at its product project
-// (④-4d: the handoff's *Requested — Opened from Social Media project*). Drawn from the task page (its stages,
-// approvers, subtasks and trail). Pure. A product project's own map: productmap.ts.
+// (④-4d: the handoff's *Requested — Opened from Social Media project*). A task written with meeting minutes (②a-3) has
+// their station after Created, and — the PIC approving them (②a-4) — 🔗 the PIC's gate before its first stage, sent
+// back with a red line, or round it, dashed, when the manager started before approval. Drawn from the task page (its
+// stages, approvers, subtasks and trail). Pure. A product project's own map: productmap.ts.
 
 import { officeTime } from '@/lib/office-time'
 import { KIND_WORDS, shortDay, STATUS_WORDS, type MktSource, type MktSubtask } from './board'
 import { groupEmoji, groupLabel, groupTone, type MktTone } from './groups'
 import { eventText, nameOf, trailTime, type MktTaskPage, type TaskEvent, type TaskProject } from './task'
+import { minutesState, picWho } from './task-minutes'
 
 /** 'appr', or a group (a People title; '—' for a stage of none). */
 export type MapLaneId = string
@@ -124,10 +127,18 @@ export function taskMap(page: MktTaskPage): TaskMap {
   const active = p.status === 'active'
   const created = events.find(e => e.action === 'created')
   const src = originOf(p)
+  // Its meeting minutes (②a-3), and the PIC approving them (②a-4) — a run's, its series'.
+  const doc = page.minutes
+  const pm = p.picMinutes
+  const pics = pm ? picWho(pm, !!doc?.template.rules.picAll && !!pm.pic2) : ''
+  const picOk = pm?.reply?.decision === 'approved' && pm.status !== 'waiting_pic' && pm.status !== 'changes'
+  // Started before the PIC approved (the manager's): the line round the gate.
+  const skipped = !!pm?.override && !picOk
 
-  // ── The road: where it was opened from, the start, then each stage — its subtasks off to the side, its Review
-  // delivery — and its approvers ──
-  const road: RoadItem[] = [...(src ? [{ id: 'src', kind: 'card' as const, stage: null, level: -1 }] : []), { id: 'start', kind: 'card', stage: null, level: -1 }]
+  // ── The road: where it was opened from, the start, its minutes and the PIC's gate, then each stage — its subtasks off
+  // to the side, its Review delivery — and its approvers ──
+  const road: RoadItem[] = [...(src ? [{ id: 'src', kind: 'card' as const, stage: null, level: -1 }] : []), { id: 'start', kind: 'card', stage: null, level: -1 },
+    ...(doc ? [{ id: 'min', kind: 'card' as const, stage: null, level: -1 }] : []), ...(doc && pm ? [{ id: 'pic', kind: 'gate' as const, stage: null, level: -1 }] : [])]
   const subsOf = (idx: number) => page.subtasks.filter(t => t.stage === idx)
   for (const s of stages) {
     road.push({ id: `s${s.idx}`, kind: 'card', stage: s.idx, level: -1 })
@@ -181,6 +192,44 @@ export function taskMap(page: MktTaskPage): TaskMap {
         // a run has no created record).
         if (src) meta.set(flowKey('src', 'start'), mk(e, e.actor || '—'))
         at = 'start'
+        // Written with its minutes: they open with it.
+        if (doc) {
+          lit.push(flowKey('start', 'min'))
+          meta.set(flowKey('start', 'min'), mk(e, `${e.actor || '—'} → ${who(p.owner)}`))
+          at = 'min'
+        }
+        break
+      // Its minutes (②a-3) and their way to the PIC (②a-4) — a stage's own approval on the link stays its card's.
+      case 'signed': case 'minutes completed':
+        if (doc) note('min', e)
+        break
+      case 'link sent': case 'resent': case 'edited after approval':
+        if (!doc || !pm) break
+        note('min', e)
+        note('pic', e)
+        lit.push(flowKey('min', 'pic'))
+        meta.set(flowKey('min', 'pic'), mk(e, `${e.actor || '—'} → ${pics}`))
+        at = 'pic'
+        break
+      case 'pic changes': {
+        if (i != null || !pm) { if (card) note(card, e); break }
+        note('pic', e)
+        note('min', e)
+        const key = backKey('pic', 'min')
+        backs.set(key, { from: 'pic', to: 'min', n: (backs.get(key)?.n ?? 0) + 1, meta: mk(e, `${e.actor || '—'} → ${who(p.owner)}`) })
+        lit.push(key)
+        at = 'min'
+        break
+      }
+      case 'pic approved':
+        if (i != null || !pm) { if (card) note(card, e); break }
+        // The work starts with it — the first stage's 'opened' lights the line on.
+        note('pic', e)
+        at = 'pic'
+        break
+      case 'started before approval': case 'work started':
+        if (pm) note('pic', e)
+        else if (card) note(card, e)
         break
       case 'opened': {
         if (!card) break
@@ -328,7 +377,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
   // ── The stations as the database has them now ─────────────────────────────────
   const lanesUsed: MapLaneId[] = []
   const addLane = (l: MapLaneId) => { if (!lanesUsed.includes(l)) lanesUsed.push(l) }
-  if (stages.some(s => s.appr.length)) addLane('appr')
+  if (stages.some(s => s.appr.length) || (doc && pm)) addLane('appr')
   const laneOf = (dept: string | undefined) => dept || '—'
   const startLane: MapLaneId = laneOf(stages[0]?.dept)
   addLane(startLane)
@@ -345,6 +394,33 @@ export function taskMap(page: MktTaskPage): TaskMap {
         id: 'start', kind: 'card', lane: startLane, col, title: 'Created', full: `Created by ${by}`, person: by, icon: '',
         date: day(created?.at ?? p.createdAt), tone: 'done', current: false, future: false, tag: null, stage: null,
         handoff: src ? `Opened from ${src.trackId}` : 'Created', status: 'Done',
+      }
+    }
+    if (r.id === 'min' && doc) {
+      // Its minutes: done once complete — or, the PIC approving them, once sent; back here when the PIC asks for changes.
+      const sentBack = pm?.status === 'changes'
+      const writing = pm ? pm.status === 'minutes' : doc.status !== 'completed'
+      const done = !writing && !sentBack
+      const n = backs.get(backKey('pic', 'min'))?.n ?? 0
+      const words = minutesState(doc, who, null).label
+      return {
+        id: 'min', kind: 'card', lane: startLane, col, title: 'Meeting minutes', full: `Meeting minutes · ${doc.title}`, person: who(p.owner), icon: '',
+        date: done ? day(doc.completedAt ?? pm?.sentAt) : '', tone: done ? 'done' : sentBack ? 'red' : 'waiting', current: !!pm && !done, future: false,
+        tag: n ? `returned ×${n}` : null, stage: null, handoff: 'Written on New Project',
+        status: done ? 'Done' : sentBack ? 'Changes requested' : words === 'Draft' ? (pm ? 'Ready to send · now here' : 'Draft') : words,
+      }
+    }
+    if (r.id === 'pic' && pm) {
+      // 🔗 The PIC approving them: waiting since they were sent, approved — or gone round, started before approval.
+      const waiting = pm.status === 'waiting_pic'
+      const sentBack = pm.status === 'changes'
+      const half = waiting && doc ? minutesState(doc, who, pm).label : ''
+      return {
+        id: 'pic', kind: 'gate', lane: 'appr', col, title: 'approves the minutes', full: `${pics} approves the minutes`, person: pics, icon: '🔗',
+        date: picOk ? day(pm.reply?.at) : waiting && pm.sentAt ? `Since ${day(pm.sentAt)}` : '',
+        tone: picOk ? 'done' : waiting ? 'waiting' : sentBack ? 'red' : 'draft', current: waiting, future: !picOk && !waiting && !sentBack && !pm.sentAt,
+        tag: null, stage: null, handoff: 'PIC via link',
+        status: waiting ? half || `Waiting for ${pics}` : picOk ? 'Approved' : skipped ? 'Started before approval' : sentBack ? 'Changes requested' : 'Planned',
       }
     }
     const s = stages.find(x => x.idx === r.stage)!
@@ -420,12 +496,14 @@ export function taskMap(page: MktTaskPage): TaskMap {
     const reached = !target.future
     const s = stages.find(x => x.idx === target.stage)
     const picked = target.kind === 'card' && s?.mode === 'prev'
+    // Round the PIC's gate: started before they approved (②a-4).
+    const round = from === 'pic' && skipped && reached
     edges.push({
       key: flowKey(from, to), from, to,
-      kind: !reached ? 'future' : picked ? 'dashed' : 'solid',
+      kind: !reached ? 'future' : picked || round ? 'dashed' : 'solid',
       // The line from where it was opened goes unlabelled: the two share a lane, its label would sit under *Created* —
       // the source's card says *Opened from*.
-      label: reached && picked ? `picked by ${byId.get(before(to) ?? '')?.person ?? '—'}` : null,
+      label: round ? 'started before approval' : reached && picked ? `picked by ${byId.get(before(to) ?? '')?.person ?? '—'}` : null,
       meta: meta.get(flowKey(from, to)) ?? null,
     })
   }
@@ -455,6 +533,7 @@ export function taskMap(page: MktTaskPage): TaskMap {
     const s = n.stage != null ? stages.find(x => x.idx === n.stage) : null
     const t = subById.get(n.id)
     const approval = t || n.mini ? `👤 ${who(s?.owner)} reviews the delivery`
+      : n.id === 'min' ? (pm ? `🔗 ${pics}` : '— No PIC sign-off')
       : n.kind === 'gate' ? (n.icon === '🔗' ? '🔗 PIC approves via link' : '👤 Internal approver')
       : s && s.appr.length ? s.appr.map(a => (a.kind === 'pic' ? `🔗 ${picName}` : `👤 ${who(a.staff)}`)).join(' → ') : '— No approval'
     const due = t ? t.dueOn : s?.dueOn
